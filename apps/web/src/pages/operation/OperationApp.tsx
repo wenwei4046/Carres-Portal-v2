@@ -20,7 +20,7 @@ import OperationDashboard from "./OperationDashboard";
 // SEPARATE ROUTES, and the swap-one-identifier trick that Stage 1 used is
 // retired with it:
 //
-//   /operation/orders      →  SalesOrdersRegister    the OFFICIAL Sales Orders
+//   /operation/orders      →  SalesOrdersOutright    the OFFICIAL Sales Orders
 //   /operation/old-orders  →  OperationOrdersControl the TEMPORARY door
 //
 // The old page is NOT deleted and NOT hidden — the cutover is a strangler

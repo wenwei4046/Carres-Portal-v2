@@ -315,7 +315,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       {
         // SO-5 (Loo, 2026-08-09) — the page is Sales Orders and the door says so.
         // ⭐ PRODUCTION CUTOVER (owner, 2026-08-10) — this door is the NEW
-        // Sales Order register (`SalesOrdersRegister`), and it is the OFFICIAL
+        // Sales Order list (`so-outright/SalesOrdersOutright`), and it is the OFFICIAL
         // customer-order entry. The old control table kept a temporary door
         // beside it until the 2026-09-23 ruling took that row off the rail.
         //

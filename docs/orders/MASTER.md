@@ -7102,26 +7102,25 @@ The current operating composition below uses UI MASTER's confirmed shared templa
 Creation stays in the Sales Portal; Operation does not regain a New Sales Order or Copy order door.
 The acceptance matrix records current implementation and proof, not a new Blueprint or new business law.
 
-- Order list rail: Order summary (Sales orders, Total payable, Paid to date, Balance due), then
-  Customer’s original requested delivery shortcuts. Both start open. Summary labels sit left and values
-  right; count uses text-strong, money has tabular digits and never wraps. Missing-amount notices
-  remain visible only when needed. Summary and Table/Cards use the same filtered loaded result;
-  incomplete scope remains in the summary tooltip/register count. Payment, Delivery and Stock
-  Status filters live in columns. Monthly demand keeps its own single-choice filters and views.
-- Table/Cards use the kit icon16 with visible words, including the selection toolbar. Search,
-  selection, columns, filters and output remain on the shared Register engine. List Cards and Table
-  read the same `registerDeliveryConditionOf` fact; this is not final-leg readiness or release proof.
-  An explicit empty initial search clears a remembered grid search; an omitted initial search still
-  restores it. URL search also clears the server query, including after a monthly drill-down.
-- Row click and Cards View open `CompactModuleCard` in the kit Drawer. One customer header carries
-  name, SO, phone, independent sales/address expansion, source requested date plus Malaysia-day
-  countdown, saved-version document, full-order door and Close. The visible SO document button owns
-  initial focus; no hidden duplicate Close is focusable. Phone icon and number wrap together.
-  Info starts with sales/address open and Total payable/Paid to date/Balance due. Delivery starts with header
-  details closed and Stock/Logistics/Customer/DO. Items, Communication and Timeline start closed. The SO Info details panel is removed; Email, Dealer, repeated statuses and document lineage are not shown in Info;
-  Items owns only goods/services, Unit price, Qty, two-decimal Amount and source Stock Status.
-  Services read Service for stock. Building type, Floor, named Lift and stair carry stay recorded
-  facts; missing stair carry is Not recorded, never a fabricated0.
+- Order list (owner 9 Oct 2026, v12 kit 11 Oct; UI MASTER §0 and §6.0): Sales Order Outright,
+  `Open · Delivered · All`, one view button (`Sales Order` · `Overview` · `Payment` · `Stock` ·
+  `Warehouse` · `Delivery`), and the Summary and Tasks panels, each collapsible. The list is the one
+  listing engine (`register/DataGrid`, 15 Oct 2026): per-column sort, header value filters kept in
+  the address, `Columns` and `Group by` (Delivery, Stock or Payment Status) in its ⋮ menu, ticks, the
+  row menu `View · Print · Cancel SO`, and every PO, Delivery Order and Receipt number opens its own
+  record. The footer gives the order count and the goods quantities; money totals live in the
+  Summary. Row click opens the full Sales Order (Ctrl/⌘-click: a new tab). Monthly demand lives on
+  Purchase Orders and opens this list narrowed on the customer's original requested delivery. The
+  earlier register (Order summary rail, Table/Cards, row quick card) was retired on 15 Oct 2026.
+- The SO quick card (`CompactModuleCard` in the kit Drawer, `SalesOrderCompactView`) keeps its
+  approved content but has no entry point since the list opens the full Sales Order: one customer
+  header carries name, SO, phone, independent sales/address expansion, source requested date plus
+  Malaysia-day countdown, saved-version document, full-order door and Close. Info starts with
+  sales/address open and Total payable/Paid to date/Balance due. Delivery starts with header details
+  closed and Stock/Logistics/Customer/DO. Items, Communication and Timeline start closed. Items owns
+  only goods/services, Unit price, Qty, two-decimal Amount and source Stock Status. Services read
+  Service for stock. Building type, Floor, named Lift and stair carry stay recorded facts; missing
+  stair carry is Not recorded, never a fabricated0.
 - Delivery reads the existing Monitor projection for the final customer leg, excluding services
   from goods readiness. Known-order viewing retains completed source facts without adding them to Monitor work. Only operation/principal may edit unsettled, non-cancelled and non-completed scopes and the
   existing server gates remain authoritative. Customer date/time is separate from crew ETA.

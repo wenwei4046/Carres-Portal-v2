@@ -140,6 +140,12 @@
   box-sizing: border-box;
   height: var(--table-head-h);
 }
+/* A two-line header (`headerSub`, `headerLines`) stays inside the 40 header
+   (01 §5): 3 above and below its two 16px lines, where one line keeps 6. */
+.rootReference .th.thTwoLine {
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
 .rootReference .td {
   box-sizing: border-box;
   height: var(--grid-cell-h);
@@ -1730,4 +1736,21 @@ div:first-child > .columnsMenuGroup {
 .rootLookFinance .tr.trSelected:not(.trExpansion):hover > .td,
 .rootLookFinance .tr.trSelected:not(.trExpansion):hover > .stickyCell {
   background: var(--fin-select-bg);
+}
+
+/* The opened row's one frame (`expandable.frame`, 01 §5): drawn over the row
+   and its items, 5 in from each side, above the cells and under the sticky
+   header; it never takes a click. */
+.openFrame {
+  position: absolute;
+  left: 5px;
+  z-index: 1;
+  border: 1px solid var(--c-open-frame);
+  border-radius: 8px;
+  pointer-events: none;
+}
+/* The status footer may take two lines (a long Qty line, 01 §5 Footer). */
+.rootReference .statusLine {
+  height: auto;
+  min-height: var(--table-foot-h);
 }
