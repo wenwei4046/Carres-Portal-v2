@@ -4,7 +4,7 @@
  * `c-*` token from `carres-tokens.css`; nothing here borrows a kit colour.
  *
  *   Card      white · 1px card border · radius 8 · pad 14 16 · no shadow
- *   KvRow     label left grey 13 · value right ink 500 · rows ≥32px · thin line
+ *   KvRow     label 150 left grey 12 · value ink 13 / 500 · rows ≥36px (01 §5.1) · thin line
  *   Buttons   main h34 charcoal · normal h34 white · toolbar h32 · icon 36 round
  *   Drawer    right · top/bottom 12 · w400 · shadow-drawer · backdrop
  *   Menu      white · radius 8 · shadow-menu · pad 6 · item pad 7 10 · 13/500
@@ -54,7 +54,7 @@ export function CardTitle({ children, note, right }: { children: ReactNode; note
   );
 }
 
-/** One label · value row, separated from the one above by a thin line. */
+/** One label · value row, 36 minimum (01 §5.1 field row), separated from the one above by a thin line. */
 export function KvRow({
   label,
   value,
@@ -85,7 +85,7 @@ export function KvRow({
   const showEditor = editing && Boolean(editor) && (open || changed);
   return (
     <div
-      className="grid min-h-8 grid-cols-[150px_minmax(0,1fr)] items-center gap-4 border-t border-c-section-line py-[7px] text-[13px] leading-[18px]"
+      className="grid min-h-9 grid-cols-[150px_minmax(0,1fr)] items-center gap-4 border-t border-c-section-line py-[7px] text-[13px] leading-[18px]"
       data-testid={testId}
     >
       <span className="text-[12px] leading-4 text-c-secondary">{label}</span>
