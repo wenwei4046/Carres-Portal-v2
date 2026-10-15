@@ -122,9 +122,25 @@ export default function PortalSidebar({ drawer = false }: {
       return false;
     }
   });
+  // 01 §4: a Sales Order detail below 1100 uses the 64px rail. This
+  // temporary layout must not overwrite the person's list preference.
+  const [narrowDetail, setNarrowDetail] = useState(() => window.innerWidth < 1100);
+  useEffect(() => {
+    const measure = () => setNarrowDetail(window.innerWidth < 1100);
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+  const isSalesOrderDetail = /^\/operation\/orders\/so\/(?!new(?:\/|$))[^/]+/.test(location.pathname);
+  const [detailExpanded, setDetailExpanded] = useState(false);
+  useEffect(() => setDetailExpanded(false), [location.pathname, narrowDetail]);
+  const autoDetail = isSalesOrderDetail && narrowDetail;
   /* A drawer is always the named rail. */
-  const collapsed = drawer ? false : storedCollapsed;
-  const toggleCollapse = () =>
+  const collapsed = drawer ? false : autoDetail ? !detailExpanded : storedCollapsed;
+  const toggleCollapse = () => {
+    if (autoDetail) {
+      setDetailExpanded((expanded) => !expanded);
+      return;
+    }
     setCollapsed((c) => {
       const next = !c;
       try {
@@ -134,6 +150,7 @@ export default function PortalSidebar({ drawer = false }: {
       }
       return next;
     });
+  };
 
   // Badge counts — operation area only. `enabled` keeps a finance-only user
   // from hitting /api/operation/badges (it would 403).

@@ -1704,3 +1704,29 @@ describe("Showroom operator destinations", () => {
     expect(within(tree).queryByRole("link", { name: /^Dealer$/ })).not.toBeInTheDocument();
   });
 });
+
+// Detail auto-fit is temporary; lists keep the person's saved menu choice.
+describe("PortalSidebar — Sales Order detail fit", () => {
+  it("uses 64px below 1100 and restores the named menu on return", () => {
+    const previousWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1025 });
+    function ReturnToList() {
+      const navigate = useNavigate();
+      return <button onClick={() => navigate("/operation/orders")}>Return to list</button>;
+    }
+    try {
+      render(<MemoryRouter initialEntries={["/operation/orders/so/test-order"]}>
+        <PortalSidebar /><ReturnToList />
+      </MemoryRouter>);
+      expect(screen.getByTestId("portal-sidebar")).toHaveStyle({ width: "64px" });
+      expect(localStorage.getItem(COLLAPSE_KEY)).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Expand menu" }));
+      expect(screen.getByTestId("portal-sidebar")).toHaveStyle({ width: "220px" });
+      expect(localStorage.getItem(COLLAPSE_KEY)).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Return to list" }));
+      expect(screen.getByTestId("portal-sidebar")).toHaveStyle({ width: "220px" });
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: previousWidth });
+    }
+  });
+});

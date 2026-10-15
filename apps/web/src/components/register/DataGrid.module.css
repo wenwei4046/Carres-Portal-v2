@@ -137,6 +137,7 @@
   min-width: 0;
 }
 .rootReference .th {
+  color: var(--c-secondary);
   box-sizing: border-box;
   height: var(--table-head-h);
 }
