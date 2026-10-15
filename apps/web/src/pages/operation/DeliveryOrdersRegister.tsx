@@ -300,7 +300,7 @@ function CountButton({
       type="button"
       data-testid={testId}
       title={title}
-      className="inline-flex h-[22px] items-center gap-1 rounded-control border border-kit-slate-6 bg-white px-1.5 text-label font-medium text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
+      className="inline-flex h-[22px] items-center gap-1 rounded-control border border-kit-slate-6 bg-white px-1.5 text-meta font-medium text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
       onClick={(event) => {
         event.stopPropagation();
         onClick();
@@ -308,7 +308,7 @@ function CountButton({
     >
       <Glyph size={12} strokeWidth={1.75} aria-hidden />
       <span>{label}</span>
-      <span className="tabular-nums font-semibold">{count}</span>
+      <span className="tabular-nums">{count}</span>
     </button>
   );
 }
@@ -373,7 +373,7 @@ function DriverSubmissionCell({
           </>
         )}
       </span>
-      <span className="block truncate text-label font-normal">
+      <span className="block truncate text-meta">
         {!row.intermediateLeg || row.signedDoPresent ? <SignedDeliveryDocumentLink doNumber={row.doNumber} present={row.signedDoPresent} /> : null}
       </span>
     </span>
@@ -434,7 +434,7 @@ function QueueAction({
     <button
       type="button"
       data-testid={queue === "check_proof" ? "do-queue-check-proof" : "do-queue-open-delivery-order"}
-      className="inline-flex h-7 max-w-full items-center gap-1.5 rounded-control border border-kit-slate-6 bg-white px-2 text-label font-medium text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
+      className="inline-flex h-7 max-w-full items-center gap-1.5 rounded-control border border-kit-slate-6 bg-white px-2 text-body font-medium text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
       onClick={(event) => {
         event.stopPropagation();
         onOpenDeliveryOrder(row);
@@ -688,7 +688,7 @@ export default function DeliveryOrdersRegister() {
               <StatusPill tone={STATUS_TONE[r.status.kind]}>{r.status.label}</StatusPill>
               {detail ? (
                 <span
-                  className="block truncate text-label font-normal text-base-600"
+                  className="block truncate text-meta text-base-600"
                   title={detail}
                   data-testid="do-status-detail"
                 >
@@ -888,7 +888,10 @@ export default function DeliveryOrdersRegister() {
             {
               key: "queue_action",
               label: DO_QUEUE_LABEL[filters.queue],
-              width: 210,
+              /* Content decides the width: the longest door,
+                 `Upload signed Delivery Order` at the button's 13 / 500,
+                 fits whole (it was cut at 210). */
+              width: 250,
               chooserGroup: "Delivery",
               /* A door states nothing, so it carries no funnel: the walk found
                  one offering a single `(blank)` option, whose only possible
@@ -1025,7 +1028,7 @@ export default function DeliveryOrdersRegister() {
               ) : null}
               <button
                 type="button"
-                className="rounded-md border border-base-200 bg-white px-3 py-1.5 text-meta font-medium text-base-700 hover:bg-base-50"
+                className="rounded-md border border-base-200 bg-white px-3 py-1.5 text-body font-medium text-base-700 hover:bg-base-50"
                 onClick={() => void refetch()}
               >
                 {DOR_COPY.tryAgain}

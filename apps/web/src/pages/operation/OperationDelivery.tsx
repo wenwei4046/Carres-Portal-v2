@@ -105,6 +105,7 @@ import { requestedDeliveryText } from "./sales-order-columns";
 import { DATE_TO_BE_CONFIRMED_FULL } from "./sales-order-guidance";
 import { DW, type DeliveryScopeRow } from "./delivery-work";
 import Segmented from "@/components/Segmented";
+import { SEGMENT, SEGMENT_OFF, SEGMENT_ON, SEGMENTED_TRACK } from "@/components/kit/Tabs";
 import {
   DEFAULT_CALENDAR_VIEW,
   DEFAULT_WORK_VIEW,
@@ -328,7 +329,7 @@ function ArrivalCell({ card }: { card: DeliveryMonitorCard }) {
       </span>
       {original ? (
         /* The ORIGINAL stays as context — never deleted, never the headline. */
-        <span className="block truncate text-label text-kit-slate-11">
+        <span className="block truncate text-meta text-kit-slate-11">
           {fmtDate(original)}
         </span>
       ) : null}
@@ -371,8 +372,8 @@ function ContactDeadline({ card }: { card: DeliveryMonitorCard }) {
     : MONITOR_COPY.contactDueSentence(date);
   return (
     <span
-      className={`flex min-w-0 items-center gap-1 text-label ${
-        card.contactOverdue ? "font-medium text-kit-red-11" : "text-kit-slate-11"
+      className={`flex min-w-0 items-center gap-1 text-meta ${
+        card.contactOverdue ? "text-kit-red-11" : "text-kit-slate-11"
       }`}
       data-testid={card.contactOverdue ? "delivery-monitor-contact-late" : "delivery-monitor-contact-due"}
       aria-label={sentence}
@@ -464,23 +465,23 @@ function MonitorCard({ card }: { card: DeliveryMonitorCard }) {
   return (
     <ScheduleCard label={`${card.eventType === "transfer" ? MONITOR_COPY.transferType : MONITOR_COPY.deliveryType} ${so}`} testId={`delivery-monitor-card-${card.scopeId}`} variant={card.eventType === "transfer" ? "secondary" : "standard"}
       header={<>
-        <div className="w-full text-label font-medium text-kit-slate-11">{card.eventType === "transfer" ? MONITOR_COPY.transferType : MONITOR_COPY.deliveryType}</div>
+        <div className="w-full text-label uppercase tracking-[0.06em] text-kit-slate-11">{card.eventType === "transfer" ? MONITOR_COPY.transferType : MONITOR_COPY.deliveryType}</div>
         <div className="min-w-0 break-words font-mono font-medium text-blue-700">
           {card.doNumber ? <div>{card.doNumber}</div> : null}
           <div>{so}</div>
         </div>
-        {card.confirmedTime ? <span className="inline-flex items-center gap-1 text-label text-kit-slate-12">
+        {card.confirmedTime ? <span className="inline-flex items-center gap-1 text-meta text-kit-slate-12">
           <Icon name="waiting" size={14} />{card.confirmedTime}
         </span> : null}
       </>}
-      footer={<Link to={monitorCardHref(card)} aria-label={card.doNumber ? `Open ${card.doNumber}` : `${MONITOR_COPY.editDelivery} ${so}`} className="inline-flex min-h-6 items-center gap-1 text-label text-blue-700 hover:underline">
+      footer={<Link to={monitorCardHref(card)} aria-label={card.doNumber ? `Open ${card.doNumber}` : `${MONITOR_COPY.editDelivery} ${so}`} className="inline-flex min-h-6 items-center gap-1 text-meta text-blue-700 hover:underline">
         {card.doNumber ? MONITOR_COPY.openDo : MONITOR_COPY.editDelivery}<Icon name="open" size={14} />
       </Link>}
     >
-      {stop ? <div className="text-label text-kit-slate-11">
+      {stop ? <div className="text-meta text-kit-slate-11">
         <div className="break-words">From {stop.from_loc || "Not recorded"}</div>
         <div className="break-words">To {stop.to_loc || "Not recorded"}</div>
-      </div> : card.locality ? <div className="break-words text-label text-kit-slate-11">{card.locality}</div> : null}
+      </div> : card.locality ? <div className="break-words text-meta text-kit-slate-11">{card.locality}</div> : null}
       <div className="flex flex-col gap-1">
         {physical.map(line => <div key={line.key} data-testid="schedule-product-line" className="flex items-center justify-between gap-1">
           <CPopover label={line.name} trigger={
@@ -493,7 +494,7 @@ function MonitorCard({ card }: { card: DeliveryMonitorCard }) {
               <div>{line.category}</div>
               <div>{MONITOR_COPY.qty} {line.qty}</div>
               <div>{line.receivedQty == null ? MONITOR_COPY.receiptUnknown : `${MONITOR_COPY.receivedQty} ${line.receivedQty}/${line.qty}`}</div>
-              <div className="text-label text-kit-slate-11">{MONITOR_COPY.receiptMeaning}</div>
+              <div className="text-meta text-kit-slate-11">{MONITOR_COPY.receiptMeaning}</div>
             </div>
           </CPopover>
           <span title={line.receivedQty == null ? MONITOR_COPY.receiptUnknown : `${MONITOR_COPY.receivedQty} ${line.receivedQty}/${line.qty}`}>
@@ -504,11 +505,11 @@ function MonitorCard({ card }: { card: DeliveryMonitorCard }) {
           </span>
         </div>)}
       </div>
-      {services.map(line => <div key={line.key} className="break-words text-label text-kit-slate-11">{line.name} ×{line.qty}</div>)}
-      {card.logisticsPartnerId && card.logisticsPartnerName ? <div className="inline-flex items-center gap-1 text-label text-kit-slate-12" aria-label={`${MONITOR_COPY.partner}: ${card.logisticsPartnerName}`}>
+      {services.map(line => <div key={line.key} className="break-words text-meta text-kit-slate-11">{line.name} ×{line.qty}</div>)}
+      {card.logisticsPartnerId && card.logisticsPartnerName ? <div className="inline-flex items-center gap-1 text-meta text-kit-slate-12" aria-label={`${MONITOR_COPY.partner}: ${card.logisticsPartnerName}`}>
         <Icon name="delivery" size={14} />{card.logisticsPartnerName}
       </div> : null}
-      <div className="min-w-0 break-words text-label" data-testid="schedule-status">
+      <div className="min-w-0 break-words text-meta" data-testid="schedule-status">
         <div className={STATUS_TONE_TEXT[scheduleStatus.progress.tone]}>{scheduleStatus.progress.label}</div>
         {scheduleStatus.supporting ? <div className={STATUS_TONE_TEXT[scheduleStatus.tone]}>{scheduleStatus.supporting}</div> : null}
       </div>
@@ -546,7 +547,7 @@ function MonitorWorkCard({
   const confirmed = card.confirmedDate ? fmtDate(card.confirmedDate) : MONITOR_COPY.notConfirmed;
   const row = (label: string, value: string, muted: boolean) => (
     <div className="flex items-baseline justify-between gap-3">
-      <span className="shrink-0 text-label text-kit-slate-11">{label}</span>
+      <span className="shrink-0 text-meta text-kit-slate-11">{label}</span>
       <span
         className={`min-w-0 truncate text-body ${muted ? "text-kit-slate-11" : "text-kit-slate-12"}`}
         {...(muted ? { "data-absence": "true" } : {})}
@@ -1211,7 +1212,7 @@ export default function OperationDelivery() {
               {/* No reference and no route: NO empty second line — the number
                   sits alone rather than above a placeholder. */}
               {second ? (
-                <span className="block truncate text-label text-kit-slate-11" title={second}>
+                <span className="block truncate text-meta text-kit-slate-11" title={second}>
                   {second}
                 </span>
               ) : null}
@@ -1399,7 +1400,7 @@ export default function OperationDelivery() {
               <span title={MONITOR_COPY.noDeliveryOrder} aria-label={MONITOR_COPY.noDeliveryOrder}><Absent>{MONITOR_COPY.noDeliveryOrderShort}</Absent></span>
             )}
             {r.scope.doIssuedAt ? (
-              <span className="block truncate text-label text-kit-slate-11">
+              <span className="block truncate text-meta text-kit-slate-11">
                 {MONITOR_COPY.doDate(fmtDate(r.scope.doIssuedAt))}
               </span>
             ) : null}
@@ -1590,38 +1591,42 @@ export default function OperationDelivery() {
     );
 
   /* ── THE TWO TOP-LEVEL TABS — the page's own first control ─────────────── */
+  /* The kit's ONE segmented control (01 §3, `components/kit/Tabs`): the
+     track and its segments are the kit's own drawing. The count stays plain
+     grey 12 text, never a pill, so the track keeps its 32 inside the 40 bar
+     (a pill count grows the segment to 38). The bar row is unchanged. */
   const topTabs = (
-    <div
-      role="tablist"
-      aria-label={MONITOR_COPY.tabs}
-      className="flex h-10 shrink-0 items-stretch gap-6 border-b border-kit-slate-5 bg-white px-3"
-      data-testid="delivery-monitor-tabs"
-    >
-      {MONITOR_TOP_TABS.map((tab) => {
-        const active = topTab === tab;
-        /* Work counts the open population. Schedule counts its visible date
-           window under the active filters; the adjacent split identifies
-           customer deliveries and transfers within that same population. */
-        const count = tab === "work" ? rails.work.all : calendarCards.length;
-        return (
-          <button
-            key={tab}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            data-testid={`delivery-monitor-tab-${tab}`}
-            className={`relative -mb-px flex items-center gap-2 border-b-2 text-body ${
-              active
-                ? "border-kit-blue-9 font-medium text-kit-slate-12"
-                : "border-transparent text-kit-slate-11 hover:text-kit-slate-12"
-            }`}
-            onClick={() => pickTopTab(tab)}
-          >
-            {MONITOR_TOP_TAB_LABEL[tab]}
-            <span className="text-meta tabular-nums text-kit-slate-11">{count}</span>
-          </button>
-        );
-      })}
+    <div className="flex h-10 shrink-0 items-center border-b border-kit-slate-5 bg-white px-3">
+      <div
+        role="tablist"
+        aria-label={MONITOR_COPY.tabs}
+        className={SEGMENTED_TRACK}
+        data-testid="delivery-monitor-tabs"
+      >
+        {MONITOR_TOP_TABS.map((tab) => {
+          const active = topTab === tab;
+          /* Work counts the open population. Schedule counts its visible date
+             window under the active filters; the adjacent split identifies
+             customer deliveries and transfers within that same population. */
+          const count = tab === "work" ? rails.work.all : calendarCards.length;
+          return (
+            <button
+              key={tab}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              data-testid={`delivery-monitor-tab-${tab}`}
+              className={`${SEGMENT} flex items-center gap-1.5 focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px] ${
+                active ? SEGMENT_ON : SEGMENT_OFF
+              }`}
+              onClick={() => pickTopTab(tab)}
+            >
+              {MONITOR_TOP_TAB_LABEL[tab]}
+              <span className="text-meta tabular-nums text-kit-slate-11">{count}</span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 
@@ -1687,7 +1692,7 @@ export default function OperationDelivery() {
                 <span className="w-full truncate text-center text-meta text-kit-slate-12">
                   {fmtDate(day.iso)}
                 </span>
-                <span className="text-label tabular-nums">{day.count}</span>
+                <span className="text-meta font-medium tabular-nums">{day.count}</span>
               </button>
             );
           })}
@@ -1705,7 +1710,7 @@ export default function OperationDelivery() {
             need every pixel, and the strip's own aria-label carries the same
             fact for a reader who cannot see the row. */}
         {isPhone ? null : (
-          <span className="my-auto shrink-0 pl-2 text-label text-kit-slate-11">
+          <span className="my-auto shrink-0 pl-2 text-meta text-kit-slate-11">
             {MONITOR_COPY.contactWeekScope}
           </span>
         )}
@@ -1923,7 +1928,7 @@ export default function OperationDelivery() {
         ) : !isPhone ? (
           <aside className="flex w-11 shrink-0 flex-col items-center gap-2 border-r border-kit-slate-5 bg-white py-2">
             {showFiltersButton}
-            <span className="text-label text-kit-slate-11 [writing-mode:vertical-rl]">{MONITOR_COPY.showFilters}</span>
+            <span className="text-meta text-kit-slate-11 [writing-mode:vertical-rl]">{MONITOR_COPY.showFilters}</span>
           </aside>
         ) : null}
 
@@ -1940,7 +1945,7 @@ export default function OperationDelivery() {
               ) : null}
               <button
                 type="button"
-                className="rounded-control border border-kit-slate-6 bg-white px-3 py-1.5 text-meta font-medium text-kit-slate-12 hover:bg-kit-slate-3"
+                className="rounded-control border border-kit-slate-6 bg-white px-3 py-1.5 text-body font-medium text-kit-slate-12 hover:bg-kit-slate-3"
                 onClick={() => {
                   void ordersQ.refetch();
                   void docsQ.refetch();
@@ -2011,7 +2016,7 @@ export default function OperationDelivery() {
               {/* THE CALENDAR'S OWN BOUNDARY, stated rather than discovered:
                   an unconfirmed delivery is not here, it is in the chase. */}
               <div
-                className="shrink-0 border-b border-kit-slate-5 bg-white px-3 py-1 text-label text-kit-slate-11"
+                className="shrink-0 border-b border-kit-slate-5 bg-white px-3 py-1 text-meta text-kit-slate-11"
                 data-testid="delivery-monitor-calendar-scope"
               >
                 <div className="text-kit-slate-11" data-testid="delivery-monitor-schedule-split">{scheduleSplitSentence(scheduleCounts)}</div>
@@ -2022,7 +2027,7 @@ export default function OperationDelivery() {
                 /* ── THE DAY LIST — one operating day, the same cards and
                    order on every viewport; on a phone the ONLY calendar. ── */
                 <div className="min-h-0 flex-1 overflow-y-auto" data-testid="delivery-monitor-daily">
-                  <div className="sticky top-0 z-10 border-b border-kit-slate-5 bg-white px-3 py-2 text-body font-semibold text-kit-slate-12">
+                  <div className="sticky top-0 z-10 border-b border-kit-slate-5 bg-white px-3 py-2 text-body font-medium text-kit-slate-12">
                     {fmtDate(selectedDate)}
                   </div>
                   {dayCards(selectedDate)}
@@ -2066,7 +2071,7 @@ export default function OperationDelivery() {
                         className="flex min-h-0 min-w-0 flex-col"
                         data-testid={`delivery-monitor-day-${iso}`}
                       >
-                        <div className="sticky top-0 z-10 border-b border-kit-slate-5 bg-white px-2 py-1.5 text-body font-semibold text-kit-slate-12">
+                        <div className="sticky top-0 z-10 border-b border-kit-slate-5 bg-white px-2 py-1.5 text-body font-medium text-kit-slate-12">
                           {fmtDate(iso)}
                         </div>
                         {dayCards(iso)}
