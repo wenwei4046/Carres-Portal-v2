@@ -72,9 +72,9 @@ const COLOUR_TOKENS = [
   ["Selection text", "--c-select-fg"],
   ["Button hover", "--c-btn-hover"],
   ["Main action", "--c-main"],
-  ["Selected row", "--c-select-soft"],
+  ["Selected row", "--c-select-bg"],
   ["Row hover", "--c-row-hover"],
-  ["Link and focus", "--c-link"],
+  ["Keyboard focus", "--c-focus"],
   ["Open frame", "--c-open-frame"],
   ["Done surface", "--c-ok-bg"],
   ["Done text", "--c-ok-fg"],
@@ -82,8 +82,8 @@ const COLOUR_TOKENS = [
   ["Needs action text", "--c-warn-fg"],
   ["Neutral pill", "--c-info-bg"],
   ["Hold", "--c-hold-bg"],
-  ["None surface", "--c-none-bg"],
-  ["None text", "--c-none-fg"],
+  ["None surface", "--c-search-bg"],
+  ["None text", "--c-secondary"],
 ] as const;
 
 function Section({ id, title, note, children }: { id: string; title: string; note?: string; children: ReactNode }) {
@@ -552,8 +552,8 @@ export default function UiShowcase() {
       <Section id="colours" title="Colours" note="Swatches and printed values read the same shared runtime tokens, with no page-local palette. The one UI/UX MASTER owns the approved palette; themes change selection colours only. Status colours remain fixed. See the actual status components in Pills.">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {COLOUR_TOKENS.map(([label, token]) => (
-            <div key={token} className="flex min-w-0 flex-col gap-2 rounded-lg border border-c-card-border bg-c-card p-3">
-              <span aria-hidden="true" className="h-11 rounded-lg border border-c-card-border" style={{ background: `var(${token})` }} data-token={token} />
+            <div key={label} className="flex min-w-0 flex-col gap-2 rounded-lg border border-c-card-border bg-c-card p-3">
+              <span aria-hidden="true" className="h-11 rounded-lg border border-c-card-border" style={token === "--c-focus" ? { outline: `var(${token})` } : { background: `var(${token})` }} data-token={token} />
               <span className="text-meta text-c-ink">{label}</span>
               <span className="text-meta font-medium">{colourValues[token] || token}</span>
               <span className="break-words text-meta text-c-secondary">{token}</span>
