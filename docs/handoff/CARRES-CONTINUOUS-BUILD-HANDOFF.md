@@ -9,7 +9,9 @@ Paste everything below the line into a fresh session. It is self-contained.
 
 ---
 
-CARRES PORTAL v2 — CONTINUOUS BUILD · checkpoint 2026-10-15 day (UI kit lane)
+CARRES PORTAL v2 — CONTINUOUS BUILD · checkpoint 2026-10-16 (UI kit lane)
+
+**Current publication and delivery:** the ONE physical `docs/ui/MASTER.md` is on main through merged PR #2087, `58047ed1f9624f0a796e6560e3deed1d1c2f1255`; its required CI passed. Root CLAUDE/AGENTS name it, and former01/02/03 paths only redirect. Desktop's bounded startup pointers now read `origin/main` while all existing dirty work is preserved. Earlier “unpublished” baseline paragraphs below are historical. Existing-page fixes continue in the same PR #2086, not a new kit. Current bounded verification: corrected page tracking assertion4/4; shared focus/fields/catalogue/SO reader tests77/77. SO Why uses the existing dialog-container provider: personally opened calendar inside Why, Esc returned to Why, Cancel retained saved facts; no business write. Broader historical findings retain their original scope and are not an all-Portal PASS.
 
 ## 0 · Owner scope carried forward (Jess, 14 Oct 2026 — do not ask her to reconfirm)
 
