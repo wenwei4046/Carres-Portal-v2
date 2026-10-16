@@ -1730,3 +1730,25 @@ describe("PortalSidebar — Sales Order detail fit", () => {
     }
   });
 });
+
+describe("PortalSidebar — common Tasks canvas fit", () => {
+  it("temporarily compacts a narrow list and delegates expansion without changing the saved preference", () => {
+    const previousWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1025 });
+    const expand = vi.fn();
+    try {
+      render(<MemoryRouter initialEntries={["/operation?tab=purchase"]}>
+        <PortalSidebar compactForCanvas onExpandForCanvas={expand} />
+      </MemoryRouter>);
+      expect(screen.getByTestId("portal-sidebar")).toHaveStyle({ width: "64px" });
+      expect(localStorage.getItem(COLLAPSE_KEY)).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Expand menu" }));
+      expect(expand).toHaveBeenCalledOnce();
+      // The shared host may still be asking whether to keep an unsaved task.
+      expect(screen.getByTestId("portal-sidebar")).toHaveStyle({ width: "64px" });
+      expect(localStorage.getItem(COLLAPSE_KEY)).toBeNull();
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: previousWidth });
+    }
+  });
+});

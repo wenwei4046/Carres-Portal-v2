@@ -29,9 +29,9 @@ import {
   type PageGroupKey,
 } from "./menu-tree";
 
-/* The menu OPENS at 220px with words and group labels (handoff 2026-10-08,
-   "Do NOT" 2). Only the person's own « click closes it, and that choice is
-   remembered under a new key so an older auto-collapse never carries over. */
+/* The named menu is 220px and remembers the person's choice. MASTER's
+   common detail/Tasks canvas fit can temporarily use its existing 64px mode
+   without overwriting that saved choice. */
 const COLLAPSE_KEY = "carres-menu-collapsed";
 
 /** The module / plain-row icon (01 §4 "Side menu": 18). */
@@ -82,10 +82,14 @@ const MODULE_ICON = 18;
  * pending pill are fetched here, each gated by role so an operation user
  * never calls the principal dashboard API (and vice-versa).
  */
-export default function PortalSidebar({ drawer = false }: {
+export default function PortalSidebar({ drawer = false, compactForCanvas = false, onExpandForCanvas }: {
   /** Below 768px the rail is a slide-in drawer (owner review 2026-09-25):
    *  always the named rail, no collapse toggle of its own. */
   drawer?: boolean;
+  /** The common shell needs the named toolbar and Tasks to fit together. */
+  compactForCanvas?: boolean;
+  /** Uses the existing Tasks draft guard before making room for the menu. */
+  onExpandForCanvas?: (expand: () => void) => void;
 } = {}) {
   const role = useAuth((s) => s.role);
   const session = useAuth((s) => s.session);
@@ -134,9 +138,17 @@ export default function PortalSidebar({ drawer = false }: {
   const [detailExpanded, setDetailExpanded] = useState(false);
   useEffect(() => setDetailExpanded(false), [location.pathname, narrowDetail]);
   const autoDetail = isSalesOrderDetail && narrowDetail;
+  const autoCanvas = !isSalesOrderDetail && compactForCanvas && narrowDetail;
   /* A drawer is always the named rail. */
-  const collapsed = drawer ? false : autoDetail ? !detailExpanded : storedCollapsed;
+  const collapsed = drawer ? false : autoDetail ? !detailExpanded : autoCanvas || storedCollapsed;
   const toggleCollapse = () => {
+    if (autoCanvas && onExpandForCanvas) {
+      onExpandForCanvas(() => {
+        setCollapsed(false);
+        try { localStorage.setItem(COLLAPSE_KEY, "0"); } catch { /* blocked storage */ }
+      });
+      return;
+    }
     if (autoDetail) {
       setDetailExpanded((expanded) => !expanded);
       return;
