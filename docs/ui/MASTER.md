@@ -6,6 +6,8 @@
 > *"delete all old confused part and use the current we confirmed"* — every new chat reads this file
 > and follows the current shared UI/UX without Jess re-teaching it.
 
+> **Publication boundary:** this change publishes the consolidated rules and new-chat entry. The expanded local `/ui` catalogue and page fixes are separate application work; their local evidence is not a deployed implementation claim.
+
 ## One physical UI/UX MASTER · owner instruction 15 Oct 2026
 
 **This file alone holds the current UI/UX specification.** The former 01/02/03 rule bodies are consolidated below and removed from their old files; those paths contain navigation only. Any historical reference to “01”, “02” or “03” now names the corresponding part of THIS MASTER, never a second authority. Git holds history. Do not create another kit or MASTER.
