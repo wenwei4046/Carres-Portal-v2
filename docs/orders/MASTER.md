@@ -4747,8 +4747,8 @@ legacy delivery/commercial edit. The current SO page has no no-date answer entry
 writes retain `promise_moves_by_amendment`. A genuinely eligible legacy row must not be excluded
 solely to hide this missing writer. The specific production no-date proof is blocked by this
 contract conflict. A new legacy response writer or eligibility change remains a scoped proposal,
-not an authorised implementation. A local synthetic real-date API/PostgREST/source-ledger slice
-passed on 15 Oct; it proves neither the no-date outcome nor production/browser completion.
+not an authorised implementation. The source lane reports in `8a911c1d1` that a local synthetic real-date API/PostgREST/source-ledger slice
+passed on 15 Oct (not rerun by the 16 Oct document publication); it proves neither the no-date outcome nor production/browser completion.
 
 - **The PIC owns the order's Operation journey from beginning to end** — delay decision, logistics
   choice and calls, delivery date/time, today's result, proof, Failed Delivery next step, loan

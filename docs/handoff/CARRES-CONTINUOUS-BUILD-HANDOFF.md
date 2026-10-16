@@ -42,7 +42,9 @@ Never report progress as a percentage; list the exact remaining obligations (§4
 
 ## 2 · Completion table (one table; re-measure before quoting)
 
-Production runs `7f4f7dd34` (ERP, POS and API manifests read 15 Oct 2026 after deploy run
+**Documentation reconciliation · 16 Oct 2026:** the following 15 Oct implementation and test observations are reports retained from `codex/kit-preview-index` (including `2c457b03b`, `14d0274e6`, `8a911c1d1`, `6d1f78c24`) and the existing #2085 record. This document-only publication did not repeat those tests or establish the current production SHA. Approved rules remain in the owning MASTERs; local checks and proposals are not deployment or owner acceptance. PR #2087 merged the consolidated UI MASTER and portable chat entry as `58047ed1f`; earlier “unpublished” notes below describe their dated local state only.
+
+Production snapshot reported on 15 Oct: `7f4f7dd34` (ERP, POS and API manifests read 15 Oct 2026 after deploy run
 `38695863784` succeeded). **Batch B is merged PR #2083
 (`build/kit-batch-b`, head `b664e6512`)**: local gates all green (lint, typecheck, 478 test files /
 7,013 tests, kit check 74/74), 42 retaken pictures committed. CI `verify` passed on exact head
@@ -134,7 +136,7 @@ Control and file-recovery slice validation: common controls80 tests PASS; TaskFi
 
 **Latest requested handover complete ·15Oct:** owner explicitly replaced the endless audit/testing approach with “make one master only; set one, I see it later and correct; stop testing.” That baseline handover is delivered: one physical UI/UX rule body, filled value/trigger/component checklist, UX contract, sole-source live catalogue, old rule bodies removed, both local client entry points aligned, scoped commits saved. This closes that requested handover, not the original all-page verification scope. The detailed historical matrix and separate outcomes remain honest: remaining Portal adoption, unpublished changes, deployment and authenticated production verification are not passed or relabelled complete. Future owner corrections change the same MASTER/shared component and the named consumers, not a new kit or a reopened whole-site audit.
 
-**Desktop new-chat entry · local only:** after developer confirmed no parallel DesktopAGENTS edit, added a bounded pointer at the top of `/Users/chaichiewlim/Desktop/Carres-Portal-v2/AGENTS.md` to the sole current `kit-docs/docs/ui/MASTER.md` and a `git show codex/kit-preview-index:docs/ui/MASTER.md` fallback. Developer also confirmed no parallel DesktopCLAUDE edit; the same bounded current-source pointer was added there for Claude-only startup. Original Desktop text and all existing uncommitted edits were retained; no specification was copied, no source branch was reset. This local pointer is explicitly unpublished.
+**Historical Desktop new-chat entry · 15 Oct · local only at that time:** after developer confirmed no parallel DesktopAGENTS edit, added a bounded pointer at the top of `/Users/chaichiewlim/Desktop/Carres-Portal-v2/AGENTS.md` to the sole current `kit-docs/docs/ui/MASTER.md` and a `git show codex/kit-preview-index:docs/ui/MASTER.md` fallback. Developer also confirmed no parallel DesktopCLAUDE edit; the same bounded current-source pointer was added there for Claude-only startup. Original Desktop text and all existing uncommitted edits were retained; no specification was copied, no source branch was reset. That pointer was unpublished at the time. On 16 Oct the Desktop entry was corrected to the published main authority; its other uncommitted work was preserved.
 
 **Current owner-directed consolidation ·15Oct ·80110b066:** `docs/ui/MASTER.md` is now the ONE physical UI/UX rule document, including the former values/measurements, component and pattern bodies. The old01/02/03 files have had their rule bodies removed and contain navigation only. `/ui` imports only this MASTER. RootCLAUDE/AGENTS point new chats to it (file ownership confirmed by developer); former01/02/03 references mean parts inside this file. Owner delegated set-one-now/correct-visually-later, so existing documented engineering defaults are retained without asking the owner to approve raw pixel lists. Preserve approved Claude design and conforming work; fix named deviations, not blanket-fail the kit. No tests run for consolidation, no main publication or production claim. Earlier split-source descriptions below are historical evidence, superseded by this paragraph.
 
@@ -146,7 +148,7 @@ Owner steering: no more endless test/fixture expansion; show the Kit for review 
 
 **Owner clarification · 15 Oct:** the ONE Master Kit authority is established by UI MASTER +01/02/03 and its `/ui` catalogue. Pages must follow it now; unfinished page adoption, source-state checks or production verification do not put that standard back up for approval. No further TEST fixture expansion is required to hand over the established standard. The detailed matrix below/above remains the implementation evidence; do not collapse it into a misleading all-green claim.
 
-**Separate delivery outcomes:** kit documentation acceptance complete — NO (remaining kit gaps/decisions in the matrix; ONE authority already established);
+**Separate delivery outcomes, reconciled 16 Oct:** consolidated kit baseline documented and published — YES (#2087); all optional kit gaps decided — NO;
 local component/full-page coverage complete — NO; Portal migration complete — NO;
 this audit change deployed — NO; authenticated production verified — NO.
 Existing Batch B release evidence above keeps its original limited scope and is not re-labelled by this audit.
@@ -234,7 +236,7 @@ Existing Batch B release evidence above keeps its original limited scope and is 
 - Earlier lane, still open (2026-09-14 Payment checkpoint): the sentence `Nobody holds Delivery
   Duty.`; a permanent home for the assignment pool; the pooled test account `operation-test@x.com`.
 
-### SO Batch design brief 14 Oct (Round 4 `Code briefs/2 SO Batch Purchase.md`) — owner rulings needed
+### SO Batch design brief 14 Oct — current dispositions; remaining proposals are NOT LAW
 
 **A · `Order PO deadline` on a group row — CONFIRMED 15 Oct 2026, no code change**
 - Jess confirmed through `Create Claude design checklist`: keep the earliest Order By among
