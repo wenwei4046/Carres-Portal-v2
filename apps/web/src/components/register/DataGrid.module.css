@@ -137,6 +137,7 @@
   min-width: 0;
 }
 .rootReference .th {
+  color: var(--c-secondary);
   box-sizing: border-box;
   height: var(--table-head-h);
 }
@@ -1753,4 +1754,13 @@ div:first-child > .columnsMenuGroup {
 .rootReference .statusLine {
   height: auto;
   min-height: var(--table-foot-h);
+}
+
+/* Current kit toolbar controls are 32px (01 §3–4). Narrow canvases use
+   the already approved 4px gap; controls retain their full names. */
+.rootReference { container: list-grid / inline-size; }
+.rootReference .toolbarIcon,
+.rootReference .toolbarPillIconOnly { width: 32px; height: 32px; }
+@container list-grid (width < 520px) {
+  .rootReference .toolbar:not(.selectionBar) { gap: 4px; }
 }

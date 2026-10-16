@@ -39,7 +39,7 @@ describe("type pairs and the top bar", () => {
 
   it("a card or panel title is 15/500 and the page title 20/600", () => {
     expect(tailwind).toMatch(/strong: \["15px", \{ lineHeight: "22px", fontWeight: "500" \}\]/);
-    expect(tailwind).toMatch(/page: \["20px", \{ lineHeight: "28px", fontWeight: "600" \}\]/);
+    expect(tailwind).toMatch(/page: \["20px", \{ lineHeight: "28px", fontWeight: "600", letterSpacing: "-0\.01em" \}\]/);
     expect(tailwind).not.toMatch(/fontSize: \{[\s\S]{0,900}"24px"/);
   });
 

@@ -19,12 +19,10 @@
  * No second engine: every task is an occurrence of the one Work read.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import Button from "@/components/kit/Button";
 import Modal from "@/components/kit/Modal";
 import { notifyTaskSaved } from "@/components/kit/Toast";
-import { Z_DIALOG } from "@/components/kit/overlay-layer";
 import { qk } from "@/lib/queries";
 import { useOpenWorkSet, type WorkRow } from "../use-open-work";
 import { TASK_CARD_WORDS, taskCard, type TaskCard } from "./task-cards";
@@ -164,11 +162,11 @@ export function useTaskDesk({ order, factsOf, onLeave }: {
       >
         {null}
       </Modal>
-      {review && task ? createPortal(
-        <div role="dialog" aria-modal="true" aria-label={`${task.line} · ${task.source.object.label}`} className={`fixed inset-0 ${Z_DIALOG} flex flex-col bg-white`} data-testid="tasks-review">
+      {review && task ? (
+        <Modal open variant="task-review" title={`${task.line} · ${task.source.object.label}`}
+          onOpenChange={() => { /* The owning form's Save/Cancel remain the only exits. */ }}>
           {review(() => { reviewClosedAt.current = Date.now(); setReview(null); })}
-        </div>,
-        document.body,
+        </Modal>
       ) : null}
     </>
   );

@@ -49,6 +49,29 @@ beforeEach(() => {
 });
 
 describe("useSalesOrderRegisterOrders", () => {
+  it("the disabled and active observers share the existing unsearched query without a duplicate population read", async () => {
+    const client = new QueryClient({defaultOptions:{queries:{retry:false}}});
+    const shared = ({children}:{children:ReactNode}) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+    const { result, rerender } = renderHook(({enabled}) => ({
+      main:useSalesOrderRegisterOrders({stage:"proceeded"}),
+      fallback:useSalesOrderRegisterOrders({stage:"proceeded"}, enabled),
+    }), {wrapper:shared,initialProps:{enabled:false}});
+    await waitFor(()=>expect(result.current.main.isSuccess).toBe(true));
+    expect(apiFetch).toHaveBeenCalledTimes(3);
+    rerender({enabled:true});
+    await waitFor(()=>expect(result.current.fallback.isSuccess).toBe(true));
+    expect(apiFetch).toHaveBeenCalledTimes(3);
+    expect(result.current.fallback.data).toBe(result.current.main.data);
+  });
+  it("a disabled fallback does not read, then uses the same complete population reader when needed", async () => {
+    const { result, rerender } = renderHook(({enabled}) => useSalesOrderRegisterOrders({stage:"proceeded"}, enabled), {wrapper,initialProps:{enabled:false}});
+    expect(apiFetch).not.toHaveBeenCalled(); expect(result.current.data).toBeUndefined();
+    rerender({enabled:true});
+    await waitFor(()=>expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data!.orders).toHaveLength(TOTAL);
+    expect(apiFetch).toHaveBeenCalledTimes(3);
+    expect(apiFetch.mock.calls.every(([url]) => new URL(url, "http://t").searchParams.get("stage") === "proceeded")).toBe(true);
+  });
   it("reads every page through the cursor and answers the whole population once", async () => {
     const { result } = renderHook(() => useSalesOrderRegisterOrders({ stage: "proceeded" }), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));

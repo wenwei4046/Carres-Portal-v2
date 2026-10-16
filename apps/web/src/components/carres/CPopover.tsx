@@ -110,7 +110,7 @@ export default function CPopover({
             outside.current = false;
           }}
           className={`${Z_FLOATING} max-h-[min(70vh,480px)] overflow-auto rounded-lg bg-c-card p-1.5 text-c-ink [box-shadow:var(--shadow-menu)] focus:outline-none`}
-          style={width ? { width } : undefined}
+          style={{ ...(width || menu ? { width: width ?? 250 } : {}), maxWidth: "var(--radix-popover-content-available-width)" }}
         >
           {children}
         </RadixPopover.Content>
@@ -150,9 +150,9 @@ export function CMenuItem({
       disabled={disabled}
       onClick={disabled ? undefined : onSelect}
       data-testid={testId}
-      className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-left text-[13px] text-c-ink ${
-        disabled ? "cursor-default opacity-45" : "hover:bg-c-search-bg"
-      } ${strong ? "font-semibold" : "font-medium"}`}
+      className={`flex w-full items-center gap-2.5 min-h-11 min-[768px]:min-h-8 rounded-lg px-2.5 py-[7px] text-left text-[13px] leading-[18px] text-c-ink ${
+        disabled ? "cursor-default opacity-[0.45]" : "hover:bg-c-search-bg"
+      } ${checked || strong ? "font-medium" : "font-normal"}`}
     >
       {icon && <MIcon name={icon} size={18} className="text-c-secondary" />}
       <span className="min-w-0 flex-1">{children}</span>
@@ -166,8 +166,8 @@ export function CMenuItem({
 export function CMenuGroup({ children, first = false }: { children: ReactNode; first?: boolean }) {
   return (
     <div
-      className={`px-2.5 pb-1 pt-2 text-[11px] font-semibold tracking-[0.04em] text-c-muted ${
-        first ? "" : "border-t border-c-section-line"
+      className={`px-2.5 pb-1 pt-2 text-[11px] font-medium uppercase tracking-[0.06em] text-c-secondary ${
+        first ? "" : "border-t border-c-row-line"
       }`}
     >
       {children}

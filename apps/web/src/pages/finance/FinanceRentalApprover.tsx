@@ -120,7 +120,7 @@ export default function FinanceRentalApprover() {
         </div>
       ) : approvalsQ.error ? (
         <div className="p-3 text-meta rounded-md bg-destructive/5 text-destructive border border-destructive/30">
-          Failed to load the approval queue: {String(approvalsQ.error)}
+          Could not read the approval queue. This does not mean nothing is waiting.
         </div>
       ) : rows.length === 0 ? (
         <div

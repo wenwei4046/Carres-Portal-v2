@@ -10,6 +10,9 @@
  */
 import { addWorkingDays, internalTaskOccurrenceId, internalTaskResultReference, myHolidaySet, projectInternalTaskWork, type InternalTask, type OperationWorkCompleted, type OperationWorkItem, type OperationWorkModule, type OperationWorkResponse } from "@carres/shared";
 import { appTodayIso } from "@/lib/fmt-date";
+import type { operationOrderDetailResponse, operationOrderListRow } from "@/lib/queries";
+import type { SupplierPoFact, LogisticsCardFacts } from "@carres/shared";
+import type { PoTemplateData, SalesOrderTemplateData } from "@/lib/pdf/types";
 
 const holidays = myHolidaySet();
 function workingDay(from: string, n: number): string {
@@ -187,6 +190,7 @@ export function testTaskSuppliers() {
 export function testTaskPo(poId: string) {
   const today = appTodayIso();
   const seed = SEEDS.find((candidate) => candidate.label === poId);
+  if (!seed || seed.module !== "purchasing") return { pos: [], destinations: [], referencedDestinations: [] };
   const supplier = seed?.recipient === "TEST Supplier B" ? TEST_SUPPLIERS[1]! : TEST_SUPPLIERS[0]!;
   const sentOn = workingDay(today, -6);
   return {
@@ -211,5 +215,101 @@ export function testTaskPo(poId: string) {
     }],
     destinations: [{ id: "w1", name: "Carres Klang" }],
     referencedDestinations: [],
+  };
+}
+
+/** Owning PO document read: reuse the same known TEST version and goods facts. */
+export function testTaskPoDocument(poId: string): PoTemplateData | null {
+  const source = testTaskPo(poId);
+  const po = source.pos[0];
+  if (!po) return null;
+  const supplier = TEST_SUPPLIERS.find((candidate) => candidate.id === po.supplier_id)!;
+  return {
+    po_id: po.id, po_number: po.id, version: po.version,
+    issue_date: po.sends[0]!.sent_at.slice(0, 10),
+    supplier: { name: supplier.name, address: null, contact: null },
+    destination: { name: source.destinations[0]!.name, address: "TEST destination" },
+    delivery_instructions: null, eta_date: po.eta_date,
+    so_refs: po.sources.map((item) => Number(item.reference.slice(3))),
+    issued_by: "TEST · Staff A",
+    lines: po.purchase_order_lines.map((line) => ({
+      sku: line.sku, description: `${line.model_name} ${line.size}`,
+      qty: line.qty, unit: "pc", identity_mode: "quantity", unit_codes: null,
+    })),
+    terms: "TEST document only",
+  };
+}
+
+/** Only Sales Orders explicitly linked by the declared TEST POs. */
+export function testTaskSalesOrderDocument(orderId: string): SalesOrderTemplateData | null {
+  const so = orderId === "00000000-0000-4000-8000-000000009101" ? 9101
+    : orderId === "00000000-0000-4000-8000-000000009102" ? 9102 : null;
+  if (!so) return null;
+  const lines = [
+    { sku: "TEST-MAT-Q", description: "TEST Mattress · Queen", qty: so === 9101 ? 4 : 2, unit_price: 100, category: "mattress", attrs: { size: "Queen" } },
+    { sku: "TEST-BF-K", description: "TEST Bedframe · King", qty: so === 9101 ? 1 : 2, unit_price: 200, category: "bedframe", attrs: { size: "King" } },
+  ].map((line) => ({ ...line, line_total: line.qty * line.unit_price }));
+  const total = lines.reduce((sum, line) => sum + line.line_total, 0);
+  return {
+    order_id: orderId, order_code: `SO-${so}`, so_number: `SO-${so}`, issue_date: workingDay(appTodayIso(), -8),
+    status_label: "Open", channel: "dealer", currency: "MYR", signed: false,
+    customer: { name: `TEST Customer ${so}`, address: "TEST address, Klang", phone: "0100000000" },
+    dealer: { name: "TEST Dealer", address: null, contact: null, outlet_name: null, outlet_address: null, salesperson_name: null, salesperson_phone: null },
+    delivery: { date: workingDay(appTodayIso(), 4), floor: null, has_lift: null },
+    lines, addons: [], subtotal: total, total, paid: 0, balance_due: total,
+  };
+}
+
+/** The same explicit document facts in the Operation list reader's contract. */
+export function testTaskOrderRows(): operationOrderListRow[] {
+  return ["00000000-0000-4000-8000-000000009101", "00000000-0000-4000-8000-000000009102"].map((id) => {
+    const doc = testTaskSalesOrderDocument(id)!;
+    return {
+      id, so: Number(doc.so_number.slice(3)), status: "proceed_order", operation_stage: "in_production",
+      warehouse_id: "w1", customer_name: doc.customer.name, customer_phone: doc.customer.phone,
+      customer_address: doc.customer.address, placed_at: `${doc.issue_date}T02:00:00Z`, proceeded_at: `${doc.issue_date}T03:00:00Z`,
+      delivery_date: doc.delivery.date, delivery_partner_id: null, delivery_partners: null,
+      request_for_delivery_at: null, partner_accepted_at: null, partner_rejected_at: null, partner_rejected_reason: null,
+      do_number: null, dispatched_at: null, delivered_at: null, outlet_id: null, dealer_id: "test-dealer", dealers: { name: doc.dealer.name },
+      paid: doc.paid, order_supplier_threads: [], order_annotations: [], order_addons: [], order_lines: doc.lines.map((line) => ({ ...line, label: line.description })),
+      po_skus: doc.lines.map((line) => line.sku), allocated_units: [],
+    };
+  });
+}
+
+/** Purchasing's known PO9001 facts, not a claimed Warehouse acceptance. */
+export function testTaskSupplierFacts(orderId: string): { purchaseOrders: SupplierPoFact[] } | null {
+  if (!testTaskSalesOrderDocument(orderId)) return null;
+  const po = testTaskPo("PO-261001-9001").pos[0]!;
+  return { purchaseOrders: [{
+    poNo: po.id, supplier: TEST_SUPPLIERS[0]!.name, issued: true, originalIso: po.official_delivery_date,
+    effectiveIso: po.eta_date, etaIso: po.eta_date, status: po.status, reply: null, supplierDo: null,
+    deliverTo: "Carres Klang", grnIso: null,
+    orderedQty: po.purchase_order_lines.reduce((sum, line) => sum + line.qty, 0),
+    receivedQty: po.purchase_order_lines.reduce((sum, line) => sum + line.received_qty, 0),
+    lines: po.purchase_order_lines.map(({ sku, qty }) => ({ sku, qty })),
+  }] };
+}
+
+export function testTaskLogisticsFacts(orderId: string): LogisticsCardFacts | null {
+  if (!testTaskSalesOrderDocument(orderId)) return null;
+  return { partner: null, routes: [], link: null, lastRevokedAt: null, detailsReceivedAt: null, answer: null, history: [] };
+}
+
+/** Opening a linked order never falls through to the root SO1319 fixture. */
+export function testTaskOrderDetail(orderId: string): operationOrderDetailResponse | null {
+  const row = testTaskOrderRows().find((order) => order.id === orderId);
+  const doc = testTaskSalesOrderDocument(orderId);
+  if (!row || !doc) return null;
+  return {
+    order: {
+      ...row, customer_phone: doc.customer.phone, customer_address: doc.customer.address,
+      customer_address_unknown: false, customer_billing_same: true,
+      source_ref: null, source_system: "native", delivery_date_tbd: false,
+      do_note: null, delivery_stops: null, invoice_no: null, invoiced_at: null,
+      paid: doc.paid, outlets: null,
+    },
+    lines: doc.lines.map((line, index) => ({ ...line, id: `${orderId}-line-${index + 1}`, label: line.description, source_po: null })),
+    addons: [], total: doc.total, warehouse: null, stockBalances: [], freeUnits: [], pos: [], history: [], threads: [],
   };
 }

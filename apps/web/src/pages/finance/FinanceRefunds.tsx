@@ -148,7 +148,7 @@ export default function FinanceRefunds() {
 
       {refundsQ.error && (
         <div className="mt-5 p-3 text-meta rounded-md bg-destructive/5 text-destructive border border-destructive/30">
-          Failed to load refunds: {String(refundsQ.error)}
+          Could not read refunds. This does not mean there are none.
         </div>
       )}
     </div>
@@ -171,7 +171,7 @@ function RefundRow({ r }: { r: RefundDisplayRow }) {
         : r.uiStatus === "pending"
           ? "Awaiting principal approval (> RM 1,000)"
           : r.uiStatus === "approved"
-            ? "Ready to pay (use AR drawer or refund_pay)"
+            ? "Ready to pay"
             : r.uiStatus === "paid"
               ? "Bank transfer recorded"
               : "Refund rejected";

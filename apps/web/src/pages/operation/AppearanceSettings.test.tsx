@@ -22,39 +22,41 @@ function Sync() {
 
 beforeEach(() => {
   updateUser.mockReset();
-  applyAppearance({ theme: "blue", focus: "soft" });
+  applyAppearance({ theme: "blue" });
   signIn(user("a"));
 });
 
 describe("Settings → Personal → Appearance — one choice, on the person's own profile", () => {
-  it("unknown profile values fall back to Blue / Soft grey", () => {
-    expect(readAppearance({ theme: "unknown", focus: "bad" })).toEqual({ theme: "blue", focus: "soft" });
+  it("unknown theme falls back to Blue and legacy focus is ignored", () => {
+    expect(readAppearance({ theme: "unknown", focus: "bad" })).toEqual({ theme: "blue" });
   });
 
   it("applies the signed-in person's profile, the next person's on a switch, and Blue on sign-out", () => {
+    document.documentElement.dataset.focus = "strong";
     render(<Sync />);
     act(() => signIn(user("a", { theme: "teal", focus: "strong" })));
-    expect(html()).toMatchObject({ theme: "teal", focus: "strong" });
+    expect(html()).toMatchObject({ theme: "teal" });
+    expect(html().focus).toBeUndefined();
     act(() => signIn(user("b")));
     expect(html().theme).toBe("blue");
     act(() => signIn(user("c", { theme: "rose", focus: "theme" })));
     expect(html().theme).toBe("rose");
     act(() => signIn(null));
-    expect(html()).toMatchObject({ theme: "blue", focus: "soft" });
+    expect(html()).toMatchObject({ theme: "blue" });
   });
 
-  it("Save changes writes both choices to the person's own profile, then the page changes", async () => {
+  it("Save changes writes only theme to the person's own profile, then the page changes", async () => {
     updateUser.mockResolvedValue({ data: { user: user("a", { theme: "violet", focus: "theme" }) }, error: null });
     const view = render(<AppearanceSettings />);
     expect(saveButton()).toBeDisabled();
     fireEvent.click(screen.getByTestId("theme-violet"));
-    fireEvent.click(screen.getByTestId("focus-theme"));
+    expect(screen.queryByRole("radiogroup", { name: "Focus outline" })).toBeNull();
     expect(html().theme).toBe("blue"); // a choice is not applied until it is saved
     fireEvent.click(saveButton());
     await screen.findByText("Saved");
     expect(updateUser).toHaveBeenCalledTimes(1);
-    expect(updateUser).toHaveBeenCalledWith({ data: { appearance: { theme: "violet", focus: "theme" } } });
-    expect(html()).toMatchObject({ theme: "violet", focus: "theme" });
+    expect(updateUser).toHaveBeenCalledWith({ data: { appearance: { theme: "violet" } } });
+    expect(html()).toMatchObject({ theme: "violet" });
     view.unmount();
     render(<AppearanceSettings />);
     expect(screen.getByTestId("theme-violet")).toHaveAttribute("aria-checked", "true");
@@ -74,7 +76,7 @@ describe("Settings → Personal → Appearance — one choice, on the person's o
     await waitFor(() => expect(saveButton()).toBeEnabled());
     fireEvent.click(saveButton());
     await screen.findByText("Saved");
-    expect(updateUser).toHaveBeenLastCalledWith({ data: { appearance: { theme: "rose", focus: "soft" } } });
+    expect(updateUser).toHaveBeenLastCalledWith({ data: { appearance: { theme: "rose" } } });
     expect(html().theme).toBe("rose");
   });
 
@@ -98,11 +100,11 @@ describe("Settings → Personal → Appearance — one choice, on the person's o
     localStorage.setItem("carres-appearance", JSON.stringify({ theme: "rose", focus: "strong" }));
     localStorage.setItem(key, JSON.stringify({ user: { id: "a", user_metadata: { appearance: { theme: "teal", focus: "theme" } } } }));
     applyStoredAppearance();
-    expect(html()).toMatchObject({ theme: "teal", focus: "theme" });
+    expect(html()).toMatchObject({ theme: "teal" });
     expect(localStorage.getItem("carres-appearance")).toBeNull();
     localStorage.removeItem(key);
     applyStoredAppearance(); // nobody signed in
-    expect(html()).toMatchObject({ theme: "blue", focus: "soft" });
+    expect(html()).toMatchObject({ theme: "blue" });
     vi.unstubAllEnvs();
   });
 });

@@ -14,7 +14,7 @@
  * catalogue names, the server's stock / payment / case facts). Nothing here
  * writes. A row click opens the order; Ctrl/⌘-click opens it in a new tab.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { REGISTER_DELIVERY_CONDITIONS, registerDeliveryConditionOf } from "@carres/shared";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -57,6 +57,16 @@ import {
 import { readStateOf, usePayBy } from "./pay-by";
 
 type Tab = "open" | "delivered" | "all";
+type ListSort = { key: string; dir: "asc" | "desc" } | null;
+type ListContext = { user: string; query: string; sort: ListSort; pageSize: number; page: number; selected: Set<string> };
+/* Tab-lifetime presentation state only, scoped to the signed-in person. The
+   URL still owns criteria; the shared grid owns expansion, focus and scroll. */
+const listContexts = new Map<string, ListContext>();
+function listContextFor(user: string, query: string): ListContext {
+  const previous = listContexts.get(user);
+  return previous ? { ...previous, query, page: previous.query === query ? previous.page : 1 }
+    : { user, query, sort: null, pageSize: 20, page: 1, selected: new Set() };
+}
 const TABS: { key: Tab; label: string }[] = [
   { key: "open", label: "Open" },
   { key: "delivered", label: "Delivered" },
@@ -141,12 +151,35 @@ export default function SalesOrdersOutright() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const userId = useAuth((s) => s.user?.id ?? "anon");
+  const latestParams = useRef(params);
+  latestParams.current = params;
+  /* Router setters do not queue functional updates like React state. A grid
+     filter effect in the same clear event must not reintroduce the old search. */
+  const updateParams = useCallback((update: (next: URLSearchParams) => void) => {
+    const next = new URLSearchParams(latestParams.current);
+    update(next);
+    if (next.toString() === latestParams.current.toString()) return;
+    latestParams.current = next;
+    setParams(next, { replace: true });
+  }, [setParams]);
 
   /* ── the real read: every proceeded order, as the register reads it ── */
   const seededSearch = params.get("search") ?? "";
-  const { data, isLoading, isError, error, refetch, dataUpdatedAt } = useSalesOrderRegisterOrders(
+  const { data, isLoading, isError, error, refetch, dataUpdatedAt, isPlaceholderData } = useSalesOrderRegisterOrders(
     seededSearch ? { stage: "proceeded", search: seededSearch } : { stage: "proceeded" },
   );
+  /* The counter is unsearched and permission-scoped. If it is unavailable,
+     only an empty searched answer needs the existing complete unsearched read. */
+  const needsPopulation = Boolean(seededSearch) && !isLoading && !isError && !isPlaceholderData && data?.orders.length === 0 && data.salesOrderTotal == null;
+  const population = useSalesOrderRegisterOrders({ stage: "proceeded" }, needsPopulation);
+  const checkingPopulation = needsPopulation && population.isPending;
+  const populationFailed = needsPopulation && population.isError;
+  const loadingList = isLoading || (isPlaceholderData && data?.orders.length === 0) || checkingPopulation;
+  const failedList = isError || populationFailed;
+  const listError = isError ? error : population.error;
+  const retryList = () => { void (populationFailed ? population.refetch() : refetch()); };
+  const populationEmpty = data?.salesOrderTotal === 0 || (data?.salesOrderTotal == null &&
+    (!seededSearch ? data?.orders.length === 0 : needsPopulation && population.data?.orders.length === 0));
   const catalogNames = useCatalogNames();
   const factsQ = useSalesOrderRegisterFacts(true);
   const facts = factsQ.data?.facts ?? null;
@@ -204,27 +237,21 @@ export default function SalesOrdersOutright() {
   }, [params]);
   const setParam = useCallback(
     (key: string, value: string | null) =>
-      setParams((p) => {
-        const next = new URLSearchParams(p);
+      updateParams((next) => {
         if (value == null) next.delete(key);
         else next.set(key, value);
-        return next;
-      }, { replace: true }),
-    [setParams],
+      }),
+    [updateParams],
   );
   const chooseTab = (next: Tab) =>
-    setParams((p) => {
-      const n = new URLSearchParams(p);
+    updateParams((n) => {
       n.set("tab", next);
-      return n;
-    }, { replace: true });
+    });
   const chooseLayout = (next: LayoutKey) =>
-    setParams((p) => {
-      const n = new URLSearchParams(p);
+    updateParams((n) => {
       n.set("cols", next);
       [...n.keys()].filter((k) => k.startsWith("f.")).forEach((k) => n.delete(k));
-      return n;
-    }, { replace: true });
+    });
 
   const inTab = useCallback(
     (r: RegisterRow) => (tab === "all" ? true : tab === "delivered" ? isDelivered(r) : !isDelivered(r)),
@@ -247,7 +274,23 @@ export default function SalesOrdersOutright() {
   );
 
   /* ── sort (the engine's header) · Group by (⋮) · paging ── */
-  const [sort, setSort] = useState<{ key: string; dir: "asc" | "desc" } | null>(null);
+  const group = (["delivery", "stock", "payment"] as const).find((g) => g === params.get("group")) ?? null;
+  const query = JSON.stringify([tab, layoutKey, Object.entries(filters).sort(([a], [b]) => a.localeCompare(b)).map(([key, values]) => [key, [...values].sort()]), seededSearch, requestedParam, group]);
+  const [listContext, setListContext] = useState(() => listContextFor(userId, query));
+  /* A genuinely changed scope starts on page1. A remount after Back does not.
+     Compare values, not new filter/sort object identities or mount effects. */
+  if (listContext.user !== userId) setListContext(listContextFor(userId, query));
+  else if (listContext.query !== query) setListContext({ ...listContext, query, page: 1 });
+  useLayoutEffect(() => { listContexts.set(listContext.user, listContext); }, [listContext]);
+  const { sort, pageSize, page, selected } = listContext;
+  const setSort = useCallback((next: ListSort) => setListContext((was) =>
+    was.sort?.key === next?.key && was.sort?.dir === next?.dir ? was : { ...was, sort: next, page: 1 }), []);
+  const setPageSize = useCallback((next: number) => setListContext((was) =>
+    was.pageSize === next ? was : { ...was, pageSize: next, page: 1 }), []);
+  const setPage = useCallback((next: number) => setListContext((was) =>
+    was.page === next ? was : { ...was, page: next }), []);
+  const setSelected = useCallback((update: Set<string> | ((selected: Set<string>) => Set<string>)) =>
+    setListContext((was) => ({ ...was, selected: typeof update === "function" ? update(was.selected) : update })), []);
   const sorted = useMemo(() => {
     if (!sort || !COLUMNS[sort.key]) return list;
     const col = COLUMNS[sort.key]!;
@@ -259,14 +302,9 @@ export default function SalesOrdersOutright() {
       return (typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y))) * dir;
     });
   }, [list, sort, ctx]);
-  const group = (["delivery", "stock", "payment"] as const).find((g) => g === params.get("group")) ?? null;
-  const [pageSize, setPageSize] = useState<number>(20);
-  const [page, setPage] = useState(1);
   const pages = group ? 1 : Math.max(1, Math.ceil(sorted.length / pageSize));
-  useEffect(() => setPage(1), [tab, layoutKey, filters, pageSize, seededSearch, requestedParam, sort, group]);
   /* A grouped list shows every order under its group; paging cuts a group. */
   const shown = group ? sorted : sorted.slice((Math.min(page, pages) - 1) * pageSize, Math.min(page, pages) * pageSize);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
   const selectedRows = list.filter((r) => selected.has(r.id));
   const toggle = (id: string) =>
     setSelected((s) => {
@@ -376,11 +414,11 @@ export default function SalesOrdersOutright() {
     ...Object.entries(filters).map(([k, v]) => ({ key: k, label: `${COLUMNS[k]!.label}: ${v.join(", ")}`, clear: () => setParam(`f.${k}`, null) })),
   ];
   const clearFilters = () =>
-    setParams((p) => {
-      const n = new URLSearchParams(p);
+    updateParams((n) => {
       [...n.keys()].filter((k) => k === "search" || k === "requested" || k.startsWith("f.")).forEach((k) => n.delete(k));
-      return n;
-    }, { replace: true });
+    });
+  const emptyMessage = populationEmpty ? "No sales orders yet" : "No sales orders match these filters";
+  const clearableEmpty = !populationEmpty && Boolean(seededSearch || requested || Object.keys(filters).length);
 
   /* No toolbar control is cut or overlaps (owner 14 Oct 2026); Summary may keep
      its icon only and the view button always keeps its name. On a short line the
@@ -523,16 +561,13 @@ export default function SalesOrdersOutright() {
   }, [layout, all, inTab, ctx]);
   const onColumnQuery = useCallback(
     (q: { filters: Record<string, string[]>; sort: { key: string; dir: "asc" | "desc" } | null }) => {
-      setSort((was) => (was?.key === q.sort?.key && was?.dir === q.sort?.dir ? was : q.sort));
-      setParams((p) => {
-        const next = new URLSearchParams(p);
-        const before = next.toString();
+      setSort(q.sort);
+      updateParams((next) => {
         [...next.keys()].filter((key) => key.startsWith("f.")).forEach((key) => next.delete(key));
         for (const [key, values] of Object.entries(q.filters)) for (const v of values) next.append(`f.${key}`, v);
-        return next.toString() === before ? p : next;
-      }, { replace: true });
+      });
     },
-    [setParams],
+    [updateParams, setSort],
   );
   const fixedGroups =
     group === "delivery"
@@ -568,7 +603,8 @@ export default function SalesOrdersOutright() {
           onPrev={() => setMonth((m) => shiftMonth(m, -1))}
           onNext={() => setMonth((m) => (m < thisMonth ? shiftMonth(m, 1) : m))}
           onHide={() => setSummaryOpen(false)}
-          loading={isLoading}
+          loading={loadingList}
+          failure={failedList ? <SalesOrderReadFailure error={listError} surface="sales-orders-register" onRetry={retryList} /> : undefined}
         />
       )}
       <main className="grid min-h-0 min-w-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-2.5">
@@ -674,6 +710,8 @@ export default function SalesOrdersOutright() {
             rows={shown}
             columns={gridColumns}
             storageKey={`carres.outright.grid.${layoutKey}.v1`}
+            sessionKey={`carres.outright.${userId}`}
+            presentationKey={JSON.stringify([query, pageSize, page, sort])}
             rowKey={(r) => r.id}
             rowTestId={(r) => `outright-row-${r.so}`}
             rowHeight={54}
@@ -708,15 +746,17 @@ export default function SalesOrdersOutright() {
               label: (_r, isOpen) => (isOpen ? "Hide items" : "Show items"),
               renderExpansion: (r) => <OrderItems row={r} catalogNames={catalogNames} ctx={ctx} drawn={drawn} />,
             }}
-            isLoading={isLoading}
-            errorState={isError ? <SalesOrderReadFailure error={error} surface="sales-orders-register" onRetry={() => void refetch()} /> : undefined}
-            emptyMessage="No orders match."
-            noMatchMessage="No orders match."
+            isLoading={loadingList}
+            errorState={failedList ? <SalesOrderReadFailure error={listError} surface="sales-orders-register" onRetry={retryList} /> : undefined}
+            emptyMessage={emptyMessage}
+            noMatchMessage={clearableEmpty ? emptyMessage : undefined}
+            onClearConditions={clearFilters}
+            clearConditionsInToolbar={selected.size === 0 && compact >= 3 && chips.length > 1}
             statusSummary={() => (
               <CListFooter
                 testId="outright-footer"
-                count={isLoading ? "Loading orders" : `${list.length} ${list.length === 1 ? "order" : "orders"}`}
-                {...(isLoading || totals.parts.length === 0 ? {} : { totals })}
+                count={loadingList ? "Loading orders" : `${list.length} ${list.length === 1 ? "order" : "orders"}`}
+                {...(loadingList || totals.parts.length === 0 ? {} : { totals })}
                 pageSize={pageSize}
                 onPageSize={setPageSize}
                 page={Math.min(page, pages)}
@@ -823,6 +863,7 @@ function SummaryPanel({
   onNext,
   onHide,
   loading,
+  failure,
 }: {
   rows: RegisterRow[];
   facts: Record<string, { cases?: string | null }> | null;
@@ -834,7 +875,9 @@ function SummaryPanel({
   onNext: () => void;
   onHide: () => void;
   loading: boolean;
+  failure?: ReactNode;
 }) {
+  if (failure) return <CSidePanel label="Summary" title="Summary" onHide={onHide} testId="outright-summary">{failure}</CSidePanel>;
   const inMonth = rows.filter((r) => r.proceeded && monthKey(r.proceeded) === month);
   const prev = shiftMonth(month, -1);
   const inPrev = rows.filter((r) => r.proceeded && monthKey(r.proceeded) === prev);

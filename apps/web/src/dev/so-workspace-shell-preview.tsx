@@ -19,13 +19,16 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import OperationApp from "@/pages/operation/OperationApp";
+import { testTaskOrderDetail, testTaskOrderRows, testTaskSupplierFacts, testTaskLogisticsFacts, testTaskSalesOrderDocument, testInternalTask, testTaskPoDocument, testTaskPo, testTaskSuppliers, testTasksFeed } from "./tasks-feed-fixture";
 import "@/index.css";
 
 const STATE = new URLSearchParams(window.location.search).get("state") ?? "full";
 const ROLE = new URLSearchParams(window.location.search).get("as") === "principal" ? "principal" : "operation";
+const PERSON = { id: "00000000-0000-4000-8000-0000000000aa", name: "TEST · Staff A", email: "preview@carres.local" };
 useAuth.setState({
-  role: ROLE as never,
-  user: { email: "operation@carres.co" } as never,
+  role: ROLE as never, hydrated: true, loading: false,
+  user: PERSON as never,
+  session: { access_token: "preview", user: PERSON } as never,
 });
 
 const ID = "11111111-1111-1111-1111-111111111111";
@@ -100,6 +103,83 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
+  /* The same TEST feed and task records as the existing shell previews.
+     No task completion or business writer is simulated by this read-only walk. */
+  const path = new URL(url, window.location.href).pathname;
+  const requestedOrder = /^\/api\/(?:operation\/)?orders\/([^/]+)/.exec(path)?.[1];
+  /* Settings are deliberately unavailable in this TEST walk. The existing
+     reader's documented default policy applies; never borrow local API data. */
+  if (["/api/operation/purchasing/settings", "/api/operation/delivery-settings/calendar", "/api/operation/delivery-settings/leads", "/api/finance/payment-settings/collection-timing"].includes(path)) {
+    return json({ error: "TEST fixture: settings read not seeded; shared fallback policy applies" }, 404);
+  }
+  const supplierOrder = /^\/api\/operation\/pos\/for-order\/([^/]+)$/.exec(path)?.[1];
+  if (supplierOrder) {
+    const facts = testTaskSupplierFacts(supplierOrder);
+    return json(facts ?? { error: "TEST fixture: supplier source not seeded" }, facts ? 200 : 404);
+  }
+  const logisticsOrder = /^\/api\/operation\/delivery-arrangements\/([^/]+)\/logistics-card$/.exec(path)?.[1];
+  if (logisticsOrder) {
+    const facts = testTaskLogisticsFacts(logisticsOrder);
+    return json(facts ?? { error: "TEST fixture: logistics source not seeded" }, facts ? 200 : 404);
+  }
+  if (path === "/api/operation/orders" && !new URL(url, window.location.href).searchParams.has("count")) {
+    return json({ orders: testTaskOrderRows(), nextCursor: null });
+  }
+  if (requestedOrder && testTaskSalesOrderDocument(requestedOrder)) {
+    const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
+    if (method !== "GET") return json({ error: "TEST fixture: linked Sales Orders are read-only" }, 405);
+    if (/^\/api\/operation\/orders\/[^/]+$/.test(path)) return json(testTaskOrderDetail(requestedOrder));
+    if (path.endsWith("/payments")) return json({ payments: [] });
+  }
+  if (requestedOrder && testTaskSalesOrderDocument(requestedOrder) && path.endsWith("/loan-offers")) return json({ offers: [] });
+  if (requestedOrder && path.endsWith("/sales-order-data")) {
+    const document = testTaskSalesOrderDocument(requestedOrder);
+    if (document) return json(document);
+  }
+  if (requestedOrder && requestedOrder !== ID && requestedOrder !== "customer-type") {
+    return json({ error: "TEST fixture: this Sales Order is not seeded" }, 404);
+  }
+  if (/\/api\/operation\/work$/.test(path)) return STATE === "tasks-failed"
+    ? json({ error: "TEST fixture: Work read failed" }, 503)
+    : json(testTasksFeed(PERSON));
+  const internalId = /\/api\/operation\/internal-tasks\/([0-9a-f-]{36})$/.exec(path)?.[1];
+  if (internalId) {
+    const task = testInternalTask(internalId, PERSON);
+    return json(task ?? {}, task ? 200 : 404);
+  }
+  const poDocumentId = /^\/api\/operation\/pos\/([^/]+)\/print-data$/.exec(path)?.[1];
+  if (poDocumentId) {
+    const document = testTaskPoDocument(decodeURIComponent(poDocumentId));
+    return json(document ?? { error: "TEST fixture: this Purchase Order is not seeded" }, document ? 200 : 404);
+  }
+  if (path === "/api/operation/pos") {
+    const po = new URL(url, window.location.href).searchParams.get("poId");
+    if (po) {
+      const result = testTaskPo(po);
+      return json(result.pos.length ? result : { error: "TEST fixture: this Purchase Order is not seeded" }, result.pos.length ? 200 : 404);
+    }
+  }
+  if (path === "/api/operation/partners") return json({ partners: [] });
+  if (path === "/api/operation/suppliers") return json(testTaskSuppliers());
+  /* Current Order Route reads the owning sources separately. Empty arrays here
+     mean no TEST record exists, not a failed source or a completed obligation. */
+  if (path.endsWith("/allocation") && STATE === "route-failed") return json({ error: "TEST fixture: allocation read failed" }, 503);
+  if (path.endsWith("/allocation")) return json({ allocation: {
+    orderId: ID, soRef: "SO-1319", unmatchedUnits: [],
+    lines: LINES.map((line) => ({ sku: line.sku, committedQty: line.qty, reservedUnits: [], soldUnits: [], reservedQty: 0, soldQty: 0, outstandingQty: line.qty })),
+    totals: { committedQty: 3, reservedQty: 0, soldQty: 0, outstandingQty: 3 },
+  } });
+  if (path.endsWith("/loans")) return json({ loans: [] });
+  if (path.endsWith("/loan-offers")) return json({ offers: [] });
+  if (path.endsWith("/refunds")) return json({ refunds: [] });
+  if (path === "/api/ops/service-cases") return json({ items: [] });
+  if (path === "/api/operation/supplier-claims") return json({ claims: [] });
+  if (path.endsWith("/booking-brief")) return json({ brief: null });
+  if (path.endsWith("/delivery-attempts")) return json({ attempts: [] });
+  if (path.startsWith("/api/finance/exceptions/") || path.startsWith("/api/operation/payment-approvals/")) return json([]);
+  if (path === "/api/operation/delivery-arrangements") return json({ arrangements: [] });
+  if (path === "/api/operation/delivery-orders") return json({ deliveryOrders: [], attempts: [], handoverEvents: [] });
+  if (path.endsWith("/route-goods")) return json({ lines: LINES.map(({ id, sku, qty }) => ({ id, sku, qty })), sources: [], purchaseOrders: [], receipts: [], units: [], readyStock: {}, failed: { purchasing: false } });
   if (url.includes(`/payments`)) {
     if (["empty", "saved", "agreement-zero"].includes(STATE)) return json({ payments: [] });
     if (STATE === "forbidden") return json({ error: "Operation or principal only" }, 403);

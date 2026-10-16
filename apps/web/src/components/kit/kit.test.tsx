@@ -114,7 +114,7 @@ describe("closed sets", () => {
   // 2026-09-25 — an eighth still means editing this line.
   it("has seven type tokens and no eighth", () => {
     expect(TYPE_TOKENS).toHaveLength(7);
-    expect(TYPE_TOKENS.map((t) => t.px)).toEqual([24, 20, 15, 13, 12, 11, 14]);
+    expect(TYPE_TOKENS.map((t) => t.px)).toEqual([20, 20, 15, 13, 12, 11, 14]);
   });
 
   it("has one class pair per tone and no more", () => {

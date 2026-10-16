@@ -31,6 +31,7 @@ export function TwoLines({
   line2TestId,
   cellTitle,
   reveal = false,
+  secondary = false,
 }: {
   line1: string;
   line2?: string | null;
@@ -43,13 +44,15 @@ export function TwoLines({
    *  incomplete`, owner ruling 2026-09-25). */
   cellTitle?: string;
   reveal?: boolean;
+  /** A reference line under an identifier: 12 / 400 grey (01 §2 second line). */
+  secondary?: boolean;
 }) {
   const lines = (
     <span
       className="block min-w-0"
       {...(cellTitle ? { title: cellTitle, "aria-label": joinLines(joinLines(line1, line2), cellTitle) } : {})}
     >
-      <span className={`block truncate ${STATUS_TONE_TEXT[tone]}`} title={cellTitle ?? line1Title ?? line1}>
+      <span className={`block truncate ${secondary ? "text-meta text-c-secondary" : STATUS_TONE_TEXT[tone]}`} title={cellTitle ?? line1Title ?? line1}>
         {line1}
       </span>
       {line2 ? (

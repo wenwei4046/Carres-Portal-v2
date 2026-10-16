@@ -24,7 +24,7 @@ export const FLOATING_SURFACE =
  * hover grey; the chosen row is the person's theme selection pair.
  */
 export const FLOATING_ITEM =
-  "flex w-full items-center gap-2 rounded-lg [padding:var(--menu-item-pad)] text-body font-medium text-c-ink " +
+  "flex w-full max-[767px]:min-h-11 items-center gap-2 rounded-lg [padding:var(--menu-item-pad)] text-body font-medium text-c-ink " +
   "cursor-pointer select-none outline-none " +
   "data-[highlighted]:bg-c-hover data-[state=checked]:bg-c-select-bg data-[state=checked]:text-c-select-fg " +
-  "data-[disabled]:opacity-40 data-[disabled]:cursor-not-allowed data-[disabled]:bg-transparent";
+  "data-[disabled]:opacity-[0.45] data-[disabled]:cursor-not-allowed data-[disabled]:bg-transparent";

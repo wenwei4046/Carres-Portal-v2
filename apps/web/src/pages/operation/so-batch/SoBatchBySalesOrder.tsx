@@ -327,7 +327,6 @@ export default function SoBatchBySalesOrder({
         presentationTools
         pageToolsItems={pageToolsItems}
         toolbarAfterTools={toolbarAfterTools ?? (fit.tight ? undefined : <span aria-hidden className="block" style={{ width: FIXED.status + 8 }} />)}
-        wrapToolbar
         searchPresentation="icon"
         allowColumnGrouping={false}
         groupBanner={false}

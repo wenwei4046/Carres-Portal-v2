@@ -9,8 +9,13 @@
  *   Drawer    right · top/bottom 12 · w400 · shadow-drawer · backdrop
  *   Menu      white · radius 8 · shadow-menu · pad 6 · item pad 7 10 · 13/500
  */
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 import MIcon from "@/components/carres/MIcon";
+import KitSelect from "@/components/kit/Select";
+import KitButton from "@/components/kit/Button";
+import KitDatePicker from "@/components/kit/DatePicker";
+import { controlClass } from "@/components/kit/field-recipe";
+import { DialogContainerProvider } from "@/components/kit/dialog-container";
 import { SEGMENT, SEGMENT_OFF, SEGMENT_ON, SEGMENTED_TRACK } from "@/components/kit/Tabs";
 import { avatarColor, personInitials, personLabel } from "@/lib/staff-avatar";
 
@@ -98,15 +103,8 @@ export function KvRow({
         <span className="flex min-w-0 items-start gap-1.5">
           <span className={`min-w-0 flex-1 break-words font-medium ${muted ? "text-c-muted" : "text-c-ink"}`}>{value}</span>
           {editing && editor && (
-            <button
-              type="button"
-              onClick={onOpen}
-              aria-label={`Edit ${label}`}
-              title="Edit"
-              className="-mt-1 grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-c-secondary hover:bg-c-hover hover:text-c-ink focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px]"
-            >
-              <MIcon name="edit" size={16} />
-            </button>
+            <KitButton variant="ghost" iconOnly icon="edit" onClick={onOpen}
+              aria-label={`Edit ${label}`} title="Edit" />
           )}
         </span>
       )}
@@ -123,10 +121,10 @@ export function factOf(v: string | null | undefined, absent = NOT_RECORDED): { v
 /* ── Buttons ────────────────────────────────────────────────────────────── */
 type BtnKind = "main" | "header" | "normal" | "quiet";
 const BTN: Record<BtnKind, string> = {
-  main: "h-[34px] px-3.5 font-semibold bg-c-ink text-white hover:opacity-90",
-  header: "h-[34px] px-3.5 font-medium bg-c-card text-c-ink border border-c-btn-border hover:bg-c-hover",
-  normal: "h-8 px-3 font-medium bg-c-card text-c-ink border border-c-btn-border hover:bg-c-hover",
-  quiet: "h-8 px-2.5 font-medium bg-transparent text-c-secondary hover:bg-c-hover",
+  main: "h-[34px] px-3.5 font-semibold bg-c-main text-white enabled:hover:opacity-90",
+  header: "h-[34px] px-3.5 font-medium bg-c-card text-c-ink border border-c-btn-border enabled:hover:bg-c-btn-hover",
+  normal: "h-8 px-3 font-medium bg-c-card text-c-ink border border-c-btn-border enabled:hover:bg-c-btn-hover",
+  quiet: "h-8 px-2.5 font-medium bg-transparent text-c-secondary enabled:hover:bg-c-btn-hover",
 };
 
 export function CBtn({
@@ -145,7 +143,7 @@ export function CBtn({
     <button
       type="button"
       {...rest}
-      className={`inline-flex shrink-0 items-center justify-center gap-1.5 focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px] whitespace-nowrap rounded-lg text-[13px] leading-none disabled:cursor-not-allowed disabled:opacity-50 ${BTN[kind]} ${className}`}
+      className={`inline-flex shrink-0 items-center justify-center gap-1.5 focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:2px] whitespace-nowrap rounded-lg text-[13px] leading-none disabled:cursor-not-allowed disabled:opacity-[.45] ${BTN[kind]} ${className}`}
     >
       {icon && <MIcon name={icon} size={18} />}
       {children}
@@ -172,16 +170,15 @@ export function CIconBtn({
       aria-label={label}
       title={label}
       {...rest}
-      className={`grid shrink-0 place-items-center rounded-full text-c-body hover:bg-c-hover focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px] ${size === 34 ? "h-[34px] w-[34px]" : "h-9 w-9"} ${className}`}
+      className={`grid shrink-0 place-items-center rounded-full text-c-body enabled:hover:bg-[var(--c-icon-hover)] enabled:active:bg-[var(--c-icon-press)] focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:2px] disabled:opacity-[.45] ${size === 34 ? "h-[34px] w-[34px]" : "h-9 w-9"} ${className}`}
     >
       <MIcon name={icon} size={20} />
     </button>
   );
 }
 
-/* ── Inputs (edit rows: h30) ────────────────────────────────────────────── */
-const FIELD =
-  "h-[30px] w-full min-w-0 rounded-lg border border-c-input-border bg-c-card px-2.5 text-[13px] text-c-ink outline-none focus:[outline:var(--c-focus)] focus:[outline-offset:-2px] disabled:bg-c-info-bg disabled:text-c-muted";
+/* Existing SO caller APIs adapt to the one Kit; no independent field skin. */
+const FIELD = controlClass(false, "single");
 
 export function CInput({
   label,
@@ -208,26 +205,16 @@ export function CSelect({
   disabled?: boolean;
   id?: string;
 }) {
+  const generatedId = useId();
   return (
-    <select
-      id={id}
-      aria-label={label}
-      value={value}
-      disabled={disabled}
-      onChange={(e) => onChange(e.target.value)}
-      className={FIELD}
-    >
-      {!value && <option value="">{placeholder}</option>}
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
+    <div className="[&>div>label]:sr-only">
+      <KitSelect id={id ?? generatedId} label={label} value={value} disabled={disabled}
+        onValueChange={onChange} placeholder={placeholder} options={options} />
+    </div>
   );
 }
 
-/** A date field with the browser's calendar; the value is ISO `YYYY-MM-DD`. */
+/** Existing ISO API, backed by the shared calendar and its keyboard/focus contract. */
 export function CDate({
   label,
   value,
@@ -241,16 +228,11 @@ export function CDate({
   min?: string;
   id?: string;
 }) {
+  const generatedId = useId();
   return (
-    <input
-      id={id}
-      type="date"
-      aria-label={label}
-      value={value ?? ""}
-      min={min}
-      onChange={(e) => onChange(e.target.value || null)}
-      className={FIELD}
-    />
+    <div className="[&>div>label]:sr-only">
+      <KitDatePicker id={id ?? generatedId} label={label} value={value} minDate={min} onChange={onChange} />
+    </div>
   );
 }
 
@@ -304,7 +286,7 @@ export function Drawer({
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !e.defaultPrevented) onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -313,7 +295,8 @@ export function Drawer({
   return (
     <>
       <div className="fixed inset-0 z-[70]" style={{ background: "var(--backdrop)" }} onClick={onClose} aria-hidden="true" />
-      <aside
+      <DialogContainerProvider>{(setContainer) => (
+      <aside ref={setContainer}
         role="dialog"
         aria-label={typeof title === "string" ? title : undefined}
         data-testid={testId}
@@ -329,6 +312,7 @@ export function Drawer({
             its own width, or the paper is re-cut forever. */}
         <div className="min-h-0 flex-1 overflow-y-scroll px-4 py-3.5 [scrollbar-gutter:stable]">{children}</div>
       </aside>
+      )}</DialogContainerProvider>
     </>
   );
 }
@@ -354,7 +338,7 @@ export function Dialog({
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !e.defaultPrevented) onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -362,7 +346,8 @@ export function Dialog({
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[80] grid place-items-center p-4" style={{ background: "var(--backdrop)" }}>
-      <div
+      <DialogContainerProvider>{(setContainer) => (
+      <div ref={setContainer}
         role="dialog"
         aria-modal="true"
         aria-label={typeof title === "string" ? title : undefined}
@@ -377,6 +362,7 @@ export function Dialog({
         <div className="min-h-0 flex-1 overflow-auto px-4 py-3.5">{children}</div>
         {footer && <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-c-section-line px-4 py-3">{footer}</div>}
       </div>
+      )}</DialogContainerProvider>
     </div>
   );
 }
@@ -408,7 +394,7 @@ export function PopMenu({
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !e.defaultPrevented) onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -439,7 +425,7 @@ export function PopMenu({
                   onClose();
                   it.onSelect();
                 }}
-                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-left text-[13px] text-c-ink hover:bg-c-hover focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px] disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-left text-[13px] text-c-ink enabled:hover:bg-c-hover focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:2px] disabled:cursor-not-allowed disabled:opacity-[.45]"
               >
                 <MIcon name={it.icon} size={18} className="text-c-secondary" />
                 <span className="flex-1">{it.label}</span>
@@ -477,7 +463,7 @@ export function PillTabs<K extends string>({
             aria-selected={on}
             onClick={() => onChange(t.key)}
             data-testid={`so-tab-${t.key}`}
-            className={`${SEGMENT} focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px] ${on ? SEGMENT_ON : SEGMENT_OFF}`}
+            className={`${SEGMENT} focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:2px] ${on ? SEGMENT_ON : SEGMENT_OFF}`}
           >
             {t.label}
           </button>
@@ -511,7 +497,7 @@ export function ViewSwitch<K extends string>({
             aria-selected={on}
             onClick={() => onChange(v.key)}
             data-testid={`route-view-${v.key}`}
-            className={`${SEGMENT} focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px] ${on ? SEGMENT_ON : SEGMENT_OFF}`}
+            className={`${SEGMENT} focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:2px] ${on ? SEGMENT_ON : SEGMENT_OFF}`}
           >
             {v.label}
           </button>

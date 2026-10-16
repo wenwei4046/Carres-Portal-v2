@@ -11,24 +11,29 @@ import { useEffect, useState } from "react";
 import MIcon from "@/components/carres/MIcon";
 import Modal from "@/components/kit/Modal";
 import PdfPreview from "@/components/kit/PdfPreview";
+import Button from "@/components/kit/Button";
 import { TASK_VIEW_WORDS as W, fileCount, type TaskFile, type TaskFileStage } from "./task-view";
 
-const ICON_BUTTON = "grid h-7 w-7 shrink-0 place-items-center rounded-full text-c-secondary outline-none hover:bg-c-hover focus-visible:[outline:var(--c-focus)] disabled:opacity-45 disabled:hover:bg-transparent";
+const ICON_BUTTON = "grid h-11 w-11 min-[768px]:h-8 min-[768px]:w-8 shrink-0 place-items-center rounded-full text-c-secondary outline-none enabled:hover:bg-c-hover focus-visible:[outline:var(--c-focus)] disabled:opacity-[0.45]";
 
 function Viewer({ file, onClose }: { file: TaskFile | null; onClose: () => void }) {
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     if (!file) return;
     let cancelled = false; let made: string | undefined;
     setUrl(null); setFailed(false);
     file.load().then((blob) => { if (cancelled) return; made = URL.createObjectURL(blob); setUrl(made); }).catch(() => { if (!cancelled) setFailed(true); });
     return () => { cancelled = true; if (made) URL.revokeObjectURL(made); };
-  }, [file]);
+  }, [file, attempt]);
   return (
     <Modal open={!!file} onOpenChange={(open) => { if (!open) onClose(); }} title={file?.name ?? W.tab.files} width="viewer">
       {url ? <PdfPreview src={url} title={file?.name ?? W.tab.files} />
-        : <p className="text-body" role={failed ? "alert" : "status"}>{failed ? W.fileFailed : W.fileLoading}</p>}
+        : <div className="flex flex-col items-start gap-2">
+          <p className="text-body" role={failed ? "alert" : "status"}>{failed ? W.fileFailed : W.fileLoading}</p>
+          {failed && <Button onClick={() => setAttempt((n) => n + 1)}>Try again</Button>}
+        </div>}
     </Modal>
   );
 }

@@ -1,27 +1,8 @@
 /**
- * Appearance — each person's own theme and focus outline (owner-confirmed
- * handoff v4, UI Kit "Settings → Appearance", Jess 2026-10-08: "每人自己选
- * theme，存在个人资料").
- *
- * A theme changes only three things — page ground, selected background,
- * selected text (and the checkbox accent, which reads the selected text). Ink,
- * charcoal buttons, status colours and borders never change. The values live
- * in `styles/carres-tokens.css` under `[data-theme]` / `[data-focus]`; this
- * file only chooses which attribute `<html>` carries.
- *
- * ONE home for the choice: the signed-in person's own login profile
- * (`user_metadata.appearance`, written by `auth.updateUser` for that person
- * only). There is no second browser copy, so a shared computer never paints
- * one person's colours for the next (01 §9 · UI MASTER Settings pattern):
- *
- *   first frame   the profile inside the login session this browser keeps for
- *                 the person (Supabase's own persisted session) — else Blue
- *   signed in     the session's profile, re-applied whenever it changes
- *   signed out    Blue (default), at once
- *   Save changes  the page changes only once the profile holds the choice
- *   a save fails  nothing changes on screen and nothing else is sent; the
- *                 picker keeps the choice so `Save changes` retries it
- *   a switch      an answer for a person who has since signed out is ignored
+ * Personal theme, saved only to the signed-in person's own profile (01 §9).
+ * A theme changes selection colours only. Keyboard focus is the fixed shared
+ * rule in 01 §3; legacy profile focus fields are ignored. Save failure retains
+ * the draft, and a late answer after an account switch applies nothing.
  */
 import { useEffect } from "react";
 import type { User } from "@supabase/supabase-js";
@@ -30,11 +11,9 @@ import { useAuth } from "./auth";
 
 export const THEME_KEYS = ["carres", "slate", "blue", "teal", "violet", "honey", "olive", "rose", "latte"] as const;
 export type ThemeKey = (typeof THEME_KEYS)[number];
-export const FOCUS_KEYS = ["soft", "theme", "strong"] as const;
-export type FocusKey = (typeof FOCUS_KEYS)[number];
-export type Appearance = { theme: ThemeKey; focus: FocusKey };
+export type Appearance = { theme: ThemeKey };
 
-export const DEFAULT_APPEARANCE: Appearance = { theme: "blue", focus: "soft" };
+export const DEFAULT_APPEARANCE: Appearance = { theme: "blue" };
 
 /** The picker's words. Each theme's identity dot is the CSS variable
  *  `--theme-dot-{key}` in `index.css` (UI Kit theme table). */
@@ -54,18 +33,11 @@ export const THEME_GROUPS: { group: "Brand" | "Cool" | "Warm"; sub: string }[] =
   { group: "Cool", sub: "Calm and crisp" },
   { group: "Warm", sub: "Soft and homely" },
 ];
-export const FOCUS_CHOICES: { key: FocusKey; name: string; note: string }[] = [
-  { key: "soft", name: "Soft grey", note: "Quiet. Default." },
-  { key: "theme", name: "Theme colour", note: "Thin line in your theme" },
-  { key: "strong", name: "Strong", note: "Easy to see" },
-];
-
 /** Anything unrecognised falls back to the default, never to a guess. */
 export function readAppearance(raw: unknown): Appearance {
-  const v = (raw ?? {}) as { theme?: unknown; focus?: unknown };
+  const v = (raw ?? {}) as { theme?: unknown };
   return {
     theme: (THEME_KEYS as readonly unknown[]).includes(v.theme) ? (v.theme as ThemeKey) : DEFAULT_APPEARANCE.theme,
-    focus: (FOCUS_KEYS as readonly unknown[]).includes(v.focus) ? (v.focus as FocusKey) : DEFAULT_APPEARANCE.focus,
   };
 }
 
@@ -73,7 +45,7 @@ export function readAppearance(raw: unknown): Appearance {
 export function applyAppearance(a: Appearance) {
   const root = document.documentElement;
   root.dataset.theme = a.theme;
-  root.dataset.focus = a.focus;
+  delete root.dataset.focus; // remove an old preference left on this document
 }
 
 /** The persisted login session's key — Supabase's own default
@@ -121,15 +93,14 @@ export function useProfileAppearance() {
   const userId = useAuth((s) => s.session?.user?.id ?? null);
   const meta = useAuth((s) => (s.session?.user?.user_metadata as { appearance?: unknown } | undefined)?.appearance);
   const theme = readAppearance(meta).theme;
-  const focus = readAppearance(meta).focus;
   useEffect(() => {
     if (!hydrated) return; // the first frame already shows the persisted profile
     if (!userId) {
       applyAppearance(DEFAULT_APPEARANCE);
       return;
     }
-    applyAppearance({ theme, focus });
-  }, [hydrated, userId, theme, focus]);
+    applyAppearance({ theme });
+  }, [hydrated, userId, theme]);
 }
 
 export type SaveResult = "saved" | "superseded";

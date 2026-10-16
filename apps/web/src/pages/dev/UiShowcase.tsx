@@ -7,12 +7,12 @@
  * from these parts only. The earlier kit that stood here (the July decisions, the
  * slate tokens and their components) is replaced, not kept beside it: one kit.
  *
- * The second half, "Shared parts the pages use", is every other shared component
- * the Portal's pages import today (counted 15 Oct 2026), led by the one listing
- * engine, DataGrid. Where two components still do one job, both are shown and the
- * last section names the merge that is owed: one kit means nothing hides here.
+ * This catalogue shows the current shared design once per purpose. Retired demos,
+ * historical import counts and migration worklists do not belong beside the kit.
+ * Remaining consumer migration is tracked in the existing delivery handoff.
  */
 import { useEffect, useState, type ReactNode } from "react";
+import kitSource from "../../../../../docs/ui/MASTER.md?raw";
 import MIcon from "@/components/carres/MIcon";
 import CPill, { type CPillTone } from "@/components/carres/CPill";
 import CPopover, { CMenu, CMenuGroup, CMenuItem } from "@/components/carres/CPopover";
@@ -25,7 +25,6 @@ import CSidePanel from "@/components/carres/CSidePanel";
 import { CChip, CIconButton, CShowPanelButton, CViewButton } from "@/components/carres/CToolbar";
 import { SEGMENT, SEGMENT_OFF, SEGMENT_ON, SEGMENTED_TRACK } from "@/components/kit/Tabs";
 import { TasksPill, useShellTasks } from "@/pages/operation/components/ShellTasks";
-import Block from "@/components/kit/Block";
 import Button from "@/components/kit/Button";
 import Checkbox from "@/components/kit/Checkbox";
 import DatePicker from "@/components/kit/DatePicker";
@@ -35,20 +34,57 @@ import Input from "@/components/kit/Input";
 import Loading from "@/components/kit/Loading";
 import Modal from "@/components/kit/Modal";
 import PdfPreview from "@/components/kit/PdfPreview";
-import RouteStop from "@/components/kit/RouteStop";
 import SavedEvidenceViewer from "@/components/kit/SavedEvidenceViewer";
 import SearchInput from "@/components/kit/SearchInput";
 import Select from "@/components/kit/Select";
-import StatusPill from "@/components/kit/StatusPill";
 import StepList, { Step } from "@/components/kit/StepList";
 import Tabs from "@/components/kit/Tabs";
 import TaskView from "@/components/kit/TaskView";
 import Textarea from "@/components/kit/Textarea";
 import Tooltip from "@/components/kit/Tooltip";
-import { TONES as STATUS_TONES } from "@/components/kit/tokens";
-import ListOptionsExample from "@/pages/dev/ListOptionsExample";
-import ServerRegisterExample from "@/pages/dev/ServerRegisterExample";
-import CompactCardExample from "@/pages/dev/CompactCardExample";
+import { TaskWideSurface } from "@/pages/operation/tasks/TaskFrame";
+
+/** Display canonical specification tables, rather than maintaining another set of values. */
+function specificationRows(source: string, start: string, end: string) {
+  const section = source.slice(source.indexOf(start)).split(end)[0] ?? "";
+  let group = "";
+  return section.split("\n").flatMap((line) => {
+    if (line.startsWith("### ")) group = line.slice(4);
+    if (!line.startsWith("|")) return [];
+    const cells = line.split("|").slice(1, -1).map((cell) => cell.trim());
+    if (!cells[0] || cells[0].startsWith("---") || ["Check", "State"].includes(cells[0])) return [];
+    return [{ group, cells: cells.length === 3 ? [cells[0]!, cells[1]!, "Preserve the owning module contract", cells[2]!] : cells }];
+  });
+}
+const MEASUREMENT_ROWS = specificationRows(kitSource, "## 7 ·", "## 8 ·");
+const UX_ROWS = specificationRows(kitSource, "## §2.2 ·", "**Feedback:**");
+
+const COLOUR_TOKENS = [
+  ["Page ground", "--c-ground"],
+  ["Surface", "--c-card"],
+  ["Table header", "--c-band"],
+  ["Primary text", "--c-ink"],
+  ["Body text", "--c-body"],
+  ["Secondary text", "--c-secondary"],
+  ["Border", "--c-card-border"],
+  ["Table row line", "--c-row-line"],
+  ["Selected tab", "--c-select-bg"],
+  ["Selection text", "--c-select-fg"],
+  ["Button hover", "--c-btn-hover"],
+  ["Main action", "--c-main"],
+  ["Selected row", "--c-select-bg"],
+  ["Row hover", "--c-row-hover"],
+  ["Keyboard focus", "--c-focus"],
+  ["Open frame", "--c-open-frame"],
+  ["Done surface", "--c-ok-bg"],
+  ["Done text", "--c-ok-fg"],
+  ["Needs action surface", "--c-warn-bg"],
+  ["Needs action text", "--c-warn-fg"],
+  ["Neutral pill", "--c-info-bg"],
+  ["Hold", "--c-hold-bg"],
+  ["None surface", "--c-search-bg"],
+  ["None text", "--c-secondary"],
+] as const;
 
 function Section({ id, title, note, children }: { id: string; title: string; note?: string; children: ReactNode }) {
   return (
@@ -140,7 +176,7 @@ function TableExample({ narrow }: { narrow: boolean }) {
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(20);
   return (
-    <section className="grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)]" style={{ width: narrow ? 560 : "100%", height: 300 }} data-carres-table="list" aria-label={narrow ? "TEST list, narrow" : "TEST list"}>
+    <section className="grid max-w-full min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)]" style={{ width: narrow ? 560 : "100%", height: 300 }} data-carres-table="list" aria-label={narrow ? "TEST list, narrow" : "TEST list"}>
       <DataGrid<Row>
         rows={ROWS}
         columns={GRID_COLUMNS}
@@ -172,8 +208,8 @@ function TableExample({ narrow }: { narrow: boolean }) {
           defaultExpandedKeys: narrow ? [] : ["t1"],
           label: (_r, isOpen) => (isOpen ? "Hide items" : "Show items"),
           renderExpansion: (r) => (
-            <ItemRows label={r.cells.order!.t}>
-              <div role="row" className="grid h-8 grid-cols-[minmax(0,1fr)_120px] items-center bg-c-band px-[5px] text-meta font-medium text-c-secondary">
+            <ItemRows label={r.cells.order!.t} stepBack={0}>
+              <div role="row" className="grid h-10 grid-cols-[minmax(0,1fr)_120px] items-center bg-c-band px-[5px] text-meta font-medium text-c-secondary">
                 <span role="columnheader">Item</span>
                 <span role="columnheader">Qty</span>
               </div>
@@ -208,7 +244,7 @@ const ORDER_LINES: COrderLine[] = [
 
 function OrderLinesExample({ narrow }: { narrow: boolean }) {
   return (
-    <div className="flex min-w-0 flex-col rounded-lg border border-c-card-border bg-c-card px-4 py-3.5" style={{ width: narrow ? 420 : "100%" }}>
+    <div className="flex max-w-full min-w-0 flex-col rounded-lg border border-c-card-border bg-c-card px-4 py-3.5" style={{ width: narrow ? 420 : "100%" }}>
       <h3 className="pb-1.5 text-strong text-c-ink">Items</h3>
       <COrderLines
         label={narrow ? "TEST items, narrow" : "TEST items"}
@@ -236,7 +272,7 @@ const CELLS: Array<[string, CCell]> = [
 ];
 const TONES: CPillTone[] = ["ok", "warn", "info", "blocked", "select"];
 
-/* ── shared parts the pages use: every one is the component the pages import ── */
+/* ── current shared controls ── */
 const CARRIERS = [
   { value: "nets", label: "NETS" },
   { value: "houzs", label: "HOUZS" },
@@ -300,29 +336,46 @@ function SharedParts() {
   const [carrier, setCarrier] = useState<string | undefined>(undefined);
   const [picked, setPicked] = useState(true);
   const [date, setDate] = useState<string | null>("2026-10-19");
-  const [view, setView] = useState("table");
+  const [view, setView] = useState("open");
+  const [sampleAction, setSampleAction] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
   return (
     <>
       <header className="flex flex-col gap-1 border-t border-c-section-line pt-8">
-        <h2 className="text-page">Shared parts the pages use</h2>
+        <h2 className="text-strong text-c-ink">Shared controls</h2>
         <p className="text-[13px] text-c-secondary">
-          Every component below is imported by Portal pages today; the count is how many pages import it (15 Oct 2026). All data is TEST.
+          Current form, menu, feedback, document and task components. All examples use TEST data; actions here do not save business records.
         </p>
       </header>
 
-      <Section id="list-engine" title="List engine: DataGrid (56 pages)" note="The one listing engine (UI MASTER §6.0, §6.2): Sales Orders register, SO Batch Purchase, Forecast Purchase, Purchase Orders, Receiving, Warehouse, Delivery, Payments, Finance and Workspace Tasks. Sort, per-column filters, Columns, grouping, resize, ticks and the selection bar, row expansion, export, list PDF, saved layouts, return context and the keyboard all live here once; a module passes its columns, rows, filters and actions.">
-        <ListOptionsExample />
-        <ServerRegisterExample />
+      <Section id="complete-pages" title="Complete pages" note="Development fixtures using actual page components. These examples do not prove saved records, production permissions or completed business actions.">
+        <nav aria-label="Complete page previews" className="flex flex-col gap-3 text-body">
+          <a className="underline underline-offset-4" href="/sales-orders-shell-preview.html">Sales Order · list and record opening</a>
+          <a className="underline underline-offset-4" href="/sales-orders-shell-preview.html?scenario=empty">Sales Order · genuinely empty list</a>
+          <a className="underline underline-offset-4" href="/sales-orders-shell-preview.html?scenario=search-empty&amp;search=TEST-NONE&amp;total=unknown">Sales Order · empty search with unknown total</a>
+          <a className="underline underline-offset-4" href="/sales-orders-shell-preview.html?scenario=population-retry&amp;search=TEST-NONE&amp;total=unknown">Sales Order · population read failure and retry</a>
+          <a className="underline underline-offset-4" href="/sales-orders-shell-preview.html?scenario=failed">Sales Order · list read failure</a>
+          <a className="underline underline-offset-4" href="/sales-orders-shell-preview.html?scenario=denied">Sales Order · list access denied</a>
+          <a className="underline underline-offset-4" href="/so-workspace-shell-preview.html">Sales Order · full shell and detail</a>
+          <a className="underline underline-offset-4" href="/so-workspace-shell-preview.html?state=empty">Sales Order · no payments recorded</a>
+          <a className="underline underline-offset-4" href="/so-workspace-shell-preview.html?state=forbidden">Sales Order · payment access denied</a>
+          <a className="underline underline-offset-4" href="/so-workspace-shell-preview.html?state=route-failed">Sales Order · Route read failure</a>
+          <a className="underline underline-offset-4" href="/so-workspace-shell-preview.html?state=tasks-failed">Sales Order · Tasks read failure</a>
+          <a className="underline underline-offset-4" href="/route-preview.html">Order Route · standalone implementation example</a>
+          <a className="underline underline-offset-4" href="/work-preview.html?shell=1&pw=1&at=%2Foperation%3Ftab%3Dwork">Workspace · My Task and Team Work</a>
+          <a className="underline underline-offset-4" href="/so-batch-shell-preview.html">Tasks · list and open task</a>
+        </nav>
+        <p className="text-meta text-c-secondary">Check complete pages at 1025, 1164 and 1440 wide, with applicable narrow and zoom states. The standalone Route shows existing implementation, not an approved replacement for the current Route composition. Acceptance is recorded in the existing delivery handoff.</p>
       </Section>
 
-      <Section id="buttons" title="Button (131 pages)" note="Main, normal and quiet; 32 high on a desktop, 40 where a finger presses. One main button per area. No danger button: a destructive command is a normal button whose word says what it does.">
+      <Section id="buttons" title="Buttons" note="Main, normal and quiet; 32 high in the desktop toolbar role, at least 44 on a narrow screen. One main button per area. Destructive commands use a clear action name.">
         <Panel2>
           <Sample label="main · normal · quiet">
             <Button variant="primary">Issue PO</Button>
-            <Button>Open order</Button>
-            <Button variant="ghost">Cancel</Button>
+            <Button onClick={() => setSampleAction("TEST · Preview selected")}>Preview</Button>
+            <Button variant="ghost" onClick={() => setSampleAction("")}>Cancel</Button>
           </Sample>
           <Sample label="with an icon · small · icon only (named)">
             <Button icon="print">Print</Button>
@@ -336,7 +389,7 @@ function SharedParts() {
         </Panel2>
       </Section>
 
-      <Section id="fields" title="Fields: Input (49) · Select (72) · Textarea (29) · DatePicker (35) · Checkbox (23) · SearchInput (5)" note="One field skin: label above, hint under, an error replaces the hint and keeps what was typed.">
+      <Section id="fields" title="Fields" note="One field skin: label above, hint under, an error replaces the hint and keeps what was typed.">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Panel2>
             <Input id="ui-k-in" label="Sales order" hint="The number on the customer's copy" defaultValue="SO-TEST-01" />
@@ -352,16 +405,16 @@ function SharedParts() {
         </div>
       </Section>
 
-      <Section id="menus" title="Menu and pop-ups: CPopover · CMenu · Tooltip (5)" note="One pop-up, CPopover: as a menu (CMenu, items as data: ↓, Enter or Space opens it on its first command, ↑ ↓ Home End move, Escape or Tab closes it and focus goes back to its button; a menu carries no colour) and as a small panel (a filter, a calendar, a list of links). Inside a dialog it opens within the dialog.">
+      <Section id="menus" title="Menus and pop-ups" note="One pop-up, CPopover: as a menu (CMenu, items as data: ↓, Enter or Space opens it on its first command, ↑ ↓ Home End move, Escape or Tab closes it and focus goes back to its button; a menu carries no colour) and as a small panel (a filter, a calendar, a list of links). Inside a dialog it opens within the dialog.">
         <Panel2>
           <Sample label="⋮ menu">
             <CMenu
               label="Row actions"
               trigger={<Button iconOnly icon="overflow" aria-label="Row actions" />}
               items={[
-                { key: "print", label: "Print", icon: "print", onSelect: () => {} },
-                { key: "copy", label: "Copy reference", icon: "copy", onSelect: () => {} },
-                { key: "cancel", label: "Cancel order", separatorBefore: true, onSelect: () => {} },
+                { key: "print", label: "Print", icon: "print", onSelect: () => setSampleAction("TEST · Print selected") },
+                { key: "copy", label: "Copy reference", icon: "copy", onSelect: () => setSampleAction("TEST · Copy reference selected") },
+                { key: "cancel", label: "Cancel order", separatorBefore: true, disabled: true, onSelect: () => setSampleAction("TEST · Cancel selected; no record changed") },
               ]}
             />
             <CPopover label="Filters" trigger={<Button icon="filter">Filter</Button>}>
@@ -376,103 +429,104 @@ function SharedParts() {
         </Panel2>
       </Section>
 
-      <Section id="tabs-kit" title="Tabs (16 pages)" note="The grey segmented control: exactly one is on.">
+      <Section id="tabs-kit" title="Tabs" note="The grey segmented control: exactly one is on.">
         <Panel2>
-          <Tabs label="Register presentation" value={view} onValueChange={setView} tabs={[{ value: "table", label: "Table" }, { value: "cards", label: "Cards" }]} />
+          <Tabs label="Sample views" value={view} onValueChange={setView} tabs={[{ value: "open", label: "Open" }, { value: "delivered", label: "Delivered" }, { value: "all", label: "All" }]} />
         </Panel2>
       </Section>
 
-      <Section id="dialogs" title="Modal (49) · Drawer (12)" note="A Modal asks one thing; a Drawer opens a record beside its list. Escape closes both and focus returns to the button that opened them.">
+      <Section id="dialogs" title="Dialogs and drawers" note="Use a dialog for a focused form and a drawer for supporting context. Ordinary dialogs close on Escape. A task-wide review keeps its owning Save and Cancel as the only exits. Closing returns focus to the trigger.">
         <Panel2>
           <Sample label="open them">
             <Button variant="primary" onClick={() => setModalOpen(true)}>Open a modal</Button>
             <Button onClick={() => setDrawerOpen(true)}>Open a drawer</Button>
+            <Button onClick={() => setReviewOpen(true)}>Open task review</Button>
           </Sample>
         </Panel2>
         <Modal
           open={modalOpen}
           onOpenChange={setModalOpen}
-          title="Record the delay decision"
+          title="TEST · Form preview"
           footer={<><Button variant="ghost" onClick={() => setModalOpen(false)}>Cancel</Button><Button variant="primary" onClick={() => setModalOpen(false)}>Save</Button></>}
         >
           <Select id="ui-k-modal-sel" label="Logistics" placeholder="Pick a carrier" options={CARRIERS} value={carrier} onValueChange={setCarrier} />
         </Modal>
         <Drawer variant="quick-view" open={drawerOpen} onOpenChange={setDrawerOpen} title="SO-TEST-01 · TEST Customer A">
           <div className="flex flex-col gap-4">
-            <Block title="Delivery"><p className="text-body">Not recorded</p></Block>
-            <Block title="Items"><p className="text-body">No items on this order</p></Block>
+            <p className="text-body text-c-secondary">TEST · Supporting document context</p>
           </div>
         </Drawer>
+        <Modal open={reviewOpen} onOpenChange={setReviewOpen} title="TEST · Task review" variant="task-review">
+          <TaskWideSurface title="TEST · Task review" about="SO-TEST-01">
+            <div className="flex flex-col gap-4">
+              <Input id="ui-k-review-note" label="Note (optional)" />
+              <div className="flex gap-2"><Button variant="primary" onClick={() => setReviewOpen(false)}>Save</Button><Button onClick={() => setReviewOpen(false)}>Cancel</Button></div>
+            </div>
+          </TaskWideSurface>
+        </Modal>
       </Section>
 
-      <Section id="states" title="States: EmptyState (16) · Loading (18)" note="Empty, failed and no access are three different sentences, never one.">
+      <Section id="states" title="Feedback states" note="Empty, failed and no access are three different sentences, never one.">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <Panel2><EmptyState icon="search" title="No orders match this filter" detail="Clear a filter to see the rest." /></Panel2>
-          <Panel2><EmptyState icon="late" title="This did not load" detail="The connection dropped before the list arrived." action={<Button variant="primary" icon="refresh">Try again</Button>} /></Panel2>
-          <Panel2><EmptyState icon="lock" title="You cannot open this" detail="Ask a manager for access." /><Loading variant="skeleton" /></Panel2>
+          <Panel2><EmptyState icon="late" title="Could not be loaded" detail="TEST · Failed read. Retry keeps the current context." action={<Button variant="primary" icon="refresh">Try again</Button>} /></Panel2>
+          <Panel2><EmptyState icon="lock" title="No access" detail="TEST · Restricted content is unavailable." /></Panel2>
         </div>
+        <Panel2><Loading variant="skeleton" /></Panel2>
       </Section>
 
-      <Section id="status-pill" title="StatusPill (19 pages)" note="The status pill the object pages and older lists use, in the action engine's tone words. It draws from the same shape and colour pairs as the list's CPill (above): one pill, changed in one place.">
-        <Panel2>
-          <Sample label="every tone">
-            {STATUS_TONES.map((tone) => <StatusPill key={tone} tone={tone}>{tone}</StatusPill>)}
-          </Sample>
-        </Panel2>
-      </Section>
-
-      <Section id="compact-card" title="Working Panel: CompactModuleCard (6 pages)" note="One card for every module's record beside its list: identity, the module's tabs, facts with their editors, items, Communication and Timeline (UI MASTER §4.3). TEST sample.">
-        <CompactCardExample />
-      </Section>
-
-      <Section id="documents" title="Documents: PdfPreview (11) · SavedEvidenceViewer (6)" note="The real rendered document, fit to width, with loading and retry. Saved photos and video stay read only.">
+      <Section id="documents" title="Documents and evidence" note="The real rendered document, fit to width, with loading and retry. Saved photos and video stay read only.">
         <Panel2>
           <PdfPreviewSample />
           <Sample label="saved evidence"><SavedEvidenceSample /></Sample>
         </Panel2>
       </Section>
 
-      <Section id="task-parts" title="Tasks: TaskView · StepList · RouteStop · Block" note="The one opened task (the Tasks panel and Workspace): the task, its record, one row per fact, then Steps · Route · History · Files. Placeholders in braces; a page fills them from records.">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="max-w-[320px]">
-            <TaskView
-              title="{The task, as its list card says it}"
-              moduleIcon="shopping_cart"
-              page="{Page}"
-              record="{Record}"
-              openRecordLabel="Open {Record}"
-              onOpenRecord={() => {}}
-              owner="{Owner Name}"
-              tabsLabel="Task sections"
-              facts={[
-                { key: "deadline", icon: "event", label: "Deadline", value: "{date · n days late}", warn: true },
-                { key: "contact", icon: "forum", label: "Contact", value: "{party · channel}" },
-              ]}
-              tabs={[
-                { key: "steps", label: "Steps", content: (
-                  <StepList aria-label="{Job}">
-                    <Step n={1} state="done" title="{Step done}" sub="{What was done}" />
-                    <Step n={2} state="current" title="{Step to do now}" sub="{Finish when: …}" />
-                  </StepList>
-                ) },
-                { key: "history", label: "History", content: <p className="text-body text-c-secondary">{"{What was recorded, newest first}"}</p> },
-              ]}
-            />
-          </div>
-          <div className="rounded-lg border border-c-card-border bg-c-card p-5">
-            <RouteStop label="{Stop}" tone="due" last>
-              <Block title="{What to do}" why={{ text: "{Why}", tone: "due" }}>
-                <p className="text-body">{"{A fact}"}</p>
-              </Block>
-            </RouteStop>
-          </div>
+      <Section id="task-parts" title="Task view and steps" note="One shared task view. The owning module supplies its facts and work; this TEST example records nothing.">
+        <div className="max-w-[420px] rounded-lg border border-c-card-border bg-c-card p-4">
+          <TaskView
+            title="Record supplier answer"
+            moduleIcon="shopping_cart"
+            page="Purchasing"
+            record="PO-TEST-01"
+            openRecordLabel="Preview PO-TEST-01"
+            onOpenRecord={() => setSampleAction("TEST · PO-TEST-01 selected")}
+            owner="TEST Staff"
+            tabsLabel="Task sections"
+            facts={[
+              { key: "deadline", icon: "event", label: "Deadline", value: "15 Oct · Thu" },
+              { key: "contact", icon: "forum", label: "Contact", value: "TEST Supplier" },
+            ]}
+            tabs={[
+              { key: "steps", label: "Steps", content: (
+                <StepList aria-label="TEST supplier answer">
+                  <Step n={1} state="done" title="Check the source" sub="TEST · Source checked" />
+                  <Step n={2} state="current" title="Record the answer" sub="TEST · The owning module supplies its form" />
+                </StepList>
+              ) },
+              { key: "history", label: "History", content: <p className="text-body text-c-secondary">TEST · No recorded changes</p> },
+            ]}
+          />
         </div>
       </Section>
+      <p role="status" aria-label="TEST action result" className="text-body text-c-secondary">{sampleAction}</p>
     </>
   );
 }
 
 export default function UiShowcase() {
+  const [colourValues, setColourValues] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const refresh = () => {
+      const computed = getComputedStyle(document.documentElement);
+      setColourValues(Object.fromEntries(COLOUR_TOKENS.map(([, token]) => [token, computed.getPropertyValue(token).trim()])));
+    };
+    refresh();
+    const observer = new MutationObserver(refresh);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "class"] });
+    return () => observer.disconnect();
+  }, []);
+
   const [tab, setTab] = useState("open");
   const [menu, setMenu] = useState(false);
   const [summary, setSummary] = useState(true);
@@ -485,19 +539,76 @@ export default function UiShowcase() {
       <header className="flex flex-col gap-1">
         <h1 className="text-page">Carres UI kit</h1>
         <p className="text-[13px] text-c-secondary">
-          The one kit (UI MASTER, 14 Oct 2026). The look is Sales Order Outright v12. Every part is the component the pages use; all data is TEST.
+          One shared standard for every Carres page: colours, typography, dimensions, components and page compositions. Use these shared components; do not create a page-specific kit. Examples use TEST data. Rules: docs/ui/MASTER.md.
         </p>
       </header>
 
-      <Section id="table" title="Carres Table" note="Sticky grey 40 header · 54 rows, every cell on one line · ▸ and tick 24 · gap 10 · a column is as wide as its longest value · ▸, tick and the identifier stay while the list scrolls in its own box · ▸ opens the items on the row's own columns · the footer takes two lines at most, short forms when the full words need a third, and never widens the list.">
+      <nav aria-label="Kit sections" className="grid grid-cols-3 gap-x-4 gap-y-1 sm:grid-cols-6 lg:grid-cols-9">
+        {[["colours", "Colours"], ["typography", "Typography"], ["measurements", "Dimensions"], ["ux-rules", "UX rules"], ["table", "Tables"], ["cells", "Table cells"], ["order-lines", "Order lines"], ["pills", "Pills"], ["toolbar", "Toolbar"], ["side-panel", "Side panel"], ["icons", "Icons"], ["complete-pages", "Complete pages"], ["buttons", "Buttons"], ["fields", "Fields"], ["menus", "Menus"], ["tabs-kit", "Tabs"], ["dialogs", "Dialogs"], ["states", "States"], ["documents", "Documents"], ["task-parts", "Tasks"]].map(([id, label]) => (
+          <a key={id} href={`#${id}`} className="inline-flex min-h-11 items-center text-body text-c-secondary underline decoration-c-chip-border underline-offset-2">{label}</a>
+        ))}
+      </nav>
+
+      <Section id="colours" title="Colours" note="Swatches and printed values read the same shared runtime tokens, with no page-local palette. The one UI/UX MASTER owns the approved palette; themes change selection colours only. Status colours remain fixed. See the actual status components in Pills.">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          {COLOUR_TOKENS.map(([label, token]) => (
+            <div key={label} className="flex min-w-0 flex-col gap-2 rounded-lg border border-c-card-border bg-c-card p-3">
+              <span aria-hidden="true" className="h-11 rounded-lg border border-c-card-border" style={token === "--c-focus" ? { outline: `var(${token})` } : { background: `var(${token})` }} data-token={token} />
+              <span className="text-meta text-c-ink">{label}</span>
+              <span className="text-meta font-medium">{colourValues[token] || token}</span>
+              <span className="break-words text-meta text-c-secondary">{token}</span>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      <Section id="typography" title="Typography" note="Inter. The page heading above shows the 20/600 title once. Samples below use the running shared classes; the UI/UX MASTER owns the permitted roles. Table numbers use tabular figures.">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {[["15 / 500 · Card title", "text-strong", "Customer"], ["14 / 400 · Breadcrumb", "text-control", "Sales Orders"], ["13 / 400 · Body", "text-body", "TEST · Order details"], ["13 / 500 · Selected or field value", "text-body font-medium", "TEST · Selected value"], ["13 / 600 · Identifier or main action", "text-body font-semibold", "SO-TEST-01"], ["12 / 400 · Label or second line", "text-meta", "TEST · Customer A"], ["12 / 500 · Header or pill", "text-meta font-medium", "Proceed date"], ["11 / 500 · Caps label", "text-label uppercase tracking-[0.06em]", "Summary"], ["11 / 700 · Count badge", "text-label font-bold", "12"]].map(([label, className, sample]) => (
+            <div key={label} className="flex min-w-0 flex-col gap-2 rounded-lg border border-c-card-border bg-c-card p-3">
+              <span className="text-meta text-c-secondary">{label}</span>
+              <span className={`${className} text-c-ink`} data-type-sample={label}>{sample}</span>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      <Section id="measurements" title="Dimensions and usage" note="The full checklist below reads directly from the one UI/UX MASTER. Each item gives its approved value, trigger and shared entry. Units: CSS px. UNRESOLVED means no approved value exists; it must not be guessed.">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          {MEASUREMENT_ROWS.map(({ group, cells }) => (
+            <div key={`${group}-${cells[0]}`} className="flex min-w-0 flex-col gap-2 rounded-lg border border-c-card-border bg-c-card p-3">
+              <p className="text-meta text-c-secondary">{group}</p>
+              <h3 className="text-body font-medium">{cells[0]}</h3>
+              <dl className="flex flex-col gap-2 text-meta">
+                <div><dt className="text-c-secondary">Approved value / contract</dt><dd>{cells[1]}</dd></div>
+                <div><dt className="text-c-secondary">Trigger / behaviour</dt><dd>{cells[2]}</dd></div>
+                {cells[3] && <div><dt className="text-c-secondary">Shared entry</dt><dd className="break-words">{cells[3]}</dd></div>}
+              </dl>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      <Section id="ux-rules" title="UX rules" note="Required state behaviour from the one UI MASTER §2.2. Components demonstrate appearance; the owning module supplies facts, permission and the actual saved result.">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {UX_ROWS.map(({ cells }) => (
+            <div key={cells[0]} className="flex min-w-0 flex-col gap-2 rounded-lg border border-c-card-border bg-c-card p-3">
+              <h3 className="text-body font-medium">{cells[0]}</h3>
+              <p className="text-meta">{cells[1]}</p>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      <Section id="table" title="Shared table · DataGrid" note="Sticky grey 40 header · 54 rows, every cell on one line · ▸ and tick 24 · gap 10 · a column is as wide as its longest value · ▸, tick and the identifier stay while the list scrolls in its own box · ▸ opens the items on the row's own columns · the footer takes two lines at most, short forms when the full words need a third, and never widens the list.">
         <TableExample narrow={false} />
         <TableExample narrow />
       </Section>
 
       <Section id="cells" title="Table cells" note="Main words, then the grey second line, each on one line. A long value widens its column and the list scrolls sideways in its own box; only a customer's name ends with … when its column is short, the full name on hover. A date has no year in this year. Three states are never merged: read and empty, read failed, no access.">
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {CELLS.map(([name, cell]) => (
-            <div key={name} className="flex flex-col gap-1.5 rounded-lg bg-c-card p-3 ring-1 ring-inset ring-c-card-border">
+            <div key={name} className="flex flex-col gap-1.5 rounded-lg border border-c-card-border bg-c-card p-3">
               <span className="text-[12px] text-c-secondary">{name}</span>
               <span className={`flex min-w-0 flex-col leading-[1.3] text-[13px] ${cell.align === "end" ? "items-end" : "items-start"}`}>
                 <CListCell cell={cell} />
@@ -521,6 +632,7 @@ export default function UiShowcase() {
       </Section>
 
       <Section id="toolbar" title="List toolbar" note="One 36px line, every button 32 high: show a hidden panel · the views · filter chips · view (its name always shown) and ⋮ · Tasks. Too short a line keeps the show-panel button's icon only.">
+        <div className="max-w-full overflow-x-auto">
         <div className="flex h-9 min-w-0 flex-nowrap items-center gap-2 rounded-lg bg-c-ground">
           {!summary && <CShowPanelButton label="Summary" onShow={() => setSummary(true)} />}
           <div role="tablist" aria-label="Views" className={SEGMENTED_TRACK}>
@@ -547,6 +659,7 @@ export default function UiShowcase() {
           </span>
           <TasksPill />
         </div>
+        </div>
       </Section>
 
       <Section id="side-panel" title="Side panel" note="The Summary frame: the 36px title row sits level with the toolbar; the body starts level with the table (36 + 10).">
@@ -561,7 +674,7 @@ export default function UiShowcase() {
               ].map(([k, v]) => (
                 <div key={k} className="flex h-8 items-center justify-between text-[13px]">
                   <span className="text-c-secondary">{k}</span>
-                  <span className="font-semibold tabular-nums text-c-ink">{v}</span>
+                  <span className="font-medium tabular-nums text-c-ink">{v}</span>
                 </div>
               ))}
             </CSidePanel>
@@ -584,12 +697,6 @@ export default function UiShowcase() {
 
       <SharedParts />
 
-      <Section id="not-yet" title="Owed: one component per job" note="Where the Portal still has two parts for one job, or a part only one page draws. Each merges once, in the kit, and every page gets it.">
-        <ul className="list-disc pl-5 text-[13px] text-c-body">
-          <li>Carres Table (Sales Order Outright) and the list engine DataGrid draw one table twice: Sales Order Outright moves onto DataGrid, then Carres Table is deleted.</li>
-          <li>The Summary side panel is drawn by Sales Order Outright only; SO Batch Purchase and the other lists still use the older filter rail.</li>
-        </ul>
-      </Section>
     </main>
   );
 }

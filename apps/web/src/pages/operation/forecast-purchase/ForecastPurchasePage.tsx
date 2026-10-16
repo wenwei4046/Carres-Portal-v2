@@ -278,7 +278,7 @@ export default function ForecastPurchasePage() {
   /* ── One view button: how the rows are grouped, and which business. ─────── */
   const [viewOpen, setViewOpen] = useState(false);
   const viewMenu = (compact: boolean) => (
-    <CPopover label={W.viewLabel} role="menu" width={236} open={viewOpen} onOpenChange={setViewOpen}
+    <CPopover label={W.viewLabel} role="menu" open={viewOpen} onOpenChange={setViewOpen}
       trigger={
         <Button data-testid="forecast-view" aria-label={`View: ${W.view}`} title={compact ? W.view : undefined}>
           <MIcon name="stacks" size={18} className="text-c-secondary" />

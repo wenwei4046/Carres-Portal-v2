@@ -437,6 +437,20 @@ describe("Checkbox", () => {
  * ────────────────────────────────────────────────────────────────────────── */
 
 describe("DatePicker", () => {
+  it("starts on the selected day, moves by keyboard, and returns the chosen ISO date and focus", async () => {
+    const onChange = vi.fn();
+    render(<DatePicker id="d" label="Delivery date" value="2026-07-19" onChange={onChange} />);
+    const trigger = screen.getByRole("button", {name:"Delivery date"});
+    trigger.focus(); openPopover(trigger);
+    const selected = screen.getByRole("button", {name:/Sunday, July 19th, 2026, selected/});
+    await waitFor(()=>expect(selected).toHaveFocus());
+    fireEvent.keyDown(selected, {key:"ArrowRight"});
+    const next = screen.getByRole("button", {name:"Monday, July 20th, 2026"});
+    await waitFor(()=>expect(next).toHaveFocus());
+    fireEvent.click(next);
+    expect(onChange).toHaveBeenCalledWith("2026-07-20");
+    await waitFor(()=>expect(trigger).toHaveFocus());
+  });
   it("prints the canonical §2.4 date, never the locale's", () => {
     render(<DatePicker id="d" label="Delivery date" value="2026-07-19" onChange={() => {}} />);
     // Through `fmtDate`, never a literal: THE YEAR RULE (owner ruling

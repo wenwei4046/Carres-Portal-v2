@@ -117,7 +117,7 @@ export default function DialogFrame({
   title: string;
   description?: string;
   headerActions?: ReactNode;
-  variant?: "quick-view" | "compact-card";
+  variant?: "quick-view" | "compact-card" | "task-review";
   /** The actions. One `primary` — §3.4 bans two blue actions in one block. */
   footer?: ReactNode;
   /** The `data-kit` value, so a test can tell a modal from a drawer. */
@@ -143,6 +143,9 @@ export default function DialogFrame({
   /* WHO HAD FOCUS WHEN THIS OPENED. Captured on the OPEN transition, because
      once the surface has mounted the answer is something inside it. */
   const opener = useRef<HTMLElement | null>(null);
+  /* 03 §8 already requires this full surface. The module retains its existing
+     Save/Cancel and submission guards; Escape/outside must not discard work. */
+  const taskReview = variant === "task-review";
 
 
   return (
@@ -165,7 +168,9 @@ export default function DialogFrame({
           /* Radix warns when Content carries no Description. Passing undefined
            * explicitly is its documented way of saying "there is none". */
           aria-describedby={description ? undefined : undefined}
-          className={`${SURFACE} ${PLACE[place]} ${widthClass} ${Z_DIALOG} focus:outline-none`}
+          className={`${taskReview ? "fixed inset-0 flex flex-col bg-white text-c-ink" : `${SURFACE} ${PLACE[place]} ${widthClass}`} ${Z_DIALOG} focus:outline-none`}
+          onEscapeKeyDown={taskReview ? (event) => event.preventDefault() : undefined}
+          onPointerDownOutside={taskReview ? (event) => event.preventDefault() : undefined}
           onOpenAutoFocus={() => {
             // Capture before Radix moves focus into the surface. A parent
             // effect can run afterwards and incorrectly remember Close.
@@ -186,7 +191,7 @@ export default function DialogFrame({
             if (back && document.contains(back)) back.focus();
           }}
         >
-          <header className={variant === "compact-card" ? "sr-only" : "flex items-start justify-between gap-4 rounded-t-lg border-b border-c-section-line [padding:var(--card-pad)]"}>
+          <header className={variant === "compact-card" || taskReview ? "sr-only" : "flex items-start justify-between gap-4 rounded-t-lg border-b border-c-section-line [padding:var(--card-pad)]"}>
             <div className={`flex flex-col gap-1 ${variant === "quick-view" ? "min-w-0 flex-1" : ""}`}>
               <Dialog.Title
                 className={`text-strong text-c-ink ${variant === "quick-view" ? "truncate" : ""}`}
@@ -198,7 +203,7 @@ export default function DialogFrame({
                 </Dialog.Description>
               )}
             </div>
-            {variant !== "compact-card" && <div className={`flex items-center gap-2 ${variant === "quick-view" ? "shrink-0" : ""}`}>{headerActions}
+            {variant !== "compact-card" && !taskReview && <div className={`flex items-center gap-2 ${variant === "quick-view" ? "shrink-0" : ""}`}>{headerActions}
             <Dialog.Close
               aria-label="Close"
               title="Close"
@@ -212,7 +217,7 @@ export default function DialogFrame({
           {/* The compact card's own identity band reaches the corners, so its
               scroller clips to the 8px corner. Never the whole surface: a list
               portaled into this dialog must not be cut off. */}
-          <div className={variant === "compact-card" ? "flex-1 overflow-y-auto rounded-lg" : "flex-1 overflow-y-auto p-4"}>{children}</div>
+          <div className={taskReview ? "flex min-h-0 flex-1 flex-col" : variant === "compact-card" ? "flex-1 overflow-y-auto rounded-lg" : "flex-1 overflow-y-auto p-4"}>{children}</div>
 
           {footer && (
             <footer className="flex items-center justify-end gap-2 rounded-b-lg border-t border-c-section-line [padding:var(--card-pad)]">

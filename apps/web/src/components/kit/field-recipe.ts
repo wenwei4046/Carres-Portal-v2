@@ -12,15 +12,15 @@
  */
 
 /** Everything a control shares: surface, hairline, type, focus (v4 owner
- *  instruction 9 Oct 2026, 01 §3). The focus is the person's own Appearance
+ *  instruction 9 Oct 2026, 01 §3). Focus uses the fixed shared keyboard
  *  outline, `var(--c-focus)`. The RADIUS and padding are the shape's (see
  *  `controlClass`). Pages that compose their own control read this too, so it
  *  carries no height and no padding. */
 export const CONTROL_BASE =
   "w-full bg-c-card text-body text-c-ink border " +
   "placeholder:text-c-muted " +
-  "focus:[outline:var(--c-focus)] focus:[outline-offset:-2px] " +
-  "disabled:bg-c-search-bg disabled:text-c-muted disabled:cursor-not-allowed";
+  "focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:0] " +
+  "disabled:bg-c-search-bg disabled:text-c-muted disabled:cursor-not-allowed disabled:opacity-[.45]";
 
 /** Resting hairline vs the refused field. 01 §1: form errors are AMBER; the
  *  red Problem pair is reserved for an evidenced problem. */
@@ -64,9 +64,12 @@ export function controlClass(
   leadingIcon = false,
 ): string {
   const border = error ? CONTROL_BORDER.error : CONTROL_BORDER.rest;
+  /* 01 §1 mobile hit target. CONTROL_BASE also skins read-only facts, so
+     height belongs to this interactive-control recipe, not the shared ink. */
+  const base = `${CONTROL_BASE} max-[767px]:min-h-11`;
   if (shape === "toolbar") {
     return [
-      CONTROL_BASE.replace("text-body ", ""),
+      base.replace("text-body ", ""),
       CONTROL_RADIUS,
       border,
       leadingIcon ? CONTROL_TOOLBAR.replace("px-3", LEADING.toolbar) : CONTROL_TOOLBAR,
@@ -74,14 +77,14 @@ export function controlClass(
   }
   if (shape === "pill") {
     return [
-      CONTROL_BASE.replace("bg-c-card ", "bg-c-search-bg "),
+      base.replace("bg-c-card ", "bg-c-search-bg "),
       "rounded-full",
       error ? CONTROL_BORDER.error : "border-transparent",
       leadingIcon ? CONTROL_SEARCH_PILL.replace("[padding-inline:12px]", LEADING.pill) : CONTROL_SEARCH_PILL,
     ].join(" ");
   }
   return [
-    CONTROL_BASE,
+    base,
     CONTROL_RADIUS,
     border,
     shape === "multi"

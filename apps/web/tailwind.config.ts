@@ -248,8 +248,8 @@ export default {
            the one boldest text on a page; card and panel titles are 15/500.
            Nothing else is 600 at 15 or above. `page` was 24/600 and `strong`
            15/600 before the 12 Oct kit. */
-        page: ["20px", { lineHeight: "28px", fontWeight: "600" }],
-        title: ["20px", { lineHeight: "28px", fontWeight: "600" }],
+        page: ["20px", { lineHeight: "28px", fontWeight: "600", letterSpacing: "-0.01em" }],
+        title: ["20px", { lineHeight: "28px", fontWeight: "600", letterSpacing: "-0.01em" }],
         strong: ["15px", { lineHeight: "22px", fontWeight: "500" }],
         body: ["13px", { lineHeight: "18px", fontWeight: "400" }],
         meta: ["12px", { lineHeight: "16px", fontWeight: "400" }],

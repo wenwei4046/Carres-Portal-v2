@@ -28,6 +28,7 @@ export default function Modal({
   width,
   children,
   returnFocusRef,
+  variant,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -51,6 +52,8 @@ export default function Modal({
   children: ReactNode;
   /** Persistent trigger for a dialog opened by a menu item that unmounts. */
   returnFocusRef?: RefObject<HTMLElement>;
+  /** Existing task-wide review: full surface; its owning form alone closes it. */
+  variant?: "task-review";
 }) {
   return (
     <DialogFrame
@@ -63,6 +66,7 @@ export default function Modal({
       footer={footer}
       width={width}
       returnFocusRef={returnFocusRef}
+      variant={variant}
     >
       {children}
     </DialogFrame>

@@ -725,6 +725,9 @@ export type DataGridProps<T> = {
   /** Called by `Clear filters` after the grid clears its own column filters,
    *  so one click really does clear everything the strip listed. */
   onClearConditions?: () => void;
+  /** The owning page already draws the aggregate Clear filters control.
+   * Keep the no-match message without duplicating that same action. */
+  clearConditionsInToolbar?: boolean;
   /**
    * Compact mode for grids embedded inside another grid's expansion row
    * (the SO drill-down). Suppresses the search box and the bottom
@@ -915,6 +918,7 @@ function DataGridInner<T>({
   activeConditions,
   reserveConditionRow = false,
   onClearConditions,
+  clearConditionsInToolbar = false,
   embedded = false,
 }: DataGridProps<T>) {
   /* ⭐ ONE PAGE-TOOLS MENU (01 §4 toolbar: Summary · tabs · view · ⋮ · Tasks;
@@ -3790,7 +3794,7 @@ function DataGridInner<T>({
             {!isLoading && errorState == null && renderList.length === 0 && (
               <tr>
                 <td colSpan={totalCols || 1} style={{ padding: 0 }}>
-                  <div className={styles.empty} style={{ position: "sticky", left: 0, width: emptyViewportWidth, boxSizing: "border-box", whiteSpace: "normal" }}>{noMatchShowing ? <>{noMatchMessage}<Button variant="neutral" size="md" onClick={() => { setSearch(""); setFilters({}); setDateFilters({}); setNumberFilters({}); setDateRangeFilters({}); onClearConditions?.(); }}>Clear filters</Button></> : emptyMessage}</div>
+                  <div className={styles.empty} style={{ position: "sticky", left: 0, width: emptyViewportWidth, boxSizing: "border-box", whiteSpace: "normal" }}>{noMatchShowing ? <>{noMatchMessage}{!clearConditionsInToolbar && <Button variant="neutral" size="md" onClick={() => { setSearch(""); setFilters({}); setDateFilters({}); setNumberFilters({}); setDateRangeFilters({}); onClearConditions?.(); }}>Clear filters</Button>}</> : emptyMessage}</div>
                 </td>
               </tr>
             )}
@@ -3972,7 +3976,7 @@ function DataGridInner<T>({
               ref={filterMenuRef}
               data-testid={isReference ? "column-filter-menu" : undefined}
               className={styles.ctxMenu}
-              style={{ top: filterMenu.y, left: filterMenu.x, maxHeight: "min(320px, calc(100vh - 16px))", overflowY: "auto", minWidth: "min(200px, calc(100vw - 16px))", maxWidth: "calc(100vw - 16px)" }}
+              style={{ top: filterMenu.y, left: filterMenu.x, maxHeight: "min(320px, calc(100vh - 16px))", overflowY: "auto", width: "min(250px, calc(100vw - 16px))", maxWidth: "calc(100vw - 16px)" }}
               onClick={(e) => e.stopPropagation()}
             >
               <div

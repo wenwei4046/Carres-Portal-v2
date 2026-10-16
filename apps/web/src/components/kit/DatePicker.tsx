@@ -65,14 +65,24 @@ export const CALENDAR_CLASSNAMES = {
   week: "",
   day: "p-0 text-center",
   day_button:
-    "h-8 w-8 rounded-lg text-body text-c-ink hover:bg-c-hover " +
-    "focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px]",
+    "h-8 w-8 rounded-lg text-body text-c-ink enabled:hover:bg-c-hover " +
+    "focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:2px]",
   today: "font-semibold text-c-select-fg",
   selected:
     "[&>button]:bg-c-select-bg [&>button]:font-semibold [&>button]:text-c-select-fg [&>button]:hover:bg-c-select-bg",
   outside: "text-c-muted",
-  disabled: "opacity-40",
+  disabled: "opacity-[0.45]",
   hidden: "invisible",
+};
+
+/* The field pop-up has room for seven44px targets on a390px screen. The
+   inline Monitor rail consumes the exported skin with its own governed
+   geometry; do not silently widen that216px adapter by changing its nav. */
+const FIELD_CALENDAR_CLASSNAMES = {
+  ...CALENDAR_CLASSNAMES,
+  button_previous: `${CALENDAR_CLASSNAMES.button_previous} max-[767px]:h-11 max-[767px]:w-11`,
+  button_next: `${CALENDAR_CLASSNAMES.button_next} max-[767px]:h-11 max-[767px]:w-11`,
+  day_button: `${CALENDAR_CLASSNAMES.day_button} max-[767px]:h-11 max-[767px]:w-11`,
 };
 
 export default function DatePicker({
@@ -129,6 +139,7 @@ export default function DatePicker({
         }
       >
         <DayPicker
+          autoFocus
           mode="single"
           selected={selected}
           defaultMonth={selected}
@@ -139,7 +150,7 @@ export default function DatePicker({
           }}
           showOutsideDays
           weekStartsOn={1}
-          classNames={CALENDAR_CLASSNAMES}
+          classNames={FIELD_CALENDAR_CLASSNAMES}
         />
       </CPopover>
     </FieldFrame>
