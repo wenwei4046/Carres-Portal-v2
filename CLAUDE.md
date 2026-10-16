@@ -39,10 +39,12 @@ number, the party and the date already worked out, and one obvious button.
 
 ---
 
+**Owner15Oct2026 · one physical UI/UX MASTER:** `docs/ui/MASTER.md` alone contains the values/measurements, component contracts, UX and page compositions. Former 01/02/03 rule bodies have moved into its named parts; old paths redirect only. Any later reference in this constitution to01/02/03 means those parts of the same MASTER. Never recreate their old independent rule bodies. Preserve conforming parts; fix specific deviations through the shared component. Owner delegated common engineering defaults to be set once, then visually corrected in this same MASTER. Business law and explicit approved design remain binding.
+
 **Mandatory UI cold-start:** before any listing/UI proposal or build, read `docs/ui/MASTER.md`
 **§0 Current kit index first** (one current source per thing on screen; anything not listed is not a
 pattern to copy), then §0.1–§0.3 (page anatomy, shared module page flow, every-new-chat procedure),
-§6.0 and the section for the part being built, the canonical token/component/pattern files, the owning
+§6.0 and the section for the part being built, the values/component/pattern parts of that same MASTER, the owning
 module listing section and COPY entries. Module cards use the kit `CompactModuleCard` (§4.3), never a
 copy of its reference HTML. Reuse the kit and complete the §2.2 full-page checks before delivery.
 Approved goods/Ready Stock flows: Purchasing §9.1 SO Batch and §9.2 Manual Purchase (Jess
@@ -65,13 +67,12 @@ On a conflict, Business wins.
   and proposing better is your DUTY. Building before approval is the only thing forbidden.
 - **Current kit adoption — owner 12 Oct 2026 · supplied 12 Oct, 5:35 PM:** the `design_handoff_sales_order_ui_kit` folder of 12 Oct 5:35 PM is the shared visual target, consolidated into the existing 01/02/03 and UI MASTER. **Every kit the owner hands over replaces the kit** (owner 12 Oct 2026: "I only want one version"): update 01/02/03, UI MASTER, `docs/ui/carres-tokens.css` and the specimen together, and delete whatever the new kit contradicts. Runtime migration and complete-page verification are still owed for most pages, so much of the running app still draws the previous kit; say which parts follow the kit instead of implying it. Imported HTML under `docs/ui-reference/sales-order-design/` is a specimen only, shown with TEST customer details. Where the package conflicts with COPY-STANDARD or a module MASTER its value is PROPOSAL / NOT LAW (01 §10). Do not import its mock business rules or clone its page CSS.
 - **Token VALUES are locked** — spacing, colour, typography, icons live in
-  `docs/01-design-tokens.md` and are not design opinions. **Composition is yours.**
+  the values part of `docs/ui/MASTER.md` and are not design opinions. **Composition is yours.**
 - **A component that does not exist: STOP and ask for it to join the kit.** Never draw one
   inline "just this once".
 - **THE ONE KIT LAW — owner ruling 2026-09-27 (Jess: "every page must follow · delete the old UI
   kit, update the new · chats don't read and create new").** There is ONE UI kit:
-  `docs/01-design-tokens.md` · `docs/02-components.md` · `docs/03-page-patterns.md` ·
-  `docs/ui/MASTER.md` §6.0. Every page, every module, every chat follows it; a page that differs
+  `docs/ui/MASTER.md` alone, including its values, components, page patterns and §6.0. Every page, every module, every chat follows it; a page that differs
   is a defect, never a "page style". Before ANY UI proposal, mock or build, read §6.0 and the
   tokens — a chat that has not read them may not draw. Never create a new component, colour, type
   size, word, rail, table or guide document; when a kit gap is real, admit the thing to the kit
@@ -643,7 +644,7 @@ Never create an empty master for symmetry.
 |---|---|
 | [`docs/COPY-STANDARD.md`](docs/COPY-STANDARD.md) | every visible word — the dictionary, the seven verbs, the banned words |
 | [`docs/ACTION-FLOW-STANDARD.md`](docs/ACTION-FLOW-STANDARD.md) | how actions are computed, appear, close, and which shows first |
-| [`docs/01-design-tokens.md`](docs/01-design-tokens.md) · [`02-components.md`](docs/02-components.md) · [`03-page-patterns.md`](docs/03-page-patterns.md) | the design system — token values and components |
+| [`docs/ui/MASTER.md`](docs/ui/MASTER.md) | the ONE physical UI/UX master: values, measurements, components, UX and page patterns |
 | [`docs/pdf/DOCUMENT-KIT.md`](docs/pdf/DOCUMENT-KIT.md) | **every printed document** — the shared shape, the owner's review rulings, which documents exist and where each one's rules live. Read it BEFORE designing any PDF |
 | [`docs/ENGINEERING.md`](docs/ENGINEERING.md) | the stack, the repo, RLS performance, deployment, testing, current production state |
 
