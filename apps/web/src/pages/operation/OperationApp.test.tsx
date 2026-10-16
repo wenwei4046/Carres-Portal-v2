@@ -112,6 +112,10 @@ vi.mock("./components/OperationRightRail", () => ({
 vi.mock("./components/ShellTasks", () => ({
   default: () => <div data-testid="shell-tasks-stub">tasks</div>,
   TasksPill: () => null,
+  // Route tests keep the task panel closed; its real store is covered by the
+  // shell/sidebar tests, while the shell now also reads its layout state.
+  useShellTasks: (select: (state: { open: boolean; pageHosts: number }) => unknown) =>
+    select({ open: false, pageHosts: 0 }),
 }));
 // The first-entry `Pending work` reminder self-fetches the same Work feed as
 // the rail (Tasks, 2026-10-06) — stubbed for the same reason as the rail.
