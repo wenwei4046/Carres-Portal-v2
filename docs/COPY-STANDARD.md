@@ -5724,7 +5724,7 @@ Receiving placement; UI MASTER owns Calendar. No posting/permission change is im
 | Theme groups, in this order | Cool · Calm and crisp · Blue is the default · Brand · Carres orange · Warm · Soft and homely | v12 Shell |
 | Theme choices | Cool Slate · Blue · Teal · Violet · Carres · Warm Honey · Olive · Rose · Latte; Blue carries the label `Default` | v12 Shell |
 | Personal scope explanation | Choose how your portal looks. This changes only your profile. | Implementation explanatory copy |
-| Fixed explanation under the card | A theme changes only the selected colour (tabs, ticked rows, links, focus). Page ground, buttons (charcoal), greys and status colours (amber, green) never change. | v12 Shell |
+| Fixed explanation under the card | Theme changes only the selection colour. | UI MASTER, Values and measurements §§9/3 (former 01); keyboard focus is fixed, never a theme preference |
 | Save / result / failure | Save changes · Saved · Could not save. Try again. | Existing save/retry grammar |
 
 ## Settings → Personal → Lunch time · owner order 9 Oct 2026 (Settings List OFF-04 · WS-04; migration 0677) · BUILT ON BRANCH, NOT DEPLOYED

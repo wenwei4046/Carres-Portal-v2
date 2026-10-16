@@ -2776,6 +2776,12 @@ because one PO goes to one supplier for one category. Rows whose PO window has g
 | `Supplier ready by` | 120 | The PO Delivery Date a PO issued today would carry (the same projection the Issue PO review shows), marked `if sent today`. It is never the `PO Delivery Date` of an issued PO, which is read on the PO itself |
 | `Status` | 120 | `Cut-off passed` (amber) with what is still to buy, when a line's PO window has gone by; otherwise `To buy` |
 
+**Owner reaffirmation 15 Oct 2026 (SO Batch brief A, through the controller):** keep the earliest
+Order By among outstanding lines, including overdue unpurchased lines. Do not replace it with the
+nearest non-late date: a future date must not hide buying already late. Each line retains its own
+deadline; trial-data age does not alter the rule. The proposed replacement is rejected; no
+application change is required by this reaffirmation.
+
 - A row opens to its item lines under the heads `Item` · `To buy` · `SO No` · `Order By` · `Supplier Deliver To`: tick · item and variant · quantity · Sales Order number (opens the order card) · that line's Order By date · the SAME `Supplier Deliver To` editor the By sales order list uses, Split included. A line that may not be bought has no tick and no editor and states its reason with the same words and the same door (`Use this PO` · `Fix in Catalog`) as the By sales order list.
 - A tick on a row ticks every line of it that may be bought; a line has its own tick. The ticks are the same ticks every view holds, and the same `Issue PO` door takes them. Who may tick and issue is unchanged.
 - Every date and number is the server's (`orderBy`, `poDeliveryDate`, `poDeliveryWorkingDays`, `poWindow`, `toBuy`); the PO window times are the Purchasing Settings values, never the specimen's.
