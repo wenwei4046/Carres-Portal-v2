@@ -8,6 +8,8 @@ the owning module MASTER and COPY-STANDARD. Reuse its kit components and run its
 Approved SO Batch stock-selection UI is in Purchasing MASTER §9.1, BUILT 2026-09-18; the
 authenticated production walk is still owed, and approval is never build proof.
 
+**Preserved older checkouts:** fetch `origin/main` before UI work and read `git show origin/main:docs/ui/MASTER.md` if the local checkout still contains older UI drafts. Preserve uncommitted work; the current main MASTER is the authority, not an older local specimen or chat memory. PR #2087 published the consolidated baseline; publication alone does not prove runtime adoption.
+
 ## Shared Blueprint reading entry — Claude, Codex and ChatGPT
 
 Use the current repository files, not a remembered chat answer or frozen restart copy.
