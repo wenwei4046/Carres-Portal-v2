@@ -524,6 +524,8 @@ interface ManualPurchaseRegisterSource {
     /** `MPR250924-4827` (0546); absent on an older API. */
     req_no?: string | null;
     purpose: string;
+    request_version?: number | null;
+    request_context?: unknown;
     destination_id: string | null;
     why: string | null;
     approval_required: boolean;
@@ -539,6 +541,9 @@ interface ManualPurchaseRegisterSource {
   }>;
   lines: Array<{
     request_id: string;
+    context_read_available?: boolean;
+    context_admission_current?: boolean;
+    context_to_buy?: number;
     qty: number;
     approved_qty: number | null;
     issued_qty: number;
@@ -1102,7 +1107,7 @@ export function receivingWorkSourceFromModuleFacts(data: {
 
 export function manualPurchaseWorkInputsFromRegister(
   data: ManualPurchaseRegisterSource,
-): Array<ManualPurchaseWorkInput & { recipient: string | null; poIds: string[]; unsentPoId: string | null }> {
+): Array<ManualPurchaseWorkInput & { recipient: string | null; poIds: string[]; unsentPoId: string | null; continueInPoId: string | null }> {
   const destination = new Map(data.destinations.map((row) => [row.id, row.name]));
   const supplier = new Map(data.suppliers.map((row) => [row.id, row.name]));
   const user = new Map(data.users.map((row) => [row.id, row.name]));
@@ -1111,6 +1116,10 @@ export function manualPurchaseWorkInputsFromRegister(
   return data.requests.map((request) => {
     const lines = data.lines.filter((line) => line.request_id === request.id);
     const live = lines.filter((line) => line.cancelled_at === null);
+    const contextual = Number(request.request_version ?? 0) > 0 || request.request_context != null;
+    if (contextual && request.approved_at != null && (live.length === 0 || live.some(line => line.context_read_available !== true || !Number.isInteger(line.context_to_buy)))) {
+      throw new Error("Manual Purchase coverage could not be loaded");
+    }
     const poIds = [...new Set(live.flatMap((line) => line.active_po_ids ?? line.po_ids ?? (line.po_id ? [line.po_id] : [])))];
     const supplierNames = live.map((line) =>
       line.supplier_id ? (supplier.get(line.supplier_id) ?? "") : "",
@@ -1151,19 +1160,13 @@ export function manualPurchaseWorkInputsFromRegister(
           received: line.received ?? false,
         })),
       }).kind,
-      remainingQty: live.reduce(
-        (total, line) =>
-          total +
-          manualPurchaseLineRemainingOf({
-            qty: line.qty,
-            approvedQty: line.approved_qty,
-            issuedQty: line.issued_qty,
-          }),
-        0,
-      ),
+      remainingQty: contextual ? live.reduce((total,line) => total + (line.context_to_buy ?? 0),0) : live.reduce(
+        (total,line) => total + manualPurchaseLineRemainingOf({ qty: line.qty, approvedQty: line.approved_qty, issuedQty: line.issued_qty }), 0),
       orderBy: manualPurchaseOrderByOf(live.map((line) => line.order_by)),
       poIds,
       unsentPoId: poIds.find((id) => sent.get(id) !== true) ?? null,
+      continueInPoId: contextual && request.purpose === "ready_stock" && live.some(line => line.context_admission_current === false)
+        ? live.filter(line => (line.context_to_buy ?? 0) > 0).flatMap(line => line.active_po_ids ?? line.po_ids ?? (line.po_id ? [line.po_id] : []))[0] ?? null : null,
       hasPos: poIds.length > 0,
       posAllSent: poIds.length > 0 && poIds.every((id) => sent.get(id) === true),
       recipient: manualPurchaseSupplierSummary(supplierNames),
@@ -1297,7 +1300,7 @@ export function projectSalesOrderWork(input: {
 }
 
 export function projectManualPurchaseWork(input: {
-  requests: readonly (ManualPurchaseWorkInput & { recipient?: string | null; unsentPoId?: string | null })[];
+  requests: readonly (ManualPurchaseWorkInput & { recipient?: string | null; unsentPoId?: string | null; continueInPoId?: string | null })[];
   approver: { userId: string; name: string | null } | null;
   poDuty: WorkspaceDutyResolution | null;
   today: string;
@@ -1318,7 +1321,7 @@ export function projectManualPurchaseWork(input: {
       office,
     ).map((item) => {
       const approval = item.ruleKey === "manual_purchase.approve";
-      return operationWorkItemFromProjection(item, {
+      return operationWorkItemFromProjection(!approval && request.continueInPoId ? { ...item, action: "Revise quantity or Deliver To" } : item, {
         object: {
           kind: "manual_purchase",
           id: request.requestId,
@@ -1332,10 +1335,12 @@ export function projectManualPurchaseWork(input: {
         recipient: request.recipient ?? null,
         requiredResult: approval
           ? "Purchase decision recorded"
-          : "Current PO version marked as sent",
+          : request.continueInPoId ? ORDER_RESULT.issue_po : "Current PO version marked as sent",
         // Approval opens its decision; uncovered demand opens the request.
         // Sending opens the first existing unsent PO, never a second buy.
-        destination: !approval && request.remainingQty === 0 && request.unsentPoId
+        destination: !approval && request.continueInPoId
+          ? `/operation/procurement?po=${encodeURIComponent(request.continueInPoId)}`
+          : !approval && request.remainingQty === 0 && request.unsentPoId
           ? `/operation/procurement?po=${encodeURIComponent(request.unsentPoId)}`
           : `/operation?tab=manual-purchase&mp=${encodeURIComponent(request.requestId)}${approval ? "&section=approval" : ""}`,
         today: input.today,

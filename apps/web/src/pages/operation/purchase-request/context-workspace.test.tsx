@@ -31,7 +31,7 @@ beforeEach(() => {
     if (path.startsWith("/api/catalog")) return { skus: [], models: [], sofaFabrics: [] };
     if (path.endsWith("/requests/plan")) return { proceedDate: "2026-10-18", recipientEarliest: "2026-11-17", recipientPlanUnavailable: false, planUnavailable: false,
       deliveryDateDefault: "2026-11-01", lines: [{ sku: "TEST-SKU", supplierId: uuid(4), supplierName: "TEST supplier", category: "sofa", productionDays: 7, arrival: "2026-11-01" }] };
-    if (path.includes("/requests/detail/")) return { request: { created_at: "2026-10-17T00:00:00Z" } };
+    if (path.includes("/requests/detail/")) return { request: { created_at: "2026-10-17T00:00:00Z", request_version: 1 } };
     if (path.endsWith("/resubmit") && init?.method === "POST") { submitted.push(JSON.parse(String(init.body))); return { id: uuid(5), req_no: "TEST-RS", request_version: 2, approval_required: true }; }
     if (path.endsWith("/purchasing/requests") && init?.method === "POST") {
       const body = JSON.parse(String(init.body)); submitted.push(body);

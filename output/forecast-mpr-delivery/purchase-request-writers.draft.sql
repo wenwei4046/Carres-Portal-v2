@@ -830,6 +830,29 @@ returns boolean language sql stable set search_path=public,pg_temp as $po_destin
 $po_destination$;
 revoke all on function public._purchasing_context_po_destination_matches(uuid,uuid,uuid) from public,anon,authenticated;
 
+-- The exact remaining recipient pool shared by Review and issue preflight.
+-- Existing immutable issue events are read; no independent recipient ledger.
+create or replace function public._purchasing_context_remaining_recipients(p_request uuid,p_demand uuid,p_scope jsonb)
+returns jsonb language plpgsql set search_path=public,pg_temp as $remaining_recipients$
+declare approved jsonb; x jsonb; prior integer; cap integer; recipients jsonb:='[]';
+begin
+ if p_scope->>'purpose'='ready_stock' then return recipients; end if;
+ select v into strict approved from jsonb_array_elements(p_scope->'approved_distribution') v where (v->>'demandId')::uuid=p_demand;
+ for x in select * from jsonb_array_elements(approved->'recipients') loop
+  select coalesce(sum((rc->>'qty')::integer),0) into prior from public.purchase_request_events e
+   cross join lateral jsonb_array_elements(coalesce(e.changes->'allocations','[]')) a cross join lateral jsonb_array_elements(a->'recipients') rc
+   where e.request_id=p_request and e.kind='po_issued' and e.changes->>'record_type'='po_issue'
+    and exists(select 1 from public.purchase_orders prior_po where prior_po.id=e.changes->>'po_id' and prior_po.status<>'cancelled')
+    and a->>'demand_id'=p_demand::text and rc->>'recipientId'=x->>'recipientId';
+  cap:=(x->>'qty')::integer-prior;
+  if cap<0 then raise exception 'issued recipient coverage changed' using errcode='22023',detail='request_po_coverage_changed'; end if;
+  if cap>0 then recipients:=recipients||jsonb_build_array(jsonb_build_object('recipientId',x->>'recipientId','qty',cap)); end if;
+ end loop;
+ return recipients;
+end;
+$remaining_recipients$;
+revoke all on function public._purchasing_context_remaining_recipients(uuid,uuid,jsonb) from public,anon,authenticated;
+
 -- Current exact coverage for the approved request. Shelf totals never net an
 -- intentional RS/GP buy; only owning Unit bindings and exact PO demand lineage count.
 create or replace function public._purchasing_context_coverage_admitted(p_id uuid,p_for_issue boolean,p_admitted_scope jsonb)
@@ -880,7 +903,8 @@ begin
    if issued<>d.issued_qty or issued>d.approved_qty then raise exception 'PO quantity differs from request coverage' using errcode='22023',detail='request_po_coverage_changed'; end if;
   end if;
   rows:=rows||jsonb_build_array(jsonb_build_object('demand_id',d.id,'kind',d.fulfilment_kind,'approved_qty',d.approved_qty,'stock_qty',held,'issued_qty',issued,
-   'to_buy',case when d.fulfilment_kind='purchase' then d.approved_qty-issued else 0 end));
+   'to_buy',case when d.fulfilment_kind='purchase' then d.approved_qty-issued else 0 end,
+   'recipients',case when d.fulfilment_kind='purchase' then public._purchasing_context_remaining_recipients(p_id,d.id,scope) else '[]'::jsonb end));
  end loop;
  return rows;
 end;
@@ -1074,11 +1098,43 @@ end;
 $review$;
 revoke all on function public._purchasing_context_review(uuid) from public,anon,authenticated;
 
+-- Historical approval may cease admitting NEW MPR issue while an already-issued
+-- RS commitment remains truthful. This read grants no approval/issue authority.
+-- Existing PO owner may finish the unchanged fixed need; no MPR recall/reapproval.
+create or replace function public._purchasing_context_committed_rs_coverage(p_id uuid)
+returns jsonb language plpgsql set search_path=public,pg_temp as $committed_rs$
+declare r public.purchase_requests%rowtype; facts jsonb;
+begin
+ select * into strict r from public.purchase_requests where id=p_id;
+ if r.purpose<>'ready_stock' or r.request_version is null or r.request_version<1 or r.approval_version is distinct from r.request_version
+  or r.approved_at is null or r.approved_by is null or r.refused_at is not null or r.withdrawn_at is not null or r.sent_back_at is not null
+  or r.approval_scope is null or r.approval_scope->'context' is distinct from r.request_context
+  or (r.approval_scope->>'request_id')::uuid is distinct from r.id
+  or (r.approval_scope->>'request_version')::integer is distinct from r.request_version
+  or r.approval_scope->>'purpose' is distinct from r.purpose
+  or (r.approval_scope->>'proceed_date')::date is distinct from r.proceed_date
+  or (r.approval_scope->>'requester_id')::uuid is distinct from r.created_by
+  or (r.approval_scope->>'created_at')::timestamptz is distinct from r.created_at
+  or r.fulfilment_intent is distinct from 'additional_stock' or r.approval_required is distinct from true
+  or r.required_by is distinct from (r.request_context->>'stockDeliveryDate')::date
+  or r.destination_id is distinct from (select (a->>'destinationId')::uuid from jsonb_array_elements(r.request_context->'lines') l cross join lateral jsonb_array_elements(l->'allocations') a limit 1)
+  or not exists(select 1 from public.purchase_demands where request_id=p_id and issued_qty>0) then return null; end if;
+ select coalesce(jsonb_agg(jsonb_build_object('id',id,'request_line_id',request_line_id,
+  'supplier_allocation_id',supplier_allocation_id,'stock_proposal_id',stock_proposal_id,'fulfilment_kind',fulfilment_kind,
+  'sku',sku,'attrs',attrs,'supplier_id',supplier_id,'destination_id',destination_id,'required_by',required_by,
+  'qty',qty,'approved_qty',approved_qty) order by id),'[]') into facts
+ from public.purchase_demands where request_id=p_id and cancelled_at is null;
+ if facts is distinct from r.approval_scope->'demands' then return null; end if;
+ return public._purchasing_context_coverage_admitted(p_id,false,r.approval_scope);
+end;
+$committed_rs$;
+revoke all on function public._purchasing_context_committed_rs_coverage(uuid) from public,anon,authenticated;
+
 -- Public read retains the existing Operation/Principal request-reader permission.
 -- An unavailable source is NOT empty scope and cannot be approved.
 create or replace function public.purchasing_request_context_review(p_id uuid)
 returns jsonb language plpgsql security definer set search_path=public,pg_temp as $review_read$
-declare actor_role text:=public.app_role(); r public.purchase_requests%rowtype; detail text; events jsonb;
+declare actor_role text:=public.app_role(); r public.purchase_requests%rowtype; detail text; events jsonb; approval_scope_valid boolean:=false; committed_coverage jsonb;
 begin
  if actor_role is null or actor_role not in ('operation','principal') then raise exception 'not permitted' using errcode='42501'; end if;
  select * into strict r from public.purchase_requests where id=p_id;
@@ -1087,11 +1143,15 @@ begin
   'occurred_at',e.occurred_at,'reason',e.reason,'changes',e.changes) order by e.occurred_at,e.id),'[]') into events
   from public.purchase_request_events e where e.request_id=p_id;
  begin
-  if r.approved_at is not null then perform public._purchasing_assert_request_approval(p_id); end if;
+  if r.approved_at is not null then
+   perform public._purchasing_assert_request_approval(p_id); approval_scope_valid:=true;
+  end if;
   return jsonb_build_object('available',true,'review',public._purchasing_context_review(p_id),'events',events,'coverage',case when r.approved_at is null then null else public._purchasing_context_coverage(p_id,false) end,'approval',case when r.approved_at is null then null else jsonb_build_object('request_version',r.request_version,'approval_version',r.approval_version,'token',md5(r.approval_scope::text)) end);
  exception when invalid_parameter_value then
   get stacked diagnostics detail=pg_exception_detail;
-  return jsonb_build_object('available',false,'reason',detail,'request_version',r.request_version,'request_context',r.request_context,'events',events);
+  begin committed_coverage:=public._purchasing_context_committed_rs_coverage(p_id);
+  exception when invalid_parameter_value then committed_coverage:=null; end;
+  return jsonb_build_object('available',false,'reason',detail,'request_version',r.request_version,'request_context',r.request_context,'events',events,'approval_scope_valid',approval_scope_valid,'committed_coverage',committed_coverage);
  end;
 end;
 $review_read$;
@@ -2405,19 +2465,7 @@ begin
     end if;
     if modern then
     select x into strict approved from jsonb_array_elements(scope->'approved_distribution') x where (x->>'demandId')::uuid=d.id;
-    recipients:='[]';
-    if r.purpose<>'ready_stock' then
-     for x in select * from jsonb_array_elements(approved->'recipients') loop
-      select coalesce(sum((rc->>'qty')::integer),0) into prior from public.purchase_request_events e
-       cross join lateral jsonb_array_elements(coalesce(e.changes->'allocations','[]')) a cross join lateral jsonb_array_elements(a->'recipients') rc
-       where e.request_id=r.id and e.kind='po_issued' and e.changes->>'record_type'='po_issue'
-        and exists(select 1 from public.purchase_orders prior_po where prior_po.id=e.changes->>'po_id' and prior_po.status<>'cancelled')
-        and a->>'demand_id'=d.id::text and rc->>'recipientId'=x->>'recipientId';
-      cap:=(x->>'qty')::integer-prior;
-      if cap<0 then raise exception 'issued recipient coverage changed' using errcode='22023',detail='request_po_coverage_changed'; end if;
-      if cap>0 then recipients:=recipients||jsonb_build_array(jsonb_build_object('recipientId',x->>'recipientId','qty',cap)); end if;
-     end loop;
-    end if;
+    recipients:=public._purchasing_context_remaining_recipients(r.id,d.id,scope);
     if src->'recipients'='null'::jsonb then
      if r.purpose<>'ready_stock' and quantity<>d.approved_qty-d.issued_qty then raise exception 'partial issue requires exact recipient allocation' using errcode='22023',detail='issue_recipient_distribution_required'; end if;
     else

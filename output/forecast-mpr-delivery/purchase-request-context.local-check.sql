@@ -805,6 +805,7 @@ begin
    made_other:=public.purchasing_create_request_with_lines(p_purpose=>'ready_stock',p_destination_id=>pd.destination_id,p_lines=>jsonb_build_array(jsonb_build_object('request_context',other,'submission_key',gen_random_uuid())),p_fulfilment_intent=>'additional_stock');
    readback:=public.purchasing_request_context_review(rid);
    if readback->'available'<>'false'::jsonb or readback->>'reason'<>'forecast_source_changed' then raise exception 'part-issued changed cohort source did not become explicitly unavailable'; end if;
+   if (select sum((v->>'issued_qty')::int) from jsonb_array_elements(readback->'committed_coverage') v)<>4 or (select sum((v->>'to_buy')::int) from jsonb_array_elements(readback->'committed_coverage') v)<>496 then raise exception 'stale admission hid truthful committed coverage4/remaining496'; end if;
    fresh_sources:=jsonb_build_array(public._purchasing_context_forecast_facts(pd.sku,rid));
    refused:=false;
    begin perform public.purchasing_resubmit_request(rid,pd.destination_id,null,p_lines=>jsonb_build_array(jsonb_build_object('request_context',base_context,'revision_key',gen_random_uuid(),'expected_version',2,'reason','TEST issued scope must stay with PO owner','forecast_source',fresh_sources)));
@@ -820,6 +821,8 @@ begin
     or (select request_version from public.purchase_requests where id=rid)<>2
     or public._purchasing_context_own_po_free(rid,line_id)<>499 then raise exception 'part-issued owner coordination rewrote approval/full need or lost exact issued supply'; end if;
    perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009698","role":"authenticated","app_metadata":{"role":"operation"}}',true);
+   readback:=public.purchasing_request_context_review(rid);
+   if readback->'available'<>'false'::jsonb or (select sum((v->>'issued_qty')::int) from jsonb_array_elements(readback->'committed_coverage') v)<>500 or (select sum((v->>'to_buy')::int) from jsonb_array_elements(readback->'committed_coverage') v)<>0 then raise exception 'existing PO owner completion did not read true500/remaining0 independently of fresh MPR admission'; end if;
    raise notice 'Actual RS PO revision/cohort LOCAL: exact source grows within approved500; reason-only reduction and overbuy refuse atomically, new Units stay free with provenance; changed cohort blocks new MPR issue/reapproval; existing PO owner completes unchanged approved scope without snapshot rewrite PASS';
    declare current_po record; missing boolean; current_document jsonb; old_document jsonb; sent_refused boolean:=false; sent_tag text;
    begin

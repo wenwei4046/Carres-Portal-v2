@@ -1286,6 +1286,9 @@ export function documentPartitionKey(f: {
 
 export interface SoBatchDocumentLine {
   demandId: string;
+  /** Owning lane's proven SKU/config identity for physical draft-paper merge.
+   * Missing stays unknown; source rows/issue selections remain independent. */
+  previewPhysicalKey?: string;
   orderId: string;
   so: number | null;
   /**

@@ -514,6 +514,19 @@ describe("operation Work response composition", () => {
     expect(inputs[0]?.remainingQty).toBe(0);
   });
 
+  it("uses owning contextual To buy and refuses unknown coverage instead of completing work", () => {
+    const data = {
+      requests: [{ id: "TEST-r", purpose: "general_purchase", request_version: 2, destination_id: "TEST-d", why: "", approval_required: true,
+        approved_at: "2026-10-18T00:00:00Z", refused_at: null, refuse_reason: null, for_service_case_id: null, for_staff_user_id: null, for_subsidiary_name: null }],
+      lines: [{ request_id: "TEST-r", qty: 2, approved_qty: 2, issued_qty: 0, cancelled_at: null, po_id: null, supplier_id: "TEST-s", order_by: null, context_read_available: true, context_to_buy: 0 },
+        { request_id: "TEST-r", qty: 3, approved_qty: 3, issued_qty: 1, cancelled_at: null, po_id: "TEST-PO", supplier_id: "TEST-s", order_by: null, context_read_available: true, context_to_buy: 2 }],
+      destinations: [], suppliers: [], users: [], serviceCases: [], pos: [{ id: "TEST-PO", sent: true }],
+    };
+    expect(manualPurchaseWorkInputsFromRegister(data)[0]).toMatchObject({ remainingQty: 2, hasPos: true, posAllSent: true });
+    data.lines[0]!.context_read_available = false;
+    expect(() => manualPurchaseWorkInputsFromRegister(data)).toThrow("coverage could not be loaded");
+  });
+
   it("derives Manual Purchase projector input from the module register facts", () => {
     const inputs = manualPurchaseWorkInputsFromRegister({
       requests: [{

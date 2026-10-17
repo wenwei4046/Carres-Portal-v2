@@ -9,6 +9,49 @@ Paste everything below the line into a fresh session. It is self-contained.
 
 ---
 
+**Latest follow-on ·18Oct2026 · LOCAL, production activation CLOSED.**
+Preceding checkpoint `aba2adb33` is local only. Follow-on preserves all work in the same
+`forecast-mpr-context` checkout. Writer exact SHA256
+`913dc8f71940b42fb51151d90a08c6784a6aa13e2ec8db91149f98e6a2885f8b`,62 function/grant assertions.
+Final canonical SQL fixture reaches ROLLBACK; exact DO probe deliberately PROBE_ROLLBACK with
+62 checks, default-closed/invalid-scope/no-account controls and unchanged business/settings/RLS.
+No migration/application/approval is inferred. Settings b4eb234d…8053774 remains separately pending.
+
+Register and Work share qualified exact remaining/Stock coverage; unread data stays unknown.
+Stale Forecast admission grants no new issue token, while unchanged already-committed RS source
+facts remain readable: partial4/remaining496 and existing-PO completion500/remaining0 pass SQL.
+Work routes outstanding committed source to its actual existing PO. No issued-MPR reapproval law
+is invented. Tick selection retains exact versions and drops stale quantities. Parent adoption is
+explicit contextFlow=false by default, with no production caller opting in. SAME shared create,
+object, Review, document and PoIssueEvidence engines are reused. Explicit GP partial recipients,
+RS500 partial1 and exact-config/location/healthy Stock offer binding are implemented. Stock offers
+retain held Units, exclude deliberate purchase allocations, and never reserve pre-create goods.
+PDF Confirm waits for actual painted current papers; late grouping identity is included in the
+readiness fingerprint so supplier data resolving cannot leave Rendering preview stuck.
+
+FINAL combined local browser → actual signed API → authenticated PostgreSQL GP5 and RS500 cases
+both PASS (2/2, /tmp/carres-context-api-browser-final.log). Separate approver; partial PO1; painted
+actual document; shared UI TEST email declaration; current send readback; remaining4/499; original
+need/version/approval unchanged; ops_tasks and work_occurrence_events counts unchanged. All in
+owned-loopback outer rollback, TEST PostgREST-shaped adapter, not production transport proof.
+Artifacts: /tmp/carres-context-api-browser/LOCAL-TEST-{general_purchase,ready_stock}-lifecycle.json
+and matching issued.png. No provider message, real Task write, production business write or activation.
+Earlier default-off parent browser GP/RS partial Review passes at1440 and390; Workspace/object
+GP/RS creation8/8 at390/1025/1164/1440. Existing local shipped-template PDF artifacts remain in
+output/forecast-mpr-delivery/local-test-documents (original1/current499). No complete production
+page walk for new context is claimed. Final API/web typechecks PASS (API with8GB heap after default-heap exhaustion); focused
+API65/65, web14/14 and shared152/152 regressions PASS. git diff --check and exact-package
+checker PASS. These are scoped checks, not a claim of the full historical migration replay.
+
+Remaining qualified boundaries: formal new/changed SC approval source; effective cancellation or
+reduction under Purchasing5.8.1 (contextual reason-only doors refuse before writes); mixed-source
+GP/SC quantity allocation and mixed-owner counted partial source input; changed multi-SKU
+Forecast remainder with no existing PO source. Do not build alternate Service/cancellation doors,
+pretend cancelled-history fixtures prove legal cancellation, or turn these into blanket SC denial.
+No SQL approval/migration/new-flow rollout, push, PR or deploy in this checkpoint. Foundation0696
+is already deployed; do not repeat a foundation-only final. Historical checkpoints below are
+superseded by this entry wherever they differ.
+
 **Latest qualified Stock + real-preview checkpoint ·18Oct2026 · LOCAL ONLY.**
 Exact writer SHA256 `ee66a225f512d74ef39cd36483a6f2dbd5a0e128e7a98a66f5e6e6ab3740c42f`,60
 function/grant assertions (supersedes1e237/58 below). One private qualified all-location Stock

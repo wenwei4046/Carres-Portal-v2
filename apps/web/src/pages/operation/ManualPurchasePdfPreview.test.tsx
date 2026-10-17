@@ -26,7 +26,15 @@ it("does not certify failed/changed paper and becomes ready only after a success
   act(() => reportPaint?.(false)); expect(ready).toHaveBeenLastCalledWith(false);
   act(() => reportPaint?.(true));
   const stalePaint = reportPaint;
-  const changed = structuredClone(drafts); changed[0].data.lines[0].qty = 2;
+  // Late supplier/category facts can change grouping identity without changing
+  // one printed byte. It must get its own painted readiness, not hang on old key.
+  const regrouped = structuredClone(drafts); regrouped[0].key = "TEST-resolved-group";
+  rerender(<ManualPurchasePdfPreview drafts={regrouped} onReadyChange={ready} />);
+  expect(ready).toHaveBeenLastCalledWith(false);
+  act(() => stalePaint?.(true)); expect(ready).toHaveBeenLastCalledWith(false);
+  await act(async () => { await vi.advanceTimersByTimeAsync(400); });
+  act(() => reportPaint?.(true)); expect(ready).toHaveBeenLastCalledWith(true);
+  const changed = structuredClone(regrouped); changed[0].data.lines[0].qty = 2;
   rerender(<ManualPurchasePdfPreview drafts={changed} onReadyChange={ready} />);
   expect(ready).toHaveBeenLastCalledWith(false);
   act(() => stalePaint?.(true)); expect(ready).toHaveBeenLastCalledWith(false);

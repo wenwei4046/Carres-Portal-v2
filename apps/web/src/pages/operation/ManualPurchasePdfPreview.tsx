@@ -21,7 +21,7 @@ type Painted = { key: string; generation: string; url?: string; error?: string }
 export default function ManualPurchasePdfPreview({ drafts, onReadyChange }: { drafts: readonly ManualPurchaseDraftPo[]; onReadyChange?: (ready: boolean) => void }) {
   /* One stable fingerprint of everything that prints — the effect re-renders
      only when the paper would actually change. */
-  const fingerprint = useMemo(() => JSON.stringify(drafts.map((d) => d.data)), [drafts]);
+  const fingerprint = useMemo(() => JSON.stringify(drafts.map((d) => ({ key: d.key, data: d.data }))), [drafts]);
   const [painted, setPainted] = useState<Painted[]>([]);
   const [attempt, setAttempt] = useState(0);
   const generation = `${fingerprint}:${attempt}`;

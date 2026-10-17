@@ -32,3 +32,31 @@ for (const width of [390,1025,1164,1440]) for (const purpose of ["gp","rs"]) {
     expect(errors).toEqual([]);
   });
 }
+for (const width of [390,1440]) for (const purpose of ["gp","rs"]) {
+  test(`guarded parent ${purpose} partial Issue Review ${width}`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.route("https://cdn.jsdelivr.net/fontsource/fonts/noto-sans-sc@latest/**", async route => {
+      const weight = /-(400|500|600|700)-normal/.exec(route.request().url())?.[1];
+      await route.fulfill({ status: 200, contentType: "font/ttf", body: readFileSync(`${process.env.NOTO_DIR}/noto${weight}.ttf`), headers: { "access-control-allow-origin": "*" } });
+    });
+    await page.goto(`/manual-purchase-context-preview.html?purpose=${purpose}&entry=register`);
+    const tick = page.getByTestId("mp-select-00000000-0000-4000-8000-000000000010");
+    await expect(tick).toBeEnabled({ timeout: 60000 }); await tick.click();
+    await page.getByTestId("mp-issue-selected").click();
+    const qty = page.getByLabel("TEST-SKU · Qty"); await expect(qty).toHaveValue(purpose === "rs" ? "500" : "5");
+    await qty.fill("1"); const create = page.getByTestId("so-batch-issue-create");
+    if (purpose === "gp") {
+      await expect(create).toBeDisabled(); await page.getByLabel("TEST recipient", { exact: true }).fill("1");
+    }
+    await expect(create).toBeEnabled({ timeout: 60000 });
+    const root = process.env.MPR_CONTEXT_SHOTS ?? "/tmp/carres-context-browser"; mkdirSync(root, { recursive: true });
+    await page.screenshot({ path: `${root}/${purpose}-${width}-partial-review.png`, fullPage: true });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await create.click();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __mprContext: { snapshot(): { issuedQty: number } } }).__mprContext.snapshot().issuedQty)).toBe(1);
+    const result = await page.evaluate(() => (window as unknown as { __mprContext: { snapshot(): { lastIssue: { contextIssue: { allocations: Array<{ qty: number; recipients: unknown[] }> } }; stored: { lines: Array<{ qty: number }> } } } }).__mprContext.snapshot());
+    expect(result.lastIssue.contextIssue.allocations[0].qty).toBe(1);
+    expect(result.stored.lines[0].qty).toBe(purpose === "rs" ? 500 : 5);
+    // No evidence declaration / supplier transport is invoked by this fixture.
+  });
+}

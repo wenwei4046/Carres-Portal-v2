@@ -5132,6 +5132,11 @@ export interface PurchaseRequestLineRow {
    * treated as 0, which is what it was.
    */
   stock_reserved_qty?: number;
+  /** Exact owning contextual coverage; absent/false is unknown, never zero. */
+  context_read_available?: boolean;
+  context_admission_current?: boolean;
+  context_to_buy?: number;
+  context_stock_qty?: number;
   required_by: string | null;
   remark: string | null;
   /** 0591 — the line's configuration, chosen like a Sales portal line
@@ -5290,6 +5295,7 @@ export interface ManualPurchaseDetailPayload {
   /** R3 / R4 — what THIS caller may do to the round (the SQL doors decide). */
   canWithdraw?: boolean;
   canEditAndSendAgain?: boolean;
+  context_can_edit_and_send_again?: boolean;
   /** `unit_cost` is present ONLY for the approver — the same screen renders
    *  for both roles, minus the money, never a permission error. */
   lines: Array<PurchaseRequestLineRow & { unit_cost?: number | null }>;

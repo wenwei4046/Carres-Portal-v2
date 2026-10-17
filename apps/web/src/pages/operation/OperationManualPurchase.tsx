@@ -1,4 +1,4 @@
-import { purchaseRequestContextSchema } from "@carres/shared";
+import { purchaseRequestContextSchema, type PurchaseRequestIssue } from "@carres/shared";
 import PurchaseRequestAllocations from "./purchase-request/PurchaseRequestAllocations";
 // design-standard: not-a-list-page — this is a governed PURCHASING REGISTER
 // destination, not a generic List page. Its frame is the module's own shell —
@@ -138,6 +138,8 @@ import {
   useManualPurchaseStock,
 } from "./ManualPurchaseStock";
 import ManualPurchasePdfPreview from "./ManualPurchasePdfPreview";
+import { prepareContextIssueReview, contextIssueDistributionValid, type ContextIssueLimit } from "./purchase-request/context-issue-review";
+import { readRequestContext } from "./purchase-request/read-request-context";
 import { useRequestContextActions } from "./purchase-request/use-request-context-readback";
 import PurchaseRequestContextFields from "./purchase-request/PurchaseRequestContextFields";
 import { approvalDistributionValid, proposalApprovalDistribution, type ApprovalDistribution, syncRequestDraftItems } from "./purchase-request/purchase-request-draft";
@@ -251,6 +253,8 @@ interface GoodsRow {
 
 interface RequestRegisterRow {
   id: string;
+  contextual: boolean;
+  contextAdmissionCurrent: boolean;
   /**
    * ⭐ `MPR No` — THE DOCUMENT IDENTITY AGAIN (owner ruling 2026-09-18, which
    * overwrites Card 08's 2026-09-04 retirement). `null` on a request raised
@@ -343,7 +347,7 @@ function decisionFactsOf(r: PurchaseRequestRow) {
   };
 }
 
-function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
+export function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
   const destName = new Map(data.destinations.map((d) => [d.id, d.name]));
   /* The two addresses the supplier's paper prints — read here so the draft on
      `Review Purchase Orders` is the document, not a summary of it. */
@@ -388,8 +392,11 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
      * `qty` and `approved_qty` are untouched: the original ask and the
      * approver's number both keep their authoritative homes.
      */
-    const remainingOf = (l: PurchaseRequestLineRow) =>
-      Math.max(
+    const saved = readRequestContext(r);
+    const contextual = saved.kind !== "legacy";
+    const remainingOf = (l: PurchaseRequestLineRow) => contextual
+      ? l.context_read_available === true && typeof l.context_to_buy === "number" ? l.context_to_buy : 0
+      : Math.max(
         0,
         manualPurchaseLineRemainingOf({
           qty: l.qty,
@@ -413,7 +420,7 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
     /* ⭐ UNKNOWN IS NOT ZERO (R2). A request whose lines did not load — the
        whole read failed, or a header was stored with no lines — has no
        confirmed remainder. It never falls into `No purchase needed`. */
-    const remainderKnown = !data.linesUnavailable && lines.length > 0;
+    const remainderKnown = !data.linesUnavailable && lines.length > 0 && (!contextual || (saved.kind === "context" && live.every(line => line.context_read_available === true)));
     const remainingQty = live.reduce((n, l) => n + remainingOf(l), 0);
     const deliverNames = live.map(
       (l) => destName.get(l.destination_id ?? r.destination_id) ?? "",
@@ -423,6 +430,8 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
       : null;
     return {
       id: r.id,
+      contextual,
+      contextAdmissionCurrent: !contextual || live.every(line => line.context_admission_current === true),
       /**
        * ⭐ WHAT PRINTS UNDER `MPR No`, AND WHAT ONLY STAYS SEARCHABLE
        * (owner ruling 2026-09-18, in its own two sentences).
@@ -442,10 +451,10 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
        * `searchValue` on this column carries the stored value whatever series
        * it belongs to.
        */
-      mprNo: (r.req_no ?? "").startsWith("MPR-") ? r.req_no : null,
+      mprNo: (r.req_no ?? "").startsWith("MPR-") || (saved.kind === "context" && /^(GP|SC|RS)\d{6}-\d+$/.test(r.req_no ?? "")) ? r.req_no : null,
       legacyReqNo: (r.req_no ?? "").startsWith("REQ-") ? r.req_no : null,
       purpose: r.purpose,
-      proceedDate: r.created_at,
+      proceedDate: saved.kind === "context" ? saved.value.proceedDate : contextual ? "" : r.created_at,
       approval,
       group: manualPurchaseGroupOf({
         approval: approval.kind,
@@ -456,7 +465,7 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
       poNos: [...new Set(live.flatMap(linePoNos))],
       deliveryDate: r.required_by,
       orderBy: manualPurchaseOrderByOf(live.map((l) => l.order_by ?? null)),
-      forText: manualPurchaseForOf({
+      forText: saved.kind === "context" && saved.value.purpose === "general_purchase" ? PURCHASE_REQUEST_REASONS.find(reason => reason.value === saved.value.reason)?.label ?? "" : manualPurchaseForOf({
         purpose: r.purpose,
         destinationName: destName.get(r.destination_id) ?? null,
         serviceCaseNo: r.for_service_case_id
@@ -513,10 +522,11 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
       lineOrderBys: live.map((l) => l.order_by ?? null),
       supplierGap: live.some((l) => l.supplier_id == null),
       productionDaysMissing: live.some((l) => l.production_days_missing === true),
-      issueWalls: live.map((l) => ({
+      issueWalls: live.filter(line => !contextual || line.fulfilment_kind === "purchase").map((l) => ({
         demandId: l.id,
         requestNo: r.req_no,
         configuration: configWords(l.attrs) || null,
+        attrs: l.attrs ?? null,
         supplierId: l.supplier_id,
         supplierName: l.supplier_id ? (supplierName.get(l.supplier_id) ?? null) : null,
         supplierAddress: l.supplier_id ? (supplierAddress.get(l.supplier_id) ?? null) : null,
@@ -593,7 +603,7 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
                      allocation rows above it are keyed `${l.id}::po::…`, so
                      nothing collides. */
                   key: l.id,
-                  qty: cancelled ? l.qty : remaining,
+                  qty: cancelled || (contextual && (!remainderKnown || l.fulfilment_kind === "stock_proposal")) ? l.approved_qty ?? l.qty : remaining,
                   supplier: catalogSupplier,
                   deliverTo: lineDestination,
                   poNos: [] as string[],
@@ -719,7 +729,7 @@ function RequesterAvatar({ name, userId }: { name: string | null; userId: string
   );
 }
 
-export default function OperationManualPurchase() {
+export default function OperationManualPurchase({ contextFlow = false }: { contextFlow?: boolean } = {}) {
   const [mode, setMode] = useState<
     "register" | "create" | { detail: string } | { edit: string }
   >("register");
@@ -841,26 +851,31 @@ export default function OperationManualPurchase() {
   );
   const selectable = useCallback(
     (r: RequestRegisterRow) =>
-      r.approval.kind === "approved" &&
+      (!r.contextual || (contextFlow && r.contextAdmissionCurrent)) && r.approval.kind === "approved" &&
       manualPurchaseSelectable(r.status.kind, r.remainingQty, r.remainderKnown),
-    [],
+    [contextFlow],
   );
-  /* A tick dies the moment its row stops being buyable — a refetch that
-     orders, withdraws or sends a request back must not leave it issuable. */
+  /* A tick belongs to exact source quantities/version, not a moving request.
+   * An external issue/refetch drops it rather than silently buying the new rest. */
+  const selectedScope = useRef(new Map<string,string>());
   useEffect(() => {
-    setSelected((prev) => {
-      const byId = new Map(rows.map((r) => [r.id, r]));
-      const next = new Set([...prev].filter((id) => {
-        const r = byId.get(id);
-        return r != null && selectable(r);
-      }));
-      return next.size === prev.size ? prev : next;
-    });
-  }, [rows, selectable]);
+    const byId = new Map(rows.map(row => [row.id,row]));
+    const next = new Set<string>(); const scopes = new Map<string,string>();
+    for (const id of selected) {
+      const row = byId.get(id); if (!row || !selectable(row)) continue;
+      const header = q.data?.requests.find(request => request.id === id);
+      const scope = JSON.stringify([header?.request_version ?? 0,header?.approval_version ?? null,row.issueWalls]);
+      const prior = selectedScope.current.get(id);
+      if (prior != null && prior !== scope) continue;
+      next.add(id); scopes.set(id,scope);
+    }
+    selectedScope.current = scopes;
+    if (next.size !== selected.size) setSelected(next);
+  }, [rows, selected, selectable, q.data]);
   /** The sentence beside a `To buy` row the tick refuses; null otherwise. The
    *  group heading already says why a pending or finished row is not buyable. */
   const deadReason = (r: RequestRegisterRow) =>
-    r.group !== "to-buy"
+    r.contextual && !r.contextAdmissionCurrent && r.remainderKnown ? "Review the existing purchase order." : r.group !== "to-buy"
       ? null
       : manualPurchaseNotSelectableReason(
           r.status.kind,
@@ -897,7 +912,9 @@ export default function OperationManualPurchase() {
    */
   const [review, setReview] = useState<null | {
     documents: ReturnType<typeof manualPurchaseReviewDocuments>;
-    payload: { requestIds: string[]; together: boolean; demandIds: string[] };
+    payload: PurchaseRequestIssue;
+    walls: typeof selectedWalls;
+    limits: Map<string, ContextIssueLimit>;
   }>(null);
 
   async function issueSelected() {
@@ -957,10 +974,18 @@ export default function OperationManualPurchase() {
        toolbar counted and the review will draw. */
     const demandIds = selectedWalls.map((w) => w.demandId);
     if (demandIds.length === 0) return;
-    setReview({
-      documents: selectedDocuments,
-      payload: { requestIds: ids, together: true, demandIds },
-    });
+    try {
+      const headers = (q.data?.requests ?? []).filter(request => ids.includes(request.id));
+      const modernHeaders = headers.filter(header => readRequestContext(header).kind !== "legacy");
+      if (modernHeaders.length && !contextFlow) throw new Error("Not available");
+      const reads = new Map(await Promise.all(modernHeaders.map(async header => [header.id,
+        await apiFetch(`/api/operation/purchasing/requests/${header.id}/context-review`)] as const)));
+      const prepared = prepareContextIssueReview(headers, reads, selectedWalls, crypto.randomUUID());
+      setReview({ documents: selectedDocuments, walls: selectedWalls, ...prepared });
+    } catch (error) {
+      setIssueError({ wrong: error instanceof Error ? error.message : "Could not be loaded", todo: "Try again" });
+      void q.refetch();
+    }
   }
 
   /**
@@ -976,6 +1001,7 @@ export default function OperationManualPurchase() {
     /* The refusal is NOT swallowed: the operator is standing on the review
        surface, which prints the server's two lines beside the document they
        name. The door is atomic, so a refusal created nothing. */
+    if (!contextIssueDistributionValid(review.payload, review.limits)) throw new Error("The approved quantity is not valid.");
     const created = await issue.mutateAsync(review.payload);
     void q.refetch();
     /* The issued documents, in the shape the shared evidence step reads — so
@@ -1516,7 +1542,9 @@ export default function OperationManualPurchase() {
   if (mode === "create" || (typeof mode === "object" && "edit" in mode)) {
     return (
       <div className="flex h-full min-h-0 flex-col">
-        <CreateRequestWorkspace
+        <GuardedRequestWorkspace
+          key={typeof mode === "object" && "edit" in mode ? mode.edit : "new-context"}
+          contextFlow={contextFlow} onReload={() => void Promise.all([q.refetch()])}
           editId={typeof mode === "object" && "edit" in mode ? mode.edit : null}
           destinations={q.data?.destinations ?? []}
           defaultDestinationId={q.data?.defaultDestinationId ?? null}
@@ -1567,6 +1595,28 @@ export default function OperationManualPurchase() {
              behind its own door, and this surface only hands the operator's
              decision to it. */
           onIssue={issueReviewed}
+          sourceBlocker={!contextIssueDistributionValid(review.payload, review.limits) ? { wrong: "The approved quantity is not valid.", todo: "Enter a whole number from 0 to the requested quantity." } : null}
+          reviewFields={document => review.payload.contextIssue ? <Block title="Items">
+            {review.payload.contextIssue.allocations?.filter(source => document.lines.some(line => line.demandId === source.demandId)).map(source => {
+              const limit = review.limits.get(source.demandId)!;
+              const wall = review.walls.find(wall => wall.demandId === source.demandId)!;
+              const patch = (change: Partial<typeof source>) => setReview(current => {
+                if (!current?.payload.contextIssue || issue.isPending) return current;
+                const next = { ...source, ...change };
+                const walls = current.walls.map(wall => wall.demandId === source.demandId && Number.isInteger(next.qty) && next.qty > 0 && next.qty <= limit.max ? { ...wall, remainingQty: next.qty } : wall);
+                return { ...current, walls, documents: manualPurchaseReviewDocuments(walls), payload: { ...current.payload, contextIssue: { ...current.payload.contextIssue,
+                  key: crypto.randomUUID(), allocations: current.payload.contextIssue.allocations!.map(value => value.demandId === source.demandId ? next : value) } } };
+              });
+              return <section key={source.demandId} aria-label={wall.sku} className="flex flex-col gap-3">
+                <Input id={`mp-issue-${source.demandId}`} label={`${wall.sku} · Qty`} type="number" min={1} max={limit.max} step={1} value={source.qty} disabled={issue.isPending}
+                  onChange={event => patch({ qty: Number(event.target.value) })} />
+                {limit.context.purpose !== "ready_stock" && limit.recipients.map(recipient => <Input key={recipient.recipientId}
+                  id={`mp-issue-${source.demandId}-${recipient.recipientId}`} label={limit.context.recipients.find(value => value.id === recipient.recipientId)?.name ?? GOODS_ABSENCE_WORDS.notRecorded}
+                  type="number" min={0} max={recipient.qty} step={1} disabled={issue.isPending} value={source.recipients?.find(value => value.recipientId === recipient.recipientId)?.qty ?? 0}
+                  onChange={event => { const qty = Number(event.target.value); patch({ recipients: [...(source.recipients ?? []).filter(value => value.recipientId !== recipient.recipientId), ...(qty > 0 ? [{ recipientId: recipient.recipientId, qty }] : [])] }); }} />)}
+              </section>;
+            })}
+          </Block> : null}
           backLabel={MW.page}
         />
       ) : null}
@@ -1933,6 +1983,7 @@ export default function OperationManualPurchase() {
         <ManualPurchaseObject
           key={detailId}
           id={detailId}
+          contextFlow={contextFlow}
           registerHeading={
             detailRow
               ? {
@@ -2135,7 +2186,7 @@ function RequestExpansion({
         ),
       /* Only a LIVE line with something left to buy can be ticked. A row that
          records a purchase order already made is evidence, not a decision. */
-      selectable: g.demandId != null && !g.cancelled && g.poNos.length === 0,
+      selectable: g.demandId != null && !g.cancelled && g.poNos.length === 0 && row.issueWalls.some(wall => wall.demandId === g.demandId && wall.remainingQty > 0),
     };
   });
 
@@ -2307,6 +2358,27 @@ const PICK_COLUMNS: readonly Column<DemandPickItem>[] = [
  *  The list scrolls inside a `max-h-64` box, so a needle that matches many
  *  items reaches all of them instead of stopping at the eighth. */
 const PICK_LIMIT = 50;
+
+/** State adapter for the SAME form, opted in only by an isolated parent.
+ * Normal application callers retain the default false; no URL activation. */
+function GuardedRequestWorkspace({ contextFlow, onReload, ...props }: Omit<Parameters<typeof CreateRequestWorkspace>[0], "contextDraft"> & { contextFlow: boolean; onReload: () => void }) {
+  const existing = useManualPurchaseDetail(contextFlow ? props.editId : null);
+  const [value, setValue] = useState<PurchaseRequestContext>(() => ({ version: 1, origin: "manual", purpose: "general_purchase", proceedDate: props.todayIso ?? "",
+    stockDeliveryDate: null, serviceCaseId: null, reason: null, companyPersonName: "", projectReference: "", explanation: "", forecastChangeReason: "", recipients: [], lines: [] }));
+  const [reason, setReason] = useState("");
+  const [seeded, setSeeded] = useState<{ id: string; version: number } | null>(null);
+  const saved = existing.data ? readRequestContext(existing.data.request) : null;
+  useEffect(() => {
+    if (!props.editId || saved?.kind !== "context" || seeded?.id === props.editId) return;
+    setValue(saved.value); setSeeded({ id: props.editId, version: saved.requestVersion });
+  }, [props.editId, saved, seeded]);
+  if (!contextFlow || (props.editId && saved?.kind === "legacy")) return <CreateRequestWorkspace {...props} />;
+  if (props.editId && (existing.isFetching || existing.isPending)) return <Loading />;
+  if (props.todayIso == null || (props.editId && (existing.isError || saved?.kind !== "context"))) return <EmptyState title="Could not be loaded" action={<Button onClick={onReload}>Try again</Button>} />;
+  if (props.editId && seeded?.id !== props.editId) return <Loading />;
+  return <CreateRequestWorkspace {...props} contextDraft={{ value, onChange: setValue, pickupLocations: props.destinations,
+    ...(props.editId && saved?.kind === "context" ? { revision: { expectedVersion: seeded?.version ?? saved.requestVersion, reason, onReasonChange: setReason } } : {}) }} />;
+}
 
 export function CreateRequestWorkspace({
   editId,
@@ -2681,7 +2753,8 @@ export function CreateRequestWorkspace({
     const offer = contextStockByLine.get(line.id)?.find(offer => offer.locationId === proposal.locationId && offer.destinationId === proposal.destinationId);
     return offer != null && proposal.qty <= offer.available;
   }));
-  const canSend = contextDraft ? !!contextValid && !!contextDatesOk && !!contextStockOk && !saving && !pick.isLoading && !pick.isError && everyStartedLineNamesAnItem : legacyCanSend;
+  const contextRevisionCurrent = !contextDraft?.revision || (!existing.isFetching && !existing.isError && existing.data?.request.request_version === contextDraft.revision.expectedVersion);
+  const canSend = contextDraft ? contextRevisionCurrent && !!contextValid && !!contextDatesOk && !!contextStockOk && !saving && !pick.isLoading && !pick.isError && everyStartedLineNamesAnItem : legacyCanSend;
 
   /** The disabled button NAMES its gap (the Receiving law) — the first
    *  missing fact wins, in the governed order: lead days first (Card 06),
@@ -2714,7 +2787,7 @@ export function CreateRequestWorkspace({
 
   const sendLabel = contextDraft
     ? contextMissing ? `${editing ? MW.sendAgain : MW.send}: ${contextMissing}`
-      : !contextDatesOk ? MW.sendNeedsDate : !contextStockOk ? `${MW.send}: From stock` : editing ? MW.sendAgain : MW.send
+      : !contextRevisionCurrent ? "Could not be loaded" : !contextDatesOk ? MW.sendNeedsDate : !contextStockOk ? `${MW.send}: From stock` : editing ? MW.sendAgain : MW.send
     : legacySendLabel;
 
   function addLine() {
@@ -2905,7 +2978,7 @@ export function CreateRequestWorkspace({
     collectedSupplierNames: new Set(supplierCollections.map(c => c.supplierName)),
   }) : legacyDraftPos;
   const contextReviewFacts = JSON.stringify({ body: contextBody, plan: plan.data,
-    stock: contextDraft ? [...contextStockByLine] : [], papers: draftPos.map(paper => paper.data) });
+    stock: contextDraft ? [...contextStockByLine] : [], papers: draftPos.map(paper => ({ key: paper.key, data: paper.data })) });
   useEffect(() => {
     if (contextReviewing && contextReviewedFacts.current !== contextReviewFacts) setContextReviewing(false);
   }, [contextReviewing, contextReviewFacts]);
@@ -4774,7 +4847,7 @@ export function ManualPurchaseObject({
                     </span>
                   ) : null}
                 </div>
-                {approval.kind === "sent_back" && d.canEditAndSendAgain ? (
+                {approval.kind === "sent_back" && (modern ? d.context_can_edit_and_send_again === true : d.canEditAndSendAgain) ? (
                   <span className="flex">
                     <Button
                       variant="primary"

@@ -203,16 +203,20 @@ export const purchaseRequestStockOffersSchema = z.array(z.object({ lineId: z.str
   for (const offer of offers) if (offer.available !== offer.units.length || new Set(offer.units.map(unit => unit.id)).size !== offer.units.length || offer.units.some(unit => unit.warehouse_id !== offer.locationId)) ctx.addIssue({ code: "custom", message: "Stock source does not match offered quantity" });
 });
 export type PurchaseRequestStockOffer = z.infer<typeof purchaseRequestStockOffersSchema>[number];
+const purchaseRequestCoverageSchema = z.array(z.object({ demand_id: z.string().uuid(), kind: z.enum(["purchase", "stock_proposal"]), approved_qty: z.number().int().min(0), stock_qty: z.number().int().min(0), issued_qty: z.number().int().min(0), to_buy: z.number().int().min(0), recipients: z.array(z.object({ recipientId: z.string().uuid(), qty: z.number().int().positive() }).strict()).optional() }).strict());
 export const purchaseRequestContextReviewReadSchema = z.discriminatedUnion("available", [
   z.object({ available: z.literal(true), review: z.object({
     request_version: z.number().int().positive(), state: z.object({ context: purchaseRequestContextSchema }).passthrough(),
     stock_source: z.array(z.record(z.unknown())), stock_offers: purchaseRequestStockOffersSchema.optional(),
-  }).passthrough(), events: z.array(purchaseRequestStoredEventSchema), coverage: z.array(z.object({ demand_id: z.string().uuid(), kind: z.enum(["purchase", "stock_proposal"]), approved_qty: z.number().int().min(0), stock_qty: z.number().int().min(0), issued_qty: z.number().int().min(0), to_buy: z.number().int().min(0) }).strict()).nullable(), approval: z.object({ request_version: z.number().int().positive(), approval_version: z.number().int().positive(), token: z.string().regex(/^[a-f0-9]{32}$/) }).strict().nullable() }).strict(),
-  z.object({ available: z.literal(false), reason: z.string().min(1), request_version: z.number().int().positive(),
+  }).passthrough(), events: z.array(purchaseRequestStoredEventSchema), coverage: purchaseRequestCoverageSchema.nullable(), approval: z.object({ request_version: z.number().int().positive(), approval_version: z.number().int().positive(), token: z.string().regex(/^[a-f0-9]{32}$/) }).strict().nullable() }).strict(),
+  z.object({ available: z.literal(false), approval_scope_valid: z.boolean().optional(), committed_coverage: purchaseRequestCoverageSchema.nullish(), reason: z.string().min(1), request_version: z.number().int().positive(),
     request_context: purchaseRequestContextSchema, events: z.array(purchaseRequestStoredEventSchema),
   }).strict(),
 ]).superRefine((read, ctx) => {
-  if (!read.available) return;
+  if (!read.available) {
+    if (read.committed_coverage != null && read.request_context.purpose !== "ready_stock") ctx.addIssue({ code: "custom", path: ["committed_coverage"], message: "Only unchanged committed RS scope has this owning continuation" });
+    return;
+  }
   if ((read.coverage === null) !== (read.approval === null)) {
     ctx.addIssue({ code: "custom", path: ["approval"], message: "Approval and coverage must describe the same saved decision" });
   }
@@ -222,6 +226,12 @@ export const purchaseRequestContextReviewReadSchema = z.discriminatedUnion("avai
   }
   if (read.coverage && new Set(read.coverage.map(line => line.demand_id)).size !== read.coverage.length) {
     ctx.addIssue({ code: "custom", path: ["coverage"], message: "Duplicate demand coverage" });
+  }
+  for (const row of read.coverage ?? []) if (row.recipients != null) {
+    if (new Set(row.recipients.map(recipient => recipient.recipientId)).size !== row.recipients.length
+      || (row.kind === "purchase" && (read.review.state.context.purpose === "ready_stock" ? row.recipients.length !== 0 : row.recipients.reduce((total,recipient) => total + recipient.qty,0) !== row.to_buy))) {
+      ctx.addIssue({ code: "custom", path: ["coverage"], message: "Remaining recipients do not match owning coverage" });
+    }
   }
 });
 /** The existing issue door accepts the reviewed approval plus optional exact

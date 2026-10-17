@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   DEMAND_PURPOSE_VALUES,
   purchaseRequestSubmitSchema,
+  purchaseRequestContextSchema,
   purchaseRequestRevisionSchema,
   purchaseRequestDecisionSchema,
   purchaseRequestIssueSchema,
@@ -35,6 +36,7 @@ import {
   type ManualPurchaseStockResponse,
   type ManualPurchaseStockUnit,
 } from "@carres/shared";
+import { stampRequestContextCoverage } from "../../lib/purchasing-context-coverage";
 import { requireOperation } from "../../lib/auth-guards";
 import { resolveActorNames } from "../../lib/actor-names";
 import { purchasingActorMayIssue } from "../../lib/purchasing-po-authority";
@@ -591,7 +593,7 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
        approved_at, approved_by, refused_at, refused_by, refuse_reason,
        withdrawn_at, sent_back_at, sent_back_reason, submitted_at, round,
        for_service_case_id, for_staff_user_id, for_subsidiary_name,
-       created_by, created_at`,
+       created_by, created_at, request_context, request_version, proceed_date, approval_version`,
     )
     .order("created_at", { ascending: false })
     .limit(500);
@@ -712,6 +714,8 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
       supplier_id: p.supplier_id,
     }));
   }
+
+  lines = await stampRequestContextCoverage(sb, requests ?? [], lines);
 
   /* Card 06 §3 — the ONE server date projection stamps every line. The plan
      failing to load costs the timing facts, never the Register (the honest
@@ -989,7 +993,7 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
      Register calls (Card 05 §3.3/§3.6; Law D). */
   const enriched = await withCatalogAndLineage(sb, stamped);
   if (enriched.error) return fail(c, enriched.error);
-  stamped = enriched.lines;
+  stamped = await stampRequestContextCoverage(sb, [request], enriched.lines);
 
   /* Card 06 §3/§6 — the SAME server date projection the Register reads, so
      the object's `Order by {date}` fact can never disagree with the row. */
@@ -1262,6 +1266,7 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
      */
     canWithdraw: isRequester && undecided && !liveIssued,
     canEditAndSendAgain: !hasContext && isRequester && undecided && request.sent_back_at != null,
+    ...(hasContext ? { context_can_edit_and_send_again: isRequester && undecided && request.sent_back_at != null && !liveIssued } : {}),
     /** The REQUEST section's `Requested By` — the real individual only; a
      *  shared-account record answers null and the reader states the defect. */
     requested_by_name: requestedBy?.name ?? null,
@@ -1460,7 +1465,7 @@ manualPurchaseRouter.get("/:id/stock-allocation", requireOperation, async (c) =>
   const { data: request, error: reqErr } = await sb
     .from("purchase_requests")
     .select(
-      "id, req_no, fulfilment_intent, approved_at, refused_at, withdrawn_at, sent_back_at",
+      "id, req_no, fulfilment_intent, approved_at, refused_at, withdrawn_at, sent_back_at, request_context, request_version, proceed_date, purpose, approval_version",
     )
     .eq("id", id)
     .maybeSingle();
@@ -1471,7 +1476,7 @@ manualPurchaseRouter.get("/:id/stock-allocation", requireOperation, async (c) =>
 
   const { data: lineRows, error: lineErr } = await sb
     .from("purchase_demands")
-    .select("id, sku, qty, approved_qty, issued_qty, cancelled_at")
+    .select("id, sku, qty, approved_qty, issued_qty, cancelled_at, request_line_id, stock_proposal_id, fulfilment_kind, destination_id")
     .eq("request_id", id);
   if (lineErr) return fail(c, lineErr);
   const lines = (lineRows ?? []) as Array<{
@@ -1481,6 +1486,10 @@ manualPurchaseRouter.get("/:id/stock-allocation", requireOperation, async (c) =>
     approved_qty: number | null;
     issued_qty: number;
     cancelled_at: string | null;
+    request_line_id?: string | null;
+    stock_proposal_id?: string | null;
+    fulfilment_kind?: string | null;
+    destination_id?: string | null;
   }>;
 
   /* The Catalog's human words, read whole and matched here — never `.in()`
@@ -1526,7 +1535,30 @@ manualPurchaseRouter.get("/:id/stock-allocation", requireOperation, async (c) =>
     }
   }
 
-  const { freeUnitsByKey } = await readFreeStock(sb);
+  const contextual = Number(request.request_version ?? 0) > 0 || request.request_context != null;
+  let qualifiedByDemand: Map<string,Set<string>> | null = null;
+  if (contextual) {
+    const saved = purchaseRequestContextSchema.safeParse(request.request_context);
+    if (!saved.success) return c.json({ error: "stock_source_unavailable" },503);
+    const source = await sb.rpc("purchasing_request_context_review", { p_id: id });
+    const review = !source.error ? purchaseRequestContextReviewReadSchema.safeParse(source.data) : null;
+    if (!review?.success || JSON.stringify(review.data.available ? review.data.review.state.context : review.data.request_context) !== JSON.stringify(saved.data)
+      || (review.data.available ? review.data.review.request_version : review.data.request_version) !== request.request_version
+      || (request.approved_at != null && (review.data.available ? review.data.approval?.approval_version !== request.approval_version : review.data.approval_scope_valid !== true))) return c.json({ error: "stock_source_unavailable" },503);
+    const stock = await sb.rpc("purchasing_request_stock_offers", { p_lines: saved.data.lines });
+    const offers = !stock.error ? purchaseRequestStockOffersSchema.safeParse(stock.data) : null;
+    if (!offers?.success) return c.json({ error: "stock_source_unavailable" },503);
+    qualifiedByDemand = new Map();
+    for (const line of lines) {
+      const requestedLine = saved.data.lines.find(value => value.id === line.request_line_id);
+      const proposal = requestedLine?.stockProposals.find(value => value.id === line.stock_proposal_id);
+      if (line.fulfilment_kind === "stock_proposal" && (!proposal || proposal.destinationId !== line.destination_id)) return c.json({ error: "stock_source_unavailable" },503);
+      const units = proposal ? offers.data.filter(offer => offer.lineId === requestedLine!.id && offer.locationId === proposal.locationId && offer.destinationId === proposal.destinationId).flatMap(offer => offer.units.map(unit => unit.id)) : [];
+      qualifiedByDemand.set(line.id,new Set(units));
+    }
+  }
+  const { freeUnitsByKey } = await readFreeStock(sb,contextual);
+
 
   const approved =
     request.approved_at != null &&
@@ -1546,9 +1578,9 @@ manualPurchaseRouter.get("/:id/stock-allocation", requireOperation, async (c) =>
       reservedQty,
       cancelled: l.cancelled_at != null,
     });
-    const free = freeUnitsByKey.get(stockMatchKey(l.sku)) ?? [];
+    const free = (freeUnitsByKey.get(stockMatchKey(l.sku)) ?? []).filter(unit => qualifiedByDemand == null || qualifiedByDemand.get(l.id)?.has(unit.id));
     const availableQty = free.reduce((n, u) => n + Math.max(1, u.qty), 0);
-    const stockBlock = manualPurchaseStockBlockOf({
+    const stockBlock = contextual && intent !== "additional_stock" && l.fulfilment_kind !== "stock_proposal" ? "stock_not_approved" as const : manualPurchaseStockBlockOf({
       approved,
       intent,
       hasReference: reference != null,
