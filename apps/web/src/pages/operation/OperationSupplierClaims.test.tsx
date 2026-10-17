@@ -164,7 +164,8 @@ describe("Supplier Claims register — the confirmed twelve columns (§9.5, 2026
   it("uses selection for Export only", () => {
     show();
     fireEvent.click(screen.getAllByRole("checkbox", { name: "Select row" })[0]!);
-    expect(screen.getByRole("button", { name: /Export Excel.*1/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Page tools" }));
+    expect(screen.getByRole("menuitem", { name: /Export Excel.*1/ })).toBeInTheDocument();
   });
 });
 
