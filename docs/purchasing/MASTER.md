@@ -1012,6 +1012,17 @@ approve an algorithm, weekly task cadence, timed Undo, Skip policy or production
 
 ### 5.2 Two input doors
 
+**Foundation SQL · Jess approved17Oct2026; application adoption NOT BUILT.**
+Migration `0696_a_purchase_request_keeps_its_recipient_and_allocation_scope.sql` is the exact
+approved draft, SHA-256 `c1b34b3a2771e68e1629c665b57823dc7be7ddefc68e6262a63f21ae761dc459`.
+It adds unused request/allocation/approval-scope fields and the approved Settings defaults,
+and preserves every historical purpose while admitting GP in three CHECKs. No RLS change,
+transaction backfill or contextual writer/form activation. Isolated replay applied it; legacy
+atomic create/configuration/resubmit3/3 and three actual CHECK negative controls passed.
+Production read-only preflight found no historical purpose outside the preserved checks.
+Application and authenticated end-to-end verification remain separate obligations.
+
+
 **Shared narrow-page UX — OWNER-APPROVED TARGET / NOT BUILT, Jess17Oct2026.**
 Forecast and MPR inherit UI MASTER's17Oct shared Shell contract: below1100, temporary64 menu,
 Summary/Tasks overlay the page rather than shrinking the content, toolbar36 and one line.
