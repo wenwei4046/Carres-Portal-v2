@@ -1568,7 +1568,9 @@ describe("the rail — purchasing fact sections, navigation not selection", () =
     renderRegister();
     expect(readFileSync(join(HERE, "SoBatchRegister.module.css"), "utf8")).toContain("@container so-batch (width < 896px)");
     /* Its positioning context is the row it sits in, not the page. */
-    expect(rail().parentElement?.className).toContain("relative");
+    const positioningRow = rail().parentElement?.closest(".relative");
+    expect(positioningRow).toHaveClass("overflow-hidden");
+    expect(positioningRow).toContainElement(rail());
   });
 
   it("keeps Report unavailable while its content is undecided", () => {

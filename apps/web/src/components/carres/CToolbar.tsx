@@ -33,13 +33,16 @@ export function CShowPanelButton({ label, onShow, compact = false }: { label: st
 export const CIconButton = forwardRef<
   HTMLButtonElement,
   { icon: string; label: string; pressed?: boolean } & Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children">
->(function CIconButton({ icon, label, pressed = false, className, ...rest }, ref) {
+>(function CIconButton({ icon, label, pressed = false, className, onClick, ...rest }, ref) {
+  const panel = label === "Show filters" || label === "Show summary" || label === "Summary" ? "Summary" : label === "Tasks" ? "Tasks" : null;
   return (
     <button
       ref={ref}
       type="button"
       aria-label={label}
       title={label}
+      data-panel-door={panel ? label : undefined}
+      onClick={(event) => { if (panel) rememberPanelOpener(panel, event.currentTarget); onClick?.(event); }}
       {...rest}
       className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-c-body hover:bg-c-hover ${pressed ? "bg-c-hover" : ""} ${className ?? ""}`}
     >
