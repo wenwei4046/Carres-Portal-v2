@@ -22,6 +22,32 @@ The narrow-panel amendment supersedes the earlier Tasks-only compact-menu fallba
 12 Forecast shell browser checks PASS; wider MPR persistence, source/stock/approval/issue/send and
 production proof remain open. Desktop dirty work is preserved. No supplier sending is authorised.
 
+**Forecast/MPR delivery checkpoint ·17Oct2026:** rule PR#2089 merged and deployed as
+`2a91dd0976ec151b3ae75eaf82d00a000226293e`; all five surfaces converged. Shared Shell PR#2090
+head`38b2b292515c9aace1ce8998aa480282395aabff` remains unmerged: Linux baseline workflow39033445428 passed and generated pictures are committed; exact-head CI pending. First CI found one obsolete immediate-parent rail assertion;
+it now checks the real positioning ancestor. Targeted rail/dialog193/193 PASS; prior Forecast
+browser12/12 PASS. Keep required CI on the exact new head. Preview reads production and requires
+its own sign-in in IAB; native Chrome's existing production MPR is authenticated as Principal.
+Do not copy login tokens or interrupt the owner's active Design tab.
+
+Context branch `codex/forecast-mpr-context` has uncommitted schema/API/recipient-field work; it is
+NOT an adopted or deployed form. Shared context tests9/9; draft allocation tests7/7; API contextual/legacy tests103/103;
+API type check and latest web type check passed with NODE_OPTIONS=--max-old-space-size=8192;
+repeat the relevant final check after the remaining writer/form changes. Full need recipient
+quantities are separate from stock and buy allocation, including all-stock scope. No mandatory
+Service decision UUID: existing Case/outcome/evidence and explicit goods feed the existing Jess
+MPR approval; separate Service remedy/movement law is not claimed fulfilled by that approval.
+Frontend sections now include selected Proceed Date, SC/GP facts, multiple recipients and per-item stock/purchase allocations in `purchase-request/PurchaseRequestContextFields.tsx`. They are composed fields for the existing CreateRequestWorkspace, NOT an alternate form and NOT mounted on the legacy submit. Unknown plan/availability stays missing; stale stock proposals remain visible for correction. Recipient removal keeps item totals and other recipients, exposing the unassigned gap. Mount only after canonical writer, complete read-back and capability admission are ready.
+
+SQL foundation draft is `output/forecast-mpr-delivery/purchase-request-context.draft.sql`,
+SHA256`c1b34b3a2771e68e1629c665b57823dc7be7ddefc68e6262a63f21ae761dc459`. Async approval was
+requested under ENGINEERING5; NO ANSWER IS NOT APPROVAL. Do not put it in migrations/apply it to
+production before the recorded approval. It adds fields/defaults and replaces three purpose
+CHECKs preserving all old values. No RLS change or transaction backfill. It applied to an isolated
+local replay and old atomic create/configuration/resubmit integration3/3 passed. New writers,
+approval snapshots/reapproval, canonical stock use, exact-version send outcomes and persisted
+form adoption are still open. No issue/receipt/supplier message was performed on production.
+
 ## 0 · Owner scope carried forward (Jess, 14 Oct 2026 — do not ask her to reconfirm)
 
 1. One existing UI kit across the whole Portal; remove superseded implementations after preserving

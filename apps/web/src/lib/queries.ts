@@ -1,3 +1,4 @@
+import type { PurchaseRequestContext } from "@carres/shared";
 import type { OutrightFactsFailed, OutrightOrderFacts } from "@carres/shared";
 import { workspaceActivitySettingsResponseSchema, type WorkspaceActivitySettingsResponse } from "@carres/shared";
 import { supabase } from "@/lib/supabase";
@@ -342,6 +343,8 @@ import { withDepartment } from "@/pages/finance/department";
 import { uploadCompartmentPhoto, uploadDeliveryProof, uploadModelPhoto } from "./photo-upload";
 
 export const qk = {
+  purchaseRequestPlan: (skus: string[], proceedDate: string | null, purpose: string | null) => ["operation", "purchasing", "requests", "plan", skus.join("|"), proceedDate, purpose] as const,
+  purchaseRequests: () => ["operation", "purchasing", "requests"] as const,
   dealers:      () => ["dealers"] as const,
   dealerSelf:   () => ["dealers", "me"] as const,
   orders:       (filters?: OrderFilters) => ["orders", filters ?? {}] as const,
@@ -5326,6 +5329,8 @@ export interface ManualPurchasePlanPayload {
    *  and has complete Settings. */
   deliveryDateDefault: string | null;
   planUnavailable: boolean;
+  recipientEarliest?: string | null;
+  recipientPlanUnavailable?: boolean;
 }
 
 /**
@@ -5334,14 +5339,14 @@ export interface ManualPurchasePlanPayload {
  * POST only because live SKUs carry free text (`Leg 4"`); it reads, creates
  * nothing and reserves nothing.
  */
-export function useManualPurchasePlan(skus: string[]) {
+export function useManualPurchasePlan(skus: string[], context?: { proceedDate: string; purpose: PurchaseRequestContext["purpose"] }) {
   const sorted = [...skus].sort();
   return useQuery<ManualPurchasePlanPayload, ApiError>({
-    queryKey: ["operation", "purchasing", "requests", "plan", sorted.join("|")],
+    queryKey: qk.purchaseRequestPlan(sorted, context?.proceedDate ?? null, context?.purpose ?? null),
     queryFn: () =>
       apiFetch<ManualPurchasePlanPayload>(
         "/api/operation/purchasing/requests/plan",
-        { method: "POST", body: JSON.stringify({ skus: sorted }) },
+        { method: "POST", body: JSON.stringify({ skus: sorted, ...context }) },
       ),
     staleTime: 30_000,
   });
@@ -5485,6 +5490,21 @@ export function useManualPurchaseRegister() {
     queryFn: () =>
       apiFetch<ManualPurchaseRegisterPayload>("/api/operation/purchasing/requests"),
     staleTime: 30_000,
+  });
+}
+
+/** The contextual request is one atomic submission through the existing owner. */
+export function useSubmitPurchaseRequestContext() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { submissionKey: string; context: PurchaseRequestContext }) =>
+      apiFetch<{ id: string; req_no: string; approval_required: boolean; replayed?: boolean }>(
+        "/api/operation/purchasing/requests",
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: qk.purchaseRequests() });
+    },
   });
 }
 

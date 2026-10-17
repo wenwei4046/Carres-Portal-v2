@@ -2,6 +2,7 @@ import { Hono, type Context } from "hono";
 import { z } from "zod";
 import {
   DEMAND_PURPOSE_VALUES,
+  purchaseRequestSubmitSchema,
   expectedArrivalOf,
   isOpsGenericAccount,
   isOtherCreditor,
@@ -31,6 +32,7 @@ import { purchasingActorMayIssue } from "../../lib/purchasing-po-authority";
 import { readFreeStock } from "../../lib/purchase-demand-read";
 import {
   loadPurchasingSettings,
+  loadPurchaseRequestSettings,
   type LoadedPurchasingSettings,
 } from "../../lib/purchasing-settings";
 import { forecastIssueRefusal, forecastItemWord } from "../../lib/forecast-purchase-read";
@@ -2019,6 +2021,32 @@ manualPurchaseRouter.post("/", requireOperation, async (c) => {
   } catch {
     return c.json({ error: "invalid_json" }, 400);
   }
+  /* The contextual form uses the SAME atomic request owner. The SQL door owns
+     duplicate submissions, source scope, dates, allocations and all writes. A
+     request is never decomposed into client-side per-line transactions. */
+  if (raw && typeof raw === "object" && "context" in raw) {
+    const submission = purchaseRequestSubmitSchema.safeParse(raw);
+    if (!submission.success) {
+      return c.json({ error: "invalid_body", code: "invalid_param", fields: submission.error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })) }, 400);
+    }
+    const { data, error } = await sb.rpc("purchasing_create_request_with_lines", {
+      p_purpose: submission.data.context.purpose,
+      p_destination_id: submission.data.context.lines.flatMap((line) => line.allocations)[0]?.destinationId
+        ?? submission.data.context.lines.flatMap((line) => line.stockProposals)[0]?.destinationId,
+      p_required_by: submission.data.context.lines.flatMap((line) => line.allocations)[0]?.supplierDeliveryDate ?? null,
+      p_why: null,
+      p_for_service_case_id: submission.data.context.serviceCaseId,
+      p_for_staff_user_id: null,
+      p_for_subsidiary_name: null,
+      // Extend the existing JSON input without creating an overloaded RPC.
+      // SQL normalises the envelope and derives every demand from the context.
+      p_lines: [{ request_context: submission.data.context, submission_key: submission.data.submissionKey }],
+      p_fulfilment_intent: submission.data.context.purpose === "ready_stock" ? "additional_stock" : "concrete_need",
+      p_purchase_requirement: null,
+    });
+    if (error) return fail(c, error);
+    return c.json(data, 201);
+  }
   const parsed = headerBody.safeParse(raw);
   if (!parsed.success) {
     return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
@@ -2182,7 +2210,7 @@ manualPurchaseRouter.post("/:id/lines", requireOperation, async (c) => {
 /** The create form's plan read may name up to this many distinct SKUs —
  *  far above any real request, far below a scraping loop. */
 const planBody = z
-  .object({ skus: z.array(z.string().min(1).max(120)).max(50) })
+  .object({ skus: z.array(z.string().min(1).max(120)).max(50), proceedDate: z.string().date().optional(), purpose: z.enum(["service_case", "general_purchase", "ready_stock"]).optional() })
   .strict();
 
 /**
@@ -2216,17 +2244,28 @@ manualPurchaseRouter.post("/plan", requireOperation, async (c) => {
     return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
   }
   const skus = [...new Set(parsed.data.skus)];
-  const proceedDate = todayIsoMYT();
+  const proceedDate = parsed.data.proceedDate ?? todayIsoMYT();
+  const sb = userClient(c.env, c.var.auth.jwt);
+  let recipientEarliest: string | null = null;
+  let recipientPlanUnavailable = false;
+  if (parsed.data.purpose) {
+    try {
+      const requestSettings = await loadPurchaseRequestSettings(sb);
+      recipientEarliest = plusCalendarDays(proceedDate, parsed.data.purpose === "service_case"
+        ? requestSettings.serviceCalendarDays : requestSettings.normalCalendarDays);
+    } catch { recipientPlanUnavailable = true; }
+  }
+  const recipientPlan = parsed.data.purpose ? { recipientEarliest, recipientPlanUnavailable } : {};
   if (skus.length === 0) {
     return c.json({
       proceedDate,
       lines: [],
       deliveryDateDefault: null,
       planUnavailable: false,
+      ...recipientPlan,
     });
   }
 
-  const sb = userClient(c.env, c.var.auth.jwt);
   let settings: LoadedPurchasingSettings | null = null;
   let planUnavailable = false;
   try {
@@ -2288,7 +2327,7 @@ manualPurchaseRouter.post("/plan", requireOperation, async (c) => {
       )
     : null;
 
-  return c.json({ proceedDate, lines, deliveryDateDefault, planUnavailable });
+  return c.json({ proceedDate, lines, deliveryDateDefault, planUnavailable, ...recipientPlan });
 });
 
 const issueBody = z.object({

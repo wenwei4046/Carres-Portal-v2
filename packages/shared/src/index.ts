@@ -63,6 +63,7 @@ export {
   type MonthlyDemandView,
 } from "./monthly-demand";
 export * from "./forecast-purchase";
+export * from "./purchase-request-context";
 export { readFailureWords, type ReadFailureSurface, type ReadFailureWords } from "./read-failure";
 export { routeGoodsLinesOf, type RouteGoodsFacts, type RouteGoodsLine, type RouteGoodsSource } from "./sales-order-route-goods";
 export { routeDeliveryScopesOf, type RouteScopeFacts } from "./sales-order-route-scopes";

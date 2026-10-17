@@ -367,3 +367,24 @@ export async function loadPoWindows(sb: SupabaseClient): Promise<LoadedPoWindows
     cutoffBySupplier,
   };
 }
+
+/** Contextual request/recipient and manual sending settings; absence is unknown. */
+export async function loadPurchaseRequestSettings(sb: SupabaseClient): Promise<{
+  normalCalendarDays: number;
+  serviceCalendarDays: number;
+  manualWhatsappScreenshotRequired: boolean;
+}> {
+  const { data, error } = await sb.from("purchasing_settings")
+    .select("purchase_request_normal_days, purchase_request_service_days, po_manual_whatsapp_screenshot_required")
+    .eq("id", 1).maybeSingle();
+  if (error || !data) throw new Error("purchase_request_settings_unavailable");
+  const normal = data.purchase_request_normal_days;
+  const service = data.purchase_request_service_days;
+  if (typeof normal !== "number" || !Number.isInteger(normal) || normal < 0 ||
+      typeof service !== "number" || !Number.isInteger(service) || service < 0 ||
+      typeof data.po_manual_whatsapp_screenshot_required !== "boolean") {
+    throw new Error("purchase_request_settings_unavailable");
+  }
+  return { normalCalendarDays: normal, serviceCalendarDays: service,
+    manualWhatsappScreenshotRequired: data.po_manual_whatsapp_screenshot_required };
+}
