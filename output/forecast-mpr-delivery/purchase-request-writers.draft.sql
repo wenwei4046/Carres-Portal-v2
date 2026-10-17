@@ -286,7 +286,10 @@ $state$;
 revoke all on function public._purchasing_request_context_state(uuid) from public,anon,authenticated;
 
 -- WIP canonical create slice. DO NOT REVIEW/APPLY as a finished migration:
--- supplier-calendar/source/destination checks, contextual approval/reapproval,
+-- Supplier-date minimum must follow productionWorkingDaysFor/expectedArrivalOf
+-- and the SAME myHolidaySet source. Office calendar is for windows/buffer,
+-- not a substitute for the supplier production week (Purchasing MASTER5.6).
+-- Supplier-calendar/source/destination checks, contextual approval/reapproval,
 -- downstream coverage/stock/send admission and complete integration are unfinished.
 -- Preimages were read locally only after all7 owning function fingerprints matched
 -- production (read-only17Oct); existing signatures and legacy bodies are preserved.
