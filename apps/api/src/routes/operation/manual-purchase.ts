@@ -5,6 +5,8 @@ import {
   purchaseRequestSubmitSchema,
   purchaseRequestRevisionSchema,
   purchaseRequestDecisionSchema,
+  purchaseRequestIssueSchema,
+  purchaseRequestContextHistory,
   purchaseRequestContextReviewReadSchema,
   purchaseRequestSupplierDateIssues,
   type PurchaseRequestContext,
@@ -92,6 +94,14 @@ function refuse(
   facts?: Parameters<typeof purchasingRefusal>[1],
 ) {
   return c.json(refusalBody(code, facts), status);
+}
+
+/** New context refusal tags retain their status and the existing governed
+ * Purchasing fallback words; raw SQL implementation messages are not UI copy. */
+function contextRefusal(c: Context<AppEnv>, error: Parameters<typeof mapPgError>[0]) {
+  const mapped = mapPgError(error);
+  const code = String(error.details ?? mapped.body.code ?? "rpc_failed");
+  return c.json(refusalBody(code), mapped.status);
 }
 
 /** `iso` + n CALENDAR days — the same day arithmetic `earliest_sell_days`
@@ -370,7 +380,7 @@ async function withCatalogAndLineage(
   const directPoIds = lines
     .map((l) => l.po_id as string | null)
     .filter((v): v is string => v != null);
-  const { data: lineagePoLines, error: lineageErr } =
+  const { data: legacyPoLines, error: lineageErr } =
     lineIds.length > 0
       ? await sb
           .from("purchase_order_lines")
@@ -378,6 +388,27 @@ async function withCatalogAndLineage(
           .in("demand_id", lineIds)
       : { data: [] as Array<Record<string, unknown>>, error: null };
   if (lineageErr) return { error: lineageErr };
+  let lineagePoLines: Array<Record<string, unknown>> = legacyPoLines ?? [];
+  const contextIssued = lines.filter(l => l.request_line_id != null && Number(l.issued_qty ?? 0) > 0);
+  if (contextIssued.length) {
+    const sourceRead = await sb.from("po_line_sources").select("po_line_id, purchase_demand_id, qty").in("purchase_demand_id", contextIssued.map(l => l.id as string));
+    if (sourceRead.error) return { error: sourceRead.error };
+    const sourceIds = [...new Set((sourceRead.data ?? []).map(s => s.po_line_id as string))];
+    const physicalRead = sourceIds.length ? await sb.from("purchase_order_lines").select("id, po_id, destination_id, qty, received_qty").in("id", sourceIds) : { data: [], error: null };
+    if (physicalRead.error) return { error: physicalRead.error };
+    const physical = new Map((physicalRead.data ?? []).map(pl => [pl.id as string, pl]));
+    const attributed: Array<Record<string, unknown>> = [];
+    for (const source of sourceRead.data ?? []) {
+      const pl = physical.get(source.po_line_id as string);
+      if (!pl) return { error: { message: "This work changed. Refresh and try again." } };
+      attributed.push({ ...pl, demand_id: source.purchase_demand_id, qty: source.qty, physical_qty: pl.qty });
+    }
+    for (const line of contextIssued) {
+      if (attributed.filter(pl => pl.demand_id === line.id).reduce((n, pl) => n + Number(pl.qty), 0) !== Number(line.issued_qty)) return { error: { message: "This work changed. Refresh and try again." } };
+    }
+    const contextualIds = new Set(contextIssued.map(l => l.id));
+    lineagePoLines = [...lineagePoLines.filter(pl => !contextualIds.has(pl.demand_id)), ...attributed];
+  }
   const poIdsByDemand = new Map<string, Set<string>>();
   const orderedByPo = new Map<string, number>();
   const lineageDemands = new Set<string>();
@@ -480,6 +511,11 @@ async function withCatalogAndLineage(
       const cat = catalogBySku.get(l.sku as string);
       return {
         ...l,
+        ...(l.request_line_id != null && l.fulfilment_kind === "purchase" ? {
+          received: Number(l.approved_qty ?? 0) > 0 && Number(l.issued_qty ?? 0) >= Number(l.approved_qty)
+            && lineagePoLines.filter(pl => pl.demand_id === l.id).length > 0
+            && lineagePoLines.filter(pl => pl.demand_id === l.id).every(pl => Number(pl.received_qty ?? 0) >= Number(pl.physical_qty ?? pl.qty)),
+        } : {}),
         category: cat?.category ?? null,
         item_label: cat?.itemLabel ?? (l.sku as string),
         po_ids: [...poIds],
@@ -573,7 +609,7 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
             .select(
               `id, request_id, sku, supplier_id, destination_id, qty, approved_qty,
                issued_qty, remaining_qty, required_by, remark, attrs, po_id, cancelled_at,
-               cancel_reason`,
+               cancel_reason, request_line_id, fulfilment_kind`,
             )
             .in("request_id", ids);
           if (res.error) return { error: res.error };
@@ -924,7 +960,7 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     .select(
       `id, sku, supplier_id, destination_id, qty, approved_qty, issued_qty,
        remaining_qty, required_by, remark, attrs, po_id, cancelled_at, cancel_reason,
-       cancelled_by`,
+       cancelled_by, request_line_id, supplier_allocation_id, stock_proposal_id, fulfilment_kind`,
     )
     .eq("request_id", id);
   if (lineErr) return fail(c, lineErr);
@@ -986,12 +1022,17 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     .order("occurred_at", { ascending: true });
   const roundEvents = (eventsRes.error ? [] : (eventsRes.data ?? [])) as Array<{
     round: number;
-    kind: "sent_back" | "resubmitted" | "withdrawn";
+    kind: "sent_back" | "resubmitted" | "withdrawn" | "stock_allocated" | "approved" | "po_issued";
     actor_id: string | null;
     occurred_at: string;
     reason: string | null;
     changes: unknown;
   }>;
+
+  const hasContext = Number(request.request_version ?? 0) > 0 || request.request_context != null;
+  if (hasContext && eventsRes.error) return fail(c, eventsRes.error);
+  const contextHistory = hasContext ? purchaseRequestContextHistory(request.request_context, Number(request.request_version), roundEvents) : null;
+  if (hasContext && !contextHistory) return c.json({ error: "context_history_unavailable", code: "context_history_unavailable" }, 503);
 
   /**
    * WHO IS AN INDIVIDUAL (Card 05 §3.2; STAFF IDENTITY LAW 2026-08-27) — the
@@ -1107,9 +1148,9 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     kind: "created",
     occurred_at: request.created_at,
     ...withActor(request.created_by as string | null),
-    units: (stamped ?? []).reduce((n, l) => n + Number(l.qty ?? 0), 0),
+    units: contextHistory?.initialUnits ?? (stamped ?? []).reduce((n, l) => n + Number(l.qty ?? 0), 0),
   });
-  if (request.approved_at != null) {
+  if (!hasContext && request.approved_at != null) {
     history.push({
       kind: "approved",
       occurred_at: request.approved_at,
@@ -1132,7 +1173,7 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
   /* D4 — a line marked not going ahead names who marked it (0522). A line
      cancelled before 0522 has no stored actor and reads the audit defect. */
   for (const l of stamped) {
-    if (l.cancelled_at != null) {
+    if (!hasContext && l.cancelled_at != null) {
       history.push({
         kind: "line_not_going_ahead",
         occurred_at: l.cancelled_at,
@@ -1143,6 +1184,12 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     }
   }
   /* R3 / R4 — every round, as stored. */
+  if (contextHistory) {
+    for (const e of contextHistory.events) {
+      const { actorId, ...facts } = e;
+      history.push({ ...facts, ...withActor(actorId) });
+    }
+  } else {
   for (const e of roundEvents) {
     history.push({
       kind: e.kind,
@@ -1164,6 +1211,8 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     });
   }
 
+  }
+
   const requestedBy = resolveIdentity(request.created_by as string | null);
   const liveIssued = (lines ?? []).some(
     (l) => l.po_id != null || Number(l.issued_qty ?? 0) > 0,
@@ -1182,7 +1231,7 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
      * decide what renders, so a control is never offered and then refused.
      */
     canWithdraw: isRequester && undecided && !liveIssued,
-    canEditAndSendAgain: isRequester && undecided && request.sent_back_at != null,
+    canEditAndSendAgain: !hasContext && isRequester && undecided && request.sent_back_at != null,
     /** The REQUEST section's `Requested By` — the real individual only; a
      *  shared-account record answers null and the reader states the defect. */
     requested_by_name: requestedBy?.name ?? null,
@@ -1194,6 +1243,7 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     })),
     pos,
     history,
+    ...(hasContext ? { context_events: roundEvents } : {}),
     destinations: dests.data ?? [],
     /* The collection rule per collected supplier — the object's Deliver To
        door applies the same lock the create form applies (1083). */
@@ -1202,7 +1252,8 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     users: (users.data ?? []).map((u) => ({ id: u.id, name: u.name })),
     approvers,
     /* Owner ruling 2026-09-18: nobody decides a purchase they raised. */
-    canApprove: approver && request.created_by !== c.var.auth.id,
+    canApprove: !hasContext && approver && request.created_by !== c.var.auth.id,
+    ...(hasContext ? { context_can_approve: approver && request.created_by !== c.var.auth.id } : {}),
     todayIso: todayIsoMYT(),
     planUnavailable,
   });
@@ -1656,7 +1707,7 @@ manualPurchaseRouter.post("/:id/decide", requireOperation, async (c) => {
   if (error) {
     // Context SQL owns version/source/stock admission. Preserve its refusal tag;
     // all existing legacy decision wording and approver handling remain below.
-    if (contextReview && error.code !== "42501") return fail(c, error);
+    if (contextReview && error.code !== "42501") return contextRefusal(c, error);
     /* THE SAME DOOR, THE SAME WORDS (closure §9): the SQL gate refuses a
        non-approver with a bare 42501 whose message is the single word
        `forbidden` — measured reaching the operator raw on production
@@ -2408,24 +2459,7 @@ manualPurchaseRouter.post("/plan", requireOperation, async (c) => {
   return c.json({ proceedDate, lines, deliveryDateDefault, planUnavailable, ...recipientPlan, ...forecastPlan });
 });
 
-const issueBody = z.object({
-  requestIds: z.array(z.string().uuid()).min(1).max(20),
-  /** The consolidation OFFER's answer. Declinable by design (card §6):
-   *  `false` issues one document per request. */
-  together: z.boolean(),
-  /**
-   * ⭐ THE CHOSEN GOODS LINES (owner ruling 2026-09-18) — optional, and its
-   * absence means *every eligible line of the named requests*, which is what
-   * the parent tick has always meant.
-   *
-   * A request that carries three items and needs two of them bought could not
-   * say so while the tick lived only on the parent row. A line named here that
-   * does not belong to a named request is refused; the server still recomputes
-   * every quantity from its own read, so this NARROWS the issue and can never
-   * widen it.
-   */
-  demandIds: z.array(z.string().uuid()).max(200).optional(),
-});
+const issueBody = purchaseRequestIssueSchema;
 
 /**
  * ISSUE — approved requests become purchase orders, THE SAME DAY (card §6:
@@ -2453,13 +2487,23 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
   if (!parsed.success) {
     return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
   }
-  const { requestIds, together, demandIds } = parsed.data;
+  const { requestIds, together, demandIds, contextIssue } = parsed.data;
 
   /* Manual Purchase and SO Batch Purchase ask the same governed capability;
      the creation RPC asks again at the database boundary. */
   const authority = await purchasingActorMayIssue(sb, c.var.auth.id);
   if (authority.error) return fail(c, authority.error);
   if (!authority.mayIssue) return refuse(c, 403, "not_po_duty");
+
+  if (contextIssue) {
+    const { data: retry, error: retryError } = await sb.rpc("purchasing_request_issue_retry", { p_key: contextIssue.key, p_client_input: parsed.data });
+    if (retryError) return contextRefusal(c, retryError);
+    if (retry !== null) {
+      const result = z.object({ po_ids: z.array(z.string()).min(1) }).strict().safeParse(retry);
+      if (!result.success) return c.json({ error: "issue_result_unavailable", code: "issue_result_unavailable" }, 503);
+      return c.json({ poIds: result.data.po_ids, documents: result.data.po_ids.length });
+    }
+  }
 
   const { data: requests, error: reqErr } = await sb
     .from("purchase_requests")
@@ -2507,10 +2551,18 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
     }
   }
 
+  const contextRequests = new Map((requests ?? []).filter(r => Number(r.request_version ?? 0) > 0 || r.request_context != null).map(r => [r.id as string, r]));
+  const reviewedRequests = new Map(contextIssue?.requests.map(r => [r.id, r]) ?? []);
+  if (contextRequests.size && (!contextIssue || reviewedRequests.size !== contextRequests.size
+    || [...contextRequests].some(([id, r]) => !reviewedRequests.has(id) || reviewedRequests.get(id)!.requestVersion !== r.request_version || reviewedRequests.get(id)!.approvalVersion !== r.approval_version))) {
+    return c.json({ error: "request_approval_changed", code: "request_approval_changed" }, 409);
+  }
+  if (!contextRequests.size && contextIssue) return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
+  const issueOverrides = new Map(contextIssue?.allocations?.map(a => [a.demandId, a]) ?? []);
   const { data: allLines, error: lineErr } = await sb
     .from("purchase_demands")
     .select(
-      "id, request_id, sku, supplier_id, destination_id, qty, approved_qty, issued_qty, required_by, cancelled_at, attrs",
+      "id, request_id, sku, supplier_id, destination_id, qty, approved_qty, issued_qty, required_by, cancelled_at, attrs, fulfilment_kind",
     )
     .in("request_id", requestIds);
   if (lineErr) return fail(c, lineErr);
@@ -2556,6 +2608,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
 
   const toIssue = (allLines ?? [])
     .filter((l) => l.cancelled_at === null)
+    .filter((l) => !contextRequests.has(l.request_id as string) || l.fulfilment_kind === "purchase")
     .filter((l) => chosenLines == null || chosenLines.has(l.id as string))
     .map((l) => ({
       ...l,
@@ -2565,12 +2618,18 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
           qty: Number(l.qty),
           approvedQty: l.approved_qty == null ? null : Number(l.approved_qty),
           issuedQty: Number(l.issued_qty ?? 0),
-        }) - (heldByDemand.get(l.id as string) ?? 0),
+        }) - (contextRequests.has(l.request_id as string) ? 0 : (heldByDemand.get(l.id as string) ?? 0)),
       ),
     }))
     .filter((l) => l.issueQty > 0);
   if (toIssue.length === 0) {
     return refuse(c, 409, "nothing_to_issue");
+  }
+
+  for (const [id, allocation] of issueOverrides) {
+    const line = toIssue.find(l => l.id === id);
+    if (!line || !contextRequests.has(line.request_id as string) || allocation.qty > line.issueQty) return c.json({ error: "request_over_issue", code: "request_over_issue" }, 422);
+    line.issueQty = allocation.qty;
   }
 
   /* ⭐ FORECAST PURCHASE — THE RECHECK BEFORE A PO IS ISSUED (owner ruling
@@ -2591,11 +2650,12 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
      the PO is refused by name and the request goes back for a new decision
      through its own send back or withdraw door. A forecast that cannot be
      read refuses the issue; a PO is never issued against a number nobody read. */
+  if (toIssue.some(l => !contextRequests.has(l.request_id as string))) {
   try {
     const stopped = await forecastIssueRefusal(
       sb,
       todayIsoMYT(),
-      toIssue.map((l) => ({ requestId: l.request_id as string, sku: l.sku as string, issueQty: l.issueQty })),
+      toIssue.filter(l => !contextRequests.has(l.request_id as string)).map((l) => ({ requestId: l.request_id as string, sku: l.sku as string, issueQty: l.issueQty })),
     );
     if (stopped) {
       const sku = await forecastItemWord(sb, stopped.sku);
@@ -2604,6 +2664,8 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
     }
   } catch (e) {
     return fail(c, ((e as { pg?: unknown }).pg ?? { message: (e as Error).message }) as Parameters<typeof fail>[1]);
+  }
+
   }
 
   // The catalog facts: supplier truth, cost, category (for the ETA).
@@ -2728,6 +2790,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
   /* ⭐ A Deliver To with no address is refused BEFORE the PO exists: the PO
      document refuses it (`destination_address_missing`), but only when the
      PDF is drawn, after the PO number is spent. Same rule as SO Batch. */
+  const destinationWarehouses = new Map<string, string>();
   const groupDestinationIds = [...new Set([...groups.values()].map((g) => g.destinationId))];
   if (groupDestinationIds.length > 0) {
     const { data: destRows, error: destErr } = await sb
@@ -2736,6 +2799,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
       .in("id", groupDestinationIds);
     if (destErr) return fail(c, destErr);
     for (const d of (destRows ?? []) as Record<string, unknown>[]) {
+      if (d.warehouse_id != null) destinationWarehouses.set(d.id as string, d.warehouse_id as string);
       const wh = d.warehouses as { address?: string | null } | { address?: string | null }[] | null;
       const whAddress = Array.isArray(wh) ? wh[0]?.address : wh?.address;
       const address = d.warehouse_id != null ? whAddress ?? null : (d.address as string | null) ?? null;
@@ -2783,7 +2847,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
     }
     governedPos.push({
       supplier_id: first.supplierId,
-      warehouse_id: warehouse.id as string,
+      warehouse_id: group.lines.some(l => contextRequests.has(l.request_id as string)) ? destinationWarehouses.get(group.destinationId) ?? warehouse.id as string : warehouse.id as string,
       destination_id: group.destinationId,
       /* ⭐ THE PO DELIVERY DATE IS THE SETTINGS DATE — OWNER CORRECTION
          (Jess, 2026-09-22), replacing Card 06 §7's "the approved Manual
@@ -2838,10 +2902,36 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
     });
   }
 
+  if (contextIssue) {
+    const canonical = (value: unknown): unknown => Array.isArray(value) ? value.map(canonical)
+      : value && typeof value === "object" ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, val]) => [key, canonical(val)])) : value;
+    for (const po of governedPos) {
+      po.context_issue_key = contextIssue.key;
+      po.context_client_input = parsed.data;
+      const merged = new Map<string, Record<string, unknown>>();
+      const output: Record<string, unknown>[] = [];
+      for (const line of po.lines as Array<Record<string, unknown>>) {
+        const owner = (allLines ?? []).find(l => l.id === line.demand_id);
+        if (!owner || !contextRequests.has(owner.request_id as string)) { output.push(line); continue; }
+        const reviewed = reviewedRequests.get(owner.request_id as string)!;
+        const override = issueOverrides.get(owner.id as string);
+        const source = { demand_id: owner.id, qty: line.qty, request_version: reviewed.requestVersion,
+          approval_version: reviewed.approvalVersion, approval_token: reviewed.approvalToken, recipients: override?.recipients ?? null };
+        const attrs = line.attrs && typeof line.attrs === "object" && !Array.isArray(line.attrs) && Object.keys(line.attrs).length ? line.attrs : null;
+        const key = `${line.sku}|${JSON.stringify(canonical(attrs))}`;
+        const saved = merged.get(key);
+        if (saved) { saved.qty = Number(saved.qty) + Number(line.qty); (saved.request_sources as unknown[]).push(source); }
+        else { const { demand_id: _demand, ...physical } = line; const next = { ...physical, request_sources: [source] }; merged.set(key, next); output.push(next); }
+      }
+      po.lines = output;
+    }
+  }
+
   const { data: batch, error: batchErr } = await sb.rpc("purchasing_issue_pos_batch", {
     p_pos: governedPos,
   });
   if (batchErr) {
+    if (contextIssue) return contextRefusal(c, batchErr);
     /* ⭐ THE SAME DOOR, THE SAME WORDS (0379/0380; closure §1 · §9). This lane
        used to call the creation authority with NO duty check at all, and any
        Postgres message it raised reached the operator raw. Both are closed: the

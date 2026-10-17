@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ManualPurchaseHistoryEvent } from "./manual-purchase";
 import { expectedArrivalOf, type PurchasingSettings } from "./purchasing-settings";
 
 /** Purchasing MASTER §5.2, owner15–17Oct. Selection is a proposal, not a stock reservation. */
@@ -197,11 +198,64 @@ export const purchaseRequestContextReviewReadSchema = z.discriminatedUnion("avai
   z.object({ available: z.literal(true), review: z.object({
     request_version: z.number().int().positive(), state: z.object({ context: purchaseRequestContextSchema }).passthrough(),
     stock_source: z.array(z.record(z.unknown())),
-  }).passthrough(), events: z.array(purchaseRequestStoredEventSchema) }).strict(),
+  }).passthrough(), events: z.array(purchaseRequestStoredEventSchema), coverage: z.array(z.object({ demand_id: z.string().uuid(), kind: z.enum(["purchase", "stock_proposal"]), approved_qty: z.number().int().min(0), stock_qty: z.number().int().min(0), issued_qty: z.number().int().min(0), to_buy: z.number().int().min(0) }).strict()).nullable(), approval: z.object({ request_version: z.number().int().positive(), approval_version: z.number().int().positive(), token: z.string().regex(/^[a-f0-9]{32}$/) }).strict().nullable() }).strict(),
   z.object({ available: z.literal(false), reason: z.string().min(1), request_version: z.number().int().positive(),
     request_context: purchaseRequestContextSchema, events: z.array(purchaseRequestStoredEventSchema),
   }).strict(),
 ]);
+/** The existing issue door accepts the reviewed approval plus optional exact
+ * partial allocations. SQL rechecks all limits and sources in one transaction. */
+export const purchaseRequestIssueSchema = z.object({
+  requestIds: z.array(z.string().uuid()).min(1).max(20), together: z.boolean(),
+  demandIds: z.array(z.string().uuid()).max(200).optional(),
+  contextIssue: z.object({
+    key: z.string().uuid(), requests: z.array(z.object({
+      id: z.string().uuid(), requestVersion: z.number().int().positive(), approvalVersion: z.number().int().positive(),
+      approvalToken: z.string().regex(/^[a-f0-9]{32}$/),
+    }).strict()).min(1).max(20),
+    allocations: z.array(z.object({ demandId: z.string().uuid(), qty: z.number().int().positive(),
+      recipients: z.array(z.object({ recipientId: z.string().uuid(), qty: z.number().int().positive() }).strict()).nullable(),
+    }).strict()).max(200).optional(),
+  }).strict().optional(),
+}).strip().superRefine((v, ctx) => {
+  if (new Set(v.requestIds).size !== v.requestIds.length) ctx.addIssue({ code: "custom", path: ["requestIds"], message: "Duplicate request" });
+  if (v.contextIssue && (new Set(v.contextIssue.requests.map(r => r.id)).size !== v.contextIssue.requests.length
+    || new Set(v.contextIssue.allocations?.map(a => a.demandId)).size !== (v.contextIssue.allocations?.length ?? 0))) ctx.addIssue({ code: "custom", path: ["contextIssue"], message: "Duplicate reviewed source" });
+});
+export type PurchaseRequestIssue = z.infer<typeof purchaseRequestIssueSchema>;
+/** Historical quantities come from immutable context events, not the sum of
+ * replacement demand rows. Raw events remain separately available for review. */
+export function purchaseRequestContextHistory(context: unknown, requestVersion: number, input: unknown): {
+  initialUnits: number; events: Array<Omit<ManualPurchaseHistoryEvent, "actor" | "actor_role"> & { actorId: string | null }>;
+} | null {
+  const current = purchaseRequestContextSchema.safeParse(context);
+  const parsed = z.array(purchaseRequestStoredEventSchema).safeParse(input);
+  if (!current.success || !parsed.success) return null;
+  const raw = parsed.data;
+  const before = raw.map(e => e.changes && typeof e.changes === "object" ? (e.changes as { before?: { context?: unknown } }).before?.context : undefined).find(c => c !== undefined);
+  const original = before === undefined ? requestVersion === 1 ? current : null : purchaseRequestContextSchema.safeParse(before);
+  if (!original?.success) return null;
+  const events: Array<Omit<ManualPurchaseHistoryEvent, "actor" | "actor_role"> & { actorId: string | null }> = [];
+  for (const e of raw) {
+    const base = { occurred_at: e.occurred_at, actorId: e.actor_id, reason: e.reason, round: e.round };
+    if (e.kind === "approved") {
+      const scope = z.object({ after: z.object({ context: purchaseRequestContextSchema,
+        approved_distribution: z.array(z.object({ qty: z.number().int().min(0) }).passthrough()),
+      }).passthrough() }).passthrough().safeParse(e.changes);
+      if (!scope.success) return null;
+      events.push({ ...base, kind: "approved", requested_units: scope.data.after.context.lines.reduce((n, l) => n + l.qty, 0),
+        approved_units: scope.data.after.approved_distribution.reduce((n, a) => n + a.qty, 0) });
+    } else if (e.kind === "po_issued") {
+      if ((e.changes as { record_type?: string } | null)?.record_type === "issue_batch") continue;
+      const issued = z.object({ record_type: z.literal("po_issue"), po_id: z.string().min(1),
+        allocations: z.array(z.object({ qty: z.number().int().positive() }).passthrough()).min(1),
+      }).passthrough().safeParse(e.changes);
+      if (!issued.success) return null;
+      events.push({ ...base, kind: "po_issued", po_no: issued.data.po_id, units: issued.data.allocations.reduce((n, a) => n + a.qty, 0) });
+    } else if (e.kind !== "stock_allocated") events.push({ ...base, kind: e.kind, changes: e.reason ? [e.reason] : [] });
+  }
+  return { initialUnits: original.data.lines.reduce((n, l) => n + l.qty, 0), events };
+}
 export type PurchaseRequestContextReviewRead = z.infer<typeof purchaseRequestContextReviewReadSchema>;
 export type PurchaseRequestDecision = z.infer<typeof purchaseRequestDecisionSchema>;
 export type PurchaseRequestSubmission = z.infer<typeof purchaseRequestSubmitSchema>;

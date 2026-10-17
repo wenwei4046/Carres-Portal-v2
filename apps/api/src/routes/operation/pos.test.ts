@@ -384,6 +384,21 @@ describe("GET /api/operation/pos", () => {
     expect(maximum).toBeLessThanOrEqual(4);
   });
 
+  it("keeps two MPR quantities on one physical line without a fake SO or duplicate total", async () => {
+    const row = { ...PO_ROW, so: null, so_refs: null, purchase_order_lines: [{ ...PO_ROW.purchase_order_lines[0], demand_id: null }] };
+    mockPosList([row as unknown as typeof PO_ROW], [], [], [], {
+      poLineSources: [1, 2].map(n => ({ po_id: "PO-2030", po_line_id: "line-a", order_id: null, order_line_id: null, so: null, purchase_demand_id: `demand-${n}`, qty: 1 })),
+      demands: [1, 2].map(n => ({ id: `demand-${n}`, request_id: `request-${n}`, purpose: "general_purchase" })),
+      requests: [1, 2].map(n => ({ id: `request-${n}`, created_at: "2026-10-18T00:00:00Z", req_no: `GP-TEST-${n}` })),
+    });
+    const res = await app.fetch(new Request("http://t/api/operation/pos", { headers: { Authorization: `Bearer ${await makeJwt("operation")}` } }), env);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { pos: Array<{ sources: Array<{ reference: string }>; purchase_order_lines: Array<{ governed_sources: Array<{ reference: string; qty: number; kind: string }> }> }> };
+    expect(body.pos[0]!.sources.map(s => s.reference)).toEqual(["GP-TEST-1", "GP-TEST-2"]);
+    expect(body.pos[0]!.purchase_order_lines[0]!.governed_sources).toEqual(expect.arrayContaining([expect.objectContaining({ reference: "GP-TEST-1", qty: 1, kind: "manual_purchase" }), expect.objectContaining({ reference: "GP-TEST-2", qty: 1, kind: "manual_purchase" })]));
+    expect(body.pos[0]!.purchase_order_lines[0]!.governed_sources.reduce((n, s) => n + s.qty, 0)).toBe(2);
+  });
+
   it("returns governed SO and Manual Purchase lineage instead of guessing from display fields", async () => {
     const row = {
       ...PO_ROW,

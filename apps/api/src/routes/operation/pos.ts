@@ -235,7 +235,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       poIds,
       (ids) => sb
         .from("po_line_sources")
-        .select("id, po_id, po_line_id, order_id, order_line_id, so, qty")
+        .select("id, po_id, po_line_id, order_id, order_line_id, so, qty, purchase_demand_id")
         .in("po_id", ids)
         .order("id"),
     );
@@ -263,11 +263,11 @@ operationPosRouter.get("/", requireOperation, async (c) => {
 
   const demandIds = [
     ...new Set(
-      pos.flatMap((po) =>
+      [...poSourcesByLine.values()].flat().map(s => s.purchase_demand_id).filter((id): id is string => typeof id === "string").concat(pos.flatMap((po) =>
         ((po.purchase_order_lines as Array<Record<string, unknown>> | null) ?? [])
           .map((line) => line.demand_id)
           .filter((id): id is string => typeof id === "string" && id.length > 0),
-      ),
+      )),
     ),
   ];
   const demandById = new Map<string, { requestId: string | null; purpose: string | null }>();
@@ -781,21 +781,15 @@ operationPosRouter.get("/", requireOperation, async (c) => {
        the source UUID, never by the label (Card 08 §3.5). A legacy line
        whose demand has no request header keeps one label-only source. */
     const manualSources = lines.flatMap((line) => {
-      const demandId = line.demand_id;
-      if (typeof demandId !== "string") return [];
-      const demand = demandById.get(demandId);
-      if (!demand) return [];
-      const facts = demand.requestId ? requestFactsById.get(demand.requestId) : null;
-      return [{
-        kind: "manual_purchase" as const,
-        /* The stored MPR number where the request has one; the governed label
-           where it has none. Never a UUID, never an invented number. */
-        reference: facts?.reqNo ?? "Manual Purchase Request",
-        req_no: facts?.reqNo ?? null,
-        request_id: demand.requestId,
-        purpose: demand.purpose,
-        proceed_date: facts?.proceedDate ?? null,
-      }];
+      const attributed = (poSourcesByLine.get(line.id as string) ?? []).filter(s => typeof s.purchase_demand_id === "string");
+      const ids = attributed.length ? attributed.map(s => s.purchase_demand_id as string) : typeof line.demand_id === "string" ? [line.demand_id] : [];
+      return ids.flatMap(demandId => {
+        const demand = demandById.get(demandId);
+        if (!demand) return [];
+        const facts = demand.requestId ? requestFactsById.get(demand.requestId) : null;
+        return [{ kind: "manual_purchase" as const, reference: facts?.reqNo ?? "Manual Purchase Request", req_no: facts?.reqNo ?? null,
+          request_id: demand.requestId, purpose: demand.purpose, proceed_date: facts?.proceedDate ?? null }];
+      });
     });
     const sources = [...(salesSourcesByPo.get(row.id as string) ?? []), ...manualSources]
       .filter(
@@ -821,7 +815,9 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       sends: sendsByPo.get(row.id as string) ?? [],
       grns: grnsByPo.get(row.id as string) ?? [],
       purchase_order_lines: lines.map((l) => {
-        const salesLineSources = poSourcesByLine.get(l.id as string) ?? [];
+        const allLineSources = poSourcesByLine.get(l.id as string) ?? [];
+        const salesLineSources = allLineSources.filter(source => source.order_id != null);
+        const requestLineSources = allLineSources.filter(source => typeof source.purchase_demand_id === "string");
         const salesAllocated = salesLineSources.reduce(
           (sum, source) => sum + Number(source.qty ?? 0),
           0,
@@ -838,7 +834,13 @@ operationPosRouter.get("/", requireOperation, async (c) => {
               reference: `SO-${Number(source.so)}`,
               qty: Number(source.qty ?? 0),
             }]),
-            ...(demand ? [{
+            ...requestLineSources.map(source => {
+              const requestDemand = demandById.get(source.purchase_demand_id as string);
+              const facts = requestDemand?.requestId ? requestFactsById.get(requestDemand.requestId) : null;
+              return { kind: "manual_purchase" as const, reference: facts?.reqNo ?? "Manual Purchase Request", req_no: facts?.reqNo ?? null,
+                qty: Number(source.qty), request_id: requestDemand?.requestId ?? null, purpose: requestDemand?.purpose ?? null, proceed_date: facts?.proceedDate ?? null };
+            }),
+            ...(demand && !requestLineSources.length ? [{
               kind: "manual_purchase" as const,
               reference: manualFacts?.reqNo ?? "Manual Purchase Request",
               req_no: manualFacts?.reqNo ?? null,

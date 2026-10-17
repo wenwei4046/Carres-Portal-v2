@@ -432,12 +432,12 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
           .select("id, demand_id")
           .in("id", ids),
       );
-      const sources = await readByIds<{ po_line_id: string; so: number | null }>(
+      const sources = await readByIds<{ po_line_id: string; so: number | null; purchase_demand_id?: string | null }>(
         scanLineIds,
         (ids) =>
           sb
             .from("po_line_sources")
-            .select("po_line_id, so")
+            .select("po_line_id, so, purchase_demand_id")
             .in("po_line_id", ids),
       );
       for (const src of sources) {
@@ -451,9 +451,9 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
       // request's own `MPR-YYYYMMDD-RRRR`, reached through the line's demand.
       const demandIds = [
         ...new Set(
-          poLines
+          [...sources.map(s => s.purchase_demand_id).filter((v): v is string => typeof v === "string"), ...poLines
             .map((l) => l.demand_id)
-            .filter((v): v is string => typeof v === "string" && v.length > 0),
+            .filter((v): v is string => typeof v === "string" && v.length > 0)],
         ),
       ];
       const requestByDemand = new Map<string, string>();
@@ -485,11 +485,15 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
             requestByDemand.set(d.id, reqNoById.get(d.request_id)!);
       }
       for (const line of poLines) {
-        const mpr = line.demand_id ? requestByDemand.get(line.demand_id) : null;
-        if (!mpr) continue;
-        const list = refsByLine.get(line.id) ?? [];
-        if (!list.includes(mpr)) list.push(mpr);
-        refsByLine.set(line.id, list);
+        const attributed = sources.filter(s => s.po_line_id === line.id && s.purchase_demand_id);
+        const ids = attributed.length ? attributed.map(s => s.purchase_demand_id!) : line.demand_id ? [line.demand_id] : [];
+        for (const id of ids) {
+          const mpr = requestByDemand.get(id);
+          if (!mpr) continue;
+          const list = refsByLine.get(line.id) ?? [];
+          if (!list.includes(mpr)) list.push(mpr);
+          refsByLine.set(line.id, list);
+        }
       }
     }
 

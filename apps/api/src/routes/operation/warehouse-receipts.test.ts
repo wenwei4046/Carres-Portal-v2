@@ -624,6 +624,19 @@ describe("GET /?scope=grn — the paged GRN Register", () => {
     return (await res.json()) as Record<string, never>;
   };
 
+  it("keeps both merged MPR references on the receipt without inventing an SO", async () => {
+    vi.mocked(userClient).mockReturnValue(makeSb(cardTables({
+      purchase_order_lines: { list: { data: [{ id: "l1", demand_id: null }], error: null } },
+      po_line_sources: { list: { data: [1, 2].map(n => ({ po_line_id: "l1", so: null, purchase_demand_id: `d${n}` })), error: null } },
+      purchase_demands: { list: { data: [1, 2].map(n => ({ id: `d${n}`, request_id: `r${n}` })), error: null } },
+      purchase_requests: { list: { data: [1, 2].map(n => ({ id: `r${n}`, req_no: `GP-TEST-${n}` })), error: null } },
+    })) as never);
+    const body = await ask("");
+    const row = (body.receipts as Array<Record<string, unknown>>)[0]!;
+    expect(row.source_refs).toEqual(["GP-TEST-1", "GP-TEST-2"]);
+    expect(row.unit_ids_by_line).toEqual({ l1: ["id-abc000001"] });
+  });
+
   it("carries GRN Date, the genuine linked documents and the expansion's line facts", async () => {
     vi.mocked(userClient).mockReturnValue(makeSb(cardTables()) as never);
     const body = await ask("");

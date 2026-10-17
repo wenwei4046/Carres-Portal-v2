@@ -54,130 +54,101 @@ exact draft absolute path is
 It is in the dedicated context checkout, NOT the older delivery checkout. Local commits only;
 controller must inspect these absolute paths rather than its own checkout's handoff.
 
-**Independent implementation checkpoint ·18Oct2026 (LOCAL ONLY, not deployed).**
-The SAME canonical resubmit RPC now accepts a strict context revision envelope with expected
-version, retry key and reason. Create/revision reuse ONE private demand projector. Approved
-unissued or returned requests retain their number, increment version/round, cancel old demands
-without deleting them, write exact before/after and preceding approval/actor/time/reason to the
-existing resubmitted event, and atomically clear current approval. Retry returns the saved event;
-changed retry/stale version/awaiting edit are refused. Later unknown SKU rolls back header,
-version, cancellations and demands together. No new public RPC signature or grant.
-Private approval writer uses the actual existing Purchasing Approver gate and records exact
-material scope/version/actor/time. Same-number version3 reapproval and history retention PASS;
-duplicate approval refused. The SAME public decide RPC now requires the strict current Review
-envelope for contextual requests; old cuts/null cannot approve them. Private functions retain no
-authenticated/anon/public grant. Contextual issue remains closed; this is LOCAL ONLY.
-Private downstream snapshot guard refuses missing/stale/changed approval. No PO/stock gate is
-claimed integrated. Exact Case procurement facts/evidence are included in material source read;
-a changed Case remedy invalidates saved approval, without guessing the first SO item. This is
-source-drift protection, NOT proof of formal approved Case procurement admission.
-Context create/revision API now use the SAME shared expectedArrivalOf/production settings and
-myHolidaySet to refuse too-early supplier dates, missing production data or unavailable Catalog
-read. It does not invent seven days, use Office calendar or rewrite recipient dates. This is API
-defence ONLY: a direct SQL caller still needs the final canonical calendar validation strategy.
-API context+legacy round tests40/40; shared context/calendar12/12 PASS. Supplier Saturday versus
-Sunday-only weeks and Christmas exclusion use the existing planner. Full SQL owning fixtures
-PASS and roll back at `/tmp/carres-context-source-check.log` (create/retry/RS500/mixed5 stock1
-buy2+2, scope drift, revision and private reapproval, SC source drift). No production writes.
-**Further LOCAL WIP (18Oct, not SQL approval):** direct SQL supplier-date verification now
-checks sufficient production working days using existing Supplier×Category settings/work week.
-Holiday dates are GENERATED from the existing myHolidaySet via
-`scripts/check-request-context-calendar.mjs`, not another editable calendar;21 dates fingerprint
-0a7afb25af26c9a26b9e39f836dabcc17dcb928cfdbc86454ca189aec1bb2856. It inherits that source's
-provisional/limited-year data. API planner stays expectedArrivalOf. Local loopback-only parity
-integration checked27 combinations (three starts, three supplier weeks including six off-days,
-three leads): exact earliest dates pass, preceding dates refuse, all rollback. Direct SQL missing
-production/too-early negatives pass. Snapshot includes current supplier plan; changed settings
-invalidate old approval. Private partial approval now saves an explicit per-demand recipient
-allocation separately from full requested need; need5/approved4 and wrong/missing-recipient
-atomic refusals pass. Private stamp signature is now(uuid,jsonb), not the earlier uuid-only WIP.
-Existing Stock allocation and low-level pool draw now call private contextual admission first,
-with their original permissions/signatures/body retained for legacy rows. Exact approved stock
-proposal, actual warehouse, normalized SKU, configuration provenance, quantity and Unit health
-are checked under request->demands->Units locks. Unit lock contention returns40001. Actual
-owning Stock writer bound synthetic local Unit at its approved site; coverage reconciled stock1
-and buy4. Wrong site, direct bind-to-purchase allocation and changed Unit refused. No preapproval
-physical reservation. Counted goods still inherit existing Unit-only binding limitation.
-Current exact coverage reads owning Unit bindings and PO demand lineage, supplier/config/site/
-purpose and quantities. It never nets generic shelf totals against a deliberate buy. Synthetic
-PO-reader fixture proved partial issued1/remaining1 and wrong source/unproven-quantity refusal;
-this is NOT successful canonical PO issuance. Private issue preflight checks approved residual,
-fulfilled physical stock proposals and current-clock feasibility for only unissued allocations.
-PUBLIC contextual issue and its direct recorder now explicitly fail closed with
-context_issue_not_ready until the complete origin/payload integration is ready. No live PO issue.
-The four Stock/issue preimages matched production18Oct via read-only source-md5 checks:
-pool_draw060a8774da2abf935f77a7bdc7b1a240; allocate3e74a58de146efa17bf7c527e3508b47;
-record_issueb83f2638d1c868e1d5a01ae5192307b9; batchf84de1ebbd4c4bd4d4d83c56f980eb3b.
-Full local SQL log `/tmp/carres-context-stock-coverage.log`; calendar parity log
-`/tmp/carres-context-calendar-parity.log`. No production SQL modification or real transaction.
-**Latest LOCAL source/approval work (supersedes the preceding remaining list):** Forecast
-source now reads real Catalog, Register population/14-day sales, Stock available units, owning
-PO free units and requests in progress, retaining contributor identities and a snapshot in the
-existing0695 mark. Shared display constants are generated/checked by
-`scripts/check-request-context-forecast-source.mjs`; their PROPOSAL/NOT LAW status is retained.
-They supply a change-reason baseline, not an automatic purchase cap or authority. Manual RS
-remains separate/uncapped; changed forecast500 with a reason and actual approval is exercised.
-Forged/stale sources refuse; own request/own issued supply are excluded during source refresh.
-The existing0695 wrapper and context create/revision use ONE private mark writer. The wrapper's
-production/local preimage matched0a92148a7e68f90aade2555a01c900d2; legacy create/mark/retry
-passed. Shared/API transports now carry exact forecastSource only for forecast-origin context;
-plan reads it through the new gated read RPC. API44/44 and API/web typechecks PASS.
-Authorised revision now reads raw before-facts plus the preceding saved approval separately:
-stale source blocks buying but does not trap a requester trying to correct it. Case/forecast
-source-only same-number refresh preserves old approval/mark history; local controls PASS.
-Private approval Review can change SC/GP stock arrangements while preserving every full-need
-line/SKU/attrs/recipient and root fact. Common demand projector preserves allocation identity;
-version increments, exact before/after/actor/time/reason is stored as an `approved` event. This
-adds `approved` to the existing event-kind CHECK while retaining all four old values. Qualified
-stock1->2/buy4->3 approval keeps need5 and reserves no Unit; stale Review, missing reason and
-full-need reduction refuse. The canonical public approval door now calls that same orchestrator
-with exact expected version, current Review, full context and separate approved distribution.
-Refusal/send-back uses exact saved version/context without requiring a fresh source, so stale
-source can be repaired. Approval API transport uses one shared strict DTO; competing legacy cuts
-are refused. Guarded unmounted query hook reads the owning Review; unavailable is never empty
-approval. The read retains raw append-only events, including exact approval before/after/actor/
-time/reason. API context+legacy round51/51 PASS; API/web typechecks PASS. Logs
-`/tmp/carres-context-review-api-focused.log`, `...-api-types.log`, `...-web-types.log`.
-Legacy create_demand/cancel_demand/move_request_destination now refuse contextual row edits;
-only whole-request revision/approval can change them. Their local/prod preimages matched
-7822bc46bfe56d0cf47e363fa35ba5b7 /7714a808edd5717cd4ad58cd31c5ff21 /
-fc0bec38981945678a130f1ad8c1b190. New shelf stock does NOT auto-net the deliberate GP remainder.
-**New technical SQL review scope:** ten per-SKU source-write guards cover Stock, Catalog,
-Orders/lines, PO/lines, existing PO source rows and request/demand sources. They change no NEW/OLD data and grant no
-role/RLS access, but same-SKU contention now returns existing40001/409 refresh semantics.
-Private keys use try-locks rather than global table freezes; different SKUs stay independent.
-This is UNAPPROVED DRAFT ONLY, never implied by the separate Settings approval. Two-client
-owned-loopback test proved same-SKU Stock insert refused without residue, unrelated SKU insert
-allowed, and the original SKU succeeds after release; all synthetic inserts rolled back. Log
-`/tmp/carres-context-source-concurrency.log`. Critical RS write paths acquire source keys before
-request roots; canonical withdrawal now does the same. Public issue ordering remains unfinished.
-Full owning SQL log `/tmp/carres-context-source-locks.log` (later source/review additions at
-`/tmp/carres-context-origin-review-final.log`); no production writer or transaction changed.
-**Merged PO source work · LOCAL WIP only.** Purchasing5.4 explicitly keeps one physical PO
-line per SKU/configuration/Deliver To. The EXISTING po_line_sources owner now has an additive
-purchase_demand_id FK, nullable order_id and exact SO-or-MPR owner CHECK; no fake SO, new ledger,
-RLS/role change or historical backfill. One private projection prefers actual generic MPR sources
-and falls back to historical single-demand pointers without double-counting. Coverage locks
-source rows, counts each request's own source quantity, and refuses physical/source totals,
-identity/purpose/site/supplier/configuration or issued-counter drift. All new-context revision/
-approval commitment checks use the same source projection. Existing source-move helper copies
-MPR ownership on split; helper-only split1+1 keeps total2. Existing free-PO readers distinguish
-concrete MPR holds from intentional RS free supply and counted supply from exact Unit supply.
-Reader fixture physical3/request1+2 retains current request's issued1/remainder1; inconsistent/
-over-issued sources refuse. Canonical issue, recorder AND shared PO birth helper remain explicitly
-closed to context/request_sources until complete issue integration. These fixtures do NOT prove
-canonical issue or the complete Deliver To journey. Full local SQL rollback PASS at
-`/tmp/carres-context-merged-source-coverage.log`.
+**Current writer package ·18Oct2026 · LOCAL ONLY; NOT APPROVED, NOT A MIGRATION, NOT READY FOR PRODUCTION ACTIVATION.**
+Stable checkout remains `/Users/chaichiewlim/.codex/worktrees/forecast-mpr-context/Carres-Portal-v2/`.
+The existing `output/forecast-mpr-delivery/purchase-request-writers.draft.sql` is now a coherent
+core inspection package, SHA256 `7e4f720cd708c19a90ac17e1eced5d7cb1573597a582b44ca098814902f142ff`.
+Alongside it: `purchase-request-writers.review.json` (exact hash,50 function fingerprints/grants,
+validated scope, closed/incomplete cases and recovery) and `purchase-request-writers.rollback-probe.sql`
+(exact embedded draft). LOCAL probe reached deliberate PROBE_ROLLBACK: exact DDL/functions/grants,
+13 owning-source guards, invalid-scope/no-account negative controls, relative business counts,
+Settings and RLS unchanged. Log `/tmp/carres-context-writer-package-probe.log`. Nothing ran on
+production. The separate Settings approval/hash above remains unchanged and pending; do not ask again.
 
-Remaining: integrate exact reviewed request_sources into canonical batch/inner/recorder, retain
-partial-issue recipient distribution + approval/version token + actual issue actor/time, revalidate
-aggregate remainder/current Settings PO date and complete sorted lock ordering; bind concrete
-incoming Units through Stock ownership without double-netting PO coverage; preserve per-request
-forecast own-supply attribution on merged lines; complete PO/Receiving/document readback, then
-assemble the COMPLETE writer approval package. Current draft is NOT ready for SQL approval.
-Existing form adoption stays unmounted; authenticated lifecycle proof and exact-version send/task
-facts follow. Standalone PO/Receiving UI redesign remains excluded. Settings approval is still
-separate and pending; foundation0696 is already consumed and must never be reapplied.
+**Implemented and tested core:** strict SC/GP/RS full context, calendar30/14 floor and separate
+supplier production dates; one canonical create/revision writer and common demand projector;
+stable allocation IDs, same-number versions/retry/history, approval invalidation and exact
+recipient-approved distribution separate from full need. Canonical public approval requires
+current Review/version/context and existing Approver authority. Stock-choice adjustment preserves
+full need; actual Stock allocation remains on its existing qualified/concurrent door. No proposal
+approval reserves a physical Unit. Case source is actual Case/remedy/evidence, never first SO item.
+Service's formal decision truth is a separate upstream dependency below, not a fabricated UUID.
+
+**Actual canonical issue is now wired locally.** The SAME `purchasing_issue_pos_batch` performs
+whole-batch source/approval/coverage admission BEFORE writes, sorted SKU/request locks, exact
+reviewed version + approval token, aggregate qty/recipient remainder and current Settings PO date.
+One common private PO birth implementation serves the original legacy wrapper and admitted
+canonical context batch; no duplicate birth writer or authenticated private grant. Public recorder
+requires actual PO source + immutable issue event, not a caller's quantity claim. Existing legacy
+commercial, actor and physical Unit gates remain. Factory collection, active/addressed destination,
+linked warehouse and source Settings are rechecked/locked. Empty and absent configuration are the
+same physical absence; raw request context is retained. Existing PO source owner gets MPR demand
+attribution with exact SO-or-MPR ownership CHECK; no fake SO/new ledger/RLS/role change/backfill.
+One physical line per SKU/config/Deliver To stays enforced. Exact Units are attributed to each
+source; concrete MPR incoming Units bind to that real demand, extra RS stays free. Counted PO goods
+retain quantity with NO fake Unit IDs. Purchased Units never double-net as From Stock. Existing
+arrival trigger preserves healthy MPR binding and clears wrong-arrival binding with ref history.
+
+Issue events retain actor/server time, PO/version, approved version/token, per-demand/recipient
+quantities and exact Unit IDs. Stable issue keys return the original PO batch once; changed scope
+refuses. A read-only same-actor/key/exact-client-input recovery RPC handles a lost HTTP response
+before the API recomputes changed remainders. All later failed PO writes roll back earlier
+numbers/POs/sources/events/Units/counters together. Context API/hook carries reviewed snapshots and
+partial allocations, filters proposal rows, ignores purchased bindings as stock deductions, merges
+physical lines and keeps the five approved grouping walls. The new hooks/form remain unmounted.
+
+**Readback:** existing MPR Register/detail reader counts each source's own quantity across all its
+actual POs; complete receipt requires its entire approved quantity and fully received physical
+lines. Missing/contradictory attribution stays unknown. PO Register and Receiving retain every
+merged MPR reference and its own quantity without SO invention. Context history reads original
+full need and immutable approval/issue events, skips batch-summary duplication and replacement-row
+cancellation fiction, and preserves raw structured events. Legacy flat edit/approval controls do
+not flatten contextual requests; the guarded review gets actual approval token/coverage. Supplier
+PDF is unchanged: its approved SO No column stays SO-only; no MPR-as-SO, recipient PII or money.
+Actual SQL document read of the issued test PO preserved date/qty and that contract.
+
+**Source consistency:**13 try-lock guards cover Stock, Catalog/models, Orders/lines, PO/lines,
+request/demands, existing PO sources, Supplier kind, supplier settings and production days.
+Settings inserts join the same source mutex, including default-row phantoms. They mutate no
+NEW/OLD data and broaden no access. Same-SKU concurrent Stock/production-setting writes return
+existing40001/409; unrelated SKU work remains independent. Existing canonical withdrawal takes
+RS source keys before request root. These are NEW SQL review impacts, never covered by Settings approval.
+
+**Latest bounded evidence:** `/tmp/carres-context-actual-issue.log` all SQL fixtures PASS + ROLLBACK:
+GP partial1+remainder1, actual merged MPR1+1 on ONE qty2 line, retry/no-duplicate + lost-response
+read recovery, later-PO atomic rollback, healthy/wrong-arrival helper, RS approved500 partial1+1
+without display cap or final recipient, own exact free supply exclusion and counted RS2 with no
+Unit IDs. Source/stock/revision/approval/date negatives remain. API/source-readback tests276 PASS
+at `/tmp/carres-context-source-readback-tests.log`; shared context/history14 PASS. Owned-loopback
+calendar/source integration2 PASS (27 canonical calendar combinations; same-SKU Stock AND Settings
+contention), `/tmp/carres-context-issue-concurrency.log`. API/web typechecks were rerun for current
+transport/readback; inspect latest `/tmp/carres-context-issue-api-types.log` and `...-web-types.log`.
+No full historical migration-chain PASS, deployed feature, authenticated transaction or supplier send.
+
+**Not ready / remaining, explicitly:**
+- SC boundary was re-audited after controller correction: **NO blanket SC gate** and no
+  Decision UUID requirement. The draft's earlier all-SC Stock/PO denial was removed unapplied.
+  Existing procurement-approved unchanged SC scope retains Purchasing authority and source checks.
+  Actual Case action/progress/evidence/SLA/Service Note and generic approval representations were
+  enumerated in `output/forecast-mpr-delivery/purchase-request-service-source-evidence.json`, with
+  exact file references, bounded live read-only counts and limits. Service7.4 applies to new/changed
+  formal customer remedy decisions; routine unchanged authorised follow-up does not repeat approval.
+  Current facts cannot reliably classify that affected subset or prove absence of legacy/external
+  approval. The controller needs a source-bound reuse contract for that subset, NOT a new Service
+  build or a purpose=SC denial. Service PLAN still does not authorise its lifecycle implementation here.
+- Counted From Stock allocation still lacks a proven owning quantity-bind door; existing Unit-only
+  permission is retained. Mixed-owner counted FORECAST supply attribution fails before initial
+  issue (forecast_quantity_source_unavailable), never guessed; manual counted RS PO supply works.
+- Mixed legacy/context requests sharing one physical item line still need complete consolidation;
+  part-issued multi-forecast-cohort source changes need owner-bound revalidation without silently
+  replacing a saved approval; original issued-scope law remains PO-owned.
+- Full existing PO Deliver To/revision/cancel/reallocation needs MPR source/Unit/recipient
+  reconciliation beyond the tested source-copy helper. Do not claim those owner workflows verified.
+- Existing-form composition/adoption, source-specific refusal copy admission, authenticated lifecycle
+  and exact-version send/task facts remain. Standalone PO/Receiving UI redesign stays excluded.
+Applying this draft would make new direct-RPC context branches reachable even with the UI unmounted;
+therefore unmounted is NOT a security/activation claim. Do NOT request production approval/apply
+or deploy dependent source-column readers while these rollout boundaries remain unresolved.
 Earlier checkpoint paragraphs below are
 historical; they must not be used to infer current writer readiness.
 

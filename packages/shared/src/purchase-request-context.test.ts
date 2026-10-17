@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { purchaseRequestContextSchema, purchaseRequestSupplierDateIssues, type PurchaseRequestContext } from "./purchase-request-context";
+import { purchaseRequestContextSchema, purchaseRequestContextHistory, purchaseRequestSupplierDateIssues, type PurchaseRequestContext } from "./purchase-request-context";
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const recipient = (n: number) => ({ id: id(n), company: "TEST", name: "TEST recipient", phone: "TEST contact", method: "delivery" as const, deliveryDate: "2026-11-20", addressLine1: "TEST street", addressLine2: "TEST block", city: "TEST city", state: "TEST state", postcode: "TEST", buildingType: "TEST", floor: "100A", lift: "has_lift" as const, pickupLocationId: null, collectedBy: "" });
 const context = (): PurchaseRequestContext => ({ version: 1, origin: "manual", purpose: "general_purchase", proceedDate: "2026-10-20", stockDeliveryDate: null, serviceCaseId: null, reason: "purchase_for_others", companyPersonName: "TEST company", projectReference: "", explanation: "", forecastChangeReason: "", recipients: [recipient(1), recipient(2)], lines: [{ id: id(3), sku: "TEST-SKU", qty: 5, attrs: null, recipientNeeds: [{ recipientId: id(1), qty: 3 }, { recipientId: id(2), qty: 2 }], stockProposals: [], allocations: [{ id: id(4), destinationId: id(10), supplierDeliveryDate: "2026-11-10", qty: 3, recipients: [{ recipientId: id(1), qty: 3 }] }, { id: id(5), destinationId: id(11), supplierDeliveryDate: "2026-11-10", qty: 2, recipients: [{ recipientId: id(2), qty: 2 }] }] }] });
@@ -110,5 +110,27 @@ describe("request supplier-date admission uses the one production calendar", () 
   it("does not invent supplier production for an all-stock proposal", () => {
     const request = context(); request.lines[0]!.allocations = [];
     expect(purchaseRequestSupplierDateIssues(request, { productionDays: [], suppliers: [] }, new Map())).toEqual([]);
+  });
+});
+
+
+describe("context history retains original need and exact issued source quantities", () => {
+  const event = (kind: string, changes: unknown) => ({ kind, changes, round: 1, actor_id: id(99), occurred_at: "2026-10-18T00:00:00Z", reason: "TEST actual reason" });
+  it("does not recount replacement rows or duplicate a batch-summary PO", () => {
+    const c = context();
+    const events = [event("resubmitted", { before: { context: c }, after_context: c }),
+      event("approved", { before: { context: c }, after: { context: c, approved_distribution: [{ qty: 2 }, { qty: 2 }] } }),
+      event("po_issued", { record_type: "po_issue", po_id: "PO-TEST", allocations: [{ qty: 1 }] }),
+      event("po_issued", { record_type: "issue_batch", po_ids: ["PO-TEST"] })];
+    const read = purchaseRequestContextHistory(c, 2, events)!;
+    expect(read.initialUnits).toBe(5);
+    expect(read.events.filter(e => e.kind === "approved")).toMatchObject([{ requested_units: 5, approved_units: 4, actorId: id(99), reason: "TEST actual reason" }]);
+    expect(read.events.filter(e => e.kind === "po_issued")).toMatchObject([{ po_no: "PO-TEST", units: 1 }]);
+    expect(read.events.filter(e => e.kind === "resubmitted")).toMatchObject([{ changes: ["TEST actual reason"] }]);
+  });
+  it("keeps missing original/reapproval/issue evidence unknown", () => {
+    expect(purchaseRequestContextHistory(context(), 2, [])).toBeNull();
+    expect(purchaseRequestContextHistory(context(), 1, [event("approved", {})])).toBeNull();
+    expect(purchaseRequestContextHistory(context(), 1, [event("po_issued", { record_type: "po_issue", po_id: "PO-TEST", allocations: [] })])).toBeNull();
   });
 });

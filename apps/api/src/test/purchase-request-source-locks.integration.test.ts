@@ -30,6 +30,17 @@ describe.skipIf(!url)("context source consistency joins the real owner writes", 
     catch (e) { refusal = e; }
     expect(refusal).toMatchObject({ code: '40001', detail: 'request_source_busy' });
     await writer.query('rollback');
+    // A Settings row insert/update also contributes source facts. It cannot
+    // pass the SKU mutex just because its owning table differs from Stock.
+    const production = (await owner.query('select s.supplier_id,m.category::text category from product_skus s join product_models m on m.id=s.model_id join purchasing_production_days p on p.supplier_id=s.supplier_id and p.category=m.category::text where s.sku=$1', [sku])).rows[0];
+    if (production) {
+      await writer.query('begin');
+      let settingsRefusal: unknown;
+      try { await writer.query('update purchasing_production_days set working_days=working_days where supplier_id=$1 and category=$2', [production.supplier_id, production.category]); }
+      catch (e) { settingsRefusal = e; }
+      expect(settingsRefusal).toMatchObject({ code: '40001', detail: 'request_source_busy' });
+      await writer.query('rollback');
+    }
     expect((await owner.query('select count(*)::integer n from ops_stock_items where sku=$1', [sku])).rows[0].n).toBe(before);
     await writer.query('begin');
     await writer.query("insert into ops_stock_items(sku,warehouse_id,status,condition) values($1,$2,'free','new')", [otherSku, warehouse]);

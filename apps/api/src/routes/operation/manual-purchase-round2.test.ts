@@ -494,3 +494,29 @@ describe("D4 / D5 / R3 / R4 · the object's facts", () => {
     expect(body.canEditAndSendAgain).toBe(true);
   });
 });
+
+describe("context source readback across merged and partial POs", () => {
+  const sources = [{ po_line_id: "pl-context-a", purchase_demand_id: LINE, qty: 1 }, { po_line_id: "pl-context-b", purchase_demand_id: LINE, qty: 1 }];
+  const physical = [{ id: "pl-context-a", po_id: "PO-CONTEXT-A", demand_id: null, sku: "5539-2NA", qty: 4, received_qty: 4, destination_id: DEST },
+    { id: "pl-context-b", po_id: "PO-CONTEXT-B", demand_id: null, sku: "5539-2NA", qty: 4, received_qty: 3, destination_id: DEST }];
+  function tables(sourceResult: unknown = sources) {
+    return { purchase_requests: [request({ request_version: 1 })],
+      purchase_demands: [line({ request_line_id: LINE, fulfilment_kind: "purchase", qty: 2, approved_qty: 2, issued_qty: 2, po_id: "PO-CONTEXT-A" })],
+      purchase_order_lines: physical, po_line_sources: sourceResult,
+      purchase_orders: [{ id: "PO-CONTEXT-A", version: 1 }, { id: "PO-CONTEXT-B", version: 1 }],
+      product_skus: [{ sku: "5539-2NA", variant: "Q", variant_kind: "size", product_models: { name: "TEST model", category: "mattress" } }], app_users: USERS };
+  }
+  it("counts only this demand's source1+1 and waits for all its physical lines to be received", async () => {
+    vi.mocked(userClient).mockReturnValue(makeSb(tables()));
+    const res = await call(""); expect(res.status).toBe(200);
+    const body = await res.json() as { linesUnavailable: boolean; lines: Array<{ received: boolean; allocations: Array<{ poId: string; qty: number }> }> };
+    expect(body.linesUnavailable).toBe(false);
+    expect(body.lines[0]!.allocations).toEqual([{ poId: "PO-CONTEXT-A", qty: 1, destinationId: DEST }, { poId: "PO-CONTEXT-B", qty: 1, destinationId: DEST }]);
+    expect(body.lines[0]!.received).toBe(false);
+  });
+  it("keeps missing attribution unknown rather than borrowing the physical line's whole quantity", async () => {
+    vi.mocked(userClient).mockReturnValue(makeSb(tables({ error: { code: "57014", message: "TEST source read unavailable" } })));
+    const res = await call(""); const body = await res.json() as { linesUnavailable: boolean; lines: unknown[] };
+    expect(body.linesUnavailable).toBe(true); expect(body.lines).toEqual([]);
+  });
+});

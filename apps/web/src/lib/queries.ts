@@ -1,4 +1,4 @@
-import type { PurchaseRequestContext, PurchaseRequestSubmission, PurchaseRequestRevision, PurchaseRequestDecision, PurchaseRequestContextReviewRead } from "@carres/shared";
+import type { PurchaseRequestContext, PurchaseRequestSubmission, PurchaseRequestRevision, PurchaseRequestDecision, PurchaseRequestContextReviewRead, PurchaseRequestIssue } from "@carres/shared";
 import type { OutrightFactsFailed, OutrightOrderFacts } from "@carres/shared";
 import { workspaceActivitySettingsResponseSchema, type WorkspaceActivitySettingsResponse } from "@carres/shared";
 import { supabase } from "@/lib/supabase";
@@ -5301,6 +5301,8 @@ export interface ManualPurchaseDetailPayload {
   /** Card 05 §3.7 — stored-fact events only; words live in the shared
    *  `manualPurchaseHistoryRecord` arithmetic. */
   history: ManualPurchaseHistoryEvent[];
+  /** Exact structured snapshots for the guarded context review. */
+  context_events?: PurchaseRequestContextReviewRead["events"];
   /** `active` rides so the Deliver To door offers only open places; a closed
    *  one still resolves to its name on a request that named it. */
   destinations: Array<{ id: string; name: string; active?: boolean }>;
@@ -5312,6 +5314,7 @@ export interface ManualPurchaseDetailPayload {
   /** Card 03 §3 — the real action owner's name on the object too. */
   approvers: Array<{ id: string; name: string | null }>;
   canApprove: boolean;
+  context_can_approve?: boolean;
   /** Card 06 — the same server date plan the Register reads. */
   todayIso?: string;
   planUnavailable?: boolean;
@@ -5377,10 +5380,7 @@ export function useManualPurchaseDetail(id: string | null) {
 export function useIssuePurchaseRequests() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: {
-      requestIds: string[];
-      together: boolean;
-    }) =>
+    mutationFn: (input: PurchaseRequestIssue) =>
       apiFetch<{
         poIds: string[];
         documents: number;

@@ -1,0 +1,380 @@
+{
+  "status": "REVIEW PACKAGE ONLY; NOT APPROVED; NOT A MIGRATION; NOT READY FOR PRODUCTION ACTIVATION",
+  "draft_sha256": "7e4f720cd708c19a90ac17e1eced5d7cb1573597a582b44ca098814902f142ff",
+  "draft_file_md5": "6636979cdd369bed179dfdf6bf4f08c6",
+  "validation_environment": "Owned loopback replay only; all synthetic business fixtures roll back; no production writes",
+  "validated_core": [
+    "Canonical GP partial1+remainder1, exact recipient/event/source/Unit ownership",
+    "Two actual approved MPRs merge to ONE physical PO line qty2 with exact source1+1",
+    "RS approved500 issues partial1+1 without a display cap or final recipient; own exact supply excluded precisely",
+    "Counted RS qty2 issues without fake Units and remains free supply",
+    "Exact-key retry and read-only lost-response recovery; changed scope refused",
+    "Later PO failure rolls back every earlier number/PO/source/event/Unit/counter",
+    "Existing healthy/wrong-arrival trigger preserves or clears MPR binding with reference history",
+    "Supplier/Settings/destination/date/source admission and per-SKU concurrent Stock/Settings guards",
+    "MPR/PO/Receiving source readers and immutable historical quantity projection"
+  ],
+  "explicit_incomplete_or_closed": [
+    "SC boundary remains for controller review: existing procurement-approved unchanged scope is NOT blanket-disabled. Case action/progress/evidence/Service Note and generic approvals were enumerated; they do not establish a general formal-remedy approval contract. New/changed formal customer remedy execution remains Service-owned/unverified; no invented Decision UUID or new Service implementation",
+    "Mixed-owner counted FORECAST supply attribution: fails before initial issue; no guessed provenance",
+    "Mixed legacy/context requests sharing the same physical item line still need coherent consolidation support",
+    "Part-issued multi-forecast-cohort source transitions/reapproval need complete owner-bound source verification; no silent snapshot rewrite",
+    "Existing PO Deliver To parent move and post-issue revisions/cancel/reallocation need full MPR source/Unit/recipient reconciliation beyond the tested source-copy helper",
+    "Form composition/adoption remains unmounted; specific context refusal copy, authenticated lifecycle and exact-version send/task completion still owed"
+  ],
+  "application_effect": "DDL adds generic MPR attribution to existing PO sources and installs existing-door context branches. It writes no business rows on installation, but would make those new direct RPC branches reachable; UI-unmounted is NOT a security/activation claim.",
+  "recovery": "Do not deploy dependent code before exact SQL approval/application and release gates. Before any production apply, remeasure current governing authority, original function fingerprints, tracker/main/all-branch migration MAX and schema preconditions. Governed production DO probe only after approval. If rollout must pause, retain prior application; do not delete issued facts or fabricate rollback/stock restoration. Production SQL rollback requires its own concrete reviewed plan.",
+  "separate_settings_approval_sha256": "b4eb234d6f0d855546d606a5f9eef1b8b30aa52a8274948855f0ba8ec8053774",
+  "functions": [
+    {
+      "signature": "_operation_create_po_inner(uuid, uuid, jsonb, date, integer[], text, uuid, uuid)",
+      "body_md5": "5bf1d8ad6d7b6382f2b398780c85e2a9",
+      "security_definer": true,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_operation_create_po_inner_admitted(uuid, uuid, jsonb, date, integer[], text, uuid, uuid, jsonb)",
+      "body_md5": "2e771a47df082aa7f1f1fc69d39a4ddc",
+      "security_definer": true,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_po_line_source_move(uuid, uuid, integer)",
+      "body_md5": "c8ea1128f0a1f94b5c023398ed9e05aa",
+      "security_definer": true,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_approve_context_review(uuid, jsonb, text)",
+      "body_md5": "f8751a2ec8712acfcd21ff9b608f40f5",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_assert_request_approval(uuid)",
+      "body_md5": "389ee4d926d0e20a2e87156eb8867cd8",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_check_context_forecast_source(jsonb, jsonb, uuid)",
+      "body_md5": "e256082d8ece6e698c339641be748bac",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_check_context_supplier_dates(jsonb, date)",
+      "body_md5": "db96f0d29a0d19aa3f7b42a0f5640d3d",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_context_approval_distribution(uuid, jsonb, boolean)",
+      "body_md5": "15067025d697826dc9e4594e60bc96a1",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_context_coverage(uuid, boolean)",
+      "body_md5": "61872e7bc123ab179eaaba7c3bfe87f4",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_context_coverage_admitted(uuid, boolean, jsonb)",
+      "body_md5": "f273e4eccea366c48b2084e7cfe9f7a3",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_context_forecast_display_source()",
+      "body_md5": "1b8984a3b5a6a0806c154c7037dfce2b",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_context_forecast_facts(text, uuid)",
+      "body_md5": "8ba4c3668d217d0a105e3ef0c5c99784",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_context_forecast_mark_lines(jsonb, jsonb)",
+      "body_md5": "c4eea86f800104ab665f1c18fb60db61",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_context_holiday_dates()",
+      "body_md5": "d083206a1ba3745e7345af7f1f749490",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_context_issue_admission(uuid, integer)",
+      "body_md5": "09ca8df4e75fd2a6c6155f321b149887",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_context_issue_preflight(jsonb)",
+      "body_md5": "262c6df3f20546e1ca25e21714a1f249",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_context_object(jsonb, jsonb)",
+      "body_md5": "6f74dc6a503365536009a172ab8f3510",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_context_own_po_free(uuid, uuid)",
+      "body_md5": "219f55abb0fb010c9638850774c43dde",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_context_record_issued_source(uuid, integer, text)",
+      "body_md5": "01a4a212548a0155bc205de97b03fac0",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_context_request_source_locks(uuid)",
+      "body_md5": "d616513bf0ac846b227931aa22b032a6",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_context_review(uuid)",
+      "body_md5": "2901f91acc1b8ce3189de81fc69dbb59",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_context_revision_before(uuid)",
+      "body_md5": "16953ceb0b2cfbe708eb4de4c6789ac6",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_context_source_locks(text[])",
+      "body_md5": "3f68cfa43c615400763552bef5b260e4",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_context_source_write_guard()",
+      "body_md5": "858cb3fef1abaeb8d5d4d9072365a992",
+      "security_definer": true,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_context_stock_admission(uuid, uuid[], boolean)",
+      "body_md5": "9926fa6d4b565127b8fa7ad1ce0edd8e",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_po_request_sources(uuid)",
+      "body_md5": "6a08039e063699407a37e2dd19dccdd6",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_request_context_state(uuid)",
+      "body_md5": "85a7228cdced6b259af4e76acf918eaf",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_request_revision_scope(uuid, text)",
+      "body_md5": "4dc15b1a0c4644edc6693c0b0e3f62f7",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_stamp_context_approval(uuid, jsonb)",
+      "body_md5": "ea667f3b5c8e685ab0d3219648e08e04",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_validate_request_context(jsonb)",
+      "body_md5": "034f65a27d66e53de70405e24e3ad9e2",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_write_context_demands(uuid, jsonb)",
+      "body_md5": "d9f3ef5331d81b535f62750632f221ef",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_write_forecast_request_mark(uuid, date, uuid, jsonb, boolean)",
+      "body_md5": "1584e591b390427330f7b7705776dbdb",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "ops_stock_bound_incoming_arrives()",
+      "body_md5": "f5c86179ab15b232c996e21dea3456d2",
+      "security_definer": false,
+      "authenticated_execute": true,
+      "anon_execute": true
+    },
+    {
+      "signature": "ops_stock_pool_draw(text, text, text, uuid, text, text, uuid, uuid, uuid)",
+      "body_md5": "0c61156c1df3028b776da794b8db4a3d",
+      "security_definer": true,
+      "authenticated_execute": true,
+      "anon_execute": false
+    },
+    {
+      "signature": "purchasing_allocate_ready_units(uuid, uuid[], uuid[])",
+      "body_md5": "088f5eb7630cc9f7889b9b480c90f0d4",
+      "security_definer": true,
+      "authenticated_execute": true,
+      "anon_execute": false
+    },
+    {
+      "signature": "purchasing_cancel_demand(uuid, text)",
+      "body_md5": "2dd965f910515b21fabc0b45db761eaf",
+      "security_definer": true,
+      "authenticated_execute": true,
+      "anon_execute": false
+    },
+    {
+      "signature": "purchasing_create_demand(text, integer, uuid, date, text, text, uuid)",
+      "body_md5": "596e927e0d6a49a76a9686eb4ab005af",
+      "security_definer": true,
+      "authenticated_execute": true,
+      "anon_execute": false
+    },
+    {
+      "signature": "purchasing_create_request_with_lines(text, uuid, text, date, uuid, uuid, text, jsonb, text, text)",
+      "body_md5": "b42e21e97e960aff65ac6d40c245353a",
+      "security_definer": true,
+      "authenticated_execute": true,
+      "anon_execute": false
+    },
+    {
+      "signature": "purchasing_decide_request(uuid, text, text, jsonb)",
+      "body_md5": "fde12867a84cce5224c13a1e6e7234be",
+      "security_definer": true,
+      "authenticated_execute": true,
+      "anon_execute": false
+    },
+    {
+      "signature": "purchasing_demand_record_issue(uuid, integer, text)",
+      "body_md5": "a0a8cf0e6abf205acef3287ec4f123e4",
+      "security_definer": true,
+      "authenticated_execute": true,
+      "anon_execute": false
+    },
+    {
+      "signature": "purchasing_issue_pos_batch(jsonb)",
+      "body_md5": "fa13f3a6fb6e525d536d75eee6eb7aa1",
+      "security_definer": true,
+      "authenticated_execute": true,
+      "anon_execute": false
+    },
+    {
+      "signature": "purchasing_move_request_destination(uuid, uuid)",
+      "body_md5": "c8ba7c10b7f62373842a50785010dd4b",
+      "security_definer": true,
+      "authenticated_execute": true,
+      "anon_execute": false
+    },
+    {
+      "signature": "purchasing_po_free_units()",
+      "body_md5": "bf4d0c8d7e62ed6e4932f86db7739181",
+      "security_definer": false,
+      "authenticated_execute": true,
+      "anon_execute": true
+    },
+    {
+      "signature": "purchasing_po_line_free_units(uuid)",
+      "body_md5": "58b6664023d5610ffb3e735f9721ed2b",
+      "security_definer": false,
+      "authenticated_execute": true,
+      "anon_execute": true
+    },
+    {
+      "signature": "purchasing_request_context_review(uuid)",
+      "body_md5": "f2a681885f73f008545a2992c67afcf4",
+      "security_definer": true,
+      "authenticated_execute": true,
+      "anon_execute": false
+    },
+    {
+      "signature": "purchasing_request_forecast_sources(text[], uuid)",
+      "body_md5": "7ba9722f24efa6e24d0a86be0e913b81",
+      "security_definer": true,
+      "authenticated_execute": true,
+      "anon_execute": false
+    },
+    {
+      "signature": "purchasing_request_issue_retry(uuid, jsonb)",
+      "body_md5": "e389ad2bed8958c427bdc36d2f98bc26",
+      "security_definer": true,
+      "authenticated_execute": true,
+      "anon_execute": false
+    },
+    {
+      "signature": "purchasing_resubmit_request(uuid, uuid, date, text, uuid, uuid, text, jsonb, text)",
+      "body_md5": "05b01ccdb6247850c1dc18307d7a9a6c",
+      "security_definer": true,
+      "authenticated_execute": true,
+      "anon_execute": false
+    },
+    {
+      "signature": "purchasing_submit_forecast_requests(uuid, date, uuid, jsonb)",
+      "body_md5": "ed6b4cb29abf9ed6c3a78100f0de6c22",
+      "security_definer": true,
+      "authenticated_execute": true,
+      "anon_execute": false
+    },
+    {
+      "signature": "purchasing_withdraw_request(uuid)",
+      "body_md5": "6adf9046fd793e403e49912c680b7574",
+      "security_definer": true,
+      "authenticated_execute": true,
+      "anon_execute": false
+    }
+  ]
+}

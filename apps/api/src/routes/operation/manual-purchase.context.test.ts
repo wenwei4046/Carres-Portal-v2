@@ -178,7 +178,7 @@ describe("context review uses the same canonical decision door", () => {
     return app.fetch(new Request(`https://api.test/api/operation/purchasing/requests/${id(10)}/context-review`, { headers: { Authorization: `Bearer ${token}` } }), env as never, { waitUntil() {}, passThroughException() {} } as never);
   }
   it("reads the exact fresh review without creating or approving anything", async () => {
-    const data = { available: true, review: review().reviewScope, events: [] };
+    const data = { available: true, review: review().reviewScope, events: [], coverage: null, approval: null };
     rpc.mockResolvedValue({ data, error: null });
     const response = await readReview();
     expect(response.status).toBe(200);

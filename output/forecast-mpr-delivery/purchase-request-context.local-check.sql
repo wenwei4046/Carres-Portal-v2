@@ -2,6 +2,10 @@
 -- Requires the WIP validator/create draft and at least one seeded active destination.
 \set ON_ERROR_STOP on
 begin;
+-- LOCAL replay configuration only: real issue admission requires a recorded address.
+-- All changes remain inside this fixture transaction and roll back.
+update public.warehouses set address='TEST isolated replay destination address' where coalesce(btrim(address),'')='';
+update public.purchasing_destinations set address='TEST isolated replay destination address' where warehouse_id is null and coalesce(btrim(address),'')='';
 create temporary table context_fixture(value jsonb);
 insert into context_fixture values ($json${"version": 1, "origin": "manual", "purpose": "general_purchase", "proceedDate": "2026-10-20", "stockDeliveryDate": null, "serviceCaseId": null, "reason": "other", "companyPersonName": "", "projectReference": "", "explanation": "TEST justification", "forecastChangeReason": "", "recipients": [{"id": "00000000-0000-4000-8000-000000000001", "company": "TEST", "name": "TEST recipient", "phone": "TEST contact", "method": "delivery", "deliveryDate": "2026-11-20", "addressLine1": "TEST", "addressLine2": "TEST", "city": "TEST", "state": "TEST", "postcode": "TEST", "buildingType": "TEST", "floor": "100A", "lift": "has_lift", "pickupLocationId": null, "collectedBy": ""}], "lines": [{"id": "00000000-0000-4000-8000-000000000003", "sku": "TEST-SKU", "qty": 5, "attrs": null, "recipientNeeds": [{"recipientId": "00000000-0000-4000-8000-000000000001", "qty": 5}], "stockProposals": [], "allocations": [{"id": "00000000-0000-4000-8000-000000000004", "destinationId": "00000000-0000-4000-8000-000000000010", "supplierDeliveryDate": "2026-11-10", "qty": 5, "recipients": [{"recipientId": "00000000-0000-4000-8000-000000000001", "qty": 5}]}]}]}$json$);
 update context_fixture set value=jsonb_set(value,'{lines,0,allocations,0,destinationId}',to_jsonb((select id::text from public.purchasing_destinations where active order by id limit 1)));
@@ -134,6 +138,16 @@ begin
  perform public.purchasing_decide_request((legacy->>'id')::uuid,'approve');
  if not exists(select 1 from public.purchase_requests where id=(legacy->>'id')::uuid and approved_at is not null and request_version=0)
    or not exists(select 1 from public.purchase_demands where request_id=(legacy->>'id')::uuid and attrs='{"TEST":"configuration"}'::jsonb and qty=1) then raise exception 'legacy create/configuration/approval regressed'; end if;
+
+ declare empty_created jsonb; empty_review jsonb;
+ begin
+  perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009698","role":"authenticated","app_metadata":{"role":"operation"}}',true);
+  empty_created:=public.purchasing_create_request_with_lines(p_purpose=>'general_purchase',p_destination_id=>d,p_lines=>jsonb_build_array(jsonb_build_object('request_context',jsonb_set(c,'{lines,0,attrs}','{}'),'submission_key',gen_random_uuid())),p_fulfilment_intent=>'concrete_need');
+  empty_review:=public.purchasing_request_context_review((empty_created->>'id')::uuid);
+  if empty_review->'available'<>'true'::jsonb or empty_review#>'{review,state,context,lines,0,attrs}'<>'{}'::jsonb or empty_review#>'{review,state,demands,0,attrs}'<>'null'::jsonb then raise exception 'empty configuration disagrees between saved context and projected physical demand'; end if;
+  raise exception 'rollback empty configuration fixture' using errcode='P0905';
+ exception when sqlstate 'P0905' then null;
+ end;
  raise notice 'Context create: exact scope/lineage, idempotency, changed-key refusal, atomic later-line failure and RS500 PASS';
 end; $owner$;
 reset role;
@@ -293,6 +307,7 @@ begin
  perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009699","role":"authenticated","app_metadata":{"role":"principal"}}',true);
  scope:=public._purchasing_stamp_context_approval((made->>'id')::uuid,null);
  if scope#>>'{service_case_source,id}' is distinct from case_id::text or scope#>>'{service_case_source,carres_action}'<>'TEST approved procurement scope' then raise exception 'actual Case source not captured'; end if;
+
  begin
   update public.service_cases set carres_action='TEST changed remedy scope' where id=case_id;
   perform public._purchasing_assert_request_approval((made->>'id')::uuid);
@@ -306,7 +321,7 @@ begin
   p_for_service_case_id=>case_id,p_lines=>jsonb_build_array(jsonb_build_object('request_context',c,'revision_key',gen_random_uuid(),'expected_version',1,'reason','TEST refresh changed actual Case source')));
  if not exists(select 1 from public.purchase_requests where id=(made->>'id')::uuid and request_version=2 and approved_at is null)
   or not exists(select 1 from public.purchase_request_events where request_id=(made->>'id')::uuid and changes#>'{previous_approval,approval_scope}'=scope) then raise exception 'changed Case source trapped revision or lost prior approval'; end if;
- raise notice 'SC source: actual Case procurement facts captured; changed remedy invalidates saved approval PASS (formal Case admission still open)';
+ raise notice 'SC source: actual Case procurement facts captured; changed remedy invalidates saved approval PASS (procurement source scope only; no formal Service remedy approval or execution claim)';
 end; $case_source_test$;
 -- Partial approval preserves full need and explicitly allocates every approved piece.
 do $partial_test$
@@ -375,7 +390,7 @@ begin
  refused:=false;
  begin
   perform public.purchasing_demand_record_issue(buy,1,null);
- exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='context_issue_not_ready'; end;
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='request_issue_proof_required'; end;
  if not refused or exists(select 1 from public.purchase_demands where request_id=r.id and issued_qty<>0) then raise exception 'legacy recorder bypassed contextual issue gate'; end if;
  refused:=false;
  begin
@@ -388,6 +403,146 @@ begin
   perform public._purchasing_context_coverage(r.id,true);
  exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='stock_proposal_unit_changed'; end;
  if not refused then raise exception 'changed physical Unit reused approved coverage'; end if;
+
+ -- Canonical issue admission, before any write. Partial quantities carry their
+ -- exact recipient allocation and reviewed version/token; full need stays intact.
+ declare pd public.purchase_demands%rowtype; src jsonb; payload jsonb; checked jsonb; dist jsonb; po_date date; test_context jsonb; n integer; admitted boolean:=false;
+ begin
+  select * into strict pd from public.purchase_demands where id=buy;
+  select x into strict dist from jsonb_array_elements(r.approval_scope->'approved_distribution') x where x->>'demandId'=buy::text;
+  for n in 0..1000 loop
+   po_date:=(now() at time zone 'Asia/Kuala_Lumpur')::date+n;
+   test_context:=jsonb_build_object('lines',jsonb_build_array(jsonb_build_object('id',pd.request_line_id,'sku',pd.sku,'allocations',jsonb_build_array(jsonb_build_object('supplierDeliveryDate',po_date)))));
+   begin
+    perform public._purchasing_check_context_supplier_dates(test_context,(now() at time zone 'Asia/Kuala_Lumpur')::date);
+    admitted:=true;
+   exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; if detail<>'supplier_date_before_earliest' then raise; end if; end;
+   exit when admitted;
+  end loop;
+  if not admitted then raise exception 'fixture calendar admission unavailable'; end if;
+  src:=jsonb_build_object('demand_id',buy,'qty',1,'request_version',r.request_version,'approval_version',r.approval_version,'approval_token',md5(r.approval_scope::text),
+    'recipients',jsonb_build_array(jsonb_build_object('recipientId',dist#>>'{recipients,0,recipientId}','qty',1)));
+  payload:=jsonb_build_array(jsonb_build_object('supplier_id',pd.supplier_id,'warehouse_id',coalesce((select warehouse_id from public.purchasing_destinations where id=pd.destination_id),loc),'destination_id',pd.destination_id,'purpose',pd.purpose,'eta_date',po_date,
+   'lines',jsonb_build_array(jsonb_build_object('sku',pd.sku,'qty',1,'attrs',pd.attrs,'request_sources',jsonb_build_array(src)))));
+  checked:=public._purchasing_context_issue_preflight(payload);
+  if checked#>>'{sources,0,qty}'<>'1' or checked#>'{sources,0,recipients}' is distinct from src->'recipients' then raise exception 'partial issue admission lost exact recipient distribution'; end if;
+  refused:=false;
+  begin
+   perform public._purchasing_context_issue_preflight(jsonb_set(payload,'{0,lines,0,request_sources,0,recipients}','null'));
+  exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='issue_recipient_distribution_required'; end;
+  if not refused then raise exception 'partial issue guessed recipient allocation'; end if;
+  refused:=false;
+  begin
+   perform public._purchasing_context_issue_preflight(jsonb_set(payload,'{0,lines,0,request_sources,0,approval_token}','"TEST-stale"'));
+  exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='request_approval_changed'; end;
+  if not refused then raise exception 'stale reviewed approval token admitted'; end if;
+  refused:=false;
+  begin
+   perform public._purchasing_context_issue_preflight(jsonb_set(payload,'{0,eta_date}',to_jsonb((po_date+1)::text)));
+  exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='request_po_date_changed'; end;
+  if not refused then raise exception 'MPR requested date replaced actual Settings PO date'; end if;
+  refused:=false;
+  begin
+   perform public._purchasing_context_issue_preflight(payload||payload||payload);
+  exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail in ('request_over_issue','invalid_issue_distribution'); end;
+  if not refused then raise exception 'multiple POs bypassed aggregate approved cap'; end if;
+
+
+  declare c2 jsonb; l2 jsonb; a2 jsonb; created2 jsonb; other_id uuid; other_demand uuid; other_scope jsonb; merged_payload jsonb; merged_issue jsonb; merged_po text;
+  begin
+   select l,a into strict l2,a2 from jsonb_array_elements(r.request_context->'lines') l cross join lateral jsonb_array_elements(l->'allocations') a where a->>'id'=pd.supplier_allocation_id::text;
+   l2:=l2||jsonb_build_object('qty',2,'recipientNeeds',a2->'recipients','stockProposals','[]'::jsonb,'allocations',jsonb_build_array(a2));
+   c2:=jsonb_set(jsonb_set(r.request_context,'{lines}',jsonb_build_array(l2)),'{recipients}',(select jsonb_agg(rc) from jsonb_array_elements(r.request_context->'recipients') rc where exists(select 1 from jsonb_array_elements(a2->'recipients') ar where ar->>'recipientId'=rc->>'id')));
+   created2:=public.purchasing_create_request_with_lines(p_purpose=>'general_purchase',p_destination_id=>pd.destination_id,p_lines=>jsonb_build_array(jsonb_build_object('request_context',c2,'submission_key',gen_random_uuid())),p_fulfilment_intent=>'concrete_need');
+   other_id:=(created2->>'id')::uuid;
+   perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009699","role":"authenticated","app_metadata":{"role":"principal"}}',true);
+   perform public.purchasing_decide_request(other_id,'approve',null,jsonb_build_object('expected_version',1,'review_scope',public._purchasing_context_review(other_id),'request_context',c2,'approved_distribution',null));
+   select approval_scope into strict other_scope from public.purchase_requests where id=other_id;
+   select id into strict other_demand from public.purchase_demands where request_id=other_id and cancelled_at is null;
+   perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009698","role":"authenticated","app_metadata":{"role":"operation"}}',true);
+   merged_payload:=jsonb_set(jsonb_set(jsonb_set(payload,'{0,context_issue_key}',to_jsonb(gen_random_uuid())),'{0,lines,0,qty}','2'),'{0,lines,0,request_sources}',jsonb_build_array(src,
+    src||jsonb_build_object('demand_id',other_demand,'request_version',1,'approval_version',1,'approval_token',md5(other_scope::text))));
+   merged_issue:=public.purchasing_issue_pos_batch(merged_payload); merged_po:=merged_issue#>>'{po_ids,0}';
+   if (select count(*) from public.purchase_order_lines pl where pl.po_id=merged_po)<>1 or (select sum(qty) from public.purchase_order_lines pl where pl.po_id=merged_po)<>2
+    or (select count(*) from public.po_line_sources ps where ps.po_id=merged_po and ps.purchase_demand_id in(buy,other_demand))<>2
+    or (select issued_qty from public.purchase_demands where id=buy)<>1 or (select issued_qty from public.purchase_demands where id=other_demand)<>1 then raise exception 'canonical merged issue violated one line or per-request source'; end if;
+   if (select count(distinct reserved_purchase_demand_id) from public.ops_stock_items where po_no=merged_po)<>2 then raise exception 'merged exact Units lost separate request owners'; end if;
+   raise notice 'Canonical merged issue LOCAL: two approved MPRs share ONE physical item line qty2, exact source1+1/counters/Unit owners, each remaining1 PASS';
+   raise exception 'rollback merged canonical issue fixture' using errcode='P0902';
+  exception when sqlstate 'P0902' then null;
+  end;
+  declare issued jsonb; retry jsonb; next_payload jsonb; test_po_id text; before_pos integer; before_units integer; before_events integer; did boolean:=false;
+  begin
+   payload:=jsonb_set(payload,'{0,context_issue_key}',to_jsonb(gen_random_uuid()));
+   payload:=jsonb_set(payload,'{0,context_client_input}',jsonb_build_object('TEST','original reviewed client input'));
+   select count(*) into before_pos from public.purchase_orders;
+   select count(*) into before_units from public.ops_stock_items;
+   select count(*) into before_events from public.purchase_request_events;
+   -- A later legacy payload failure must roll back the entire earlier context
+   -- birth, permanent-number claim, source events, counters and Units together.
+   refused:=false;
+   begin
+    perform public.purchasing_issue_pos_batch(payload||jsonb_set(jsonb_set(payload->0,'{lines}',jsonb_build_array(jsonb_build_object('sku','TEST-UNKNOWN-CATALOG-SKU','qty',1))),'{context_issue_key}',payload#>'{0,context_issue_key}'));
+   exception when others then get stacked diagnostics detail=pg_exception_detail; refused:=detail='unresolved_supplier'; end;
+   if not refused or (select count(*) from public.purchase_orders)<>before_pos or (select count(*) from public.ops_stock_items)<>before_units
+    or (select count(*) from public.purchase_request_events)<>before_events or (select issued_qty from public.purchase_demands where id=buy)<>0 then raise exception 'later failed PO left partial context issue writes'; end if;
+   issued:=public.purchasing_issue_pos_batch(payload);
+   test_po_id:=issued#>>'{po_ids,0}';
+   if test_po_id is null or (select issued_qty from public.purchase_demands where id=buy)<>1
+    or (select sum(src.qty) from public.purchase_order_lines pl cross join lateral public._purchasing_po_request_sources(pl.id) src where pl.po_id=test_po_id and src.demand_id=buy)<>1
+    or (select count(*) from public.purchase_order_lines pl where pl.po_id=test_po_id)<>1 then raise exception 'canonical partial PO did not retain exact source'; end if;
+   declare document jsonb;
+   begin
+    document:=public.purchasing_po_document(test_po_id);
+    if jsonb_array_length(document->'lines')<>1 or document#>>'{lines,0,qty}'<>'1' or document->>'eta_date' is distinct from po_date::text
+     or exists(select 1 from jsonb_array_elements(document->'lines') l where l ?| array['cost','price','unit_price','total'])
+     or exists(select 1 from jsonb_array_elements(document->'lines') l cross join lateral jsonb_array_elements(l->'sources') so where so->>'so' is not null)
+     or document::text like '%TEST recipient%' then raise exception 'canonical supplier document invented money, SO or recipient facts'; end if;
+   end;
+   retry:=public.purchasing_request_issue_retry((payload#>>'{0,context_issue_key}')::uuid,payload#>'{0,context_client_input}');
+   if retry<>issued then raise exception 'read-only lost-response recovery lost committed result'; end if;
+   refused:=false;
+   begin
+    perform public.purchasing_request_issue_retry((payload#>>'{0,context_issue_key}')::uuid,'{"TEST":"changed reviewed client input"}');
+   exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='issue_retry_key_reused'; end;
+   if not refused then raise exception 'retry recovery accepted different client scope'; end if;
+   retry:=public.purchasing_issue_pos_batch(payload);
+   if retry<>issued or (select count(*) from public.purchase_orders)<>before_pos+1 or (select issued_qty from public.purchase_demands where id=buy)<>1 then raise exception 'same issue retry duplicated PO or counter'; end if;
+   refused:=false;
+   begin
+    perform public.purchasing_issue_pos_batch(jsonb_set(payload,'{0,lines,0,qty}','2'));
+   exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='issue_retry_key_reused'; end;
+   if not refused then raise exception 'same retry key admitted changed issue scope'; end if;
+   next_payload:=jsonb_set(jsonb_set(payload,'{0,context_issue_key}',to_jsonb(gen_random_uuid())),'{0,lines,0,request_sources,0,recipients}','null');
+   perform public.purchasing_issue_pos_batch(next_payload);
+   if (select issued_qty from public.purchase_demands where id=buy)<>2 or (select count(*) from public.purchase_orders)<>before_pos+2 then raise exception 'second actual partial issue did not consume exact remainder'; end if;
+   coverage:=public._purchasing_context_coverage(r.id,true);
+   if not exists(select 1 from jsonb_array_elements(coverage) x where x->>'demand_id'=buy::text and x->>'to_buy'='0' and x->>'issued_qty'='2' and x->>'stock_qty'='0') then raise exception 'purchased Units double-netted as From Stock'; end if;
+   if exists(select 1 from public.purchase_order_lines pl join public.ops_stock_items u on u.po_line_id=pl.id where pl.po_id in(select jsonb_array_elements_text(issued->'po_ids'))
+      and (u.reserved_purchase_demand_id is distinct from buy or u.reserved_ref is distinct from r.req_no or u.status<>'incoming')) then raise exception 'concrete incoming Unit lost actual request binding'; end if;
+
+   declare incoming uuid; bad_arrival uuid; mode text;
+   begin
+    select stock_identity_mode into strict mode from public.product_skus where sku=pd.sku;
+    if mode='exact_unit' then
+     select id into strict incoming from public.ops_stock_items where po_no=test_po_id and reserved_purchase_demand_id=buy;
+     select id into strict bad_arrival from public.ops_stock_items where reserved_purchase_demand_id=buy and status='incoming' and id<>incoming;
+     update public.ops_stock_items set status='free' where id=incoming;
+     if not exists(select 1 from public.ops_stock_items where id=incoming and status='reserved' and reserved_purchase_demand_id=buy and reserved_ref=r.req_no) then raise exception 'healthy arrival lost MPR binding'; end if;
+     update public.ops_stock_items set status='on_hold',hold_reason='wrong_item',held_at=now() where id=bad_arrival;
+     if not exists(select 1 from public.ops_stock_items where id=bad_arrival and status='on_hold' and reserved_purchase_demand_id is null and reserved_ref is null and r.req_no=any(ref_history)) then raise exception 'wrong arrival retained false coverage or lost prior reference'; end if;
+     coverage:=public._purchasing_context_coverage(r.id,true);
+     if not exists(select 1 from jsonb_array_elements(coverage) x where x->>'demand_id'=buy::text and x->>'issued_qty'='2' and x->>'stock_qty'='0') then raise exception 'arrival double-netted purchase coverage'; end if;
+     raise notice 'Existing arrival trigger LOCAL: healthy incoming MPR Unit becomes reserved; wrong arrival clears binding and keeps reference history PASS (trigger only)';
+    elsif exists(select 1 from public.ops_stock_items where po_no=test_po_id) then raise exception 'counted PO invented Unit identities';
+    end if;
+   end;
+   raise notice 'Canonical issue LOCAL: real partial1 + remainder1; exact source/recipient/event/Unit ownership, same-key retry once, changed-key scope refusal and later-PO atomic rollback PASS';
+   raise exception 'rollback actual issue fixture' using errcode='P0901';
+  exception when sqlstate 'P0901' then null;
+  end;
+  raise notice 'Issue batch preflight: exact partial recipient/version/token and Settings PO date pass; guessed recipients, stale review, later PO date and repeated-document overbuy refuse PASS (no PO created)';
+ end;
  -- Synthetic PO rows test the coverage reader only; they do NOT claim
  -- successful canonical issue. Existing public context issue is still closed.
  perform set_config('session_replication_role','replica',true);
@@ -530,6 +685,65 @@ begin
   p_lines=>jsonb_build_array(jsonb_build_object('request_context',c,'revision_key',next_key,'expected_version',1,'reason','TEST refresh actual source','forecast_source',sources)));
  if replay->>'req_no' is distinct from made->>'req_no' or replay->>'request_version'<>'2'
   or not exists(select 1 from public.purchase_request_events where request_id=(made->>'id')::uuid and changes#>'{previous_approval,approval_scope}'=scope and changes#>'{before,forecast_mark,lines}' is not null) then raise exception 'forecast source revision lost identity/history'; end if;
+
+ declare rid uuid:=(made->>'id')::uuid; pd public.purchase_demands%rowtype; po_date date; n integer; accepted boolean:=false; test_context jsonb; payload jsonb; result jsonb; line_id uuid; own_free integer;
+ begin
+  perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009699","role":"authenticated","app_metadata":{"role":"principal"}}',true);
+  perform public.purchasing_decide_request(rid,'approve',null,jsonb_build_object('expected_version',2,'review_scope',public._purchasing_context_review(rid),'request_context',c,'approved_distribution',null));
+  select approval_scope into strict scope from public.purchase_requests where id=rid;
+  select * into strict pd from public.purchase_demands where request_id=rid and cancelled_at is null;
+  for n in 0..1000 loop
+   po_date:=(now() at time zone 'Asia/Kuala_Lumpur')::date+n;
+   test_context:=jsonb_build_object('lines',jsonb_build_array(jsonb_build_object('id',pd.request_line_id,'sku',pd.sku,'allocations',jsonb_build_array(jsonb_build_object('supplierDeliveryDate',po_date)))));
+   begin perform public._purchasing_check_context_supplier_dates(test_context,(now() at time zone 'Asia/Kuala_Lumpur')::date); accepted:=true;
+   exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; if detail<>'supplier_date_before_earliest' then raise; end if; end;
+   exit when accepted;
+  end loop;
+  perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009698","role":"authenticated","app_metadata":{"role":"operation"}}',true);
+  payload:=jsonb_build_array(jsonb_build_object('context_issue_key',gen_random_uuid(),'supplier_id',pd.supplier_id,'warehouse_id',coalesce((select warehouse_id from public.purchasing_destinations where id=pd.destination_id),warehouse),'destination_id',pd.destination_id,'purpose',pd.purpose,'eta_date',po_date,'procurement_partner_id',case when (select kind from public.suppliers where id=pd.supplier_id)='factory_pickup' then coalesce((select collected_by_partner_id from public.purchasing_supplier_settings where supplier_id=pd.supplier_id),(select id from public.delivery_partners order by id limit 1)) else null end,
+   'lines',jsonb_build_array(jsonb_build_object('sku',pd.sku,'qty',1,'attrs',pd.attrs,'request_sources',jsonb_build_array(jsonb_build_object('demand_id',pd.id,'qty',1,'request_version',2,'approval_version',2,'approval_token',md5(scope::text),'recipients',null))))));
+  result:=public.purchasing_issue_pos_batch(payload);
+  select id into strict line_id from public.purchase_order_lines where po_id=result#>>'{po_ids,0}';
+  own_free:=public._purchasing_context_own_po_free(rid,line_id);
+  if own_free<>1 or public.purchasing_po_line_free_units(line_id)<>1 or exists(select 1 from public.ops_stock_items where po_line_id=line_id and (reserved_purchase_demand_id is not null or reserved_ref is not null)) then raise exception 'RS supply was reserved or lost exact own-source exclusion'; end if;
+  perform public._purchasing_assert_request_approval(rid);
+  perform public.purchasing_issue_pos_batch(jsonb_set(payload,'{0,context_issue_key}',to_jsonb(gen_random_uuid())));
+  if (select issued_qty from public.purchase_demands where id=pd.id)<>2 then raise exception 'own RS partial PO invalidated unchanged approved remainder'; end if;
+  raise notice 'Canonical forecast RS LOCAL: approved500 permits partial1+1 without display cap/final recipient; actual own free PO Units excluded precisely, remain free and approval stays current PASS';
+  raise exception 'rollback RS issue fixture' using errcode='P0903';
+ exception when sqlstate 'P0903' then null;
+ end;
+
+ declare counted jsonb; counted_created jsonb; counted_id uuid; counted_d public.purchase_demands%rowtype; counted_scope jsonb; counted_payload jsonb; counted_result jsonb; counted_po text; po_date date; n integer; accepted boolean:=false; test_context jsonb;
+ begin
+  counted:=jsonb_set(jsonb_set(jsonb_set(c,'{origin}','"stock_request"'),'{forecastChangeReason}','""'),'{lines,0,qty}','2');
+  counted:=jsonb_set(counted,'{lines,0,allocations,0,qty}','2');
+  update public.product_skus s set stock_identity_mode='quantity' where s.sku=counted#>>'{lines,0,sku}';
+  counted_created:=public.purchasing_create_request_with_lines(p_purpose=>'ready_stock',p_destination_id=>(counted#>>'{lines,0,allocations,0,destinationId}')::uuid,
+   p_lines=>jsonb_build_array(jsonb_build_object('request_context',counted,'submission_key',gen_random_uuid())),p_fulfilment_intent=>'additional_stock');
+  counted_id:=(counted_created->>'id')::uuid;
+  perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009699","role":"authenticated","app_metadata":{"role":"principal"}}',true);
+  perform public.purchasing_decide_request(counted_id,'approve',null,jsonb_build_object('expected_version',1,'review_scope',public._purchasing_context_review(counted_id),'request_context',counted,'approved_distribution',null));
+  select approval_scope into strict counted_scope from public.purchase_requests where id=counted_id;
+  select * into strict counted_d from public.purchase_demands where request_id=counted_id;
+  for n in 0..1000 loop
+   po_date:=(now() at time zone 'Asia/Kuala_Lumpur')::date+n;
+   test_context:=jsonb_build_object('lines',jsonb_build_array(jsonb_build_object('id',counted_d.request_line_id,'sku',counted_d.sku,'allocations',jsonb_build_array(jsonb_build_object('supplierDeliveryDate',po_date)))));
+   begin perform public._purchasing_check_context_supplier_dates(test_context,(now() at time zone 'Asia/Kuala_Lumpur')::date); accepted:=true;
+   exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; if detail<>'supplier_date_before_earliest' then raise; end if; end;
+   exit when accepted;
+  end loop;
+  perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009698","role":"authenticated","app_metadata":{"role":"operation"}}',true);
+  counted_payload:=jsonb_build_array(jsonb_build_object('context_issue_key',gen_random_uuid(),'supplier_id',counted_d.supplier_id,'warehouse_id',coalesce((select warehouse_id from public.purchasing_destinations where id=counted_d.destination_id),warehouse),'destination_id',counted_d.destination_id,'purpose','ready_stock','eta_date',po_date,
+   'procurement_partner_id',case when (select kind from public.suppliers where id=counted_d.supplier_id)='factory_pickup' then coalesce((select collected_by_partner_id from public.purchasing_supplier_settings where supplier_id=counted_d.supplier_id),(select id from public.delivery_partners order by id limit 1)) else null end,
+   'lines',jsonb_build_array(jsonb_build_object('sku',counted_d.sku,'qty',2,'attrs',counted_d.attrs,'request_sources',jsonb_build_array(jsonb_build_object('demand_id',counted_d.id,'qty',2,'request_version',1,'approval_version',1,'approval_token',md5(counted_scope::text),'recipients',null))))));
+  counted_result:=public.purchasing_issue_pos_batch(counted_payload); counted_po:=counted_result#>>'{po_ids,0}';
+  if exists(select 1 from public.ops_stock_items where po_no=counted_po) or not exists(select 1 from public.purchase_order_lines pl where pl.po_id=counted_po and pl.identity_mode='quantity' and pl.qty=2 and public.purchasing_po_line_free_units(pl.id)=2)
+   or (select issued_qty from public.purchase_demands where id=counted_d.id)<>2 then raise exception 'counted canonical PO invented Units or lost free additional quantity'; end if;
+  raise notice 'Canonical counted RS LOCAL: quantity2 PO retains exact request source and free quantity2; no fake Unit IDs PASS';
+  raise exception 'rollback counted issue fixture' using errcode='P0904';
+ exception when sqlstate 'P0904' then null;
+ end;
  raise notice 'Forecast origin: actual source mark, changed-quantity reason/no hidden cap, retry, forged/stale source refusal and same-number source refresh PASS';
 end; $forecast_origin_test$;
 -- Qualified approval review may change stock arrangements, never the full need.
