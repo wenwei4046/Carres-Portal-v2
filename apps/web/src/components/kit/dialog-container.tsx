@@ -19,6 +19,9 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 
 const DialogContainer = createContext<HTMLElement | null>(null);
+/** A responsive panel keeps its current surface while a child dialog is open. */
+export const PanelDialogPresence = createContext<(() => (() => void)) | null>(null);
+export function usePanelDialogPresence() { return useContext(PanelDialogPresence); }
 
 /** Read by `Select` · `Popover` · `DatePicker`. Null when not inside a dialog. */
 export function useDialogContainer(): HTMLElement | null {

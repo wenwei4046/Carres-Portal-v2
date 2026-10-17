@@ -131,10 +131,21 @@ for (const width of WIDTHS) {
     await dialog.getByTestId("new-task-add").click();
     await expect(dialog.getByText("Task name is required.")).toBeVisible();
     await dialog.locator("#new-task-name").fill("TEST · Call TEST Supplier A about the price list");
+    if (width === 1025) {
+      for (const resized of [1164, 1025, 1164]) {
+        await page.setViewportSize({ width: resized, height: 900 });
+        await expect(dialog.locator("#new-task-name")).toHaveValue("TEST · Call TEST Supplier A about the price list");
+        await expect(dialog.locator("#new-task-name")).toBeFocused();
+      }
+    }
     await dialog.locator("#new-task-assignee").click();
     await page.getByRole("option", { name: "TEST · Staff B" }).click();
     await dialog.getByTestId("new-task-add").click();
     await expect(dialog).toBeHidden();
+    if (width === 1025) {
+      await expect(page.locator('[data-kit="drawer"][data-variant="tasks-panel"]')).toHaveCount(0);
+      await page.setViewportSize({ width, height: 900 });
+    }
 
     await page.locator("[data-task-card]", { hasText: "TEST · Get the new product photographs" }).click();
     const view = page.locator(`${TASKS} [data-kit="task-view"]`);

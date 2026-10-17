@@ -55,10 +55,10 @@
  * nothing renders the markup byte for byte as it was, which is why every other
  * modal in the portal is untouched by this card.
  */
-import { useRef, type RefObject, type ReactNode } from "react";
+import { useLayoutEffect, useRef, type RefObject, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import Icon from "./Icon";
-import { DialogContainerProvider } from "./dialog-container";
+import { DialogContainerProvider, usePanelDialogPresence } from "./dialog-container";
 import { Z_DIALOG } from "./overlay-layer";
 
 const SURFACE =
@@ -149,6 +149,10 @@ export default function DialogFrame({
      Save/Cancel and submission guards; Escape/outside must not discard work. */
   const taskReview = variant === "task-review";
   const contextualPanel = variant === "summary-panel" || variant === "tasks-panel";
+  const holdPanel = usePanelDialogPresence();
+  useLayoutEffect(() => {
+    if (open && !contextualPanel) return holdPanel?.();
+  }, [open, contextualPanel, holdPanel]);
 
 
   return (
@@ -192,6 +196,11 @@ export default function DialogFrame({
                all (`composeEventHandlers` checks `defaultPrevented`), so the
                null-trigger path that dropped focus on `<body>` never fires. */
             event.preventDefault();
+            // A responsive panel may have moved its focused input into the
+            // inline canvas. Keep that valid focus instead of the old opener.
+            const active = document.activeElement;
+            if (active instanceof HTMLElement && active !== document.body && document.contains(active)
+              && event.target instanceof HTMLElement && !event.target.contains(active)) return;
             const back = returnFocusRef?.current ?? opener.current;
             /* Only if it is still ON the page: a row that the close itself
                removed cannot take focus, and forcing it would throw. Falling
