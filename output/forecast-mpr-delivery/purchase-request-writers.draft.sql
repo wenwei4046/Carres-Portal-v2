@@ -210,7 +210,7 @@ begin
       perform (v_stock->>'id')::uuid;
       if v_stock->>'qty' is null or (v_stock->>'qty')::integer<1 or not exists
         (select 1 from public.warehouses where id=(v_stock->>'locationId')::uuid) or not exists
-        (select 1 from public.purchasing_destinations where id=(v_stock->>'destinationId')::uuid and active) then
+        (select 1 from public.purchasing_destinations where id=(v_stock->>'destinationId')::uuid and active and warehouse_id=(v_stock->>'locationId')::uuid) then
         raise exception 'invalid stock proposal' using errcode='22023', detail='invalid_param';
       end if;
       select coalesce(sum((r->>'qty')::integer),0) into v_allocated from jsonb_array_elements(v_stock->'recipients') r;
@@ -258,12 +258,12 @@ begin
     select l, a, 'stock_proposal'::text from jsonb_array_elements(r.request_context->'lines') l cross join lateral jsonb_array_elements(l->'stockProposals') a
   )
   select coalesce(jsonb_agg(jsonb_build_object(
-    'line',l->>'id','allocation',a->>'id','kind',kind,'sku',l->>'sku','qty',(a->>'qty')::int,
-    'attrs',nullif(l->'attrs','null'::jsonb),'destination',a->>'destinationId',
+    'line',(l->>'id')::uuid,'allocation',(a->>'id')::uuid,'kind',kind,'sku',l->>'sku','qty',(a->>'qty')::int,
+    'attrs',nullif(l->'attrs','null'::jsonb),'destination',(a->>'destinationId')::uuid,
     'date',case when kind='purchase' then a->>'supplierDeliveryDate' else
       case when r.purpose='ready_stock' then r.request_context->>'stockDeliveryDate' else
         (select min(x->>'deliveryDate') from jsonb_array_elements(r.request_context->'recipients') x) end end
-  ) order by l->>'id',a->>'id'),'[]') into expected from projected;
+  ) order by (l->>'id')::uuid,(a->>'id')::uuid),'[]') into expected from projected;
   select coalesce(jsonb_agg(jsonb_build_object(
     'line',d.request_line_id,'allocation',coalesce(d.supplier_allocation_id,d.stock_proposal_id),'kind',d.fulfilment_kind,
     'sku',d.sku,'qty',d.qty,'attrs',d.attrs,'destination',d.destination_id,'date',d.required_by

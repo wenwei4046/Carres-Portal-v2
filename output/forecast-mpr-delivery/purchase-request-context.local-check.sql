@@ -50,7 +50,7 @@ reset role;
 select set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009698","role":"authenticated","app_metadata":{"role":"operation"}}',true);
 set local role authenticated;
 do $owner$
-declare c jsonb; rs jsonb; made jsonb; replay jsonb; k uuid:=gen_random_uuid(); badkey uuid:=gen_random_uuid(); d uuid; badline jsonb; detail text; refused boolean:=false; before_n integer; legacy jsonb;
+declare c jsonb; rs jsonb; made jsonb; replay jsonb; k uuid:=gen_random_uuid(); badkey uuid:=gen_random_uuid(); d uuid; badline jsonb; detail text; refused boolean:=false; before_n integer; legacy jsonb; mixed jsonb; mixed_line jsonb; recipient2 uuid:=gen_random_uuid(); stock_site record; mixed_result jsonb;
 begin
  select value into c from context_fixture; select value into rs from stock_context_fixture;
  d:=(c#>>'{lines,0,allocations,0,destinationId}')::uuid;
@@ -66,6 +66,29 @@ begin
      p_lines=>jsonb_build_array(jsonb_build_object('request_context',c||'{"explanation":"TEST changed scope"}'::jsonb,'submission_key',k)),p_fulfilment_intent=>'concrete_need');
  exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='submission_scope_changed'; end;
  if not refused then raise exception 'changed-scope submission key accepted'; end if;
+ select id,warehouse_id into strict stock_site from public.purchasing_destinations where active and warehouse_id is not null order by id limit 1;
+ mixed_line:=(c#>'{lines,0}')||jsonb_build_object('id',gen_random_uuid(),
+   'recipientNeeds',jsonb_build_array(jsonb_build_object('recipientId',c#>>'{recipients,0,id}','qty',3),jsonb_build_object('recipientId',recipient2,'qty',2)),
+   'stockProposals',jsonb_build_array(jsonb_build_object('id',gen_random_uuid(),'locationId',stock_site.warehouse_id,'destinationId',stock_site.id,'qty',1,
+     'recipients',jsonb_build_array(jsonb_build_object('recipientId',c#>>'{recipients,0,id}','qty',1)))),
+   'allocations',jsonb_build_array(
+     (c#>'{lines,0,allocations,0}')||jsonb_build_object('id',gen_random_uuid(),'qty',2,'recipients',jsonb_build_array(jsonb_build_object('recipientId',c#>>'{recipients,0,id}','qty',2))),
+     (c#>'{lines,0,allocations,0}')||jsonb_build_object('id',gen_random_uuid(),'qty',2,'supplierDeliveryDate','2026-11-11','recipients',jsonb_build_array(jsonb_build_object('recipientId',recipient2,'qty',2)))));
+ mixed:=jsonb_set(jsonb_set(c,'{lines}',jsonb_build_array(mixed_line)),'{recipients}',
+   jsonb_build_array(c#>'{recipients,0}',(c#>'{recipients,0}')||jsonb_build_object('id',recipient2,'name','TEST second recipient')));
+ mixed_result:=public.purchasing_create_request_with_lines(p_purpose=>'general_purchase',p_destination_id=>d,
+   p_lines=>jsonb_build_array(jsonb_build_object('request_context',mixed,'submission_key',gen_random_uuid())),p_fulfilment_intent=>'concrete_need');
+ if (select sum(qty) from public.purchase_demands where request_id=(mixed_result->>'id')::uuid)<>5
+   or (select sum(qty) from public.purchase_demands where request_id=(mixed_result->>'id')::uuid and fulfilment_kind='purchase')<>4
+   or (select count(*) from public.purchase_demands where request_id=(mixed_result->>'id')::uuid)<>3 then raise exception 'full5 need, stock1 and split buy2/2 were not retained'; end if;
+ refused:=false;
+ select jsonb_set(mixed,'{lines,0,stockProposals,0,locationId}',to_jsonb(warehouse_id)) into strict badline
+ from public.purchasing_destinations where active and warehouse_id is not null and warehouse_id<>stock_site.warehouse_id order by id limit 1;
+ begin
+   perform public.purchasing_create_request_with_lines(p_purpose=>'general_purchase',p_destination_id=>d,
+     p_lines=>jsonb_build_array(jsonb_build_object('request_context',badline,'submission_key',badkey)),p_fulfilment_intent=>'concrete_need');
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='invalid_param'; end;
+ if not refused then raise exception 'stock location and destination site mismatch accepted'; end if;
  select count(*) into before_n from public.purchase_demands where created_by=auth.uid();
  badline:=jsonb_set(jsonb_set(jsonb_set(c#>'{lines,0}','{id}',to_jsonb(gen_random_uuid())), '{allocations,0,id}',to_jsonb(gen_random_uuid())),'{sku}','"TEST-UNKNOWN-CATALOG-SKU"');
  refused:=false;
@@ -98,7 +121,7 @@ reset role;
 do $state_test$
 declare rid uuid; baseline jsonb; after_state jsonb; refused boolean; detail text;
 begin
- select id into strict rid from public.purchase_requests where created_by='fffffff1-0000-4000-8000-000000009698' and purpose='general_purchase' and request_version=1;
+ select id into strict rid from public.purchase_requests where created_by='fffffff1-0000-4000-8000-000000009698' and purpose='general_purchase' and request_version=1 and jsonb_array_length(request_context#>'{lines,0,stockProposals}')=0;
  baseline:=public._purchasing_request_context_state(rid);
  if baseline->'context' is distinct from (select request_context from public.purchase_requests where id=rid)
    or baseline#>'{demands,0,approved_qty}' is distinct from 'null'::jsonb then raise exception 'state reader invented approved scope'; end if;
@@ -122,6 +145,9 @@ begin
  if not refused then raise exception 'changed header date passed contextual state guard'; end if;
  after_state:=public._purchasing_request_context_state(rid);
  if after_state is distinct from baseline then raise exception 'refused state reads left fixture changes'; end if;
+ select id into strict rid from public.purchase_requests where created_by='fffffff1-0000-4000-8000-000000009698' and purpose='general_purchase' and request_version=1 and jsonb_array_length(request_context#>'{lines,0,stockProposals}')=1;
+ baseline:=public._purchasing_request_context_state(rid);
+ if jsonb_array_length(baseline->'demands')<>3 or exists(select 1 from public.ops_stock_items where reserved_purchase_demand_id in (select id from public.purchase_demands where request_id=rid)) then raise exception 'mixed-scope proposal lost lineage or reserved Units'; end if;
  raise notice 'Context state: exact material facts, unknown approval and quantity/configuration/header-date drift refusal PASS';
 end; $state_test$;
 rollback;
