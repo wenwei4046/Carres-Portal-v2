@@ -1,5 +1,5 @@
 -- LOCAL TEST DATABASE ONLY. TEST context; all fixtures rolled back.
--- Requires the WIP validator draft and at least one seeded active destination.
+-- Requires the WIP validator/create draft and at least one seeded active destination.
 \set ON_ERROR_STOP on
 begin;
 create temporary table context_fixture(value jsonb);
@@ -32,4 +32,65 @@ do $test$ declare c jsonb; refused boolean:=false; begin
   begin perform public._purchasing_validate_request_context(c); exception when data_exception then refused:=true; end;
   if not refused then raise exception 'stock date below Settings floor accepted'; end if;
 end; $test$;
+-- Owning-create slice only. LOCAL fixtures, not production transactions.
+update context_fixture set value=jsonb_set(value,'{lines,0,sku}',to_jsonb((select sku from public.product_skus where supplier_id is not null order by sku limit 1)));
+update stock_context_fixture set value=jsonb_set(value,'{lines,0,sku}',(select value#>'{lines,0,sku}' from context_fixture));
+set local session_replication_role=replica;
+insert into auth.users(id,email) values ('fffffff1-0000-4000-8000-000000009698','TEST-context-owner@carres.test'),('fffffff1-0000-4000-8000-000000009699','TEST-context-manager@carres.test'),('fffffff1-0000-4000-8000-000000009700','TEST-context-assigner@carres.test');
+insert into public.app_users(id,email,name,role,status,is_person) values
+ ('fffffff1-0000-4000-8000-000000009698','TEST-context-owner@carres.test','TEST Requester','operation','active',true),
+ ('fffffff1-0000-4000-8000-000000009699','TEST-context-manager@carres.test','TEST Manager','principal','active',true),
+ ('fffffff1-0000-4000-8000-000000009700','TEST-context-assigner@carres.test','TEST Assigner','principal','active',true);
+set local session_replication_role=origin;
+grant select on context_fixture,stock_context_fixture to authenticated;
+select set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009700","role":"authenticated","app_metadata":{"role":"principal"}}',true);
+set local role authenticated;
+select public.workspace_assign_duty('purchasing_approver','fffffff1-0000-4000-8000-000000009699',current_date,null,'TEST local fixture; rolled back');
+reset role;
+select set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009698","role":"authenticated","app_metadata":{"role":"operation"}}',true);
+set local role authenticated;
+do $owner$
+declare c jsonb; rs jsonb; made jsonb; replay jsonb; k uuid:=gen_random_uuid(); badkey uuid:=gen_random_uuid(); d uuid; badline jsonb; detail text; refused boolean:=false; before_n integer; legacy jsonb;
+begin
+ select value into c from context_fixture; select value into rs from stock_context_fixture;
+ d:=(c#>>'{lines,0,allocations,0,destinationId}')::uuid;
+ made:=public.purchasing_create_request_with_lines(p_purpose=>'general_purchase',p_destination_id=>d,
+   p_lines=>jsonb_build_array(jsonb_build_object('request_context',c,'submission_key',k)),p_fulfilment_intent=>'concrete_need');
+ replay:=public.purchasing_create_request_with_lines(p_purpose=>'general_purchase',p_destination_id=>d,
+   p_lines=>jsonb_build_array(jsonb_build_object('request_context',c,'submission_key',k)),p_fulfilment_intent=>'concrete_need');
+ if made->>'id' is distinct from replay->>'id' or made->>'req_no' !~ '^GP[0-9]{6}-[0-9]{4}$' then raise exception 'idempotency or governed GP identity failed'; end if;
+ if not exists(select 1 from public.purchase_requests where id=(made->>'id')::uuid and request_context=c and request_version=1 and approval_scope is null and approval_version is null and approval_required and approved_at is null) then raise exception 'exact saved context/approval boundary failed'; end if;
+ if not exists(select 1 from public.purchase_demands where request_id=(made->>'id')::uuid and request_line_id=(c#>>'{lines,0,id}')::uuid and supplier_allocation_id=(c#>>'{lines,0,allocations,0,id}')::uuid and qty=5 and fulfilment_kind='purchase') then raise exception 'stable demand lineage failed'; end if;
+ begin
+   perform public.purchasing_create_request_with_lines(p_purpose=>'general_purchase',p_destination_id=>d,
+     p_lines=>jsonb_build_array(jsonb_build_object('request_context',c||'{"explanation":"TEST changed scope"}'::jsonb,'submission_key',k)),p_fulfilment_intent=>'concrete_need');
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='submission_scope_changed'; end;
+ if not refused then raise exception 'changed-scope submission key accepted'; end if;
+ select count(*) into before_n from public.purchase_demands where created_by=auth.uid();
+ badline:=jsonb_set(jsonb_set(jsonb_set(c#>'{lines,0}','{id}',to_jsonb(gen_random_uuid())), '{allocations,0,id}',to_jsonb(gen_random_uuid())),'{sku}','"TEST-UNKNOWN-CATALOG-SKU"');
+ refused:=false;
+ begin
+   perform public.purchasing_create_request_with_lines(p_purpose=>'general_purchase',p_destination_id=>d,
+     p_lines=>jsonb_build_array(jsonb_build_object('request_context',jsonb_set(c,'{lines}',(c->'lines')||jsonb_build_array(badline)),'submission_key',badkey)),p_fulfilment_intent=>'concrete_need');
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='unknown_sku'; end;
+ if not refused or exists(select 1 from public.purchase_requests where created_by=auth.uid() and submission_key=badkey)
+   or (select count(*) from public.purchase_demands where created_by=auth.uid())<>before_n then raise exception 'later line failure was not atomic'; end if;
+ made:=public.purchasing_create_request_with_lines(p_purpose=>'ready_stock',p_destination_id=>d,
+   p_lines=>jsonb_build_array(jsonb_build_object('request_context',rs,'submission_key',gen_random_uuid())),p_fulfilment_intent=>'additional_stock');
+ if made->>'req_no' !~ '^RS[0-9]{6}-[0-9]{4}$' or not exists(select 1 from public.purchase_demands where request_id=(made->>'id')::uuid and qty=500) then raise exception 'manual RS500 admission/identity failed'; end if;
+ legacy:=public.purchasing_create_request_with_lines(p_purpose=>'ready_stock',p_destination_id=>d,p_required_by=>'2026-11-10',
+   p_lines=>jsonb_build_array(jsonb_build_object('sku',c#>>'{lines,0,sku}','qty',1,'attrs','{"TEST":"configuration"}'::jsonb,'required_by','2026-11-10')),
+   p_fulfilment_intent=>'additional_stock');
+ perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009699","role":"authenticated","app_metadata":{"role":"principal"}}',true);
+ refused:=false;
+ begin
+   perform public.purchasing_decide_request((made->>'id')::uuid,'approve');
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='context_approval_not_ready'; end;
+ if not refused or exists(select 1 from public.purchase_requests where id=(made->>'id')::uuid and approved_at is not null) then raise exception 'legacy decision certified an unstamped context'; end if;
+ perform public.purchasing_decide_request((legacy->>'id')::uuid,'approve');
+ if not exists(select 1 from public.purchase_requests where id=(legacy->>'id')::uuid and approved_at is not null and request_version=0)
+   or not exists(select 1 from public.purchase_demands where request_id=(legacy->>'id')::uuid and attrs='{"TEST":"configuration"}'::jsonb and qty=1) then raise exception 'legacy create/configuration/approval regressed'; end if;
+ raise notice 'Context create: exact scope/lineage, idempotency, changed-key refusal, atomic later-line failure and RS500 PASS';
+end; $owner$;
+reset role;
 rollback;
