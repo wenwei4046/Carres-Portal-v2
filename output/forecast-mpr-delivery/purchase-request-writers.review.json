@@ -754,5 +754,80 @@
     "apps/web/src/lib/pdf/use-pdf-canvases.ts": {
       "sha256": "ceaf9c2304fa1f13daa0dfe9985635f07fc5701edff429b8b800733ca029ea05"
     }
+  },
+  "release_dependency_table": [
+    {
+      "capability": "Approved Forecast/MPR unchanged GP/RS need, stock/purchase/recipient scope, approval, partial issue, existing MPR residual, documents/current send",
+      "completed": "BUILT LOCAL; GP5/RS500 API/browser/PG positives, immutable approval/source/readback; ordinary unchanged residual needs no new PO source editor",
+      "remaining_implementation": "Production entry/capability admission remains off; exact release gates after SQL approval/application",
+      "missing_business_decision": "None identified for this approved unchanged scope",
+      "external_verification": "Production transport/authenticated complete Shell flow only after governed release; no transaction writes authorised now"
+    },
+    {
+      "capability": "PO outstanding cancellation/reduction under Purchasing5.8.1",
+      "completed": "BUILT LOCAL; pending versus effective, supplier evidence PO/object check, partial/full, counted received/cancel balance, commercial exception, Unit retirement, original paper/history, current-version send Work",
+      "remaining_implementation": "Finance-visible actionable cancellation notification receiver; full Shell896 acceptance and successful actual Storage byte-upload/save acceptance",
+      "missing_business_decision": "No new cancellation policy/ordinary approver decision required; existing rules suffice",
+      "external_verification": "Real isolated Storage service currently unprovisioned; Receiving and eventual production/provider verification remain scoped"
+    },
+    {
+      "capability": "Finance notification for effective cancellation only",
+      "completed": "Immutable event and Finance-only money-free scoped read contract; shared work-engine finance_duty and TaskView/source-link grammar already exist",
+      "remaining_implementation": "Expose exact event occurrence to Finance-readable existing Tasks/handoff surface, source link and recorded delivery/actionability; coordinate YH per Finance MASTER5/Openitems1. Do not build settlement, new Finance module or new roster",
+      "missing_business_decision": "None established for merely receiving the approved5.8.1 notification; FinanceApprover is not ordinary notification owner",
+      "external_verification": "Finance role sees and opens exact event/PO/qty/evidence, repeat reads do not duplicate; Operation sees no money"
+    },
+    {
+      "capability": "SC already authorised unchanged procurement follow-up",
+      "completed": "Existing Case/files/order-line/source facts and Purchasing approval remain readable and usable; no service_case blanket denial/Decision UUID",
+      "remaining_implementation": "Keep exact scope comparison and reuse source authorisation evidence; do not rebuild Service or repeat routine approval",
+      "missing_business_decision": "None; do not reopen existing authorisation",
+      "external_verification": "Authenticated unchanged case using actual existing written authorisation/source, without claiming upload actor is remedy approver"
+    },
+    {
+      "capability": "SC new or materially changed formal remedy/charge/movement",
+      "completed": "Authority and bounded producer/evidence inventory captured in service-source-evidence JSON",
+      "remaining_implementation": "Bind only affected subset to existing Case/history/evidence/Service Note/generic-approval representation that proves qualified Service Case Approver actor/time/exact goods+remedy/policy/version; smallest read contract, no new module/UUID",
+      "missing_business_decision": "No new approval rule requested. UNKNOWN is which existing source record proves that decision and unchanged-scope lineage; evidence/producer dependency, not absence of business law",
+      "external_verification": "Trace actual qualified authorisation; fresh source/version evidence must distinguish previously authorised follow-up from changed remedy"
+    },
+    {
+      "capability": "Conditional changed Forecast cohort / no-existing-source continuation / merged recipient redistribution / multi-owner counted partial receipt",
+      "completed": "Unsafe inference refuses; unchanged approved residual path already works",
+      "remaining_implementation": "Only exact affected changed-source/editor or receipt attribution branch, within existing owners",
+      "missing_business_decision": "Do not infer a new requirement from incomplete implementation; apply existing governing source/change rules",
+      "external_verification": "Not a blanket blocker for ordinary unchanged Forecast/MPR and not a new Service/Finance build commission"
+    }
+  ],
+  "finance_receiver_evidence": {
+    "required_by": "docs/purchasing/MASTER.md:2013-2017 (5.8.1): traceable actionable Finance notification, original PO/lines/qty/evidence, shared Work/handoff; notification is not financial settlement",
+    "available_shared_routing": [
+      "packages/shared/src/work-engine.ts WorkOwnerRule finance_duty (Finance role label, no invented named roster)",
+      "apps/web/src/components/kit/TaskView.tsx source-owned task presentation",
+      "Existing occurrenceKey/sourceVersion/idempotency/linked source grammar in OperationWorkItem; effective event already supplies stable id/PO/version",
+      "Existing scoped GET /api/operation/pos/:id/cancellations explicitly permits Finance money-free reads"
+    ],
+    "current_receiver_gap": "apps/api/src/routes/operation/work.ts:2588 feed and followup doors use requireOperation. 0694 internal_tasks and its route also Operation/Principal-only and explicitly not system-generated module work. Assigning Finance there would not deliver an accessible Finance notification.",
+    "do_not_repurpose": "Finance MASTER supplier Notes to follow up concerns actually owed CN/DN amounts from billed discrepancies/returns. Cancellation alone does not prove a note owed; no synthetic credit note or forced FinanceApprover assignment.",
+    "smallest_delivery": "Finance-readable adapter of existing shared Tasks/handoff for effective cancellation event, one stable event occurrence and original source link/read; receiver access and visible actionable notification only. Financial review/settlement capability beyond that is separate and not a blocker for the notification slice.",
+    "coordination": "Finance MASTER §5 Open items1 says agree with YH before Finance code changes. No Finance code edits or external chat messages performed; this is engineering coordination, not an owner business questionnaire."
+  },
+  "isolated_upload_runtime_evidence": {
+    "checked": "2026-10-18",
+    "available": "Owned loopback PostgreSQL only at the previously recorded TEST database; current browser/API test uses explicit TEST PostgREST-shaped adapter",
+    "not_provisioned": "No docker, podman, colima, orb or supabase executable discovered; no supabase/config.toml in this checkout; no configured isolated Storage service/TEST endpoint supplied. No real Supabase Storage service was started or contacted.",
+    "existing_flow": "SupplierAnswerEvidenceUploadField -> actual POST /api/storage/dos/sign-upload -> user-JWT createSignedUploadUrl -> shared EvidenceUploadField uploadToSignedUrl -> returned owning PO path; no new uploader required",
+    "verified": "SQL independently refuses same-PO prefix with no object and existing object with foreign prefix; qualified own-PO Storage object accepted; uploader state/failure remains governed by shared evidence field",
+    "claim_limit": "Metadata fixtures are not actual uploaded bytes. A Storage-shaped mock would not close this provider acceptance gap and is not labelled real upload. Reuse a supplied isolated Storage endpoint/service to prove bytes, RLS, failure/retry and same-form save; do not use production as TEST."
+  },
+  "approval_request_draft": {
+    "status": "PREPARED FOR ONE EXACT SQL REVIEW; NOT SUBMITTED; NO APPROVAL OR APPLICATION INFERRED",
+    "exact_draft_absolute_path": "/Users/chaichiewlim/.codex/worktrees/forecast-mpr-context/Carres-Portal-v2/output/forecast-mpr-delivery/purchase-request-writers.draft.sql",
+    "review_absolute_path": "/Users/chaichiewlim/.codex/worktrees/forecast-mpr-context/Carres-Portal-v2/output/forecast-mpr-delivery/purchase-request-writers.review.json",
+    "sha256": "bc0a271221ca82412e911a311b00ac2220fdc8778dfdd6f4f0103472bcae69aa",
+    "proposed_question": "Approve this exact default-CLOSED Forecast/MPR writer SQL for the governed rollback probe and migration/application process? It adds immutable PO cancellation evidence with internal Operation/Principal/Finance SELECT-only RLS, preserves original quantities/receipts/history and existing-table policies, installs the reviewed owning-door branches with all76 function/grant checks, and keeps context activation CLOSED. This excludes the separately pending Settings writer and does not authorise business activation, supplier sends or production transactions.",
+    "readiness": "Exact closed installation is locally substantiated by final rollback fixture,76 function/grant assertions,13 source guards, new-ledger RLS/grants/immutable checks, unchanged rows/settings/existing RLS and package integrity. Closed installation is not full workflow activation readiness.",
+    "before_submission_or_apply": "Present impact and full default-closed boundary to human SQL reviewer; before authorised production probe/apply remeasure current authority, all original function preimages/schema and tracker/main/all-branch migration MAX. Never rename or apply from memory. Do not conflate this with already-applied0696 or pending Settings approval.",
+    "activation_release_conditions": "Only the affected receiver/source/upload/Shell/prod gates in release_dependency_table; no unrelated Finance settlement/new Service build requirement. Keep activation closed until substantiated; no production probe or write now."
   }
 }

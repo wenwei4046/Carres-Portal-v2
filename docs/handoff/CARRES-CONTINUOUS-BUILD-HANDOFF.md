@@ -87,6 +87,23 @@ production contact; coordinate only the owning Finance/SC handoff dependencies. 
 foundation recap, rejection-only cancellation result or Settings question. Exact current package is
 reviewable but neither approved nor production activation-ready. No automatic deployment permitted.
 
+**Bounded dependency clarification ·18Oct2026 afterf930209c3.**
+Current same review JSON now includes release_dependency_table, finance_receiver_evidence,
+isolated_upload_runtime_evidence and one prepared (NOT SUBMITTED) exact SQL approval request.
+Finance Work receiver is a narrow5.8.1 notification/access adapter, not a Finance settlement/module
+build. Shared finance_duty/TaskView/occurrence/source-link grammar exists; current Operation Work
+and0694 routes/RLS exclude Finance, so a fake Ops task does not deliver it. Notes-to-follow-up
+means actually owed CN/DN and must not be manufactured from cancellation. YH coordination is
+engineering, no new business approval rule. SC existing authorised unchanged scope remains distinct
+from new/changed formal remedy; existing approval law exists, the missing fact is qualified owning
+source representation/read contract. Do not ask owner to repeat that law.
+No Docker/Podman/Colima/Orb/Supabase executable or repo config.toml/isolated Storage endpoint is
+available here. Real Storage bytes/RLS provider acceptance is therefore NOT VERIFIED; actual shared
+uploader/signing source is reusable. Do not replace this evidence with a Storage-shaped mock or
+use production as TEST. No new infra, service account, provider contact, production read/write or
+activation in this clarification. Closed-installation approval request is prepared with full exact
+path/SHA and stated RLS impact, not submitted as a complete production vertical slice.
+
 **Latest follow-on ·18Oct2026 · LOCAL, production activation CLOSED.**
 Prior checkpoints `aba2adb33` and `fa7bdbdc6` are local only. Follow-on preserves all work in the same
 `forecast-mpr-context` checkout. Writer exact SHA256
