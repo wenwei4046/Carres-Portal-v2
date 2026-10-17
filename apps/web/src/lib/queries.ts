@@ -344,6 +344,7 @@ import { uploadCompartmentPhoto, uploadDeliveryProof, uploadModelPhoto } from ".
 
 export const qk = {
   purchaseRequestPlan: (skus: string[], proceedDate: string | null, purpose: string | null, origin: string | null = null, requestId: string | null = null) => ["operation", "purchasing", "requests", "plan", skus.join("|"), proceedDate, purpose, origin, requestId] as const,
+  purchaseRequestItems: () => ["to-order", "pick-items"] as const,
   purchaseRequestContextReview: (id: string) => ["operation", "purchasing", "requests", id, "context-review"] as const,
   purchaseRequests: () => ["operation", "purchasing", "requests"] as const,
   dealers:      () => ["dealers"] as const,

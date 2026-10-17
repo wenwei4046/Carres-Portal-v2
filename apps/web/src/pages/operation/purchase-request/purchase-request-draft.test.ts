@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PurchaseRequestContext } from "@carres/shared";
-import { changeRequestPurpose, recipientBalance, removeRequestRecipient, requestLineBalance, setRecipientQuantity, type RequestLine } from "./purchase-request-draft";
+import { syncRequestDraftItems, changeRequestPurpose, recipientBalance, removeRequestRecipient, requestLineBalance, setRecipientQuantity, type RequestLine } from "./purchase-request-draft";
 
 const line = (): RequestLine => ({
   id: "line", sku: "TEST-SKU", qty: 5, attrs: { fabric: "TEST" },
@@ -71,5 +71,18 @@ describe("purchase request draft allocation", () => {
     expect(next.serviceCaseId).toBeNull();
     expect(next.reason).toBeNull();
     expect(next.lines[0]).toEqual(original.lines[0]);
+  });
+});
+
+describe("shared picker context identity", () => {
+  it("retains scope on quantity edit but clears another configured item's assignments", () => {
+    const original = context();
+    const same = syncRequestDraftItems(original, [{ id: "line", sku: "TEST-SKU", qty: "6", attrs: { fabric: "TEST" } }]);
+    expect(same.lines[0].qty).toBe(6);
+    expect(same.lines[0].recipientNeeds).toEqual(original.lines[0].recipientNeeds);
+    expect(same.lines[0].allocations).toEqual(original.lines[0].allocations);
+    const changed = syncRequestDraftItems(original, [{ id: "line", sku: "TEST-SKU", qty: "5", attrs: { fabric: "OTHER TEST" } }]);
+    expect(changed.lines[0]).toMatchObject({ qty: 5, recipientNeeds: [], stockProposals: [], allocations: [] });
+    expect(original.lines[0].allocations).toHaveLength(1);
   });
 });

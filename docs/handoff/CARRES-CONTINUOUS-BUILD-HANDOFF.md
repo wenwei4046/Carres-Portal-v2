@@ -9,6 +9,38 @@ Paste everything below the line into a fresh session. It is self-contained.
 
 ---
 
+**Latest guarded form/action slice ·18Oct2026 · LOCAL ONLY; not a full lifecycle claim.**
+The SAME `CreateRequestWorkspace` now accepts an explicit optional `contextDraft` prop. Normal
+production caller passes none; there is no URL toggle/new production route. It reuses the same
+Catalog picker, ConfigureDrawer, kit fields and canonical create/revise hooks. Reading order is
+Request Details → recipients where applicable → existing Items → allocation sections → shared
+PO draft papers. Full SC/GP facts and RS500 survive submission; same-number revision carries its
+version/reason/key. Qty edits leave allocation gaps visible; different SKU/config clears stale
+assignments; context line IDs are UUIDs. Purpose is locked on revision. Dirty Cancel uses existing
+Modal, failed submit retains the complete draft and key. Calendar/production facts come from the
+owning plan; no browser working-day calculation. Preview groups actual To-buy allocations by
+Supplier/Category/DeliverTo/Purpose/need-date, merges same physical SKU/config and retains draft
+status/no official dates or Units/no recipient PII. Readback hook now has an additional guarded
+action composition using existing decision/issue mutations: exact fresh Review and explicit
+approval distribution; exact approved version/token and explicit partial issue. Defaults OFF,
+permission facts required, no production caller, no cached approval while refetching/error.
+Validation:61 web/document contract cases (six actual Workspace component tests and three guarded
+action tests included); full owned-local SQL fixture rerun reaches ROLLBACK after actual canonical
+create/approve/partial issue/source/Unit/document/retry checks;145 existing PO send API mocks and31
+Work completion tests pass. Web typecheck passed after the final accessible revision-field ID fix.
+Logs: `/tmp/carres-context-form-tests.log`, `/tmp/carres-context-form-local-db.log`,
+`/tmp/carres-context-form-po-actions.log`, `/tmp/carres-context-form-work-tests.log`,
+`/tmp/carres-context-form-types.log`.
+SQL draft bytes unchanged8a29f80c…d41e7e; exact-package51 assertions still pass. No migration/PR/deploy.
+NOT VERIFIED: combined authenticated browser-to-DB lifecycle, actual rendered PDF screenshot,
+real supplier transport or real Task save/completion. Form tests mock the PDF renderer, while the
+shipped template has separate contract checks. The object approval/distribution controls and
+source-qualified Stock/Case reads are not yet mounted; full-page visual/keyboard/narrow acceptance
+and specific context refusal copy remain owed. Writer release gaps remain post-issue owning PO
+reconciliation, counted/forecast attribution and part-issued forecast cohort reapproval. SC new/
+changed formal remedy source is a bounded dependency, not a blanket SC gate or Service build.
+Settings remains pending; do not reapply0696. Do not describe this slice as production-ready.
+
 **Latest readback implementation slice ·18Oct2026 · LOCAL ONLY.**
 Shared/API context review now rejects mismatched request/approval versions, mixed pending/approved
 coverage and duplicate demand IDs. Web saved-need and approval readers keep legacy / unavailable /

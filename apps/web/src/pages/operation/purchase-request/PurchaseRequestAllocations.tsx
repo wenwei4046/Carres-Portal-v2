@@ -19,7 +19,7 @@ export default function PurchaseRequestAllocations({ line, recipients, destinati
   onChange: (line: RequestLine) => void;
 }) {
   const balance = requestLineBalance(line);
-  const qty = (id: string, label: string, value: number, onChange: (value: number) => void, max?: number) => <Input id={id} label={label} type="number" min={0} max={max} step={1} disabled={disabled} error={max != null && value > max ? `Choose ${max} or fewer` : undefined} value={value} onChange={(event) => {
+  const qty = (id: string, label: string, value: number, onChange: (value: number) => void, max?: number) => <Input key={id} id={id} label={label} type="number" min={0} max={max} step={1} disabled={disabled} error={max != null && value > max ? `Choose ${max} or fewer` : undefined} value={value} onChange={(event) => {
     const next = Number(event.target.value);
     if (Number.isInteger(next) && next >= 0) onChange(next);
   }} />;

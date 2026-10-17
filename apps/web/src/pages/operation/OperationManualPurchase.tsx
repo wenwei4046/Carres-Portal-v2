@@ -63,6 +63,8 @@ import {
   type OrderActionTone,
   type ProductCategory,
   GOODS_ABSENCE_WORDS,
+  purchaseRequestSubmitSchema, purchaseRequestRevisionSchema,
+  type PurchaseRequestContext,
 } from "@carres/shared";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
@@ -86,6 +88,7 @@ const configWords = (attrs: Record<string, unknown> | null | undefined): string 
   lineConfigBits(attrs ?? null).join(" · ");
 import Textarea from "@/components/kit/Textarea";
 import Loading from "@/components/kit/Loading";
+import Modal from "@/components/kit/Modal";
 import SearchInput from "@/components/kit/SearchInput";
 import Select from "@/components/kit/Select";
 import StatusPill from "@/components/kit/StatusPill";
@@ -102,8 +105,10 @@ import { addDaysIso } from "@/lib/excel-date-filter";
 import { fmtDate } from "@/lib/fmt-date";
 import { conciseLocality, NOT_RECORDED } from "@/lib/locality";
 import {
+  qk,
   useAlreadyOnPo,
   useCreatePurchaseRequest,
+  useSubmitPurchaseRequestContext, useRevisePurchaseRequestContext,
   useDecidePurchaseRequest,
   useIssuePurchaseRequests,
   useManualPurchaseDetail,
@@ -130,7 +135,9 @@ import {
   useManualPurchaseStock,
 } from "./ManualPurchaseStock";
 import ManualPurchasePdfPreview from "./ManualPurchasePdfPreview";
-import { manualPurchaseDraftPos } from "./manual-purchase-draft-po";
+import PurchaseRequestContextFields from "./purchase-request/PurchaseRequestContextFields";
+import { syncRequestDraftItems } from "./purchase-request/purchase-request-draft";
+import { contextPurchaseDraftPos, manualPurchaseDraftPos } from "./manual-purchase-draft-po";
 import {
   manualPurchaseReviewDocuments,
   manualPurchaseSelectedWalls,
@@ -2297,7 +2304,7 @@ const PICK_COLUMNS: readonly Column<DemandPickItem>[] = [
  *  items reaches all of them instead of stopping at the eighth. */
 const PICK_LIMIT = 50;
 
-function CreateRequestWorkspace({
+export function CreateRequestWorkspace({
   editId,
   destinations,
   defaultDestinationId,
@@ -2307,9 +2314,18 @@ function CreateRequestWorkspace({
   minDeliveryDays,
   todayIso,
   onDone,
+  contextDraft,
 }: {
-  /** R4 · `Edit and send again` — the SAME request, prefilled once from its
-   *  object read. Null for a new request. */
+  /** Isolated TEST/adoption composition only. No production route supplies this.
+   * Existing writer hooks remain the only submit doors. No URL feature toggle. */
+  contextDraft?: {
+    value: PurchaseRequestContext;
+    onChange: (value: PurchaseRequestContext) => void;
+    pickupLocations: Array<{ id: string; name: string }>;
+    stockByLine: Parameters<typeof PurchaseRequestContextFields>[0]["stockByLine"];
+    revision?: { expectedVersion: number; reason: string; onReasonChange?: (reason: string) => void };
+  };
+  /** R4: same saved request; null creates a new request. */
   editId: string | null;
   destinations: Array<{ id: string; name: string; address?: string | null }>;
   defaultDestinationId: string | null;
@@ -2334,9 +2350,17 @@ function CreateRequestWorkspace({
   const editing = editId != null;
   const existing = useManualPurchaseDetail(editId);
   const resubmit = useResubmitManualPurchase();
+  const submitContext = useSubmitPurchaseRequestContext();
+  const reviseContext = useRevisePurchaseRequestContext();
+  const [contextKey] = useState(() => crypto.randomUUID());
+  const contextRef = useRef(contextDraft);
+  contextRef.current = contextDraft;
+  const contextSending = useRef(false);
+  const initialContext = useRef(JSON.stringify(contextDraft?.value));
+  const [discardContext, setDiscardContext] = useState(false);
 
   const pick = useQuery({
-    queryKey: ["to-order", "pick-items"],
+    queryKey: qk.purchaseRequestItems(),
     queryFn: () =>
       apiFetch<{ items: DemandPickItem[] }>(
         "/api/operation/purchase/to-order/demand/pick-items",
@@ -2387,7 +2411,15 @@ function CreateRequestWorkspace({
   const [serviceCaseId, setServiceCaseId] = useState<string | undefined>(undefined);
   const [staffUserId, setStaffUserId] = useState<string | undefined>(undefined);
   const [subsidiaryName, setSubsidiaryName] = useState("");
-  const [lines, setLines] = useState<LineDraft[]>(() => [blankLine()]);
+  const [lines, setLines] = useState<LineDraft[]>(() => contextDraft?.value.lines.length
+    ? contextDraft.value.lines.map((line) => ({ ...blankLine(), id: line.id, sku: line.sku, qty: String(line.qty), attrs: line.attrs }))
+    : [{ ...blankLine(), ...(contextDraft ? { id: crypto.randomUUID() } : {}) }]);
+  useEffect(() => {
+    const draft = contextRef.current;
+    if (!draft) return;
+    const next = syncRequestDraftItems(draft.value, lines);
+    if (JSON.stringify(next) !== JSON.stringify(draft.value)) draft.onChange(next);
+  }, [lines]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   /* ⭐ THE HEADER IS NO LONGER REMEMBERED ACROSS A FAILURE (0410). It used to
@@ -2405,7 +2437,7 @@ function CreateRequestWorkspace({
      background refetch never overwrites what the requester is typing. */
   const [seeded, setSeeded] = useState(false);
   useEffect(() => {
-    if (!editing || seeded || !existing.data) return;
+    if (contextDraft || !editing || seeded || !existing.data) return;
     const r = existing.data.request;
     setPurpose(r.purpose as DemandPurpose);
     /* R4 — an edit reopens the request exactly as it was sent back, including
@@ -2447,7 +2479,7 @@ function CreateRequestWorkspace({
         "/api/ops/service-cases?state=ongoing",
       ),
     staleTime: 60_000,
-    enabled: purpose === "service_case",
+    enabled: (contextDraft?.value.purpose ?? purpose) === "service_case",
   });
 
   const createHeader = useCreatePurchaseRequest();
@@ -2478,7 +2510,10 @@ function CreateRequestWorkspace({
     () => [...new Set(lines.map((l) => l.sku).filter((s): s is string => s != null))],
     [lines],
   );
-  const plan = useManualPurchasePlan(pickedSkus);
+  const plan = useManualPurchasePlan(pickedSkus, contextDraft ? {
+    proceedDate: contextDraft.value.proceedDate, purpose: contextDraft.value.purpose,
+    origin: contextDraft.value.origin, ...(editId ? { requestId: editId } : {}),
+  } : undefined);
   const planBySku = useMemo(
     () =>
       new Map<string, ManualPurchasePlanLine>(
@@ -2587,7 +2622,7 @@ function CreateRequestWorkspace({
       })
     : null;
 
-  const canSend =
+  const legacyCanSend =
     (!editing || seeded) &&
     !saving &&
     leadDaysOk &&
@@ -2603,6 +2638,40 @@ function CreateRequestWorkspace({
     submittable.every(qtyOk) &&
     everyStartedLineNamesAnItem;
 
+  const contextBody = contextDraft ? {
+    context: contextDraft.value,
+    ...(contextDraft.value.origin === "forecast_suggestion" && plan.data?.forecastSource ? { forecastSource: plan.data.forecastSource } : {}),
+    ...(editing && contextDraft.revision
+      ? { revisionKey: contextKey, expectedVersion: contextDraft.revision.expectedVersion, reason: contextDraft.revision.reason }
+      : { submissionKey: contextKey }),
+  } : null;
+  const parsedContext = contextBody ? (editing ? purchaseRequestRevisionSchema : purchaseRequestSubmitSchema).safeParse(contextBody) : null;
+  const contextValid = parsedContext?.success;
+  const contextGapWords: Record<string, string> = {
+    proceedDate: "Proceed Date", serviceCaseId: "Service Case", reason: "Reason for purchase", companyPersonName: "Company / Person name",
+    explanation: "Explanation", stockDeliveryDate: "Delivery Date", recipients: "Goods recipient", name: "Recipient name", phone: "Phone",
+    deliveryDate: "Customer Original Delivery Date", addressLine1: "Address line 1", addressLine2: "Address line 2", city: "City", state: "State",
+    postcode: "Postcode", buildingType: "Building type", floor: "Floor", lift: "Lift", pickupLocationId: "Pickup location", collectedBy: "Collected by",
+    lines: "Items", qty: "Qty", recipientNeeds: "Qty", stockProposals: "From stock", allocations: "To buy", destinationId: "Supplier Deliver To",
+    supplierDeliveryDate: "Supplier Delivery Date", forecastSource: "Not available",
+  };
+  const contextMissing = parsedContext && !parsedContext.success
+    ? parsedContext.error.issues[0]?.path[0] === "reason" ? "Reason for change" : [...(parsedContext.error.issues[0]?.path ?? [])].reverse().map(part => contextGapWords[String(part)]).find(Boolean) ?? "Qty" : null;
+  const contextDatesOk = contextDraft && plan.data?.recipientEarliest != null && !plan.isFetching && !plan.isError
+    && !plan.data.recipientPlanUnavailable && !plan.data.forecastSourceUnavailable
+    && (contextDraft.value.purpose === "ready_stock"
+      ? (contextDraft.value.stockDeliveryDate ?? "") >= plan.data.recipientEarliest
+      : contextDraft.value.recipients.every(r => r.deliveryDate >= plan.data!.recipientEarliest!))
+    && contextDraft.value.lines.every(line => line.allocations.every(a => {
+      const earliest = planBySku.get(line.sku)?.arrival;
+      return earliest != null && a.supplierDeliveryDate >= earliest;
+    }));
+  const contextStockOk = contextDraft?.value.lines.every(line => line.stockProposals.every(proposal => {
+    const offer = contextDraft.stockByLine.get(line.id)?.find(offer => offer.locationId === proposal.locationId && offer.destinationId === proposal.destinationId);
+    return offer != null && proposal.qty <= offer.available;
+  }));
+  const canSend = contextDraft ? !!contextValid && !!contextDatesOk && !!contextStockOk && !saving && !pick.isLoading && !pick.isError && everyStartedLineNamesAnItem : legacyCanSend;
+
   /** The disabled button NAMES its gap (the Receiving law) — the first
    *  missing fact wins, in the governed order: lead days first (Card 06),
    *  then the header facts top-to-bottom. While the plan is still being
@@ -2611,7 +2680,7 @@ function CreateRequestWorkspace({
     pickedSkus.length > 0 &&
     plan.data != null &&
     (plan.data.planUnavailable || leadGaps.length > 0);
-  const sendLabel =
+  const legacySendLabel =
     leadBlocked
       ? MW.sendNeedsLeadDays
       : !dateOk
@@ -2632,8 +2701,13 @@ function CreateRequestWorkspace({
                   ? MW.sendAgain
                   : MW.send;
 
+  const sendLabel = contextDraft
+    ? contextMissing ? `${editing ? MW.sendAgain : MW.send}: ${contextMissing}`
+      : !contextDatesOk ? MW.sendNeedsDate : !contextStockOk ? `${MW.send}: From stock` : editing ? MW.sendAgain : MW.send
+    : legacySendLabel;
+
   function addLine() {
-    const l = blankLine();
+    const l = { ...blankLine(), ...(contextDraft ? { id: crypto.randomUUID() } : {}) };
     setLines((ls) => [...ls, l]);
     setActiveId(l.id);
   }
@@ -2641,7 +2715,7 @@ function CreateRequestWorkspace({
   function removeLine(id: string) {
     setLines((ls) => {
       const rest = ls.filter((l) => l.id !== id);
-      return rest.length > 0 ? rest : [blankLine()];
+      return rest.length > 0 ? rest : [{ ...blankLine(), ...(contextDraft ? { id: crypto.randomUUID() } : {}) }];
     });
     setActiveId((a) => (a === id ? null : a));
   }
@@ -2670,6 +2744,27 @@ function CreateRequestWorkspace({
    * only ever a way to re-use an orphan.
    */
   async function send() {
+    if (contextDraft) {
+      if (!canSend || contextSending.current || !contextBody) return;
+      contextSending.current = true; setSaving(true); setHeaderError(null);
+      try {
+        if (editing && editId) {
+          const body = purchaseRequestRevisionSchema.parse(contextBody);
+          await reviseContext.mutateAsync({ id: editId, ...body });
+          onDone(editId);
+        } else {
+          const body = purchaseRequestSubmitSchema.parse(contextBody);
+          const result = await submitContext.mutateAsync(body);
+          onDone(result.id);
+        }
+      } catch (error) {
+        const body = (error as { body?: { code?: string; message?: string; action?: string } }).body;
+        const fallback = purchasingRefusal(body?.code);
+        setHeaderError(`${body?.message ?? fallback.wrong} ${body?.action ?? fallback.todo}`);
+      } finally { contextSending.current = false; setSaving(false); }
+      return;
+    }
+
     if (!canSend || !chosenDest) return;
     setSaving(true);
     setHeaderError(null);
@@ -2769,7 +2864,7 @@ function CreateRequestWorkspace({
   /* ⭐ THE RIGHT HALF IS THE PAPER (owner 2026-09-28, "it should pdf preview …
      it same with so batch"): one DRAFT Purchase Order per supplier, from the
      SAME draft the form holds — never a second copy of the facts. */
-  const draftPos = manualPurchaseDraftPos({
+  const legacyDraftPos = manualPurchaseDraftPos({
     lines: lines
       .map((l) => ({ line: l, picked: items.find((it) => it.sku === l.sku) ?? null }))
       .filter((p): p is { line: LineDraft; picked: DemandPickItem } => p.picked != null)
@@ -2790,6 +2885,26 @@ function CreateRequestWorkspace({
     collectedSupplierNames: new Set(supplierCollections.map((c) => c.supplierName)),
   });
 
+  const draftPos = contextDraft ? contextPurchaseDraftPos({ context: contextDraft.value, items,
+    destinations, suppliers, plan: plan.data?.lines ?? [],
+    collectedSupplierNames: new Set(supplierCollections.map(c => c.supplierName)),
+  }) : legacyDraftPos;
+  const contextFields = (section: "details" | "recipients" | "allocations") => contextDraft && <PurchaseRequestContextFields
+    section={section} purposeLocked={editing} value={contextDraft.value} onChange={contextDraft.onChange}
+    serviceCases={(casesQ.data?.items ?? []).map(sc => ({ id: sc.id, label: sc.caseNo ?? sc.case_no ?? GOODS_ABSENCE_WORDS.notRecorded }))}
+    destinations={destinations} pickupLocations={contextDraft.pickupLocations} stockByLine={contextDraft.stockByLine}
+    earliestRecipientDate={plan.data?.recipientEarliest ?? null}
+    earliestSupplierDateBySku={new Map((plan.data?.lines ?? []).map(line => [line.sku, line.arrival]))}
+    disabled={saving}
+    additionalFields={section === "details" && contextDraft.revision ? <Textarea id="mp-context-revision-reason" label="Reason for change" required
+      value={contextDraft.revision.reason} disabled={saving || !contextDraft.revision.onReasonChange}
+      onChange={event => contextDraft.revision?.onReasonChange?.(event.target.value)} /> : undefined}
+    automaticFacts={section === "details" ? <>
+      <SharedFact idPrefix="mp-context" framed automatic label={MW.createRequestedBy} value={requesterName} />
+      <SharedFact idPrefix="mp-context" framed automatic label="Request date" value={editing && existing.data?.request.created_at ? fmtDate(existing.data.request.created_at) : GOODS_ABSENCE_WORDS.notRecorded} />
+    </> : undefined}
+  />;
+
   /* ⭐ D1 · SEND STAYS ON SCREEN (measured 2026-09-17: at 390px the header's
      action pair sat past the right edge and the goods input shrank to ~42px).
      The pair is drawn ONCE per width: in the shell header on a wide canvas,
@@ -2797,7 +2912,10 @@ function CreateRequestWorkspace({
      exactly one, so the accessibility tree never holds two Send buttons. */
   const actions = (where: "header" | "footer") => (
     <span className={`mp-create-actions mp-create-actions-${where} flex items-center gap-3`}>
-      <Button variant="ghost" onClick={() => onDone(editId ?? undefined)}>
+      <Button variant="ghost" disabled={saving} onClick={() => {
+        if (contextDraft && JSON.stringify(contextDraft.value) !== initialContext.current) setDiscardContext(true);
+        else onDone(editId ?? undefined);
+      }}>
         {MW.cancel}
       </Button>
       <Button
@@ -2840,7 +2958,7 @@ function CreateRequestWorkspace({
           />
         ) : null}
         <h2 className="mp-create-heading text-kit-slate-12">
-          {editing ? MW.editAndSendAgain : "New Manual Purchase Request"}
+          {contextDraft ? (contextDraft.value.origin === "manual" ? "Manual Purchase Request" : "Forecast Purchase") : editing ? MW.editAndSendAgain : "New Manual Purchase Request"}
         </h2>
         {/* ⭐ THE SALES ORDER COMPOSITION (owner 2026-09-22): the form on the
             left, the live internal MPR preview on the right, ONE reading order
@@ -2849,6 +2967,11 @@ function CreateRequestWorkspace({
             and the preview under it rather than two unreadable columns. */}
         <div className="mp-create-split" data-testid="object-two-panes">
           <div className="mp-create-form mp-create-style flex min-w-0 flex-col gap-6">
+            {contextDraft ? <>{contextFields("details")}{contextFields("recipients")}
+              {(plan.isError || pick.isError) && <EmptyState title="Could not be loaded" action={<Button onClick={() => { void plan.refetch(); void pick.refetch(); }}>Try again</Button>} />}
+              {plan.isLoading && <Loading />}
+              {headerError && <p className="text-meta text-kit-red-11" role="alert">{headerError}</p>}
+            </> : <>
             <Block title={MW.secCreateRequestDetails}>
               {/* ⭐ ONE TITLE, ONE BOX, THREE TO A ROW — owner ruling 2026-09-26
                   ("yes" to the sketch), the Sales Order fact grammar. Row 1: the
@@ -3020,6 +3143,7 @@ function CreateRequestWorkspace({
               </div>
             </Block>
 
+            </>}
             <Block title={MW.secCreateItems}>
       {/* ── ITEMS · THE DOCUMENT TABLE (recipe 3 of the ONE KIT LAW, owner
           2026-09-27; owner "yes" to the sketch, 2026-09-26): the same table
@@ -3061,7 +3185,7 @@ function CreateRequestWorkspace({
                       id={`mp-item-${i}`}
                       aria-label={W.itemLabel}
                       value={picked ? `${picked.sku} · ${picked.label}` : line.needle}
-                      disabled={done}
+                      disabled={done || saving}
                       onFocus={() => setActiveId(line.id)}
                       onChange={(e) => {
                         setActiveId(line.id);
@@ -3130,7 +3254,7 @@ function CreateRequestWorkspace({
                         aria-label={W.itemsColQty}
                         inputMode="numeric"
                         value={line.qty}
-                        disabled={done}
+                        disabled={done || saving}
                         onChange={(e) => patch(line.id, { qty: e.target.value })}
                       />
                     </div>
@@ -3165,7 +3289,7 @@ function CreateRequestWorkspace({
                       </span>
                     ))}
 
-                  {picked ? (
+                  {picked && !contextDraft ? (
                     <AlreadyHave
                       sku={picked.sku}
                       free={picked.free}
@@ -3201,21 +3325,27 @@ function CreateRequestWorkspace({
             line — and wears the neutral box, not the ghost (owner, 2026-09-03).
             Not `primary`: `Send for approval` already holds the screen's one. */}
         <div className="flex">
-          <Button variant="neutral" onClick={addLine} data-testid="mp-line-add">
+          <Button variant="neutral" disabled={saving} onClick={addLine} data-testid="mp-line-add">
             {MW.addLine}
           </Button>
         </div>
       </div>
             </Block>
+            {contextFields("allocations")}
           </div>
 
           {/* The preview reads the SAME draft the form holds — never a second
               copy of the facts, and never a supplier document. */}
-          <aside className="mp-create-preview-pane" aria-label={MW.page}>
-            <ManualPurchasePdfPreview drafts={draftPos} />
+          <aside className="mp-create-preview-pane" aria-label={contextDraft ? "Review POs" : MW.page}>
+            {contextDraft && <h3>Review POs</h3>}
+            {contextDraft && draftPos.length === 0 ? <p>Add an item to see its PO</p> : <ManualPurchasePdfPreview drafts={draftPos} />}
           </aside>
         </div>
       </div>
+      {contextDraft && <Modal open={discardContext} onOpenChange={setDiscardContext} title="Discard" footer={<>
+        <Button onClick={() => setDiscardContext(false)}>{MW.cancel}</Button>
+        <Button variant="primary" onClick={() => onDone(editId ?? undefined)}>Discard</Button>
+      </>}>Not saved</Modal>}
       <div className="mp-create-footer" data-testid="mp-create-footer">
         {actions("footer")}
       </div>
@@ -3788,7 +3918,7 @@ function ManualPurchaseObject({
     section?.scrollIntoView({ block: "start" });
   }, [openSection, q.isPending]);
   const pick = useQuery({
-    queryKey: ["to-order", "pick-items"],
+    queryKey: qk.purchaseRequestItems(),
     queryFn: () =>
       apiFetch<{ items: DemandPickItem[] }>(
         "/api/operation/purchase/to-order/demand/pick-items",

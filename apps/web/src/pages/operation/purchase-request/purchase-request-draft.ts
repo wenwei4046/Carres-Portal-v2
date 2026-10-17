@@ -63,3 +63,25 @@ export function changeRequestPurpose(context: PurchaseRequestContext, purpose: P
     })),
   };
 }
+
+/** Configuration equality matches physical PO-line identity, including empty attrs. */
+export function requestAttrsKey(attrs: Record<string, unknown> | null): string {
+  return JSON.stringify(attrs && Object.keys(attrs).length ? attrs : null,
+    (_key, entry: unknown) => entry && typeof entry === "object" && !Array.isArray(entry)
+      ? Object.fromEntries(Object.entries(entry).sort(([a], [b]) => a.localeCompare(b))) : entry);
+}
+
+/** The existing Catalog picker owns item identity/quantity. Preserve arrangements
+ * for the same configured item; a different SKU/configuration must be allocated
+ * again, never inherit the old item's Stock or supplier proposals. */
+export function syncRequestDraftItems(context: PurchaseRequestContext, items: ReadonlyArray<{
+  id: string; sku: string | null; qty: string; attrs: Record<string, unknown> | null;
+}>): PurchaseRequestContext {
+  return { ...context, lines: items.filter((item): item is typeof item & { sku: string } => item.sku != null).map(item => {
+    const old = context.lines.find(line => line.id === item.id);
+    const unchanged = old?.sku === item.sku && requestAttrsKey(old.attrs) === requestAttrsKey(item.attrs);
+    return { id: item.id, sku: item.sku, qty: Number(item.qty), attrs: item.attrs,
+      recipientNeeds: unchanged ? old.recipientNeeds : [], stockProposals: unchanged ? old.stockProposals : [],
+      allocations: unchanged ? old.allocations : [] };
+  }) };
+}

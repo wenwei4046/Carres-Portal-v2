@@ -21,7 +21,7 @@
     "One physical line with differing/unknown source supply intents is refused before issue; no automatic regrouping or invented legacy stock intent. Known-intent mixed legacy/context consolidation is implemented without backfilling historical approvals/recipient scope",
     "Part-issued multi-forecast-cohort source transitions/reapproval need complete owner-bound source verification; no silent snapshot rewrite",
     "Existing PO Deliver To parent move and post-issue revisions/cancel/reallocation need full MPR source/Unit/recipient reconciliation beyond the tested source-copy helper",
-    "Form composition/adoption remains unmounted; specific context refusal copy, authenticated lifecycle and exact-version send/task completion still owed"
+    "Form is now composed/tested in the SAME Workspace behind an absent-by-default prop. Production entry, source-qualified Stock/Case reads, complete object approval/distribution controls, context refusal copy, full-page visual/keyboard/narrow and authenticated lifecycle/exact-version send/task acceptance remain owed."
   ],
   "application_effect": "DDL adds generic MPR attribution to existing PO sources and installs existing-door context branches. It writes no business rows on installation, but would make those new direct RPC branches reachable; UI-unmounted is NOT a security/activation claim.",
   "recovery": "Do not deploy dependent code before exact SQL approval/application and release gates. Before any production apply, remeasure current governing authority, original function fingerprints, tracker/main/all-branch migration MAX and schema preconditions. Governed production DO probe only after approval. If rollout must pause, retain prior application; do not delete issued facts or fabricate rollback/stock restoration. Production SQL rollback requires its own concrete reviewed plan.",
@@ -386,17 +386,38 @@
     }
   ],
   "readback_adoption": {
-    "status": "LOCAL BUILT / DEFAULT OFF / NO PRODUCTION CALLER",
+    "status": "LOCAL BUILT / DEFAULT OFF / NO PRODUCTION CALLER; guarded decision and partial-issue action composition added",
     "api_contract": "Reject mixed pending/approved coverage, mismatched request/approval versions and duplicate demand coverage; unavailable is never empty approval.",
     "web_contract": "Saved legacy scope remains legacy. Modern saved context must match fresh owning review version and exact facts; JSON object key order is immaterial. Fetching/error/disabled context cannot supply cached approval. No historical recipient/allocation/approval backfill.",
     "entry": "apps/web/src/pages/operation/purchase-request/use-request-context-readback.ts",
     "validation": "377 related API cases (352 across six files plus25 round2), web readback10, shared context14; API/web typechecks; exact SQL package checker51 assertions. All local only.",
-    "adoption_remaining": "Existing CreateRequestWorkspace composition, reviewed refusal copy, authenticated complete-page/lifecycle acceptance and production SQL release admission remain incomplete."
+    "adoption_remaining": "Mount existing object approval/distribution controls against the guarded actions; source-qualified Stock/Case reads, reviewed refusal copy, authenticated complete-page/lifecycle acceptance and production SQL release admission remain incomplete."
   },
   "review_readiness": {
     "core_inspection": "READY TO INSPECT exact draft, fingerprints, embedded rollback probe, local validation and bounded SC evidence. This is not a request to approve production application.",
     "production_application": "NOT READY. Direct RPC branches become reachable at installation; UI default off alone is not an activation gate. Close or explicitly bound post-issue owner reconciliation, counted/provenance and forecast cohort cases before release admission.",
     "service_dependency": "SUBSET UNKNOWN, not a blanket SC prohibition. Reuse an evidenced qualified Service approval source for new/changed formal customer-remedy execution. Unchanged procurement-authorised SC retains existing Purchasing admission. See purchase-request-service-source-evidence.json.",
     "settings": "Separate exact-hash approval remains pending; no repeated question and no inference from foundation approval."
+  },
+  "guarded_form_slice": {
+    "classification": "LOCAL BUILT AND TESTED; NO PRODUCTION ENTRY OR ACTIVATION",
+    "implementation": "Optional contextDraft prop in the SAME existing CreateRequestWorkspace. Same Catalog picker/configurator, shared field components, canonical submit/revise hooks and PO paper builder. Normal caller supplies no contextDraft; no URL toggle.",
+    "behaviour": [
+      "SC/GP recipient context and manual RS500 remain whole in canonical submission; no legacy flat payload",
+      "Same-request revision carries exact expected version/reason/key; purpose remains locked",
+      "Qty edits retain explicit allocations for correction; SKU/config changes clear old-item assignments; stable UUID line/allocation identity",
+      "Dirty cancel uses existing Modal; failed submit retains scope/key; selected Proceed Date uses authoritative calendar/production plan",
+      "PO draft shows only To-buy allocation groups Supplier/Category/DeliverTo/Purpose/need-date; equal physical SKU/config merges; no official PO dates/Unit IDs/SO invention/recipient PII",
+      "Guarded actions use exact fresh owning Review for decision and current approval token/version for explicit partial issue. Disabled/refetch/error cannot invoke writes."
+    ],
+    "validation": {
+      "web_and_document_contract": "61 cases across six files passed; includes six existing-Workspace form tests and three guarded action cases",
+      "local_database": "Full purchase-request-context.local-check.sql rerun PASS with final ROLLBACK, including actual canonical create/approve/partial issue/retry/remainder/source/Unit/document projection and mixed legacy scope",
+      "existing_po_send_api": "145 local mocked route tests PASS; no provider or real send",
+      "existing_work_completion": "31 cases across three local test files PASS, including MPR-linked completion through existing PO send door",
+      "sql_identity": "Unchanged 8a29f80c82cc122e0378aafb7cddb287376bfbf891db423e2975921f33d41e7e; package checker51 function/grant assertions PASS",
+      "web_typecheck": "PASS after final revision-field accessible ID fix"
+    },
+    "not_claimed": "No combined authenticated browser-to-database create/approve/partial-issue/PDF/send/task walk. PDF preview in form tests is mocked; shipped template contract is tested separately. No actual PDF screenshot, real transport, production transaction, task completion, release or SQL approval/application."
   }
 }
