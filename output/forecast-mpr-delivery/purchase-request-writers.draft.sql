@@ -2,13 +2,38 @@
 -- Pure validator compiles locally; full direct-RPC invariants, Settings/source checks,
 -- writer integration and negative controls are not yet complete.
 -- Draft contextual request validation: one owning SQL transaction rechecks conservation.
+-- Direct RPC callers must satisfy the same required fields and JSON types as
+-- the shared schema; SQL NULL is never accepted as an omitted required field.
+create or replace function public._purchasing_context_object(p_value jsonb, p_shape jsonb)
+returns void language plpgsql set search_path=public,pg_temp as $shape$
+declare k text; expected text;
+begin
+  if jsonb_typeof(p_value) is distinct from 'object' then
+    raise exception 'context object required' using errcode='22023',detail='invalid_param';
+  end if;
+  if exists(select 1 from jsonb_object_keys(p_value) x where not p_shape ? x) then
+    raise exception 'unknown context field' using errcode='22023',detail='invalid_param';
+  end if;
+  for k,expected in select key,value from jsonb_each_text(p_shape) loop
+    if not p_value ? k or not (jsonb_typeof(p_value->k)=any(string_to_array(expected,'|'))) then
+      raise exception 'missing or invalid context field: %',k using errcode='22023',detail='invalid_param';
+    end if;
+    if expected='number' and (p_value->>k)!~'^[0-9]+$' then
+      raise exception 'whole quantity required' using errcode='22023',detail='invalid_param';
+    end if;
+  end loop;
+end;
+$shape$;
+revoke all on function public._purchasing_context_object(jsonb,jsonb) from public,anon,authenticated;
+
 create or replace function public._purchasing_validate_request_context(p_context jsonb)
 returns void language plpgsql set search_path = public, pg_temp as $fn$
 declare
   v_line jsonb; v_recipient jsonb; v_allocation jsonb; v_stock jsonb;
   v_purpose text := p_context->>'purpose'; v_qty integer; v_stock_qty integer;
-  v_requested integer; v_allocated integer; v_recipient_id text;
+  v_fact jsonb; v_requested integer; v_allocated integer; v_recipient_id text;
 begin
+  perform public._purchasing_context_object(p_context,'{"version":"number","origin":"string","purpose":"string","proceedDate":"string","serviceCaseId":"string|null","reason":"string|null","companyPersonName":"string","projectReference":"string","explanation":"string","forecastChangeReason":"string","recipients":"array","lines":"array"}'::jsonb);
   if jsonb_typeof(p_context) <> 'object' or jsonb_typeof(p_context->'version') is distinct from 'number' or p_context->>'version' is distinct from '1'
      or v_purpose is null or v_purpose not in ('general_purchase','service_case','ready_stock')
      or jsonb_typeof(p_context->'lines') is distinct from 'array'
@@ -16,6 +41,7 @@ begin
      or jsonb_typeof(p_context->'recipients') is distinct from 'array' then
     raise exception 'invalid purchase context' using errcode='22023', detail='invalid_param';
   end if;
+  if (p_context->>'proceedDate')!~'^\d{4}-\d{2}-\d{2}$' then raise exception 'ISO date required' using errcode='22023'; end if;
   perform (p_context->>'proceedDate')::date;
   if p_context->>'proceedDate' is null then
     raise exception 'proceed date is required' using errcode='22023', detail='invalid_param';
@@ -40,10 +66,11 @@ begin
       or (p_context->>'reason'='other' and nullif(btrim(p_context->>'explanation'),'') is null) then
       raise exception 'purchase reason is required' using errcode='22023', detail='invalid_param';
     end if;
-  elsif nullif(p_context->>'reason','') is not null then
+  elsif p_context->'reason' <> 'null'::jsonb or btrim(p_context->>'companyPersonName')<>'' or btrim(p_context->>'projectReference')<>'' or btrim(p_context->>'explanation')<>'' then
     raise exception 'this purpose has no GP reason' using errcode='22023', detail='invalid_param';
   end if;
-  if v_purpose<>'service_case' and nullif(p_context->>'serviceCaseId','') is not null then
+  if p_context->'serviceCaseId' <> 'null'::jsonb then perform (p_context->>'serviceCaseId')::uuid; end if;
+  if v_purpose<>'service_case' and p_context->'serviceCaseId' <> 'null'::jsonb then
     raise exception 'this purpose has no service case' using errcode='22023', detail='invalid_param';
   end if;
   if v_purpose='service_case' and not exists
@@ -54,7 +81,11 @@ begin
     raise exception 'duplicate recipient' using errcode='22023', detail='invalid_param';
   end if;
   for v_recipient in select * from jsonb_array_elements(p_context->'recipients') loop
+    perform public._purchasing_context_object(v_recipient,'{"id":"string","company":"string","name":"string","phone":"string","method":"string","deliveryDate":"string","addressLine1":"string","addressLine2":"string","city":"string","state":"string","postcode":"string","buildingType":"string","floor":"string","lift":"string|null","pickupLocationId":"string|null","collectedBy":"string"}'::jsonb);
+    if (v_recipient->>'deliveryDate')!~'^\d{4}-\d{2}-\d{2}$' then raise exception 'ISO date required' using errcode='22023'; end if;
     perform (v_recipient->>'id')::uuid, (v_recipient->>'deliveryDate')::date;
+    if v_recipient->'lift' <> 'null'::jsonb and v_recipient->>'lift' not in ('has_lift','no_lift') then raise exception 'invalid lift' using errcode='22023'; end if;
+    if v_recipient->'pickupLocationId' <> 'null'::jsonb then perform (v_recipient->>'pickupLocationId')::uuid; end if;
     if nullif(btrim(v_recipient->>'name'),'') is null or nullif(btrim(v_recipient->>'phone'),'') is null then
       raise exception 'recipient name and phone required' using errcode='22023', detail='invalid_param';
     end if;
@@ -75,7 +106,13 @@ begin
   if (select count(*) <> count(distinct l->>'id') from jsonb_array_elements(p_context->'lines') l) then
     raise exception 'duplicate line' using errcode='22023', detail='invalid_param';
   end if;
+  if (select count(*)<>count(distinct a->>'id') from jsonb_array_elements(p_context->'lines') l cross join lateral (select x a from jsonb_array_elements(l->'allocations') x union all select x a from jsonb_array_elements(l->'stockProposals') x) scopes) then raise exception 'duplicate allocation identity' using errcode='22023'; end if;
   for v_line in select * from jsonb_array_elements(p_context->'lines') loop
+    perform public._purchasing_context_object(v_line,'{"id":"string","sku":"string","qty":"number","attrs":"object|null","recipientNeeds":"array","stockProposals":"array","allocations":"array"}'::jsonb);
+    if nullif(btrim(v_line->>'sku'),'') is null then raise exception 'item required' using errcode='22023'; end if;
+    for v_fact in select * from jsonb_array_elements(v_line->'recipientNeeds') loop
+      perform public._purchasing_context_object(v_fact,'{"recipientId":"string","qty":"number"}'::jsonb);
+    end loop;
     perform (v_line->>'id')::uuid;
     v_qty := (v_line->>'qty')::integer;
     if jsonb_typeof(v_line->'attrs') not in ('object','null') then
@@ -86,6 +123,22 @@ begin
       or jsonb_typeof(v_line->'recipientNeeds') is distinct from 'array' then
       raise exception 'invalid item scope' using errcode='22023', detail='invalid_param';
     end if;
+    for v_allocation in select * from jsonb_array_elements(v_line->'allocations') loop
+      perform public._purchasing_context_object(v_allocation,'{"id":"string","destinationId":"string","supplierDeliveryDate":"string","qty":"number","recipients":"array"}'::jsonb);
+      if (v_allocation->>'supplierDeliveryDate')!~'^\d{4}-\d{2}-\d{2}$' then raise exception 'ISO date required' using errcode='22023'; end if;
+      for v_fact in select * from jsonb_array_elements(v_allocation->'recipients') loop
+        perform public._purchasing_context_object(v_fact,'{"recipientId":"string","qty":"number"}'::jsonb);
+      end loop;
+      if (select count(*)<>count(distinct r->>'recipientId') from jsonb_array_elements(v_allocation->'recipients') r) then raise exception 'duplicate recipient allocation' using errcode='22023'; end if;
+    end loop;
+    for v_stock in select * from jsonb_array_elements(v_line->'stockProposals') loop
+      perform public._purchasing_context_object(v_stock,'{"id":"string","locationId":"string","destinationId":"string","qty":"number","recipients":"array"}'::jsonb);
+      for v_fact in select * from jsonb_array_elements(v_stock->'recipients') loop
+        perform public._purchasing_context_object(v_fact,'{"recipientId":"string","qty":"number"}'::jsonb);
+      end loop;
+      if (select count(*)<>count(distinct r->>'recipientId') from jsonb_array_elements(v_stock->'recipients') r) then raise exception 'duplicate stock recipient' using errcode='22023'; end if;
+    end loop;
+    if (select count(*)<>count(distinct (x->>'locationId',x->>'destinationId')) from jsonb_array_elements(v_line->'stockProposals') x) then raise exception 'duplicate stock site' using errcode='22023'; end if;
     select coalesce(sum((s->>'qty')::integer),0) into v_stock_qty from jsonb_array_elements(v_line->'stockProposals') s;
     select coalesce(sum((a->>'qty')::integer),0) into v_allocated from jsonb_array_elements(v_line->'allocations') a;
     if v_stock_qty<0 or v_stock_qty>v_qty or v_stock_qty+v_allocated<>v_qty
@@ -155,44 +208,5 @@ end;
 $fn$;
 revoke all on function public._purchasing_validate_request_context(jsonb) from public, anon, authenticated;
 
--- DRAFT ONLY: audited editor for 0696's approved Settings inventory. The
--- matching application remains on the guarded context branch until reviewed.
-create or replace function public.purchasing_set_request_settings(
-  p_normal_days integer,
-  p_service_days integer,
-  p_manual_whatsapp_screenshot_required boolean
-)
-returns void language plpgsql security definer set search_path = public, pg_temp
-as $fn$
-declare
-  v_role text := (select public.purchasing_settings_gate());
-  v_old public.purchasing_settings%rowtype;
-begin
-  if p_normal_days is null or p_normal_days < 0 or p_service_days is null or p_service_days < 0
-    or p_manual_whatsapp_screenshot_required is null then
-    raise exception 'Enter whole calendar days of zero or more and choose Active or Inactive.' using errcode='22023';
-  end if;
-  select * into strict v_old from public.purchasing_settings where id=1 for update;
-  if v_old.purchase_request_normal_days=p_normal_days
-    and v_old.purchase_request_service_days=p_service_days
-    and v_old.po_manual_whatsapp_screenshot_required=p_manual_whatsapp_screenshot_required then return; end if;
-  update public.purchasing_settings set purchase_request_normal_days=p_normal_days,
-    purchase_request_service_days=p_service_days,
-    po_manual_whatsapp_screenshot_required=p_manual_whatsapp_screenshot_required,
-    updated_by=auth.uid(), updated_at=now() where id=1;
-  if v_old.purchase_request_normal_days is distinct from p_normal_days then
-    perform public.purchasing_record_change(v_role,'purchase_request_normal_days',null,null,
-      v_old.purchase_request_normal_days::text,p_normal_days::text,'Purchasing setting · Normal / Ready Stock recipient calendar days');
-  end if;
-  if v_old.purchase_request_service_days is distinct from p_service_days then
-    perform public.purchasing_record_change(v_role,'purchase_request_service_days',null,null,
-      v_old.purchase_request_service_days::text,p_service_days::text,'Purchasing setting · Service Case recipient calendar days');
-  end if;
-  if v_old.po_manual_whatsapp_screenshot_required is distinct from p_manual_whatsapp_screenshot_required then
-    perform public.purchasing_record_change(v_role,'po_manual_whatsapp_screenshot_required',null,null,
-      v_old.po_manual_whatsapp_screenshot_required::text,p_manual_whatsapp_screenshot_required::text,'Purchasing setting · Manual WhatsApp screenshot');
-  end if;
-end;
-$fn$;
-revoke all on function public.purchasing_set_request_settings(integer,integer,boolean) from public, anon;
-grant execute on function public.purchasing_set_request_settings(integer,integer,boolean) to authenticated;
+-- The independent, reviewable Settings writer is in
+-- purchase-request-settings-writer.draft.sql; there is one definition only.
