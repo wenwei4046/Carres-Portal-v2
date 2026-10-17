@@ -15,4 +15,9 @@ if (a < tag.length || b < a || probe.slice(a, b) !== draft.toString('utf8')) thr
 const expected = probe.match(/for item in select \* from jsonb_array_elements\('(.+)'::jsonb\) loop/);
 if (!expected || JSON.stringify(JSON.parse(expected[1].replaceAll("''", "'"))) !== JSON.stringify(review.functions)) throw new Error('Probe function/grant assertions differ from the review inventory');
 if (!probe.includes('PROBE_ROLLBACK') || !probe.includes('no-account issue negative control')) throw new Error('Missing rollback or negative-control boundary');
+for (const name of ['purchase-request-writers.rollback-probe.sql', 'purchase-request-context.local-check.sql', 'purchase-request-service-source-evidence.json', 'purchase-request-settings-writer.draft.sql']) {
+  const expected = review.companion_files?.[name]?.sha256;
+  const actual = createHash('sha256').update(readFileSync(new URL(name, base))).digest('hex');
+  if (expected !== actual) throw new Error(`Review companion does not match exact file: ${name}`);
+}
 console.log(`Writer inspection package matches exact draft ${sha}; ${review.functions.length} function/grant assertions. No application or approval performed.`);

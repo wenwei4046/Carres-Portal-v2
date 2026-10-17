@@ -87,5 +87,25 @@
     "path": "Preserve exact existing Case/order-line/action/evidence/progress/Service Note source links and current Purchasing-approved scope. Have the controller bind only the actually affected formal-remedy subset to a confirmed owning Case approval representation/read contract, reusing existing Case history/evidence and shared Duty. Existing procurement-authorised unchanged cases keep their purchasing path. No new Service implementation, roster, applicant acknowledgement or Decision-UUID requirement is commissioned here.",
     "falsifier": "A current governing file, Case progress/Service Note/generic approval producer, or observable source record demonstrates a qualified Service Case Approver decision with exact goods/remedy/scope, actor/time and unchanged-scope lineage; trace/reuse that representation instead of treating it missing."
   },
-  "draft_action": "Removed the earlier overly broad purpose=service_case Stock/PO denial from the UNAPPLIED draft. Package remains NOT READY FOR PRODUCTION ACTIVATION; no production SQL/app/data changed."
+  "draft_action": "Removed the earlier overly broad purpose=service_case Stock/PO denial from the UNAPPLIED draft. Package remains NOT READY FOR PRODUCTION ACTIVATION; no production SQL/app/data changed.",
+  "purchasing_consumer_boundary": {
+    "classification": "READ CONTRACT DEPENDENCY; NO SERVICE MODULE BUILT",
+    "qualified_source_must_prove": [
+      "Exact Case and goods/Units/quantity/configuration/remedy/movement and relevant policy/version",
+      "Existing Service Case Approver decision actor, time and actual approved outcome through the shared authority, with stable source identity",
+      "Current facts still within that approved scope; changed remedy, charge or scope uses its new governed decision; routine unchanged follow-up does not repeat approval"
+    ],
+    "do_not_require": "A newly invented Decision UUID/table. Reuse any actual owning existing representation that proves the above; source identity need not be a UUID.",
+    "current_purchasing_fact": "_purchasing_request_context_state retains actual Case id/order/line/SKU/category/supplier/carres_action/what_affected/customer_wants/evidence and compares against saved Purchasing approval. Its service_case_source is scope-drift evidence only, not formal Service decision authority.",
+    "local_controls": "Existing SC procurement fixture captures actual Case facts, unchanged Purchasing scope stays readable, changed Case action invalidates saved scope, authorised unissued same-number repair retains old approval history. TEST text saying approved procurement scope does not manufacture a qualified Service remedy approval.",
+    "activation_limit": "No reliable typed producer currently classifies a new/changed formal remedy versus already-authorised unchanged follow-up. All new-context activation stays closed pending that owning read contract. No purpose=service_case blanket-denial predicate or applicant self-certified authorisation is added.",
+    "source_locations": [
+      "docs/service/MASTER.md \u00a77.4",
+      "docs/ERP-ARCHITECTURE.md module ownership and Service Case decision gate",
+      "apps/api/src/routes/ops/service-cases.ts progress/evidence/PATCH",
+      "apps/api/src/routes/ops/service-notes.ts",
+      "apps/api/src/routes/principal/approvals.ts",
+      "packages/shared/src/workspace-duties-catalogue.ts service_case_approver"
+    ]
+  }
 }

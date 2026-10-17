@@ -80,10 +80,26 @@ describe.skipIf(!enabled)("owned local browser → actual API → PostgreSQL lif
       expect(work[0]).toMatchObject({remainingQty:left,hasPos:true,posAllSent:true});
       const saved=await db.json(`select jsonb_build_object('request_version',request_version,'approval_version',approval_version,'need',request_context#>'{lines,0,qty}') from public.purchase_requests where id='${newId}';`);
       expect(saved).toMatchObject({request_version:1,approval_version:1,need});
+      // SAME existing parent revision API after the browser-issued PO. Explicit
+      // source proof adds one within unchanged approval; old send remains V1.
+      const ownerReviewResponse=await request(`/api/operation/purchasing/requests/${newId}/context-review`);
+      const ownerReview=await ownerReviewResponse.json() as any;expect(ownerReviewResponse.status).toBe(200);expect(ownerReview.available).toBe(true);
+      const physical=await db.json(`select jsonb_build_object('id',id,'destination_id',destination_id) from public.purchase_order_lines where po_id='${poId}';`);
+      const source=ownerReview.coverage.find((row:any)=>row.kind==='purchase'&&row.to_buy>0);
+      const revisionResponse=await request(`/api/operation/pos/${poId}/revise`,{reason:"TEST existing parent adds one approved source",lines:[{lineId:physical.id,qty:2,destinationId:physical.destination_id,expectedPoVersion:document.version,requestSources:[{demandId:source.demand_id,qty:2,requestVersion:ownerReview.approval.request_version,approvalVersion:ownerReview.approval.approval_version,approvalToken:ownerReview.approval.token,recipients:purpose==='ready_stock'?[]:[{recipientId:source.recipients[0].recipientId,qty:1}]}]}]});
+      const parentRevision=await revisionResponse.json() as any;expect(revisionResponse.status,JSON.stringify(parentRevision)).toBe(200);
+      const revisedRegisterResponse=await request("/api/operation/purchasing/requests");const revisedRegister=await revisedRegisterResponse.json() as any;
+      expect(revisedRegisterResponse.status,JSON.stringify(revisedRegister)).toBe(200);
+      const revisedWork=manualPurchaseWorkInputsFromRegister({...revisedRegister,requests:revisedRegister.requests.filter((row:any)=>row.id===newId),lines:revisedRegister.lines.filter((line:any)=>line.request_id===newId)});
+      expect(revisedWork[0]).toMatchObject({remainingQty:left-1,hasPos:true,posAllSent:false});
+      const revisedPrintResponse=await request(`/api/operation/pos/${poId}/print-data`);const revisedPrint=await revisedPrintResponse.json() as any;
+      expect(revisedPrintResponse.status).toBe(200);expect(revisedPrint.version).toBe(document.version+1);expect(revisedPrint.lines.reduce((total:number,line:any)=>total+line.qty,0)).toBe(2);
+      const revisedSendsResponse=await request(`/api/operation/pos/${poId}/sends`);const revisedSends=await revisedSendsResponse.json() as any;
+      expect(revisedSendsResponse.status).toBe(200);expect(revisedSends.sends).toEqual(sends.sends);
       const afterTasks=await db.json("reset role; select jsonb_build_object('tasks',(select count(*) from public.ops_tasks),'work_events',(select count(*) from public.work_occurrence_events));");
       expect(afterTasks).toEqual(taskCounts);
       const output=process.env.MPR_CONTEXT_API_OUTPUT??"/tmp/carres-context-api-browser";mkdirSync(output,{recursive:true});
-      writeFileSync(`${output}/LOCAL-TEST-${purpose}-lifecycle.json`,JSON.stringify({environment:"owned loopback; outer ROLLBACK",requestId:newId,poId,documentVersion:document.version,qty:1,work,saved,sends,taskCounts,afterTasks,apiErrors,transport:"actual API + authenticated PG; test PostgREST-shaped adapter, not production PostgREST transport proof; register scoped to this newly-created TEST request, unrelated replay history retained; floor_config uses existing schema defaults only within rollback"},null,2));
+      writeFileSync(`${output}/LOCAL-TEST-${purpose}-lifecycle.json`,JSON.stringify({environment:"owned loopback; outer ROLLBACK",requestId:newId,poId,documentVersion:document.version,qty:1,work,saved,sends,parentRevision,revisedWork,revisedDocumentVersion:revisedPrint.version,taskCounts,afterTasks,apiErrors,transport:"actual API + authenticated PG; test PostgREST-shaped adapter, not production PostgREST transport proof; register scoped to this newly-created TEST request, unrelated replay history retained; floor_config uses existing schema defaults only within rollback"},null,2));
       await page.screenshot({path:`${output}/LOCAL-TEST-${purpose}-issued.png`,fullPage:true});expect(apiErrors).toEqual([]);
     }catch(error){
       console.error("LOCAL browser TEST state",(await page.locator("body").innerText()).slice(-6500),JSON.stringify(apiErrors));

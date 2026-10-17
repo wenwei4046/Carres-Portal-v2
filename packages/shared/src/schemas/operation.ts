@@ -172,7 +172,19 @@ export const revisePoInput = z.object({
       lineId: z.string().uuid(),
       qty: z.number().int().min(1),
       destinationId: z.string().uuid().nullable(),
-    }).strict(),
+      expectedPoVersion: z.number().int().positive().optional(),
+      /** Existing sources only. Qty is the new source total on this line;
+       * recipients describe only the added quantity, never a new approval. */
+      requestSources: z.array(z.object({
+        demandId: z.string().uuid(), qty: z.number().int().positive(),
+        requestVersion: z.number().int().positive(), approvalVersion: z.number().int().positive(),
+        approvalToken: z.string().regex(/^[a-f0-9]{32}$/),
+        recipients: z.array(z.object({ recipientId: z.string().uuid(), qty: z.number().int().positive() }).strict()),
+      }).strict()).min(1).optional(),
+    }).strict().superRefine((line,ctx) => {
+      if ((line.requestSources != null) !== (line.expectedPoVersion != null)) ctx.addIssue({ code:"custom", message:"Source changes require the exact PO version" });
+      if (line.requestSources && (new Set(line.requestSources.map(source => source.demandId)).size !== line.requestSources.length || line.requestSources.reduce((total,source) => total+source.qty,0) !== line.qty)) ctx.addIssue({ code:"custom", message:"Sources must describe the whole line exactly once" });
+    }),
   ).min(1),
 }).strict();
 export type RevisePoInput = z.infer<typeof revisePoInput>;

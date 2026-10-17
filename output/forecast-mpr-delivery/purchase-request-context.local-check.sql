@@ -491,6 +491,57 @@ begin
     or (select issued_qty from public.purchase_demands where id=buy)<>1 or (select issued_qty from public.purchase_demands where id=other_demand)<>1 then raise exception 'canonical merged issue violated one line or per-request source'; end if;
    if (select count(distinct reserved_purchase_demand_id) from public.ops_stock_items where po_no=merged_po)<>2 then raise exception 'merged exact Units lost separate request owners'; end if;
    raise notice 'Canonical merged issue LOCAL: two approved MPRs share ONE physical item line qty2, exact source1+1/counters/Unit owners, each remaining1 PASS';
+   -- Actual existing parent revision: explicit source1+1 grows only the
+   -- selected approved source, then the other. Nested rollback retains fixture.
+   declare physical uuid; version integer; proposed jsonb; changed jsonb; recipients jsonb; refused boolean; got text; before_events bigint;
+   begin
+    select id into strict physical from public.purchase_order_lines where po_id=merged_po;
+    select po.version into strict version from public.purchase_orders po where id=merged_po;
+    recipients:=public._purchasing_context_remaining_recipients(r.id,buy,r.approval_scope);
+    proposed:=jsonb_build_array(jsonb_build_object('line_id',physical,'qty',3,'expected_po_version',version,'request_sources',jsonb_build_array(
+      jsonb_build_object('demand_id',buy,'qty',2,'request_version',r.request_version,'approval_version',r.approval_version,'approval_token',md5(r.approval_scope::text),'recipients',recipients),
+      jsonb_build_object('demand_id',other_demand,'qty',1,'request_version',1,'approval_version',1,'approval_token',md5(other_scope::text),'recipients','[]'::jsonb))));
+    select count(*) into before_events from public.purchase_request_events;
+    refused:=false;
+    begin perform public.purchasing_revise_po(merged_po,'TEST stale multi-source proposal',jsonb_set(proposed,'{0,expected_po_version}',to_jsonb(version-1)));
+    exception when serialization_failure then refused:=true; end;
+    if not refused then raise exception 'stale merged PO version admitted'; end if;
+    refused:=false;
+    begin perform public.purchasing_revise_po(merged_po,'TEST recipient required',jsonb_set(proposed,'{0,request_sources,0,recipients}','[]'));
+    exception when invalid_parameter_value then get stacked diagnostics got=pg_exception_detail; refused:=got='invalid_issue_distribution'; end;
+    if not refused or (select count(*) from public.purchase_request_events)<>before_events or (select qty from public.purchase_order_lines where id=physical)<>2 then raise exception 'invalid merged proposal wrote partial facts'; end if;
+    refused:=false;
+    begin perform public.purchasing_revise_po(merged_po,'TEST stale source approval',jsonb_set(proposed,'{0,request_sources,0,approval_token}',to_jsonb(repeat('0',32))));
+    exception when invalid_parameter_value then get stacked diagnostics got=pg_exception_detail; refused:=got='request_approval_changed'; end;
+    if not refused then raise exception 'changed source approval admitted'; end if;
+    begin
+     changed:=public.purchasing_revise_po(merged_po,'TEST both source additions in one parent transaction',jsonb_set(jsonb_set(proposed,'{0,qty}','4'),'{0,request_sources,1}',jsonb_build_object('demand_id',other_demand,'qty',2,'request_version',1,'approval_version',1,'approval_token',md5(other_scope::text),'recipients',public._purchasing_context_remaining_recipients(other_id,other_demand,other_scope))));
+     if (select count(*) from public.ops_stock_items where po_line_id=physical and reserved_purchase_demand_id=buy)<>2
+      or (select count(*) from public.ops_stock_items where po_line_id=physical and reserved_purchase_demand_id=other_demand)<>2
+      or exists(select 1 from public.ops_stock_items i where i.po_line_id=physical and public._purchasing_context_unit_demand(i.id) is distinct from i.reserved_purchase_demand_id) then raise exception 'simultaneous source additions guessed Unit owners'; end if;
+     perform public._purchasing_context_coverage(r.id,false);perform public._purchasing_context_coverage(other_id,false);
+     raise exception 'rollback simultaneous growth test' using errcode='P0905';
+    exception when sqlstate 'P0905' then null; end;
+    changed:=public.purchasing_revise_po(merged_po,'TEST explicit first source grows1 while second unchanged',proposed);
+    if (select qty from public.purchase_order_lines where id=physical)<>3
+     or (select issued_qty from public.purchase_demands where id=buy)<>2 or (select issued_qty from public.purchase_demands where id=other_demand)<>1
+     or (select count(*) from public.ops_stock_items where po_line_id=physical and reserved_purchase_demand_id=buy)<>2
+     or (select count(*) from public.ops_stock_items where po_line_id=physical and reserved_purchase_demand_id=other_demand)<>1
+     or public._purchasing_context_remaining_recipients(r.id,buy,r.approval_scope)<>'[]'::jsonb then raise exception 'partial merged growth lost source/recipient/Unit ownership'; end if;
+    perform public._purchasing_context_coverage(r.id,false);
+    proposed:=jsonb_set(jsonb_set(jsonb_set(jsonb_set(proposed,'{0,qty}','4'),'{0,expected_po_version}',changed->'version'),'{0,request_sources,0,recipients}','[]'),'{0,request_sources,1}',jsonb_build_object('demand_id',other_demand,'qty',2,'request_version',1,'approval_version',1,'approval_token',md5(other_scope::text),'recipients',public._purchasing_context_remaining_recipients(other_id,other_demand,other_scope)));
+    changed:=public.purchasing_revise_po(merged_po,'TEST explicit second source grows without assigning first source twice',proposed);
+    if (select count(*) from public.ops_stock_items where po_line_id=physical and reserved_purchase_demand_id=buy)<>2
+     or (select count(*) from public.ops_stock_items where po_line_id=physical and reserved_purchase_demand_id=other_demand)<>2
+     or exists(select 1 from public.ops_stock_items i where i.po_line_id=physical and public._purchasing_context_unit_demand(i.id) is distinct from i.reserved_purchase_demand_id)
+     or public._purchasing_context_remaining_recipients(other_id,other_demand,other_scope)<>'[]'::jsonb then raise exception 'second merged growth reused another source Unit/recipient'; end if;
+    perform public._purchasing_context_coverage(other_id,false);
+    if (select request_context from public.purchase_requests where id=r.id) is distinct from r.request_context
+     or (select approval_scope from public.purchase_requests where id=other_id) is distinct from other_scope then raise exception 'parent growth rewrote approved request'; end if;
+    raise notice 'Actual merged parent revision LOCAL: GP source1+1 ->2+1 ->2+2, explicit version/approval/added recipients, exact separate Units, immutable approval, stale/recipient negatives PASS';
+    raise exception 'rollback merged growth only' using errcode='P0904';
+   exception when sqlstate 'P0904' then null;
+   end;
    declare original_line uuid; moved_line uuid; chosen_code text; target_destination uuid; original_scope jsonb; original_context jsonb; moved jsonb; bad_destination uuid; got text;
    begin
     select id into strict original_line from public.purchase_order_lines where po_id=merged_po;

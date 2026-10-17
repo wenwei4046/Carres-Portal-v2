@@ -10,9 +10,9 @@ Paste everything below the line into a fresh session. It is self-contained.
 ---
 
 **Latest follow-on ·18Oct2026 · LOCAL, production activation CLOSED.**
-Preceding checkpoint `aba2adb33` is local only. Follow-on preserves all work in the same
+Prior checkpoints `aba2adb33` and `fa7bdbdc6` are local only. Follow-on preserves all work in the same
 `forecast-mpr-context` checkout. Writer exact SHA256
-`913dc8f71940b42fb51151d90a08c6784a6aa13e2ec8db91149f98e6a2885f8b`,62 function/grant assertions.
+`8d06bb4a480a2ec5d31637a1796485abe6171ab3ddb2415060349e8978d0c3dc`,62 function/grant assertions.
 Final canonical SQL fixture reaches ROLLBACK; exact DO probe deliberately PROBE_ROLLBACK with
 62 checks, default-closed/invalid-scope/no-account controls and unchanged business/settings/RLS.
 No migration/application/approval is inferred. Settings b4eb234d…8053774 remains separately pending.
@@ -43,10 +43,25 @@ page walk for new context is claimed. Final API/web typechecks PASS (API with8GB
 API65/65, web14/14 and shared152/152 regressions PASS. git diff --check and exact-package
 checker PASS. These are scoped checks, not a claim of the full historical migration replay.
 
+New existing-parent revision slice: SAME purchasing_revise_po/HTTP schema admits explicit
+additive modern MPR source allocations with exact PO version/current source approval tokens and
+added recipient split. GP source1+1 ->2+1 ->2+2 and simultaneous2+2 pass actual rolled-back SQL,
+separate new Unit owners/reservations and unchanged approvals; stale version/token and missing
+recipients refuse before writes. Combined recipient caps apply across every changed line. API149/149
+passes; API8GB/web typechecks and combined GP/RS browser2/2 rerun pass. The latter also calls
+the actual parent HTTP revision1->2 and reads current document version2/qty2, retained V1 send,
+remaining498/3 and current-send=false; task/event counts stay unchanged. Existing PO UI is not expanded
+with a source editor, so implicit merged inputs still refuse; no source reassignment or reduction.
+
 Remaining qualified boundaries: formal new/changed SC approval source; effective cancellation or
-reduction under Purchasing5.8.1 (contextual reason-only doors refuse before writes); mixed-source
-GP/SC quantity allocation and mixed-owner counted partial source input; changed multi-SKU
-Forecast remainder with no existing PO source. Do not build alternate Service/cancellation doors,
+reduction under Purchasing5.8.1 (contextual reason-only doors refuse before writes); mixed
+SO/legacy source quantity changes and mixed-owner counted partial move input; changed multi-SKU
+Forecast remainder with no existing PO source. Existing PO source editor/full production acceptance
+is still owed. Ordinary evidenced no-fee cancellation must not acquire an extra approver vote:
+measured local schema has no cancelled_qty/structured cancellation producer; reason-only API
+cannot supply required supplier/evidence/version/Finance facts. Review JSON names the exact bounded
+owning delivery and distinguishes approved target from commissioned scope. Service source evidence
+JSON names the reusable Case/Service Note/generic approval read contract, without a new UUID gate. Do not build alternate Service/cancellation doors,
 pretend cancelled-history fixtures prove legal cancellation, or turn these into blanket SC denial.
 No SQL approval/migration/new-flow rollout, push, PR or deploy in this checkpoint. Foundation0696
 is already deployed; do not repeat a foundation-only final. Historical checkpoints below are

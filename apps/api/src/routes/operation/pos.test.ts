@@ -3366,3 +3366,22 @@ describe("supplier email dispatch", () => {
     expect(db.rpc.mock.calls.filter(call => call[0] === "purchasing_confirm_po_sent")).toHaveLength(0);
   });
 });
+
+
+describe("existing PO revision exact contextual source transport", () => {
+  const lineId="fffffff1-0000-4000-8000-000000000001";
+  const source={demandId:"fffffff1-0000-4000-8000-000000000002",qty:3,requestVersion:1,approvalVersion:1,approvalToken:"a".repeat(32),recipients:[]};
+  it("passes explicit source/version through the SAME revision RPC, legacy shape remains unchanged", async () => {
+    const rpc=vi.fn(async()=>({data:{version:2},error:null}));vi.mocked(userClient).mockReturnValue({rpc} as never);
+    for(const contextual of [false,true]) {
+      const res=await app.fetch(new Request("https://api.test/api/operation/pos/TEST/revise",{method:"POST",headers:{Authorization:`Bearer ${await makeJwt("operation")}`,"Content-Type":"application/json"},body:JSON.stringify({reason:"TEST source growth",lines:[{lineId,qty:3,destinationId:null,...(contextual?{expectedPoVersion:1,requestSources:[source]}:{})}]})}),env);
+      expect(res.status).toBe(200);
+      expect(rpc).toHaveBeenLastCalledWith("purchasing_revise_po",{p_po_id:"TEST",p_reason:"TEST source growth",p_lines:[{line_id:lineId,qty:3,destination_id:null,...(contextual?{expected_po_version:1,request_sources:[{demand_id:source.demandId,qty:3,request_version:1,approval_version:1,approval_token:source.approvalToken,recipients:[]}]}:{})}]});
+    }
+  });
+  it.each(["missing version","duplicate source","wrong total"])("refuses %s before SQL", async(kind)=> {
+    const rpc=vi.fn();vi.mocked(userClient).mockReturnValue({rpc} as never);
+    const res=await app.fetch(new Request("https://api.test/api/operation/pos/TEST/revise",{method:"POST",headers:{Authorization:`Bearer ${await makeJwt("operation")}`,"Content-Type":"application/json"},body:JSON.stringify({reason:"TEST invalid source",lines:[{lineId,qty:kind==="wrong total"?4:3,destinationId:null,...(kind==="missing version"?{}:{expectedPoVersion:1}),requestSources:kind==="duplicate source"?[source,source]:[source]}]})}),env);
+    expect(res.status).toBe(422);expect(rpc).not.toHaveBeenCalled();
+  });
+});

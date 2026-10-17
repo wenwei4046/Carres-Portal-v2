@@ -841,7 +841,7 @@ begin
  for x in select * from jsonb_array_elements(approved->'recipients') loop
   select coalesce(sum((rc->>'qty')::integer),0) into prior from public.purchase_request_events e
    cross join lateral jsonb_array_elements(coalesce(e.changes->'allocations','[]')) a cross join lateral jsonb_array_elements(a->'recipients') rc
-   where e.request_id=p_request and e.kind='po_issued' and e.changes->>'record_type'='po_issue'
+   where e.request_id=p_request and e.kind='po_issued' and (e.changes->>'record_type'='po_issue' or (e.changes->>'record_type'='po_source_change' and e.changes->>'operation'='revise_po'))
     and exists(select 1 from public.purchase_orders prior_po where prior_po.id=e.changes->>'po_id' and prior_po.status<>'cancelled')
     and a->>'demand_id'=p_demand::text and rc->>'recipientId'=x->>'recipientId';
   cap:=(x->>'qty')::integer-prior;
@@ -4334,6 +4334,14 @@ declare
   v_context_new_units uuid[];
   v_context_demand uuid;
   v_context_qty integer;
+  v_context_input jsonb;
+  v_context_explicit boolean;
+  v_context_sources jsonb;
+  v_context_src jsonb;
+  v_context_total bigint;
+  v_context_recipients jsonb;
+  v_context_remaining jsonb;
+  v_context_recipient jsonb;
 begin
   v_role := public.purchasing_supplier_call_gate();
   v_uid  := auth.uid();
@@ -4388,6 +4396,8 @@ begin
       raise exception 'qty is required per line'
         using errcode = '22023', detail = 'invalid_input';
     end if;
+    if exists(select 1 from jsonb_array_elements(v_context_before)) and (mod((v_el->>'qty')::numeric,1)<>0 or (v_el->>'qty')::numeric>2147483647) then
+      raise exception 'whole quantity required' using errcode='22023',detail='invalid_qty'; end if;
     v_qty := (v_el ->> 'qty')::integer;
 
     v_has_dest := v_el ? 'destination_id';
@@ -4457,31 +4467,91 @@ begin
       using errcode = '22023', detail = 'nothing_changed';
   end if;
 
-  -- The existing PO owner may revise an unambiguous RS source only within its
-  -- saved human-approved quantity. Never guess an MPR/recipient in a mixed line.
+  -- Existing PO revision, additive source changes only. A merged source is
+  -- never guessed: every current source, exact version/approval and the added
+  -- recipient distribution must be supplied. Reductions use effective cancellation.
+  if (select count(*) from jsonb_array_elements(v_updates))<>(select count(distinct x->>'line_id') from jsonb_array_elements(v_updates) x) then
+   raise exception 'duplicate PO line' using errcode='22023',detail='invalid_input'; end if;
   for v_context_item in select * from jsonb_array_elements(v_updates) loop
    select * into strict v_line from public.purchase_order_lines where id=(v_context_item->>'line_id')::uuid;
    v_delta:=(v_context_item->>'qty')::integer-v_line.qty;
    if v_delta<>0 and exists(select 1 from public._purchasing_po_request_sources(v_line.id) src join public.purchase_demands d on d.id=src.demand_id
      join public.purchase_requests r on r.id=d.request_id where r.request_version>0) then
     if v_delta<0 then raise exception 'Effective source cancellation authority is required' using errcode='22023',detail='request_po_cancel_authority_required'; end if;
-    if (select count(*) from public._purchasing_po_request_sources(v_line.id))<>1
-     or exists(select 1 from public.po_line_sources where po_line_id=v_line.id and order_id is not null) then
-     raise exception 'revision requires explicit request source allocation' using errcode='22023',detail='request_source_allocation_required'; end if;
-    select d.id,d.request_id,d.qty,d.approved_qty,d.issued_qty,d.purpose,d.supplier_id,d.sku,d.attrs,r.request_version,r.approval_version,r.approval_scope,r.request_context,
+    if exists(select 1 from public.po_line_sources where po_line_id=v_line.id and order_id is not null)
+     or (select sum(src.qty) from public._purchasing_po_request_sources(v_line.id) src) is distinct from v_line.qty then
+     raise exception 'PO source coverage changed' using errcode='22023',detail='request_po_coverage_changed'; end if;
+    select x into strict v_context_input from jsonb_array_elements(p_lines) x where x->>'line_id'=v_line.id::text;
+    v_context_explicit:=v_context_input ? 'request_sources';
+    if v_context_explicit then
+     if jsonb_typeof(v_context_input->'expected_po_version') is distinct from 'number'
+      or (v_context_input->>'expected_po_version')::numeric is distinct from v_po.version::numeric then
+      raise exception 'PO version changed' using errcode='40001',detail='request_po_coverage_changed'; end if;
+     v_context_sources:=v_context_input->'request_sources';
+     if jsonb_typeof(v_context_sources) is distinct from 'array'
+      or jsonb_array_length(v_context_sources)<>(select count(*) from public._purchasing_po_request_sources(v_line.id))
+      or jsonb_array_length(v_context_sources)<>(select count(distinct x->>'demand_id') from jsonb_array_elements(v_context_sources) x) then
+      raise exception 'exact request sources required' using errcode='22023',detail='request_source_allocation_required'; end if;
+    else
+     if (select count(*) from public._purchasing_po_request_sources(v_line.id))<>1 then
+      raise exception 'revision requires explicit request source allocation' using errcode='22023',detail='request_source_allocation_required'; end if;
+     select jsonb_build_array(jsonb_build_object('demand_id',src.demand_id,'qty',(v_context_item->>'qty')::integer,'recipients','[]'::jsonb)) into v_context_sources from public._purchasing_po_request_sources(v_line.id) src;
+    end if;
+    v_context_total:=0;
+    for v_context_src in select * from jsonb_array_elements(v_context_sources) loop
+     if v_context_explicit then perform public._purchasing_context_object(v_context_src,'{"demand_id":"string","qty":"number","request_version":"number","approval_version":"number","approval_token":"string","recipients":"array"}'); end if;
+     select d.id,d.request_id,d.qty,d.approved_qty,d.issued_qty,d.purpose,d.supplier_id,d.sku,d.attrs,r.request_version,r.approval_version,r.approval_scope,r.request_context,r.fulfilment_intent,
       r.approved_at,r.refused_at,r.withdrawn_at,r.sent_back_at,src.qty source_qty
-     into strict v_context_source from public._purchasing_po_request_sources(v_line.id) src join public.purchase_demands d on d.id=src.demand_id join public.purchase_requests r on r.id=d.request_id;
-    if v_context_source.request_version<1 or v_context_source.purpose<>'ready_stock' then
-     raise exception 'revision requires explicit request recipient allocation' using errcode='22023',detail='request_source_allocation_required'; end if;
-    if v_context_source.source_qty<>v_line.qty or v_context_source.approved_at is null or v_context_source.refused_at is not null or v_context_source.withdrawn_at is not null
+      into v_context_source from public._purchasing_po_request_sources(v_line.id) src join public.purchase_demands d on d.id=src.demand_id join public.purchase_requests r on r.id=d.request_id where d.id=(v_context_src->>'demand_id')::uuid;
+     if not found or v_context_source.request_version<1 then raise exception 'unknown contextual source' using errcode='22023',detail='request_source_allocation_required'; end if;
+     if not v_context_explicit and v_context_source.purpose<>'ready_stock' then
+      raise exception 'revision requires explicit request recipient allocation' using errcode='22023',detail='request_source_allocation_required'; end if;
+     if jsonb_typeof(v_context_src->'qty') is distinct from 'number' or (v_context_src->>'qty')::numeric<1
+      or mod((v_context_src->>'qty')::numeric,1)<>0 or (v_context_src->>'qty')::numeric>2147483647 then
+      raise exception 'invalid source quantity' using errcode='22023',detail='invalid_qty'; end if;
+     v_context_qty:=(v_context_src->>'qty')::integer;
+     v_context_total:=v_context_total+v_context_qty;
+     if v_context_qty<v_context_source.source_qty then raise exception 'Effective source cancellation authority is required' using errcode='22023',detail='request_po_cancel_authority_required'; end if;
+     if v_context_source.approved_at is null or v_context_source.refused_at is not null or v_context_source.withdrawn_at is not null
       or v_context_source.sent_back_at is not null or v_context_source.approval_version is distinct from v_context_source.request_version
       or v_context_source.request_context is distinct from v_context_source.approval_scope->'context'
       or not exists(select 1 from jsonb_array_elements(v_context_source.approval_scope->'approved_distribution') x where x->>'demandId'=v_context_source.id::text and (x->>'qty')::integer=v_context_source.approved_qty)
       or v_context_source.sku is distinct from v_line.sku or nullif(v_context_source.attrs,'{}'::jsonb) is distinct from nullif(v_line.attrs,'{}'::jsonb)
-      or v_context_source.supplier_id is distinct from v_po.supplier_id
-      or (v_delta>0 and not exists(select 1 from public.product_skus where sku=v_line.sku and supplier_id=v_po.supplier_id)) then
-     raise exception 'approved source differs from proposed PO revision' using errcode='22023',detail='request_approval_changed'; end if;
-    v_context_updates:=v_context_updates||jsonb_build_array(jsonb_build_object('line_id',v_line.id,'demand_id',v_context_source.id,'qty',(v_context_item->>'qty')::integer,'delta',v_delta));
+      or v_context_source.supplier_id is distinct from v_po.supplier_id or v_context_source.purpose is distinct from v_po.purpose
+      or not public._purchasing_context_po_destination_matches(v_context_source.id,v_line.id,coalesce(v_line.destination_id,v_po.destination_id))
+      or not exists(select 1 from public.product_skus where sku=v_line.sku and supplier_id=v_po.supplier_id) then
+      raise exception 'approved source differs from proposed PO revision' using errcode='22023',detail='request_approval_changed'; end if;
+     if v_context_explicit and ((v_context_src->>'request_version')::numeric is distinct from v_context_source.request_version::numeric
+      or (v_context_src->>'approval_version')::numeric is distinct from v_context_source.approval_version::numeric
+      or v_context_src->>'approval_token' is distinct from md5(v_context_source.approval_scope::text)) then
+      raise exception 'request approval changed' using errcode='22023',detail='request_approval_changed'; end if;
+     -- Fresh normal approval, or ONLY unchanged committed RS scope after its
+     -- Forecast cohort changed. This cannot create a new request/source/approval.
+     if v_context_source.purpose='ready_stock' then
+      if public._purchasing_context_committed_rs_coverage(v_context_source.request_id) is null then raise exception 'committed source changed' using errcode='22023',detail='request_approval_changed'; end if;
+     else perform public._purchasing_context_coverage(v_context_source.request_id,true); end if;
+     v_context_recipients:=v_context_src->'recipients';
+     if v_context_source.purpose='ready_stock' then
+      if v_context_recipients is distinct from '[]'::jsonb then raise exception 'RS has no final recipient' using errcode='22023',detail='invalid_issue_distribution'; end if;
+     else
+      v_context_remaining:=public._purchasing_context_remaining_recipients(v_context_source.request_id,v_context_source.id,v_context_source.approval_scope);
+      if jsonb_typeof(v_context_recipients) is distinct from 'array'
+       or (select count(*) from jsonb_array_elements(v_context_recipients))<>(select count(distinct x->>'recipientId') from jsonb_array_elements(v_context_recipients) x) then
+       raise exception 'exact added recipient allocation required' using errcode='22023',detail='invalid_issue_distribution'; end if;
+      for v_context_recipient in select * from jsonb_array_elements(v_context_recipients) loop
+       perform public._purchasing_context_object(v_context_recipient,'{"recipientId":"string","qty":"number"}');
+       if (v_context_recipient->>'qty')::numeric<1 or mod((v_context_recipient->>'qty')::numeric,1)<>0
+        or not exists(select 1 from jsonb_array_elements(v_context_remaining) x where (x->>'recipientId')::uuid=(v_context_recipient->>'recipientId')::uuid and (x->>'qty')::numeric>=(v_context_recipient->>'qty')::numeric) then
+        raise exception 'recipient exceeds approved remainder' using errcode='22023',detail='invalid_issue_distribution'; end if;
+      end loop;
+      if (select coalesce(sum((x->>'qty')::numeric),0) from jsonb_array_elements(v_context_recipients) x)<>v_context_qty-v_context_source.source_qty then
+       raise exception 'added recipients differ from source quantity' using errcode='22023',detail='invalid_issue_distribution'; end if;
+     end if;
+     if v_context_qty>v_context_source.source_qty then
+      v_context_updates:=v_context_updates||jsonb_build_array(jsonb_build_object('line_id',v_line.id,'demand_id',v_context_source.id,'qty',v_context_qty,'delta',v_context_qty-v_context_source.source_qty,'recipients',v_context_recipients));
+     end if;
+    end loop;
+    if v_context_total<>(v_context_item->>'qty')::integer then raise exception 'source totals differ from PO quantity' using errcode='22023',detail='request_source_allocation_required'; end if;
    end if;
   end loop;
   for v_context_row in select (x->>'demand_id')::uuid demand_id,sum((x->>'delta')::integer)::integer delta from jsonb_array_elements(v_context_updates) x group by 1 loop
@@ -4490,6 +4560,15 @@ begin
     or v_context_source.issued_qty<>(select coalesce(sum(src.qty),0) from public.purchase_order_lines pl join public.purchase_orders po on po.id=pl.po_id
       cross join lateral public._purchasing_po_request_sources(pl.id) src where src.demand_id=v_context_source.id and po.status<>'cancelled') then
     raise exception 'revision exceeds approved source remainder' using errcode='22023',detail='request_over_issue'; end if;
+  end loop;
+
+  -- The same demand may span several PO lines. Recipient conservation is
+  -- checked across the entire revision, not independently per visible line.
+  for v_context_row in select (x->>'demand_id')::uuid demand_id,rc->>'recipientId' recipient_id,sum((rc->>'qty')::numeric) qty
+   from jsonb_array_elements(v_context_updates) x cross join lateral jsonb_array_elements(x->'recipients') rc group by 1,2 loop
+   select d.request_id,r.approval_scope into strict v_context_source from public.purchase_demands d join public.purchase_requests r on r.id=d.request_id where d.id=v_context_row.demand_id;
+   if not exists(select 1 from jsonb_array_elements(public._purchasing_context_remaining_recipients(v_context_source.request_id,v_context_row.demand_id,v_context_source.approval_scope)) rc where rc->>'recipientId'=v_context_row.recipient_id and (rc->>'qty')::numeric>=v_context_row.qty) then
+    raise exception 'combined recipients exceed approved remainder' using errcode='22023',detail='invalid_issue_distribution'; end if;
   end loop;
 
   -- ── PASS 2 · snapshot the PRIOR version, before any write.
@@ -4572,10 +4651,16 @@ begin
 
   for v_context_item in select * from jsonb_array_elements(v_context_updates) loop
    v_context_demand:=(v_context_item->>'demand_id')::uuid;
+   select * into strict v_line from public.purchase_order_lines where id=(v_context_item->>'line_id')::uuid;
    update public.po_line_sources set qty=(v_context_item->>'qty')::integer where po_line_id=(v_context_item->>'line_id')::uuid and purchase_demand_id=v_context_demand;
    update public.purchase_demands set issued_qty=issued_qty+(v_context_item->>'delta')::integer where id=v_context_demand;
-   select coalesce(array_agg(id order by id),'{}') into v_context_new_units from public.ops_stock_items where po_line_id=(v_context_item->>'line_id')::uuid and not(id=any(v_context_units)) and status<>'voided';
-   v_context_allocations:=v_context_allocations||jsonb_build_array(jsonb_build_object('demand_id',v_context_demand,'qty_delta',(v_context_item->>'delta')::integer,'unit_ids',to_jsonb(v_context_new_units)));
+   select coalesce(array_agg(id order by id),'{}') into v_context_new_units from (select id from public.ops_stock_items where po_line_id=(v_context_item->>'line_id')::uuid and not(id=any(v_context_units)) and status<>'voided' order by id limit (v_context_item->>'delta')::integer) chosen;
+   if v_line.identity_mode='exact_unit' and cardinality(v_context_new_units)<>(v_context_item->>'delta')::integer then raise exception 'source Unit attribution mismatch' using errcode='22023',detail='unit_ledger_mismatch'; end if;
+   v_context_units:=v_context_units||v_context_new_units;
+   if exists(select 1 from public.purchase_demands d join public.purchase_requests r on r.id=d.request_id where d.id=v_context_demand and r.fulfilment_intent='concrete_need') then
+    update public.ops_stock_items set reserved_purchase_demand_id=v_context_demand,reserved_ref=(select r.req_no from public.purchase_requests r join public.purchase_demands d on d.request_id=r.id where d.id=v_context_demand) where id=any(v_context_new_units);
+   end if;
+   v_context_allocations:=v_context_allocations||jsonb_build_array(jsonb_build_object('line_id',v_context_item->'line_id','demand_id',v_context_demand,'qty_delta',(v_context_item->>'delta')::integer,'recipients',v_context_item->'recipients','unit_ids',to_jsonb(v_context_new_units)));
   end loop;
 
   v_version := coalesce(v_po.version, 1) + 1;
@@ -4604,8 +4689,8 @@ begin
   -- The new exact Units belong to the one proven source on this revised line.
   -- Record all actual identities without reserving intentional RS stock.
   for v_context_item in select * from jsonb_array_elements(v_context_updates) loop
-   select coalesce(jsonb_agg(id order by id),'[]') into v_snap from public.ops_stock_items where po_line_id=(v_context_item->>'line_id')::uuid and status<>'voided';
-   select jsonb_agg(case when x->>'line_id'=v_context_item->>'line_id' and x->>'demand_id'=v_context_item->>'demand_id' then jsonb_set(x,'{unit_ids}',v_snap) else x end) into v_context_after from jsonb_array_elements(v_context_after) x;
+   select a->'unit_ids' into strict v_snap from jsonb_array_elements(v_context_allocations) a where a->>'demand_id'=v_context_item->>'demand_id' and a->>'line_id'=v_context_item->>'line_id';
+   select jsonb_agg(case when x->>'line_id'=v_context_item->>'line_id' and x->>'demand_id'=v_context_item->>'demand_id' then jsonb_set(x,'{unit_ids}',(select coalesce(jsonb_agg(id order by id),'[]') from (select distinct id from jsonb_array_elements(coalesce(x->'unit_ids','[]')||v_snap) id) ids)) else x end) into v_context_after from jsonb_array_elements(v_context_after) x;
   end loop;
   for v_context_request in select distinct (x->>'request_id')::uuid from jsonb_array_elements(v_context_before) x
    join public.purchase_requests r on r.id=(x->>'request_id')::uuid where r.request_version>0 loop

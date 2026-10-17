@@ -2651,6 +2651,10 @@ operationPosRouter.post("/:id/revise", requireOperation, async (c) => {
       line_id: l.lineId,
       qty: l.qty,
       destination_id: l.destinationId,
+      ...(l.requestSources ? { expected_po_version:l.expectedPoVersion, request_sources:l.requestSources.map(source => ({
+        demand_id:source.demandId, qty:source.qty, request_version:source.requestVersion,
+        approval_version:source.approvalVersion, approval_token:source.approvalToken, recipients:source.recipients,
+      })) } : {}),
     })),
   });
   if (error) return mapSupplierCallError(c, error);
