@@ -5,6 +5,7 @@ import Button from "./Button";
 import { CMenu } from "@/components/carres/CPopover";
 import Modal from "./Modal";
 import Drawer, { ContextualPanelSurface } from "./Drawer";
+import Select from "./Select";
 import { ShellHeaderContext } from "@/pages/operation/components/shell-header-context";
 
 function MenuDialog() {
@@ -93,7 +94,7 @@ describe("task-wide review focus and dismissal", () => {
 
 function ResponsivePanel() {
  const [open, setOpen] = useState(false);
- return <><Button onClick={() => setOpen(true)}>Open summary</Button>{open && <ContextualPanelSurface panel="Summary" onHide={() => setOpen(false)}><input aria-label="Retained panel input" defaultValue="TEST" /><Button onClick={() => setOpen(false)}>Hide summary</Button></ContextualPanelSurface>}</>;
+ return <><Button onClick={() => setOpen(true)}>Open summary</Button>{open && <ContextualPanelSurface panel="Summary" onHide={() => setOpen(false)}><input aria-label="Retained panel input" defaultValue="TEST" /><Select id="retained-select" label="TEST panel choice" value="one" options={[{ value: "one", label: "TEST One" }, { value: "two", label: "TEST Two" }]} onValueChange={() => {}} /><Button onClick={() => setOpen(false)}>Hide summary</Button></ContextualPanelSurface>}</>;
 }
 it("retains the same input and scroll host when a docked panel becomes an overlay and back", async () => {
  const originalWidth = window.innerWidth;
@@ -108,6 +109,10 @@ it("retains the same input and scroll host when a docked panel becomes an overla
  fireEvent(window, new Event("resize"));
  expect(await screen.findByRole("dialog", { name: "Summary" })).toContainElement(input);
  expect(input).toHaveValue("TEST unsaved"); expect(host.scrollTop).toBe(42);
+ fireEvent.click(screen.getByRole("combobox", { name: "TEST panel choice" }));
+ const list = await screen.findByRole("listbox");
+ expect(host).toContainElement(list);
+ fireEvent.keyDown(list, { key: "Escape" });
  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1164 });
  fireEvent(window, new Event("resize"));
  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());

@@ -20,6 +20,7 @@
 import { useCallback, useState, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import DialogFrame from "./DialogFrame";
+import { DialogContainerScope, useDialogContainer } from "./dialog-container";
 import { useNarrowModuleCanvas } from "./useNarrowModuleCanvas";
 import { useShellHeader } from "@/pages/operation/components/shell-header-context";
 
@@ -75,6 +76,7 @@ export function ContextualPanelSurface({ children, onHide, panel, open = true }:
   panel: "Summary" | "Tasks";
   open?: boolean;
 }) {
+  const inheritedContainer = useDialogContainer();
   const small = useNarrowModuleCanvas();
   const inShell = useShellHeader() != null;
   const narrow = small && inShell;
@@ -84,7 +86,7 @@ export function ContextualPanelSurface({ children, onHide, panel, open = true }:
   const slot = <div ref={attach} className="flex min-h-0 flex-1 flex-col" />;
   return <>
     {narrow && onHide ? <Drawer returnFocusRef={panelOpeners[panel]} variant={panel === "Summary" ? "summary-panel" : "tasks-panel"} open={open} title={panel} onOpenChange={(open) => { if (!open) onHide(); }}>{slot}</Drawer> : open ? <div ref={attach} className="contents" /> : null}
-    {createPortal(children, host)}
+    {createPortal(<DialogContainerScope container={narrow ? host : inheritedContainer}>{children}</DialogContainerScope>, host)}
   </>;
 }
 
