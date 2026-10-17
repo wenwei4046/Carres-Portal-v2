@@ -23,6 +23,16 @@
 
 **Engineering defaults:** owner delegated “set one, I see it later and correct” on15Oct. Retain the documented existing line heights, field padding and modal size variants as the common engineering defaults. These are not claimed to be owner-reviewed pixel choices; later owner corrections update this file, the shared component and affected consumers once. Existing explicit owner decisions and module business law still win. No broad test/fixture expansion is a prerequisite for this kit handover; no production conformance is implied.
 
+**Implementation evidence ·17Oct2026 · on branch, not deployed:** `Drawer` admits the existing
+Summary264/Tasks320 contextual variants through `DialogFrame`; `ContextualPanelSurface` keeps a
+stable content host across dock/overlay changes. `FilterRail`, `CSidePanel` and `ShellTasks` reuse it.
+The common Operations Shell applies temporary navigation64 independently of Tasks. Existing
+Workspace page-host exclusion remains. `/ui` Side panel demonstrates the same consumed component.
+Forecast TEST browser checks12/12 include1025 overlays without canvas loss, focus return, retained
+selection and restored wide menu preference. MPR's New door guards/discards an old task through the
+existing task host, preventing its Send PO card from reopening over create. Complete purchasing
+records, release gates and authenticated production verification remain separate work.
+
 ## Start here · the one Master UI Kit
 
 **Narrow contextual panels — OWNER-APPROVED TARGET / NOT BUILT, Jess 2026-10-17.**

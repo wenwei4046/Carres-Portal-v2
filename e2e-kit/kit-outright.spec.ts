@@ -116,14 +116,19 @@ for (const width of WIDTHS) {
   for (const summary of [false, true]) {
     for (const tasks of [false, true]) {
       test(`Sales Order Outright at ${width}, Summary ${summary ? "open" : "closed"}, Tasks ${tasks ? "open" : "closed"}`, async ({ page }) => {
+        test.skip(width < 1100 && summary && tasks, "Narrow panels use one foreground Drawer; each overlay is measured separately");
         await page.setViewportSize({ width, height: 900 });
         await page.goto(PAGE, { waitUntil: "networkidle" });
         await page.locator('[data-testid^="outright-row-"]').first().waitFor();
         await setPanels(page, summary, tasks);
         for (const state of ["rows closed", "one row open"] as const) {
           if (state === "one row open") {
+            // A narrow modal protects the canvas. Edit it after closing, then
+            // reopen the same panel and measure the retained expanded row.
+            if (width < 1100 && (summary || tasks)) await page.keyboard.press("Escape");
             await page.getByRole("button", { name: "Show items" }).first().click();
             await page.locator('[data-carres-table="item-rows"]').first().waitFor();
+            if (width < 1100 && (summary || tasks)) await setPanels(page, summary, tasks);
           }
           await page.mouse.move(4, 4);
           const m = await measure(page);
@@ -165,7 +170,7 @@ test("Sales Order Outright toolbar never cuts or hides a control with filters on
   await page.setViewportSize({ width: 1025, height: 900 });
   await page.goto(PAGE, { waitUntil: "networkidle" });
   await page.locator('[data-testid^="outright-row-"]').first().waitFor();
-  await setPanels(page, false, true);
+  await setPanels(page, false, false);
   await page.getByRole("button", { name: /^View:/ }).click();
   await page.getByRole("menu").getByText("Overview", { exact: true }).click();
   for (const col of ["Payment", "Problems"]) {
@@ -176,21 +181,28 @@ test("Sales Order Outright toolbar never cuts or hides a control with filters on
     await page.getByTestId("column-filter-menu").locator('input[type="checkbox"]').first().check();
     await page.keyboard.press("Escape");
   }
+  const canvasWidth = await page.getByTestId("outright-toolbar").evaluate((bar) => bar.getBoundingClientRect().width);
+  await setPanels(page, false, true);
   await page.waitForTimeout(500);
   const m = await page.evaluate(() => {
     const bar = document.querySelector('[data-testid="outright-toolbar"]') as HTMLElement;
     const tasks = document.querySelector('aside[aria-label="Tasks"]') as HTMLElement;
-    const edge = Math.min(bar.getBoundingClientRect().right, tasks.getBoundingClientRect().left);
+    const edge = bar.getBoundingClientRect().right;
     const buttons = [...bar.querySelectorAll("button")].filter((b) => (b as HTMLElement).offsetParent);
     return {
+      canvasWidth: bar.getBoundingClientRect().width,
+      panelWidth: Math.round(tasks.closest('[role="dialog"]')!.getBoundingClientRect().width),
+      modal: Boolean(tasks.closest('[role="dialog"][aria-modal="true"]')),
       overflow: bar.scrollWidth - bar.clientWidth,
       past: buttons.filter((b) => b.getBoundingClientRect().right > edge + 0.5).length,
       view: buttons.find((b) => (b.getAttribute("aria-label") ?? "").startsWith("View:"))?.textContent?.trim(),
     };
   });
-  /* Approach-neutral (owner 14 Oct): the short-line behaviour is pending review. */
+  expect(m.canvasWidth, "the overlay preserves the canvas").toBe(canvasWidth);
+  expect(m.panelWidth).toBe(320);
+  expect(m.modal).toBe(true);
   expect(m.overflow, "the toolbar line holds every control").toBeLessThanOrEqual(0);
-  expect(m.past, "no control runs under the Tasks panel").toBe(0);
+  expect(m.past, "every control fits the unchanged canvas").toBe(0);
   expect(m.view, "the view button keeps its name").toContain("Overview");
   expect(await carresCheck(page)).toEqual(PASS);
 });
@@ -205,15 +217,17 @@ test("Sales Order Outright toolbar holds one search chip in the Sales Order view
     const bar = document.querySelector('[data-testid="outright-toolbar"]') as HTMLElement | null;
     const tasks = document.querySelector('aside[aria-label="Tasks"]') as HTMLElement;
     if (!bar) return null;
-    const edge = Math.min(bar.getBoundingClientRect().right, tasks.getBoundingClientRect().left);
+    const edge = bar.getBoundingClientRect().right;
     const buttons = [...bar.querySelectorAll("button")].filter((b) => (b as HTMLElement).offsetParent);
     const table = document.querySelector('[data-carres-table="list"]') as HTMLElement;
     return {
+      canvasWidth: bar.getBoundingClientRect().width,
+      panelWidth: Math.round(tasks.closest('[role="dialog"]')!.getBoundingClientRect().width),
+      modal: Boolean(tasks.closest('[role="dialog"][aria-modal="true"]')),
       overflow: bar.scrollWidth - bar.clientWidth,
       past: buttons.filter((b) => b.getBoundingClientRect().right > edge + 0.5).length,
       view: buttons.find((b) => (b.getAttribute("aria-label") ?? "").startsWith("View:"))?.textContent?.trim(),
-      /* The Tasks body starts level with the table. */
-      level: Math.round((tasks.children[1] as HTMLElement).getBoundingClientRect().top) - Math.round(table.getBoundingClientRect().top),
+      tableWidth: table.getBoundingClientRect().width,
       rows: Math.round(bar.getBoundingClientRect().height) > 40 ? 2 : 1,
     };
   });
@@ -221,16 +235,18 @@ test("Sales Order Outright toolbar holds one search chip in the Sales Order view
   expect(m!.overflow).toBeLessThanOrEqual(0);
   expect(m!.past).toBe(0);
   expect(m!.view).toContain("Sales Order");
-  expect(m!.level, "the Tasks body starts level with the table").toBe(0);
+  expect(m!.panelWidth, "Tasks uses the governed narrow overlay").toBe(320);
+  expect(m!.modal).toBe(true);
+  expect(m!.tableWidth).toBeGreaterThan(0);
   expect(m!.rows, "the toolbar stays one line").toBe(1);
   expect(await carresCheck(page)).toEqual(PASS);
 });
 
-test("Sales Order Outright opened row: Qty and Supplier are reachable by keyboard inside the list's own scroll box (1025, Tasks open)", async ({ page }) => {
+test("Sales Order Outright opened row: Qty and Supplier are reachable by keyboard inside the list's own scroll box (1025, Tasks reopened)", async ({ page }) => {
   await page.setViewportSize({ width: 1025, height: 900 });
   await page.goto(PAGE, { waitUntil: "networkidle" });
   await page.locator('[data-testid^="outright-row-"]').first().waitFor();
-  await setPanels(page, false, true);
+  await setPanels(page, false, false);
   await page.getByRole("button", { name: "Show items" }).first().click();
   const items = page.locator('[data-carres-table="item-rows"]').first();
   await items.waitFor();
@@ -250,6 +266,12 @@ test("Sales Order Outright opened row: Qty and Supplier are reachable by keyboar
   expect(await inBox("Qty")).not.toBe("missing");
   expect(await inBox("Supplier"), "Supplier comes into view with the arrow keys").toBe("in view");
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), "the page itself never scrolls sideways").toBeLessThanOrEqual(0);
+  const scrollLeft = await page.locator("[data-list-scroll]").evaluate((box) => box.scrollLeft);
+  await setPanels(page, false, true);
+  await expect(page.getByRole("dialog", { name: "Tasks", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(items).toBeVisible();
+  expect(await page.locator("[data-list-scroll]").evaluate((box) => box.scrollLeft)).toBe(scrollLeft);
 });
 
 /* THE MONTHLY DEMAND DOOR (15 Oct 2026). Purchasing's Monthly demand opens the

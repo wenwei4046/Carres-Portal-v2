@@ -13,6 +13,15 @@ CARRES PORTAL v2 — CONTINUOUS BUILD · checkpoint 2026-10-16 (UI kit lane)
 
 **Current publication and delivery:** the ONE physical `docs/ui/MASTER.md` is on main through merged PR #2087, `58047ed1f9624f0a796e6560e3deed1d1c2f1255`; its required CI passed. Root CLAUDE/AGENTS name it, and former01/02/03 paths only redirect. Desktop's bounded startup pointers now read `origin/main` while all existing dirty work is preserved. Earlier “unpublished” baseline paragraphs below are historical. Existing-page fixes continue in the same PR #2086, not a new kit. Current bounded verification: corrected page tracking assertion4/4; shared focus/fields/catalogue/SO reader tests77/77. SO Why uses the existing dialog-container provider: personally opened calendar inside Why, Esc returned to Why, Cancel retained saved facts; no business write. Broader historical findings retain their original scope and are not an all-Portal PASS. The former433px toolbar blocker is fixed in8e2c746a2: existing common shell temporarily uses compact navigation below1100 with Tasks open, preserves stored preference, and guards expansion before hiding Tasks; Workspace is excluded.127 sidebar tests and the original4 targeted1025 browser cases PASS. Developer personally measured nav64/canvas589/cut[]/page1025, expansion/reopen cycle and1164 restoration. This supersedes older pending-toolbar wording below; production proof is not yet claimed.
 
+**Forecast/MPR · owner17Oct override:** Jess approved implementation through deployment and
+read-only authenticated verification of the current purchasing checklist. Earlier “do not start
+Manual Purchase” statements below are historical and superseded for this scope. Purchasing §5.2,
+COPY and the same UI MASTER own the approved contract; document baseline PR#2089, head7a6bd332a.
+The narrow-panel amendment supersedes the earlier Tasks-only compact-menu fallback, with shared
+264/320 overlays below1100. Shared implementation is on `codex/forecast-mpr-shell`, not deployed.
+12 Forecast shell browser checks PASS; wider MPR persistence, source/stock/approval/issue/send and
+production proof remain open. Desktop dirty work is preserved. No supplier sending is authorised.
+
 ## 0 · Owner scope carried forward (Jess, 14 Oct 2026 — do not ask her to reconfirm)
 
 1. One existing UI kit across the whole Portal; remove superseded implementations after preserving

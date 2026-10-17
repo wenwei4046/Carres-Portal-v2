@@ -138,10 +138,11 @@ export default function PortalSidebar({ drawer = false, compactForCanvas = false
   const [detailExpanded, setDetailExpanded] = useState(false);
   useEffect(() => setDetailExpanded(false), [location.pathname, narrowDetail]);
   const autoDetail = isSalesOrderDetail && narrowDetail;
-  const autoCanvas = !isSalesOrderDetail && compactForCanvas && narrowDetail;
+  const autoCanvas = compactForCanvas && narrowDetail;
   /* A drawer is always the named rail. */
-  const collapsed = drawer ? false : autoDetail ? !detailExpanded : autoCanvas || storedCollapsed;
+  const collapsed = drawer ? false : autoCanvas ? true : autoDetail ? !detailExpanded : storedCollapsed;
   const toggleCollapse = () => {
+    if (autoCanvas && !onExpandForCanvas) return;
     if (autoCanvas && onExpandForCanvas) {
       onExpandForCanvas(() => {
         setCollapsed(false);
@@ -616,6 +617,7 @@ export default function PortalSidebar({ drawer = false, compactForCanvas = false
           <button
             type="button"
             onClick={toggleCollapse}
+            disabled={autoCanvas && !onExpandForCanvas}
             title={collapsed ? "Expand menu" : "Collapse menu"}
             aria-label={collapsed ? "Expand menu" : "Collapse menu"}
             className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-[16px] text-c-secondary hover:bg-c-hover ${collapsed ? "" : "ml-auto"}`}

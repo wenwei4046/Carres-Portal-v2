@@ -87,6 +87,9 @@ for (const { name, path, ready } of PAGES) {
       for (const tasks of [false, true]) {
         const state = `summary-${summary ? "on" : "off"}-tasks-${tasks ? "on" : "off"}`;
         test(`${name} at ${width}, ${state}`, async ({ page }) => {
+          // Below1100 the existing Drawer isolates one foreground panel;
+          // the former two-docked-column picture is no longer a reachable state.
+          test.skip(width < 1100 && summary && tasks, "Narrow panels use the shared modal focus surface; measure each overlay separately");
           await open(page, path, ready, width);
           test.skip(!(await setSummary(page, summary)), `${name} has no Summary panel to ${summary ? "open" : "close"}`);
           test.skip(!(await setTasks(page, tasks)), `${name} has no Tasks panel to ${tasks ? "open" : "close"}`);
