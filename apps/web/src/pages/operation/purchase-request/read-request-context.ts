@@ -1,4 +1,4 @@
-import { purchaseRequestContextSchema, type PurchaseRequestContext } from "@carres/shared";
+import { purchaseRequestContextReviewReadSchema, purchaseRequestContextSchema, type PurchaseRequestContext, type PurchaseRequestContextReviewRead } from "@carres/shared";
 
 export type ReadRequestContext =
   | { kind: "legacy" }
@@ -19,4 +19,25 @@ export function readRequestContext(request: {
   if (!parsed.success || parsed.data.purpose !== request.purpose || parsed.data.proceedDate !== request.proceed_date
     || !Number.isInteger(request.request_version) || (request.request_version ?? 0) < 1) return { kind: "unavailable" };
   return { kind: "context", value: parsed.data, requestVersion: request.request_version! };
+}
+
+/** Separate saved need from fresh approval evidence. Legacy quantities and header
+ * timestamps never become a modern allocation or approval token. No write grant. */
+type AvailableReview = Extract<PurchaseRequestContextReviewRead, { available: true }>;
+
+function orderedJson(value: unknown): string {
+  return JSON.stringify(value, (_key, entry: unknown) => entry && typeof entry === "object" && !Array.isArray(entry)
+    ? Object.fromEntries(Object.entries(entry).sort(([a], [b]) => a.localeCompare(b))) : entry);
+}
+
+export function readRequestApproval(
+  saved: ReadRequestContext,
+  input: unknown,
+): { kind: "legacy" } | { kind: "unavailable" } | { kind: "pending"; review: AvailableReview }
+  | { kind: "approved"; review: AvailableReview } {
+  if (saved.kind !== "context") return { kind: saved.kind };
+  const parsed = purchaseRequestContextReviewReadSchema.safeParse(input);
+  if (!parsed.success || !parsed.data.available || parsed.data.review.request_version !== saved.requestVersion
+    || orderedJson(parsed.data.review.state.context) !== orderedJson(saved.value)) return { kind: "unavailable" };
+  return { kind: parsed.data.approval === null ? "pending" : "approved", review: parsed.data };
 }

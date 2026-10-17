@@ -202,7 +202,19 @@ export const purchaseRequestContextReviewReadSchema = z.discriminatedUnion("avai
   z.object({ available: z.literal(false), reason: z.string().min(1), request_version: z.number().int().positive(),
     request_context: purchaseRequestContextSchema, events: z.array(purchaseRequestStoredEventSchema),
   }).strict(),
-]);
+]).superRefine((read, ctx) => {
+  if (!read.available) return;
+  if ((read.coverage === null) !== (read.approval === null)) {
+    ctx.addIssue({ code: "custom", path: ["approval"], message: "Approval and coverage must describe the same saved decision" });
+  }
+  if (read.approval && (read.approval.request_version !== read.review.request_version
+    || read.approval.approval_version !== read.review.request_version)) {
+    ctx.addIssue({ code: "custom", path: ["approval"], message: "Approval belongs to a different request version" });
+  }
+  if (read.coverage && new Set(read.coverage.map(line => line.demand_id)).size !== read.coverage.length) {
+    ctx.addIssue({ code: "custom", path: ["coverage"], message: "Duplicate demand coverage" });
+  }
+});
 /** The existing issue door accepts the reviewed approval plus optional exact
  * partial allocations. SQL rechecks all limits and sources in one transaction. */
 export const purchaseRequestIssueSchema = z.object({

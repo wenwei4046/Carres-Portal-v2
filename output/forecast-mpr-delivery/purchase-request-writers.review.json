@@ -384,5 +384,19 @@
       "authenticated_execute": true,
       "anon_execute": false
     }
-  ]
+  ],
+  "readback_adoption": {
+    "status": "LOCAL BUILT / DEFAULT OFF / NO PRODUCTION CALLER",
+    "api_contract": "Reject mixed pending/approved coverage, mismatched request/approval versions and duplicate demand coverage; unavailable is never empty approval.",
+    "web_contract": "Saved legacy scope remains legacy. Modern saved context must match fresh owning review version and exact facts; JSON object key order is immaterial. Fetching/error/disabled context cannot supply cached approval. No historical recipient/allocation/approval backfill.",
+    "entry": "apps/web/src/pages/operation/purchase-request/use-request-context-readback.ts",
+    "validation": "377 related API cases (352 across six files plus25 round2), web readback10, shared context14; API/web typechecks; exact SQL package checker51 assertions. All local only.",
+    "adoption_remaining": "Existing CreateRequestWorkspace composition, reviewed refusal copy, authenticated complete-page/lifecycle acceptance and production SQL release admission remain incomplete."
+  },
+  "review_readiness": {
+    "core_inspection": "READY TO INSPECT exact draft, fingerprints, embedded rollback probe, local validation and bounded SC evidence. This is not a request to approve production application.",
+    "production_application": "NOT READY. Direct RPC branches become reachable at installation; UI default off alone is not an activation gate. Close or explicitly bound post-issue owner reconciliation, counted/provenance and forecast cohort cases before release admission.",
+    "service_dependency": "SUBSET UNKNOWN, not a blanket SC prohibition. Reuse an evidenced qualified Service approval source for new/changed formal customer-remedy execution. Unchanged procurement-authorised SC retains existing Purchasing admission. See purchase-request-service-source-evidence.json.",
+    "settings": "Separate exact-hash approval remains pending; no repeated question and no inference from foundation approval."
+  }
 }

@@ -186,6 +186,18 @@ describe("context review uses the same canonical decision door", () => {
     expect(rpc).toHaveBeenCalledTimes(1);
     expect(rpc).toHaveBeenCalledWith("purchasing_request_context_review", { p_id: id(10) });
   });
+  it.each([
+    { coverage: [], approval: null },
+    { coverage: null, approval: { request_version: 2, approval_version: 2, token: "a".repeat(32) } },
+    { coverage: [], approval: { request_version: 1, approval_version: 1, token: "a".repeat(32) } },
+    { coverage: [], approval: { request_version: 2, approval_version: 1, token: "a".repeat(32) } },
+  ])("refuses mixed pending/approved or historical-version readback", async (proof) => {
+    rpc.mockResolvedValue({ data: { available: true, review: review().reviewScope, events: [], ...proof }, error: null });
+    const response = await readReview();
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ code: "context_review_unavailable" });
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
   it("retains explicit unknown source and refuses missing RPC/data instead of empty approval", async () => {
     const data = { available: false, reason: "forecast_source_changed", request_version: 2, request_context: context(), events: [] };
     rpc.mockResolvedValueOnce({ data, error: null });

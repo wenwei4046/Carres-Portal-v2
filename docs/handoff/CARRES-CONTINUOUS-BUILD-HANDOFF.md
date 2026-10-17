@@ -9,6 +9,24 @@ Paste everything below the line into a fresh session. It is self-contained.
 
 ---
 
+**Latest readback implementation slice ·18Oct2026 · LOCAL ONLY.**
+Shared/API context review now rejects mismatched request/approval versions, mixed pending/approved
+coverage and duplicate demand IDs. Web saved-need and approval readers keep legacy / unavailable /
+pending / exact-current-approved separate; no old header, current replacement rows or timestamp
+manufactures historical recipients or approval scope. Object-key ordering does not change facts.
+The existing context query has a guarded readback adapter, default OFF and no production caller;
+refetch/error cannot reuse cached approval proof. No second form or new UI/copy was introduced.
+Validation:377 related API cases (352 across six files plus25 round2), web readback10,
+shared context14; API/web typechecks passed; SQL package
+checker still matches8a29f80c…d41e7e and51 function/grant assertions. SQL bytes unchanged.
+The existing review JSON now distinguishes inspection readiness from production application:
+core is inspectable, production activation is NOT READY. Direct RPC activation, post-issue owning
+PO reconciliation, bounded counted/provenance/cohort cases, complete form/copy and authenticated
+lifecycle remain explicit gaps. SC evidence remains in the existing source-evidence JSON: preserve
+unchanged procurement-authorised SC, classify only new/changed formal customer-remedy decisions
+against a qualified existing approval source. No blanket SC gate, invented Decision UUID or new
+Service build. Settings pending; foundation0696 already applied and must not be repeated.
+
 **Forecast/MPR current checkpoint ·18Oct2026 (supersedes older release status below).**
 #2090 deployed92378f55a7e7c8c525ef4c68590a5b050c8397ab. #2092 exact-head CI39046262388
 and Preview39046262385 passed; merged/deployed2c8b25aab77b60e69e29c752455884897d2958ac,
