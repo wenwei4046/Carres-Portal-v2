@@ -4,7 +4,7 @@ import { readRequestContext } from "./read-request-context";
 
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const context: PurchaseRequestContext = {
-  version: 1, origin: "stock_request", purpose: "ready_stock", proceedDate: "2026-10-17", serviceCaseId: null,
+  version: 1, origin: "stock_request", purpose: "ready_stock", proceedDate: "2026-10-17", stockDeliveryDate: "2026-11-20", serviceCaseId: null,
   reason: null, companyPersonName: "", projectReference: "", explanation: "", forecastChangeReason: "", recipients: [],
   lines: [{ id: id(1), sku: "TEST-SKU", qty: 500, attrs: { fabric: "TEST" }, recipientNeeds: [], stockProposals: [], allocations: [{ id: id(2), destinationId: id(3), supplierDeliveryDate: "2026-11-20", qty: 500, recipients: [] }] }],
 };

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { purchaseRequestContextSchema, type PurchaseRequestContext } from "./purchase-request-context";
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const recipient = (n: number) => ({ id: id(n), company: "TEST", name: "TEST recipient", phone: "TEST contact", method: "delivery" as const, deliveryDate: "2026-11-20", addressLine1: "TEST street", addressLine2: "TEST block", city: "TEST city", state: "TEST state", postcode: "TEST", buildingType: "TEST", floor: "100A", lift: "has_lift" as const, pickupLocationId: null, collectedBy: "" });
-const context = (): PurchaseRequestContext => ({ version: 1, origin: "manual", purpose: "general_purchase", proceedDate: "2026-10-20", serviceCaseId: null, reason: "purchase_for_others", companyPersonName: "TEST company", projectReference: "", explanation: "", forecastChangeReason: "", recipients: [recipient(1), recipient(2)], lines: [{ id: id(3), sku: "TEST-SKU", qty: 5, attrs: null, recipientNeeds: [{ recipientId: id(1), qty: 3 }, { recipientId: id(2), qty: 2 }], stockProposals: [], allocations: [{ id: id(4), destinationId: id(10), supplierDeliveryDate: "2026-11-10", qty: 3, recipients: [{ recipientId: id(1), qty: 3 }] }, { id: id(5), destinationId: id(11), supplierDeliveryDate: "2026-11-10", qty: 2, recipients: [{ recipientId: id(2), qty: 2 }] }] }] });
+const context = (): PurchaseRequestContext => ({ version: 1, origin: "manual", purpose: "general_purchase", proceedDate: "2026-10-20", stockDeliveryDate: null, serviceCaseId: null, reason: "purchase_for_others", companyPersonName: "TEST company", projectReference: "", explanation: "", forecastChangeReason: "", recipients: [recipient(1), recipient(2)], lines: [{ id: id(3), sku: "TEST-SKU", qty: 5, attrs: null, recipientNeeds: [{ recipientId: id(1), qty: 3 }, { recipientId: id(2), qty: 2 }], stockProposals: [], allocations: [{ id: id(4), destinationId: id(10), supplierDeliveryDate: "2026-11-10", qty: 3, recipients: [{ recipientId: id(1), qty: 3 }] }, { id: id(5), destinationId: id(11), supplierDeliveryDate: "2026-11-10", qty: 2, recipients: [{ recipientId: id(2), qty: 2 }] }] }] });
 describe("approved purchase request context", () => {
   it("keeps same SKU5 split3/2, then stock1 leaves purchase2/2 and recipient need3/2", () => {
     const request = context();
@@ -68,9 +68,12 @@ describe("approved purchase request context", () => {
     expect(purchaseRequestContextSchema.safeParse(request).success).toBe(true);
   });
   it("accepts manual RS outside forecast quantity caps, without invented recipients or reason", () => {
-    const request = context(); Object.assign(request, { purpose: "ready_stock", origin: "stock_request", reason: null, companyPersonName: "", recipients: [] });
+    const request = context(); Object.assign(request, { purpose: "ready_stock", origin: "stock_request", stockDeliveryDate: "2026-11-20", reason: null, companyPersonName: "", recipients: [] });
     const line = request.lines[0]!; line.qty = 500; line.recipientNeeds = []; line.allocations = [{ ...line.allocations[0]!, qty: 500, recipients: [] }];
     expect(purchaseRequestContextSchema.safeParse(request).success).toBe(true);
+    request.stockDeliveryDate = null;
+    expect(purchaseRequestContextSchema.safeParse(request).success).toBe(false);
+    request.stockDeliveryDate = "2026-11-20";
     request.recipients = [recipient(1)];
     expect(purchaseRequestContextSchema.safeParse(request).success).toBe(false);
   });

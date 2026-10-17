@@ -63,6 +63,8 @@ export const purchaseRequestContextSchema = z.object({
   origin: z.enum(["manual", "forecast_suggestion", "stock_request"]),
   purpose: z.enum(["service_case", "general_purchase", "ready_stock"]),
   proceedDate: date,
+  // RS need date is distinct from each supplier allocation's production date.
+  stockDeliveryDate: date.nullable(),
   serviceCaseId: z.string().uuid().nullable(),
   reason: z.enum(["company_use", "staff_purchase", "purchase_for_others", "other"]).nullable(),
   companyPersonName: z.string().trim(),
@@ -74,6 +76,8 @@ export const purchaseRequestContextSchema = z.object({
 }).strict().superRefine((request, ctx) => {
   const issue = (path: Array<string | number>, message: string) => ctx.addIssue({ code: "custom", path, message });
   const rs = request.purpose === "ready_stock";
+  if (rs && !request.stockDeliveryDate) issue(["stockDeliveryDate"], "Choose the Delivery Date");
+  if (!rs && request.stockDeliveryDate !== null) issue(["stockDeliveryDate"], "Recipient dates belong to their recipients");
   if (rs && request.origin === "manual") issue(["origin"], "Stock requests start in Forecast Purchase");
   if (!rs && request.origin !== "manual") issue(["origin"], "This entry creates stock requests");
   if (rs && request.recipients.length) issue(["recipients"], "Stock requests have no final recipient");

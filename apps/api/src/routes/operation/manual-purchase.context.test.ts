@@ -9,7 +9,7 @@ import { loadPurchaseRequestSettings } from "../../lib/purchasing-settings";
 import app from "../../index";
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const env = { SUPABASE_URL: "https://test.supabase.co", SUPABASE_ANON_KEY: "test-anon", SUPABASE_SERVICE_ROLE_KEY: "test-service", SUPABASE_JWT_SECRET: "unused" };
-const context = (): PurchaseRequestContext => ({ version: 1, origin: "stock_request", purpose: "ready_stock", proceedDate: "2026-11-01", serviceCaseId: null, reason: null, companyPersonName: "", projectReference: "", explanation: "", forecastChangeReason: "", recipients: [], lines: [{ id: id(1), sku: "TEST-SKU", qty: 500, attrs: null, recipientNeeds: [], stockProposals: [], allocations: [{ id: id(2), destinationId: id(3), supplierDeliveryDate: "2026-11-20", qty: 500, recipients: [] }] }] });
+const context = (): PurchaseRequestContext => ({ version: 1, origin: "stock_request", purpose: "ready_stock", proceedDate: "2026-11-01", stockDeliveryDate: "2026-12-01", serviceCaseId: null, reason: null, companyPersonName: "", projectReference: "", explanation: "", forecastChangeReason: "", recipients: [], lines: [{ id: id(1), sku: "TEST-SKU", qty: 500, attrs: null, recipientNeeds: [], stockProposals: [], allocations: [{ id: id(2), destinationId: id(3), supplierDeliveryDate: "2026-11-20", qty: 500, recipients: [] }] }] });
 const rpc = vi.fn();
 async function post(path: string, body: unknown, signedIn = true) {
   const token = signedIn ? await signTestJwt(id(99), { email: "test@carres.test", app_metadata: { role: "operation" } }) : null;

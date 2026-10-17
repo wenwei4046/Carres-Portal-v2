@@ -9,7 +9,7 @@ const line = (): RequestLine => ({
   allocations: [{ id: "buy", destinationId: "destination", supplierDeliveryDate: "2026-11-17", qty: 4, recipients: [{ recipientId: "a", qty: 2 }, { recipientId: "b", qty: 2 }] }],
 });
 const context = (): PurchaseRequestContext => ({
-  version: 1, origin: "manual", purpose: "general_purchase", proceedDate: "2026-10-17",
+  version: 1, origin: "manual", purpose: "general_purchase", proceedDate: "2026-10-17", stockDeliveryDate: null,
   serviceCaseId: null, reason: "purchase_for_others", companyPersonName: "TEST", projectReference: "TEST project", explanation: "", forecastChangeReason: "",
   recipients: ["a", "b"].map((id) => ({ id, company: "", name: `TEST ${id}`, phone: "TEST", method: "self_pickup", deliveryDate: "2026-11-17", addressLine1: "", addressLine2: "", city: "", state: "", postcode: "", buildingType: "", floor: "", lift: null, pickupLocationId: "site", collectedBy: "TEST" })),
   lines: [line()],

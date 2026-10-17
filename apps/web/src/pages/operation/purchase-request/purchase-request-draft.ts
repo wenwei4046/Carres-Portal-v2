@@ -48,6 +48,7 @@ export function changeRequestPurpose(context: PurchaseRequestContext, purpose: P
     purpose,
     origin: stock ? "stock_request" : "manual",
     serviceCaseId: null,
+    stockDeliveryDate: null,
     reason: null,
     companyPersonName: "",
     projectReference: "",

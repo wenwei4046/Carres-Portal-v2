@@ -31,9 +31,9 @@ returns void language plpgsql set search_path = public, pg_temp as $fn$
 declare
   v_line jsonb; v_recipient jsonb; v_allocation jsonb; v_stock jsonb;
   v_purpose text := p_context->>'purpose'; v_qty integer; v_stock_qty integer;
-  v_fact jsonb; v_requested integer; v_allocated integer; v_recipient_id text;
+  v_fact jsonb; v_floor_days integer; v_settings public.purchasing_settings%rowtype; v_requested integer; v_allocated integer; v_recipient_id text;
 begin
-  perform public._purchasing_context_object(p_context,'{"version":"number","origin":"string","purpose":"string","proceedDate":"string","serviceCaseId":"string|null","reason":"string|null","companyPersonName":"string","projectReference":"string","explanation":"string","forecastChangeReason":"string","recipients":"array","lines":"array"}'::jsonb);
+  perform public._purchasing_context_object(p_context,'{"version":"number","origin":"string","purpose":"string","proceedDate":"string","stockDeliveryDate":"string|null","serviceCaseId":"string|null","reason":"string|null","companyPersonName":"string","projectReference":"string","explanation":"string","forecastChangeReason":"string","recipients":"array","lines":"array"}'::jsonb);
   if jsonb_typeof(p_context) <> 'object' or jsonb_typeof(p_context->'version') is distinct from 'number' or p_context->>'version' is distinct from '1'
      or v_purpose is null or v_purpose not in ('general_purchase','service_case','ready_stock')
      or jsonb_typeof(p_context->'lines') is distinct from 'array'
@@ -47,9 +47,23 @@ begin
     raise exception 'proceed date is required' using errcode='22023', detail='invalid_param';
   end if;
   if exists (select 1 from jsonb_object_keys(p_context) k where k not in
-    ('version','origin','purpose','proceedDate','serviceCaseId','reason',
+    ('version','origin','purpose','proceedDate','stockDeliveryDate','serviceCaseId','reason',
      'companyPersonName','projectReference','explanation','forecastChangeReason','recipients','lines')) then
     raise exception 'unknown purchase field' using errcode='22023', detail='invalid_param';
+  end if;
+  select * into v_settings from public.purchasing_settings where id=1;
+  if not found or v_settings.purchase_request_normal_days is null or v_settings.purchase_request_normal_days<0
+    or v_settings.purchase_request_service_days is null or v_settings.purchase_request_service_days<0 then
+    raise exception 'purchase request date settings unavailable' using errcode='22023',detail='request_settings_unavailable';
+  end if;
+  v_floor_days:=case when v_purpose='service_case' then v_settings.purchase_request_service_days else v_settings.purchase_request_normal_days end;
+  if v_purpose='ready_stock' then
+    if p_context->'stockDeliveryDate'='null'::jsonb or (p_context->>'stockDeliveryDate')!~'^\d{4}-\d{2}-\d{2}$'
+      or (p_context->>'stockDeliveryDate')::date < (p_context->>'proceedDate')::date+v_floor_days then
+      raise exception 'stock request Delivery Date is missing or too early' using errcode='22023',detail='recipient_date_too_early';
+    end if;
+  elsif p_context->'stockDeliveryDate'<>'null'::jsonb then
+    raise exception 'recipient dates belong to their recipients' using errcode='22023',detail='invalid_param';
   end if;
   if p_context->>'origin' is null or (v_purpose='ready_stock' and p_context->>'origin' not in ('stock_request','forecast_suggestion'))
     or (v_purpose<>'ready_stock' and p_context->>'origin' is distinct from 'manual') then
@@ -84,6 +98,7 @@ begin
     perform public._purchasing_context_object(v_recipient,'{"id":"string","company":"string","name":"string","phone":"string","method":"string","deliveryDate":"string","addressLine1":"string","addressLine2":"string","city":"string","state":"string","postcode":"string","buildingType":"string","floor":"string","lift":"string|null","pickupLocationId":"string|null","collectedBy":"string"}'::jsonb);
     if (v_recipient->>'deliveryDate')!~'^\d{4}-\d{2}-\d{2}$' then raise exception 'ISO date required' using errcode='22023'; end if;
     perform (v_recipient->>'id')::uuid, (v_recipient->>'deliveryDate')::date;
+    if (v_recipient->>'deliveryDate')::date < (p_context->>'proceedDate')::date+v_floor_days then raise exception 'recipient date too early' using errcode='22023',detail='recipient_date_too_early'; end if;
     if v_recipient->'lift' <> 'null'::jsonb and v_recipient->>'lift' not in ('has_lift','no_lift') then raise exception 'invalid lift' using errcode='22023'; end if;
     if v_recipient->'pickupLocationId' <> 'null'::jsonb then perform (v_recipient->>'pickupLocationId')::uuid; end if;
     if nullif(btrim(v_recipient->>'name'),'') is null or nullif(btrim(v_recipient->>'phone'),'') is null then
