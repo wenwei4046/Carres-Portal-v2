@@ -13,7 +13,7 @@ import { matchesRegisterColumnFilters, type DatePreset, type RegisterColumnQuery
 //     right of the caller's toolbar children)
 //   · ONE engine extension, done once so every register gets it (Law 13):
 //     a `selectable` grid shows a selection bar — "N selected · Clear ·
-//     Export Excel (N)" — and that export writes the SELECTED rows only.
+//     selected outputs in Page tools — that export writes the SELECTED rows only.
 //     The toolbar's own Export Excel stays the current view (Law 9).
 //   · when a page wires `onRowClick` (detail panel), row click no longer ALSO
 //     toggles selection — the checkbox column owns selection. Pages without
@@ -3593,16 +3593,11 @@ function DataGridInner<T>({
           {selectionPrimary}
           <div className={styles.toolbarSpacer} />
           {!hideSelectionExport && (
-            <button
-              type="button"
-              className={styles.toolbarPill}
-              onClick={() => {
-                void exportRows(selectedOrIndeterminateVisibleRows);
-              }}
-            >
-              <Icon name="download" />
-              <span>Export Excel ({selectedOrIndeterminateVisibleRows.length})</span>
-            </button>
+            <div className={styles.pageTools}>
+              <CMenu label="Page tools" trigger={<Button iconOnly icon="overflow" aria-label="Page tools" />}
+                items={[{ key: "selection-export", label: `Export Excel (${selectedOrIndeterminateVisibleRows.length})`, icon: "download",
+                  disabled: exportLoading, onSelect: () => { void exportRows(selectedOrIndeterminateVisibleRows); } }]} />
+            </div>
           )}
           {(selectionActions ?? [])
             /* ⭐ AN ACTION THAT CANNOT MEAN ANYTHING FOR THIS SELECTION IS NOT

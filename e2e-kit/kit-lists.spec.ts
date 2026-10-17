@@ -198,6 +198,11 @@ for (const width of WIDTHS) {
     expect(m!.listSpare, "ticked: the list scrolls sideways").toBeLessThanOrEqual(1);
     expect(await carresCheck(page), "ticked: carres-check.js").toEqual(PASS);
 
+    expect((await page.getByTestId("selection-bar").boundingBox())!.height).toBe(36);
+    await page.getByTestId("selection-bar").getByRole("button", { name: "Page tools", exact: true }).click();
+    await expect(page.getByRole("menuitem", { name: "Export Excel (1)", exact: true })).toBeVisible();
+    expect(await carresCheck(page), "selection export remains reachable inside the existing menu").toEqual(PASS);
+    await page.keyboard.press("Escape");
     await useStock.click();
     /* Both Units are held for the line: nothing is left to buy on SO-1301, so
        it leaves `To buy` and its tick goes with it. */

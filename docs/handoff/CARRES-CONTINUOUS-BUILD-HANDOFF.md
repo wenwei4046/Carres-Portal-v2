@@ -18,9 +18,25 @@ read-only authenticated verification of the current purchasing checklist. Earlie
 Manual Purchase” statements below are historical and superseded for this scope. Purchasing §5.2,
 COPY and the same UI MASTER own the approved contract; document baseline PR#2089, head7a6bd332a.
 The narrow-panel amendment supersedes the earlier Tasks-only compact-menu fallback, with shared
-264/320 overlays below1100. Shared implementation is on `codex/forecast-mpr-shell`, not deployed.
-12 Forecast shell browser checks PASS; wider MPR persistence, source/stock/approval/issue/send and
-production proof remain open. Desktop dirty work is preserved. No supplier sending is authorised.
+264/320 overlays below1100. Shared Shell PR#2090 passed exact-head CI39038029507 and Preview39038029521 at
+ae5fd1770d367282498db6abc372cf215b77d923, merged as92378f55a7e7c8c525ef4c68590a5b050c8397ab.
+Production deployment39040933172 passed; all five production surfaces converged to that SHA.
+Authenticated hidden-IAB read-only walks of MPR and Forecast at1025/1164/1440 verified temporary64
+menu and saved220 restoration, Summary264/Tasks320 overlays with unchanged canvas, Forecast Summary
+focus return and Tasks focus return. No request/order/task/supplier write was performed; viewport reset.
+Actual deviations found: both DataGrid toolbars remain40 instead of MASTER36; MPR's legacy Show filters
+button loses close focus. The bounded correction reuses the existing CIconButton and shared DataGrid CSS
+on `codex/forecast-mpr-live-check-fixes`; local Forecast/MPR browser13/13, MPR unit176/176 and web build pass. The changed selected toolbar is also36 and one line. Not deployed until its own exact-head gates, baseline review and release checks. CI39043269468 on776971009 passed types/unit/build and114 page cases, but3 selected SO Batch cases exposed Export Excel overflow. The shared selection export now uses the existing Page tools menu; main business actions stay on the36px row. Targeted browser3/3, SO Batch/Payment export unit211/211 and web build pass. A full local kit check and fresh final-head CI are running; do not count the failed head as passed. Linux baseline workflow39042785594 passed on6041b450b;28 changed pictures were reviewed: shared DataGrid toolbar moves Forecast/SO Batch/Workspace table geometry by4px, without replacing Workspace's own flow. Sales Order/Tasks pictures unchanged.
+Do not call the full page acceptance passed before those corrections are released and read back.
+
+Foundation PR#2091 is merged/deployed (08d5cfb10, migration0696), byte-identical to Jess's approved
+foundation draft SHA256 c1b34b3a2771e68e1629c665b57823dc7be7ddefc68e6262a63f21ae761dc459.
+Production tracker20261017132212; SQL MD5 a441435a3a5d4f79765f54256fd88be9. No RLS/backfill,
+record-count change or purchasing-function change in its immediate read-only post-check.
+Guarded context/Settings work remains local on `codex/forecast-mpr-context` at2bbb4a285; its RS need date is now distinct from supplier allocation dates; shared9/API8/draft+readback11, local GP/RS500+12 refusal controls and web/API build/types pass;
+new fields are unmounted, owning context/approval/reapproval/coverage/send writes are not complete.
+The independent Settings SQL review draft there is not approved/applied; foundation approval does not cover it.
+Wider MPR persistence, source/stock/approval/issue/send production proof remains open. Desktop dirty work is preserved. No supplier sending is authorised.
 
 ## 0 · Owner scope carried forward (Jess, 14 Oct 2026 — do not ask her to reconfirm)
 

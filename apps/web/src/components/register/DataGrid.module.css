@@ -117,12 +117,12 @@
 }
 
 /* ── Reference geometry. The opt-in names an intent (the Register template),
-   not a second look: it fixes the toolbar to one 40px row and the footer to
+   not a second look: it fixes the toolbar to one 36px row and the footer to
    one unwrapped 44px line. ── */
 .rootReference .toolbar {
   box-sizing: border-box;
-  height: 40px;
-  min-height: 40px;
+  height: 36px;
+  min-height: 36px;
   padding: 0;
   flex-wrap: nowrap;
   overflow: hidden;
@@ -458,10 +458,10 @@ div:first-child > .columnsMenuGroup {
    Replaces the toolbar while ticked rows are visible: the template's
    selection pill — select wash and ink, a 13/600 count, 28px buttons. */
 .root .toolbar.selectionBar {
-  height: auto;
-  min-height: 40px;
+  height: 36px;
+  min-height: 36px;
   overflow: visible;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 10px;
   padding: 0 6px 0 14px;
   border: 0;
@@ -1542,8 +1542,8 @@ div:first-child > .columnsMenuGroup {
   flex: none;
 }
 .rootReference .toolbar:not(.selectionBar) {
-  height: 40px;
-  min-height: 40px;
+  height: 36px;
+  min-height: 36px;
   margin-bottom: 0;
 }
 .rootReference.rootLabelledToolbar .toolbar {

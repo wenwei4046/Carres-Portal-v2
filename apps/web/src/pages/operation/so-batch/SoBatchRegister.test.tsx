@@ -386,7 +386,7 @@ function purchaseOrdersItem(): HTMLElement {
 
 /** The selection bar's buttons by their words; the small view button has none. */
 const barButtons = () => within(screen.getByTestId("selection-bar")).getAllByRole("button")
-  .filter((button) => button.getAttribute("data-testid") !== "so-batch-view").map((button) => button.textContent);
+  .filter((button) => button.getAttribute("data-testid") !== "so-batch-view").map((button) => button.getAttribute("aria-label") ?? button.textContent);
 
 /** The words under and beside a row's Status pill, without its PO numbers. */
 const statusLines = (orderId: string) =>
@@ -1228,7 +1228,7 @@ describe("selection — the parent checkbox is ALL eligible child demand", () =>
        `Use stock` joins only while a ticked line has a free Unit. The view
        button is there once, small, after the acts: the ticks are the same in
        every grouping, so the grouping can still be changed. */
-    expect(barButtons()).toEqual(["Clear", "Issue PO", "Export Excel (1)"]);
+    expect(barButtons()).toEqual(["Clear", "Issue PO", "Page tools"]);
     expect(screen.getAllByTestId("so-batch-view")).toHaveLength(1);
     expect(within(bar).getByTestId("so-batch-view")).toHaveAccessibleName("View: By sales order");
     expect(screen.queryByTestId("so-batch-selection-bar")).not.toBeInTheDocument();
@@ -3577,7 +3577,7 @@ describe("Use stock on the selection bar (owner 13 Oct 2026, round 3)", () => {
     await waitFor(() => expect(reads()).toEqual(["/api/operation/purchase/demands/o1/ready-stock"]));
     await settle();
     /* The selection bar is there, with its usual acts and nothing more. */
-    expect(barButtons()).toEqual(["Clear", "Issue PO", "Export Excel (1)"]);
+    expect(barButtons()).toEqual(["Clear", "Issue PO", "Page tools"]);
     expect(screen.queryByTestId("so-batch-use-stock")).toBeNull();
     expect(posts()).toEqual([]);
   });
@@ -3593,7 +3593,7 @@ describe("Use stock on the selection bar (owner 13 Oct 2026, round 3)", () => {
     expect(useStock().textContent).toBe("Use stock · 2");
     expect([...screen.getByTestId("so-batch-selection-actions").children].map((el) => el.getAttribute("data-testid")))
       .toEqual(["so-batch-use-stock", "so-batch-duty-chip", "so-batch-issue"]);
-    expect(barButtons()).toEqual(["Clear", "Use stock · 2", "Issue PO", "Export Excel (2)"]);
+    expect(barButtons()).toEqual(["Clear", "Use stock · 2", "Issue PO", "Page tools"]);
     /* Only the ticked Sales Orders were read, and reading reserved nothing. */
     expect([...new Set(reads())]).toEqual([
       "/api/operation/purchase/demands/o1/ready-stock",
