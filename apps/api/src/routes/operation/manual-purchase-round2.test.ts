@@ -519,4 +519,15 @@ describe("context source readback across merged and partial POs", () => {
     const res = await call(""); const body = await res.json() as { linesUnavailable: boolean; lines: unknown[] };
     expect(body.linesUnavailable).toBe(true); expect(body.lines).toEqual([]);
   });
+  it("retains a legacy stored PO residual beside a new generic source without assigning the full total to each PO", async () => {
+    const data = tables([{ po_line_id: "pl-context-b", purchase_demand_id: LINE, qty: 1 }]);
+    data.purchase_requests = [request({ request_version: 0, approval_scope: null })];
+    data.purchase_demands = [line({ request_line_id: null, fulfilment_kind: "purchase", qty: 3, approved_qty: 3, issued_qty: 3, po_id: "PO-CONTEXT-A" })];
+    data.purchase_order_lines = [physical[1]!];
+    vi.mocked(userClient).mockReturnValue(makeSb(data));
+    const res = await call(""); const body = await res.json() as { linesUnavailable: boolean; lines: Array<{ allocations: Array<{ poId: string; qty: number }> }> };
+    expect(body.linesUnavailable).toBe(false);
+    expect(body.lines[0]!.allocations).toEqual([{ poId: "PO-CONTEXT-B", qty: 1, destinationId: DEST }, { poId: "PO-CONTEXT-A", qty: 2, destinationId: DEST }]);
+  });
+
 });

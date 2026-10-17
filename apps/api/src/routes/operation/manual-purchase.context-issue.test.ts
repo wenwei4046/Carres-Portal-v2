@@ -60,6 +60,15 @@ describe("context issue keeps the canonical PO door", () => {
     const lines = rpc.mock.calls.find(([fn]) => fn === "purchasing_issue_pos_batch")![1].p_pos[0].lines;
     expect(lines).toHaveLength(1); expect(lines[0].qty).toBe(4);
   });
+  it("merges a legacy request without inventing its approval version or recipient mapping", async () => {
+    Object.assign(tables.purchase_requests![1]!, { request_version: 0, request_context: null, approval_version: null, approval_scope: null });
+    const input = body(); input.contextIssue.requests = [input.contextIssue.requests[0]!];
+    expect((await issue(input)).status).toBe(200);
+    const lines = rpc.mock.calls.find(([fn]) => fn === "purchasing_issue_pos_batch")![1].p_pos[0].lines;
+    expect(lines).toHaveLength(1); expect(lines[0].qty).toBe(4);
+    expect(lines[0].request_sources[1]).toMatchObject({ demand_id: id(12), qty: 2, request_version: 0, approval_version: null, approval_token: null, recipients: null });
+    expect(tables.purchase_requests![1]).toMatchObject({ request_version: 0, approval_scope: null, approval_version: null });
+  });
   it("passes an explicit partial recipient allocation without cutting the other request", async () => {
     const input = { ...body(), contextIssue: { ...body().contextIssue, allocations: [{ demandId: id(11), qty: 1, recipients: [{ recipientId: id(70), qty: 1 }] }] } };
     expect((await issue(input)).status).toBe(200);

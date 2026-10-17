@@ -384,14 +384,15 @@ async function withCatalogAndLineage(
     lineIds.length > 0
       ? await sb
           .from("purchase_order_lines")
-          .select("po_id, demand_id, qty, destination_id")
+          .select("id, po_id, demand_id, qty, destination_id")
           .in("demand_id", lineIds)
       : { data: [] as Array<Record<string, unknown>>, error: null };
   if (lineageErr) return { error: lineageErr };
   let lineagePoLines: Array<Record<string, unknown>> = legacyPoLines ?? [];
-  const contextIssued = lines.filter(l => l.request_line_id != null && Number(l.issued_qty ?? 0) > 0);
-  if (contextIssued.length) {
-    const sourceRead = await sb.from("po_line_sources").select("po_line_id, purchase_demand_id, qty").in("purchase_demand_id", contextIssued.map(l => l.id as string));
+  const sourceIssued = lines.filter(l => Number(l.issued_qty ?? 0) > 0);
+  const contextIssued = sourceIssued.filter(l => l.request_line_id != null);
+  if (sourceIssued.length) {
+    const sourceRead = await sb.from("po_line_sources").select("po_line_id, purchase_demand_id, qty").in("purchase_demand_id", sourceIssued.map(l => l.id as string));
     if (sourceRead.error) return { error: sourceRead.error };
     const sourceIds = [...new Set((sourceRead.data ?? []).map(s => s.po_line_id as string))];
     const physicalRead = sourceIds.length ? await sb.from("purchase_order_lines").select("id, po_id, destination_id, qty, received_qty").in("id", sourceIds) : { data: [], error: null };
@@ -406,8 +407,8 @@ async function withCatalogAndLineage(
     for (const line of contextIssued) {
       if (attributed.filter(pl => pl.demand_id === line.id).reduce((n, pl) => n + Number(pl.qty), 0) !== Number(line.issued_qty)) return { error: { message: "This work changed. Refresh and try again." } };
     }
-    const contextualIds = new Set(contextIssued.map(l => l.id));
-    lineagePoLines = [...lineagePoLines.filter(pl => !contextualIds.has(pl.demand_id)), ...attributed];
+    const genericPhysicalIds = new Set(sourceIds);
+    lineagePoLines = [...lineagePoLines.filter(pl => !genericPhysicalIds.has(pl.id as string)), ...attributed];
   }
   const poIdsByDemand = new Map<string, Set<string>>();
   const orderedByPo = new Map<string, number>();
@@ -454,15 +455,18 @@ async function withCatalogAndLineage(
   /* A pre-0361 issue left no `demand_id` on the PO line; the demand's own
      `po_id` + `issued_qty` is the only stored account of that document. */
   for (const l of lines) {
-    if (l.po_id != null && !lineageDemands.has(l.id as string)) {
+    const knownQty = (allocationsByDemand.get(l.id as string) ?? []).reduce((n, a) => n + a.qty, 0);
+    const legacyResidual = Math.max(0, Number(l.issued_qty ?? 0) - knownQty);
+    if (l.po_id != null && (!lineageDemands.has(l.id as string) || (l.request_line_id == null && legacyResidual > 0))) {
       orderedByPo.set(
         l.po_id as string,
-        (orderedByPo.get(l.po_id as string) ?? 0) + Number(l.issued_qty ?? 0),
+        (orderedByPo.get(l.po_id as string) ?? 0) + legacyResidual,
       );
       allocationsByDemand.set(l.id as string, [
+        ...(allocationsByDemand.get(l.id as string) ?? []),
         {
           poId: l.po_id as string,
-          qty: Number(l.issued_qty ?? 0),
+          qty: legacyResidual,
           destinationId: (l.destination_id as string | null) ?? null,
         },
       ]);
@@ -1190,7 +1194,16 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
       history.push({ ...facts, ...withActor(actorId) });
     }
   } else {
+  const recordedPoIds = new Set<string>();
   for (const e of roundEvents) {
+    if (e.kind === "po_issued") {
+      const proof = e.changes as { record_type?: string; po_id?: string; allocations?: Array<{ qty: number }> } | null;
+      if (proof?.record_type === "po_issue" && proof.po_id && Array.isArray(proof.allocations)) {
+        history.push({ kind: "po_issued", occurred_at: e.occurred_at, ...withActor(e.actor_id), po_no: proof.po_id, units: proof.allocations.reduce((n, a) => n + Number(a.qty), 0) });
+        recordedPoIds.add(proof.po_id);
+      }
+      continue;
+    }
     history.push({
       kind: e.kind,
       occurred_at: e.occurred_at,
@@ -1201,6 +1214,7 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     });
   }
   for (const p of pos) {
+    if (recordedPoIds.has(p.id)) continue;
     history.push({
       kind: "po_issued",
       occurred_at: p.placed_at ?? request.created_at,
@@ -2912,11 +2926,11 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
       const output: Record<string, unknown>[] = [];
       for (const line of po.lines as Array<Record<string, unknown>>) {
         const owner = (allLines ?? []).find(l => l.id === line.demand_id);
-        if (!owner || !contextRequests.has(owner.request_id as string)) { output.push(line); continue; }
-        const reviewed = reviewedRequests.get(owner.request_id as string)!;
+        if (!owner) { output.push(line); continue; }
+        const reviewed = reviewedRequests.get(owner.request_id as string);
         const override = issueOverrides.get(owner.id as string);
-        const source = { demand_id: owner.id, qty: line.qty, request_version: reviewed.requestVersion,
-          approval_version: reviewed.approvalVersion, approval_token: reviewed.approvalToken, recipients: override?.recipients ?? null };
+        const source = { demand_id: owner.id, qty: line.qty, request_version: reviewed?.requestVersion ?? 0,
+          approval_version: reviewed?.approvalVersion ?? null, approval_token: reviewed?.approvalToken ?? null, recipients: override?.recipients ?? null };
         const attrs = line.attrs && typeof line.attrs === "object" && !Array.isArray(line.attrs) && Object.keys(line.attrs).length ? line.attrs : null;
         const key = `${line.sku}|${JSON.stringify(canonical(attrs))}`;
         const saved = merged.get(key);

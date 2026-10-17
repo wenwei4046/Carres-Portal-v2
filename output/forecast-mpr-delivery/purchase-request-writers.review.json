@@ -1,11 +1,12 @@
 {
   "status": "REVIEW PACKAGE ONLY; NOT APPROVED; NOT A MIGRATION; NOT READY FOR PRODUCTION ACTIVATION",
-  "draft_sha256": "7e4f720cd708c19a90ac17e1eced5d7cb1573597a582b44ca098814902f142ff",
-  "draft_file_md5": "6636979cdd369bed179dfdf6bf4f08c6",
+  "draft_sha256": "8a29f80c82cc122e0378aafb7cddb287376bfbf891db423e2975921f33d41e7e",
+  "draft_file_md5": "d030fa5dacb2c12bc59e46e89f6ac72a",
   "validation_environment": "Owned loopback replay only; all synthetic business fixtures roll back; no production writes",
   "validated_core": [
     "Canonical GP partial1+remainder1, exact recipient/event/source/Unit ownership",
     "Two actual approved MPRs merge to ONE physical PO line qty2 with exact source1+1",
+    "Known-intent legacy/context MPRs merge to ONE physical RS qty2 source1+1; legacy approval_scope/version and recipient mapping remain explicitly unknown; legacy header/quantity gates retained",
     "RS approved500 issues partial1+1 without a display cap or final recipient; own exact supply excluded precisely",
     "Counted RS qty2 issues without fake Units and remains free supply",
     "Exact-key retry and read-only lost-response recovery; changed scope refused",
@@ -17,7 +18,7 @@
   "explicit_incomplete_or_closed": [
     "SC boundary remains for controller review: existing procurement-approved unchanged scope is NOT blanket-disabled. Case action/progress/evidence/Service Note and generic approvals were enumerated; they do not establish a general formal-remedy approval contract. New/changed formal customer remedy execution remains Service-owned/unverified; no invented Decision UUID or new Service implementation",
     "Mixed-owner counted FORECAST supply attribution: fails before initial issue; no guessed provenance",
-    "Mixed legacy/context requests sharing the same physical item line still need coherent consolidation support",
+    "One physical line with differing/unknown source supply intents is refused before issue; no automatic regrouping or invented legacy stock intent. Known-intent mixed legacy/context consolidation is implemented without backfilling historical approvals/recipient scope",
     "Part-issued multi-forecast-cohort source transitions/reapproval need complete owner-bound source verification; no silent snapshot rewrite",
     "Existing PO Deliver To parent move and post-issue revisions/cancel/reallocation need full MPR source/Unit/recipient reconciliation beyond the tested source-copy helper",
     "Form composition/adoption remains unmounted; specific context refusal copy, authenticated lifecycle and exact-version send/task completion still owed"
@@ -35,7 +36,7 @@
     },
     {
       "signature": "_operation_create_po_inner_admitted(uuid, uuid, jsonb, date, integer[], text, uuid, uuid, jsonb)",
-      "body_md5": "2e771a47df082aa7f1f1fc69d39a4ddc",
+      "body_md5": "c54e9e184ed0e165f073e5a446cbb50a",
       "security_definer": true,
       "authenticated_execute": false,
       "anon_execute": false
@@ -133,7 +134,14 @@
     },
     {
       "signature": "_purchasing_context_issue_preflight(jsonb)",
-      "body_md5": "262c6df3f20546e1ca25e21714a1f249",
+      "body_md5": "fb5dc5095b362a42a6c85265459383a8",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_context_legacy_issue_scope(uuid)",
+      "body_md5": "ba2f5f4cd9bec14c2ff58340e0b8670d",
       "security_definer": false,
       "authenticated_execute": false,
       "anon_execute": false
@@ -154,7 +162,7 @@
     },
     {
       "signature": "_purchasing_context_record_issued_source(uuid, integer, text)",
-      "body_md5": "01a4a212548a0155bc205de97b03fac0",
+      "body_md5": "12ebfdfee5c629b9d796de054d6b35f9",
       "security_definer": false,
       "authenticated_execute": false,
       "anon_execute": false
@@ -308,7 +316,7 @@
     },
     {
       "signature": "purchasing_issue_pos_batch(jsonb)",
-      "body_md5": "fa13f3a6fb6e525d536d75eee6eb7aa1",
+      "body_md5": "e0460c396fdc85821675b27c223ed542",
       "security_definer": true,
       "authenticated_execute": true,
       "anon_execute": false

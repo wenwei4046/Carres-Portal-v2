@@ -57,8 +57,8 @@ controller must inspect these absolute paths rather than its own checkout's hand
 **Current writer package ·18Oct2026 · LOCAL ONLY; NOT APPROVED, NOT A MIGRATION, NOT READY FOR PRODUCTION ACTIVATION.**
 Stable checkout remains `/Users/chaichiewlim/.codex/worktrees/forecast-mpr-context/Carres-Portal-v2/`.
 The existing `output/forecast-mpr-delivery/purchase-request-writers.draft.sql` is now a coherent
-core inspection package, SHA256 `7e4f720cd708c19a90ac17e1eced5d7cb1573597a582b44ca098814902f142ff`.
-Alongside it: `purchase-request-writers.review.json` (exact hash,50 function fingerprints/grants,
+core inspection package, SHA256 `8a29f80c82cc122e0378aafb7cddb287376bfbf891db423e2975921f33d41e7e`.
+Alongside it: `purchase-request-writers.review.json` (exact hash,51 function fingerprints/grants,
 validated scope, closed/incomplete cases and recovery) and `purchase-request-writers.rollback-probe.sql`
 (exact embedded draft). LOCAL probe reached deliberate PROBE_ROLLBACK: exact DDL/functions/grants,
 13 owning-source guards, invalid-scope/no-account negative controls, relative business counts,
@@ -96,6 +96,23 @@ before the API recomputes changed remainders. All later failed PO writes roll ba
 numbers/POs/sources/events/Units/counters together. Context API/hook carries reviewed snapshots and
 partial allocations, filters proposal rows, ignores purchased bindings as stock deductions, merges
 physical lines and keeps the five approved grouping walls. The new hooks/form remain unmounted.
+
+**Known-intent legacy/context consolidation is now implemented locally.** Old approval headers,
+quantity ceilings and existing authority remain the legacy contract; the private admission captures
+only CURRENT locked transaction facts, never an invented historical approval_scope/version.
+One physical RS qty2 line can retain modern1 + legacy1; actual counters and free supply reconcile.
+Legacy approval_scope/version/recipient mapping stay NULL/explicitly unknown in actual issue history.
+Canonical context snapshots still require their exact reviewed token. Different/unknown supply
+intents on ONE physical line refuse before writes (no guessed free-vs-held goods and no automatic
+new grouping dimension); the existing declinable consolidation choice stays unchanged. Legacy
+incoming binding behavior is retained. Legacy request/demand locks and direct context recorder
+use root-before-demand/NOWAIT to avoid inversion with old Stock writers. API merges known old/new
+sources; MPR readback keeps actual generic shares plus the stored legacy old-PO residual rather
+than attaching the full issued total to both. Actual new legacy issue events outrank inferred PO
+header events without duplicate timeline entries. Local full fixture PASS + ROLLBACK at
+`/tmp/carres-context-legacy-bridge.log`; mixed-source/residual API tests plus full MPR/PO/Receiving
+regression373 PASS at `/tmp/carres-context-legacy-bridge-api.log`; API typecheck PASS at
+`/tmp/carres-context-legacy-bridge-api-types.log`. Updated51-function exact rollback probe PASS.
 
 **Readback:** existing MPR Register/detail reader counts each source's own quantity across all its
 actual POs; complete receipt requires its entire approved quantity and fully received physical
@@ -139,8 +156,9 @@ No full historical migration-chain PASS, deployed feature, authenticated transac
 - Counted From Stock allocation still lacks a proven owning quantity-bind door; existing Unit-only
   permission is retained. Mixed-owner counted FORECAST supply attribution fails before initial
   issue (forecast_quantity_source_unavailable), never guessed; manual counted RS PO supply works.
-- Mixed legacy/context requests sharing one physical item line still need complete consolidation;
-  part-issued multi-forecast-cohort source changes need owner-bound revalidation without silently
+- Known-intent old/new consolidation is implemented above; unknown/different physical supply intent
+  remains a named source-admission failure. Part-issued multi-forecast-cohort source changes need
+  owner-bound revalidation without silently
   replacing a saved approval; original issued-scope law remains PO-owned.
 - Full existing PO Deliver To/revision/cancel/reallocation needs MPR source/Unit/recipient
   reconciliation beyond the tested source-copy helper. Do not claim those owner workflows verified.

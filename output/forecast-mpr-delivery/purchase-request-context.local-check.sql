@@ -810,4 +810,47 @@ begin
   or not exists(select 1 from public.forecast_purchase_requests where request_id=rid and lines=groups#>'{0,lines}') then raise exception 'existing 0695 wrapper/retry/mark semantics regressed'; end if;
  raise notice 'Legacy forecast wrapper: same canonical create/mark/retry, legacy context remains absent PASS';
 end; $legacy_forecast_test$;
+-- Compatibility across old/new requests: preserve actual legacy approval facts,
+-- never fill its historical approval_scope/version or unknown recipient mapping.
+do $mixed_legacy_context_issue$
+declare c jsonb; modern jsonb; legacy jsonb; mr uuid; lr uuid; md public.purchase_demands%rowtype; ld public.purchase_demands%rowtype; approved jsonb; payload jsonb; result jsonb; po text; po_date date; n integer; accepted boolean:=false; detail text;
+begin
+ select value into c from stock_context_fixture;
+ perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009698","role":"authenticated","app_metadata":{"role":"operation"}}',true);
+ modern:=public.purchasing_create_request_with_lines(p_purpose=>'ready_stock',p_destination_id=>(c#>>'{lines,0,allocations,0,destinationId}')::uuid,p_lines=>jsonb_build_array(jsonb_build_object('request_context',c,'submission_key',gen_random_uuid())),p_fulfilment_intent=>'additional_stock');
+ legacy:=public.purchasing_create_request_with_lines(p_purpose=>'ready_stock',p_destination_id=>(c#>>'{lines,0,allocations,0,destinationId}')::uuid,p_required_by=>(c#>>'{lines,0,allocations,0,supplierDeliveryDate}')::date,
+  p_lines=>jsonb_build_array(jsonb_build_object('sku',c#>>'{lines,0,sku}','qty',2,'attrs',null,'required_by',c#>>'{lines,0,allocations,0,supplierDeliveryDate}')),p_fulfilment_intent=>'additional_stock');
+ mr:=(modern->>'id')::uuid; lr:=(legacy->>'id')::uuid;
+ perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009699","role":"authenticated","app_metadata":{"role":"principal"}}',true);
+ perform public.purchasing_decide_request(mr,'approve',null,jsonb_build_object('expected_version',1,'review_scope',public._purchasing_context_review(mr),'request_context',c,'approved_distribution',null));
+ perform public.purchasing_decide_request(lr,'approve',null,null);
+ select approval_scope into strict approved from public.purchase_requests where id=mr;
+ select * into strict md from public.purchase_demands where request_id=mr;
+ select * into strict ld from public.purchase_demands where request_id=lr;
+ for n in 0..1000 loop
+  po_date:=(now() at time zone 'Asia/Kuala_Lumpur')::date+n;
+  begin perform public._purchasing_check_context_supplier_dates(jsonb_build_object('lines',jsonb_build_array(jsonb_build_object('id',md.request_line_id,'sku',md.sku,'allocations',jsonb_build_array(jsonb_build_object('supplierDeliveryDate',po_date))))),(now() at time zone 'Asia/Kuala_Lumpur')::date); accepted:=true;
+  exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; if detail<>'supplier_date_before_earliest' then raise; end if; end;
+  exit when accepted;
+ end loop;
+ perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009698","role":"authenticated","app_metadata":{"role":"operation"}}',true);
+ payload:=jsonb_build_array(jsonb_build_object('context_issue_key',gen_random_uuid(),'supplier_id',md.supplier_id,'warehouse_id',(select warehouse_id from public.purchasing_destinations where id=md.destination_id),'destination_id',md.destination_id,'purpose','ready_stock','eta_date',po_date,
+  'lines',jsonb_build_array(jsonb_build_object('sku',md.sku,'qty',2,'attrs',md.attrs,'request_sources',jsonb_build_array(
+   jsonb_build_object('demand_id',md.id,'qty',1,'request_version',1,'approval_version',1,'approval_token',md5(approved::text),'recipients',null),
+   jsonb_build_object('demand_id',ld.id,'qty',1,'request_version',0,'approval_version',null,'approval_token',null,'recipients',null))))));
+ begin
+  update public.purchase_requests set fulfilment_intent=null where id=lr;
+  perform public.purchasing_issue_pos_batch(payload);
+  raise exception 'mixed unknown legacy intent incorrectly merged';
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; if detail<>'request_source_intent_unavailable' then raise; end if;
+ end;
+ result:=public.purchasing_issue_pos_batch(payload); po:=result#>>'{po_ids,0}';
+ if (select count(*) from public.purchase_order_lines pl where pl.po_id=po)<>1 or (select sum(qty) from public.po_line_sources ps where ps.po_id=po)<>2
+  or (select issued_qty from public.purchase_demands where id=md.id)<>1 or (select issued_qty from public.purchase_demands where id=ld.id)<>1 then raise exception 'mixed legacy/context issue lost one physical line or exact source/counter'; end if;
+ if not exists(select 1 from public.purchase_requests where id=lr and request_version=0 and request_context is null and approval_scope is null and approval_version is null)
+  or not exists(select 1 from public.purchase_request_events e cross join lateral jsonb_array_elements(e.changes->'allocations') src where e.request_id=lr and e.kind='po_issued' and e.changes->>'record_type'='po_issue' and e.changes->'approval_scope_known'='false'::jsonb and src->'recipient_scope_known'='false'::jsonb) then raise exception 'mixed issue invented historical legacy approval/recipient evidence'; end if;
+ raise notice 'Mixed old/new canonical issue LOCAL: ONE RS physical qty2 source1+1; modern remainder499/legacy remainder1; historical legacy scope/version/recipient mapping stay explicitly unknown PASS';
+end;
+$mixed_legacy_context_issue$;
+
 rollback;
