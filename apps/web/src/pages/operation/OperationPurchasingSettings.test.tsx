@@ -26,6 +26,7 @@ const setCutoff = vi.fn();
 const setAddress = vi.fn();
 const setChannel = vi.fn();
 const setPriority = vi.fn();
+const setRequestSettings = vi.fn();
 
 function mutation(mutateAsync: ReturnType<typeof vi.fn>) {
   return { mutateAsync, isPending: false, isError: false, error: null };
@@ -37,6 +38,7 @@ vi.mock("@/lib/queries", async () => {
     ...actual,
     usePurchasingSettings: () => settingsQuery(),
     useSetPurchasingNumber: () => mutation(setNumber),
+    useSetPurchaseRequestSettings: () => mutation(setRequestSettings),
     useSetPurchasingPoDays: () => mutation(setPoDays),
     useSetProductionDays: () => mutation(setProduction),
     useSetSupplierWorkWeek: () => mutation(setWorkWeek),
@@ -711,5 +713,33 @@ describe("Supplier channels", () => {
     const section = screen.getByTestId("supplier-channel-settings");
     expect(within(section).queryByRole("button", { name: "Save" })).toBeNull();
     for (const input of within(section).getAllByRole("textbox")) expect(input).toBeDisabled();
+  });
+});
+
+
+describe("purchase request Settings · guarded adoption", () => {
+  it("keeps all three edited values after a refusal and retries the same facts", async () => {
+    settingsQuery.mockReturnValue({ data: settings({ requestSettings: { normalDays: 30, serviceDays: 14, manualWhatsappScreenshotRequired: true } }), isLoading: false, error: null });
+    setRequestSettings.mockRejectedValueOnce(new Error("refused")).mockResolvedValueOnce(settings());
+    render(wrap(<OperationPurchasingSettings />));
+    const section = within(screen.getByTestId("purchase-request-settings"));
+    fireEvent.change(section.getByRole("spinbutton", { name: "Normal / Ready Stock" }), { target: { value: "31" } });
+    fireEvent.change(section.getByRole("spinbutton", { name: "Service Case" }), { target: { value: "15" } });
+    fireEvent.click(section.getByRole("combobox", { name: "Manual WhatsApp screenshot" }));
+    fireEvent.click(screen.getByRole("option", { name: "Inactive", exact: true }));
+    fireEvent.click(section.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(section.getByRole("alert")).toHaveTextContent("Not confirmed"));
+    expect(section.getByRole("spinbutton", { name: "Normal / Ready Stock" })).toHaveValue(31);
+    expect(section.getByRole("spinbutton", { name: "Service Case" })).toHaveValue(15);
+    expect(section.getByRole("combobox")).toHaveTextContent("Inactive");
+    fireEvent.click(section.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(setRequestSettings).toHaveBeenCalledTimes(2));
+    expect(setRequestSettings.mock.calls.map((call) => call[0])).toEqual(Array(2).fill({ normalDays: 31, serviceDays: 15, manualWhatsappScreenshotRequired: false }));
+  });
+  it("offers no Save when these Settings could not be read", () => {
+    render(wrap(<OperationPurchasingSettings />));
+    const section = within(screen.getByTestId("purchase-request-settings"));
+    expect(section.getByText("Not available")).toBeVisible();
+    expect(section.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
   });
 });

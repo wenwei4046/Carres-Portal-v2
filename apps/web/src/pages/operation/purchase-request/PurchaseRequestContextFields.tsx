@@ -34,8 +34,8 @@ export default function PurchaseRequestContextFields({ value, onChange, serviceC
         {value.purpose === "general_purchase" && <>
           <Select id="purchase-request-reason" label="Reason for purchase" required disabled={disabled} value={value.reason ?? undefined} options={PURCHASE_REQUEST_REASONS} onValueChange={(reason) => patch({ reason: reason as PurchaseRequestContext["reason"], companyPersonName: "", projectReference: "", explanation: "" })} />
           {value.reason === "purchase_for_others" && <>
-            <Input id="purchase-request-company-person" label="Company / person name" required disabled={disabled} value={value.companyPersonName} onChange={(event) => patch({ companyPersonName: event.target.value })} />
-            <Input id="purchase-request-project" label="Project / reference" disabled={disabled} value={value.projectReference} onChange={(event) => patch({ projectReference: event.target.value })} />
+            <Input id="purchase-request-company-person" label="Company / Person name" required disabled={disabled} value={value.companyPersonName} onChange={(event) => patch({ companyPersonName: event.target.value })} />
+            <Input id="purchase-request-project" label="Project name / reference" disabled={disabled} value={value.projectReference} onChange={(event) => patch({ projectReference: event.target.value })} />
           </>}
           {value.reason === "other" && <Textarea id="purchase-request-explanation" label="Explanation" required disabled={disabled} value={value.explanation} onChange={(event) => patch({ explanation: event.target.value })} />}
         </>}

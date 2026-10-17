@@ -462,6 +462,12 @@ export const purchasingSettingsResponseSchema = z.object({
     .object({ first: z.string(), second: z.string().nullable(), secondEnabled: z.boolean() })
     .optional(),
   manualPurchaseMinDeliveryDays: z.number().int(),
+  /** 0696 foundation. Editable only after the matching audited writer is installed. */
+  requestSettings: z.object({
+    normalDays: z.number().int().nonnegative(),
+    serviceDays: z.number().int().nonnegative(),
+    manualWhatsappScreenshotRequired: z.boolean(),
+  }).optional(),
   /** 0602 · `Repair return target`. Optional: read by the Settings route only. */
   repairReturnWorkingDays: z.number().int().optional(),
   /** 0606 · Supplier Claims reply timing. Optional: read by the Settings route only. */
@@ -529,6 +535,13 @@ export const purchasingSettingsResponseSchema = z.object({
   canEdit: z.boolean(),
 });
 export type PurchasingSettingsResponse = z.infer<typeof purchasingSettingsResponseSchema>;
+
+export const purchasingSetRequestSettingsInput = z.object({
+  normalDays: z.number().int().min(0).max(2147483647),
+  serviceDays: z.number().int().min(0).max(2147483647),
+  manualWhatsappScreenshotRequired: z.boolean(),
+}).strict();
+export type PurchasingSetRequestSettingsInput = z.infer<typeof purchasingSetRequestSettingsInput>;
 export const purchasingSetReadyStockPriorityInput = z.object({ priority: z.enum(["customer_delivery", "proceed_date"]) });
 
 const purchasingDestinationName = z.string().trim().min(1).max(120);
@@ -757,6 +770,7 @@ export function settingValueLabel(
   if (settingKey === "supplier_work_week") return workWeekLabel(parsePgIntArray(raw));
   if (settingKey === "po_days") return weekdayListLabel(parsePgIntArray(raw));
   if (settingKey === "ready_stock_priority") return raw === "customer_delivery" ? "Customer Requested Delivery Date" : raw === "proceed_date" ? "Proceed Date" : raw;
+  if (settingKey === "po_manual_whatsapp_screenshot_required") return raw === "true" ? "Active" : raw === "false" ? "Inactive" : raw;
   if (settingKey === "po_windows") return poWindowsHistoryLabel(raw);
   if (settingKey === "supplier_po_cutoff") return clockWordOf(raw) ?? raw;
   return raw;

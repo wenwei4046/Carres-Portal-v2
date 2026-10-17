@@ -26,7 +26,7 @@ export default function PurchaseRequestAllocations({ line, recipients, destinati
   const recipientFields = (key: string, values: RecipientQuantity[], onChange: (values: RecipientQuantity[]) => void) => !stockRequest && <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">{recipients.map((recipient, index) => qty(`${line.id}-${key}-${recipient.id}`, recipient.name || `Recipient ${index + 1}`, values.find((value) => value.recipientId === recipient.id)?.qty ?? 0, (next) => onChange(setRecipientQuantity(values, recipient.id, next)), line.qty))}</div>;
   const patchAllocation = (id: string, change: Partial<RequestLine["allocations"][number]>) => onChange({ ...line, allocations: line.allocations.map((allocation) => allocation.id === id ? { ...allocation, ...change } : allocation) });
   const patchStock = (id: string, change: Partial<RequestLine["stockProposals"][number]>) => onChange({ ...line, stockProposals: line.stockProposals.map((proposal) => proposal.id === id ? { ...proposal, ...change } : proposal) });
-  return <Block title={line.sku} note={`Requested ${line.qty} · From stock ${balance.stock} · To buy ${balance.buy} · Unallocated ${balance.left}`}>
+  return <Block title={line.sku} note={`Requested ${line.qty} · From stock ${balance.stock} · Allocated ${balance.buy} / To buy ${line.qty - balance.stock} · Unallocated ${balance.left}`}>
     <div className="flex flex-col gap-3">
       {!stockRequest && <>
         <div>Goods recipient</div>
@@ -49,16 +49,16 @@ export default function PurchaseRequestAllocations({ line, recipients, destinati
         </section>)}
       </>}
       <div>To buy</div>
-      {line.allocations.map((allocation, index) => <section key={allocation.id} aria-label={`Purchase allocation ${index + 1}`} className="flex flex-col gap-3">
+      {line.allocations.map((allocation, index) => <section key={allocation.id} aria-label={`Supplier delivery ${index + 1}`} className="flex flex-col gap-3">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Select id={`${allocation.id}-destination`} label="Deliver to" required disabled={disabled} value={allocation.destinationId || undefined} onValueChange={(destinationId) => patchAllocation(allocation.id, { destinationId })} options={destinations.map((site) => ({ value: site.id, label: site.name }))} />
+          <Select id={`${allocation.id}-destination`} label="Supplier Deliver To" required disabled={disabled} value={allocation.destinationId || undefined} onValueChange={(destinationId) => patchAllocation(allocation.id, { destinationId })} options={destinations.map((site) => ({ value: site.id, label: site.name }))} />
           <DatePicker id={`${allocation.id}-date`} label="Supplier Delivery Date" required disabled={disabled || earliestSupplierDate == null} minDate={earliestSupplierDate ?? undefined} error={earliestSupplierDate && allocation.supplierDeliveryDate && allocation.supplierDeliveryDate < earliestSupplierDate ? `Choose ${earliestSupplierDate} or later` : undefined} value={allocation.supplierDeliveryDate || null} onChange={(date) => patchAllocation(allocation.id, { supplierDeliveryDate: date ?? "" })} />
-          {qty(`${allocation.id}-qty`, "Qty", allocation.qty, (qty) => patchAllocation(allocation.id, { qty }), line.qty)}
+          {qty(`${allocation.id}-qty`, index > 0 ? "Qty to send elsewhere" : "Qty", allocation.qty, (qty) => patchAllocation(allocation.id, { qty }), line.qty)}
         </div>
         {recipientFields(allocation.id, allocation.recipients, (recipients) => patchAllocation(allocation.id, { recipients }))}
         <div><Button variant="ghost" disabled={disabled} onClick={() => onChange({ ...line, allocations: line.allocations.filter((value) => value.id !== allocation.id) })}>Remove</Button></div>
       </section>)}
-      <div><Button disabled={disabled} onClick={() => onChange({ ...line, allocations: [...line.allocations, { id: crypto.randomUUID(), destinationId: "", supplierDeliveryDate: "", qty: Math.max(0, balance.left), recipients: [] }] })}>+ Add allocation</Button></div>
+      <div><Button disabled={disabled} onClick={() => onChange({ ...line, allocations: [...line.allocations, { id: crypto.randomUUID(), destinationId: "", supplierDeliveryDate: "", qty: Math.max(0, balance.left), recipients: [] }] })}>Split delivery</Button></div>
     </div>
   </Block>;
 }

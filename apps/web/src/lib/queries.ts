@@ -5049,6 +5049,13 @@ export function usePurchaseToday(
 
 export interface PurchaseRequestRow {
   id: string;
+  /** Context read-back is validated before adoption; absence stays legacy.
+   * Approval coverage is not inferred from approved_at or an empty snapshot. */
+  request_context?: unknown;
+  request_version?: number | null;
+  proceed_date?: string | null;
+  approval_scope?: unknown;
+  approval_version?: number | null;
   /** Legacy compatibility only (Card 08, 2026-09-04): historical rows keep
    *  their stored REQ/MPR value; new rows are null. No operator-facing
    *  component may consume it — the UUID is the identity. */
@@ -5753,6 +5760,12 @@ function usePurchasingSettingsMutation<TInput>(path: string) {
 
 export function useSetPurchasingNumber() {
   return usePurchasingSettingsMutation<PurchasingSetNumberInput>("/number");
+}
+/** Guarded with contextual form adoption: requires its approved audited Settings writer. */
+export function useSetPurchaseRequestSettings() {
+  return usePurchasingSettingsMutation<{
+    normalDays: number; serviceDays: number; manualWhatsappScreenshotRequired: boolean;
+  }>("/request-settings");
 }
 export function useSetPurchasingPoDays() {
   return usePurchasingSettingsMutation<PurchasingSetPoDaysInput>("/po-days");
