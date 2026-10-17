@@ -1,3 +1,4 @@
+import { purchaseRequestStockOffersSchema, type PurchaseRequestStockOffer } from "@carres/shared";
 import type { PurchaseRequestContext, PurchaseRequestSubmission, PurchaseRequestRevision, PurchaseRequestDecision, PurchaseRequestContextReviewRead, PurchaseRequestIssue } from "@carres/shared";
 import type { OutrightFactsFailed, OutrightOrderFacts } from "@carres/shared";
 import { workspaceActivitySettingsResponseSchema, type WorkspaceActivitySettingsResponse } from "@carres/shared";
@@ -5108,6 +5109,11 @@ export interface PurchaseRequestRow {
 }
 
 export interface PurchaseRequestLineRow {
+  /** Exact contextual allocation lineage; absent on historical requests. */
+  request_line_id?: string | null;
+  supplier_allocation_id?: string | null;
+  stock_proposal_id?: string | null;
+  fulfilment_kind?: "purchase" | "stock_proposal" | null;
   id: string;
   request_id: string;
   sku: string;
@@ -5162,6 +5168,8 @@ export interface PurchaseRequestLineRow {
   /** Card 04 — the line's REAL PO lineage (`purchase_order_lines.demand_id`
    *  plus the demand's own po_id), never an inference. */
   po_ids?: string[];
+  /** Current non-cancelled coverage; po_ids retains historical lineage. */
+  active_po_ids?: string[];
   /**
    * ⭐ ONE ENTRY PER PURCHASE ORDER THIS LINE ACTUALLY WENT ONTO, carrying
    * THAT document's own quantity and destination (settled design, owner
@@ -5290,6 +5298,7 @@ export interface ManualPurchaseDetailPayload {
   pos: Array<{
     id: string;
     po_no: string;
+    status?: string | null;
     placed_at: string | null;
     /** D5 — the CURRENT version's marked-sent time; null = Sending not confirmed. */
     marked_sent_at?: string | null;
@@ -5353,6 +5362,24 @@ export interface ManualPurchasePlanPayload {
  * POST only because live SKUs carry free text (`Leg 4"`); it reads, creates
  * nothing and reserves nothing.
  */
+/** Exact configuration/line key prevents reusing another configured SKU's pool. */
+export function usePurchaseRequestStockOffers(lines: Array<Pick<PurchaseRequestContext["lines"][number], "id" | "sku" | "attrs">>, enabled = false) {
+  return useQuery({
+    queryKey: ["operation", "purchasing", "requests", "stock-offers", lines], enabled,
+    queryFn: async (): Promise<PurchaseRequestStockOffer[]> => {
+      // Transport-sized reads do not cap the number of requested configurations.
+      const chunks = Array.from({ length: Math.ceil(lines.length / 50) }, (_, index) => lines.slice(index * 50, (index + 1) * 50));
+      const reads = await Promise.all(chunks.map(async chunk => {
+        const response = await apiFetch<{ offers: unknown }>("/api/operation/purchasing/requests/stock-offers", { method: "POST", body: JSON.stringify({ lines: chunk }) });
+        return purchaseRequestStockOffersSchema.parse(response.offers);
+      }));
+      const offers = purchaseRequestStockOffersSchema.parse(reads.flat());
+      if (offers.some(offer => !lines.some(line => line.id === offer.lineId))) throw new Error("Could not be loaded");
+      return offers;
+    }, staleTime: 0,
+  });
+}
+
 export function useManualPurchasePlan(skus: string[], context?: { proceedDate: string; purpose: PurchaseRequestContext["purpose"]; origin?: PurchaseRequestContext["origin"]; requestId?: string }) {
   const sorted = [...skus].sort();
   return useQuery<ManualPurchasePlanPayload, ApiError>({

@@ -545,6 +545,7 @@ interface ManualPurchaseRegisterSource {
     cancelled_at: string | null;
     po_id: string | null;
     po_ids?: string[];
+    active_po_ids?: string[];
     received?: boolean;
     supplier_id: string | null;
     order_by: string | null;
@@ -1110,7 +1111,7 @@ export function manualPurchaseWorkInputsFromRegister(
   return data.requests.map((request) => {
     const lines = data.lines.filter((line) => line.request_id === request.id);
     const live = lines.filter((line) => line.cancelled_at === null);
-    const poIds = [...new Set(live.flatMap((line) => line.po_ids ?? (line.po_id ? [line.po_id] : [])))];
+    const poIds = [...new Set(live.flatMap((line) => line.active_po_ids ?? line.po_ids ?? (line.po_id ? [line.po_id] : [])))];
     const supplierNames = live.map((line) =>
       line.supplier_id ? (supplier.get(line.supplier_id) ?? "") : "",
     );

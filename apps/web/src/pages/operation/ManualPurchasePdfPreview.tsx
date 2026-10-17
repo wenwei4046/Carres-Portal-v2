@@ -9,23 +9,27 @@
  * keystroke flickers and burns the tab. Every object URL is revoked when it is
  * replaced or the page closes.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { SO_BATCH_PURCHASE_WORDS as W, poIndexLabel } from "@carres/shared";
 import Button from "@/components/kit/Button";
 import PdfPreview from "@/components/kit/PdfPreview";
 import { renderPoPdf } from "@/lib/pdf/render";
 import type { ManualPurchaseDraftPo } from "./manual-purchase-draft-po";
 
-type Painted = { key: string; url?: string; error?: string };
+type Painted = { key: string; generation: string; url?: string; error?: string };
 
-export default function ManualPurchasePdfPreview({ drafts }: { drafts: readonly ManualPurchaseDraftPo[] }) {
+export default function ManualPurchasePdfPreview({ drafts, onReadyChange }: { drafts: readonly ManualPurchaseDraftPo[]; onReadyChange?: (ready: boolean) => void }) {
   /* One stable fingerprint of everything that prints — the effect re-renders
      only when the paper would actually change. */
   const fingerprint = useMemo(() => JSON.stringify(drafts.map((d) => d.data)), [drafts]);
   const [painted, setPainted] = useState<Painted[]>([]);
   const [attempt, setAttempt] = useState(0);
+  const generation = `${fingerprint}:${attempt}`;
+  const paintedReadiness = useRef({ generation, papers: new Map<string, boolean>() });
+  if (paintedReadiness.current.generation !== generation) paintedReadiness.current = { generation, papers: new Map() };
 
   useEffect(() => {
+    onReadyChange?.(drafts.length === 0);
     let dead = false;
     const urls: string[] = [];
     const timer = window.setTimeout(() => {
@@ -35,9 +39,9 @@ export default function ManualPurchasePdfPreview({ drafts }: { drafts: readonly 
             const blob = await renderPoPdf(d.data);
             const url = URL.createObjectURL(blob);
             urls.push(url);
-            return { key: d.key, url };
+            return { key: d.key, generation, url };
           } catch {
-            return { key: d.key, error: "Could not load the preview." };
+            return { key: d.key, generation, error: "Could not load the preview." };
           }
         }),
       ).then((next) => {
@@ -46,6 +50,8 @@ export default function ManualPurchasePdfPreview({ drafts }: { drafts: readonly 
           return;
         }
         setPainted(next);
+        // The existing PdfPreview owns painted-page readiness, below. A Blob
+        // alone does not certify that the operator can review the document.
       });
     }, 400);
     return () => {
@@ -55,14 +61,14 @@ export default function ManualPurchasePdfPreview({ drafts }: { drafts: readonly 
     };
     // `fingerprint` stands for `drafts`' printed content.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerprint, attempt]);
+  }, [fingerprint, attempt, onReadyChange]);
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3" data-testid="mp-create-pdf-preview">
       {/* NOT SENDABLE, AND IT SAYS SO — SO Batch's own sentence. */}
       <p className="shrink-0 text-meta text-kit-slate-11">{W.previewNotSendable}</p>
       {drafts.map((d, i) => {
-        const shot = painted.find((p) => p.key === d.key);
+        const shot = painted.find((p) => p.key === d.key && p.generation === generation);
         return (
           <section key={d.key} className="flex min-h-[640px] flex-1 flex-col gap-1" data-testid={`mp-draft-po-${i}`}>
             {drafts.length > 1 ? (
@@ -71,7 +77,11 @@ export default function ManualPurchasePdfPreview({ drafts }: { drafts: readonly 
               </p>
             ) : null}
             {shot?.url ? (
-              <PdfPreview key={shot.url} src={shot.url} title="Draft purchase order preview" data-testid={`mp-draft-po-pdf-${i}`} />
+              <PdfPreview key={shot.url} src={shot.url} title="Draft purchase order preview" onReady={ready => {
+                if (paintedReadiness.current.generation !== generation) return;
+                paintedReadiness.current.papers.set(d.key, ready);
+                onReadyChange?.(drafts.every(paper => paintedReadiness.current.papers.get(paper.key) === true));
+              }} data-testid={`mp-draft-po-pdf-${i}`} />
             ) : (
               <div className="flex flex-1 flex-col items-center justify-center gap-2 rounded-card border border-kit-slate-5 bg-white text-meta text-kit-slate-11" role="status">
                 {shot?.error ? (

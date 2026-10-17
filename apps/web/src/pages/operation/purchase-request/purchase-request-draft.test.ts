@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PurchaseRequestContext } from "@carres/shared";
-import { syncRequestDraftItems, changeRequestPurpose, recipientBalance, removeRequestRecipient, requestLineBalance, setRecipientQuantity, type RequestLine } from "./purchase-request-draft";
+import { approvalDistributionValid, proposalApprovalDistribution, syncRequestDraftItems, changeRequestPurpose, recipientBalance, removeRequestRecipient, requestLineBalance, setRecipientQuantity, type RequestLine } from "./purchase-request-draft";
 
 const line = (): RequestLine => ({
   id: "line", sku: "TEST-SKU", qty: 5, attrs: { fabric: "TEST" },
@@ -84,5 +84,21 @@ describe("shared picker context identity", () => {
     const changed = syncRequestDraftItems(original, [{ id: "line", sku: "TEST-SKU", qty: "5", attrs: { fabric: "OTHER TEST" } }]);
     expect(changed.lines[0]).toMatchObject({ qty: 5, recipientNeeds: [], stockProposals: [], allocations: [] });
     expect(original.lines[0].allocations).toHaveLength(1);
+  });
+});
+
+describe("explicit approval recipient scope", () => {
+  it("keeps full need5 separate from an approved cut and refuses silent recipient reassignment", () => {
+    const original = context(); const proposal = proposalApprovalDistribution(original);
+    expect(approvalDistributionValid(original, proposal)).toBe(true);
+    proposal[1].qty = 3;
+    expect(approvalDistributionValid(original, proposal)).toBe(false);
+    proposal[1].recipients = [{ recipientId: "a", qty: 2 }, { recipientId: "b", qty: 1 }];
+    expect(approvalDistributionValid(original, proposal)).toBe(true);
+    expect(original.lines[0].qty).toBe(5);
+    expect(original.lines[0].recipientNeeds).toEqual([{ recipientId: "a", qty: 3 }, { recipientId: "b", qty: 2 }]);
+    proposal[1].recipients = [{ recipientId: "a", qty: 3 }];
+    expect(approvalDistributionValid(original, proposal)).toBe(false);
+    expect(approvalDistributionValid(original, [proposal[0], proposal[0]])).toBe(false);
   });
 });

@@ -194,10 +194,19 @@ const purchaseRequestStoredEventSchema = z.object({
   round: z.number().int().positive(), kind: z.enum(["sent_back", "resubmitted", "withdrawn", "stock_allocated", "approved", "po_issued"]),
   actor_id: z.string().uuid().nullable(), occurred_at: z.string(), reason: z.string().nullable(), changes: z.unknown(),
 }).strict();
+/** Live proposal scope, never a reservation or approval. */
+export const purchaseRequestStockLinesSchema = z.array(z.object({ id: z.string().uuid(), sku: z.string().min(1).max(120), attrs: z.record(z.unknown()).nullable() }).strict()).max(50).superRefine((lines, ctx) => {
+  if (new Set(lines.map(line => line.id)).size !== lines.length) ctx.addIssue({ code: "custom", message: "Duplicate stock line identity" });
+});
+export const purchaseRequestStockOffersSchema = z.array(z.object({ lineId: z.string().uuid(), locationId: z.string().uuid(), destinationId: z.string().uuid(), name: z.string().min(1), available: z.number().int().nonnegative(), units: z.array(z.object({ id: z.string().uuid(), qty: z.literal(1), warehouse_id: z.string().uuid(), condition: z.string() }).strict()) }).strict()).superRefine((offers, ctx) => {
+  if (new Set(offers.map(offer => `${offer.lineId}/${offer.locationId}/${offer.destinationId}`)).size !== offers.length) ctx.addIssue({ code: "custom", message: "Duplicate stock offer" });
+  for (const offer of offers) if (offer.available !== offer.units.length || new Set(offer.units.map(unit => unit.id)).size !== offer.units.length || offer.units.some(unit => unit.warehouse_id !== offer.locationId)) ctx.addIssue({ code: "custom", message: "Stock source does not match offered quantity" });
+});
+export type PurchaseRequestStockOffer = z.infer<typeof purchaseRequestStockOffersSchema>[number];
 export const purchaseRequestContextReviewReadSchema = z.discriminatedUnion("available", [
   z.object({ available: z.literal(true), review: z.object({
     request_version: z.number().int().positive(), state: z.object({ context: purchaseRequestContextSchema }).passthrough(),
-    stock_source: z.array(z.record(z.unknown())),
+    stock_source: z.array(z.record(z.unknown())), stock_offers: purchaseRequestStockOffersSchema.optional(),
   }).passthrough(), events: z.array(purchaseRequestStoredEventSchema), coverage: z.array(z.object({ demand_id: z.string().uuid(), kind: z.enum(["purchase", "stock_proposal"]), approved_qty: z.number().int().min(0), stock_qty: z.number().int().min(0), issued_qty: z.number().int().min(0), to_buy: z.number().int().min(0) }).strict()).nullable(), approval: z.object({ request_version: z.number().int().positive(), approval_version: z.number().int().positive(), token: z.string().regex(/^[a-f0-9]{32}$/) }).strict().nullable() }).strict(),
   z.object({ available: z.literal(false), reason: z.string().min(1), request_version: z.number().int().positive(),
     request_context: purchaseRequestContextSchema, events: z.array(purchaseRequestStoredEventSchema),
@@ -258,7 +267,7 @@ export function purchaseRequestContextHistory(context: unknown, requestVersion: 
       events.push({ ...base, kind: "approved", requested_units: scope.data.after.context.lines.reduce((n, l) => n + l.qty, 0),
         approved_units: scope.data.after.approved_distribution.reduce((n, a) => n + a.qty, 0) });
     } else if (e.kind === "po_issued") {
-      if ((e.changes as { record_type?: string } | null)?.record_type === "issue_batch") continue;
+      if (["issue_batch", "po_source_change"].includes((e.changes as { record_type?: string } | null)?.record_type ?? "")) continue;
       const issued = z.object({ record_type: z.literal("po_issue"), po_id: z.string().min(1),
         allocations: z.array(z.object({ qty: z.number().int().positive() }).passthrough()).min(1),
       }).passthrough().safeParse(e.changes);

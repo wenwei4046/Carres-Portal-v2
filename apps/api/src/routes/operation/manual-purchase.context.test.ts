@@ -45,6 +45,13 @@ describe("contextual request API uses the existing owner", () => {
     expect(response.ok).toBe(false);
     expect(rpc).toHaveBeenCalledTimes(1);
   });
+  it("reports the default-closed SQL admission without claiming a saved request", async () => {
+    rpc.mockResolvedValue({ data: null, error: { code: "55000", message: "Not available", details: "request_context_not_enabled" } });
+    const response = await post("", { submissionKey: id(11), context: context() });
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: "request_context_not_enabled", code: "request_context_not_enabled", message: "Not available" });
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
   it("refuses signed-out submission before reaching the request door", async () => {
     expect((await post("", { submissionKey: id(11), context: context() }, false)).status).toBe(401);
     expect(rpc).not.toHaveBeenCalled();
@@ -208,5 +215,27 @@ describe("context review uses the same canonical decision door", () => {
     expect((await readReview()).status).toBe(503);
     rpc.mockResolvedValueOnce({ data: null, error: { code: "42883", message: "not installed" } });
     expect((await readReview()).ok).toBe(false);
+  });
+});
+
+describe("qualified Stock proposal source", () => {
+  const lines = [{ id: id(1), sku: 'TEST-SKU 4"', attrs: { colour: "TEST" } }];
+  const offer = { lineId: id(1), locationId: id(2), destinationId: id(3), name: "TEST location", available: 1,
+    units: [{ id: id(4), qty: 1, warehouse_id: id(2), condition: "new" }] };
+  it("uses the current caller and exact stable line/configuration in the shared read-only RPC", async () => {
+    rpc.mockResolvedValue({ data: [offer], error: null });
+    const response = await post("/stock-offers", { lines });
+    expect(response.status).toBe(200); expect(await response.json()).toEqual({ offers: [offer] });
+    expect(rpc).toHaveBeenCalledWith("purchasing_request_stock_offers", { p_lines: lines });
+  });
+  it.each([null, [{ ...offer, available: 2 }], [{ ...offer, lineId: id(9) }], [{ ...offer, units: [{ ...offer.units[0], warehouse_id: id(9) }] }]])("never turns malformed or foreign stock into available/zero stock", async data => {
+    rpc.mockResolvedValue({ data, error: null });
+    const response = await post("/stock-offers", { lines }); expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: "stock_source_unavailable" });
+  });
+  it("refuses duplicate line identities and signed-out reads before RPC", async () => {
+    expect((await post("/stock-offers", { lines: [...lines, ...lines] })).status).toBe(400);
+    expect((await post("/stock-offers", { lines }, false)).status).toBe(401);
+    expect(rpc).not.toHaveBeenCalled();
   });
 });

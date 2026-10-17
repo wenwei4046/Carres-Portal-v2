@@ -281,7 +281,6 @@ export const MANUAL_PURCHASE_WORDS = {
    *  nothing to say*, and the read's own loading and failure states keep their
    *  separate words — an unread cell never claims a PO does not exist. */
   poNone: "No PO yet",
-  notOrderedYet: "Not ordered yet",
   /** THE TWO WORK ACTION SENTENCES (Card 08 §3.4) — no number, no person's
    *  name, no UUID. The Work row's context line distinguishes the purchase
    *  through its business facts (`manualPurchaseWorkContext`). */

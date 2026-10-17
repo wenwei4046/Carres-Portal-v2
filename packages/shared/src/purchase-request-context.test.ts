@@ -121,7 +121,8 @@ describe("context history retains original need and exact issued source quantiti
     const events = [event("resubmitted", { before: { context: c }, after_context: c }),
       event("approved", { before: { context: c }, after: { context: c, approved_distribution: [{ qty: 2 }, { qty: 2 }] } }),
       event("po_issued", { record_type: "po_issue", po_id: "PO-TEST", allocations: [{ qty: 1 }] }),
-      event("po_issued", { record_type: "issue_batch", po_ids: ["PO-TEST"] })];
+      event("po_issued", { record_type: "issue_batch", po_ids: ["PO-TEST"] }),
+      event("po_issued", { record_type: "po_source_change", po_id: "PO-TEST", po_version: 2, before_scope: [], after_scope: [] })];
     const read = purchaseRequestContextHistory(c, 2, events)!;
     expect(read.initialUnits).toBe(5);
     expect(read.events.filter(e => e.kind === "approved")).toMatchObject([{ requested_units: 5, approved_units: 4, actorId: id(99), reason: "TEST actual reason" }]);

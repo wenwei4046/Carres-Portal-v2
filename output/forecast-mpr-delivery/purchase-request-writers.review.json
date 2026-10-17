@@ -1,7 +1,7 @@
 {
-  "status": "REVIEW PACKAGE ONLY; NOT APPROVED; NOT A MIGRATION; NOT READY FOR PRODUCTION ACTIVATION",
-  "draft_sha256": "8a29f80c82cc122e0378aafb7cddb287376bfbf891db423e2975921f33d41e7e",
-  "draft_file_md5": "d030fa5dacb2c12bc59e46e89f6ac72a",
+  "status": "EXACT CLOSED-INSTALLATION REVIEW PACKAGE; NOT APPROVED; NOT A MIGRATION; ACTIVATION STILL BLOCKED",
+  "draft_sha256": "ee66a225f512d74ef39cd36483a6f2dbd5a0e128e7a98a66f5e6e6ab3740c42f",
+  "draft_file_md5": "60f7221a2f6f09ddcd3771b0dfe6743f",
   "validation_environment": "Owned loopback replay only; all synthetic business fixtures roll back; no production writes",
   "validated_core": [
     "Canonical GP partial1+remainder1, exact recipient/event/source/Unit ownership",
@@ -13,17 +13,26 @@
     "Later PO failure rolls back every earlier number/PO/source/event/Unit/counter",
     "Existing healthy/wrong-arrival trigger preserves or clears MPR binding with reference history",
     "Supplier/Settings/destination/date/source admission and per-SKU concurrent Stock/Settings guards",
-    "MPR/PO/Receiving source readers and immutable historical quantity projection"
+    "MPR/PO/Receiving source readers and immutable historical quantity projection",
+    "Actual parent Change Deliver To moves exactly the selected MPR Unit/source1 from merged physical2 on the SAME PO; both request remaining1, full need/approval and prior issue events preserved; unproven destination drift refused",
+    "Actual counted single-owner parent Deliver To splits source2 into1+1 without fake Unit IDs",
+    "Existing qualified PO revision increases an unambiguous RS source within original human-approved500; exact new Unit ownership stays free; aggregate overbuy refuses atomically",
+    "Part-issued changed forecast cohort blocks new MPR issue and no-PO resubmit/reapproval; existing PO owner can complete unchanged original approved need within its cap, without snapshot rewrite/new MPR approval",
+    "Reason-only cancellation and quantity reduction refuse contextual scope before writes under Purchasing5.8.1; no supplier agreement/fee/effective-version evidence invented and no cancellation workflow commissioned",
+    "Current active PO coverage is separate from retained cancelled lineage in API and Work; missing PO status is unavailable, not zero",
+    "Local current-version send-ledger declarations retain V1 snapshot and old send, refuse stale version, declare each actual current PO separately; source500/remaining0 readback; no provider call or real Task save",
+    "One qualified Stock reader supplies all active-location exact-config healthy Unit offers to pre-create and saved Review; no reservation, unread source stays unavailable; SQL role/config/site/health/no-reservation controls pass",
+    "Actual painted-page readiness, not Blob generation alone, gates Confirm; false/changed/stale/failed-preview callbacks cannot certify current papers. Source failure hides Stock offers rather than asserting no stock. Known stale source can be returned/refused for repair without granting approval."
   ],
   "explicit_incomplete_or_closed": [
-    "SC boundary remains for controller review: existing procurement-approved unchanged scope is NOT blanket-disabled. Case action/progress/evidence/Service Note and generic approvals were enumerated; they do not establish a general formal-remedy approval contract. New/changed formal customer remedy execution remains Service-owned/unverified; no invented Decision UUID or new Service implementation",
-    "Mixed-owner counted FORECAST supply attribution: fails before initial issue; no guessed provenance",
-    "One physical line with differing/unknown source supply intents is refused before issue; no automatic regrouping or invented legacy stock intent. Known-intent mixed legacy/context consolidation is implemented without backfilling historical approvals/recipient scope",
-    "Part-issued multi-forecast-cohort source transitions/reapproval need complete owner-bound source verification; no silent snapshot rewrite",
-    "Existing PO Deliver To parent move and post-issue revisions/cancel/reallocation need full MPR source/Unit/recipient reconciliation beyond the tested source-copy helper",
-    "Form is now composed/tested in the SAME Workspace behind an absent-by-default prop. Production entry, source-qualified Stock/Case reads, complete object approval/distribution controls, context refusal copy, full-page visual/keyboard/narrow and authenticated lifecycle/exact-version send/task acceptance remain owed."
+    "SC: existing procurement-authorised unchanged scope is not blanket-disabled. Only new/changed formal customer-remedy execution requires a qualified existing Service approval source; source contract still unverified. See existing service-source-evidence JSON; no Decision UUID/new Service build.",
+    "Effective cancellation/quantity reduction: \u00a75.8.1 approved target lacks a current qualified supplier-agreement/fee/version producer in this delivery. Legacy reason-only door is blocked for new context scope; commitments remain covered. No expanded PO cancellation build.",
+    "GP/SC quantity revision or mixed-source PO quantity change requires explicit source/recipient allocation; old PO revision input supplies none. New context branch refuses before writes rather than guessing. RS single-owner growth and total-preserving destination moves are implemented.",
+    "Mixed-owner counted FORECAST attribution remains unavailable and refuses before initial issue; mixed counted partial moves need explicit source when more than one owner. No fake Units.",
+    "No issued MPR reapproval/recall path is invented. \u00a79.2 reserves no-PO revision to unissued requests; existing PO/source owners handle already-issued commitments. Tested changed-cohort boundary preserves immutable original request/approval/issue facts.",
+    "Existing guarded Workspace and object Stock/recipient controls have local real-browser8-case visual/keyboard/narrow evidence and separate rolled-back SQL proof. Register/Forecast parent adoption/selected Issue Review and combined browser-to-database lifecycle remain owed; scoped qualified SC evidence/authority boundary is still open. No production activation."
   ],
-  "application_effect": "DDL adds generic MPR attribution to existing PO sources and installs existing-door context branches. It writes no business rows on installation, but would make those new direct RPC branches reachable; UI-unmounted is NOT a security/activation claim.",
+  "application_effect": "Exact installation refuses if already-active contextual records exist. Private admission is CLOSED with55000/request_context_not_enabled, has no public/anon/authenticated execution grant and no GUC/browser/user-setting bypass. New context create/revise/decide/Stock/issue and contextual PO effects cannot activate on install. Legacy-only doors retain existing behaviour. No business rows, Settings values, new roles or RLS change on installation. Activation requires a separate exact reviewed change after remaining functional/authority acceptance.",
   "recovery": "Do not deploy dependent code before exact SQL approval/application and release gates. Before any production apply, remeasure current governing authority, original function fingerprints, tracker/main/all-branch migration MAX and schema preconditions. Governed production DO probe only after approval. If rollout must pause, retain prior application; do not delete issued facts or fabricate rollback/stock restoration. Production SQL rollback requires its own concrete reviewed plan.",
   "separate_settings_approval_sha256": "b4eb234d6f0d855546d606a5f9eef1b8b30aa52a8274948855f0ba8ec8053774",
   "functions": [
@@ -92,7 +101,7 @@
     },
     {
       "signature": "_purchasing_context_coverage_admitted(uuid, boolean, jsonb)",
-      "body_md5": "f273e4eccea366c48b2084e7cfe9f7a3",
+      "body_md5": "b30e867c7524e8e14b1929ea78cabfcb",
       "security_definer": false,
       "authenticated_execute": false,
       "anon_execute": false
@@ -106,7 +115,7 @@
     },
     {
       "signature": "_purchasing_context_forecast_facts(text, uuid)",
-      "body_md5": "8ba4c3668d217d0a105e3ef0c5c99784",
+      "body_md5": "36c5538c49523289aeec96f5a37f8d84",
       "security_definer": false,
       "authenticated_execute": false,
       "anon_execute": false
@@ -134,7 +143,7 @@
     },
     {
       "signature": "_purchasing_context_issue_preflight(jsonb)",
-      "body_md5": "fb5dc5095b362a42a6c85265459383a8",
+      "body_md5": "f040d292828c536937d96c799cb6d99d",
       "security_definer": false,
       "authenticated_execute": false,
       "anon_execute": false
@@ -155,28 +164,42 @@
     },
     {
       "signature": "_purchasing_context_own_po_free(uuid, uuid)",
-      "body_md5": "219f55abb0fb010c9638850774c43dde",
+      "body_md5": "eb470c61da4c4a4ebc91ea54f7e6940e",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_context_po_destination_matches(uuid, uuid, uuid)",
+      "body_md5": "34fd8803c83272818638304146fa7338",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_context_po_source_scope(text)",
+      "body_md5": "0f1ebff6d959eb165ff52352fd7cabf9",
       "security_definer": false,
       "authenticated_execute": false,
       "anon_execute": false
     },
     {
       "signature": "_purchasing_context_record_issued_source(uuid, integer, text)",
-      "body_md5": "12ebfdfee5c629b9d796de054d6b35f9",
+      "body_md5": "1d79c2c85ca7f6cdd0694205aef114f7",
       "security_definer": false,
       "authenticated_execute": false,
       "anon_execute": false
     },
     {
       "signature": "_purchasing_context_request_source_locks(uuid)",
-      "body_md5": "d616513bf0ac846b227931aa22b032a6",
+      "body_md5": "01ed5d83e4e5b1aa9a72a60eae80864b",
       "security_definer": false,
       "authenticated_execute": false,
       "anon_execute": false
     },
     {
       "signature": "_purchasing_context_review(uuid)",
-      "body_md5": "2901f91acc1b8ce3189de81fc69dbb59",
+      "body_md5": "c8c23dee9cd655d7b98c9564348ace0a",
       "security_definer": false,
       "authenticated_execute": false,
       "anon_execute": false
@@ -204,7 +227,28 @@
     },
     {
       "signature": "_purchasing_context_stock_admission(uuid, uuid[], boolean)",
-      "body_md5": "9926fa6d4b565127b8fa7ad1ce0edd8e",
+      "body_md5": "7afe47537a404876f88977eeb225f5fe",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_context_stock_offers(jsonb)",
+      "body_md5": "cb54c72108391e97062acf902cbc80c4",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_context_unit_demand(uuid)",
+      "body_md5": "17a749c4b9b7986a9771e37b1c3f4994",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_context_writer_admission()",
+      "body_md5": "799b52f12579bdf2fd9a7b95285b6508",
       "security_definer": false,
       "authenticated_execute": false,
       "anon_execute": false
@@ -259,6 +303,13 @@
       "anon_execute": false
     },
     {
+      "signature": "operation_cancel_po(text, text)",
+      "body_md5": "b87a096a846f821ea9b54df82776737f",
+      "security_definer": true,
+      "authenticated_execute": true,
+      "anon_execute": false
+    },
+    {
       "signature": "ops_stock_bound_incoming_arrives()",
       "body_md5": "f5c86179ab15b232c996e21dea3456d2",
       "security_definer": false,
@@ -287,6 +338,13 @@
       "anon_execute": false
     },
     {
+      "signature": "purchasing_change_po_deliver_to(text, uuid, integer, uuid, text, text[])",
+      "body_md5": "bd1fdf1269abb28d7873cff616a27944",
+      "security_definer": true,
+      "authenticated_execute": true,
+      "anon_execute": false
+    },
+    {
       "signature": "purchasing_create_demand(text, integer, uuid, date, text, text, uuid)",
       "body_md5": "596e927e0d6a49a76a9686eb4ab005af",
       "security_definer": true,
@@ -295,14 +353,14 @@
     },
     {
       "signature": "purchasing_create_request_with_lines(text, uuid, text, date, uuid, uuid, text, jsonb, text, text)",
-      "body_md5": "b42e21e97e960aff65ac6d40c245353a",
+      "body_md5": "aebf7a327b5526e47c5d4558a6a24306",
       "security_definer": true,
       "authenticated_execute": true,
       "anon_execute": false
     },
     {
       "signature": "purchasing_decide_request(uuid, text, text, jsonb)",
-      "body_md5": "fde12867a84cce5224c13a1e6e7234be",
+      "body_md5": "3cce60d8c6c4bf013da39752e8addaa7",
       "security_definer": true,
       "authenticated_execute": true,
       "anon_execute": false
@@ -364,8 +422,22 @@
       "anon_execute": false
     },
     {
+      "signature": "purchasing_request_stock_offers(jsonb)",
+      "body_md5": "b84285c414014f19f2795ad592bb002a",
+      "security_definer": true,
+      "authenticated_execute": true,
+      "anon_execute": false
+    },
+    {
       "signature": "purchasing_resubmit_request(uuid, uuid, date, text, uuid, uuid, text, jsonb, text)",
-      "body_md5": "05b01ccdb6247850c1dc18307d7a9a6c",
+      "body_md5": "34ace934d87852a1194d42384461fb12",
+      "security_definer": true,
+      "authenticated_execute": true,
+      "anon_execute": false
+    },
+    {
+      "signature": "purchasing_revise_po(text, text, jsonb)",
+      "body_md5": "03dfedbde2b762e0165d115441466134",
       "security_definer": true,
       "authenticated_execute": true,
       "anon_execute": false
@@ -393,12 +465,6 @@
     "validation": "377 related API cases (352 across six files plus25 round2), web readback10, shared context14; API/web typechecks; exact SQL package checker51 assertions. All local only.",
     "adoption_remaining": "Mount existing object approval/distribution controls against the guarded actions; source-qualified Stock/Case reads, reviewed refusal copy, authenticated complete-page/lifecycle acceptance and production SQL release admission remain incomplete."
   },
-  "review_readiness": {
-    "core_inspection": "READY TO INSPECT exact draft, fingerprints, embedded rollback probe, local validation and bounded SC evidence. This is not a request to approve production application.",
-    "production_application": "NOT READY. Direct RPC branches become reachable at installation; UI default off alone is not an activation gate. Close or explicitly bound post-issue owner reconciliation, counted/provenance and forecast cohort cases before release admission.",
-    "service_dependency": "SUBSET UNKNOWN, not a blanket SC prohibition. Reuse an evidenced qualified Service approval source for new/changed formal customer-remedy execution. Unchanged procurement-authorised SC retains existing Purchasing admission. See purchase-request-service-source-evidence.json.",
-    "settings": "Separate exact-hash approval remains pending; no repeated question and no inference from foundation approval."
-  },
   "guarded_form_slice": {
     "classification": "LOCAL BUILT AND TESTED; NO PRODUCTION ENTRY OR ACTIVATION",
     "implementation": "Optional contextDraft prop in the SAME existing CreateRequestWorkspace. Same Catalog picker/configurator, shared field components, canonical submit/revise hooks and PO paper builder. Normal caller supplies no contextDraft; no URL toggle.",
@@ -408,7 +474,8 @@
       "Qty edits retain explicit allocations for correction; SKU/config changes clear old-item assignments; stable UUID line/allocation identity",
       "Dirty cancel uses existing Modal; failed submit retains scope/key; selected Proceed Date uses authoritative calendar/production plan",
       "PO draft shows only To-buy allocation groups Supplier/Category/DeliverTo/Purpose/need-date; equal physical SKU/config merges; no official PO dates/Unit IDs/SO invention/recipient PII",
-      "Guarded actions use exact fresh owning Review for decision and current approval token/version for explicit partial issue. Disabled/refetch/error cannot invoke writes."
+      "Guarded actions use exact fresh owning Review for decision and current approval token/version for explicit partial issue. Disabled/refetch/error cannot invoke writes.",
+      "Send for approval enters in-page Review only; Confirm and send performs the sole request write after successful PO preview. Source/body/paper changes invalidate Review, Cancel returns to editing, draft retained; missing renderer readiness blocks confirmation."
     ],
     "validation": {
       "web_and_document_contract": "61 cases across six files passed; includes six existing-Workspace form tests and three guarded action cases",
@@ -418,6 +485,25 @@
       "sql_identity": "Unchanged 8a29f80c82cc122e0378aafb7cddb287376bfbf891db423e2975921f33d41e7e; package checker51 function/grant assertions PASS",
       "web_typecheck": "PASS after final revision-field accessible ID fix"
     },
-    "not_claimed": "No combined authenticated browser-to-database create/approve/partial-issue/PDF/send/task walk. PDF preview in form tests is mocked; shipped template contract is tested separately. No actual PDF screenshot, real transport, production transaction, task completion, release or SQL approval/application."
+    "not_claimed": "No combined authenticated browser-to-database walkthrough or production activation. Component tests mock API; actual SQL, retained document render and Work contracts are verified separately. No supplier provider call, real task save/completion or SQL application."
+  },
+  "review_readiness": {
+    "closed_installation": "READY TO INSPECT the exact default-CLOSED package, function/grant fingerprints, preconditions and rolled-back local probe; no approval/application requested by this update. Production original preimages, tracker/main/all-branch MAX and all release checks must be remeasured before any authorised application.",
+    "activation": "NOT READY. No activation inferred from closed installation, UI tests or foundation approval. Source-qualified Stock/Case composition and full-page/authenticated lifecycle acceptance remain owed; SC formal remedy authority and \u00a75.8.1 cancellation producer remain bounded owning dependencies.",
+    "settings": "Separate pending b4eb234d\u20268053774; no repeated question."
+  },
+  "production_preimages_2026_10_18_read_only": {
+    "project": "kfprgpjpaffedghytstl",
+    "operation_cancel_po(text,text)": "434d11827f1199e035b86369bdb75030",
+    "purchasing_change_po_deliver_to(text,uuid,integer,uuid,text,text[])": "25d6b08f9ae768c120e5d0ae83db1233",
+    "purchasing_revise_po(text,text,jsonb)": "d72930f9c4b6a9055d02f08579f27105",
+    "result": "All three match owned replay originals. Existing definer/role gates and authenticated=true/anon=false preserved. No production write."
+  },
+  "post_issue_validation": {
+    "database": "Full owned loopback fixture PASS, final ROLLBACK; private admission temporarily opened ONLY within that fixture transaction and restored CLOSED by rollback. Actual PO destination/RS growth/source quantities/Unit ownership/proof and named boundary negatives verified. Supplier address missing refuses before actual issue; TEST-only blank-address completion stays inside rollback fixture.",
+    "probe": "60 exact function/grant assertions,13 source guards; default-closed/invalid-scope/no-account negatives; unchanged business rows/Settings/RLS, deliberate LOCAL PROBE_ROLLBACK",
+    "api": "441 related API cases passed before Stock reader; Stock/context API40/40 passes (6 new qualified-reader cases). Serial rerun previously resolved parallel import timeout without test relaxation.",
+    "web": "68/68 across8 files, including real Workspace/object Stock approval and painted-PDF readiness contract; shared192/192 across3 files. Real browser8/8 GP/RS at390/1025/1164/1440 with shipped PDF renderer/painter, keyboard Review/confirm/approval; memory TEST transport only, NOT browser-to-DB. Narrow test originally targeted hidden desktop header action; corrected to existing visible footer action.",
+    "pdf": "Two actual local kept document JSON snapshots exported client-side before outer rollback: V1 qty1 and V3 qty499. Shipped PO template and font family used; one page each, no recipient/money. Files LOCAL-TEST-RS-*. No real supplier transport or actual Task completion."
   }
 }

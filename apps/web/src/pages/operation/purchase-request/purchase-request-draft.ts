@@ -85,3 +85,36 @@ export function syncRequestDraftItems(context: PurchaseRequestContext, items: Re
       allocations: unchanged ? old.allocations : [] };
   }) };
 }
+
+export type ApprovalDistribution = NonNullable<NonNullable<import("@carres/shared").PurchaseRequestDecision["contextReview"]>["approvedDistribution"]>;
+/** Seed editable review proposals from their exact allocation identities. This
+ * is not a saved approval and never draws quantities from historical headers. */
+export function proposalApprovalDistribution(context: PurchaseRequestContext): ApprovalDistribution {
+  return context.lines.flatMap(line => [
+    ...line.stockProposals.map(allocation => ({ lineId: line.id, allocationId: allocation.id, kind: "stock_proposal" as const, qty: allocation.qty, recipients: structuredClone(allocation.recipients) })),
+    ...line.allocations.map(allocation => ({ lineId: line.id, allocationId: allocation.id, kind: "purchase" as const, qty: allocation.qty, recipients: structuredClone(allocation.recipients) })),
+  ]);
+}
+
+export function approvalDistributionValid(context: PurchaseRequestContext, values: ApprovalDistribution): boolean {
+  const proposed = proposalApprovalDistribution(context);
+  if (!values.length || values.length !== proposed.length) return false;
+  const keys = new Set<string>();
+  for (const value of values) {
+    const key = `${value.lineId}/${value.kind}/${value.allocationId}`;
+    if (keys.has(key)) return false; keys.add(key);
+    const source = proposed.find(p => p.lineId === value.lineId && p.kind === value.kind && p.allocationId === value.allocationId);
+    if (!source || !Number.isInteger(value.qty) || value.qty < 0 || value.qty > source.qty) return false;
+    if (context.purpose === "ready_stock") { if (value.recipients.length) return false; }
+    else {
+      const seen = new Set<string>(); let total = 0;
+      for (const recipient of value.recipients) {
+        const cap = source.recipients.find(r => r.recipientId === recipient.recipientId)?.qty;
+        if (seen.has(recipient.recipientId) || cap == null || !Number.isInteger(recipient.qty) || recipient.qty <= 0 || recipient.qty > cap) return false;
+        seen.add(recipient.recipientId); total += recipient.qty;
+      }
+      if (total !== value.qty) return false;
+    }
+  }
+  return values.some(value => value.qty > 0);
+}

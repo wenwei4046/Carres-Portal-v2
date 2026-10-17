@@ -1,13 +1,16 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import type { PurchaseRequestContext } from "@carres/shared";
 vi.mock("@/lib/api", async original => ({ ...(await original<typeof import("@/lib/api")>()), apiFetch: vi.fn() }));
 vi.mock("../PurchasingTabs", () => ({ default: ({ right }: { right: React.ReactNode }) => <div>{right}</div> }));
 vi.mock("../SalesOrderWorkspace", () => ({ Fact: ({ label, value }: { label: string; value: string }) => <div>{label}: {value}</div> }));
-vi.mock("../ManualPurchasePdfPreview", () => ({ default: ({ drafts }: { drafts: unknown }) => <pre data-testid="paper-facts">{JSON.stringify(drafts)}</pre> }));
+vi.mock("../ManualPurchasePdfPreview", () => ({ default: ({ drafts, onReadyChange }: { drafts: unknown; onReadyChange?: (ready: boolean) => void }) => {
+  useEffect(() => { reportPdfReady = onReadyChange; onReadyChange?.(pdfReady); }, [onReadyChange]);
+  return <pre data-testid="paper-facts">{JSON.stringify(drafts)}</pre>;
+} }));
 import { ApiError, apiFetch } from "@/lib/api";
 import { CreateRequestWorkspace } from "../OperationManualPurchase";
 const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12,"0")}`;
@@ -17,9 +20,12 @@ const context = (): PurchaseRequestContext => ({ version: 1, origin: "stock_requ
 const submitted: unknown[] = [];
 const done = vi.fn();
 let refuse = false;
+let pdfReady = true;
+let reportPdfReady: ((ready: boolean) => void) | undefined;
 beforeEach(() => {
-  submitted.length = 0; done.mockReset(); refuse = false;
+  submitted.length = 0; done.mockReset(); refuse = false; pdfReady = true; reportPdfReady = undefined;
   vi.mocked(apiFetch).mockImplementation((async (path: string, init?: RequestInit) => {
+    if (path.endsWith("/stock-offers")) return { offers: [] };
     if (path.includes("/demand/pick-items")) return { items: [{ sku: "TEST-SKU", label: "TEST goods", supplier: "TEST supplier", free: 0 }] };
     if (path.startsWith("/api/ops/service-cases")) return { items: [{ id: uuid(9), caseNo: "TEST-CASE" }] };
     if (path.startsWith("/api/catalog")) return { skus: [], models: [], sofaFabrics: [] };
@@ -40,7 +46,7 @@ function mount(initial = context(), editing = false) {
     const [value, onChange] = useState(initial);
     return <CreateRequestWorkspace editId={editing ? uuid(5) : null} destinations={[{ id: uuid(3), name: "TEST destination", address: "TEST address" }]} defaultDestinationId={null}
       supplierCollections={[]} suppliers={[{ name: "TEST supplier", address: "TEST supplier address" }]} staff={[]} minDeliveryDays={30} todayIso="2026-10-18" onDone={done}
-      contextDraft={{ value, onChange, pickupLocations: [], stockByLine: new Map(), ...(editing ? { revision: { expectedVersion: 1, reason: "TEST revised same request" } } : {}) }} />;
+      contextDraft={{ value, onChange, pickupLocations: [], ...(editing ? { revision: { expectedVersion: 1, reason: "TEST revised same request" } } : {}) }} />;
   }
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(<QueryClientProvider client={client}><MemoryRouter><TestWorkspace /></MemoryRouter></QueryClientProvider>);
@@ -53,6 +59,9 @@ describe("existing Workspace isolated context composition", () => {
     expect(screen.queryByLabelText("Use stock we already have?")).toBeNull();
     expect(screen.queryByText("Goods recipient")).toBeNull();
     expect(screen.getByTestId("paper-facts")).toHaveTextContent('"qty":500');
+    fireEvent.click(send);
+    expect(submitted).toHaveLength(0);
+    await waitFor(() => expect(send).toHaveTextContent("Confirm and send"));
     fireEvent.click(send);
     await waitFor(() => expect(done).toHaveBeenCalledWith(uuid(5)));
     expect(submitted).toHaveLength(1);
@@ -70,12 +79,13 @@ describe("existing Workspace isolated context composition", () => {
     await waitFor(() => expect(send).not.toBeDisabled());
     expect(screen.getByRole("heading", { name: "Goods recipient" })).toBeInTheDocument();
     expect(screen.getByTestId("paper-facts")).not.toHaveTextContent("PRIVATE TEST");
-    fireEvent.click(send); await waitFor(() => expect(done).toHaveBeenCalledTimes(1));
+    fireEvent.click(send); expect(submitted).toHaveLength(0); fireEvent.click(send);
+    await waitFor(() => expect(done).toHaveBeenCalledTimes(1));
     expect(submitted[0]).toEqual({ submissionKey: expect.any(String), context: initial });
   });
   it("revises the same request with exact expected version and no legacy payload", async () => {
     mount(context(), true); const send = screen.getByTestId("mp-send");
-    await waitFor(() => expect(send).not.toBeDisabled()); fireEvent.click(send);
+    await waitFor(() => expect(send).not.toBeDisabled()); fireEvent.click(send); expect(submitted).toHaveLength(0); fireEvent.click(send);
     await waitFor(() => expect(done).toHaveBeenCalledWith(uuid(5)));
     expect(submitted[0]).toEqual({ revisionKey: expect.any(String), expectedVersion: 1, reason: "TEST revised same request", context: context() });
   });
@@ -90,10 +100,21 @@ describe("existing Workspace isolated context composition", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     expect(document.getElementById("mp-qty-0")).toHaveValue("501");
   });
+  it("requires preview readiness before Confirm and keeps the draft when Review is cancelled", async () => {
+    pdfReady = false; mount(); const send = screen.getByTestId("mp-send");
+    await waitFor(() => expect(send).not.toBeDisabled()); fireEvent.click(send);
+    expect(send).toHaveTextContent("Confirm and send"); expect(send).toBeDisabled();
+    expect(submitted).toHaveLength(0);
+    fireEvent.click(screen.getAllByRole("button", { name: "Back to edit" })[0]);
+    expect(send).toHaveTextContent("Send for approval"); expect(document.getElementById("mp-qty-0")).toHaveValue("500");
+    fireEvent.click(send); act(() => reportPdfReady?.(true));
+    expect(send).not.toBeDisabled(); fireEvent.click(send);
+    await waitFor(() => expect(done).toHaveBeenCalledTimes(1)); expect(submitted).toHaveLength(1);
+  });
   it("retains the whole scope and retry identity after a refused submit", async () => {
     refuse = true; mount();
     const send = screen.getByTestId("mp-send");
-    await waitFor(() => expect(send).not.toBeDisabled()); fireEvent.click(send);
+    await waitFor(() => expect(send).not.toBeDisabled()); fireEvent.click(send); expect(submitted).toHaveLength(0); fireEvent.click(send);
     await screen.findByRole("alert");
     expect(done).not.toHaveBeenCalled();
     expect(screen.getByTestId("paper-facts")).toHaveTextContent('"qty":500');

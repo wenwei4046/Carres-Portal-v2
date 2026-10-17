@@ -501,6 +501,19 @@ describe("operation Work response composition", () => {
     });
   });
 
+  it("does not require sending a cancelled historical PO again once active coverage is fully sent", () => {
+    const inputs = manualPurchaseWorkInputsFromRegister({
+      requests: [{ id: "TEST-r", purpose: "ready_stock", destination_id: "TEST-d", why: "", approval_required: true,
+        approved_at: "2026-10-18T00:00:00Z", refused_at: null, refuse_reason: null, for_service_case_id: null, for_staff_user_id: null, for_subsidiary_name: null }],
+      lines: [{ request_id: "TEST-r", qty: 2, approved_qty: 2, issued_qty: 2, cancelled_at: null, po_id: "TEST-active", po_ids: ["TEST-cancelled", "TEST-active"],
+        active_po_ids: ["TEST-active"], supplier_id: "TEST-s", order_by: "2026-11-01" }],
+      destinations: [], suppliers: [], users: [], serviceCases: [], pos: [{ id: "TEST-cancelled", sent: false }, { id: "TEST-active", sent: true }],
+    });
+    expect(inputs[0]?.poIds).toEqual(["TEST-active"]);
+    expect(inputs[0]?.posAllSent).toBe(true);
+    expect(inputs[0]?.remainingQty).toBe(0);
+  });
+
   it("derives Manual Purchase projector input from the module register facts", () => {
     const inputs = manualPurchaseWorkInputsFromRegister({
       requests: [{

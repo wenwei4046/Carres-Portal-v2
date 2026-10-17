@@ -1,3 +1,5 @@
+import { purchaseRequestContextSchema } from "@carres/shared";
+import PurchaseRequestAllocations from "./purchase-request/PurchaseRequestAllocations";
 // design-standard: not-a-list-page — this is a governed PURCHASING REGISTER
 // destination, not a generic List page. Its frame is the module's own shell —
 // `PurchasingTabs` draws the destination header, the 240px `FilterRail` draws
@@ -63,7 +65,7 @@ import {
   type OrderActionTone,
   type ProductCategory,
   GOODS_ABSENCE_WORDS,
-  purchaseRequestSubmitSchema, purchaseRequestRevisionSchema,
+  PURCHASE_REQUEST_REASONS, purchaseRequestSubmitSchema, purchaseRequestRevisionSchema,
   type PurchaseRequestContext,
 } from "@carres/shared";
 import { useQuery } from "@tanstack/react-query";
@@ -113,6 +115,7 @@ import {
   useIssuePurchaseRequests,
   useManualPurchaseDetail,
   useManualPurchasePlan,
+  usePurchaseRequestStockOffers,
   useManualPurchaseRegister,
   useMoveManualPurchaseDeliverTo,
   useResubmitManualPurchase,
@@ -135,8 +138,9 @@ import {
   useManualPurchaseStock,
 } from "./ManualPurchaseStock";
 import ManualPurchasePdfPreview from "./ManualPurchasePdfPreview";
+import { useRequestContextActions } from "./purchase-request/use-request-context-readback";
 import PurchaseRequestContextFields from "./purchase-request/PurchaseRequestContextFields";
-import { syncRequestDraftItems } from "./purchase-request/purchase-request-draft";
+import { approvalDistributionValid, proposalApprovalDistribution, type ApprovalDistribution, syncRequestDraftItems } from "./purchase-request/purchase-request-draft";
 import { contextPurchaseDraftPos, manualPurchaseDraftPos } from "./manual-purchase-draft-po";
 import {
   manualPurchaseReviewDocuments,
@@ -491,7 +495,7 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
         [
           ...new Set(
             live
-              .flatMap((l) => l.po_ids ?? (l.po_id ? [l.po_id] : []))
+              .flatMap((l) => l.active_po_ids ?? l.po_ids ?? (l.po_id ? [l.po_id] : []))
               .map((id) => poFacts.get(id)?.official_delivery_date ?? null)
               .filter((d): d is string => typeof d === "string" && d !== ""),
           ),
@@ -2089,7 +2093,7 @@ function RequestExpansion({
         ? MW.poNotRecorded
         : g.cancelled
           ? MANUAL_PURCHASE_STATUS_WORDS.not_going_ahead
-          : MW.notOrderedYet,
+          : manualPurchasePoSummary([]),
       poDeliveryDate: g.poDeliveryDate ? fmtDate(g.poDeliveryDate) : undefined,
       poDeliveryDateAbsence: GOODS_ABSENCE_WORDS.noPoYet,
       sku: g.sku,
@@ -2322,7 +2326,6 @@ export function CreateRequestWorkspace({
     value: PurchaseRequestContext;
     onChange: (value: PurchaseRequestContext) => void;
     pickupLocations: Array<{ id: string; name: string }>;
-    stockByLine: Parameters<typeof PurchaseRequestContextFields>[0]["stockByLine"];
     revision?: { expectedVersion: number; reason: string; onReasonChange?: (reason: string) => void };
   };
   /** R4: same saved request; null creates a new request. */
@@ -2358,6 +2361,9 @@ export function CreateRequestWorkspace({
   const contextSending = useRef(false);
   const initialContext = useRef(JSON.stringify(contextDraft?.value));
   const [discardContext, setDiscardContext] = useState(false);
+  const [contextReviewing, setContextReviewing] = useState(false);
+  const [contextPdfReady, setContextPdfReady] = useState(false);
+  const contextReviewedFacts = useRef<string | null>(null);
 
   const pick = useQuery({
     queryKey: qk.purchaseRequestItems(),
@@ -2514,6 +2520,11 @@ export function CreateRequestWorkspace({
     proceedDate: contextDraft.value.proceedDate, purpose: contextDraft.value.purpose,
     origin: contextDraft.value.origin, ...(editId ? { requestId: editId } : {}),
   } : undefined);
+  const qualifiedStock = usePurchaseRequestStockOffers(contextDraft?.value.lines.map(({ id, sku, attrs }) => ({ id, sku, attrs })) ?? [], contextDraft != null && contextDraft.value.purpose !== "ready_stock");
+  const contextStockByLine = new Map<string, Array<{ locationId: string; destinationId: string; name: string; available: number }>>();
+  if (!qualifiedStock.isFetching && !qualifiedStock.isError) for (const offer of qualifiedStock.data ?? []) {
+    contextStockByLine.set(offer.lineId, [...(contextStockByLine.get(offer.lineId) ?? []), offer]);
+  }
   const planBySku = useMemo(
     () =>
       new Map<string, ManualPurchasePlanLine>(
@@ -2666,8 +2677,8 @@ export function CreateRequestWorkspace({
       const earliest = planBySku.get(line.sku)?.arrival;
       return earliest != null && a.supplierDeliveryDate >= earliest;
     }));
-  const contextStockOk = contextDraft?.value.lines.every(line => line.stockProposals.every(proposal => {
-    const offer = contextDraft.stockByLine.get(line.id)?.find(offer => offer.locationId === proposal.locationId && offer.destinationId === proposal.destinationId);
+  const contextStockOk = (contextDraft?.value.purpose === "ready_stock" || (!qualifiedStock.isFetching && !qualifiedStock.isError && qualifiedStock.data != null)) && contextDraft?.value.lines.every(line => line.stockProposals.every(proposal => {
+    const offer = contextStockByLine.get(line.id)?.find(offer => offer.locationId === proposal.locationId && offer.destinationId === proposal.destinationId);
     return offer != null && proposal.qty <= offer.available;
   }));
   const canSend = contextDraft ? !!contextValid && !!contextDatesOk && !!contextStockOk && !saving && !pick.isLoading && !pick.isError && everyStartedLineNamesAnItem : legacyCanSend;
@@ -2746,6 +2757,10 @@ export function CreateRequestWorkspace({
   async function send() {
     if (contextDraft) {
       if (!canSend || contextSending.current || !contextBody) return;
+      if (!contextReviewing) {
+        contextReviewedFacts.current = contextReviewFacts; setContextReviewing(true); return;
+      }
+      if (contextReviewedFacts.current !== contextReviewFacts || (draftPos.length > 0 && !contextPdfReady)) return;
       contextSending.current = true; setSaving(true); setHeaderError(null);
       try {
         if (editing && editId) {
@@ -2889,19 +2904,24 @@ export function CreateRequestWorkspace({
     destinations, suppliers, plan: plan.data?.lines ?? [],
     collectedSupplierNames: new Set(supplierCollections.map(c => c.supplierName)),
   }) : legacyDraftPos;
+  const contextReviewFacts = JSON.stringify({ body: contextBody, plan: plan.data,
+    stock: contextDraft ? [...contextStockByLine] : [], papers: draftPos.map(paper => paper.data) });
+  useEffect(() => {
+    if (contextReviewing && contextReviewedFacts.current !== contextReviewFacts) setContextReviewing(false);
+  }, [contextReviewing, contextReviewFacts]);
   const contextFields = (section: "details" | "recipients" | "allocations") => contextDraft && <PurchaseRequestContextFields
     section={section} purposeLocked={editing} value={contextDraft.value} onChange={contextDraft.onChange}
     serviceCases={(casesQ.data?.items ?? []).map(sc => ({ id: sc.id, label: sc.caseNo ?? sc.case_no ?? GOODS_ABSENCE_WORDS.notRecorded }))}
-    destinations={destinations} pickupLocations={contextDraft.pickupLocations} stockByLine={contextDraft.stockByLine}
+    destinations={destinations} pickupLocations={contextDraft.pickupLocations} stockByLine={contextStockByLine}
     earliestRecipientDate={plan.data?.recipientEarliest ?? null}
     earliestSupplierDateBySku={new Map((plan.data?.lines ?? []).map(line => [line.sku, line.arrival]))}
-    disabled={saving}
+    disabled={saving || contextReviewing}
     additionalFields={section === "details" && contextDraft.revision ? <Textarea id="mp-context-revision-reason" label="Reason for change" required
-      value={contextDraft.revision.reason} disabled={saving || !contextDraft.revision.onReasonChange}
+      value={contextDraft.revision.reason} disabled={saving || contextReviewing || !contextDraft.revision.onReasonChange}
       onChange={event => contextDraft.revision?.onReasonChange?.(event.target.value)} /> : undefined}
     automaticFacts={section === "details" ? <>
       <SharedFact idPrefix="mp-context" framed automatic label={MW.createRequestedBy} value={requesterName} />
-      <SharedFact idPrefix="mp-context" framed automatic label="Request date" value={editing && existing.data?.request.created_at ? fmtDate(existing.data.request.created_at) : GOODS_ABSENCE_WORDS.notRecorded} />
+      <SharedFact idPrefix="mp-context" framed automatic label="Request date" value={editing ? existing.data?.request.created_at ? fmtDate(existing.data.request.created_at) : GOODS_ABSENCE_WORDS.notRecorded : fmtDate(todayIso)} />
     </> : undefined}
   />;
 
@@ -2913,19 +2933,20 @@ export function CreateRequestWorkspace({
   const actions = (where: "header" | "footer") => (
     <span className={`mp-create-actions mp-create-actions-${where} flex items-center gap-3`}>
       <Button variant="ghost" disabled={saving} onClick={() => {
+        if (contextDraft && contextReviewing) { setContextReviewing(false); return; }
         if (contextDraft && JSON.stringify(contextDraft.value) !== initialContext.current) setDiscardContext(true);
         else onDone(editId ?? undefined);
       }}>
-        {MW.cancel}
+        {contextDraft && contextReviewing ? "Back to edit" : MW.cancel}
       </Button>
       <Button
         variant="primary"
-        disabled={!canSend}
+        disabled={!canSend || (contextDraft != null && contextReviewing && draftPos.length > 0 && !contextPdfReady)}
         loading={saving}
         onClick={() => void send()}
         data-testid={where === "header" ? "mp-send" : "mp-send-footer"}
       >
-        {sendLabel}
+        {contextDraft && contextReviewing ? "Confirm and send" : sendLabel}
       </Button>
     </span>
   );
@@ -2970,7 +2991,8 @@ export function CreateRequestWorkspace({
             {contextDraft ? <>{contextFields("details")}{contextFields("recipients")}
               {(plan.isError || pick.isError) && <EmptyState title="Could not be loaded" action={<Button onClick={() => { void plan.refetch(); void pick.refetch(); }}>Try again</Button>} />}
               {plan.isLoading && <Loading />}
-              {headerError && <p className="text-meta text-kit-red-11" role="alert">{headerError}</p>}
+              {headerError && <div><p className="text-meta text-kit-red-11" role="alert">{headerError}</p>
+                <Button onClick={() => { setContextReviewing(false); void plan.refetch(); void pick.refetch(); }}>Try again</Button></div>}
             </> : <>
             <Block title={MW.secCreateRequestDetails}>
               {/* ⭐ ONE TITLE, ONE BOX, THREE TO A ROW — owner ruling 2026-09-26
@@ -3185,7 +3207,7 @@ export function CreateRequestWorkspace({
                       id={`mp-item-${i}`}
                       aria-label={W.itemLabel}
                       value={picked ? `${picked.sku} · ${picked.label}` : line.needle}
-                      disabled={done || saving}
+                      disabled={done || saving || contextReviewing}
                       onFocus={() => setActiveId(line.id)}
                       onChange={(e) => {
                         setActiveId(line.id);
@@ -3209,38 +3231,35 @@ export function CreateRequestWorkspace({
                           <span className="text-meta text-kit-slate-11">{W.createdWord}</span>
                         ) : (
                           <span className="mt-1 inline-flex flex-wrap gap-x-4 text-meta">
-                            <button
-                              type="button"
-                              className="text-kit-blue-11 hover:underline"
+                            <Button variant="ghost" size="sm"
+                              type="button" disabled={saving || contextReviewing}
                               aria-label={`Configure ${picked.label}`}
                               data-testid={`mp-line-configure-${i}`}
                               onClick={() => setConfigureId(line.id)}
                             >
                               Configure
-                            </button>
-                            <button
-                              type="button"
-                              className="text-danger hover:underline"
+                            </Button>
+                            <Button variant="ghost" size="sm"
+                              type="button" disabled={saving || contextReviewing}
                               aria-label={`${MW.remove} ${picked.label}`}
                               data-testid={`mp-line-remove-${i}`}
                               onClick={() => removeLine(line.id)}
                             >
                               {MW.remove}
-                            </button>
+                            </Button>
                           </span>
                         )}
                       </span>
                     ) : done ? null : (
                       <span className="inline-flex text-meta">
-                        <button
-                          type="button"
-                          className="text-danger hover:underline"
+                        <Button variant="ghost" size="sm"
+                          type="button" disabled={saving || contextReviewing}
                           aria-label={MW.remove}
                           data-testid={`mp-line-remove-${i}`}
                           onClick={() => removeLine(line.id)}
                         >
                           {MW.remove}
-                        </button>
+                        </Button>
                       </span>
                     )}
                   </td>
@@ -3254,7 +3273,7 @@ export function CreateRequestWorkspace({
                         aria-label={W.itemsColQty}
                         inputMode="numeric"
                         value={line.qty}
-                        disabled={done || saving}
+                        disabled={done || saving || contextReviewing}
                         onChange={(e) => patch(line.id, { qty: e.target.value })}
                       />
                     </div>
@@ -3325,20 +3344,25 @@ export function CreateRequestWorkspace({
             line — and wears the neutral box, not the ghost (owner, 2026-09-03).
             Not `primary`: `Send for approval` already holds the screen's one. */}
         <div className="flex">
-          <Button variant="neutral" disabled={saving} onClick={addLine} data-testid="mp-line-add">
+          <Button variant="neutral" disabled={saving || contextReviewing} onClick={addLine} data-testid="mp-line-add">
             {MW.addLine}
           </Button>
         </div>
       </div>
             </Block>
-            {contextFields("allocations")}
+            {contextDraft?.value.purpose !== "ready_stock" && contextDraft && (qualifiedStock.isPending || qualifiedStock.isFetching ? <Loading /> : qualifiedStock.isError ? <EmptyState title="Could not be loaded" action={<Button onClick={() => void qualifiedStock.refetch()}>Try again</Button>} /> : null)}
+            {(!contextDraft || contextDraft.value.purpose === "ready_stock" || (qualifiedStock.data != null && !qualifiedStock.isFetching && !qualifiedStock.isError)) && contextFields("allocations")}
           </div>
 
           {/* The preview reads the SAME draft the form holds — never a second
               copy of the facts, and never a supplier document. */}
           <aside className="mp-create-preview-pane" aria-label={contextDraft ? "Review POs" : MW.page}>
             {contextDraft && <h3>Review POs</h3>}
-            {contextDraft && draftPos.length === 0 ? <p>Add an item to see its PO</p> : <ManualPurchasePdfPreview drafts={draftPos} />}
+            {contextDraft && draftPos.length === 0 ? contextDraft.value.lines.length === 0 ? <p>Add an item to see its PO</p>
+              : contextDraft.value.lines.some(line => line.allocations.some(allocation => allocation.qty > 0))
+                ? <EmptyState title="Could not be loaded" action={<Button onClick={() => void pick.refetch()}>Try again</Button>} />
+                : <p>To buy · 0</p>
+              : <ManualPurchasePdfPreview drafts={draftPos} onReadyChange={contextDraft ? setContextPdfReady : undefined} />}
           </aside>
         </div>
       </div>
@@ -3870,7 +3894,7 @@ function TwoLines({
   );
 }
 
-function ManualPurchaseObject({
+export function ManualPurchaseObject({
   id,
   registerHeading,
   position,
@@ -3878,7 +3902,10 @@ function ManualPurchaseObject({
   onBack,
   openSection,
   onEditAndSendAgain,
+  contextFlow = false,
 }: {
+  /** Explicit isolated adoption only; normal object caller leaves this false. */
+  contextFlow?: boolean;
   id: string;
   /** `approval` when a Work action asked for that section; null otherwise. */
   openSection?: string | null;
@@ -3896,6 +3923,25 @@ function ManualPurchaseObject({
   onEditAndSendAgain: () => void;
 }) {
   const q = useManualPurchaseDetail(id);
+  const contextActions = useRequestContextActions(id, q.data?.request, { enabled: contextFlow,
+    mayApprove: q.data?.context_can_approve === true, mayIssue: false });
+  const modern = contextFlow && contextActions.saved.kind === "context";
+  const [contextDistribution, setContextDistribution] = useState<ApprovalDistribution | null>(null);
+  const [contextAdjustment, setContextAdjustment] = useState<PurchaseRequestContext | null>(null);
+  const [contextStockReason, setContextStockReason] = useState("");
+  const [editingContextStock, setEditingContextStock] = useState(false);
+  const contextApprovalValue = contextAdjustment ?? (contextActions.saved.kind === "context" ? contextActions.saved.value : null);
+  const contextBaseline = useRef<string | null>(null);
+  const pendingReview = contextActions.approval.kind === "pending" ? contextActions.approval.review.review : null;
+  useEffect(() => {
+    if (!modern || !pendingReview || contextBaseline.current !== null) return;
+    contextBaseline.current = JSON.stringify(pendingReview);
+    setContextDistribution(current => proposalApprovalDistribution(pendingReview.state.context).map(proposal =>
+      current?.find(value => value.lineId === proposal.lineId && value.kind === proposal.kind && value.allocationId === proposal.allocationId) ?? proposal));
+  }, [modern, pendingReview]);
+  const contextReviewChanged = pendingReview != null && contextBaseline.current != null && JSON.stringify(pendingReview) !== contextBaseline.current;
+  const deciding = modern ? contextActions.decision.isPending : false;
+
   /**
    * ⭐ THE ASKED-FOR SECTION IS BROUGHT INTO VIEW ONCE THE OBJECT HAS LOADED
    * (owner ruling 2026-09-11: "Work must open the exact request's Approval
@@ -3948,6 +3994,8 @@ function ManualPurchaseObject({
   );
 
   const d = q.data;
+  const savedContext = contextActions.saved.kind === "context" ? contextActions.saved.value : null;
+  const unreadableContext = d != null && (Number(d.request.request_version ?? 0)>0 || d.request.request_context != null) && savedContext == null;
   /* Card 08 §3.3 — the object header speaks business facts only:
      `{Need for} · {For}` as the identity, `{Proceed Date} · {supplier}` as
      the quieter context. The loaded object recomputes them from its own
@@ -3973,7 +4021,7 @@ function ManualPurchaseObject({
         }),
       }),
       context: [
-        fmtDate(d.request.created_at.slice(0, 10)),
+        fmtDate(savedContext?.proceedDate ?? d.request.created_at.slice(0, 10)),
         manualPurchaseSupplierSummary(
           liveL.map((l) =>
             l.supplier_id ? (supNameById.get(l.supplier_id) ?? "") : "",
@@ -4017,6 +4065,13 @@ function ManualPurchaseObject({
     if (!d) return;
     setDecideError(null);
     try {
+      if (modern) {
+        if (contextActions.saved.kind !== "context" || (decision === "approve" && (!contextDistribution || contextReviewChanged))) return;
+        await contextActions.decide({ decision, reason: decision === "approve" ? (contextAdjustment ? contextStockReason.trim() : null) : refuseReason.trim(),
+          context: decision === "approve" ? contextApprovalValue ?? contextActions.saved.value : contextActions.saved.value, approvedDistribution: decision === "approve" ? contextDistribution : null });
+        setReasonFor(null); setRefuseReason("");
+        return;
+      }
       await decide.mutateAsync({
         id,
         decision,
@@ -4114,7 +4169,7 @@ function ManualPurchaseObject({
       </div>
     );
   }
-  if (q.isError || !d || !status) {
+  if (q.isError || !d || !status || unreadableContext) {
     return (
       <div className="absolute inset-0 flex flex-col bg-kit-slate-3" data-testid="mp-detail-failed">
         {header}
@@ -4159,7 +4214,7 @@ function ManualPurchaseObject({
   const approval = manualPurchaseApprovalOf(decisionFactsOf(request));
   /* The approver's controls exist only while the request waits on THEM — a
      sent-back request waits on its requester, a withdrawn one on nobody. */
-  const showDecision = d.canApprove && approval.kind === "need_approval";
+  const showDecision = (d.canApprove || modern && d.context_can_approve === true) && approval.kind === "need_approval";
 
   async function withdrawRequest() {
     setWithdrawError(null);
@@ -4198,7 +4253,7 @@ function ManualPurchaseObject({
     const n = Number(v);
     return !Number.isInteger(n) || n < 0 || n > l.qty;
   });
-  const cutsReady =
+  const legacyCutsReady =
     live.length > 0 &&
     live.every((l) => {
       const n = Number(cuts[l.id]);
@@ -4208,7 +4263,9 @@ function ManualPurchaseObject({
      status arithmetic derives `Not going ahead` from it, with no reason on
      record (MPR-20260904-8935). One line at 0 among others is a legitimate
      partial cut and stays allowed. */
-  const allZero = cutsReady && live.every((l) => Number(cuts[l.id]) === 0);
+  const cutsReady = modern ? contextActions.canDecide && !contextReviewChanged && contextActions.saved.kind === "context"
+    && contextDistribution != null && contextApprovalValue != null && purchaseRequestContextSchema.safeParse(contextApprovalValue).success && (!contextAdjustment || contextStockReason.trim().length > 0) && approvalDistributionValid(contextApprovalValue, contextDistribution) : legacyCutsReady;
+  const allZero = modern ? contextDistribution?.every(value => value.qty === 0) === true : legacyCutsReady && live.every((l) => Number(cuts[l.id]) === 0);
 
   /* WHAT WE ALREADY HAVE — one row per live SKU, quantities summed. */
   const haveRows: Array<{ sku: string; requestedQty: number }> = [];
@@ -4299,10 +4356,11 @@ function ManualPurchaseObject({
           <Block title={MW.secRequest} headerSlot={withdrawDoor}>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-testid="mp-detail-facts">
               <Fact label={MW.colProceedDate} testId="mp-detail-proceed-date">
-                {fmtDate(request.created_at.slice(0, 10))}
+                {fmtDate(savedContext?.proceedDate ?? request.created_at.slice(0, 10))}
               </Fact>
-              <Fact label={MW.colDeliveryDate} testId="mp-detail-delivery-date">
-                {request.required_by ? (
+              {savedContext && <Fact label="Request date">{fmtDate((request.submitted_at ?? request.created_at).slice(0,10))}</Fact>}
+              <Fact label={savedContext && savedContext.purpose !== "ready_stock" ? "Customer Original Delivery Date" : MW.colDeliveryDate} testId="mp-detail-delivery-date">
+                {savedContext && savedContext.purpose !== "ready_stock" ? [...new Set(savedContext.recipients.map(recipient => recipient.deliveryDate))].sort().map(date => fmtDate(date)).join(" · ") : request.required_by ? (
                   fmtDate(request.required_by)
                 ) : (
                   /* A historical null stays honest — never backfilled, never
@@ -4328,8 +4386,13 @@ function ManualPurchaseObject({
               ) : null}
               <Fact label={MW.needFor}>{purposeLabelOf(request.purpose)}</Fact>
               <Fact label={MW.colFor} testId="mp-detail-for">
-                {forText}
+                {savedContext?.purpose === "general_purchase" ? PURCHASE_REQUEST_REASONS.find(reason => reason.value === savedContext.reason)?.label ?? GOODS_ABSENCE_WORDS.notRecorded : forText}
               </Fact>
+              {savedContext?.purpose === "general_purchase" && savedContext.reason === "purchase_for_others" && <>
+                <Fact label="Company / Person name">{savedContext.companyPersonName}</Fact>
+                {savedContext.projectReference && <Fact label="Project name / reference">{savedContext.projectReference}</Fact>}
+              </>}
+              {savedContext?.purpose === "general_purchase" && savedContext.reason === "other" && <Fact label="Explanation">{savedContext.explanation}</Fact>}
               <Fact label={MW.colDeliverTo} testId="mp-detail-deliver-to">
                 <DeliverToFact
                   requestId={request.id}
@@ -4341,7 +4404,7 @@ function ManualPurchaseObject({
                      (refused, every line cancelled) and the same arithmetic
                      hides the door here so it is never offered and refused. */
                   movable={
-                    status != null &&
+                    contextActions.saved.kind === "legacy" && status != null &&
                     (status.kind === "waiting_approval" || status.kind === "ready_to_order") &&
                     !lines.some((l) => l.po_id != null || (l.po_ids?.length ?? 0) > 0)
                   }
@@ -4379,9 +4442,23 @@ function ManualPurchaseObject({
             </div>
           </Block>
 
+          {savedContext && savedContext.purpose !== "ready_stock" && <Block title="Goods recipient">
+            {savedContext.recipients.map(recipient => <section key={recipient.id} className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {recipient.company && <Fact label="Company / organisation">{recipient.company}</Fact>}
+              <Fact label="Recipient name">{recipient.name}</Fact><Fact label="Phone">{recipient.phone}</Fact>
+              <Fact label="Customer Original Delivery Date">{fmtDate(recipient.deliveryDate)}</Fact>
+              {recipient.method === "delivery" ? <>
+                <Fact label="Address line 1">{recipient.addressLine1}</Fact><Fact label="Address line 2">{recipient.addressLine2}</Fact>
+                <Fact label="City">{recipient.city}</Fact><Fact label="State">{recipient.state}</Fact><Fact label="Postcode">{recipient.postcode}</Fact>
+                <Fact label="Building type">{recipient.buildingType}</Fact><Fact label="Floor">{recipient.floor}</Fact><Fact label="Lift">{recipient.lift === "has_lift" ? "Has lift" : "No lift"}</Fact>
+              </> : <><Fact label="Pickup location">{recipient.pickupLocationId ? destName.get(recipient.pickupLocationId) ?? GOODS_ABSENCE_WORDS.notRecorded : GOODS_ABSENCE_WORDS.notRecorded}</Fact><Fact label="Collected by">{recipient.collectedBy}</Fact></>}
+            </section>)}
+          </Block>}
+
           {/* ② ITEMS REQUESTED — read-only; Catalog human words beside the
               explicit SKU; the supplier is Catalog-derived, never chosen. */}
           <Block title={MW.secItemsRequested}>
+            {savedContext && <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-testid="mp-full-requested-need">{savedContext.lines.map(line => <Fact key={line.id} label={`${line.sku} · ${MW.expRequestedQty}`}>{line.qty}</Fact>)}</div>}
             <ObjectTable
               testId="mp-object-items"
               minWidth={860}
@@ -4460,7 +4537,15 @@ function ManualPurchaseObject({
 
           {/* ③ WHAT WE ALREADY HAVE — decision facts, not buttons; the one
               shared arithmetic prints `Still Needed`. */}
-          <Block title={MW.secAlreadyHave}>
+          {savedContext ? <Block title={MW.secAlreadyHave}>
+            {contextActions.approval.kind === "pending" || contextActions.approval.kind === "approved" ? (
+              contextActions.approval.review.review.stock_offers != null ? savedContext.lines.map(line => {
+                const offers = contextActions.approval.kind === "pending" || contextActions.approval.kind === "approved" ? contextActions.approval.review.review.stock_offers ?? [] : [];
+                const units = new Set(offers.filter(offer => offer.lineId === line.id).flatMap(offer => offer.units.map(unit => unit.id)));
+                return <Fact key={line.id} label={`${line.sku} · From stock`}>{units.size}</Fact>;
+              }) : <EmptyState title="Could not be loaded" />
+            ) : <EmptyState title="Could not be loaded" />}
+          </Block> : <Block title={MW.secAlreadyHave}>
             {haveRows.length > 0 ? (
               <p className="mb-2 text-meta text-kit-slate-11" data-testid="mp-object-have-note">
                 {MW.skuReferenceNote}
@@ -4492,7 +4577,7 @@ function ManualPurchaseObject({
                 ))}
               </ObjectTable>
             )}
-          </Block>
+          </Block>}
 
           {/* ④ APPROVAL — only when there is a decision to make here or a
               decision record to read; the state itself is a Request fact. */}
@@ -4500,6 +4585,55 @@ function ManualPurchaseObject({
           <Block title={MW.secApproval}>
             {approval.kind === "need_approval" && showDecision ? (
               <div className="flex flex-col gap-3" data-testid="mp-decision">
+                {modern ? <div className="flex flex-col gap-3" data-testid="mp-context-approval">
+                  {contextActions.isFetching && <Loading />}
+                  {contextActions.approval.kind !== "pending" || contextReviewChanged ? <EmptyState title="Could not be loaded" action={<Button onClick={() => {
+                    contextBaseline.current = null;
+                    void Promise.all([q.refetch(), contextActions.refetch()]);
+                  }}>Try again</Button>} /> : null}
+                  {contextApprovalValue?.purpose !== "ready_stock" && <>
+                    <div><Button variant="neutral" disabled={editingContextStock || deciding || !contextActions.canDecide || contextReviewChanged || pendingReview?.stock_offers == null}
+                      onClick={() => setEditingContextStock(true)}>Change selection</Button></div>
+                    {editingContextStock && contextApprovalValue && pendingReview?.stock_offers != null && <>
+                      {contextApprovalValue.lines.map(line => <PurchaseRequestAllocations key={line.id} line={line} recipients={contextApprovalValue.recipients}
+                        destinations={d.destinations} stockOffers={pendingReview.stock_offers!.filter(offer => offer.lineId === line.id)}
+                        stockRequest={false} earliestSupplierDate={null} approvalAdjustment disabled={deciding || !contextActions.canDecide || contextReviewChanged}
+                        onChange={next => {
+                          const value = { ...contextApprovalValue, lines: contextApprovalValue.lines.map(item => item.id === next.id ? next : item) };
+                          setContextAdjustment(value); setContextDistribution(proposalApprovalDistribution(value));
+                        }} />)}
+                      <div><Button variant="ghost" disabled={deciding} onClick={() => {
+                        setContextAdjustment(null); setContextStockReason(""); setEditingContextStock(false);
+                        if (contextActions.saved.kind === "context") setContextDistribution(proposalApprovalDistribution(contextActions.saved.value));
+                      }}>Cancel</Button></div>
+                      <Textarea id="mp-context-stock-reason" label="Reason for change" required disabled={deciding} value={contextStockReason}
+                        onChange={event => setContextStockReason(event.target.value)} />
+                    </>}
+                  </>}
+                  {contextDistribution?.map((value, index) => {
+                    const context = contextApprovalValue;
+                    const line = context?.lines.find(line => line.id === value.lineId);
+                    const source = (value.kind === "purchase" ? line?.allocations : line?.stockProposals)?.find(source => source.id === value.allocationId);
+                    const costLine = live.find(demand => demand.request_line_id === value.lineId && (demand.supplier_allocation_id ?? demand.stock_proposal_id) === value.allocationId);
+                    const patch = (change: Partial<ApprovalDistribution[number]>) => setContextDistribution(rows => rows?.map((row, i) => i === index ? { ...row, ...change } : row) ?? null);
+                    return <section key={`${value.lineId}/${value.kind}/${value.allocationId}`} className="flex flex-col gap-3">
+                      <div>{line?.sku} · {value.kind === "purchase" ? "To buy" : "From stock"} · {source ? destName.get(source.destinationId) ?? GOODS_ABSENCE_WORDS.notRecorded : GOODS_ABSENCE_WORDS.notRecorded}</div>
+                      <div>{MW.expRequestedQty}: {source?.qty ?? GOODS_ABSENCE_WORDS.notRecorded}</div>
+                      <Input id={`mp-approved-${value.allocationId}`} label={MW.expApprovedQty} type="number" min={0} max={source?.qty} step={1}
+                        disabled={deciding || !contextActions.canDecide || contextReviewChanged} value={value.qty}
+                        onChange={event => patch({ qty: Number(event.target.value) })} />
+                      {costLine && Object.prototype.hasOwnProperty.call(costLine,"unit_cost") && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <Fact label={MW.colTransactionCost}>{costLine.unit_cost == null ? "Catalog has no price." : `RM ${Number(costLine.unit_cost).toLocaleString()}`}</Fact>
+                        <Fact label={MW.colLineTotal}>{costLine.unit_cost == null || !Number.isInteger(value.qty) ? GOODS_ABSENCE_WORDS.notRecorded : `RM ${(Number(costLine.unit_cost)*value.qty).toLocaleString()}`}</Fact>
+                      </div>}
+                      {context?.purpose !== "ready_stock" && source?.recipients.map(recipient => <Input key={recipient.recipientId}
+                        id={`mp-approved-${value.allocationId}-${recipient.recipientId}`} label={context?.recipients.find(r => r.id === recipient.recipientId)?.name ?? GOODS_ABSENCE_WORDS.notRecorded}
+                        type="number" min={0} max={recipient.qty} step={1} disabled={deciding || !contextActions.canDecide || contextReviewChanged}
+                        value={value.recipients.find(r => r.recipientId === recipient.recipientId)?.qty ?? 0}
+                        onChange={event => { const qty = Number(event.target.value); patch({ recipients: [...value.recipients.filter(r => r.recipientId !== recipient.recipientId), ...(qty > 0 ? [{ recipientId: recipient.recipientId, qty }] : [])] }); }} />)}
+                    </section>;
+                  })}
+                </div> : (
                 <ObjectTable
                   testId="mp-approval-table"
                   minWidth={760}
@@ -4523,7 +4657,8 @@ function ManualPurchaseObject({
                     />
                   ))}
                 </ObjectTable>
-                {cutInvalid ? (
+                )}
+                {!modern && cutInvalid ? (
                   <TwoLines
                     testId="mp-cut-invalid"
                     wrong={purchasingRefusal("invalid_cut_qty", { qty: cutInvalid.qty }).wrong}
@@ -4572,7 +4707,7 @@ function ManualPurchaseObject({
                     </Button>
                     <Button
                       variant="neutral"
-                      disabled={refuseReason.trim().length === 0 || decide.isPending}
+                      disabled={refuseReason.trim().length === 0 || (modern ? deciding || !contextActions.canReject : decide.isPending)}
                       onClick={() => void submitDecision(reasonFor)}
                       data-testid={reasonFor === "refuse" ? "mp-refuse-submit" : "mp-send-back-submit"}
                     >
@@ -4583,14 +4718,14 @@ function ManualPurchaseObject({
                   <div className="flex flex-wrap items-center justify-end gap-3">
                     <Button
                       variant="neutral"
-                      onClick={() => setReasonFor("send_back")}
+                      disabled={modern && !contextActions.canReject} onClick={() => setReasonFor("send_back")}
                       data-testid="mp-send-back"
                     >
                       {MW.sendBack}
                     </Button>
                     <Button
                       variant="neutral"
-                      onClick={() => setReasonFor("refuse")}
+                      disabled={modern && !contextActions.canReject} onClick={() => setReasonFor("refuse")}
                       data-testid="mp-refuse"
                     >
                       {MW.refuse}
@@ -4599,7 +4734,7 @@ function ManualPurchaseObject({
                     <Button
                       variant="primary"
                       disabled={!cutsReady || allZero}
-                      loading={decide.isPending}
+                      loading={modern ? deciding : decide.isPending}
                       onClick={() => void submitDecision("approve")}
                       data-testid="mp-approve"
                     >
@@ -4682,7 +4817,7 @@ function ManualPurchaseObject({
           <Block title={MW.secPurchaseOrders}>
             {d.pos.length === 0 ? (
               <p className="text-body text-base-500" data-testid="mp-object-not-ordered">
-                {MW.notOrderedYet}
+                {manualPurchasePoSummary([])}
               </p>
             ) : (
               <ObjectTable
@@ -4718,6 +4853,7 @@ function ManualPurchaseObject({
                       >
                         {p.po_no}
                       </button>
+                      {p.status === "cancelled" && <StatusPill tone="neutral">Cancelled</StatusPill>}
                     </td>
                     <td className="px-2 py-2 tabular-nums">{p.ordered_qty}</td>
                     <td className="px-2 py-2 tabular-nums">{stillToOrderOf(p.id)}</td>

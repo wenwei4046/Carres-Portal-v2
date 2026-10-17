@@ -283,6 +283,7 @@ export const TO_ORDER_WORDS = {
   reasonInternalStaffPurchase: "Internal Staff Purchase",
   reasonSubsidiaryPurchase: "Subsidiary Purchase",
   reasonOtherPurchase: "Other Purchase",
+  reasonGeneralPurchase: "General Purchase",
   /**
    * THE RETIRED FOUR — history's own words, never offered again (Card 03).
    * Rows stored before the 2026-08-28 ruling keep printing the word they were
@@ -563,6 +564,9 @@ export const RETIRED_DEMAND_PURPOSE_LABELS: Record<string, string> = {
  */
 export function demandPurposeLabelOf(v: string | null | undefined): string | null {
   if (!v) return null;
+  // Modern GP has its context-specific create contract; adding its stored
+  // label must not offer it through the legacy flat-purpose picker.
+  if (v === "general_purchase") return TO_ORDER_WORDS.reasonGeneralPurchase;
   return (
     DEMAND_PURPOSES.find((p) => p.value === v)?.label ??
     RETIRED_DEMAND_PURPOSE_LABELS[v] ??

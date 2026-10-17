@@ -52,6 +52,19 @@ describe("fresh approval and partial issue action adoption", () => {
     await expect(result.current.issueRemaining({ key: uuid, together: false })).rejects.toThrow("Not available");
     expect(issue).not.toHaveBeenCalled(); expect(decide).not.toHaveBeenCalled();
   });
+  it("permits only return/refusal on a known stale source and refuses cached/foreign versions", async () => {
+    const data = { available: false, reason: "forecast_source_changed", request_version: 1, request_context: context, events: [] };
+    vi.mocked(usePurchaseRequestContextReview).mockReturnValue({ ...query, data } as never);
+    const { result, rerender } = renderHook(() => useRequestContextActions(uuid, request, { enabled: true, mayApprove: true, mayIssue: false }));
+    expect(result.current.canDecide).toBe(false); expect(result.current.canReject).toBe(true);
+    await expect(result.current.decide({ decision: "approve", context, approvedDistribution: null })).rejects.toThrow("Not available");
+    await result.current.decide({ decision: "send_back", reason: "TEST repair source", context, approvedDistribution: null });
+    expect(decide).toHaveBeenCalledWith(expect.objectContaining({ decision: "send_back", contextReview: { expectedVersion: 1, reviewScope: { request_version: 1 }, context, approvedDistribution: null } }));
+    vi.mocked(usePurchaseRequestContextReview).mockReturnValue({ ...query, data, isFetching: true } as never); rerender();
+    expect(result.current.canReject).toBe(false);
+    vi.mocked(usePurchaseRequestContextReview).mockReturnValue({ ...query, data: { ...data, request_version: 2 } } as never); rerender();
+    expect(result.current.canReject).toBe(false);
+  });
   it("passes the complete owning review and explicit distribution through the existing decision hook", async () => {
     vi.mocked(usePurchaseRequestContextReview).mockReturnValue({ ...query, data: { available: true, review: owning, events: [], coverage: null, approval: null } } as never);
     const { result } = renderHook(() => useRequestContextActions(uuid, request, { enabled: true, mayApprove: true, mayIssue: false }));

@@ -503,7 +503,7 @@ describe("context source readback across merged and partial POs", () => {
     return { purchase_requests: [request({ request_version: 1 })],
       purchase_demands: [line({ request_line_id: LINE, fulfilment_kind: "purchase", qty: 2, approved_qty: 2, issued_qty: 2, po_id: "PO-CONTEXT-A" })],
       purchase_order_lines: physical, po_line_sources: sourceResult,
-      purchase_orders: [{ id: "PO-CONTEXT-A", version: 1 }, { id: "PO-CONTEXT-B", version: 1 }],
+      purchase_orders: [{ id: "PO-CONTEXT-A", version: 1, status: "open" }, { id: "PO-CONTEXT-B", version: 1, status: "open" }],
       product_skus: [{ sku: "5539-2NA", variant: "Q", variant_kind: "size", product_models: { name: "TEST model", category: "mattress" } }], app_users: USERS };
   }
   it("counts only this demand's source1+1 and waits for all its physical lines to be received", async () => {
@@ -512,6 +512,17 @@ describe("context source readback across merged and partial POs", () => {
     const body = await res.json() as { linesUnavailable: boolean; lines: Array<{ received: boolean; allocations: Array<{ poId: string; qty: number }> }> };
     expect(body.linesUnavailable).toBe(false);
     expect(body.lines[0]!.allocations).toEqual([{ poId: "PO-CONTEXT-A", qty: 1, destinationId: DEST }, { poId: "PO-CONTEXT-B", qty: 1, destinationId: DEST }]);
+    expect(body.lines[0]!.received).toBe(false);
+  });
+  it("preserves cancelled PO lineage while counting only active coverage for remainder and Work", async () => {
+    const data = tables(); data.purchase_orders[0]!.status = "cancelled";
+    data.purchase_demands = [line({ request_line_id: LINE, fulfilment_kind: "purchase", qty: 2, approved_qty: 2, issued_qty: 1, po_id: "PO-CONTEXT-B" })];
+    vi.mocked(userClient).mockReturnValue(makeSb(data));
+    const response = await call(""); expect(response.status).toBe(200);
+    const body = await response.json() as { linesUnavailable: boolean; lines: Array<{ po_ids: string[]; active_po_ids: string[]; received: boolean }> };
+    expect(body.linesUnavailable).toBe(false);
+    expect(body.lines[0]!.po_ids).toEqual(["PO-CONTEXT-A", "PO-CONTEXT-B"]);
+    expect(body.lines[0]!.active_po_ids).toEqual(["PO-CONTEXT-B"]);
     expect(body.lines[0]!.received).toBe(false);
   });
   it("keeps missing attribution unknown rather than borrowing the physical line's whole quantity", async () => {

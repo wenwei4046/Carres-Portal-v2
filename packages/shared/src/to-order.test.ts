@@ -1281,6 +1281,7 @@ describe("P15 · the Source a typed demand may carry", () => {
       spare_parts: "Spare Parts",
     });
     expect(demandPurposeLabelOf("ready_stock")).toBe("Ready Stock");
+    expect(demandPurposeLabelOf("general_purchase")).toBe("General Purchase");
     expect(demandPurposeLabelOf("subsidiary_purchase")).toBe("Subsidiary Purchase");
     expect(demandPurposeLabelOf("office")).toBe("Office");
     expect(demandPurposeLabelOf("warranty")).toBe("Warranty");

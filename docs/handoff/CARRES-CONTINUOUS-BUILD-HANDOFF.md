@@ -9,6 +9,75 @@ Paste everything below the line into a fresh session. It is self-contained.
 
 ---
 
+**Latest qualified Stock + real-preview checkpoint ·18Oct2026 · LOCAL ONLY.**
+Exact writer SHA256 `ee66a225f512d74ef39cd36483a6f2dbd5a0e128e7a98a66f5e6e6ab3740c42f`,60
+function/grant assertions (supersedes1e237/58 below). One private qualified all-location Stock
+reader feeds pre-create API and existing saved Review; actual Unit/config/site/health/role checks,
+no reservation. SQL local fixture + exact rollback probe pass with CLOSED admission preserved.
+Existing Workspace now reads that qualified source (no injected stockByLine fallback), includes
+configuration in cache identity and refuses stale/error reads; missing read never means stock0.
+Existing object Jess adjustment reuses PurchaseRequestAllocations, locks original goods/need and
+supplier date/site; explicit Stock/buy recipient changes and reason required. Positive actual UI
+Stock2/buy3/fullneed5 passes. Refuse/send-back uses saved need, not staged stock changes; known
+source-invalid Review can be returned/refused without granting approval, while unread/refetch/
+foreign versions stay shut. Review Cancel is current COPY `Back to edit`; draft retained.
+Important preview fix: Confirm waits for existing shared PdfPreview.onReady painted pages, not
+just successful PDF Blob. Failed/old/resized/retrying painter cannot certify current papers.
+No component fork. GP label now uses shared stored-purpose label without enabling the legacy GP
+flat-purpose picker. Old object/goods no-PO wording reuses manualPurchasePoSummary([]).
+Local evidence: web68/68; shared192/192; Stock/context API40/40; real browser8/8 GP/RS at390,
+1025,1164,1440 with actual renderer+painter/keyboard/create→Review→Confirm→object→approve.
+Browser fixture uses in-memory TEST transport only: NOT authenticated browser-to-DB evidence.
+`apps/web/manual-purchase-context-preview.html` is a dev-only entry outside index.html/build graph,
+not a new production route/alternate form. SQL500/partial/source/send proof remains separate.
+Logs `/tmp/carres-context-stock-{local-check,probe,api-tests,ui-tests,api-types,web-types}.log`,
+`/tmp/carres-context-browser-check.log`, `/tmp/carres-context-shared-final.log`. Eight browser
+pictures per stage are under `/tmp/carres-context-browser`. Original narrow test selected hidden
+header action; corrected to existing visible footer, no production button behavior changed.
+Kit: existing Block/Input/Select/Textarea/Button/PdfPreview supported/reused. Specific deviation
+fixed: old bare inline Configure/Remove controls now common ghost Button with truthful disabled
+state. Request date previews current server today, selected Proceed Date remains independent.
+NOT APPLICABLE here: register rail/filter/selection engine; this is isolated Workspace/object
+acceptance, not a claim that the full Portal/parent paths are delivered.
+NEXT: default-disabled Register/Forecast parent adoption + selected Issue Review, exact source
+proof/partial quantities; combined browser-to-DB lifecycle. SC new/changed formal remedy and
+qualified cancellation remain bounded owning dependencies, not invented rules. Settings and
+writer SQL still unapproved; no migration/production write/push/deploy/real Task or supplier send.
+
+**Current guarded lifecycle checkpoint ·18Oct2026 · supersedes historical gaps below.**
+Worktree `forecast-mpr-context`, branch `codex/forecast-mpr-context`. Foundation0696 is already
+applied/deployed; repeated historical approval is not a new Settings/writer approval.
+Create now stages Review POs → Confirm and send; actual preview readiness gates confirmation,
+Cancel retains draft, source/paper changes invalidate Review. Existing object default-off controls
+carry explicit approval qty/recipient distribution; full original need and saved recipient facts
+remain visible. Parent Change Deliver To now reconciles selected MPR source/Units on the SAME PO;
+counted single-owner split has no fake Units. Existing PO owner RS growth respects original500
+approval and exact current coverage/provenance; a changed partial-Forecast cohort blocks new MPR
+issue/no-PO resubmission without rewriting approval. No issued-MPR recall/reapproval is invented.
+Purchasing5.8.1 requires supplier agreement/fee/effective-version facts: reason-only context cancel
+and quantity reduction REFUSE before writes. Earlier local cancellation arithmetic is NOT legal
+cancellation proof. Legacy-only doors retain existing behavior; no cancellation UI commissioned.
+SQL exact SHA256 `1e237b4bf392a0a7b559430bdd4fdcdd99adbc2ce86d297a7a863be8fe873856`,58
+function/grant fingerprints. Private admission is CLOSED (55000/request_context_not_enabled), no
+GUC/browser/user switch, refuses install over active context records. No migration/PR/apply/deploy.
+Latest local evidence: API441/441, web66/66 across8 files, shared14, real local calendar/source-lock
+integration2; API/web typechecks pass. Owned-loopback SQL fixture completes actual create/revise/
+approve/partial issue/parent source coordination/current-version send declarations then ROLLBACK;
+exact DDL probe deliberately ends PROBE_ROLLBACK after all checks. Logs `/tmp/carres-context-`
+`coordinate-{api-tests,web-tests,api-types,web-types,integration}.log` and
+`/tmp/carres-context-po-coordinate-{test,probe}.log`. API serial rerun fixed one earlier parallel
+resource-related import timeout without altering test or timeout. No production write/message/Task.
+Two actual saved local snapshots are rendered through the shipped PO renderer under
+`output/forecast-mpr-delivery/local-test-documents/`: V1 qty1, current V3 qty499, both one-page PDF;
+visually reviewed after TEST supplier-address completion, no recipient/price leak. Synthetic local
+send declarations retain V1 evidence, refuse stale V1 and independently mark both current POs;
+no external provider called. Reader-only cancelled coverage fixture is NOT effective-cancel proof.
+Remaining independent work: qualified all-location SKU/config Stock offers and Jess adjustment
+composition, qualified SC evidence reader, full local browser-to-DB visual/keyboard/narrow journey.
+Owning dependency boundaries: formal new/changed SC remedy producer, effective cancellation and
+mixed-source qty revision contract; do not invent them or expand Service/PO module scope. Current
+Settings hash b4eb234d…53774 remains pending. Continue implementation, not foundation-only recap.
+
 **Latest guarded form/action slice ·18Oct2026 · LOCAL ONLY; not a full lifecycle claim.**
 The SAME `CreateRequestWorkspace` now accepts an explicit optional `contextDraft` prop. Normal
 production caller passes none; there is no URL toggle/new production route. It reuses the same

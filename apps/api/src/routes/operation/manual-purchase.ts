@@ -8,6 +8,8 @@ import {
   purchaseRequestIssueSchema,
   purchaseRequestContextHistory,
   purchaseRequestContextReviewReadSchema,
+  purchaseRequestStockLinesSchema,
+  purchaseRequestStockOffersSchema,
   purchaseRequestSupplierDateIssues,
   type PurchaseRequestContext,
   expectedArrivalOf,
@@ -101,6 +103,7 @@ function refuse(
 function contextRefusal(c: Context<AppEnv>, error: Parameters<typeof mapPgError>[0]) {
   const mapped = mapPgError(error);
   const code = String(error.details ?? mapped.body.code ?? "rpc_failed");
+  if (code === "request_context_not_enabled") return c.json({ error: code, code, message: "Not available" }, 503);
   return c.json(refusalBody(code), mapped.status);
 }
 
@@ -337,6 +340,7 @@ async function withCatalogAndLineage(
         id: string;
         po_no: string;
         version: number | null;
+        status?: string | null;
         /** 0428/0430 — the ORIGINAL supplier-facing date, never `eta_date`. */
         official_delivery_date: string | null;
         supplier_id: string | null;
@@ -389,8 +393,9 @@ async function withCatalogAndLineage(
       : { data: [] as Array<Record<string, unknown>>, error: null };
   if (lineageErr) return { error: lineageErr };
   let lineagePoLines: Array<Record<string, unknown>> = legacyPoLines ?? [];
-  const sourceIssued = lines.filter(l => Number(l.issued_qty ?? 0) > 0);
+  const sourceIssued = lines.filter(l => l.request_line_id != null || Number(l.issued_qty ?? 0) > 0);
   const contextIssued = sourceIssued.filter(l => l.request_line_id != null);
+  const sourcePoStatus = new Map<string, string>();
   if (sourceIssued.length) {
     const sourceRead = await sb.from("po_line_sources").select("po_line_id, purchase_demand_id, qty").in("purchase_demand_id", sourceIssued.map(l => l.id as string));
     if (sourceRead.error) return { error: sourceRead.error };
@@ -398,6 +403,11 @@ async function withCatalogAndLineage(
     const physicalRead = sourceIds.length ? await sb.from("purchase_order_lines").select("id, po_id, destination_id, qty, received_qty").in("id", sourceIds) : { data: [], error: null };
     if (physicalRead.error) return { error: physicalRead.error };
     const physical = new Map((physicalRead.data ?? []).map(pl => [pl.id as string, pl]));
+    if (contextIssued.length && (physicalRead.data ?? []).length) {
+      const headers = await sb.from("purchase_orders").select("id, status").in("id", [...new Set((physicalRead.data ?? []).map(pl => pl.po_id as string))]);
+      if (headers.error) return { error: headers.error };
+      for (const po of headers.data ?? []) if (typeof po.status === "string" && po.status.length) sourcePoStatus.set(po.id as string, po.status);
+    }
     const attributed: Array<Record<string, unknown>> = [];
     for (const source of sourceRead.data ?? []) {
       const pl = physical.get(source.po_line_id as string);
@@ -405,7 +415,8 @@ async function withCatalogAndLineage(
       attributed.push({ ...pl, demand_id: source.purchase_demand_id, qty: source.qty, physical_qty: pl.qty });
     }
     for (const line of contextIssued) {
-      if (attributed.filter(pl => pl.demand_id === line.id).reduce((n, pl) => n + Number(pl.qty), 0) !== Number(line.issued_qty)) return { error: { message: "This work changed. Refresh and try again." } };
+      if (attributed.some(pl => pl.demand_id === line.id && !sourcePoStatus.has(pl.po_id as string))) return { error: { message: "This work changed. Refresh and try again." } };
+      if (attributed.filter(pl => pl.demand_id === line.id && sourcePoStatus.get(pl.po_id as string) !== "cancelled").reduce((n, pl) => n + Number(pl.qty), 0) !== Number(line.issued_qty)) return { error: { message: "This work changed. Refresh and try again." } };
     }
     const genericPhysicalIds = new Set(sourceIds);
     lineagePoLines = [...lineagePoLines.filter(pl => !genericPhysicalIds.has(pl.id as string)), ...attributed];
@@ -482,6 +493,7 @@ async function withCatalogAndLineage(
     id: string;
     po_no: string;
     version: number | null;
+        status?: string | null;
     official_delivery_date: string | null;
     supplier_id: string | null;
   }> = [];
@@ -495,13 +507,14 @@ async function withCatalogAndLineage(
        sibling column reads exactly this field. */
     const poRes = await sb
       .from("purchase_orders")
-      .select("id, version, official_delivery_date, supplier_id")
+      .select("id, version, status, official_delivery_date, supplier_id")
       .in("id", allPoIds);
     if (poRes.error) return { error: poRes.error };
     pos = (poRes.data ?? []).map((p) => ({
       id: p.id as string,
       po_no: p.id as string,
       version: (p.version as number | null) ?? null,
+      ...(p.status != null ? { status: p.status as string } : {}),
       official_delivery_date: (p.official_delivery_date as string | null) ?? null,
       supplier_id: (p.supplier_id as string | null) ?? null,
     }));
@@ -517,12 +530,13 @@ async function withCatalogAndLineage(
         ...l,
         ...(l.request_line_id != null && l.fulfilment_kind === "purchase" ? {
           received: Number(l.approved_qty ?? 0) > 0 && Number(l.issued_qty ?? 0) >= Number(l.approved_qty)
-            && lineagePoLines.filter(pl => pl.demand_id === l.id).length > 0
-            && lineagePoLines.filter(pl => pl.demand_id === l.id).every(pl => Number(pl.received_qty ?? 0) >= Number(pl.physical_qty ?? pl.qty)),
+            && lineagePoLines.filter(pl => pl.demand_id === l.id && sourcePoStatus.get(pl.po_id as string) !== "cancelled").length > 0
+            && lineagePoLines.filter(pl => pl.demand_id === l.id && sourcePoStatus.get(pl.po_id as string) !== "cancelled").every(pl => Number(pl.received_qty ?? 0) >= Number(pl.physical_qty ?? pl.qty)),
         } : {}),
         category: cat?.category ?? null,
         item_label: cat?.itemLabel ?? (l.sku as string),
         po_ids: [...poIds],
+        ...(l.request_line_id != null ? { active_po_ids: [...poIds].filter(id => sourcePoStatus.has(id) && sourcePoStatus.get(id) !== "cancelled") } : {}),
         /* One entry per purchase order this line actually went onto, with
            THAT document's quantity and destination. Empty = nothing issued. */
         allocations: allocationsByDemand.get(l.id as string) ?? [],
@@ -693,6 +707,7 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
       id: p.id,
       po_no: p.po_no,
       sent: sentVersions.has(`${p.id}::${p.version ?? 1}`),
+      ...(p.status != null ? { status: p.status } : {}),
       official_delivery_date: p.official_delivery_date,
       supplier_id: p.supplier_id,
     }));
@@ -1089,7 +1104,7 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
   if (enriched.pos.length > 0) {
     const poIds = enriched.pos.map((p) => p.id);
     const [poRes, promRes, sendRes] = await Promise.all([
-      sb.from("purchase_orders").select("id, placed_at, official_delivery_date, version").in("id", poIds),
+      sb.from("purchase_orders").select("id, placed_at, official_delivery_date, version, status").in("id", poIds),
       sb
         .from("po_supplier_promises")
         .select("po_id, kind, answer, about_date, previous_date, new_date, reason, recorded_at, po_version, channel, recipient, evidence, reported_by, reported_at, recorded_by")
@@ -1127,6 +1142,7 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
         po_no: p.id as string,
         placed_at: (p.placed_at as string | null) ?? null,
         marked_sent_at: markedSentAt,
+        ...(p.status != null ? { status: p.status as string } : {}),
         po_delivery_date: originalDate,
         // This compact connected-document view adds a column only for a change.
         supplier_delivery_date: supplierDate !== originalDate ? supplierDate : null,
@@ -1901,7 +1917,7 @@ manualPurchaseRouter.post("/:id/resubmit", requireOperation, async (c) => {
       p_lines: [{ request_context: b.context, revision_key: b.revisionKey,
         expected_version: b.expectedVersion, reason: b.reason, ...(b.forecastSource ? { forecast_source: b.forecastSource } : {}) }],
     });
-    if (error) return fail(c, error);
+    if (error) return contextRefusal(c, error);
     return c.json(data);
   }
   const parsed = resubmitBody.safeParse(raw);
@@ -2174,7 +2190,7 @@ manualPurchaseRouter.post("/", requireOperation, async (c) => {
       p_fulfilment_intent: submission.data.context.purpose === "ready_stock" ? "additional_stock" : "concrete_need",
       p_purchase_requirement: null,
     });
-    if (error) return fail(c, error);
+    if (error) return contextRefusal(c, error);
     return c.json(data, 201);
   }
   const parsed = headerBody.safeParse(raw);
@@ -2335,6 +2351,20 @@ manualPurchaseRouter.post("/:id/lines", requireOperation, async (c) => {
   });
   if (error) return fail(c, error);
   return c.json(data);
+});
+
+/** Qualified exact-config stock proposals. Same SQL reader as saved Review;
+ * caller's JWT/owning role only. Failed/invalid source is never empty stock. */
+manualPurchaseRouter.post("/stock-offers", requireOperation, async (c) => {
+  let raw: unknown;
+  try { raw = await c.req.json(); } catch { return c.json({ error: "invalid_json" }, 400); }
+  const input = z.object({ lines: purchaseRequestStockLinesSchema }).strict().safeParse(raw);
+  if (!input.success) return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
+  const source = await userClient(c.env, c.var.auth.jwt).rpc("purchasing_request_stock_offers", { p_lines: input.data.lines });
+  if (source.error) return fail(c, source.error);
+  const offers = purchaseRequestStockOffersSchema.safeParse(source.data);
+  if (!offers.success || offers.data.some(offer => !input.data.lines.some(line => line.id === offer.lineId))) return c.json({ error: "stock_source_unavailable" }, 503);
+  return c.json({ offers: offers.data });
 });
 
 /** The create form's plan read may name up to this many distinct SKUs —
