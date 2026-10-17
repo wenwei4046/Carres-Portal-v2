@@ -726,7 +726,7 @@ describe("purchase request Settings · guarded adoption", () => {
     fireEvent.change(section.getByRole("spinbutton", { name: "Normal / Ready Stock" }), { target: { value: "31" } });
     fireEvent.change(section.getByRole("spinbutton", { name: "Service Case" }), { target: { value: "15" } });
     fireEvent.click(section.getByRole("combobox", { name: "Manual WhatsApp screenshot" }));
-    fireEvent.click(screen.getByRole("option", { name: "Inactive", exact: true }));
+    fireEvent.click(screen.getByRole("option", { name: /^Inactive$/ }));
     fireEvent.click(section.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(section.getByRole("alert")).toHaveTextContent("Not confirmed"));
     expect(section.getByRole("spinbutton", { name: "Normal / Ready Stock" })).toHaveValue(31);
