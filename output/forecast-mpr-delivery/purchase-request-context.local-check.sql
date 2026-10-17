@@ -93,4 +93,35 @@ begin
  raise notice 'Context create: exact scope/lineage, idempotency, changed-key refusal, atomic later-line failure and RS500 PASS';
 end; $owner$;
 reset role;
+-- Private state reader stays private. Run these fixture assertions as the
+-- isolated database owner after restoring role, never grant its use to callers.
+do $state_test$
+declare rid uuid; baseline jsonb; after_state jsonb; refused boolean; detail text;
+begin
+ select id into strict rid from public.purchase_requests where created_by='fffffff1-0000-4000-8000-000000009698' and purpose='general_purchase' and request_version=1;
+ baseline:=public._purchasing_request_context_state(rid);
+ if baseline->'context' is distinct from (select request_context from public.purchase_requests where id=rid)
+   or baseline#>'{demands,0,approved_qty}' is distinct from 'null'::jsonb then raise exception 'state reader invented approved scope'; end if;
+ refused:=false;
+ begin
+   update public.purchase_demands set qty=qty+1 where request_id=rid;
+   perform public._purchasing_request_context_state(rid);
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='request_scope_changed'; end;
+ if not refused then raise exception 'changed demand qty passed contextual state guard'; end if;
+ refused:=false;
+ begin
+   update public.purchase_demands set attrs='{"TEST":"changed configuration"}'::jsonb where request_id=rid;
+   perform public._purchasing_request_context_state(rid);
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='request_scope_changed'; end;
+ if not refused then raise exception 'changed configuration passed contextual state guard'; end if;
+ refused:=false;
+ begin
+   update public.purchase_requests set required_by=required_by+1 where id=rid;
+   perform public._purchasing_request_context_state(rid);
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='request_scope_changed'; end;
+ if not refused then raise exception 'changed header date passed contextual state guard'; end if;
+ after_state:=public._purchasing_request_context_state(rid);
+ if after_state is distinct from baseline then raise exception 'refused state reads left fixture changes'; end if;
+ raise notice 'Context state: exact material facts, unknown approval and quantity/configuration/header-date drift refusal PASS';
+end; $state_test$;
 rollback;

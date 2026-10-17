@@ -226,6 +226,65 @@ revoke all on function public._purchasing_validate_request_context(jsonb) from p
 -- The independent, reviewable Settings writer is in
 -- purchase-request-settings-writer.draft.sql; there is one definition only.
 
+-- WIP material-state reader for the future approval/issue owners. This records
+-- facts only; calling it does not approve, issue, reserve or complete a task.
+-- New-context callers must enter here BEFORE any legacy shared request lock:
+-- request FOR UPDATE -> all request demands FOR UPDATE (stable order) -> Units.
+create or replace function public._purchasing_request_context_state(p_id uuid)
+returns jsonb language plpgsql set search_path=public,pg_temp as $state$
+declare r public.purchase_requests%rowtype; expected jsonb; actual jsonb; facts jsonb;
+begin
+  select * into r from public.purchase_requests where id=p_id for update;
+  if not found then raise exception 'unknown request' using errcode='22023',detail='unknown_request'; end if;
+  if r.request_version<1 or r.request_context is null then raise exception 'no contextual scope' using errcode='22023',detail='context_unavailable'; end if;
+  perform public._purchasing_validate_request_context(r.request_context);
+  if r.purpose is distinct from r.request_context->>'purpose' or r.proceed_date is distinct from (r.request_context->>'proceedDate')::date
+    or r.for_service_case_id is distinct from (r.request_context->>'serviceCaseId')::uuid then
+    raise exception 'request header changed' using errcode='22023',detail='request_scope_changed';
+  end if;
+  if r.approval_required is distinct from true or r.fulfilment_intent is distinct from
+    (case when r.purpose='ready_stock' then 'additional_stock' else 'concrete_need' end)
+    or r.required_by is distinct from (case when r.purpose='ready_stock' then (r.request_context->>'stockDeliveryDate')::date else
+      (select min((x->>'deliveryDate')::date) from jsonb_array_elements(r.request_context->'recipients') x) end)
+    or r.destination_id is distinct from coalesce(
+      (select (a->>'destinationId')::uuid from jsonb_array_elements(r.request_context->'lines') l cross join lateral jsonb_array_elements(l->'allocations') a limit 1),
+      (select (a->>'destinationId')::uuid from jsonb_array_elements(r.request_context->'lines') l cross join lateral jsonb_array_elements(l->'stockProposals') a limit 1)) then
+    raise exception 'request material header changed' using errcode='22023',detail='request_scope_changed';
+  end if;
+  perform 1 from public.purchase_demands where request_id=p_id order by id for update;
+  with projected as (
+    select l, a, 'purchase'::text as kind from jsonb_array_elements(r.request_context->'lines') l cross join lateral jsonb_array_elements(l->'allocations') a
+    union all
+    select l, a, 'stock_proposal'::text from jsonb_array_elements(r.request_context->'lines') l cross join lateral jsonb_array_elements(l->'stockProposals') a
+  )
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'line',l->>'id','allocation',a->>'id','kind',kind,'sku',l->>'sku','qty',(a->>'qty')::int,
+    'attrs',nullif(l->'attrs','null'::jsonb),'destination',a->>'destinationId',
+    'date',case when kind='purchase' then a->>'supplierDeliveryDate' else
+      case when r.purpose='ready_stock' then r.request_context->>'stockDeliveryDate' else
+        (select min(x->>'deliveryDate') from jsonb_array_elements(r.request_context->'recipients') x) end end
+  ) order by l->>'id',a->>'id'),'[]') into expected from projected;
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'line',d.request_line_id,'allocation',coalesce(d.supplier_allocation_id,d.stock_proposal_id),'kind',d.fulfilment_kind,
+    'sku',d.sku,'qty',d.qty,'attrs',d.attrs,'destination',d.destination_id,'date',d.required_by
+  ) order by d.request_line_id,coalesce(d.supplier_allocation_id,d.stock_proposal_id)),'[]') into actual
+  from public.purchase_demands d where d.request_id=p_id and d.cancelled_at is null;
+  if expected<>actual then raise exception 'demand allocation changed' using errcode='22023',detail='request_scope_changed'; end if;
+  if exists(select 1 from public.purchase_demands d left join public.product_skus s on s.sku=d.sku
+    where d.request_id=p_id and d.cancelled_at is null and (s.sku is null or s.supplier_id is distinct from d.supplier_id)) then
+    raise exception 'catalog supplier changed' using errcode='22023',detail='request_source_changed';
+  end if;
+  select coalesce(jsonb_agg(jsonb_build_object('id',id,'request_line_id',request_line_id,
+    'supplier_allocation_id',supplier_allocation_id,'stock_proposal_id',stock_proposal_id,'fulfilment_kind',fulfilment_kind,
+    'sku',sku,'attrs',attrs,'supplier_id',supplier_id,'destination_id',destination_id,'required_by',required_by,
+    'qty',qty,'approved_qty',approved_qty) order by id),'[]') into facts
+  from public.purchase_demands where request_id=p_id and cancelled_at is null;
+  return jsonb_build_object('version',1,'request_id',r.id,'request_version',r.request_version,
+    'requester_id',r.created_by,'created_at',r.created_at,'purpose',r.purpose,'proceed_date',r.proceed_date,'context',r.request_context,'demands',facts);
+end;
+$state$;
+revoke all on function public._purchasing_request_context_state(uuid) from public,anon,authenticated;
+
 -- WIP canonical create slice. DO NOT REVIEW/APPLY as a finished migration:
 -- supplier-calendar/source/destination checks, contextual approval/reapproval,
 -- downstream coverage/stock/send admission and complete integration are unfinished.
