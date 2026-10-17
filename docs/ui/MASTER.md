@@ -25,6 +25,24 @@
 
 ## Start here · the one Master UI Kit
 
+**Narrow contextual panels — OWNER-APPROVED TARGET / NOT BUILT, Jess 2026-10-17.**
+For the shared module-page layout below1100 CSS px, temporarily use the64px menu regardless of
+whether Tasks is open. Preserve the saved navigation preference and restore the normal responsive
+layout when space returns. Summary and Tasks open on demand as overlays over the main content,
+not columns that subtract from its available width. Keep their existing body widths264/320 and
+shared component appearance; use the existing Drawer/overlay focus, close, Escape and unsaved-work
+guards. Opening/closing or switching panels must not discard draft inputs, selection, filters or
+scroll position. Do not automatically reopen a prior Send PO task over a new form. Normal wide
+panel defaults are unchanged; Workspace's own task/pick-list layout remains separately governed.
+
+The underlying toolbar stays36px, one line, with every existing action reachable and its view
+name retained. Do not adopt the prototype72px/two-row fallback, hide business controls or shrink
+text to force fit. The ordinary close/hide doors return to the unchanged page. This approval
+resolves the recorded1025 menu/Summary/Tasks fit proposal; it grants no business action or new
+permission. This is a shared Shell correction, not a per-module layout. Implement and verify its
+actual fit; owner approval of direction is not proof all1025 states now fit.
+
+
 - **New chat: execute, do not guess.** Read this MASTER's [filled measurement checklist](#kit-measurements) and this MASTER §2.2's UX contract before touching UI. For the parts being built, name the approved value, trigger, existing component and `/ui` example. Mark CONFORMS / DEVIATION / NOT APPLICABLE in the existing handoff; a missing value is UNRESOLVED, never an implementation value promoted to law. Do not create another guide or tracker.
 - **Rules:** this MASTER: values → components → page compositions; COPY and module MASTERs keep business ownership.
 - **Practical reference:** the approved Sales Order Outright v12 direction, improved in existing shared components; no fresh redesign or second kit.
@@ -136,7 +154,8 @@ accepts → next page.
   database previews its web part only; the server part is checked on live after merge, read only.
 - **Order.** Sales Order Outright → SO Batch Purchase → then one by one down the side menu.
   Workspace, Tasks and Forecast Purchase are approved and live; each is checked when its turn comes,
-  not rebuilt. The new Manual Purchase Request design is not approved: Code does not build it.
+  not rebuilt. Forecast/MPR implementation is authorised by Jess on17Oct2026 under Purchasing §5.2;
+  the approved checklist governs its scope. Prototype evidence is not deployment or verification.
 
 Status 15 Oct 2026: Sales Order Outright page 1 is DEPLOYED (#2066, `41bc9a6d3`); production read on
 15 Oct: `carres-check.js` PASS at 1025 / 1164 / 1440 with Summary and Tasks in each state, no
@@ -1515,7 +1534,7 @@ Icons: Material Symbols Rounded, outline, weight 300; 18 in buttons and menus, 2
 | Menu words | A long name wraps to a second line (13 on 17) and is never cut. A page that is not built shows `Coming soon` 11 grey under its name and is not a link. The whole menu has one scrollbar |
 | Logo | Wordmark 20 high open; mark 34 closed; never recolour or distort |
 | Top bar | 56 high, bottom hairline; `[Module] / [Page]` with the path 14 / 400 and the title 20 / 600; search, team, bell at the right |
-| Toolbar row | 36 high, one line, never wraps; Summary title, toolbar and Tasks title share this line. Every button on it is 32 high, centred: Summary · tabs · view button · ⋮ · Tasks (fix list 14 Oct 2026). The view button keeps its name in every state, the show-panel button may keep its icon only (name on hover), and no control is cut or runs under a panel (owner 14 Oct 2026). Common available-canvas fit (owner-delegated engineering baseline, 16 Oct 2026): below 1100, an Operations list with Tasks open uses the existing 64px compact navigation without overwriting the person's saved list preference. Expanding the named navigation passes through the existing task draft guard and hides Tasks to make room; its existing Tasks/count door reopens it and restores compact navigation. Workspace, which owns its task area, is excluded. At 1100 and above the saved navigation choice stays. Keep every action and the full view name; no two-row toolbar or hidden business control is adopted. Built today: one line (filter chips keep their icon, then one `Clear filters`, gaps 8 → 4). The two-row alternative (Design Round 4: chips keep their words, the view button and ⋮ move to a second line) is kept on branch `preview/two-row-toolbar`, outside the release |
+| Toolbar row | 36 high, one line, controls32; view name retained, no clipping or hidden business action. Below1100 use the17Oct narrow contextual-panel contract above: temporary64 menu, Summary/Tasks overlays, no width subtraction. Above it retain the normal layout. The72px/two-row prototype is not adopted. Existing conforming shared toolbar composition remains. |
 | Summary | 264, left; a section has ONE headline tile with its breakdown rows under it, never two tiles that mean the same thing (owner 12 Oct 2026); title row on the ground, then one white card per section, 8 apart; row exactly 32 high; label 13 / 400 `#4B5563`, value 13 / 500 ink, amber 500 when it needs action; 1px line on its right |
 | Tasks | 320, right; title row on the ground: `Tasks` · `Log call` · ⤢ (all tasks in Workspace) · › hide, and no footer link; 1px `#E5E7EB` line separates it from the middle with 12 on both sides. Under the title: the day strip, then `To do` · `Waiting` · `Done` as the same grey segmented control as the page tabs, equal widths, then one white card per contact or action group, 8 apart With a task open the panel stays 320 below 1280 wide and may use the spare width from 1280 (13 Oct 2026), so opening a task never takes room from the list |
 | Day strip (owner 12 Oct 2026) | On the panel ground with one hairline under it, no box. Office working days only (Monday to Friday by default), 5 days per page, ‹ › move a working week; a task dated on a weekend shows on the next Monday. Each day: weekday 11 / 500 · date 12 · task count 11 / 500 in the theme colour, amber when something is late, blank when none. The picked day wears the selection pair. Today's list shows only today's tasks; another day's tasks are seen by picking that day |
@@ -1524,7 +1543,7 @@ Icons: Material Symbols Rounded, outline, weight 300; 18 in buttons and menus, 2
 | Screen parts | Every module page has the same seven numbered parts (`Carres Screen Map.dc.html`): 1 side menu · 2 top bar · 3 toolbar · 4 main table or detail · 5 Summary · 6 Tasks list · 7 open task. Parts 1, 2, 3, 6 and 7 are the shell: changed once, every module follows |
 | Zones | 12 between zones |
 
-The page never scrolls; panels and table bodies scroll inside with thin scrollbars. Summary and Tasks collapse and reopen from ghost buttons in the toolbar row. They open by window width: at 1600 or wider, both; from 1280 to 1599, Tasks only, with Summary closed until the person opens it; under 1280, both closed. Opening or closing a panel never changes a column width. A detail page under 1100 wide collapses the menu to 64 by itself; the person's own choice returns on the list. A detail opens in the middle in place of the list: Summary and the toolbar hide, Tasks stays, Back returns to the same scroll position. There is no list plus detail three-panel view.
+The page never scrolls; panels and table bodies scroll inside with thin scrollbars. Summary and Tasks collapse and reopen from ghost buttons in the toolbar row. They open by window width: at 1600 or wider, both; from 1280 to 1599, Tasks only, with Summary closed until the person opens it; under 1280, both closed. Opening or closing a panel never changes a column width. Below1100 the17Oct narrow contextual-panel contract replaces docked Summary/Tasks and applies temporary64 navigation; the person's own choice returns on the list. A detail opens in the middle in place of the list: Summary and the toolbar hide, Tasks stays, Back returns to the same scroll position. There is no list plus detail three-panel view.
 
 ## 5 · Register
 
@@ -1599,9 +1618,9 @@ For every used row, record **CONFORMS / DEVIATION / NOT APPLICABLE** in the exis
 
 | Check | Approved value | Trigger / behaviour | Shared entry under apps/web/src |
 |---|---|---|---|
-| Navigation | 220 expanded; 64 collapsed | Remember user choice; detail below viewport1100 temporarily64; Operations list below1100 with Tasks open also temporarily64 (Workspace excluded); expand uses existing draft guard then hides Tasks; reopen Tasks restores compact fit; wider/list-without-Tasks restores choice | pages/portal/PortalSidebar.tsx |
+| Navigation | 220 expanded;64 collapsed | Below1100 shared module pages temporarily64; Summary/Tasks use overlays under the17Oct contract. Preserve saved preference, drafts and focus; restore normal layout when room returns. Workspace own layout excluded. | pages/portal/PortalSidebar.tsx |
 | Top bar | Height56; bottom1px #E5E7EB | Same frame across modules | components/kit/PageShell.tsx and existing header adapters |
-| Toolbar | Height36; controls32; one line | Never clipped; narrow give-way policy UNRESOLVED, not permission to hide actions | components/carres/CToolbar.tsx and existing list host |
+| Toolbar | Height36; controls32; one line | Never clipped. Narrow fit resolved17Oct: temporary64 menu and overlay Summary/Tasks below1100; no two-row fallback or removed actions. | components/carres/CToolbar.tsx and existing list host |
 | Summary | Width264; rows32; cards8 apart | One headline per section; no duplicate totals | Existing source-summary adapter |
 | Tasks | Width320 | Open task may use spare width at viewport1280+ | pages/operation/components/ShellTasks.tsx |
 | Zones | Gap12 | Panel/table scroll internally; no page sideways overflow | components/kit/PageShell.tsx |
@@ -2010,7 +2029,7 @@ The existing delivery handoff tracks migration and production evidence; this fil
 
 ## 1 · Shell
 
-Menu → top bar (module and page, search, team, notifications) → one 36 toolbar row → Summary on the left, list or detail in the middle, Tasks on the right. Summary and Tasks are collapsible contextual regions, not mandatory columns on every screen. Selection uses the person's theme; default Blue. The page never scrolls; panels and the table body scroll inside. A detail opens in the middle in place of the list: Summary and the toolbar hide, Tasks stays, Back returns to the same scroll position. There is no list plus detail three-panel view; the one exception is the Workspace page, where an opened task stands beside its pick list (§8). Panels open by window width: at 1600 or wider Summary and Tasks; from 1280 to 1599 Tasks only; under 1280 neither. Tasks also opens itself for the Log form, an open task and every detail. Opening or closing a panel never changes a column width. Keep content reachable with navigation expanded or collapsed. Narrow layouts collapse secondary panels; they never compress essential facts until unreadable.
+Menu → top bar (module and page, search, team, notifications) → one 36 toolbar row → Summary on the left, list or detail in the middle, Tasks on the right. Summary and Tasks are collapsible contextual regions, not mandatory columns on every screen. Selection uses the person's theme; default Blue. The page never scrolls; panels and the table body scroll inside. A detail opens in the middle in place of the list: Summary and the toolbar hide, Tasks stays, Back returns to the same scroll position. There is no list plus detail three-panel view; the one exception is the Workspace page, where an opened task stands beside its pick list (§8). Panels open by window width: at 1600 or wider Summary and Tasks; from 1280 to 1599 Tasks only; under 1280 neither. Tasks also opens itself for the Log form, an open task and every detail. Opening or closing a panel never changes a column width. Keep content reachable with navigation expanded or collapsed. Below1100 follow the17Oct overlay-panel contract; secondary panels do not reduce the main canvas or compress essential facts.
 
 ## 2 · Register
 
