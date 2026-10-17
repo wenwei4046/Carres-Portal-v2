@@ -53,6 +53,22 @@ the actual parent HTTP revision1->2 and reads current document version2/qty2, re
 remaining498/3 and current-send=false; task/event counts stay unchanged. Existing PO UI is not expanded
 with a source editor, so implicit merged inputs still refuse; no source reassignment or reduction.
 
+Final boundary walk2/2 (/tmp/carres-context-boundary-browser-final.log) exercises actual HTTP
+reason-only cancel and negative qty revision: both4xx, complete relative PO/line/source/Unit/
+request-event/revision/history facts unchanged. Then SAME existing MPR selected Review/Issue
+covers all unchanged residual: GP5/RS500 issued, to_buy0, current-send=false. Last sending stays
+pending so no real Task/work-occurrence completion is triggered; counts unchanged, outer rollback.
+Current exact lifecycle JSON artifacts are retained in output/forecast-mpr-delivery/
+local-test-documents/LOCAL-TEST-{GP,RS}-lifecycle.json; review package checks their SHA256.
+A PO source-allocation editor is NOT needed for that ordinary unchanged workflow. It is needed
+only for explicit post-issued merged-source/recipient redistribution or per-source growth when a
+changed Forecast cohort blocks new MPR issue; existing SQL/API contract rejects missing proof.
+Do not expand independent PO design to claim the ordinary MPR path done. Keep this conditional
+unsupported branch and no-existing-source multi-SKU continuation separate in review readiness.
+Existing cancel_demand is unissued remainder only, supplier_answers is date/split only; neither
+supplies an effective PO cancellation agreement/fee/quantity chain. No positive cancellation,
+real receiving, production transport or automatic Task completion claim is made.
+
 Remaining qualified boundaries: formal new/changed SC approval source; effective cancellation or
 reduction under Purchasing5.8.1 (contextual reason-only doors refuse before writes); mixed
 SO/legacy source quantity changes and mixed-owner counted partial move input; changed multi-SKU

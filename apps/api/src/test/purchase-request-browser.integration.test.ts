@@ -29,14 +29,14 @@ describe.skipIf(!enabled)("owned local browser → actual API → PostgreSQL lif
     });
   },60000);
   afterAll(async()=> { if(db)await db.finish(); _setJwksForTesting(null); },30000);
-  it.each([{purpose:"ready_stock",need:500,left:499},{purpose:"general_purchase",need:5,left:4}])("actual $purpose need$need → qualified approval → partial1 → painted PO/send/Work readback, outer rollback",async({purpose,need,left})=> {
+  it.each([{purpose:"ready_stock",need:500,left:499},{purpose:"general_purchase",need:5,left:4}])("actual $purpose need$need → approval/partial1/parent2 → fully covered, last send pending; cancellation negatives, outer rollback",async({purpose,need,left})=> {
     const context=await db.json(`select request_context from public.purchase_requests where purpose='${purpose}' and jsonb_array_length(request_context->'lines')=1 and request_context#>>'{lines,0,qty}'='${need}' and jsonb_array_length(request_context#>'{lines,0,stockProposals}')=0 limit 1;`);
     const taskCounts=await db.json("reset role; select jsonb_build_object('tasks',(select count(*) from public.ops_tasks),'work_events',(select count(*) from public.work_occurrence_events));");
     expect(context).toBeTruthy(); db.actor=owner; db.requestIds=new Set();
     const registerResponse=await request("/api/operation/purchasing/requests"); const register=await registerResponse.json() as any;
     expect(registerResponse.status,JSON.stringify(register)).toBe(200);
     const browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1440,height:1000}});
-    const apiErrors:unknown[]=[];let newId="";let poId="";
+    const apiErrors:unknown[]=[];let newId="";let poId="";let tearingDown=false;
     try {
       await page.addInitScript(seed=>{(globalThis as any).__mprLocalSeed=seed;},{context,destinations:register.destinations,suppliers:register.suppliers,users:register.users,actor:owner});
       await page.route("https://cdn.jsdelivr.net/fontsource/fonts/noto-sans-sc@latest/**",async route=> {
@@ -50,7 +50,10 @@ describe.skipIf(!enabled)("owned local browser → actual API → PostgreSQL lif
         const text=await response.text();if(!response.ok) { apiErrors.push({path:incoming.url(),status:response.status,text});console.error("LOCAL API refusal",incoming.url(),response.status,text); }
         if(incoming.method()==="POST"&&new URL(incoming.url()).pathname.endsWith("/purchasing/requests")&&response.ok)newId=JSON.parse(text).id;
         if(new URL(incoming.url()).pathname.endsWith("/issue")&&response.ok)poId=JSON.parse(text).poIds[0];
-        await route.fulfill({status:response.status,contentType:"application/json",body:text,headers:{"access-control-allow-origin":"*","access-control-allow-headers":"authorization,content-type","access-control-allow-methods":"GET,POST,OPTIONS"}});
+        try { await route.fulfill({status:response.status,contentType:"application/json",body:text,headers:{"access-control-allow-origin":"*","access-control-allow-headers":"authorization,content-type","access-control-allow-methods":"GET,POST,OPTIONS"}}); }
+        catch(error) { // Only navigation/cleanup may cancel an already asserted transport request.
+          if (!tearingDown || !/Route is already handled|Target page, context or browser has been closed/i.test(String(error))) throw error;
+        }
       });
       await page.goto(`${process.env.MPR_CONTEXT_BASE_URL??"http://localhost:5437"}/manual-purchase-context-preview.html?purpose=rs&transport=local`);
       const send=page.getByTestId("mp-send");await browserExpect(send).toBeEnabled({timeout:60000});await send.click();await browserExpect(send).toHaveText("Confirm and send");await browserExpect(page.getByTestId("mp-create-pdf-preview").locator("canvas").first()).toBeVisible({timeout:15000});await browserExpect(send).toBeEnabled({timeout:60000});await send.click();
@@ -96,14 +99,40 @@ describe.skipIf(!enabled)("owned local browser → actual API → PostgreSQL lif
       expect(revisedPrintResponse.status).toBe(200);expect(revisedPrint.version).toBe(document.version+1);expect(revisedPrint.lines.reduce((total:number,line:any)=>total+line.qty,0)).toBe(2);
       const revisedSendsResponse=await request(`/api/operation/pos/${poId}/sends`);const revisedSends=await revisedSendsResponse.json() as any;
       expect(revisedSendsResponse.status).toBe(200);expect(revisedSends.sends).toEqual(sends.sends);
+      // Existing reason-only cancellation/reduction cannot certify supplier
+      // facts. Exercise the actual HTTP doors, retain every committed fact.
+      const cancellationFacts=()=>db.json(`select jsonb_build_object('po',(select to_jsonb(po) from public.purchase_orders po where id='${poId}'),'lines',(select jsonb_agg(to_jsonb(l) order by id) from public.purchase_order_lines l where po_id='${poId}'),'sources',(select jsonb_agg(to_jsonb(s) order by id) from public.po_line_sources s where po_id='${poId}'),'units',(select jsonb_agg(to_jsonb(u) order by id) from public.ops_stock_items u where po_no='${poId}'),'events',(select count(*) from public.purchase_request_events where request_id='${newId}'),'revisions',(select count(*) from public.po_revisions where po_id='${poId}'),'history',(select count(*) from public.po_history where po_id='${poId}'));`);
+      const beforeCancel=await cancellationFacts();
+      const cancelResponse=await request(`/api/operation/pos/${poId}/cancel`,{reason:"TEST reason without supplier agreement/fee/evidence is not effective cancellation"});
+      expect(cancelResponse.status).toBeGreaterThanOrEqual(400);expect(cancelResponse.status).toBeLessThan(500);
+      const reduceResponse=await request(`/api/operation/pos/${poId}/revise`,{reason:"TEST reason is not effective reduction",lines:[{lineId:physical.id,qty:1,destinationId:physical.destination_id}]});
+      expect(reduceResponse.status).toBeGreaterThanOrEqual(400);expect(reduceResponse.status).toBeLessThan(500);
+      expect(await cancellationFacts()).toEqual(beforeCancel);
+      // Unchanged approved residual uses SAME MPR selected Review/Issue. It
+      // does not require a new multi-source PO editor. Leave new send pending:
+      // no real Work occurrence completion or supplier/provider message.
+      await page.evaluate(()=>(globalThis as any).__mprLocalRefresh());
+      const remainderTick=page.getByTestId(`mp-select-${newId}`);await browserExpect(remainderTick).toBeEnabled({timeout:60000});await remainderTick.click();
+      await page.getByTestId("mp-issue-selected").click();
+      await browserExpect(page.getByLabel(`${context.lines[0].sku} · Qty`)).toHaveValue(String(left-1));
+      const priorPoId=poId;poId="";
+      const issueRemainder=page.getByTestId("so-batch-issue-create");await browserExpect(issueRemainder).toBeEnabled({timeout:60000});await issueRemainder.click();
+      await browserExpect.poll(()=>poId,{timeout:60000}).not.toBe("");expect(poId).not.toBe(priorPoId);
+      const coveredResponse=await request("/api/operation/purchasing/requests");const covered=await coveredResponse.json() as any;expect(coveredResponse.status).toBe(200);
+      const coveredWork=manualPurchaseWorkInputsFromRegister({...covered,requests:covered.requests.filter((row:any)=>row.id===newId),lines:covered.lines.filter((line:any)=>line.request_id===newId)});
+      expect(coveredWork[0]).toMatchObject({remainingQty:0,hasPos:true,posAllSent:false});
+      const fullCoverage=await db.json(`select jsonb_build_object('need',r.request_context#>'{lines,0,qty}','request_version',r.request_version,'approval_version',r.approval_version,'issued',(select sum(issued_qty) from public.purchase_demands where request_id=r.id),'original_po','${priorPoId}') from public.purchase_requests r where id='${newId}';`);
+      expect(fullCoverage).toMatchObject({need,request_version:1,approval_version:1,issued:need});
+      await browserExpect(page.getByTestId("so-batch-evidence-channel")).toBeVisible({timeout:60000});
+      await page.waitForLoadState("networkidle");
       const afterTasks=await db.json("reset role; select jsonb_build_object('tasks',(select count(*) from public.ops_tasks),'work_events',(select count(*) from public.work_occurrence_events));");
       expect(afterTasks).toEqual(taskCounts);
       const output=process.env.MPR_CONTEXT_API_OUTPUT??"/tmp/carres-context-api-browser";mkdirSync(output,{recursive:true});
-      writeFileSync(`${output}/LOCAL-TEST-${purpose}-lifecycle.json`,JSON.stringify({environment:"owned loopback; outer ROLLBACK",requestId:newId,poId,documentVersion:document.version,qty:1,work,saved,sends,parentRevision,revisedWork,revisedDocumentVersion:revisedPrint.version,taskCounts,afterTasks,apiErrors,transport:"actual API + authenticated PG; test PostgREST-shaped adapter, not production PostgREST transport proof; register scoped to this newly-created TEST request, unrelated replay history retained; floor_config uses existing schema defaults only within rollback"},null,2));
+      writeFileSync(`${output}/LOCAL-TEST-${purpose}-lifecycle.json`,JSON.stringify({environment:"owned loopback; outer ROLLBACK",requestId:newId,poId:priorPoId,remainderPoId:poId,documentVersion:document.version,qty:1,work,saved,sends,parentRevision,revisedWork,revisedDocumentVersion:revisedPrint.version,cancelStatus:cancelResponse.status,reductionStatus:reduceResponse.status,coveredWork,fullCoverage,taskCounts,afterTasks,apiErrors,transport:"actual API + authenticated PG; test PostgREST-shaped adapter, not production PostgREST transport proof; register scoped to this newly-created TEST request, unrelated replay history retained; floor_config uses existing schema defaults only within rollback"},null,2));
       await page.screenshot({path:`${output}/LOCAL-TEST-${purpose}-issued.png`,fullPage:true});expect(apiErrors).toEqual([]);
     }catch(error){
       console.error("LOCAL browser TEST state",(await page.locator("body").innerText()).slice(-6500),JSON.stringify(apiErrors));
       await page.screenshot({path:"/tmp/carres-context-api-browser-failed.png",fullPage:true});throw error;
-    }finally{await page.unrouteAll({behavior:"wait"});await browser.close();}
+    }finally{tearingDown=true;await page.goto("about:blank");await page.unrouteAll({behavior:"wait"});await browser.close();}
   },240000);
 });

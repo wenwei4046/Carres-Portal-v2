@@ -1,0 +1,117 @@
+{
+  "environment": "owned loopback; outer ROLLBACK",
+  "requestId": "2fa5f992-bf10-4f10-965d-243d7b9606c3",
+  "poId": "PO261018-9622",
+  "remainderPoId": "PO261018-6950",
+  "documentVersion": 1,
+  "qty": 1,
+  "work": [
+    {
+      "requestId": "2fa5f992-bf10-4f10-965d-243d7b9606c3",
+      "reference": "GP261018-9475",
+      "context": "Manual Purchase Request · General Purchase · Ohana",
+      "status": "ready_to_order",
+      "remainingQty": 4,
+      "orderBy": "2026-11-02",
+      "poIds": [
+        "PO261018-9622"
+      ],
+      "unsentPoId": null,
+      "continueInPoId": null,
+      "hasPos": true,
+      "posAllSent": true,
+      "recipient": "Ohana"
+    }
+  ],
+  "saved": {
+    "need": 5,
+    "request_version": 1,
+    "approval_version": 1
+  },
+  "sends": {
+    "sends": [
+      {
+        "channel": "email",
+        "note": null,
+        "sent_at": "2026-10-18T06:34:02.260551+08:00",
+        "kind": "confirmed_sent",
+        "recipient": "TEST@example.test",
+        "po_version": 1,
+        "sent_by": "fffffff1-0000-4000-8000-000000009698",
+        "duty_user_id": "00000000-0000-0000-0000-00000000f004",
+        "acting_user_id": null,
+        "sent_by_name": "TEST Requester",
+        "duty_name": null,
+        "acting_name": null
+      }
+    ]
+  },
+  "parentRevision": {
+    "ok": true,
+    "result": {
+      "po_id": "PO261018-9622",
+      "rev_no": 1,
+      "changes": [
+        "2008(A) TRION qty 1 → 2"
+      ],
+      "version": 2
+    }
+  },
+  "revisedWork": [
+    {
+      "requestId": "2fa5f992-bf10-4f10-965d-243d7b9606c3",
+      "reference": "GP261018-9475",
+      "context": "Manual Purchase Request · General Purchase · Ohana",
+      "status": "ready_to_order",
+      "remainingQty": 3,
+      "orderBy": "2026-11-02",
+      "poIds": [
+        "PO261018-9622"
+      ],
+      "unsentPoId": "PO261018-9622",
+      "continueInPoId": null,
+      "hasPos": true,
+      "posAllSent": false,
+      "recipient": "Ohana"
+    }
+  ],
+  "revisedDocumentVersion": 2,
+  "cancelStatus": 422,
+  "reductionStatus": 422,
+  "coveredWork": [
+    {
+      "requestId": "2fa5f992-bf10-4f10-965d-243d7b9606c3",
+      "reference": "GP261018-9475",
+      "context": "Manual Purchase Request · General Purchase · Ohana",
+      "status": "ordered",
+      "remainingQty": 0,
+      "orderBy": "2026-11-02",
+      "poIds": [
+        "PO261018-9622",
+        "PO261018-6950"
+      ],
+      "unsentPoId": "PO261018-9622",
+      "continueInPoId": null,
+      "hasPos": true,
+      "posAllSent": false,
+      "recipient": "Ohana"
+    }
+  ],
+  "fullCoverage": {
+    "need": 5,
+    "issued": 5,
+    "original_po": "PO261018-9622",
+    "request_version": 1,
+    "approval_version": 1
+  },
+  "taskCounts": {
+    "tasks": 0,
+    "work_events": 0
+  },
+  "afterTasks": {
+    "tasks": 0,
+    "work_events": 0
+  },
+  "apiErrors": [],
+  "transport": "actual API + authenticated PG; test PostgREST-shaped adapter, not production PostgREST transport proof; register scoped to this newly-created TEST request, unrelated replay history retained; floor_config uses existing schema defaults only within rollback"
+}
