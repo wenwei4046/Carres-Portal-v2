@@ -1012,28 +1012,111 @@ approve an algorithm, weekly task cadence, timed Undo, Skip policy or production
 
 ### 5.2 Two input doors
 
-`SO Batch Purchase` is system demand from customer Sales Orders. `Manual Purchase Request` is conscious
-internal intent under the owner-approved purpose vocabulary (rulings 2026-08-28 Card 03 /
-2026-08-29 Card 04) — exactly `Ready Stock` · `Showroom Display` · `Service Case` ·
-`Internal Staff Purchase` · `Subsidiary Purchase` · `Other Purchase`, with Management included
-under `Internal Staff Purchase` (there is no `Management Purchase`). Only `Other Purchase`
-asks — and must answer — `What is this for?`; routine purposes do not ask a duplicate `Why`.
-Each exceptional purpose names its STRUCTURED object at creation (0401): a `Service Case`
-purchase links the actual Case, an `Internal Staff Purchase` names the real staff member, a
-`Subsidiary Purchase` names the actual subsidiary company; `Ready Stock` and
-`Showroom Display` are served by the governed destination on the request. There is no urgent or
-emergency purpose, extra question, queue or approval/issue bypass. The four pre-ruling purposes
-(`Display` · `Warranty` · `Office` · `Spare Parts`) are retired: no
-door accepts them for a new request and no historical row is relabelled into the new
-vocabulary. **Each Manual Purchase request has an MPR number — owner ruling (Jess, 2026-09-18);
-overwrites the 2026-09-04 no-number correction (Card 08).** The number is `MPRYYMMDD-NNNN`
-(`MPR` = Manual Purchase Request), allocated when the request is created, permanent and never
-reused. It names the request, not a supplier document: the supplier still receives only the PO
-(`PO-YYYYMMDD-RRRR`), and one request may become several POs. Consignment Orders, Repair Orders and
-other documents keep their own numbers; MPR covers only Manual Purchase requests. Historical
-`MPR-…` values keep their numbers; historical `REQ-####` values stay searchable. The build restores
-the allocator that migration 0424 turned off (a new migration; 0424 is never edited). `MP` is not
-used — it is the Mattress Protector SKU code.
+**Shared narrow-page UX — OWNER-APPROVED TARGET / NOT BUILT, Jess17Oct2026.**
+Forecast and MPR inherit UI MASTER's17Oct shared Shell contract: below1100, temporary64 menu,
+Summary/Tasks overlay the page rather than shrinking the content, toolbar36 and one line.
+Preserve recipient/item edits, stock selections, Review state, source links and task drafts on
+panel changes. No72px toolbar, page-local Shell or duplicate business controls. This affects
+presentation only; approval, stock, date, PO and sending authorities below are unchanged.
+The canonical UI contract is in docs/ui/MASTER.md; preserved Desktop drafts are not a competing kit.
+
+
+**Current purchase-request design contract — OWNER-CONFIRMED 15–17 October 2026;
+reconciled 17 October. APPROVED TARGET; prototype evidence is not production verification.**
+This contract replaces conflicting older form, timing, purpose and stock-intent instructions in
+§9.2's dated implementation descriptions. Those descriptions remain evidence of the earlier build.
+
+- One contextual form: MPR admits SC/GP; Forecast suggestions and `+ New stock request` create RS.
+  Forecast is a page name, not an FP number. RS has no customer, SO, reason dropdown or final
+  customer handover. Manual RS is not restricted to the forecast model list or suggested cap.
+  Changed forecast suggestions require a reason and retain source evidence.
+- Requester and actual Request date are automatic. Proceed Date is requester-selected planned
+  purchasing date, distinct from actual submission/approval/issue dates and calculated Order By.
+- Read order: Request Details → Goods recipient/Delivery where applicable → Items (stock and
+  supplier arrangements) → final item-to-recipient allocation where needed → Review. No new-request
+  attachment upload. SC links existing Case files; PO PDFs/send evidence remain on PO.
+- GP admits any company/person and multiple recipients. Preserve name/company, phone, delivery
+  or self pickup, final date, address or pickup site and allocated item quantities. Address line2,
+  Floor and Lift are required for delivery. Floor accepts actual values (G, LG, UG, M,12A or
+  higher floors), not a fixed G–40 limit. No Bill to or duplicate Remark. No Save draft approval.
+- Latest supplied owner ruling17Oct replaces requester-read-only stock intent: SC/GP requester
+  may propose/select From stock per item/location; Jess can change it. Requested quantity remains
+  the total need; only confirmed residual To buy reaches PO. RS hides this choice. Do not infer
+  preapproval physical reservation permission from a prototype; all commitments use Stock's
+  authorised door and concurrency checks. No duplicate whole-form Yes/No stock question.
+- Items default to Carres Klang; per-row Change Deliver To and Split delivery retain quantity,
+  destination and date lineage. Split means one product quantity divided, not a later transport
+  leg. Allocated total equals To buy. Latest17Oct grouping remains Supplier × Category × Deliver To
+  × Purpose × Delivery Date; different destinations create separate POs (supersedes earlier
+  one-PO/multiple-destinations draft). Preserve recipient allocation after splits and stock changes.
+- Per supplied17Oct date ruling: recipient date uses Settings Purchase Request normal/RS30 calendar
+  days and SC14 calendar days after Proceed Date as earliest selectable date. This is not a
+  blanket maximum30-day rule. Supplier dates derive separately from supplier/category production
+  working days and calendar, not by copying the final-recipient date. Missing settings stay unknown.
+  Non-RS date copy is Customer Original Delivery Date; RS uses Delivery Date. Date derivation must
+  keep Order By/approval due meaning distinct; no silent approval of an already infeasible date.
+- Supplier destinations are permitted receiving sites. Supplied17Oct rule prohibits supplier
+  delivery to the end customer; a recipient self-pickup arrangement must identify the actual
+  permitted pickup site, not silently equate a contact/address with a warehouse. Later transport
+  follows Delivery/Stock ownership and is not completed by GRN alone.
+- Send for approval → in-page Review POs → Confirm and send → approver action; Jess approves
+  before PO Duty issues/sends via shared Review/PDF/sending components. Keep requester/approver
+  permissions and actual actor evidence; prototype View as grants no real permission.
+- No silent edits while awaiting approval. Returned requests edit/resubmit under the same number.
+  Approved/unissued changes invalidate approval and require reapproval under the same number.
+  Issued/received scope uses governed PO/Receiving/Claim rules. Draft/Recall remain proposals.
+
+
+**Approved request changes before PO — OWNER-APPROVED TARGET / NOT BUILT,
+Jess 2026-10-14 (A).** An approved purchase request with no issued PO may be revised under
+the SAME permanent request number. Record before/after scope, reason, actual actor and time;
+invalidate the preceding approval and return to Need approval. No purchasing under that old
+approval is allowed; PO Duty may issue only after the revised scope is approved and revalidated.
+This includes changed goods, configuration, quantity, destination or recipient arrangements.
+Preserve all prior revisions and approval evidence. The same request semantics apply to forecast-origin RS requests;
+its approver remains Jess under the existing Forecast ruling. Change permission must follow
+the existing governed request authority, not a new grant to every employee.
+If a PO has been issued, do not use this no-PO path: follow the affected PO/source change rules.
+§5.8.2's linked replacement request remains scoped to supplier-cannot-supply replacement,
+not the default for approved unissued request edits. This approval does not approve Draft,
+Recall to edit, broader withdrawal or new supplier cancellation rules. No implementation or
+deployment is claimed by this record.
+
+`SO Batch Purchase` is customer-SO demand. Manual create offers exactly **Service Case (SC)**
+and **General Purchase (GP)**. GP covers company use, employee purchases, projects and purchases
+for any company/person. Its required Reason for purchase is a dropdown: `Company use` ·
+`Staff purchase` · `Purchase for others` · `Other`. Purchase for others requires Company / Person
+name and optionally Project name / reference; Other requires an explanation. These are reasons
+within GP, not separate purposes or numbering families. Internal Staff Purchase and Subsidiary
+Purchase are not current manual-create choices. Showroom is source-generated; Ready Stock enters
+from Forecast. Do not add independent Other Purchase, Internal or Project purposes.
+
+**Stock-request entry relocation — OWNER-APPROVED TARGET, Jess 2026-10-15; BUILD authorised 17 October.**
+Forecast Purchase adds `+ New stock request` for one-off advance stock buying. It opens the SAME
+shared purchase-request form, with stock intent supplied by that entry, not a second form or
+request/approval/PO writer. Staff choose Catalog goods/configuration, quantity, permitted supplier
+destination and needed date; this manual ask is not limited to the forecast suggestion/model list.
+**Owner correction 2026-10-15:** both manual top-ups and forecast-suggested stock requests use
+RS identity (Ready Stock). Do not allocate FP for new requests or require a visible forecast
+number distinction. Retain structured origin evidence for existing rechecks and audit; this
+numbering simplification changes no approval, coverage or source-specific validation rules.
+Both require Jess approval, followed by PO Duty issuance/sending through existing governed doors.
+They retain distinct extra-replenishment versus forecast recheck rules; moving the entry does not
+silently turn every RS ask into a formula-limited forecast. Keep source and coverage evidence.
+
+In the CURRENT DESIGN, Manual Purchase Request manual create offers only Service Case and General Purchase; do not design Ready Stock as a selectable purpose
+there. Showroom Display enters through its approved source flow. All RS stock requests remain reachable
+in the shared request detail/approval/PO journey without re-entering data; relocation is not removal
+of their underlying purpose, records or history. Current production Ready Stock creation remains
+until the replacement entry and complete approval→PO path are implemented and verified, then
+remove that duplicate entry. The original design instruction alone did not authorise a build. Jess explicitly authorised
+implementation through deployment and authenticated verification on17Oct2026; completion remains unproven. This replaces the earlier requirement to keep Ready Stock in the
+MPR manual-create DESIGN pending a future decision; operational cutover remains separately proven.
+Routine purposes do not ask a duplicate `Why`. Earlier dated create-form evidence that still
+mentions Other Purchase describes historical implementation, not current admission authority.
+SC links the actual Case and its approved procurement scope, not an assumed replacement of
+all goods on the original SO. GP records its required reason and the actual recipient arrangements.
+Request identity follows §6.1; source records and issued PO identities remain separate.
 **Approval — APPROVED / LOCKED (Jess, 2026-09-16); BUILT in Manual Purchase Round 2, migration
 0522.** Every Manual Purchase requires approval, whatever its purpose or amount; no purpose or
 amount bypass exists. `purchasing_create_request` always stores `approval_required = true` and no
