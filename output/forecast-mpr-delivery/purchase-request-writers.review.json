@@ -1,7 +1,7 @@
 {
   "status": "EXACT CLOSED-INSTALLATION REVIEW PACKAGE; NOT APPROVED; NOT A MIGRATION; ACTIVATION STILL BLOCKED",
-  "draft_sha256": "8d06bb4a480a2ec5d31637a1796485abe6171ab3ddb2415060349e8978d0c3dc",
-  "draft_file_md5": "f27a3a8f1828646b891af85e1269f035",
+  "draft_sha256": "bc0a271221ca82412e911a311b00ac2220fdc8778dfdd6f4f0103472bcae69aa",
+  "draft_file_md5": "cc268cd7240a4e3b811a01a3e007c959",
   "validation_environment": "Owned loopback replay only; all synthetic business fixtures roll back; no production writes",
   "validated_core": [
     "Canonical GP partial1+remainder1, exact recipient/event/source/Unit ownership",
@@ -18,7 +18,6 @@
     "Actual counted single-owner parent Deliver To splits source2 into1+1 without fake Unit IDs",
     "Existing qualified PO revision increases an unambiguous RS source within original human-approved500; exact new Unit ownership stays free; aggregate overbuy refuses atomically",
     "Part-issued changed forecast cohort blocks new MPR issue and no-PO resubmit/reapproval; existing PO owner can complete unchanged original approved need within its cap, without snapshot rewrite/new MPR approval",
-    "Reason-only cancellation and quantity reduction refuse contextual scope before writes under Purchasing5.8.1; no supplier agreement/fee/effective-version evidence invented and no cancellation workflow commissioned",
     "Current active PO coverage is separate from retained cancelled lineage in API and Work; missing PO status is unavailable, not zero",
     "Local current-version send-ledger declarations retain V1 snapshot and old send, refuse stale version, declare each actual current PO separately; source500/remaining0 readback; no provider call or real Task save",
     "One qualified Stock reader supplies all active-location exact-config healthy Unit offers to pre-create and saved Review; no reservation, unread source stays unavailable; SQL role/config/site/health/no-reservation controls pass",
@@ -27,18 +26,26 @@
     "Review unavailable distinguishes a validated current approval scope from failing physical coverage; Stock repair may reuse that fact, while it still grants no issue/approval authority. Qualified Stock binding API intersects actual eligible Unit IDs/location/config with complete register facts, retains held Units, excludes deliberate purchase allocations.",
     "Stale new-MPR admission is distinct from truthful already-committed RS coverage. Read-only fallback requires unchanged saved request/version/approval/demand scope and actual existing PO coverage; parent owner completion500/remaining0 is readable, no new approval/issue token granted. Canonical local fixture verifies stale partial4/remaining496 and fully covered500/remaining0.",
     "Final owned-loopback GP5 and RS500 browser workflows both pass: distinct qualified approver, selected partial PO1, painted actual document, shared TEST email declaration, current send readback, remaining4/499, unchanged original approval/version, unchanged ops_tasks/work_occurrence_events counts; outer rollback. Uses TEST PostgREST-shaped adapter, not production transport proof.",
-    "Existing purchasing_revise_po admits explicit additive modern MPR multi-source changes on an existing physical line: exact PO version and every existing source token/version, source totals and added recipient conservation, aggregate per-demand cap across changed lines, exact new Unit ownership/concrete reservation, unchanged request/approval, existing prior-document snapshot/current-version send invalidation. GP1+1 to2+1 to2+2 and simultaneous2+2 plus stale-version/token/missing-recipient negatives pass local SQL. SAME API schema/route passes source proof; no new PO module form."
+    "Existing purchasing_revise_po admits explicit additive modern MPR multi-source changes on an existing physical line: exact PO version and every existing source token/version, source totals and added recipient conservation, aggregate per-demand cap across changed lines, exact new Unit ownership/concrete reservation, unchanged request/approval, existing prior-document snapshot/current-version send invalidation. GP1+1 to2+1 to2+2 and simultaneous2+2 plus stale-version/token/missing-recipient negatives pass local SQL. SAME API schema/route passes source proof; no new PO module form.",
+    "Effective same-PO cancellation LOCAL: pending supplier/fee facts retain coverage; actual PO-prefixed delivery-orders Storage object required; foreign/missing file refused. Ordinary evidenced agreement/no-fee and supplier inability complete without an extra vote. Commercial exception uses existing Purchasing Approver; first/latest requester self-approval refused.",
+    "Partial1 and whole2 merged GP cancellation retain original ordered/received/source quantities, approval, history and V1 frozen paper; retire only selected incoming Units. Counted received1 of2 cancels outstanding1 without fake Units; guarded late receipt/retired-Unit availability refused. Receipt is SQL seeded, not an actual Receiving UI proof.",
+    "Actual GP5 and RS500 browser-to-signed-API-to-authenticated-PG lifecycle2/2 passes with qualified cancellation1, active source/MPR remaining1, current PO version3/ordered2/received0/cancelled1/pending1 and actual-register cancellation-send Work projection. TEST Storage metadata only, no remote upload/provider/production transport claim. No Task/work-event writes; outer rollback.",
+    "Current-version cancellation document uses SAME official PO template; partial/full shipped-template PDFs rendered and visually checked. Current V2/V3 send declaration and stale-version denial pass owned SQL; original sent V1 remains immutable.",
+    "Shared balances167/167, API routes/Work/MPR300/300 and existing PO/editor/PDF101/101 pass locally. Native Select adapter in isolated form tests verifies draft semantics, not Radix appearance or a complete live cancellation page walk.",
+    "Actual existing PO object/editor browser walk2/2 over same authenticated local API: canonical procurement entry, keyboard Edit, preserved current V3 painted PDF,1440 and390 widths with no horizontal overflow, paper reachable in the main scroll, Close/Cancel preserves input and explicit Discard leaves without business/Task writes. Exact GP/RS screenshots retained. Source reads narrowed to this newly-created TESTPO, no fake business facts. Standalone object fixture does not prove full Shell/896 boundary or upload-provider save."
   ],
   "explicit_incomplete_or_closed": [
     "SC: existing procurement-authorised unchanged scope is not blanket-disabled. Only new/changed formal customer-remedy execution requires a qualified existing Service approval source; source contract still unverified. See existing service-source-evidence JSON; no Decision UUID/new Service build.",
-    "Effective cancellation/quantity reduction: \u00a75.8.1 approved target lacks a current qualified supplier-agreement/fee/version producer in this delivery. Legacy reason-only door is blocked for new context scope; commitments remain covered. No expanded PO cancellation build.",
     "Mixed-owner counted FORECAST attribution remains unavailable and refuses before initial issue; mixed counted partial moves need explicit source when more than one owner. No fake Units.",
-    "No issued MPR reapproval/recall path is invented. \u00a79.2 reserves no-PO revision to unissued requests; existing PO/source owners handle already-issued commitments. Tested changed-cohort boundary preserves immutable original request/approval/issue facts.",
-    "Existing guarded Workspace and object Stock/recipient controls have local real-browser8-case visual/keyboard/narrow evidence and separate rolled-back SQL proof. Default-off Register parent and selected partial Issue Review now have GP/RS local browser proof. Combined GP/RS browser \u2192 actual API \u2192 authenticated owned PostgreSQL lifecycle passes with TEST transport adapter and outer rollback; production PostgREST/authenticated complete-page proof remains owed; scoped qualified SC evidence/authority boundary is still open. No production activation.",
+    "No issued MPR reapproval/recall path is invented. §9.2 reserves no-PO revision to unissued requests; existing PO/source owners handle already-issued commitments. Tested changed-cohort boundary preserves immutable original request/approval/issue facts.",
+    "Existing guarded Workspace and object Stock/recipient controls have local real-browser8-case visual/keyboard/narrow evidence and separate rolled-back SQL proof. Default-off Register parent and selected partial Issue Review now have GP/RS local browser proof. Combined GP/RS browser → actual API → authenticated owned PostgreSQL lifecycle passes with TEST transport adapter and outer rollback; production PostgREST/authenticated complete-page proof remains owed; scoped qualified SC evidence/authority boundary is still open. No production activation.",
     "Multi-SKU changed Forecast cohort whose remaining source has no existing PO line still lacks a qualified post-issued continuation contract. Do not invent MPR recall/reapproval, new PO source, or broad source bypass. Single existing RS source growth within unchanged approved cap is proven.",
-    "Additive multi-source modern MPR revision is SQL/API built and locally verified; existing PO UI has no explicit source/recipient editor and is not expanded by this request. Implicit merged changes, mixed SO/legacy source quantity edits, source reductions/reassignment and unknown source facts refuse before writes. Single-source RS compatibility retained. SC still requires unchanged qualified owning scope and separate formal-remedy source dependency; no blanket SC block."
+    "Additive multi-source modern MPR revision is SQL/API built and locally verified; existing PO UI has no explicit source/recipient editor and is not expanded by this request. Implicit merged changes, mixed SO/legacy source quantity edits, source reductions/reassignment and unknown source facts refuse before writes. Single-source RS compatibility retained. SC still requires unchanged qualified owning scope and separate formal-remedy source dependency; no blanket SC block.",
+    "Finance actionable cancellation Work notification/consumer remains undelivered. Immutable effective event and scoped Finance GET read are BUILT LOCAL producer/read contract only. Finance MASTER subsequent collaboration rule requires agreement with YH before Finance code changes; no Finance files, assignment, settlement or notification are fabricated.",
+    "Actual uploaded-file bytes/provider save, full Shell/896 boundary and production/Receiving acceptance remain unverified. Existing PO object/editor1440/390/keyboard/discard/current painted PDF now pass actual local browser; SQL validates separate missing-own-object and existing-foreign-prefix negatives. This is not production activation readiness.",
+    "After an effective cancellation, ordinary revise/Deliver To mutations refuse until they carry exact active-source/receipt/recipient ownership; no silent original-vs-active mixing. Legacy-only cancellation behavior is retained, not globally certified under5.8.1."
   ],
-  "application_effect": "Exact installation refuses if already-active contextual records exist. Private admission is CLOSED with55000/request_context_not_enabled, has no public/anon/authenticated execution grant and no GUC/browser/user-setting bypass. New context create/revise/decide/Stock/issue and contextual PO effects cannot activate on install. Legacy-only doors retain existing behaviour. No business rows, Settings values, new roles or RLS change on installation. Activation requires a separate exact reviewed change after remaining functional/authority acceptance.",
+  "application_effect": "Exact installation refuses if already-active contextual records exist. Private admission is CLOSED with55000/request_context_not_enabled, has no public/anon/authenticated execution grant and no GUC/browser/user-setting bypass. New context create/revise/decide/Stock/issue and contextual PO effects cannot activate on install. Legacy-only doors retain existing behaviour. No business rows, Settings values, new roles or RLS change on installation. Activation requires a separate exact reviewed change after remaining functional/authority acceptance. New append-only cancellation ledger is the sole RLS addition: internal Operation/Principal/Finance SELECT only, no anon/authenticated writes; existing-table RLS/policies unchanged. Exact SQL includes recreation of only this new ledger policy/guard. Existing table policies are neither replaced nor broadened.",
   "recovery": "Do not deploy dependent code before exact SQL approval/application and release gates. Before any production apply, remeasure current governing authority, original function fingerprints, tracker/main/all-branch migration MAX and schema preconditions. Governed production DO probe only after approval. If rollout must pause, retain prior application; do not delete issued facts or fabricate rollback/stock restoration. Production SQL rollback requires its own concrete reviewed plan.",
   "separate_settings_approval_sha256": "b4eb234d6f0d855546d606a5f9eef1b8b30aa52a8274948855f0ba8ec8053774",
   "functions": [
@@ -74,6 +81,20 @@
       "signature": "_purchasing_assert_request_approval(uuid)",
       "body_md5": "389ee4d926d0e20a2e87156eb8867cd8",
       "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_cancellation_immutable()",
+      "body_md5": "480cd802ade74ced23f3b912c8638500",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_cancelled_scope_receipt_guard()",
+      "body_md5": "128a3ad9fc50cd8ed0162e36d0f38b25",
+      "security_definer": true,
       "authenticated_execute": false,
       "anon_execute": false
     },
@@ -114,7 +135,7 @@
     },
     {
       "signature": "_purchasing_context_coverage_admitted(uuid, boolean, jsonb)",
-      "body_md5": "63b8750601f9d6fff28f165432e80ecb",
+      "body_md5": "6533f6cb3efa4f50e1234532dad15852",
       "security_definer": false,
       "authenticated_execute": false,
       "anon_execute": false
@@ -205,7 +226,7 @@
     },
     {
       "signature": "_purchasing_context_remaining_recipients(uuid, uuid, jsonb)",
-      "body_md5": "ff4ebfd27d59ac49ac34c2529561bdce",
+      "body_md5": "976861914fa189d0439bcd99d1ecca37",
       "security_definer": false,
       "authenticated_execute": false,
       "anon_execute": false
@@ -274,6 +295,41 @@
       "anon_execute": false
     },
     {
+      "signature": "_purchasing_po_demand_cancelled_qty(uuid, uuid)",
+      "body_md5": "6947c458a7d70820312465906adf9862",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_po_issued_recipients(text, uuid)",
+      "body_md5": "e7aa3f91fc8369d0ef1433ebad066a25",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_po_line_cancelled_qty(uuid)",
+      "body_md5": "3b9098732577ba76c4b5381bd728d601",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_po_line_pending_qty(uuid)",
+      "body_md5": "5f7ecef6d40cd931589c1749217c7349",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
+      "signature": "_purchasing_po_request_active_sources(uuid)",
+      "body_md5": "8ca3f0ce5c358d00e3ded55070285686",
+      "security_definer": false,
+      "authenticated_execute": false,
+      "anon_execute": false
+    },
+    {
       "signature": "_purchasing_po_request_sources(uuid)",
       "body_md5": "6a08039e063699407a37e2dd19dccdd6",
       "security_definer": false,
@@ -330,6 +386,13 @@
       "anon_execute": false
     },
     {
+      "signature": "operation_cancel_po(text, text, jsonb)",
+      "body_md5": "0656f26250b23327f20c2a3f123ce60b",
+      "security_definer": true,
+      "authenticated_execute": true,
+      "anon_execute": false
+    },
+    {
       "signature": "ops_stock_bound_incoming_arrives()",
       "body_md5": "f5c86179ab15b232c996e21dea3456d2",
       "security_definer": false,
@@ -359,7 +422,14 @@
     },
     {
       "signature": "purchasing_change_po_deliver_to(text, uuid, integer, uuid, text, text[])",
-      "body_md5": "bd1fdf1269abb28d7873cff616a27944",
+      "body_md5": "018e548a0079e098cf7b159fb88fb5db",
+      "security_definer": true,
+      "authenticated_execute": true,
+      "anon_execute": false
+    },
+    {
+      "signature": "purchasing_confirm_po_sent(text, integer, text, text, text)",
+      "body_md5": "b1e35c6b998a77e070a1c0809ae9b5f8",
       "security_definer": true,
       "authenticated_execute": true,
       "anon_execute": false
@@ -407,6 +477,27 @@
       "anon_execute": false
     },
     {
+      "signature": "purchasing_po_cancellation_facts(text)",
+      "body_md5": "bfa80a455d6f0cfb4b347b7bb29ad334",
+      "security_definer": true,
+      "authenticated_execute": true,
+      "anon_execute": false
+    },
+    {
+      "signature": "purchasing_po_cancellations(text[])",
+      "body_md5": "b18b67efe69b1eddea6bc09f5288db6c",
+      "security_definer": true,
+      "authenticated_execute": true,
+      "anon_execute": false
+    },
+    {
+      "signature": "purchasing_po_document(text)",
+      "body_md5": "cbbf66cc6cd4cf296eb863b1ced4fd35",
+      "security_definer": true,
+      "authenticated_execute": true,
+      "anon_execute": false
+    },
+    {
       "signature": "purchasing_po_free_units()",
       "body_md5": "bf4d0c8d7e62ed6e4932f86db7739181",
       "security_definer": false,
@@ -415,10 +506,17 @@
     },
     {
       "signature": "purchasing_po_line_free_units(uuid)",
-      "body_md5": "58b6664023d5610ffb3e735f9721ed2b",
+      "body_md5": "516f4c9fde8a6f37574e5d5a22a1296b",
       "security_definer": false,
       "authenticated_execute": true,
       "anon_execute": true
+    },
+    {
+      "signature": "purchasing_record_supplier_answers(text, jsonb)",
+      "body_md5": "ceeb303c3788f9e379d91e880b2f16e6",
+      "security_definer": true,
+      "authenticated_execute": true,
+      "anon_execute": false
     },
     {
       "signature": "purchasing_request_context_review(uuid)",
@@ -449,6 +547,13 @@
       "anon_execute": false
     },
     {
+      "signature": "purchasing_require_reply_evidence()",
+      "body_md5": "86158e48562d0e04b7de239770cde22f",
+      "security_definer": true,
+      "authenticated_execute": true,
+      "anon_execute": false
+    },
+    {
       "signature": "purchasing_resubmit_request(uuid, uuid, date, text, uuid, uuid, text, jsonb, text)",
       "body_md5": "34ace934d87852a1194d42384461fb12",
       "security_definer": true,
@@ -457,7 +562,7 @@
     },
     {
       "signature": "purchasing_revise_po(text, text, jsonb)",
-      "body_md5": "6f96ce70186b45771469a5b3af214a0d",
+      "body_md5": "0f762cd03d22c774e83c1fdeff58590e",
       "security_definer": true,
       "authenticated_execute": true,
       "anon_execute": false
@@ -498,19 +603,22 @@
       "Send for approval enters in-page Review only; Confirm and send performs the sole request write after successful PO preview. Source/body/paper changes invalidate Review, Cancel returns to editing, draft retained; missing renderer readiness blocks confirmation."
     ],
     "validation": {
-      "web_and_document_contract": "61 cases across six files passed; includes six existing-Workspace form tests and three guarded action cases",
+      "web_and_document_contract": "Current PO/editor/PDF101/101 PASS, default-off MPR prior checks retained",
       "local_database": "Full purchase-request-context.local-check.sql rerun PASS with final ROLLBACK, including actual canonical create/approve/partial issue/retry/remainder/source/Unit/document projection and mixed legacy scope",
-      "existing_po_send_api": "145 local mocked route tests PASS; no provider or real send",
+      "existing_po_send_api": "Current API PO/Work/MPR300/300 PASS, TEST only",
       "existing_work_completion": "31 cases across three local test files PASS, including MPR-linked completion through existing PO send door",
-      "sql_identity": "Exact 8d06bb4a480a2ec5d31637a1796485abe6171ab3ddb2415060349e8978d0c3dc;62 function/grant assertions PASS; final canonical fixture ROLLBACK and deliberate exact PROBE_ROLLBACK PASS.",
-      "web_typecheck": "PASS after final revision-field accessible ID fix"
+      "sql_identity": "Exact bc0a271221ca82412e911a311b00ac2220fdc8778dfdd6f4f0103472bcae69aa;76 function/grant assertions PASS; final canonical fixture ROLLBACK and deliberate exact PROBE_ROLLBACK PASS. Existing RLS unchanged, new immutable readonly cancellation ledger checked separately.",
+      "web_typecheck": "PASS, final shared PDF loading/painter and PO cancellation/test changes included"
     },
     "not_claimed": "Combined local GP/RS signed API/authenticated PostgreSQL browser walkthrough now passes with TEST transport adapter and outer rollback. Production PostgREST transport, complete authenticated production page acceptance and activation remain unclaimed. No supplier provider call or real task write/completion."
   },
   "review_readiness": {
     "closed_installation": "READY TO INSPECT the exact default-CLOSED package, function/grant fingerprints, preconditions and rolled-back local probe; no approval/application requested by this update. Production original preimages, tracker/main/all-branch MAX and all release checks must be remeasured before any authorised application.",
-    "activation": "NOT READY. Closed installation only; no activation inferred from foundation approval. Ordinary unchanged GP/RS residual completes through existing MPR Review/Issue without a new PO source editor (local verified). Explicit post-issued merged-source/recipient editing is a conditional separate PO interaction dependency, not required for that ordinary path and not commissioned here. Effective cancellation/reduction supplier evidence + cancelled-quantity/Finance chain, formal new/changed SC source contract and production transport/full-page acceptance remain unimplemented/unverified as classified in bounded_release_scope.",
-    "settings": "Separate pending exact b4eb234d6f0d855546d606a5f9eef1b8b30aa52a8274948855f0ba8ec8053774; no repeated question or inferred approval."
+    "activation": "NOT READY. Exact closed installation review only; no activation inferred from foundation approval. Ordinary GP/RS existing MPR residual and qualified same-PO cancellation are verified locally. Finance actionable consumer, formal new/changed SC authority read contract, current live-page/provider and production acceptance remain as bounded_release_scope.",
+    "settings": "Separate pending exact b4eb234d6f0d855546d606a5f9eef1b8b30aa52a8274948855f0ba8ec8053774; no repeated question or inferred approval.",
+    "effective_cancellation": "LOCAL writer/read/balance/current document/send Work and actual object/editor1440/390/keyboard/discard verified; actionable Finance consumer, qualified new/changed SC contract, upload-provider/full Shell and production/Receiving acceptance remain release blockers.",
+    "sql_identity": "Exact bc0a271221ca82412e911a311b00ac2220fdc8778dfdd6f4f0103472bcae69aa;76 function/grant assertions PASS; final canonical fixture ROLLBACK and deliberate exact PROBE_ROLLBACK PASS. Existing RLS unchanged, new immutable readonly cancellation ledger checked separately.",
+    "final_types": "API and web typecheck PASS with8GB heap, after all cancellation, existing-PO browser and PDF painter changes; no production claim."
   },
   "production_preimages_2026_10_18_read_only": {
     "project": "kfprgpjpaffedghytstl",
@@ -521,44 +629,40 @@
   },
   "post_issue_validation": {
     "database": "Full owned loopback fixture PASS, final ROLLBACK; private admission temporarily opened ONLY within that fixture transaction and restored CLOSED by rollback. Actual PO destination/RS growth/source quantities/Unit ownership/proof and named boundary negatives verified. Supplier address missing refuses before actual issue; TEST-only blank-address completion stays inside rollback fixture.",
-    "probe": "62 exact function/grant assertions,13 source guards; default-closed/invalid-scope/no-account controls, unchanged business rows/Settings/RLS; latest LOCAL exact probe deliberately PROBE_ROLLBACK",
+    "probe": "76 exact function/grant assertions,13 source guards, default-closed/invalid-scope/no-account controls; unchanged business rows/Settings/existing RLS; new ledger readonly policy/grants/immutable guard and unchanged count verified; deliberate PROBE_ROLLBACK.",
     "api": "441 related API cases passed before Stock reader; Stock/context API40/40 passes (6 new qualified-reader cases). Serial rerun previously resolved parallel import timeout without test relaxation.",
     "web": "68/68 across8 files, including real Workspace/object Stock approval and painted-PDF readiness contract; shared192/192 across3 files. Real browser8/8 GP/RS at390/1025/1164/1440 with shipped PDF renderer/painter, keyboard Review/confirm/approval; memory TEST transport only, NOT browser-to-DB. Narrow test originally targeted hidden desktop header action; corrected to existing visible footer action.",
     "pdf": "Two actual local kept document JSON snapshots exported client-side before outer rollback: V1 qty1 and V3 qty499. Shipped PO template and font family used; one page each, no recipient/money. Files LOCAL-TEST-RS-*. No real supplier transport or actual Task completion.",
     "final_follow_on": "API65/65, web14/14, shared152/152 focused regressions PASS; combined local GP/RS browser2/2 PASS. API/web typechecks PASS (API8GB heap after default-heap exhaustion). No approval, migration, production write, provider send, Task write or activation.",
     "multi_source": "GP existing parent1+1 ->2+1 ->2+2 plus simultaneous source additions PASS; exact separate Unit owners/reservations, remaining recipients, unchanged approval. Stale PO version/token/missing-recipient negatives refuse before writes. Existing PO API149/149 PASS; API/web typechecks PASS. Combined GP/RS browser/API/authenticated PG2/2 rerun PASS, including actual parent HTTP revision1->2, current print-data version2/qty2, retained V1 send, revised Work498/3 and current-send=false, no ops_tasks/work_occurrence_events writes; TEST transport, outer rollback. No new UI source editor.",
-    "final_boundary_walk": "Final local2/2 GP5/RS500 browser/API/PG walk also exercises reason-only cancellation and qty reduction via actual HTTP doors, both refuse4xx and preserve relative full PO/line/source/Unit/request-event/revision/history facts. Existing MPR UI then issues all unchanged residual, full source coverage5/500 and to_buy0, current-send=false. Last sending intentionally pending; ops_tasks/work_occurrence_events counts unchanged. No positive effective-cancellation, real receiving or production PostgREST proof claimed."
+    "final_boundary_walk": "Final2/2 GP5/RS500 browser/API/PG lifecycle retains reason-only cancel/reduction refusal, then all unchanged residual through same MPR UI. It now also completes qualified pending->effective cancellation1, reads ordered2/received0/cancelled1/pending1, MPR remaining1 and current cancellation version3 send Work. Last sending remains pending; tasks/events counts unchanged; all business fixtures rollback. TEST Storage metadata not provider upload bytes; no real Receiving or production transport proof.",
+    "effective_cancellation": "See cancellation_reduction_readiness; qualified SQL/API chain now locally built, former rejection-only boundary superseded."
   },
   "cancellation_reduction_readiness": {
-    "classification": "APPROVED BUSINESS TARGET; CURRENT CONTEXTUAL ACTIVATION BLOCKER, NOT IMPLEMENTED HERE",
-    "authority": "docs/purchasing/MASTER.md \u00a75.8.1: ordinary evidenced supplier inability or agreement/no fee permits any qualified Operation/Principal helper; do not add an extra approver vote. Fee/shipped/disagreement exceptions keep existing commercial authority. The section expressly does not commission its application implementation or expand the separate PO-placement unblock BUILD scope.",
-    "measured_owned_schema": {
-      "purchase_order_lines": "qty and received_qty plus damaged_qty/wrong_item_qty; no cancelled_qty column",
-      "qualified_cancellation_functions": [
-        "operation_cancel_po(text,text)"
-      ],
-      "structured_cancellation_tables": [],
-      "environment": "Owned local replay only,18Oct2026; not a fresh production measurement"
+    "classification": "EFFECTIVE CANCELLATION BUILT AND VERIFIED IN OWNED LOCAL SQL/API; FINANCE DELIVERY AND COMPLETE LIVE PAGE ACCEPTANCE REMAIN BLOCKED",
+    "authority": "docs/purchasing/MASTER.md §5.8.1; ordinary agreed/no-fee or unable-to-supply evidence needs no extra owner vote; commercial exceptions use existing Purchasing Approver and no self-approval.",
+    "owning_door": "operation_cancel_po(text,text,jsonb), existing HTTP POST /api/operation/pos/:id/cancel optional qualified cancellation input; existing PO Edit last action. Old reason-only contextual call still refuses.",
+    "ledger": "po_goods_cancellation_events append-only original source/receipt/version/actual actor/supplier facts; no original ordered/received/source qty rewrite; exactly selected incoming Units retired.",
+    "evidence": "At most20 paths, each <=2000 chars, each PO-id/ prefix and existing delivery-orders storage.objects record. This is the existing supplier-evidence Storage contract; TEST integration seeds metadata inside rollback, not provider bytes.",
+    "balances": "One private active/pending arithmetic shared by source admission, recipient allocation, readers, free supply, supplier replies, receipt guards, documents and send Work. No fixed cancellation addback to demand.",
+    "document_and_work": "Same immutable PO versions/PDF/send flow. Exact current cancellation event+version owns purchasing.cancellation_send occurrence; old send does not close it, no business deadline invented.",
+    "finance_producer_read_contract": {
+      "status": "BUILT LOCAL; NOT A DELIVERED NOTIFICATION",
+      "source": "po_goods_cancellation_events effective id + po_id + applied_po_version",
+      "read": "GET /api/operation/pos/:id/cancellations -> purchasing_po_cancellation_facts(text)",
+      "payload": "financeHandoffs: stable event id, original PO/version/supplier link, affected exact line/source/recipient/Unit qty scope, reason, actual actor/time, PO-owned supplier evidence; ownerModule finance/state needs_finance_review",
+      "financial_effect": "None; no amount, deposit/refund/fee settlement, fake credit note or FinanceApprover assignment",
+      "consumer_dependency": "Finance owning actionable shared Work/handoff consumer and acceptance; Finance MASTER §5 Open items1 requires agreement with YH before Finance code changes. No human authorisation to message YH was supplied in this chat."
     },
-    "current_producer": "packages/shared/src/schemas/operation.ts cancelPoInput + apps/api/src/routes/operation/pos.ts POST/:id/cancel pass reason only. No exact selected line/outstanding qty, supplier inability/agreement, fee state, evidence/version or Finance handoff contract. Ordinary authority exists in business law; typed producer is missing.",
-    "safe_current_effect": "Draft refuses contextual reason-only cancellation and negative revision before writes. It does not turn a request or unknown fee answer into cancellation; keeps coverage, received facts and historical documents. Legacy-only behavior is retained, not claimed fixed or \u00a75.8.1-compliant.",
-    "required_bounded_owning_delivery": [
-      "Existing PO cancellation records selected outstanding source quantities, exact current PO/receipt/Unit scope, supplier statement/evidence and tri-state fee; pending request retains coverage. No new receiving or Service form.",
-      "Effective cancellation retains original ordered/received plus explicit cancelled amounts, retires only exact unreceived Units, source-owned allocation consequences and one remaining-balance calculation. Existing PO/Receiving/Stock consumers must consume that qualified balance without rewriting receipts.",
-      "Current-version document/send and unfinished actions remain, traceable Finance continuation without amounts to Operation; ordinary qualified no-fee cancellation is not forced through commercial exception approval."
-    ],
-    "not_a_solution": "Do not implement cancellation by reducing original qty, subtracting a fixed amount from demand, status-only historical fixture, new self-certified approval flag, fake Unit or a new approval requirement.",
-    "existing_related_doors": {
-      "purchasing_cancel_demand(uuid,text)": "0321 whole unissued remainder cancellation retains issued_qty/PO. It is not supplier commitment cancellation; contextual direct one-line edit remains refused by whole-scope guard.",
-      "purchasing_record_supplier_answers(text,jsonb)": "0587 owning answer flow supports confirmed/new_date/split with evidence and version; no supplier cancellation agreement/inability or fee tri-state/effective cancellation quantity. Signature measured in owned local replay; no fresh production contract or effective cancellation is certified."
-    }
+    "boundaries": "No real Receiving UI walk, provider upload/send, production writes or automatic Task completion; existing old reason-only legacy behavior not recertified. Activation CLOSED; not a migration or SQL approval request.",
+    "ui_evidence": "Same existing PO object/editor via dev-only canonical procurement entry and current actual API reads. GP/RS2/2 at1440/390, current painted V3 paper reachable, keyboard entry and dirty keep/discard without writes. Standalone object, not full Shell/896 or successful upload-provider/Receiving proof."
   },
   "companion_files": {
     "purchase-request-writers.rollback-probe.sql": {
-      "sha256": "4dcd9afbf4c3371109dae4c2697ca95dcbcd13d25336586fc074eedf793cab74"
+      "sha256": "4d40b8303f8dd63855c9a9d69c3afa1d98870b0a8cacca1f320d9aef153a078a"
     },
     "purchase-request-context.local-check.sql": {
-      "sha256": "836b0cacd1c3479ff4dd0ad24ffce3d0f8242ad51210004f2bbd15afb289a4da"
+      "sha256": "4a3e4ec5a0e465f906849b5397c92e48b355082a09f45b6881691bc83ed95fab"
     },
     "purchase-request-service-source-evidence.json": {
       "sha256": "efe4825bf7f5c56432f23f1bffdfcdf8e96866dd81a3fea13eab1923fde3dc65"
@@ -567,20 +671,50 @@
       "sha256": "b4eb234d6f0d855546d606a5f9eef1b8b30aa52a8274948855f0ba8ec8053774"
     },
     "local-test-documents/LOCAL-TEST-GP-lifecycle.json": {
-      "sha256": "11648c44f6efc77009ff87ce8a38576b6f4bedc967aab996322ffe3563b9e8f9"
+      "sha256": "1accc8c2747196686813923c525a21a2cbd8129e5c9d9ccb0778e234706ebbba"
     },
     "local-test-documents/LOCAL-TEST-RS-lifecycle.json": {
-      "sha256": "a3d24a3915abc0a7e4e3daf65fddfa91443371063614fbf9289dd8819b9e0674"
+      "sha256": "f6952a84b1d2b43c16d569f7dae3066469afd319683d490f4fb62649803b2648"
+    },
+    "local-test-documents/cancellations/LOCAL-TEST-CANCEL-PARTIAL.json": {
+      "sha256": "a6ddbfdf94f7114e0cdbdb39a3145eeb3ae023fb2805d9044c05500dbe0f1afc"
+    },
+    "local-test-documents/cancellations/LOCAL-TEST-CANCEL-PARTIAL.pdf": {
+      "sha256": "20de50e02f8ef23a82cdf8ca8efdfc90eefcd6acdee159d6cb5a3974f3c8b995"
+    },
+    "local-test-documents/cancellations/LOCAL-TEST-CANCEL-FULL.json": {
+      "sha256": "aed922eb64e7aca665645a1a54bcf2be838604ae2ca7cb256710d938095fcb74"
+    },
+    "local-test-documents/cancellations/LOCAL-TEST-CANCEL-FULL.pdf": {
+      "sha256": "4f14d89bf0c3fa8c767e5146c4de491ba49424b336620068fb78cf81a0fb6dc2"
+    },
+    "local-test-documents/cancellations/LOCAL-TEST-RS-cancellation-1440.png": {
+      "sha256": "f5e7578fd92807fac695a62ce6eb26376f4d4a024f6ef66f3b98caf0238d9e1d"
+    },
+    "local-test-documents/cancellations/LOCAL-TEST-RS-cancellation-390.png": {
+      "sha256": "5257ca6c4aa50c570fefc48c1611e699008424d43e5d02f3bf50ed2b9c15a307"
+    },
+    "local-test-documents/cancellations/LOCAL-TEST-RS-cancellation-paper-390.png": {
+      "sha256": "fe4f204a8a30793fd03d7b5353d6a6c73bf65b2df81fd01c885a8b1f1e0c570f"
+    },
+    "local-test-documents/cancellations/LOCAL-TEST-GP-cancellation-1440.png": {
+      "sha256": "60010e7f194af09eed3dd8ad6cfbc650b293305849db320a5d479395b7abcbda"
+    },
+    "local-test-documents/cancellations/LOCAL-TEST-GP-cancellation-390.png": {
+      "sha256": "d5ee9235a3cf0aec7ebbc96fad3ed8a4a22479923973b52a76ed8d7113398c86"
+    },
+    "local-test-documents/cancellations/LOCAL-TEST-GP-cancellation-paper-390.png": {
+      "sha256": "83ddb5c22b0359fa6d7310e8b8455ab3a595cdd30b384f0d14fe1bd2cf655669"
     }
   },
   "bounded_release_scope": {
     "closed_installation": {
       "classification": "LOCAL VERIFIED REVIEW CANDIDATE ONLY",
-      "exact_sql_sha256": "8d06bb4a480a2ec5d31637a1796485abe6171ab3ddb2415060349e8978d0c3dc",
+      "exact_sql_sha256": "bc0a271221ca82412e911a311b00ac2220fdc8778dfdd6f4f0103472bcae69aa",
       "activation_closed": true,
       "approval_requested": false,
       "production_ready": false,
-      "why_not_rollout_ready": "Settings approval pending; effective cancellation/quantity balance, formal new/changed SC source contract and production transport/full-page acceptance are not delivered by the closed install."
+      "why_not_rollout_ready": "Settings approval pending; actionable Finance cancellation consumer, formal new/changed SC source contract and full live-page/provider/production acceptance remain undelivered. Qualified cancellation writer and balances are locally verified."
     },
     "ordinary_unchanged_gp_rs": {
       "classification": "LOCAL VERIFIED",
@@ -594,9 +728,9 @@
       "separate_unresolved_case": "Changed multi-SKU Forecast remainder with no existing PO source lacks an owning continuation contract; no new MPR reapproval/source bypass is invented."
     },
     "effective_po_cancellation": {
-      "classification": "APPROVED TARGET / UNIMPLEMENTED OWNING DEPENDENCY",
-      "existing_doors": "operation_cancel_po(text,text) receives reason only. purchasing_cancel_demand cancels only unissued demand remainder, not outstanding PO commitments. purchasing_record_supplier_answers records dates/splits, not cancellation agreement/fee/effective quantities.",
-      "action": "Preserve the original PO line qty, receipt/source/Unit/history and covered commitment. Do not use any of those doors as evidence of effective cancellation or require an extra ordinary no-fee approval. See cancellation_reduction_readiness for exact missing owning chain."
+      "classification": "BUILT LOCAL WITH EXPLICIT REMAINING DEPENDENCIES",
+      "contract": "cancellation_reduction_readiness",
+      "activation": "CLOSED; no production write or claimed Finance notification"
     },
     "sc": {
       "classification": "PRECISE SOURCE DEPENDENCY, NOT A PURPOSE-WIDE DENIAL",
@@ -606,7 +740,19 @@
   },
   "validation_files": {
     "apps/api/src/test/purchase-request-browser.integration.test.ts": {
-      "sha256": "93482c3a3ffffed988556461fe0a59c2eb36d7711ec160b60a6c9b9a5dc99f23"
+      "sha256": "c5fe6e2f98dd381fd2ca2c379582019cd07bf7fa6897ad03cc49a4dc431a4607"
+    },
+    "apps/web/src/pages/operation/purchase-orders/PoCancellationFields.test.tsx": {
+      "sha256": "65a2eb091a5250902fa030bfd1e8ec053c639c869c9cdd6377081121f82476c6"
+    },
+    "apps/web/src/pages/operation/purchase-orders/PurchaseOrdersPage.test.tsx": {
+      "sha256": "23b8be68dfb6c7c15ff113048bdd23c17aaa2c6e4e2f629ef17b8ec7d58e82a0"
+    },
+    "apps/web/src/dev/manual-purchase-context-preview.tsx": {
+      "sha256": "ec9747539358fa6f346ceb0cff7f6b563c718230073d28ba8b1f6888108d897b"
+    },
+    "apps/web/src/lib/pdf/use-pdf-canvases.ts": {
+      "sha256": "ceaf9c2304fa1f13daa0dfe9985635f07fc5701edff429b8b800733ca029ea05"
     }
   }
 }

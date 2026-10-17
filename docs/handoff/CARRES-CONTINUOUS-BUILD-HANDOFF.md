@@ -9,6 +9,84 @@ Paste everything below the line into a fresh session. It is self-contained.
 
 ---
 
+**CURRENT ·18Oct2026 · effective PO cancellation review slice, LOCAL ONLY.**
+
+Same isolated `forecast-mpr-context` checkout, branch `codex/forecast-mpr-context`; original
+Desktop dirty checkout untouched. All historical claims below are superseded where they differ.
+No migration, production SQL/business write, provider send, real Task save/completion, push or
+deploy in this slice. Foundation0696 was already deployed and MUST NOT be reapplied. Settings
+writer b4eb234d…8053774 remains separately pending; no repeated approval question.
+
+Exact writer draft SHA256 `bc0a271221ca82412e911a311b00ac2220fdc8778dfdd6f4f0103472bcae69aa`.
+Review JSON + exact embedded rollback probe now inventory76 functions/grants,13 source guards,
+default-CLOSED/invalid-scope/no-account controls. Existing RLS/policies/business/settings unchanged;
+new `po_goods_cancellation_events` ledger has only internal Operation/Principal/Finance SELECT,
+no anon/authenticated writes and immutable UPDATE/DELETE/TRUNCATE guard. NEW TABLE RLS IS AN
+EXPLICIT REVIEW ITEM; no production change/approval is inferred. Probe deliberately exits3 at
+PROBE_ROLLBACK, all checks PASS. SQL fixture passes finalROLLBACK. Review integrity checker pins
+exact SQL, probe, fixtures, SC evidence, GP/RS lifecycle JSON, cancellation PDF/JSON and test files.
+
+Effective cancellation uses SAME operation_cancel_po(text,text,jsonb)/HTTPcancel/PO Edit last
+entry, shared kit fields/evidence uploader, current official PO PDF and supplier-send engine.
+Any active qualified Operation/Principal person can record/complete ordinary evidenced agreement
+or inability +explicit no fee; no PO Duty/extra approver vote. Pending unknown facts retain
+coverage. Existing Purchasing Approver handles fee/disagreement/shipping exception; first/latest
+requester self-approval denied. Evidence paths must be actual delivery-orders Storage objects
+under this PO prefix, max20; foreign/missing objects refuse. No hand-typed filename proof.
+
+One immutable ledger derives actual cancelled/pending/active source/recipient quantities.
+Original ordered/received/source qty and approval remain, exact selected incoming Units retire,
+reference history retained. Partial1/full2 merged GP and counted received1+cancel1 of2 pass;
+counted receipt was SQL seeded, NOT actual Receiving UI. Late receipt beyond uncancelled qty and
+retired Unit availability refuse. Ordinary revise/DeliverTo AFTER effective cancellation safely
+refuse until exact active-source mutation contract exists. Old reason-only contextual cancel
+still refuses; legacy-only path retained, NOT claimed globally5.8.1-compliant.
+
+Current cancellation V2/V3 document/send and frozen sentV1 retain their own scopes. Same PDF
+partial/full artifacts under local-test-documents/cancellations were rendered and visually checked.
+Cancellation send Work uses exact event/version, existing embedded PoIssueEvidence, normal PO Duty
+and cover, no invented deadline; old sending does not close current Work. Qualified full-cancelled
+PO retains PDF and Send action. Pending is not an effective cancellation or sent document.
+
+Final local browser→actual signed API→authenticated PG GP5/RS500 lifecycle2/2 PASS:
+partial1→parent2→same MPR residual/full coverage→pending cancel→effective cancel1→currentV3
+ordered2/received0/cancelled1/pending1/MPRremaining1 and actual-register send Work. Actual Storage
+metadata seeded inside outer rollback; no provider byte upload/production PostgREST proof.
+ops_tasks/work_occurrence_events counts unchanged. Artifacts refreshed in existing GP/RS lifecycle
+JSON files. API route/Work/MPR300/300, shared balances167/167 and PO/editor/PDF101/101 PASS.
+Final API/web8GB typechecks PASS, including browser viewport typing and shared PDF
+loading/painter/editor changes.
+PO editor tests verify current paper/send retention, discarded-vs-kept input, unknown fee, failure
+retry same key, fresh-source refusal and existing commercial decision. Native Select adapter in
+isolated state tests is not Radix/whole-page appearance proof. git diff --check PASS.
+
+**Substantive release dependencies, precise scope:**
+1. Finance producer/read contract BUILT LOCAL only: effective immutable event plus scoped money-free
+   GET/:id/cancellations/financeHandoffs names event/PO/version/supplier/source qty/reason/evidence/
+   actual actor/time. Actionable Finance shared Work/handoff CONSUMER NOT DELIVERED. Finance MASTER
+   §5 Open items1 requires agreement with YH before Finance code changes; no human authorisation to
+   message another chat here. No Finance files, Ops-targeted fake task, fake credit note, ordinary
+   FinanceApprover assignment or settlement written. Controller must coordinate this owning consumer.
+2. SC existing procurement-authorised unchanged path preserved, no blanket purpose denial or Decision
+   UUID. Existing Case/progress/Service Note/general approvals evidence is in
+   purchase-request-service-source-evidence.json. Only NEW/CHANGED formal customer remedy needs an
+   exact qualified existing Service approval representation/read contract; not yet verified. No
+   Service implementation or applicant self-certified approval added.
+3. Actual existing PO object/editor browser2/2 now passes canonical procurement entry, keyboard Edit,
+   current painted V3 PDF,1440/390, no horizontal overflow, main-scroll paper reach and dirty keep/discard.
+   Shared painter now exposes loading/actual painted-page state and PO key includes current version.
+   GP/RS screenshots retained in local-test-documents/cancellations. Standalone object fixture is not
+   full Shell/896 boundary, upload-provider save or Receiving acceptance. New workflow SQL approval,
+   governed application and release checks still required; private admission remains CLOSED.
+4. Post-issued merged-source/recipient redistribution editor and mixed-owner counted partial receipt
+   attribution are conditional unsupported branches, not a reason to block ordinary unchanged MPR
+   residual. No guessed provenance, new engine or parallel guide.
+
+Next independent work: upload-provider-local save acceptance and full Shell/896 boundary without
+production contact; coordinate only the owning Finance/SC handoff dependencies. Do not repeat a
+foundation recap, rejection-only cancellation result or Settings question. Exact current package is
+reviewable but neither approved nor production activation-ready. No automatic deployment permitted.
+
 **Latest follow-on ·18Oct2026 · LOCAL, production activation CLOSED.**
 Prior checkpoints `aba2adb33` and `fa7bdbdc6` are local only. Follow-on preserves all work in the same
 `forecast-mpr-context` checkout. Writer exact SHA256

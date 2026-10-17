@@ -839,11 +839,9 @@ begin
  if p_scope->>'purpose'='ready_stock' then return recipients; end if;
  select v into strict approved from jsonb_array_elements(p_scope->'approved_distribution') v where (v->>'demandId')::uuid=p_demand;
  for x in select * from jsonb_array_elements(approved->'recipients') loop
-  select coalesce(sum((rc->>'qty')::integer),0) into prior from public.purchase_request_events e
-   cross join lateral jsonb_array_elements(coalesce(e.changes->'allocations','[]')) a cross join lateral jsonb_array_elements(a->'recipients') rc
-   where e.request_id=p_request and e.kind='po_issued' and (e.changes->>'record_type'='po_issue' or (e.changes->>'record_type'='po_source_change' and e.changes->>'operation'='revise_po'))
-    and exists(select 1 from public.purchase_orders prior_po where prior_po.id=e.changes->>'po_id' and prior_po.status<>'cancelled')
-    and a->>'demand_id'=p_demand::text and rc->>'recipientId'=x->>'recipientId';
+  select coalesce(sum((rc->>'qty')::integer),0) into prior
+   from public.purchase_orders po cross join lateral jsonb_array_elements(public._purchasing_po_issued_recipients(po.id,p_demand)) rc
+   where po.status<>'cancelled' and rc->>'recipientId'=x->>'recipientId';
   cap:=(x->>'qty')::integer-prior;
   if cap<0 then raise exception 'issued recipient coverage changed' using errcode='22023',detail='request_po_coverage_changed'; end if;
   if cap>0 then recipients:=recipients||jsonb_build_array(jsonb_build_object('recipientId',x->>'recipientId','qty',cap)); end if;
@@ -899,7 +897,7 @@ begin
    if exists(select 1 from public.purchase_order_lines pl join public.purchase_orders po on po.id=pl.po_id cross join lateral public._purchasing_po_request_sources(pl.id) src where src.demand_id=d.id and po.status<>'cancelled'
     and (pl.sku is distinct from d.sku or nullif(pl.attrs,'{}'::jsonb) is distinct from nullif(d.attrs,'{}'::jsonb) or po.supplier_id is distinct from d.supplier_id
       or not public._purchasing_context_po_destination_matches(d.id,pl.id,coalesce(pl.destination_id,po.destination_id)) or po.purpose is distinct from d.purpose)) then raise exception 'PO no longer matches its approved demand' using errcode='22023',detail='request_po_coverage_changed'; end if;
-   select coalesce(sum(src.qty),0) into issued from public.purchase_order_lines pl join public.purchase_orders po on po.id=pl.po_id cross join lateral public._purchasing_po_request_sources(pl.id) src where src.demand_id=d.id and po.status<>'cancelled';
+   select coalesce(sum(src.qty),0) into issued from public.purchase_order_lines pl join public.purchase_orders po on po.id=pl.po_id cross join lateral public._purchasing_po_request_active_sources(pl.id) src where src.demand_id=d.id and po.status<>'cancelled';
    if issued<>d.issued_qty or issued>d.approved_qty then raise exception 'PO quantity differs from request coverage' using errcode='22023',detail='request_po_coverage_changed'; end if;
   end if;
   rows:=rows||jsonb_build_array(jsonb_build_object('demand_id',d.id,'kind',d.fulfilment_kind,'approved_qty',d.approved_qty,'stock_qty',held,'issued_qty',issued,
@@ -3897,6 +3895,8 @@ declare
   v_context_moves jsonb:='[]';
 begin
   v_role := public.purchasing_supplier_call_gate();
+  if exists(select 1 from public.purchase_order_lines cl where cl.po_id=p_po_id and public._purchasing_po_line_cancelled_qty(cl.id)>0) then
+   raise exception 'Post-cancellation movement requires exact active sources' using errcode='22023',detail='request_source_allocation_required'; end if;
   v_uid  := auth.uid();
   -- Same source-key/root order as context issue; NOWAIT never deadlocks with it.
   perform public._purchasing_context_source_locks(array(select distinct sku from public.purchase_order_lines where po_id=p_po_id));
@@ -4381,6 +4381,9 @@ begin
       using errcode = '22023', detail = 'po_not_open';
   end if;
 
+  if exists(select 1 from public.purchase_order_lines l where l.po_id=p_po_id and public._purchasing_po_line_cancelled_qty(l.id)>0) then
+   raise exception 'Post-cancellation quantity revision needs its exact active source scope' using errcode='22023',detail='request_source_allocation_required'; end if;
+
   -- ── PASS 1 · validate everything and collect the intended updates.
   --    THE FLOOR SPEAKS BEFORE ANY WRITE (2990s' discipline): a violation on
   --    line 3 must leave lines 1 and 2 untouched.
@@ -4712,3 +4715,833 @@ end;
 $function$;
 revoke all on function public.purchasing_revise_po(text,text,jsonb) from public,anon;
 grant execute on function public.purchasing_revise_po(text,text,jsonb) to authenticated;
+-- §5.8.1: one append-only occurrence ledger on the existing PO cancellation door.
+-- No legacy transaction backfill, no money/settlement, no new Receiving/Service form.
+create table if not exists public.po_goods_cancellation_events (
+ id uuid primary key, request_id uuid not null, request_version integer not null check(request_version>0),
+ po_id text not null references public.purchase_orders(id), expected_po_version integer not null,
+ kind text not null check(kind in('pending','exception_approved','exception_refused','effective')),
+ reason text not null, decision_reason text, scope jsonb not null, supplier_facts jsonb not null,
+ actor_id uuid not null references public.app_users(id), at timestamptz not null default clock_timestamp(),
+ command jsonb not null, applied_po_version integer,
+ unique(request_id,request_version),
+ check((kind='effective')=(applied_po_version is not null))
+);
+create index if not exists po_goods_cancellation_events_po_idx on public.po_goods_cancellation_events(po_id,kind);
+alter table public.po_goods_cancellation_events enable row level security;
+revoke all on public.po_goods_cancellation_events from public,anon,authenticated;
+grant select on public.po_goods_cancellation_events to authenticated;
+drop policy if exists po_goods_cancellation_events_read on public.po_goods_cancellation_events;
+create policy po_goods_cancellation_events_read on public.po_goods_cancellation_events for select to authenticated
+ using((select public.app_role()) in ('operation','principal','finance'));
+create or replace function public._purchasing_cancellation_immutable()
+returns trigger language plpgsql set search_path=public,pg_temp as $immutable$
+begin raise exception 'Cancellation history is immutable' using errcode='55000'; end;
+$immutable$;
+revoke all on function public._purchasing_cancellation_immutable() from public,anon,authenticated;
+drop trigger if exists po_goods_cancellation_events_immutable on public.po_goods_cancellation_events;
+create trigger po_goods_cancellation_events_immutable before update or delete or truncate on public.po_goods_cancellation_events
+ for each statement execute function public._purchasing_cancellation_immutable();
+
+-- ONE cancelled/outstanding arithmetic. Original line/source quantities never change.
+create or replace function public._purchasing_po_line_cancelled_qty(p_line uuid)
+returns integer language sql stable set search_path=public,pg_temp as $cancelled_qty$
+ select coalesce(sum((l->>'qty')::integer),0)::integer from public.po_goods_cancellation_events e
+ cross join lateral jsonb_array_elements(e.scope) l where e.kind='effective' and l->>'lineId'=p_line::text;
+$cancelled_qty$;
+revoke all on function public._purchasing_po_line_cancelled_qty(uuid) from public,anon,authenticated;
+create or replace function public._purchasing_po_demand_cancelled_qty(p_line uuid,p_demand uuid)
+returns integer language sql stable set search_path=public,pg_temp as $cancelled_source$
+ select coalesce(sum((s->>'qty')::integer),0)::integer from public.po_goods_cancellation_events e
+ cross join lateral jsonb_array_elements(e.scope) l cross join lateral jsonb_array_elements(l->'sources') s
+ where e.kind='effective' and l->>'lineId'=p_line::text and s->>'demandId'=p_demand::text;
+$cancelled_source$;
+revoke all on function public._purchasing_po_demand_cancelled_qty(uuid,uuid) from public,anon,authenticated;
+create or replace function public._purchasing_po_request_active_sources(p_line uuid)
+returns table(source_id uuid,demand_id uuid,qty integer) language sql stable set search_path=public,pg_temp as $active_sources$
+ select s.source_id,s.demand_id,s.qty-public._purchasing_po_demand_cancelled_qty(p_line,s.demand_id) from public._purchasing_po_request_sources(p_line) s;
+$active_sources$;
+revoke all on function public._purchasing_po_request_active_sources(uuid) from public,anon,authenticated;
+
+create or replace function public._purchasing_po_issued_recipients(p_po text,p_demand uuid)
+returns jsonb language sql stable set search_path=public,pg_temp as $po_recipients$
+ with quantities as (
+ select rc->>'recipientId' id,(rc->>'qty')::integer qty from public.purchase_request_events e
+ cross join lateral jsonb_array_elements(coalesce(e.changes->'allocations','[]')) a
+ cross join lateral jsonb_array_elements(a->'recipients') rc
+ where e.kind='po_issued' and e.changes->>'po_id'=p_po and a->>'demand_id'=p_demand::text
+ and (e.changes->>'record_type'='po_issue' or (e.changes->>'record_type'='po_source_change' and e.changes->>'operation'='revise_po'))
+ union all
+ select rc->>'recipientId',-(rc->>'qty')::integer from public.po_goods_cancellation_events e
+ cross join lateral jsonb_array_elements(e.scope) l cross join lateral jsonb_array_elements(l->'sources') s
+ cross join lateral jsonb_array_elements(s->'recipients') rc where e.po_id=p_po and e.kind='effective' and s->>'demandId'=p_demand::text
+ ), totals as(select id,sum(qty)::integer qty from quantities group by id)
+ select coalesce(jsonb_agg(jsonb_build_object('recipientId',id,'qty',qty) order by id) filter(where qty>0),'[]'::jsonb) from totals;
+$po_recipients$;
+revoke all on function public._purchasing_po_issued_recipients(text,uuid) from public,anon,authenticated;
+
+create or replace function public.purchasing_po_cancellation_facts(p_po_id text)
+returns jsonb language plpgsql security definer set search_path=public,pg_temp as $read_cancel$
+begin
+ if public.app_role() is null or public.app_role() not in('operation','principal','finance') then raise exception 'not permitted' using errcode='42501'; end if;
+ if not exists(select 1 from public.purchase_orders where id=p_po_id) then raise exception 'PO not found' using errcode='22023',detail='po_not_found'; end if;
+ return jsonb_build_object('poVersion',(select version from public.purchase_orders where id=p_po_id),'actorId',auth.uid(),'canDecideException',coalesce(public.app_role()='principal' and public.workspace_is_person(auth.uid()) and (public.workspace_resolve_duty('purchasing_approver')->>'actor_user_id')::uuid=auth.uid(),false),'lines',coalesce((select jsonb_agg(jsonb_build_object('lineId',l.id,'identityMode',l.identity_mode,'sku',l.sku,'orderedQty',l.qty,'receivedQty',l.received_qty,
+  'cancelledQty',public._purchasing_po_line_cancelled_qty(l.id),'pendingQty',public._purchasing_po_line_pending_qty(l.id),
+  'sources',(select coalesce(jsonb_agg(jsonb_build_object('demandId',s.demand_id,'requestId',(select request_id from public.purchase_demands where id=s.demand_id),'requestNo',(select r.req_no from public.purchase_requests r join public.purchase_demands d on d.request_id=r.id where d.id=s.demand_id),'contextual',(select r.request_version>0 from public.purchase_requests r join public.purchase_demands d on d.request_id=r.id where d.id=s.demand_id),'purpose',(select purpose from public.purchase_demands where id=s.demand_id),'unitChoices',case when public.app_role()='finance' then '[]'::jsonb else (select coalesce(jsonb_agg(jsonb_build_object('id',i.id,'unitCode',i.unit_code,'status',i.status) order by i.unit_code),'[]') from public.ops_stock_items i where i.po_line_id=l.id and public._purchasing_context_unit_demand(i.id)=s.demand_id) end,'recipients',case when public.app_role()='finance' then '[]'::jsonb else (select coalesce(jsonb_agg(rc||jsonb_build_object('name',(select c->>'name' from public.purchase_requests r cross join lateral jsonb_array_elements(r.request_context->'recipients') c where r.id=d.request_id and c->>'id'=rc->>'recipientId'))),'[]') from public.purchase_demands d cross join lateral jsonb_array_elements(public._purchasing_po_issued_recipients(p_po_id,s.demand_id)) rc where d.id=s.demand_id) end,'orderedQty',s.qty,'cancelledQty',public._purchasing_po_demand_cancelled_qty(l.id,s.demand_id),'activeQty',s.qty-public._purchasing_po_demand_cancelled_qty(l.id,s.demand_id))),'[]') from public._purchasing_po_request_sources(l.id) s)) order by l.id) from public.purchase_order_lines l where l.po_id=p_po_id),'[]'),
+  'events',coalesce((select jsonb_agg(to_jsonb(e)-'command' order by e.at,e.id) from public.po_goods_cancellation_events e where e.po_id=p_po_id),'[]'),
+  'financeHandoffs',coalesce((select jsonb_agg(jsonb_build_object('id',e.id,'poId',e.po_id,'poVersion',e.applied_po_version,'supplierId',(select supplier_id from public.purchase_orders where id=e.po_id),'sourceType','po_cancellation','ownerModule','finance','state','needs_finance_review','at',e.at,'actorId',e.actor_id,'lines',e.scope,'reason',e.reason,'evidence',e.supplier_facts->'evidence','result','effective_cancellation_requires_finance_follow_up') order by e.at) from public.po_goods_cancellation_events e where e.po_id=p_po_id and e.kind='effective'),'[]'));
+end;
+$read_cancel$;
+revoke all on function public.purchasing_po_cancellation_facts(text) from public,anon;
+grant execute on function public.purchasing_po_cancellation_facts(text) to authenticated;
+
+-- Qualified form of the SAME cancellation action. Existing reason-only signature
+-- is not evidence. Pending requests never change procurement/receipt/Unit coverage.
+create or replace function public.operation_cancel_po(p_po_id text,p_reason text,p_cancellation jsonb)
+returns jsonb language plpgsql security definer set search_path=public,pg_temp as $effective_cancel$
+#variable_conflict use_column
+declare who jsonb; po public.purchase_orders%rowtype; prior public.po_goods_cancellation_events%rowtype; replay public.po_goods_cancellation_events%rowtype;
+ command jsonb:=jsonb_build_object('poId',p_po_id,'reason',p_reason,'cancellation',p_cancellation);
+ action text; facts jsonb; scope jsonb; line jsonb; src jsonb; rc jsonb; rec record; pl public.purchase_order_lines%rowtype;
+ d public.purchase_demands%rowtype; request public.purchase_requests%rowtype; key uuid; v_request_id uuid; version integer;
+ quantity integer; total integer; n integer; existing integer; units uuid[]:='{}'; selected_units uuid[]:='{}'; item uuid;
+ ordinary boolean; exceptional boolean; kind text; actor uuid:=auth.uid(); role public.app_role; request_actor uuid;
+ v_snapshot jsonb; next_po_version integer; request_uuid uuid; decision text; existing_kind text;
+begin
+ perform public._purchasing_context_writer_admission();
+ who:=public.purchasing_supplier_reply_actor();
+ if (who->>'allowed')::boolean is not true or not public.workspace_is_person(auth.uid()) then raise exception 'active authorised staff required' using errcode='42501'; end if;
+ role:=public.app_role();
+ if coalesce(p_reason,'') !~ '[^[:space:]]' then raise exception 'reason required' using errcode='22023',detail='reason_required'; end if;
+ perform public._purchasing_context_object(p_cancellation,'{"action":"string","key":"string","requestId":"string","expectedRequestVersion":"number","expectedPoVersion":"number","lines":"array","supplierFacts":"object","decisionReason":"string"}');
+ key:=(p_cancellation->>'key')::uuid;v_request_id:=(p_cancellation->>'requestId')::uuid;action:=p_cancellation->>'action';
+ if action not in('record','complete','approve_exception','refuse_exception') then raise exception 'unknown cancellation action' using errcode='22023',detail='invalid_param'; end if;
+ if not pg_try_advisory_xact_lock(hashtextextended('purchasing.cancellation:'||v_request_id::text,0)) then raise exception 'cancellation changed' using errcode='40001',detail='request_coverage_changed'; end if;
+ select * into replay from public.po_goods_cancellation_events where id=key;
+ if found then
+  if replay.command is distinct from command then raise exception 'cancellation key reused' using errcode='22023',detail='request_key_changed'; end if;
+  return jsonb_build_object('id',replay.id,'requestVersion',replay.request_version,'state',replay.kind,'poVersion',replay.applied_po_version,'replayed',true);
+ end if;
+ perform public._purchasing_context_source_locks(array(select distinct sku from public.purchase_order_lines where po_id=p_po_id));
+ for request_uuid in select distinct d.request_id from public.purchase_order_lines l cross join lateral public._purchasing_po_request_sources(l.id) s join public.purchase_demands d on d.id=s.demand_id where l.po_id=p_po_id order by 1 loop
+  perform 1 from public.purchase_requests where id=request_uuid for update nowait;
+ end loop;
+ select * into po from public.purchase_orders where id=p_po_id for update;
+ if not found then raise exception 'PO not found' using errcode='22023',detail='po_not_found'; end if;
+ if po.status<>'open' or po.version is distinct from (p_cancellation->>'expectedPoVersion')::integer then raise exception 'current open PO version required' using errcode='40001',detail='stale_po_version'; end if;
+ select * into prior from public.po_goods_cancellation_events e where e.request_id=v_request_id order by request_version desc limit 1;
+ if prior.id is not null and (prior.po_id<>p_po_id or prior.kind='effective') then raise exception 'cancellation already effective or foreign' using errcode='22023',detail='cancellation_scope_changed'; end if;
+ if coalesce(prior.request_version,0)<>(p_cancellation->>'expectedRequestVersion')::integer then raise exception 'cancellation changed' using errcode='40001',detail='cancellation_scope_changed'; end if;
+ version:=coalesce(prior.request_version,0)+1;scope:=p_cancellation->'lines';facts:=p_cancellation->'supplierFacts';
+ perform public._purchasing_context_object(facts,'{"supplierStatement":"string","fee":"string","shipped":"boolean|null","evidence":"array"}');
+ if facts->>'supplierStatement' not in('awaiting','agreed','unable_to_supply','disagreed') or facts->>'fee' not in('yes','no','not_confirmed')
+  or exists(select 1 from jsonb_array_elements(facts->'evidence') x where jsonb_typeof(x)<>'string' or btrim(x#>>'{}')='') then raise exception 'invalid supplier facts' using errcode='22023',detail='invalid_param'; end if;
+ if jsonb_array_length(facts->'evidence')>20 or exists(select 1 from jsonb_array_elements_text(facts->'evidence') path where length(path)>2000 or left(path,length(p_po_id)+1) is distinct from p_po_id||'/' or not exists(select 1 from storage.objects where bucket_id='delivery-orders' and name=path)) then
+  raise exception 'Use uploaded supplier evidence belonging to this PO' using errcode='22023',detail='reply_evidence_required'; end if;
+ if jsonb_array_length(scope)=0 or jsonb_array_length(scope)<>(select count(distinct x->>'lineId') from jsonb_array_elements(scope) x) then raise exception 'exact cancellation lines required' using errcode='22023',detail='invalid_param'; end if;
+ -- Validate ALL affected facts before recording an event or changing a Unit.
+ for line in select * from jsonb_array_elements(scope) loop
+  perform public._purchasing_context_object(line,'{"lineId":"string","qty":"number","receivedQty":"number","unitIds":"array","sources":"array"}');
+  select * into pl from public.purchase_order_lines where id=(line->>'lineId')::uuid and po_id=p_po_id for update;
+  quantity:=(line->>'qty')::integer;
+  if not found or quantity<1 or pl.received_qty is distinct from (line->>'receivedQty')::integer
+   or quantity>public._purchasing_po_line_pending_qty(pl.id) then raise exception 'outstanding receipt scope changed' using errcode='40001',detail='cancellation_receipt_changed'; end if;
+  if jsonb_array_length(line->'sources')=0 or jsonb_array_length(line->'sources')<>(select count(distinct x->>'demandId') from jsonb_array_elements(line->'sources') x)
+   or exists(select 1 from public.po_line_sources where po_line_id=pl.id and order_id is not null) then raise exception 'exact MPR source scope required' using errcode='22023',detail='request_source_allocation_required'; end if;
+  total:=0;selected_units:='{}';
+  for src in select * from jsonb_array_elements(line->'sources') loop
+   perform public._purchasing_context_object(src,'{"demandId":"string","qty":"number","recipients":"array"}');
+   select pd.* into d from public.purchase_demands pd where pd.id=(src->>'demandId')::uuid for update;
+   if not found or not exists(select 1 from public._purchasing_po_request_active_sources(pl.id) s where s.demand_id=d.id and s.qty>=(src->>'qty')::integer)
+    or (src->>'qty')::integer<1 then raise exception 'source commitment changed' using errcode='40001',detail='request_po_coverage_changed'; end if;
+   select * into strict request from public.purchase_requests where id=d.request_id;
+   if request.request_version<1 then raise exception 'qualified contextual source required' using errcode='22023',detail='request_source_allocation_required'; end if;
+   total:=total+(src->>'qty')::integer;
+   if request.purpose='ready_stock' then
+    if src->'recipients'<>'[]'::jsonb then raise exception 'RS has no final recipient' using errcode='22023',detail='invalid_issue_distribution'; end if;
+   elsif (select coalesce(sum((rc->>'qty')::integer),0) from jsonb_array_elements(src->'recipients') rc)<>(src->>'qty')::integer
+    or jsonb_array_length(src->'recipients')<>(select count(distinct rc->>'recipientId') from jsonb_array_elements(src->'recipients') rc) then raise exception 'exact cancelled recipients required' using errcode='22023',detail='invalid_issue_distribution'; end if;
+   for rc in select * from jsonb_array_elements(src->'recipients') loop
+    perform public._purchasing_context_object(rc,'{"recipientId":"string","qty":"number"}');
+    if (rc->>'qty')::integer<1 then raise exception 'invalid cancelled recipient' using errcode='22023',detail='invalid_issue_distribution'; end if;
+   end loop;
+   if pl.identity_mode='exact_unit' then
+    select coalesce(array_agg(i.id order by i.id),'{}') into selected_units from public.ops_stock_items i where i.id in(select x::uuid from jsonb_array_elements_text(line->'unitIds') x)
+     and i.po_line_id=pl.id and i.status='incoming' and public._purchasing_context_unit_demand(i.id)=d.id;
+    if cardinality(selected_units)<>(src->>'qty')::integer then raise exception 'selected Units are not unreceived source Units' using errcode='40001',detail='cancellation_unit_changed'; end if;
+   elsif pl.identity_mode='quantity' then
+    if line->'unitIds'<>'[]'::jsonb then raise exception 'counted goods have no Unit IDs' using errcode='22023',detail='invalid_param'; end if;
+    if pl.received_qty>0 and (select count(*) from public._purchasing_po_request_sources(pl.id))<>1 then raise exception 'received counted source attribution required' using errcode='22023',detail='request_source_receipt_scope_required'; end if;
+   else raise exception 'identity mode unavailable' using errcode='22023',detail='catalog_identity_mode_missing'; end if;
+  end loop;
+  if total<>quantity then raise exception 'source total differs from cancellation' using errcode='22023',detail='request_source_allocation_required'; end if;
+  if pl.identity_mode='exact_unit' then
+   if jsonb_array_length(line->'unitIds')<>quantity or jsonb_array_length(line->'unitIds')<>(select count(distinct x) from jsonb_array_elements_text(line->'unitIds') x) then raise exception 'exact selected Units required' using errcode='22023',detail='cancellation_unit_changed'; end if;
+   for item in select x::uuid from jsonb_array_elements_text(line->'unitIds') x order by 1 loop
+    perform 1 from public.ops_stock_items where id=item and status='incoming' for update nowait;
+    if not found then raise exception 'selected Unit receipt changed' using errcode='40001',detail='cancellation_unit_changed'; end if;
+    units:=array_append(units,item);
+   end loop;
+  end if;
+ end loop;
+ for rec in select s->>'demandId' demand_id,rc->>'recipientId' recipient_id,sum((rc->>'qty')::integer) qty from jsonb_array_elements(scope) l cross join lateral jsonb_array_elements(l->'sources') s cross join lateral jsonb_array_elements(s->'recipients') rc group by 1,2 loop
+  if not exists(select 1 from jsonb_array_elements(public._purchasing_po_issued_recipients(p_po_id,rec.demand_id::uuid)) rc where rc->>'recipientId'=rec.recipient_id and (rc->>'qty')::integer>=rec.qty) then raise exception 'recipient cancellation exceeds this PO coverage' using errcode='22023',detail='invalid_issue_distribution'; end if;
+ end loop;
+ -- Canonical sets keep equivalent reviewed source order from becoming a
+ -- different commercial scope; object key order is already canonical JSONB.
+ select jsonb_agg(jsonb_set(jsonb_set(l,'{unitIds}',(select coalesce(jsonb_agg(u order by u),'[]') from jsonb_array_elements(l->'unitIds') u)),'{sources}',(select jsonb_agg(jsonb_set(src,'{recipients}',(select coalesce(jsonb_agg(rc order by rc->>'recipientId'),'[]') from jsonb_array_elements(src->'recipients') rc)) order by src->>'demandId') from jsonb_array_elements(l->'sources') src)) order by l->>'lineId') into scope from jsonb_array_elements(scope) l;
+ ordinary:=facts->>'supplierStatement' in('agreed','unable_to_supply') and facts->>'fee'='no' and facts->'shipped'='false'::jsonb and jsonb_array_length(facts->'evidence')>0;
+ exceptional:=facts->>'supplierStatement'='disagreed' or facts->>'fee'='yes' or facts->'shipped'='true'::jsonb;
+ kind:='pending';
+ if action in('approve_exception','refuse_exception') then
+  perform public.purchasing_approver_gate();
+  select actor_id into request_actor from public.po_goods_cancellation_events e where e.request_id=v_request_id order by request_version limit 1;
+  if prior.id is null or prior.kind<>'pending' or not exceptional or prior.scope is distinct from scope or prior.supplier_facts is distinct from facts or prior.reason is distinct from p_reason then raise exception 'exact pending exception required' using errcode='22023',detail='cancellation_scope_changed'; end if;
+  if actor=request_actor or actor=prior.actor_id then raise exception 'requester cannot approve own exception' using errcode='42501',detail='own_request'; end if;
+  if btrim(p_cancellation->>'decisionReason')='' then raise exception 'decision reason required' using errcode='22023',detail='reason_required'; end if;
+  if action='approve_exception' and (jsonb_array_length(facts->'evidence')=0 or facts->>'fee'='not_confirmed' or facts->>'supplierStatement'='awaiting') then raise exception 'exception evidence is incomplete' using errcode='22023',detail='cancellation_not_effective'; end if;
+  kind:=case when action='approve_exception' then 'exception_approved' else 'exception_refused' end;
+ elsif action='complete' then
+  if not ordinary and not (exceptional and prior.kind='exception_approved' and prior.scope=scope and prior.supplier_facts=facts and prior.reason=p_reason and prior.expected_po_version=po.version
+    and facts->>'fee'<>'not_confirmed' and facts->>'supplierStatement'<>'awaiting' and jsonb_array_length(facts->'evidence')>0) then
+   raise exception 'Supplier facts or qualified commercial decision are incomplete' using errcode='22023',detail='cancellation_not_effective'; end if;
+  kind:='effective';next_po_version:=po.version+1;
+ end if;
+ insert into public.po_goods_cancellation_events(id,request_id,request_version,po_id,expected_po_version,kind,reason,decision_reason,scope,supplier_facts,actor_id,command,applied_po_version)
+ values(key,v_request_id,version,p_po_id,po.version,kind,p_reason,nullif(btrim(p_cancellation->>'decisionReason'),''),scope,facts,actor,command,next_po_version);
+ if kind='effective' then
+  select jsonb_build_object('eta_date',po.eta_date,'destination_id',po.destination_id,'lines',(select jsonb_agg(jsonb_build_object('sku',l.sku,'qty',l.qty,'destination_id',l.destination_id,'cancelled_qty',public._purchasing_po_line_cancelled_qty(l.id)-coalesce((select (x->>'qty')::integer from jsonb_array_elements(scope) x where x->>'lineId'=l.id::text),0)) order by l.sku,l.id) from public.purchase_order_lines l where po_id=p_po_id)) into v_snapshot;
+  insert into public.po_revisions(po_id,rev_no,snapshot,reason,created_by) select p_po_id,coalesce(max(rev_no),0)+1,v_snapshot,p_reason,actor from public.po_revisions where po_id=p_po_id;
+  update public.ops_stock_items set status='voided',updated_at=now() where id=any(units);
+  for rec in select distinct (s->>'demandId')::uuid id from jsonb_array_elements(scope) l cross join lateral jsonb_array_elements(l->'sources') s loop
+   update public.purchase_demands pd set issued_qty=(select coalesce(sum(s.qty),0) from public.purchase_order_lines l join public.purchase_orders p on p.id=l.po_id cross join lateral public._purchasing_po_request_active_sources(l.id) s where s.demand_id=pd.id and p.status<>'cancelled') where pd.id=rec.id;
+  end loop;
+  update public.purchase_orders set version=next_po_version,revised_at=now(),updated_at=now(),status=case
+   when not exists(select 1 from public.purchase_order_lines l where l.po_id=p_po_id and public._purchasing_po_line_pending_qty(l.id)>0)
+     and not exists(select 1 from public.purchase_order_lines l where l.po_id=p_po_id and l.received_qty>0) then 'cancelled' else status end where id=p_po_id;
+ end if;
+ insert into public.po_history(po_id,text,by_role,by_user_id) values(p_po_id,format('Cancellation %s · %s · %s',kind,v_request_id,p_reason),role,actor);
+ insert into public.audit_log(role,actor_text,action,ref) values(role,(select name from public.app_users where id=actor),format('PO cancellation %s · %s',v_request_id,kind),p_po_id);
+ return jsonb_build_object('id',key,'requestVersion',version,'state',kind,'poVersion',next_po_version,'replayed',false);
+exception when lock_not_available then raise exception 'This work changed. Refresh and try again.' using errcode='40001',detail='cancellation_receipt_changed';
+end;
+$effective_cancel$;
+revoke all on function public.operation_cancel_po(text,text,jsonb) from public,anon;
+grant execute on function public.operation_cancel_po(text,text,jsonb) to authenticated;
+
+CREATE OR REPLACE FUNCTION public.purchasing_po_line_free_units(p_po_line_id uuid)
+ RETURNS integer
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  select case
+    when pl.id is null or po.status is distinct from 'open' then 0
+    -- A Manual Purchase line buys for that request; only a recorded
+    -- `additional_stock` request leaves its goods for anyone.
+    when pl.purchase_request_id is not null
+         and (select r.fulfilment_intent from purchase_requests r
+               where r.id = pl.purchase_request_id) is distinct from 'additional_stock'
+      then 0
+    when exists(select 1 from public.purchase_demands d join public.purchase_requests r on r.id=d.request_id
+      where d.id=pl.demand_id and r.fulfilment_intent is distinct from 'additional_stock')
+      or exists(select 1 from public.po_line_sources s join public.purchase_demands d on d.id=s.purchase_demand_id join public.purchase_requests r on r.id=d.request_id
+        where s.po_line_id=pl.id and r.fulfilment_intent is distinct from 'additional_stock') then 0
+    when pl.identity_mode='quantity' then greatest(0,pl.qty-public._purchasing_po_line_cancelled_qty(pl.id)-coalesce(pl.received_qty,0)-greatest(0,
+      coalesce((select sum(s.qty)::integer from public.po_line_sources s where s.po_line_id=pl.id and s.order_id is not null),0)-coalesce(pl.received_qty,0)))
+    else greatest(0,
+      (select count(*)::int
+         from ops_stock_items i
+        where i.po_line_id = pl.id
+          and i.status = 'incoming'
+          and coalesce(i.identity_scope, 'unit') = 'unit'
+          and i.reserved_order_line_id is null
+          and i.reserved_purchase_demand_id is null)
+      -- Customer lineage still waiting: what the line was raised for, less
+      -- what has already arrived (a receipt answers its customers first).
+      - greatest(0,
+          coalesce((select sum(greatest(0, s.qty))::int
+                      from po_line_sources s
+                     where s.po_line_id = pl.id and s.order_id is not null), 0)
+          - coalesce(pl.received_qty, 0)))
+  end
+  from (select p_po_line_id as id) k
+  left join purchase_order_lines pl on pl.id = k.id
+  left join purchase_orders po on po.id = pl.po_id;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.purchasing_po_document(p_po_id text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  v_role     app_role;
+  v_po       purchase_orders;
+  v_dest     purchasing_destinations;
+  v_sup      suppliers;
+  v_address  text;
+  v_sup_addr text;
+  v_lines    jsonb;
+  v_issuer   text;
+  v_missing_destination_name text;
+begin
+  v_role := public.app_role();
+  if v_role is null or v_role not in ('operation', 'principal') then
+    raise exception 'forbidden: only operation or principal can export a PO document'
+      using errcode = '42501', detail = 'forbidden';
+  end if;
+
+  select * into v_po from purchase_orders where id = p_po_id;
+  if not found then
+    raise exception 'PO % not found', p_po_id
+      using errcode = '42P01', detail = 'po_not_found';
+  end if;
+
+  if v_po.status = 'cancelled' and not exists(select 1 from public.po_goods_cancellation_events where po_id=p_po_id and kind='effective' and applied_po_version=v_po.version) then
+    raise exception 'PO % is cancelled and cannot be exported', p_po_id
+      using errcode = 'P0001', detail = 'po_not_printable';
+  end if;
+
+  select * into v_dest from purchasing_destinations where id = v_po.destination_id;
+  select * into v_sup from suppliers where id = v_po.supplier_id;
+
+  if v_dest.warehouse_id is not null then
+    select address into v_address from warehouses where id = v_dest.warehouse_id;
+  else
+    v_address := v_dest.address;
+  end if;
+
+  if v_address is null or coalesce(v_address, '') !~ '[^[:space:]]' then
+    raise exception 'no address on file for %', v_dest.name
+      using errcode = 'P0001', detail = 'destination_address_missing';
+  end if;
+
+  -- One PO may carry several destinations. Every line must still resolve to a
+  -- real printable address before the formal document can leave Carres.
+  select coalesce(d.name, 'the recorded Deliver To')
+    into v_missing_destination_name
+    from purchase_order_lines l
+    left join purchasing_destinations d
+      on d.id = coalesce(l.destination_id, v_po.destination_id)
+    left join warehouses w on w.id = d.warehouse_id
+   where l.po_id = p_po_id
+     and nullif(btrim(case when d.warehouse_id is not null then w.address else d.address end), '') is null
+   limit 1;
+
+  if found then
+    raise exception 'no address on file for %', v_missing_destination_name
+      using errcode = 'P0001', detail = 'destination_address_missing';
+  end if;
+
+  v_sup_addr := nullif(btrim(coalesce(v_sup.address, '')), '');
+
+  -- audit_log's one timestamp is `occurred_at` (0001). This was incorrectly
+  -- spelled `created_at` in 0383, making every document call fail before any
+  -- payload could be returned.
+  select actor_text into v_issuer
+    from audit_log
+   where ref = p_po_id and action like 'Created PO %'
+   order by occurred_at asc
+   limit 1;
+
+  select coalesce(jsonb_agg(x order by x->>'sku'), '[]'::jsonb) into v_lines
+    from (
+      select jsonb_build_object(
+               'sku',         l.sku,
+               'description', coalesce(ps.variant, l.sku),
+               'qty',         l.qty,
+               'cancelled_qty',public._purchasing_po_line_cancelled_qty(l.id),
+               'cancelled_unit_codes',(select coalesce(jsonb_agg(i.unit_code order by i.unit_code),'[]') from public.ops_stock_items i where i.po_line_id=l.id and exists(select 1 from public.po_goods_cancellation_events ce cross join lateral jsonb_array_elements(ce.scope) cl where ce.kind='effective' and cl->>'lineId'=l.id::text and cl->'unitIds' @> jsonb_build_array(i.id))),
+               'received_qty',l.received_qty,
+               'pending_qty',greatest(0,l.qty-l.received_qty-public._purchasing_po_line_cancelled_qty(l.id)),
+               'unit',        'pc',
+               'destination', (
+                 select jsonb_build_object(
+                          'name', d.name,
+                          'address', case when d.warehouse_id is not null then w.address else d.address end
+                        )
+                   from purchasing_destinations d
+                   left join warehouses w on w.id = d.warehouse_id
+                  where d.id = coalesce(l.destination_id, v_po.destination_id)
+               ),
+               'attrs',       (
+                 select coalesce(jsonb_object_agg(k, v), '{}'::jsonb)
+                   from jsonb_each(coalesce(l.attrs, '{}'::jsonb)) as e(k, v)
+                  where k in ('color', 'gap', 'fabric_name')
+               ),
+               -- 0443 · the Units THIS LINE was born with, by immutable line
+               -- binding — never `(po_no, sku)`. Retired (voided) Units of a
+               -- reduced revision stay off the current paper; a quantity
+               -- line prints none because it has none.
+               'identity_mode', l.identity_mode,
+               'unit_codes', (
+                 select coalesce(jsonb_agg(si.unit_code order by si.unit_code), '[]'::jsonb)
+                   from ops_stock_items si
+                  where si.po_line_id = l.id
+                    and si.identity_scope = 'unit'
+                    and si.status <> 'voided'
+               ),
+               'sources', (
+                 select coalesce(
+                          jsonb_agg(jsonb_build_object('so', s.so, 'qty', s.qty)
+                                    order by s.so nulls last),
+                          '[]'::jsonb)
+                   from po_line_sources s
+                  where s.po_line_id = l.id
+               )
+             ) as x
+        from purchase_order_lines l
+        left join product_skus ps on ps.sku = l.sku
+       where l.po_id = p_po_id
+    ) s;
+
+  return jsonb_build_object(
+    'po_number',   v_po.id,
+    'po_id',       v_po.id,
+    'version',     coalesce(v_po.version, 1),
+    'issue_date',  to_char(coalesce(v_po.placed_at, now()), 'YYYY-MM-DD'),
+    'supplier', jsonb_build_object(
+      'name',    coalesce(v_sup.name, 'Supplier'),
+      'address', v_sup_addr,
+      'contact', v_sup.contact
+    ),
+    'destination', jsonb_build_object(
+      'name',    v_dest.name,
+      'address', v_address
+    ),
+    'delivery_instructions', nullif(btrim(coalesce(v_po.delivery_instructions, '')), ''),
+    'eta_date',    v_po.official_delivery_date,
+    'so_refs',     to_jsonb(coalesce(v_po.so_refs, array[]::int[])),
+    'issued_by',   v_issuer,
+    'lines',       v_lines,
+    'terms',       null
+  );
+end;
+$function$
+;
+revoke all on function public.purchasing_po_document(text) from public,anon;
+grant execute on function public.purchasing_po_document(text) to authenticated;
+
+CREATE OR REPLACE FUNCTION public.purchasing_confirm_po_sent(p_po_id text, p_expected_version integer, p_channel text, p_recipient text, p_note text DEFAULT NULL::text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_actor uuid := auth.uid();
+  v_version integer;
+  v_status text;
+  v_recipient text := btrim(coalesce(p_recipient, ''));
+  v_send_id uuid;
+  v_who jsonb;
+begin
+  if v_actor is null then
+    raise exception 'not_authenticated' using errcode = '28000';
+  end if;
+
+  if not public.purchasing_actor_may_issue(v_actor) then
+    raise exception 'not_po_duty' using errcode = 'P0001', detail = 'not_po_duty';
+  end if;
+  v_who := public.purchasing_po_actor();
+
+  if p_channel not in ('whatsapp', 'email', 'print') then
+    raise exception 'invalid_channel' using errcode = '22023';
+  end if;
+  if v_recipient = '' then
+    raise exception 'recipient_required' using errcode = '22023';
+  end if;
+  if p_expected_version is null then
+    raise exception 'expected_version_required' using errcode = '22023';
+  end if;
+
+  select version, status::text into v_version, v_status
+  from public.purchase_orders
+  where id = p_po_id
+  for update;
+
+  if not found then
+    raise exception 'po_not_found' using errcode = 'P0002';
+  end if;
+  if v_status = 'cancelled' and not exists(select 1 from public.po_goods_cancellation_events where po_id=p_po_id and kind='effective' and applied_po_version=v_version) then
+    raise exception 'po_not_issuable' using errcode = 'P0001';
+  end if;
+
+  if coalesce(v_version, 1) <> p_expected_version then
+    raise exception 'stale_po_version: saw %, current is %', p_expected_version, coalesce(v_version, 1)
+      using errcode = 'P0001', detail = 'stale_po_version';
+  end if;
+
+  -- 0430 · WHAT the supplier received, not only THAT something left. The first
+  -- confirmed send of a version keeps the document authority's own payload; a
+  -- resend of the same version changes nothing, so the recorded facts of a
+  -- version can never drift between two sends of it.
+  insert into public.po_version_documents (po_id, po_version, document, created_by)
+  values (p_po_id, coalesce(v_version, 1), public.purchasing_po_document(p_po_id), v_actor)
+  on conflict (po_id, po_version) do nothing;
+
+  insert into public.po_sends (
+    po_id, channel, note, sent_by, kind, recipient, po_version,
+    duty_user_id, acting_user_id
+  )
+  values (
+    p_po_id, p_channel, nullif(btrim(coalesce(p_note, '')), ''), v_actor,
+    'confirmed_sent', v_recipient, coalesce(v_version, 1),
+    nullif(v_who->>'normal_user_id', '')::uuid,
+    nullif(v_who->>'acting_user_id', '')::uuid
+  )
+  returning id into v_send_id;
+
+  insert into public.po_history (po_id, text, by_user_id)
+  values (
+    p_po_id,
+    format('Version %s sent to %s by %s', coalesce(v_version, 1), v_recipient, p_channel),
+    v_actor
+  );
+
+  return jsonb_build_object(
+    'send_id', v_send_id,
+    'po_id', p_po_id,
+    'po_version', coalesce(v_version, 1),
+    'channel', p_channel,
+    'recipient', v_recipient
+  );
+end;
+$function$
+;
+revoke all on function public.purchasing_confirm_po_sent(text,integer,text,text,text) from public,anon;
+grant execute on function public.purchasing_confirm_po_sent(text,integer,text,text,text) to authenticated;
+
+create or replace function public._purchasing_cancelled_scope_receipt_guard()
+returns trigger language plpgsql security definer set search_path=public,pg_temp as $receipt_guard$
+begin
+ if tg_table_name='purchase_order_lines' then
+  if new.received_qty>old.received_qty and new.received_qty>new.qty-public._purchasing_po_line_cancelled_qty(new.id) then
+   raise exception 'Cancelled goods require the existing receipt discrepancy path' using errcode='22023',detail='cancelled_scope_arrival_requires_discrepancy'; end if;
+ else
+  if old.status='voided' and new.status in('free','reserved','sold','incoming') and exists(
+   select 1 from public.po_goods_cancellation_events e cross join lateral jsonb_array_elements(e.scope) l where e.kind='effective' and l->'unitIds' @> jsonb_build_array(old.id)) then
+   raise exception 'Retired cancelled Unit cannot become available' using errcode='22023',detail='cancelled_scope_arrival_requires_discrepancy'; end if;
+ end if;
+ return new;
+end;
+$receipt_guard$;
+revoke all on function public._purchasing_cancelled_scope_receipt_guard() from public,anon,authenticated;
+drop trigger if exists purchasing_cancelled_line_receipt_guard on public.purchase_order_lines;
+create trigger purchasing_cancelled_line_receipt_guard before update of received_qty on public.purchase_order_lines for each row execute function public._purchasing_cancelled_scope_receipt_guard();
+drop trigger if exists purchasing_cancelled_unit_receipt_guard on public.ops_stock_items;
+create trigger purchasing_cancelled_unit_receipt_guard before update of status on public.ops_stock_items for each row execute function public._purchasing_cancelled_scope_receipt_guard();
+
+create or replace function public.purchasing_po_cancellations(p_po_ids text[])
+returns jsonb language plpgsql security definer set search_path=public,pg_temp as $batch_cancel_read$
+begin
+ if public.app_role() is null or public.app_role() not in('operation','principal','finance') then raise exception 'not permitted' using errcode='42501'; end if;
+ return coalesce((select jsonb_agg(jsonb_build_object('poId',p.id,'facts',public.purchasing_po_cancellation_facts(p.id)) order by p.id) from public.purchase_orders p where p.id=any(p_po_ids) and exists(select 1 from public.po_goods_cancellation_events e where e.po_id=p.id)),'[]'::jsonb);
+end;
+$batch_cancel_read$;
+revoke all on function public.purchasing_po_cancellations(text[]) from public,anon;
+grant execute on function public.purchasing_po_cancellations(text[]) to authenticated;
+
+create or replace function public._purchasing_po_line_pending_qty(p_line uuid)
+returns integer language sql stable set search_path=public,pg_temp as $pending_qty$
+ select greatest(0,l.qty-l.received_qty-public._purchasing_po_line_cancelled_qty(l.id)) from public.purchase_order_lines l where l.id=p_line;
+$pending_qty$;
+revoke all on function public._purchasing_po_line_pending_qty(uuid) from public,anon,authenticated;
+
+CREATE OR REPLACE FUNCTION public.purchasing_record_supplier_answers(p_po_id text, p jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  v_po public.purchase_orders; v_role public.app_role; v_who jsonb; v_version integer;
+  v_group uuid := gen_random_uuid(); v_files text[]; v_file text; v_evidence text;
+  v_line jsonb; v_pol public.purchase_order_lines; v_still integer; v_kind text;
+  v_batch jsonb; v_batches jsonb; v_total integer; v_date date; v_answer text; v_reason text;
+  v_remarks text; v_previous date; v_id uuid; v_rows integer := 0; v_confirmations integer := 0;
+  v_do_no text; v_do_file text; v_touched integer; v_line_out jsonb := '[]'::jsonb;
+  v_last_delay record; v_arrival record; v_summary text := '';
+begin
+  v_role := public.purchasing_supplier_call_gate();
+  v_who := public.purchasing_supplier_reply_actor();
+  if (v_who->>'allowed')::boolean is not true or auth.uid() is null then
+    raise exception 'Only Operation staff may record the supplier answer.' using errcode='42501', detail='forbidden';
+  end if;
+  select * into v_po from public.purchase_orders where id = p_po_id for update;
+  if not found then raise exception 'Purchase Order not found.' using errcode='22023', detail='po_not_found'; end if;
+
+  v_version := nullif(p->>'poVersion','')::integer;
+  if v_version is distinct from coalesce(v_po.version, 1) then
+    raise exception 'Open the current PO and record the supplier answer.' using errcode='22023', detail='stale_po_version';
+  end if;
+  if v_po.status <> 'open' or not exists (select 1 from public.purchase_order_lines where po_id = v_po.id and public._purchasing_po_line_pending_qty(id)>0) then
+    raise exception 'This PO has no goods left to deliver.' using errcode='22023', detail='po_not_open';
+  end if;
+  if not exists (select 1 from public.po_sends where po_id = v_po.id and kind = 'confirmed_sent' and po_version = v_version) then
+    raise exception 'Record the current PO PDF sent before the supplier answer.' using errcode='22023', detail='po_not_sent';
+  end if;
+
+  -- Evidence: every file must be this PO's own upload. The Supplier DO file
+  -- counts as evidence when it is the only file.
+  v_do_no := case when coalesce(p#>>'{supplierDo,number}', '') ~ '[^[:space:]]' then btrim(p#>>'{supplierDo,number}') end;
+  v_do_file := case when coalesce(p#>>'{supplierDo,file}', '') ~ '[^[:space:]]' then btrim(p#>>'{supplierDo,file}') end;
+  if (v_do_no is null) <> (v_do_file is null) then
+    raise exception 'Record the Supplier DO number and upload the Supplier DO.' using errcode='22023', detail='supplier_do_incomplete';
+  end if;
+  if v_do_no is not null and length(v_do_no) not between 3 and 50 then
+    raise exception 'The Supplier DO number is 3 to 50 characters.' using errcode='22023', detail='supplier_do_invalid';
+  end if;
+  select coalesce(array_agg(x order by ord), '{}') into v_files
+    from (select distinct on (x) x, ord
+            from (select v_do_file as x, 0 as ord
+                  union all
+                  select btrim(e.value), e.ordinality
+                    from jsonb_array_elements_text(coalesce(p->'evidence','[]'::jsonb)) with ordinality e(value, ordinality)) all_files
+           where coalesce(x, '') ~ '[^[:space:]]'
+           order by x, ord) distinct_files;
+  if cardinality(v_files) = 0 then
+    raise exception 'Add the WhatsApp screenshot of the supplier''s answer.' using errcode='22023', detail='screenshot_required';
+  end if;
+  foreach v_file in array v_files loop
+    if left(v_file, length(p_po_id)+1) is distinct from p_po_id || '/'
+       or not exists (select 1 from storage.objects where bucket_id='delivery-orders' and name=v_file) then
+      raise exception 'A file was not uploaded for this PO.' using errcode='22023', detail='screenshot_not_found';
+    end if;
+  end loop;
+  v_evidence := v_files[1];
+
+  if jsonb_typeof(p->'lines') is distinct from 'array' then
+    raise exception 'Record the answer per goods line.' using errcode='22023', detail='invalid_input';
+  end if;
+  if v_do_no is null and not exists (select 1 from jsonb_array_elements(p->'lines') l where coalesce(l->>'answer','no_change') <> 'no_change') then
+    raise exception 'Answer at least one goods line or record the Supplier DO.' using errcode='22023', detail='nothing_to_record';
+  end if;
+
+  for v_line in select * from jsonb_array_elements(p->'lines') loop
+    select * into v_pol from public.purchase_order_lines
+      where id = nullif(v_line->>'poLineId','')::uuid and po_id = v_po.id;
+    if not found then
+      raise exception 'That goods line is not on this PO.' using errcode='22023', detail='po_line_not_found';
+    end if;
+    v_still := public._purchasing_po_line_pending_qty(v_pol.id);
+    if v_still <= 0 then
+      raise exception 'All of this line was received.' using errcode='22023', detail='line_all_received';
+    end if;
+    v_kind := v_line->>'answer';
+    if v_kind = 'no_change' then continue; end if;
+    if v_kind not in ('confirmed','new_date','split') then
+      raise exception 'Choose the supplier''s answer for each line.' using errcode='22023', detail='invalid_input';
+    end if;
+
+    -- The batches: one for `confirmed` / `new_date`, several for `split`.
+    if v_kind = 'split' then
+      v_batches := coalesce(v_line->'batches', '[]'::jsonb);
+      if jsonb_typeof(v_batches) <> 'array' or jsonb_array_length(v_batches) = 0 then
+        raise exception 'Add at least one delivery date to the split.' using errcode='22023', detail='batches_required';
+      end if;
+      select coalesce(sum(nullif(b->>'qty','')::integer), 0) into v_total from jsonb_array_elements(v_batches) b;
+      if v_total <> v_still then
+        raise exception 'The batches must total what is still to deliver.' using errcode='22023', detail='batch_total_mismatch';
+      end if;
+    elsif v_kind = 'confirmed' then
+      -- Confirmed = the line's CURRENT expected date (its newest answer, else the
+      -- original PO Delivery Date) stands. The stored row carries the ladder's
+      -- own classification; a re-confirmed delay keeps its reason.
+      select a.arrival, a.answer, a.reason into v_arrival
+        from public.purchasing_po_expected_arrivals(p_po_id) a where a.po_line_id = v_pol.id
+        order by a.arrival desc limit 1;
+      if v_arrival.arrival is null then
+        raise exception 'This line has no date to confirm yet.' using errcode='22023', detail='new_date_required';
+      end if;
+      v_batches := jsonb_build_array(jsonb_build_object('qty', v_still, 'date', v_arrival.arrival::text,
+        'reason', v_arrival.reason, 'remarks', v_line->>'remarks'));
+    else
+      if coalesce(v_line->>'date','') = '' then
+        raise exception 'Record the supplier delivery date.' using errcode='22023', detail='new_date_required';
+      end if;
+      v_batches := jsonb_build_array(jsonb_build_object('qty', v_still, 'date', v_line->>'date',
+        'reason', v_line->>'reason', 'remarks', v_line->>'remarks'));
+    end if;
+
+    select coalesce(new_date, about_date) into v_previous
+      from public.po_supplier_promises
+     where po_id = p_po_id and kind = 'tomorrow_delivery' and po_version = v_version
+       and (po_line_id = v_pol.id or po_line_id is null)
+     order by (po_line_id is not null) desc, recorded_at desc, id desc limit 1;
+
+    for v_batch in select * from jsonb_array_elements(v_batches) loop
+      v_date := nullif(v_batch->>'date','')::date;
+      if v_date is null then
+        raise exception 'Record the supplier delivery date.' using errcode='22023', detail='new_date_required';
+      end if;
+      if nullif(v_batch->>'qty','')::integer is null or (v_batch->>'qty')::integer <= 0 then
+        raise exception 'A batch needs a quantity.' using errcode='22023', detail='batch_qty_invalid';
+      end if;
+      v_answer := case
+        when v_po.official_delivery_date is null then 'reported'
+        when v_date = v_po.official_delivery_date then 'confirmed'
+        when v_date < v_po.official_delivery_date then 'earlier'
+        else 'delayed' end;
+      v_reason := case when coalesce(v_batch->>'reason', '') ~ '[^[:space:]]' then btrim(v_batch->>'reason') end;
+      v_remarks := nullif(btrim(coalesce(v_batch->>'remarks', '')), '');
+      if v_answer = 'delayed' then
+        if v_reason is null then
+          -- A re-confirmed delay keeps the reason it was recorded with.
+          select p2.reason, p2.remarks into v_last_delay from public.po_supplier_promises p2
+           where p2.po_id = p_po_id and p2.kind = 'tomorrow_delivery' and p2.answer = 'delayed'
+             and p2.po_version = v_version and (p2.po_line_id = v_pol.id or p2.po_line_id is null)
+           order by (p2.po_line_id is not null) desc, p2.recorded_at desc, p2.id desc limit 1;
+          v_reason := v_last_delay.reason; v_remarks := coalesce(v_remarks, v_last_delay.remarks);
+        end if;
+        if not (coalesce(v_reason,'') = any (public.purchasing_supplier_delay_reasons())) then
+          raise exception 'Choose why the supplier moved the date.' using errcode='22023', detail='reason_required';
+        end if;
+        if v_reason = 'Other' and coalesce(v_remarks, '') !~ '[^[:space:]]' then
+          raise exception 'Write why the supplier moved the date.' using errcode='22023', detail='other_note_required';
+        end if;
+      else
+        v_reason := null;
+      end if;
+
+      insert into public.po_supplier_promises(po_id, po_line_id, kind, answer, about_date, about_qty, previous_date, new_date,
+        reason, remarks, recorded_by, po_version, channel, recipient, evidence, reported_by, reported_at, answer_group)
+      values (p_po_id, v_pol.id, 'tomorrow_delivery', v_answer, v_po.official_delivery_date, (v_batch->>'qty')::integer,
+        v_previous, v_date, v_reason, v_remarks, auth.uid(), v_version, p->>'channel', btrim(p->>'recipient'),
+        v_evidence, btrim(p->>'reportedBy'), (p->>'reportedAt')::timestamptz, v_group)
+      returning id into v_id;
+      v_rows := v_rows + 1;
+      foreach v_file in array v_files loop
+        insert into public.po_supplier_answer_screenshots(answer_id, path, recorded_by)
+          values (v_id, v_file, auth.uid()) on conflict (answer_id, path) do nothing;
+      end loop;
+
+      -- A `confirmed` line IS the day-before confirmation for that exact date
+      -- and the PO's own Warehouse (§5.7 completion).
+      if v_kind = 'confirmed' and v_po.destination_id is not null then
+        insert into public.po_arrival_confirmations (po_id, po_version, for_date, destination_id, kind, evidence,
+          channel, recipient, reported_by, reported_at, recorded_by, duty_user_id, acting_user_id)
+        values (p_po_id, v_version, v_date, v_po.destination_id, 'supplier_confirmation', v_files,
+          p->>'channel', btrim(p->>'recipient'), btrim(p->>'reportedBy'), (p->>'reportedAt')::timestamptz, auth.uid(),
+          nullif(v_who->>'normal_user_id','')::uuid, nullif(v_who->>'acting_user_id','')::uuid);
+        v_confirmations := v_confirmations + 1;
+      end if;
+      v_summary := v_summary || format('%s%s ×%s · %s%s', case when v_summary = '' then '' else ' · ' end,
+        v_pol.sku, (v_batch->>'qty')::integer, v_date,
+        case v_answer when 'delayed' then format(' · Delayed · %s', v_reason) when 'earlier' then ' · Earlier' else '' end);
+    end loop;
+    v_line_out := v_line_out || jsonb_build_object('poLineId', v_pol.id, 'batches', v_batches);
+  end loop;
+
+  -- `Supplier DO received`: the PO's own DO fields, written once, and the
+  -- day-before evidence for EVERY expected arrival still open.
+  if v_do_no is not null then
+    update public.purchase_orders
+       set do_number = v_do_no, do_file_path = v_do_file, do_uploaded_at = now(), do_uploaded_by = auth.uid()
+     where id = p_po_id;
+    if v_po.destination_id is not null then
+      for v_arrival in select distinct a.arrival from public.purchasing_po_expected_arrivals(p_po_id) a where a.arrival is not null loop
+        insert into public.po_arrival_confirmations (po_id, po_version, for_date, destination_id, kind, supplier_do_no, evidence,
+          channel, recipient, reported_by, reported_at, recorded_by, duty_user_id, acting_user_id)
+        values (p_po_id, v_version, v_arrival.arrival, v_po.destination_id, 'supplier_do', v_do_no, v_files,
+          p->>'channel', btrim(p->>'recipient'), btrim(p->>'reportedBy'), (p->>'reportedAt')::timestamptz, auth.uid(),
+          nullif(v_who->>'normal_user_id','')::uuid, nullif(v_who->>'acting_user_id','')::uuid);
+        v_confirmations := v_confirmations + 1;
+      end loop;
+    end if;
+    insert into public.po_history(po_id, text, by_role, by_user_id)
+      values (p_po_id, format('Supplier DO %s recorded · PO V%s', v_do_no, v_version), v_role, auth.uid());
+  end if;
+
+  if v_rows > 0 then
+    v_touched := public.purchasing_project_line_etas(p_po_id);
+    insert into public.po_history(po_id, text, by_role, by_user_id)
+      values (p_po_id, format('Supplier answer recorded · PO V%s · %s', v_version, v_summary), v_role, auth.uid());
+  end if;
+  insert into public.audit_log(role, actor_text, action, ref)
+    values (v_role, (select name from public.app_users where id = auth.uid()), 'Supplier answer recorded', p_po_id);
+
+  return jsonb_build_object('po_id', p_po_id, 'answer_group', v_group, 'answers', v_rows,
+    'confirmations', v_confirmations, 'supplier_do', v_do_no, 'orders_touched', coalesce(v_touched, 0),
+    'lines', v_line_out, 'evidence', cardinality(v_files));
+end;
+$function$
+;
+revoke all on function public.purchasing_record_supplier_answers(text,jsonb) from public,anon,authenticated;
+grant execute on function public.purchasing_record_supplier_answers(text,jsonb) to authenticated;
+
+CREATE OR REPLACE FUNCTION public.purchasing_require_reply_evidence()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare v_po public.purchase_orders; v_who jsonb; v_line public.purchase_order_lines;
+begin
+  if new.kind <> 'tomorrow_delivery' then return new; end if;
+  v_who := public.purchasing_supplier_reply_actor();
+  if (v_who->>'allowed')::boolean is not true then
+    raise exception 'Only Operation staff may record the supplier answer.' using errcode='42501';
+  end if;
+  select * into v_po from public.purchase_orders where id=new.po_id for update;
+  if new.po_version is distinct from coalesce(v_po.version,1) then
+    raise exception 'Open the current PO and record the supplier answer.' using errcode='22023',detail='stale_po_version';
+  end if;
+  if v_po.status <> 'open' or not exists(select 1 from public.purchase_order_lines
+    where po_id=v_po.id and public._purchasing_po_line_pending_qty(id)>0) then
+    raise exception 'This PO has no goods left to deliver.' using errcode='22023',detail='po_not_open';
+  end if;
+  if not exists(select 1 from public.po_sends where po_id=v_po.id
+    and kind='confirmed_sent' and po_version=new.po_version) then
+    raise exception 'Record the current PO PDF sent before the supplier answer.' using errcode='22023',detail='po_not_sent';
+  end if;
+  if new.po_line_id is not null then
+    select * into v_line from public.purchase_order_lines where id = new.po_line_id and po_id = v_po.id;
+    if not found then
+      raise exception 'That goods line is not on this PO.' using errcode='22023',detail='po_line_not_found';
+    end if;
+    if public._purchasing_po_line_pending_qty(v_line.id) <= 0 then
+      raise exception 'All of this line was received.' using errcode='22023',detail='line_all_received';
+    end if;
+    if new.about_qty is null or new.about_qty <= 0 or new.about_qty > public._purchasing_po_line_pending_qty(v_line.id) then
+      raise exception 'A batch cannot exceed what is still to deliver.' using errcode='22023',detail='batch_qty_invalid';
+    end if;
+  end if;
+  if new.answer is null or new.new_date is null
+    or new.answer not in ('confirmed','earlier','delayed','reported')
+    or (new.answer='reported' and v_po.official_delivery_date is not null)
+    or (new.answer<>'reported' and (
+          v_po.official_delivery_date is null
+          or new.about_date is distinct from v_po.official_delivery_date
+          or (new.answer='confirmed' and new.new_date <> v_po.official_delivery_date)
+          or (new.answer='earlier'   and new.new_date >= v_po.official_delivery_date)
+          or (new.answer='delayed'   and new.new_date <= v_po.official_delivery_date)))
+    or (new.answer='delayed' and not (coalesce(new.reason,'') = any (public.purchasing_supplier_delay_reasons())))
+    or (new.answer='delayed' and new.reason='Other' and coalesce(new.remarks, '') !~ '[^[:space:]]')
+    or (new.answer<>'delayed' and new.reason is not null) then
+    raise exception 'Record the supplier delivery date and reason.' using errcode='22023',detail='invalid_input';
+  end if;
+  if new.channel is null or new.channel not in ('whatsapp','email','phone','in_person')
+    or coalesce(new.recipient, '') !~ '[^[:space:]]' or coalesce(new.evidence, '') !~ '[^[:space:]]'
+    or coalesce(new.reported_by, '') !~ '[^[:space:]]' or new.reported_at is null
+    or left(new.evidence,length(new.po_id)+1) is distinct from new.po_id || '/'
+    or not exists(select 1 from storage.objects where bucket_id='delivery-orders' and name=new.evidence)
+    or length(new.recipient)>200 or length(new.reported_by)>200 or length(new.evidence)>2000
+    or length(new.remarks)>500
+    or new.reported_at < (select min(sent_at) from public.po_sends where po_id=v_po.id and kind='confirmed_sent' and po_version=new.po_version)
+    or new.reported_at > now() or new.recorded_by is distinct from auth.uid()
+    or auth.uid() is null then
+    raise exception 'Record the reply channel, recipient, evidence, reporter and time.' using errcode='22023',detail='reply_evidence_required';
+  end if;
+  new.duty_user_id := nullif(v_who->>'normal_user_id','')::uuid;
+  new.acting_user_id := nullif(v_who->>'acting_user_id','')::uuid;
+  new.recorded_at:=clock_timestamp();
+  return new;
+end;
+$function$
+;
+revoke all on function public.purchasing_require_reply_evidence() from public,anon,authenticated;
+grant execute on function public.purchasing_require_reply_evidence() to authenticated;

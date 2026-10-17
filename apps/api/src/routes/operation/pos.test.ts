@@ -3385,3 +3385,22 @@ describe("existing PO revision exact contextual source transport", () => {
     expect(res.status).toBe(422);expect(rpc).not.toHaveBeenCalled();
   });
 });
+
+describe("qualified cancellation stays on the existing PO door",()=> {
+ const cancellation={action:"complete",key:"fffffff1-0000-4000-8000-000000009701",requestId:"fffffff1-0000-4000-8000-000000009702",expectedRequestVersion:0,expectedPoVersion:2,decisionReason:"",supplierFacts:{supplierStatement:"agreed",fee:"no",shipped:false,evidence:["TEST supplier email.pdf"]},lines:[{lineId:"fffffff1-0000-4000-8000-000000009703",qty:1,receivedQty:0,unitIds:[],sources:[{demandId:"fffffff1-0000-4000-8000-000000009704",qty:1,recipients:[]}]}]};
+ it("passes the exact facts to the qualified overload without granting the reason-only signature evidence",async()=> {
+  const rpc=vi.fn(async()=>({data:{state:"effective",poVersion:3},error:null}));vi.mocked(userClient).mockReturnValue({rpc} as never);
+  const response=await app.fetch(new Request("https://api.test/api/operation/pos/TEST/cancel",{method:"POST",headers:{Authorization:`Bearer ${await makeJwt("operation")}`,"Content-Type":"application/json"},body:JSON.stringify({reason:"TEST supplier agreed",cancellation})}),env);
+  expect(response.status).toBe(200);expect(rpc).toHaveBeenCalledWith("operation_cancel_po",{p_po_id:"TEST",p_reason:"TEST supplier agreed",p_cancellation:cancellation});
+  expect(await response.json()).toEqual({cancellation:{state:"effective",poVersion:3}});
+ });
+ it("lets Finance read only the owning money-free cancellation continuation, no PO write",async()=> {
+  const rpc=vi.fn(async()=>({data:{lines:[],events:[],financeHandoffs:[{sourceType:"po_cancellation",ownerModule:"finance",state:"needs_finance_review"}]},error:null}));vi.mocked(userClient).mockReturnValue({rpc} as never);
+  const token=await makeJwt("finance");
+  const response=await app.fetch(new Request("https://api.test/api/operation/pos/TEST/cancellations",{headers:{Authorization:`Bearer ${token}`}}),env);
+  expect(response.status).toBe(200);expect(rpc).toHaveBeenCalledWith("purchasing_po_cancellation_facts",{p_po_id:"TEST"});
+  rpc.mockClear();
+  const write=await app.fetch(new Request("https://api.test/api/operation/pos/TEST/cancel",{method:"POST",headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},body:JSON.stringify({reason:"TEST no Finance PO write",cancellation})}),env);
+  expect(write.status).toBe(403);expect(rpc).not.toHaveBeenCalled();
+ });
+});

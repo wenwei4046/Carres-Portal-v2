@@ -1,20 +1,20 @@
 {
   "environment": "owned loopback; outer ROLLBACK",
-  "requestId": "1df99296-81a3-4096-a119-5814b838eb9f",
-  "poId": "PO261018-3204",
-  "remainderPoId": "PO261018-6273",
+  "requestId": "7476f000-2a10-4074-97e1-afedeab8055b",
+  "poId": "PO261018-5592",
+  "remainderPoId": "PO261018-3245",
   "documentVersion": 1,
   "qty": 1,
   "work": [
     {
-      "requestId": "1df99296-81a3-4096-a119-5814b838eb9f",
-      "reference": "RS261018-6495",
+      "requestId": "7476f000-2a10-4074-97e1-afedeab8055b",
+      "reference": "RS261018-2465",
       "context": "Manual Purchase Request · Ready Stock · Carres Klang · Ohana",
       "status": "ready_to_order",
       "remainingQty": 499,
       "orderBy": "2026-11-02",
       "poIds": [
-        "PO261018-3204"
+        "PO261018-5592"
       ],
       "unsentPoId": null,
       "continueInPoId": null,
@@ -33,7 +33,7 @@
       {
         "channel": "email",
         "note": null,
-        "sent_at": "2026-10-18T06:34:02.260551+08:00",
+        "sent_at": "2026-10-18T07:42:17.553896+08:00",
         "kind": "confirmed_sent",
         "recipient": "TEST@example.test",
         "po_version": 1,
@@ -49,7 +49,7 @@
   "parentRevision": {
     "ok": true,
     "result": {
-      "po_id": "PO261018-3204",
+      "po_id": "PO261018-5592",
       "rev_no": 1,
       "changes": [
         "2008(A) TRION qty 1 → 2"
@@ -59,16 +59,16 @@
   },
   "revisedWork": [
     {
-      "requestId": "1df99296-81a3-4096-a119-5814b838eb9f",
-      "reference": "RS261018-6495",
+      "requestId": "7476f000-2a10-4074-97e1-afedeab8055b",
+      "reference": "RS261018-2465",
       "context": "Manual Purchase Request · Ready Stock · Carres Klang · Ohana",
       "status": "ready_to_order",
       "remainingQty": 498,
       "orderBy": "2026-11-02",
       "poIds": [
-        "PO261018-3204"
+        "PO261018-5592"
       ],
-      "unsentPoId": "PO261018-3204",
+      "unsentPoId": "PO261018-5592",
       "continueInPoId": null,
       "hasPos": true,
       "posAllSent": false,
@@ -80,17 +80,17 @@
   "reductionStatus": 422,
   "coveredWork": [
     {
-      "requestId": "1df99296-81a3-4096-a119-5814b838eb9f",
-      "reference": "RS261018-6495",
+      "requestId": "7476f000-2a10-4074-97e1-afedeab8055b",
+      "reference": "RS261018-2465",
       "context": "Manual Purchase Request · Ready Stock · Carres Klang · Ohana",
       "status": "ordered",
       "remainingQty": 0,
       "orderBy": "2026-11-02",
       "poIds": [
-        "PO261018-3204",
-        "PO261018-6273"
+        "PO261018-5592",
+        "PO261018-3245"
       ],
-      "unsentPoId": "PO261018-3204",
+      "unsentPoId": "PO261018-5592",
       "continueInPoId": null,
       "hasPos": true,
       "posAllSent": false,
@@ -100,10 +100,275 @@
   "fullCoverage": {
     "need": 500,
     "issued": 500,
-    "original_po": "PO261018-3204",
+    "original_po": "PO261018-5592",
     "request_version": 1,
     "approval_version": 1
   },
+  "pendingCancellation": {
+    "cancellation": {
+      "id": "7ca7a95f-4903-48a6-9a64-001d317395ff",
+      "state": "pending",
+      "replayed": false,
+      "poVersion": null,
+      "requestVersion": 1
+    }
+  },
+  "effectiveCancellation": {
+    "cancellation": {
+      "id": "4221e531-7310-4d79-b331-01dfbb7f34e5",
+      "state": "effective",
+      "replayed": false,
+      "poVersion": 3,
+      "requestVersion": 2
+    }
+  },
+  "cancellationFactsRead": {
+    "lines": [
+      {
+        "sku": "2008(A) TRION",
+        "lineId": "5336ab1e-cb81-4e34-acba-1eacc59a2673",
+        "sources": [
+          {
+            "purpose": "ready_stock",
+            "demandId": "50b2abea-0026-478c-af90-45c5bdf17271",
+            "activeQty": 1,
+            "requestId": "7476f000-2a10-4074-97e1-afedeab8055b",
+            "requestNo": "RS261018-2465",
+            "contextual": true,
+            "orderedQty": 2,
+            "recipients": [],
+            "unitChoices": [
+              {
+                "id": "7cce4d07-7a50-4c58-bad6-af0ef30ef26d",
+                "status": "incoming",
+                "unitCode": "U1-000-003"
+              },
+              {
+                "id": "457438b2-04cc-4b8e-8f5e-317dbed70994",
+                "status": "voided",
+                "unitCode": "U1-000-004"
+              }
+            ],
+            "cancelledQty": 1
+          }
+        ],
+        "orderedQty": 2,
+        "pendingQty": 1,
+        "receivedQty": 0,
+        "cancelledQty": 1,
+        "identityMode": "exact_unit"
+      }
+    ],
+    "events": [
+      {
+        "at": "2026-10-18T07:42:29.302056+08:00",
+        "id": "7ca7a95f-4903-48a6-9a64-001d317395ff",
+        "kind": "pending",
+        "po_id": "PO261018-5592",
+        "scope": [
+          {
+            "qty": 1,
+            "lineId": "5336ab1e-cb81-4e34-acba-1eacc59a2673",
+            "sources": [
+              {
+                "qty": 1,
+                "demandId": "50b2abea-0026-478c-af90-45c5bdf17271",
+                "recipients": []
+              }
+            ],
+            "unitIds": [
+              "457438b2-04cc-4b8e-8f5e-317dbed70994"
+            ],
+            "receivedQty": 0
+          }
+        ],
+        "reason": "TEST scoped supplier cancellation",
+        "actor_id": "fffffff1-0000-4000-8000-000000009698",
+        "request_id": "aec5083a-f8cb-464f-b3fa-2fa6f206497a",
+        "supplier_facts": {
+          "fee": "not_confirmed",
+          "shipped": null,
+          "evidence": [],
+          "supplierStatement": "awaiting"
+        },
+        "decision_reason": null,
+        "request_version": 1,
+        "applied_po_version": null,
+        "expected_po_version": 2
+      },
+      {
+        "at": "2026-10-18T07:42:29.482306+08:00",
+        "id": "4221e531-7310-4d79-b331-01dfbb7f34e5",
+        "kind": "effective",
+        "po_id": "PO261018-5592",
+        "scope": [
+          {
+            "qty": 1,
+            "lineId": "5336ab1e-cb81-4e34-acba-1eacc59a2673",
+            "sources": [
+              {
+                "qty": 1,
+                "demandId": "50b2abea-0026-478c-af90-45c5bdf17271",
+                "recipients": []
+              }
+            ],
+            "unitIds": [
+              "457438b2-04cc-4b8e-8f5e-317dbed70994"
+            ],
+            "receivedQty": 0
+          }
+        ],
+        "reason": "TEST scoped supplier cancellation",
+        "actor_id": "fffffff1-0000-4000-8000-000000009698",
+        "request_id": "aec5083a-f8cb-464f-b3fa-2fa6f206497a",
+        "supplier_facts": {
+          "fee": "no",
+          "shipped": false,
+          "evidence": [
+            "PO261018-5592/TEST-cancellation.pdf"
+          ],
+          "supplierStatement": "agreed"
+        },
+        "decision_reason": null,
+        "request_version": 2,
+        "applied_po_version": 3,
+        "expected_po_version": 2
+      }
+    ],
+    "actorId": "fffffff1-0000-4000-8000-000000009698",
+    "poVersion": 3,
+    "financeHandoffs": [
+      {
+        "at": "2026-10-18T07:42:29.482306+08:00",
+        "id": "4221e531-7310-4d79-b331-01dfbb7f34e5",
+        "poId": "PO261018-5592",
+        "lines": [
+          {
+            "qty": 1,
+            "lineId": "5336ab1e-cb81-4e34-acba-1eacc59a2673",
+            "sources": [
+              {
+                "qty": 1,
+                "demandId": "50b2abea-0026-478c-af90-45c5bdf17271",
+                "recipients": []
+              }
+            ],
+            "unitIds": [
+              "457438b2-04cc-4b8e-8f5e-317dbed70994"
+            ],
+            "receivedQty": 0
+          }
+        ],
+        "state": "needs_finance_review",
+        "reason": "TEST scoped supplier cancellation",
+        "result": "effective_cancellation_requires_finance_follow_up",
+        "actorId": "fffffff1-0000-4000-8000-000000009698",
+        "evidence": [
+          "PO261018-5592/TEST-cancellation.pdf"
+        ],
+        "poVersion": 3,
+        "sourceType": "po_cancellation",
+        "supplierId": "00000000-0000-0000-0000-0000000000e1",
+        "ownerModule": "finance"
+      }
+    ],
+    "canDecideException": false
+  },
+  "afterCancellationWork": [
+    {
+      "requestId": "7476f000-2a10-4074-97e1-afedeab8055b",
+      "reference": "RS261018-2465",
+      "context": "Manual Purchase Request · Ready Stock · Carres Klang · Ohana",
+      "status": "ready_to_order",
+      "remainingQty": 1,
+      "orderBy": "2026-11-02",
+      "poIds": [
+        "PO261018-5592",
+        "PO261018-3245"
+      ],
+      "unsentPoId": "PO261018-5592",
+      "continueInPoId": null,
+      "hasPos": true,
+      "posAllSent": false,
+      "recipient": "Ohana"
+    }
+  ],
+  "cancellationSendWork": [
+    {
+      "contractVersion": 2,
+      "id": "purchasing:PO261018-5592:purchasing.cancellation_send:@cancellation%3A4221e531-7310-4d79-b331-01dfbb7f34e5%3A3",
+      "module": "purchasing",
+      "ruleKey": "purchasing.cancellation_send",
+      "ruleVersion": 1,
+      "object": {
+        "kind": "purchase_order",
+        "id": "PO261018-5592",
+        "label": "PO261018-5592"
+      },
+      "problem": "Sending not confirmed",
+      "action": "Send PO261018-5592(3) to Ohana",
+      "recipient": "Ohana",
+      "requiredResult": "Current PO version marked as sent",
+      "completionPredicate": "confirmed_sent for the exact current cancellation PO version",
+      "completionStatement": "Current cancellation PO version marked as sent",
+      "owner": {
+        "rule": "po_duty",
+        "dutyKey": "po_duty",
+        "normal": null,
+        "activeCover": null,
+        "coverEvidence": null,
+        "acting": null,
+        "state": "not_assigned"
+      },
+      "timing": {
+        "businessDueOn": null,
+        "actionOn": null,
+        "placement": "no_working_date",
+        "missedAge": {
+          "state": "not_calculable",
+          "workingDays": null,
+          "basis": null
+        },
+        "eligibility": "unknown",
+        "noDateReason": "The owning rule has no working date",
+        "calendar": {
+          "module": {
+            "key": "purchasing.cancellation_send",
+            "source": "work_engine",
+            "state": "ready"
+          },
+          "actor": {
+            "key": "duty:po_duty",
+            "source": "people",
+            "state": "not_configured"
+          },
+          "holidayName": null
+        }
+      },
+      "communication": null,
+      "blocker": null,
+      "nextConsequence": null,
+      "interaction": {
+        "mode": "embedded",
+        "actionKey": "purchasing.confirm_po_sent",
+        "componentKey": "purchasing.po_issue_evidence",
+        "capability": "POST /api/operation/pos/:id/confirm-sent",
+        "inputContract": "ConfirmPoSentInput",
+        "evidenceContract": "po_sends confirmed_sent for the rendered version",
+        "idempotencyKey": "po_id + po_version",
+        "staleVersion": "ConfirmPoSentInput.poVersion",
+        "staleRefusal": "stale_po_version",
+        "successReceipt": "PO sent to supplier",
+        "fallbackDestination": "/operation?tab=purchase-orders&po=PO261018-5592"
+      },
+      "destination": "/operation?tab=purchase-orders&po=PO261018-5592",
+      "observedAt": "2026-10-17T23:42:29.766Z",
+      "sourceVersion": "PO261018-5592:3:4221e531-7310-4d79-b331-01dfbb7f34e5",
+      "tone": "info",
+      "locked": false,
+      "broken": false
+    }
+  ],
   "taskCounts": {
     "tasks": 0,
     "work_events": 0

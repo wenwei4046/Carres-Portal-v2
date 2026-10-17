@@ -280,11 +280,11 @@ export function poWorkStateOf(
   _todayIso: string,
 ): PoWorkState {
   const p = poReceivingProgress(
-    po.lines.map((l) => ({ qty: l.qty, received_qty: l.receivedQty })),
+    po.lines.map((l) => ({ qty: l.qty, received_qty: l.receivedQty, cancelled_qty:l.cancelledQty })),
   );
   if (po.status === "cancelled") return "cancelled";
   if (po.status !== "open") return "completed";
-  if (p.ordered > 0 && p.received >= p.ordered) return "completed";
+  if (p.ordered > 0 && p.pendingDelivery === 0) return "completed";
   // Ready = goods ARRIVED (something checked in). A date merely PASSING is
   // NOT arrival — that is Overdue, a sub-state of waiting (Jess's state
   // machine, 2026-08-02, which corrected the earlier date-based rule).

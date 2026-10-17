@@ -81,7 +81,9 @@ export interface PurchaseOrderRegisterInput {
   expectedReadyDate?: string | null;
   /** `null` = the line quantities could not be read. An unknown read is never
    *  zero and never Completed (Purchasing MASTER §5.8 / §9.3). */
-  lines: readonly { qty: number | null; receivedQty: number | null }[] | null;
+  lines: readonly { qty: number | null; receivedQty: number | null; cancelledQty?:number }[] | null;
+  /** Only the exact current effective cancellation may retain its send action. */
+  cancellationVersion?:number|null;
   sends: readonly PurchaseOrderRegisterSend[];
 }
 
@@ -141,12 +143,13 @@ export function purchaseOrderRegisterFacts(
     (sum, line) => sum + Math.max(0, Math.min(Number(line.qty) || 0, Number(line.receivedQty) || 0)),
     0,
   );
-  const open = Math.max(0, ordered - received);
+  const cancelledQty=lines.reduce((total,line)=>total+Math.max(0,Number(line.cancelledQty??0)),0);
+  const open = Math.max(0, ordered - received - cancelledQty);
   /* Goods are known to be pending only when the read succeeded. */
   const pending = quantitiesKnown && open > 0;
   const confirmed = input.sends
     .filter((send) => send.kind === "confirmed_sent" && confirmedVersion(send) > 0)
-    .sort((a, b) => b.sentAt.localeCompare(a.sentAt));
+    .sort((a, b) => b.sentAt.localeCompare(a.sentAt) || confirmedVersion(b)-confirmedVersion(a));
   const currentSend = confirmed.find((send) => confirmedVersion(send) === version) ?? null;
   const latestConfirmedSend = confirmed[0] ?? null;
   const supplierVersion = latestConfirmedSend ? confirmedVersion(latestConfirmedSend) : null;
@@ -157,8 +160,9 @@ export function purchaseOrderRegisterFacts(
     !cancelled && (input.status === "received" || (quantitiesKnown && ordered > 0 && open === 0));
   const filters: PurchaseOrderRegisterFilter[] = [];
 
-  if (!cancelled && !currentSend) filters.push("pdf_not_sent");
-  if (!cancelled && version > 1 && supplierVersion !== version) {
+  const cancellationSend=input.cancellationVersion===version;
+  if ((!cancelled || cancellationSend) && !currentSend) filters.push("pdf_not_sent");
+  if ((!cancelled || cancellationSend) && version > 1 && supplierVersion !== version) {
     filters.push("supplier_update_required");
   }
   /* SUPPLIER REPLY facets: only a current version marked as sent with goods
@@ -248,7 +252,7 @@ export function purchaseOrderWork(
   input: PurchaseOrderRegisterInput,
   facts: PurchaseOrderRegisterFacts,
 ): PurchaseOrderWorkCopy | null {
-  if (facts.operationStatus === "Cancelled") return null;
+  if (facts.operationStatus === "Cancelled" && input.cancellationVersion!==facts.version) return null;
   /* ⭐ ISSUED IS NOT SENT, AND THE LINE SAYS SEND (owner 2026-09-25, the PO
      window send line; Purchasing §5.6.1 · COPY). The PO already exists, so
      `Issue …` told the operator to do what was done. The Work card, the PO

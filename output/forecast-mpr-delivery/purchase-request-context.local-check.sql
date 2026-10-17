@@ -491,6 +491,116 @@ begin
     or (select issued_qty from public.purchase_demands where id=buy)<>1 or (select issued_qty from public.purchase_demands where id=other_demand)<>1 then raise exception 'canonical merged issue violated one line or per-request source'; end if;
    if (select count(distinct reserved_purchase_demand_id) from public.ops_stock_items where po_no=merged_po)<>2 then raise exception 'merged exact Units lost separate request owners'; end if;
    raise notice 'Canonical merged issue LOCAL: two approved MPRs share ONE physical item line qty2, exact source1+1/counters/Unit owners, each remaining1 PASS';
+   -- Effective cancellation through SAME PO door, ordinary supplier evidence.
+   -- Nested rollback retains the surrounding merged-issue acceptance fixture.
+   declare physical uuid; chosen uuid; other_unit uuid; input jsonb; result jsonb; pending jsonb; call_key uuid:=gen_random_uuid(); cancel_id uuid:=gen_random_uuid();
+    original_document jsonb; document jsonb; refused boolean; detail text; before_scope jsonb; before_events bigint; retry_result jsonb;
+   begin
+    select id into strict physical from public.purchase_order_lines where po_id=merged_po;
+    select id into strict chosen from public.ops_stock_items where po_no=merged_po and reserved_purchase_demand_id=buy;
+    select id into strict other_unit from public.ops_stock_items where po_no=merged_po and reserved_purchase_demand_id=other_demand;
+    perform public.purchasing_confirm_po_sent(merged_po,1,'email','TEST-only@example.test','TEST V1 retained before cancellation');
+    select vd.document into strict original_document from public.po_version_documents vd where vd.po_id=merged_po and vd.po_version=1;
+    insert into storage.objects(bucket_id,name) values('delivery-orders',merged_po||'/TEST-cancellation.pdf');
+    before_scope:=(select approval_scope from public.purchase_requests where id=r.id);
+    input:=jsonb_build_object('action','record','key',call_key,'requestId',cancel_id,'expectedRequestVersion',0,'expectedPoVersion',1,'decisionReason','',
+     'lines',jsonb_build_array(jsonb_build_object('lineId',physical,'qty',1,'receivedQty',0,'unitIds',jsonb_build_array(chosen),'sources',jsonb_build_array(jsonb_build_object('demandId',buy,'qty',1,'recipients',public._purchasing_po_issued_recipients(merged_po,buy))))),
+     'supplierFacts',jsonb_build_object('supplierStatement','awaiting','fee','not_confirmed','shipped',null,'evidence','[]'::jsonb));
+    pending:=public.operation_cancel_po(merged_po,'TEST ordinary source-owned cancellation',input);
+    if pending->>'state'<>'pending' or (select issued_qty from public.purchase_demands where id=buy)<>1
+     or public._purchasing_po_line_cancelled_qty(physical)<>0 or (select status from public.ops_stock_items where id=chosen)<>'incoming'
+     or (select version from public.purchase_orders where id=merged_po)<>1 then raise exception 'pending cancellation released coverage or changed document'; end if;
+    retry_result:=public.operation_cancel_po(merged_po,'TEST ordinary source-owned cancellation',input);
+    if retry_result->>'replayed'<>'true' then raise exception 'pending retry not idempotent'; end if;
+    refused:=false;
+    begin perform public.operation_cancel_po(merged_po,'TEST ordinary source-owned cancellation',jsonb_set(jsonb_set(jsonb_set(input,'{action}','"complete"'),'{key}',to_jsonb(gen_random_uuid())),'{expectedRequestVersion}','1'));
+    exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail;refused:=detail='cancellation_not_effective'; end;
+    if not refused then raise exception 'unknown agreement/fee silently became effective'; end if;
+    declare exception_input jsonb; exception_result jsonb; changed jsonb;
+    begin
+     exception_input:=jsonb_set(jsonb_set(input,'{key}',to_jsonb(gen_random_uuid())),'{requestId}',to_jsonb(gen_random_uuid()));
+     exception_input:=jsonb_set(exception_input,'{supplierFacts}',jsonb_build_object('supplierStatement','disagreed','fee','yes','shipped',false,'evidence',jsonb_build_array(merged_po||'/TEST-cancellation.pdf')));
+     exception_result:=public.operation_cancel_po(merged_po,'TEST commercial exception',exception_input);
+     refused:=false;
+     begin perform public.operation_cancel_po(merged_po,'TEST commercial exception',jsonb_set(jsonb_set(jsonb_set(exception_input,'{action}','"complete"'),'{key}',to_jsonb(gen_random_uuid())),'{expectedRequestVersion}','1'));
+     exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail;refused:=detail='cancellation_not_effective'; end;
+     if not refused then raise exception 'commercial exception bypassed approval'; end if;
+     perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009699","role":"authenticated","app_metadata":{"role":"principal"}}',true);
+     begin
+      changed:=jsonb_set(jsonb_set(exception_input,'{key}',to_jsonb(gen_random_uuid())),'{requestId}',to_jsonb(gen_random_uuid()));
+      perform public.operation_cancel_po(merged_po,'TEST own commercial exception',changed);
+      refused:=false;
+      begin perform public.operation_cancel_po(merged_po,'TEST own commercial exception',jsonb_set(jsonb_set(jsonb_set(jsonb_set(changed,'{action}','"approve_exception"'),'{key}',to_jsonb(gen_random_uuid())),'{expectedRequestVersion}','1'),'{decisionReason}','"TEST self approval must refuse"'));
+      exception when insufficient_privilege then get stacked diagnostics detail=pg_exception_detail;refused:=detail='own_request'; end;
+      if not refused then raise exception 'commercial exception requester self approved'; end if;
+      raise exception 'rollback self-decision control' using errcode='P0908';
+     exception when sqlstate 'P0908' then null; end;
+     changed:=jsonb_set(jsonb_set(jsonb_set(jsonb_set(exception_input,'{action}','"approve_exception"'),'{key}',to_jsonb(gen_random_uuid())),'{expectedRequestVersion}','1'),'{decisionReason}','"TEST scoped commercial decision"');
+     exception_result:=public.operation_cancel_po(merged_po,'TEST commercial exception',changed);
+     if exception_result->>'state'<>'exception_approved' then raise exception 'qualified commercial decision not retained'; end if;
+     perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009698","role":"authenticated","app_metadata":{"role":"operation"}}',true);
+     changed:=jsonb_set(jsonb_set(jsonb_set(exception_input,'{action}','"complete"'),'{key}',to_jsonb(gen_random_uuid())),'{expectedRequestVersion}','2');
+     exception_result:=public.operation_cancel_po(merged_po,'TEST commercial exception',changed);
+     if exception_result->>'state'<>'effective' or public._purchasing_po_line_cancelled_qty(physical)<>1 then raise exception 'approved exact commercial exception did not apply'; end if;
+     raise notice 'Commercial cancellation LOCAL: same scoped pending request, existing Purchasing Approver decision required, actual actor/time retained, exact approval consumed by ordinary helper PASS';
+     raise exception 'rollback scoped commercial test' using errcode='P0907';
+    exception when sqlstate 'P0907' then null; end;
+    input:=jsonb_set(jsonb_set(jsonb_set(input,'{action}','"complete"'),'{key}',to_jsonb(gen_random_uuid())),'{expectedRequestVersion}','1');
+    input:=jsonb_set(input,'{supplierFacts}',jsonb_build_object('supplierStatement','agreed','fee','no','shipped',false,'evidence',jsonb_build_array(merged_po||'/TEST-cancellation.pdf')));
+    refused:=false;
+    begin perform public.operation_cancel_po(merged_po,'TEST ordinary source-owned cancellation',jsonb_set(input,'{supplierFacts,evidence}','["another-PO/absent.pdf"]'));
+    exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail;refused:=detail='reply_evidence_required'; end;
+    if not refused then raise exception 'foreign or absent file certified supplier evidence'; end if;
+    refused:=false;
+    begin perform public.operation_cancel_po(merged_po,'TEST ordinary source-owned cancellation',jsonb_set(input,'{supplierFacts,evidence}',jsonb_build_array(merged_po||'/TEST-never-uploaded.pdf')));
+    exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail;refused:=detail='reply_evidence_required'; end;
+    if not refused then raise exception 'same PO prefix without an uploaded object certified supplier evidence'; end if;
+    insert into storage.objects(bucket_id,name) values('delivery-orders',merged_po||'-foreign/TEST-present.pdf');
+    refused:=false;
+    begin perform public.operation_cancel_po(merged_po,'TEST ordinary source-owned cancellation',jsonb_set(input,'{supplierFacts,evidence}',jsonb_build_array(merged_po||'-foreign/TEST-present.pdf')));
+    exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail;refused:=detail='reply_evidence_required'; end;
+    if not refused then raise exception 'existing uploaded object with foreign prefix certified this PO evidence'; end if;
+    result:=public.operation_cancel_po(merged_po,'TEST ordinary source-owned cancellation',input);
+    if result->>'state'<>'effective' or result->>'poVersion'<>'2' or public._purchasing_po_line_cancelled_qty(physical)<>1
+     or (select qty from public.purchase_order_lines where id=physical)<>2 or (select received_qty from public.purchase_order_lines where id=physical)<>0
+     or (select status from public.ops_stock_items where id=chosen)<>'voided' or (select reserved_purchase_demand_id from public.ops_stock_items where id=chosen) is not null
+     or (select status from public.ops_stock_items where id=other_unit)<>'incoming' or (select reserved_purchase_demand_id from public.ops_stock_items where id=other_unit) is distinct from other_demand
+     or (select issued_qty from public.purchase_demands where id=buy)<>0 or (select issued_qty from public.purchase_demands where id=other_demand)<>1
+     or (select qty from public.po_line_sources where po_line_id=physical and purchase_demand_id=buy)<>1 then raise exception 'effective cancellation lost original/source/Unit facts'; end if;
+    perform public._purchasing_context_coverage(r.id,false);perform public._purchasing_context_coverage(other_id,false);
+    if public._purchasing_context_remaining_recipients(r.id,buy,before_scope) is distinct from (select x->'recipients' from jsonb_array_elements(before_scope->'approved_distribution') x where x->>'demandId'=buy::text)
+     or (select approval_scope from public.purchase_requests where id=r.id) is distinct from before_scope then raise exception 'effective cancellation rewrote need/approval or recipient coverage'; end if;
+    refused:=false;
+    begin perform public.purchasing_confirm_po_sent(merged_po,1,'email','TEST-only@example.test','TEST stale V1 must not certify cancellation');
+    exception when raise_exception then get stacked diagnostics detail=pg_exception_detail;refused:=detail='stale_po_version'; end;
+    if not refused then raise exception 'old send certified cancellation V2'; end if;
+    document:=public.purchasing_po_document(merged_po);
+    if document#>>'{lines,0,cancelled_qty}'<>'1' or document#>>'{lines,0,qty}'<>'2' then raise exception 'current document lacks ordered/cancelled facts'; end if;
+    raise notice 'LOCAL_TEST_CANCEL_PARTIAL_JSON %',document;
+    perform public.purchasing_confirm_po_sent(merged_po,2,'email','TEST-only@example.test','TEST current cancellation V2');
+    if (select vd.document from public.po_version_documents vd where vd.po_id=merged_po and vd.po_version=1) is distinct from original_document then raise exception 'cancellation rewrote sent V1'; end if;
+    refused:=false;
+    begin update public.ops_stock_items set status='free' where id=chosen;
+    exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail;refused:=detail='cancelled_scope_arrival_requires_discrepancy'; end;
+    if not refused then raise exception 'retired cancelled Unit became available on later arrival'; end if;
+    -- Supplier inability is a direct evidenced refusal to supply, no second
+    -- supplier-agreement or extra owner vote is imposed on this ordinary case.
+    input:=jsonb_set(jsonb_set(jsonb_set(jsonb_set(input,'{key}',to_jsonb(gen_random_uuid())),'{requestId}',to_jsonb(gen_random_uuid())),'{expectedRequestVersion}','0'),'{expectedPoVersion}','2');
+    input:=jsonb_set(input,'{lines}',jsonb_build_array(jsonb_build_object('lineId',physical,'qty',1,'receivedQty',0,'unitIds',jsonb_build_array(other_unit),'sources',jsonb_build_array(jsonb_build_object('demandId',other_demand,'qty',1,'recipients',public._purchasing_po_issued_recipients(merged_po,other_demand))))));
+    input:=jsonb_set(input,'{supplierFacts,supplierStatement}','"unable_to_supply"');
+    result:=public.operation_cancel_po(merged_po,'TEST supplier cannot supply the other outstanding source',input);
+    if (select status from public.purchase_orders where id=merged_po)<>'cancelled' or (select version from public.purchase_orders where id=merged_po)<>3
+     or public._purchasing_po_line_cancelled_qty(physical)<>2 or (select qty from public.purchase_order_lines where id=physical)<>2
+     or (select issued_qty from public.purchase_demands where id=other_demand)<>0 then raise exception 'whole unreceived cancellation lost original counts'; end if;
+    raise notice 'LOCAL_TEST_CANCEL_FULL_JSON %',public.purchasing_po_document(merged_po);
+    perform public.purchasing_confirm_po_sent(merged_po,3,'email','TEST-only@example.test','TEST cancelled whole PO current instruction');
+    if jsonb_array_length(public.purchasing_po_cancellation_facts(merged_po)->'financeHandoffs')<>2 then raise exception 'effective cancellation lacks traceable finance continuation'; end if;
+    select count(*) into before_events from public.po_goods_cancellation_events;
+    retry_result:=public.operation_cancel_po(merged_po,'TEST supplier cannot supply the other outstanding source',input);
+    if retry_result->>'replayed'<>'true' or (select count(*) from public.po_goods_cancellation_events)<>before_events then raise exception 'effective retry duplicated cancellation'; end if;
+    raise notice 'Effective cancellation LOCAL: pending retains coverage; ordinary agreement/no-fee and evidenced inability complete without extra vote; partial1/full2 retain ordered2/source/history/approval, exact Units retired, current V2/V3 sends and V1 immutable, unknown facts/late availability refused; finance facts traceable PASS';
+    raise exception 'rollback effective cancellation acceptance only' using errcode='P0906';
+   exception when sqlstate 'P0906' then null; end;
    -- Actual existing parent revision: explicit source1+1 grows only the
    -- selected approved source, then the other. Nested rollback retains fixture.
    declare physical uuid; version integer; proposed jsonb; changed jsonb; recipients jsonb; refused boolean; got text; before_events bigint;
@@ -931,6 +1041,32 @@ begin
   if exists(select 1 from public.ops_stock_items where po_no=counted_po) or not exists(select 1 from public.purchase_order_lines pl where pl.po_id=counted_po and pl.identity_mode='quantity' and pl.qty=2 and public.purchasing_po_line_free_units(pl.id)=2)
    or (select issued_qty from public.purchase_demands where id=counted_d.id)<>2 then raise exception 'counted canonical PO invented Units or lost free additional quantity'; end if;
   raise notice 'Canonical counted RS LOCAL: quantity2 PO retains exact request source and free quantity2; no fake Unit IDs PASS';
+  declare physical uuid; result jsonb; proposed jsonb; refused boolean; detail text;
+  begin
+   select id into strict physical from public.purchase_order_lines where po_id=counted_po;
+   insert into storage.objects(bucket_id,name) values('delivery-orders',counted_po||'/TEST-cancellation.pdf');
+   -- Seeded partial receipt truth, not a claim of exercising Receiving UI.
+   update public.purchase_order_lines set received_qty=1 where id=physical;
+   proposed:=jsonb_build_object('action','complete','key',gen_random_uuid(),'requestId',gen_random_uuid(),'expectedRequestVersion',0,'expectedPoVersion',1,'decisionReason','',
+    'lines',jsonb_build_array(jsonb_build_object('lineId',physical,'qty',1,'receivedQty',0,'unitIds','[]'::jsonb,'sources',jsonb_build_array(jsonb_build_object('demandId',counted_d.id,'qty',1,'recipients','[]'::jsonb)))),
+    'supplierFacts',jsonb_build_object('supplierStatement','unable_to_supply','fee','no','shipped',false,'evidence',jsonb_build_array(counted_po||'/TEST-cancellation.pdf')));
+   refused:=false;
+   begin perform public.operation_cancel_po(counted_po,'TEST counted outstanding cancellation',proposed);
+   exception when serialization_failure then get stacked diagnostics detail=pg_exception_detail;refused:=detail='cancellation_receipt_changed'; end;
+   if not refused then raise exception 'stale counted receipt scope admitted'; end if;
+   proposed:=jsonb_set(proposed,'{lines,0,receivedQty}','1');
+   result:=public.operation_cancel_po(counted_po,'TEST counted outstanding cancellation',proposed);
+   if result->>'state'<>'effective' or (select qty from public.purchase_order_lines where id=physical)<>2 or (select received_qty from public.purchase_order_lines where id=physical)<>1
+    or public._purchasing_po_line_cancelled_qty(physical)<>1 or public._purchasing_po_line_pending_qty(physical)<>0
+    or exists(select 1 from public.ops_stock_items where po_no=counted_po) or (select issued_qty from public.purchase_demands where id=counted_d.id)<>1
+    or (select approval_scope from public.purchase_requests where id=counted_id) is distinct from counted_scope then raise exception 'counted partial receipt cancellation lost history or invented Units'; end if;
+   refused:=false;
+   begin update public.purchase_order_lines set received_qty=2 where id=physical;
+   exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail;refused:=detail='cancelled_scope_arrival_requires_discrepancy'; end;
+   if not refused then raise exception 'cancelled counted goods accepted into original commitment'; end if;
+   raise notice 'Counted effective cancellation LOCAL: original2/seeded received1/cancelled1/pending0, exact source active1, unchanged request/approval, no Unit IDs; stale receipt and late accepted-quantity bypass refuse PASS';
+   raise exception 'rollback counted effective cancellation only' using errcode='P0909';
+  exception when sqlstate 'P0909' then null; end;
   declare counted_line uuid; target_destination uuid; changed jsonb;
   begin
    select id into strict counted_line from public.purchase_order_lines where po_id=counted_po;

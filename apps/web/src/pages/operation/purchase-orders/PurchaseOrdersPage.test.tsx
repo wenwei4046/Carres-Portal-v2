@@ -255,6 +255,8 @@ vi.mock("@/lib/queries", () => ({
   useOperationSupplierClaims: () => ({ isLoading: connectionLoading, isError: connectionError, refetch, data: connectionError || connectionLoading ? undefined : { claims: connectionEmpty ? [] : [{ id: "claim-1", claim_no: "SC-1001", requested_action: "return", status: "open" }], counts: { open: connectionEmpty ? 0 : 1, closed: 0, all: connectionEmpty ? 0 : 1 } } }),
   useOperationPoAudit: () => ({ isError: auditError, refetch, data: auditError ? undefined : { revisions: [{ id: "rev-1", rev_no: 1, reason: "Deliver To changed", created_at: "2026-08-28T09:00:00Z", actor_name: "Yee Jean" }], history: [{ id: "hist-1", text: "Purchase order revised", occurred_at: "2026-08-28T09:00:00Z", actor_name: "Yee Jean", by_role: "operation" }] } }),
   useRecordSend: () => ({ mutate: vi.fn() }),
+  usePoCancellations: () => ({data:{actorId:"helper",poVersion:2,canDecideException:false,financeHandoffs:[],events:[],lines:[{lineId:"line-1",sku:"MAT-K-001",identityMode:"quantity",orderedQty:3,receivedQty:1,cancelledQty:0,pendingQty:2,sources:[{demandId:"demand",requestId:"request",requestNo:"MPR TEST",purpose:"ready_stock",contextual:true,orderedQty:3,activeQty:3,cancelledQty:0,unitChoices:[],recipients:[]}]}]},isLoading:false,isError:false,isFetching:false,refetch}),
+  useRecordPoCancellation: () => ({mutateAsync:vi.fn(),isPending:false}),
   useRegisterLayouts: () => ({ data: { layouts: [], limit: 10 }, isLoading: false, isError: false }),
   useSaveRegisterLayout: () => ({ mutateAsync: vi.fn() }),
   useSetDefaultRegisterLayout: () => ({ mutateAsync: vi.fn() }),
@@ -321,7 +323,8 @@ beforeEach(() => {
   );
   queryData.pos[0]!.purchase_order_lines[0]!.destination_id = "destination-1";
   queryData.pos[0]!.purchase_order_lines[0]!.identity_mode = null;
-  Object.assign(queryData.pos[0]!, { status: "open" });
+  Object.assign(queryData.pos[0]!, { status: "open", cancellation_version:null, contextual_cancellation_available:false });
+  Object.assign(queryData.pos[0]!.purchase_order_lines[0]!,{cancelled_qty:0});
   queryData.pos[0]!.purchase_order_lines[0]!.received_qty = 1;
   queryData.pos[0]!.eta_date = "2026-09-10";
   queryData.pos[0]!.official_delivery_date = "2026-09-10";
@@ -1302,4 +1305,31 @@ describe("Purchase Orders Overview", () => {
     expect(screen.getByRole("tab", { name: "Table" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByTestId("register-grid")).toHaveAttribute("data-groups", "not_marked_as_sent,issued,completed,cancelled");
   });
+});
+
+
+describe("qualified cancellation in the existing PO object",()=>{
+ it("retains the actual cancellation editor on a dismissed discard and leaves only after explicit discard",async()=>{
+  Object.assign(queryData.pos[0]!,{contextual_cancellation_available:true});
+  renderPage("/operation/procurement?po=PO-20260828-4827");
+  fireEvent.keyDown(screen.getByTestId("po-object-edit"),{key:"Enter"});
+  fireEvent.click(screen.getByRole("menuitem",{name:"Cancel goods not received"}));
+  const editor=await screen.findByTestId("po-cancellation-fields");
+  fireEvent.change(within(editor).getByLabelText(/^Reason/),{target:{value:"TEST pending cancellation"}});
+  fireEvent.click(screen.getByRole("button",{name:"Close document work"}));
+  expect(await screen.findByRole("dialog",{name:"Discard"})).toBeVisible();
+  fireEvent.click(within(screen.getByRole("dialog",{name:"Discard"})).getByRole("button",{name:"Cancel"}));
+  expect(within(editor).getByLabelText(/^Reason/)).toHaveValue("TEST pending cancellation");
+  fireEvent.click(screen.getByRole("button",{name:"Back to Purchase Orders"}));
+  fireEvent.click(within(await screen.findByRole("dialog",{name:"Discard"})).getByRole("button",{name:"Discard"}));
+  await waitFor(()=>expect(screen.queryByTestId("po-cancellation-fields")).not.toBeInTheDocument());
+ });
+ it("whole qualified cancellation retains the official current PDF and sending action",()=>{
+  Object.assign(queryData.pos[0]!,{status:"cancelled",cancellation_version:2});
+  Object.assign(queryData.pos[0]!.purchase_order_lines[0]!,{received_qty:0,cancelled_qty:3});
+  renderPage("/operation/procurement?po=PO-20260828-4827");
+  expect(screen.getByRole("button",{name:"Download PDF"})).toBeVisible();
+  expect(screen.getByTestId("po-document-panes")).toBeInTheDocument();
+  expect(screen.getByTestId("purchase-order-object")).toHaveTextContent("Send");
+ });
 });

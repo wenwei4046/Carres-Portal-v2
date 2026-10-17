@@ -410,11 +410,24 @@ async function withCatalogAndLineage(
       if (headers.error) return { error: headers.error };
       for (const po of headers.data ?? []) if (typeof po.status === "string" && po.status.length) sourcePoStatus.set(po.id as string, po.status);
     }
+    const cancellationByLine=new Map<string,{cancelledQty:number;sources:Array<{demandId:string;activeQty:number;cancelledQty:number;orderedQty:number}>}>();
+    if(contextIssued.length && physical.size) {
+      const facts=await sb.rpc("purchasing_po_cancellations",{p_po_ids:[...new Set((physicalRead.data??[]).map(pl=>pl.po_id as string))]});
+      if(facts.error || !Array.isArray(facts.data)) return {error:facts.error??{message:"Cancellation source could not be loaded"}};
+      for(const observed of facts.data) for(const line of observed.facts?.lines??[]) {
+        const original=physical.get(line.lineId);
+        if(!original || original.qty!==line.orderedQty || original.received_qty!==line.receivedQty || !Number.isInteger(line.cancelledQty) || !Array.isArray(line.sources)) return {error:{message:"This work changed. Refresh and try again."}};
+        cancellationByLine.set(line.lineId,line);
+      }
+    }
     const attributed: Array<Record<string, unknown>> = [];
     for (const source of sourceRead.data ?? []) {
       const pl = physical.get(source.po_line_id as string);
       if (!pl) return { error: { message: "This work changed. Refresh and try again." } };
-      attributed.push({ ...pl, demand_id: source.purchase_demand_id, qty: source.qty, physical_qty: pl.qty });
+      const cancellation=cancellationByLine.get(String(pl.id));
+      const cancelledSource=cancellation?.sources.find(value=>value.demandId===source.purchase_demand_id);
+      if(cancellation && (!cancelledSource || cancelledSource.orderedQty!==source.qty || !Number.isInteger(cancelledSource.activeQty) || cancelledSource.activeQty<0)) return {error:{message:"This work changed. Refresh and try again."}};
+      attributed.push({ ...pl, demand_id: source.purchase_demand_id, qty:cancelledSource?.activeQty??source.qty, original_qty:source.qty, cancelled_qty:cancelledSource?.cancelledQty??0, physical_qty:pl.qty,physical_active_qty:Number(pl.qty)-(cancellation?.cancelledQty??0) });
     }
     for (const line of contextIssued) {
       if (attributed.some(pl => pl.demand_id === line.id && !sourcePoStatus.has(pl.po_id as string))) return { error: { message: "This work changed. Refresh and try again." } };
@@ -443,7 +456,7 @@ async function withCatalogAndLineage(
    */
   const allocationsByDemand = new Map<
     string,
-    Array<{ poId: string; qty: number; destinationId: string | null }>
+    Array<{ poId: string; qty: number; originalQty?: number; cancelledQty?: number; destinationId: string | null }>
   >();
   for (const pl of lineagePoLines ?? []) {
     const d = pl.demand_id as string | null;
@@ -461,6 +474,8 @@ async function withCatalogAndLineage(
       {
         poId: pl.po_id as string,
         qty: Number(pl.qty ?? 0),
+        originalQty:Number(pl.original_qty??pl.qty??0),
+        cancelledQty:Number(pl.cancelled_qty??0),
         destinationId: (pl.destination_id as string | null) ?? null,
       },
     ]);
@@ -532,13 +547,13 @@ async function withCatalogAndLineage(
         ...l,
         ...(l.request_line_id != null && l.fulfilment_kind === "purchase" ? {
           received: Number(l.approved_qty ?? 0) > 0 && Number(l.issued_qty ?? 0) >= Number(l.approved_qty)
-            && lineagePoLines.filter(pl => pl.demand_id === l.id && sourcePoStatus.get(pl.po_id as string) !== "cancelled").length > 0
-            && lineagePoLines.filter(pl => pl.demand_id === l.id && sourcePoStatus.get(pl.po_id as string) !== "cancelled").every(pl => Number(pl.received_qty ?? 0) >= Number(pl.physical_qty ?? pl.qty)),
+            && lineagePoLines.filter(pl => pl.demand_id === l.id && Number(pl.qty)>0 && sourcePoStatus.get(pl.po_id as string) !== "cancelled").length > 0
+            && lineagePoLines.filter(pl => pl.demand_id === l.id && Number(pl.qty)>0 && sourcePoStatus.get(pl.po_id as string) !== "cancelled").every(pl => Number(pl.received_qty ?? 0) >= Number(pl.physical_active_qty ?? pl.physical_qty ?? pl.qty)),
         } : {}),
         category: cat?.category ?? null,
         item_label: cat?.itemLabel ?? (l.sku as string),
         po_ids: [...poIds],
-        ...(l.request_line_id != null ? { active_po_ids: [...poIds].filter(id => sourcePoStatus.has(id) && sourcePoStatus.get(id) !== "cancelled") } : {}),
+        ...(l.request_line_id != null ? { active_po_ids: [...poIds].filter(id => sourcePoStatus.has(id) && sourcePoStatus.get(id) !== "cancelled" && lineagePoLines.some(pl=>pl.demand_id===l.id && pl.po_id===id && Number(pl.qty)>0)) } : {}),
         /* One entry per purchase order this line actually went onto, with
            THAT document's quantity and destination. Empty = nothing issued. */
         allocations: allocationsByDemand.get(l.id as string) ?? [],

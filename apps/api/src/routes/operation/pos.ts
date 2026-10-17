@@ -308,13 +308,14 @@ operationPosRouter.get("/", requireOperation, async (c) => {
      Identity stays the request UUID and the business facts (Proceed Date,
      purpose) still travel, so detailed source lines can tell two purchases
      apart. */
+  const modernRequestIds = new Set<string>();
   const requestFactsById = new Map<string, { proceedDate: string | null; reqNo: string | null }>();
   if (requestIds.length > 0) {
     const requestResult = await readEveryChunked<Record<string, unknown>, string>(
       requestIds,
       (ids) => sb
         .from("purchase_requests")
-        .select("id, created_at, req_no")
+        .select("id, created_at, req_no, request_version")
         .in("id", ids)
         .order("id"),
     );
@@ -323,6 +324,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       return c.json(m.body, m.status);
     }
     for (const request of requestResult.data) {
+      if (Number(request.request_version ?? 0)>0) modernRequestIds.add(String(request.id));
       requestFactsById.set(request.id as string, {
         proceedDate:
           typeof request.created_at === "string"
@@ -333,6 +335,31 @@ operationPosRouter.get("/", requireOperation, async (c) => {
             ? request.req_no.trim()
             : null,
       });
+    }
+  }
+  // Context cancellation is authoritative by immutable PO events. Version1
+  // cannot have an effective cancellation (completion always mints Version2+).
+  for(const po of pos) po.contextual_cancellation_available=(linesByPo.get(String(po.id))??[]).some(line=>[line.demand_id,...(poSourcesByLine.get(String(line.id))??[]).map(source=>source.purchase_demand_id)].some(id=>modernRequestIds.has(demandById.get(String(id))?.requestId??"")));
+  const cancellationCandidates=pos.filter(po => Number(po.version ?? 1)>1 && (linesByPo.get(String(po.id))??[]).some(line => {
+    const ids=[line.demand_id,...(poSourcesByLine.get(String(line.id))??[]).map(source=>source.purchase_demand_id)];
+    return ids.some(id=>modernRequestIds.has(demandById.get(String(id))?.requestId??""));
+  }));
+  if(cancellationCandidates.length) {
+    const result=await sb.rpc("purchasing_po_cancellations",{p_po_ids:cancellationCandidates.map(po=>po.id)});
+    if(result.error || !Array.isArray(result.data)) return c.json({error:"cancellation_source_unavailable"},503);
+    const factsByPo=new Map(result.data.map((row:any)=>[row.poId,row.facts]));
+    for(const po of cancellationCandidates) {
+      const facts=factsByPo.get(po.id) as {lines:Array<{lineId:string;orderedQty:number;receivedQty:number;cancelledQty:number;pendingQty:number}>;events:Array<{kind:string;applied_po_version:number;id:string}>}|undefined;
+      if(facts && (!Array.isArray(facts.lines)||!Array.isArray(facts.events))) return c.json({error:"cancellation_source_unavailable"},503);
+      for(const line of linesByPo.get(String(po.id))??[]) {
+        const observed=facts?.lines.find(value=>value.lineId===line.id);
+        if(facts && (!observed || observed.orderedQty!==line.qty || observed.receivedQty!==line.received_qty || !Number.isInteger(observed.cancelledQty) || observed.cancelledQty<0 || observed.cancelledQty>Number(line.qty)-Number(line.received_qty))) return c.json({error:"cancellation_scope_changed"},503);
+        line.cancelled_qty=observed?.cancelledQty??0;
+        line.pending_qty=observed?.pendingQty??Number(line.qty)-Number(line.received_qty);
+      }
+      const effective=facts?.events.filter(event=>event.kind==="effective"&&event.applied_po_version===po.version)??[];
+      po.cancellation_version=effective.length?po.version:null;
+      po.cancellation_event_id=effective[0]?.id??null;
     }
   }
   const tomorrowAboutByPo = new Map<string, string | null>();
@@ -1705,11 +1732,16 @@ operationPosRouter.get("/issued-today", requireOperation, async (c) => {
 operationPosRouter.get("/:id/issue-context", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data: po, error } = await sb.from("purchase_orders")
-    .select("id, supplier_id, destination_id, status")
+    .select("id, supplier_id, destination_id, status, version")
     .eq("id", c.req.param("id")).maybeSingle();
   if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
   if (!po) return c.json({ message: "PO not found" }, 404);
-  if (po.status === "cancelled") return c.json({ message: "Cancelled POs cannot be printed" }, 422);
+  if (po.status === "cancelled") {
+    if(Number(po.version??1)<2) return c.json({ message: "Cancelled POs cannot be printed" },422);
+    const facts=await sb.rpc("purchasing_po_cancellation_facts",{p_po_id:po.id});
+    if(facts.error) return c.json({error:"cancellation_source_unavailable"},503);
+    if(!facts.data?.events?.some((event:any)=>event.kind==="effective"&&event.applied_po_version===po.version)) return c.json({message:"Cancelled POs cannot be printed"},422);
+  }
   const [supplier, destination] = await Promise.all([
     sb.from("suppliers").select("name, whatsapp_group_url, po_send_channel, contact_email, contact")
       .eq("id", po.supplier_id).maybeSingle(),
@@ -2213,6 +2245,18 @@ async function autoReserveReceivedToSourceOrder(
   }
 }
 
+operationPosRouter.get("/:id/cancellations", async(c,next)=> {
+  // Finance consumes only this money-free owning cancellation record. This
+  // does not open other Operation routes or grant settlement/PO write rights.
+  if(c.var.auth.role === "finance") return next();
+  return requireOperation(c,next);
+}, async(c)=> {
+  const sb=userClient(c.env,c.var.auth.jwt);
+  const {data,error}=await sb.rpc("purchasing_po_cancellation_facts",{p_po_id:c.req.param("id")});
+  if(error){const mapped=mapPgError(error);return c.json(mapped.body,mapped.status);}
+  return c.json(data);
+});
+
 // ----- POST /:id/cancel -----
 operationPosRouter.post("/:id/cancel", requireOperation, async (c) => {
   const parsed = await parseJsonBody(c, cancelPoInput);
@@ -2221,12 +2265,13 @@ operationPosRouter.post("/:id/cancel", requireOperation, async (c) => {
   const { data, error } = await sb.rpc("operation_cancel_po", {
     p_po_id: c.req.param("id"),
     p_reason: parsed.data.reason,
+    ...(parsed.data.cancellation ? {p_cancellation:parsed.data.cancellation} : {}),
   });
   if (error) {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
-  return c.json({ po: data });
+  return c.json(parsed.data.cancellation ? { cancellation: data } : { po: data });
 });
 
 // ----- POST /:id/assign-pickup-partner -----

@@ -327,6 +327,9 @@ export const MODULE_WORK_RULES: readonly WorkRuleDefinition[] = [
     completionFact: "a sent mark for every linked current PO version (po_sends)",
   },
   {
+    key:"purchasing.cancellation_send",module:"purchasing",trigger:"an effective PO cancellation has a current version not confirmed sent",owner:"effective PO Duty holder and governed cover",ownerRule:"po_duty",action:"Send PO to supplier",dueRule:"no new deadline; preserve actual cancellation version",completionFact:"confirmed_sent for the exact current cancellation PO version",
+  },
+  {
     /* ⭐ ONE OCCURRENCE PER PO WINDOW (Purchasing §5.6.1, owner rulings
      * 2026-09-24/25). Replaces the per-Sales-Order `issue_po` card in Work and
      * the retired `confirm_ready_date` (Purchasing §5.7/§5.8): the calculated
@@ -610,6 +613,7 @@ const WORK_COMPLETION_STATEMENTS: Readonly<Record<string, string>> = {
   ask_delivery_date: "The requested delivery date or governed no-date answer is recorded",
   "manual_purchase.approve": "The approval or refusal decision is recorded",
   "manual_purchase.issue_po": "Every linked current PO version marked as sent",
+  "purchasing.cancellation_send": "Current cancellation PO version marked as sent",
   "purchasing.po_window": "Every PO issued from the window has its current version marked as sent",
   "payment.collect_customer_balance": "The outstanding balance is RM 0",
   "payment.review_overpayment": "The overpaid amount is RM 0 or an approved refund covers it",

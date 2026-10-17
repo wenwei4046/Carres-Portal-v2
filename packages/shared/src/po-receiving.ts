@@ -49,6 +49,7 @@ export type PoReceivingState =
  *  shape — nullable/absent tolerated so a pre-0283 payload degrades to zero
  *  issues rather than NaN). */
 export interface PoReceivingLine {
+  cancelled_qty?: number | null;
   qty?: number | null;
   received_qty?: number | null;
   damaged_qty?: number | null;
@@ -105,7 +106,7 @@ export function poReceivingProgress(
     const r = Math.max(0, Math.min(q, n(l.received_qty)));
     ordered += q;
     received += r;
-    pendingDelivery += q - r;
+    pendingDelivery += Math.max(0,q-r-Math.max(0,n(l.cancelled_qty)));
     damaged += Math.max(0, n(l.damaged_qty));
     wrongItem += Math.max(0, n(l.wrong_item_qty));
   }

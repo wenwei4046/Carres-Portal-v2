@@ -820,7 +820,16 @@ export type ResumeDispatchInput = z.infer<typeof resumeDispatchInput>;
  * required for the audit trail (mirrors abandonOrderInput shape).
  */
 export const cancelPoInput = z.object({
-  reason: z.string().min(1),
+  reason: z.string().trim().min(1).max(500),
+  cancellation: z.object({
+    action:z.enum(["record","complete","approve_exception","refuse_exception"]),
+    key:z.string().uuid(),requestId:z.string().uuid(),expectedRequestVersion:z.number().int().nonnegative(),expectedPoVersion:z.number().int().positive(),
+    decisionReason:z.string().max(500),
+    supplierFacts:z.object({supplierStatement:z.enum(["awaiting","agreed","unable_to_supply","disagreed"]),fee:z.enum(["yes","no","not_confirmed"]),shipped:z.boolean().nullable(),evidence:z.array(z.string().trim().min(1).max(2000)).max(20)}).strict(),
+    lines:z.array(z.object({lineId:z.string().uuid(),qty:z.number().int().positive(),receivedQty:z.number().int().nonnegative(),unitIds:z.array(z.string().uuid()),
+      sources:z.array(z.object({demandId:z.string().uuid(),qty:z.number().int().positive(),recipients:z.array(z.object({recipientId:z.string().uuid(),qty:z.number().int().positive()}).strict())}).strict()).min(1),
+    }).strict()).min(1),
+  }).strict().optional(),
 }).strict();
 export type CancelPoInput = z.infer<typeof cancelPoInput>;
 

@@ -344,6 +344,7 @@ import { withDepartment } from "@/pages/finance/department";
 import { uploadCompartmentPhoto, uploadDeliveryProof, uploadModelPhoto } from "./photo-upload";
 
 export const qk = {
+  poCancellations:(id:string)=>["operation","pos",id,"cancellations"] as const,
   purchaseRequestPlan: (skus: string[], proceedDate: string | null, purpose: string | null, origin: string | null = null, requestId: string | null = null) => ["operation", "purchasing", "requests", "plan", skus.join("|"), proceedDate, purpose, origin, requestId] as const,
   purchaseRequestItems: () => ["to-order", "pick-items"] as const,
   purchaseRequestContextReview: (id: string) => ["operation", "purchasing", "requests", id, "context-review"] as const,
@@ -454,6 +455,7 @@ export const qk = {
   // `List*Query` zod-derived shapes from `@carres/shared` so a wrong key fails
   // typecheck at the call site rather than silently breaking cache reads.
   operation: {
+    poRoot:()=>["operation","pos"] as const,
     workspaceAssignmentHistory: (duty: string) => ["operation", "workspace-assignment-history", duty] as const,
     workActivitySettings: () => ["operation", "work-activity-settings"] as const,
     work:      () => ["operation", "work"] as const,
@@ -3358,6 +3360,7 @@ export interface operationOrderDetailResponse {
 /** Row in GET /api/operation/pos. `purchase_order_lines(...)` is the embedded
  *  PostgREST nested resource. */
 export interface operationPoListRow {
+  contextual_cancellation_available?:boolean;
   id: string;
   supplier_id: string;
   warehouse_id: string;
@@ -3393,6 +3396,8 @@ export interface operationPoListRow {
    *  DERIVED from this against the latest send — never stored. */
   revised_at?: string | null;
   placed_at: string;
+  cancellation_version?:number|null;
+  cancellation_event_id?:string|null;
   purchase_order_lines: {
     // 0076 (Loo 2026-05-10): line UUID — primary key after migration. Used
     // by ReceivePOModal as the recv-state key (replacing sku) so multi-
@@ -3402,6 +3407,8 @@ export interface operationPoListRow {
     sku: string;
     qty: number;
     received_qty: number;
+    cancelled_qty?:number;
+    pending_qty?:number;
     /** 0442 — the Catalog stock identity mode SNAPSHOTTED at issue.
      *  `exact_unit`: the line owns one permanent Unit ID per piece;
      *  `quantity`: counted goods, no Unit IDs (the column prints `—`). */
@@ -12730,4 +12737,23 @@ export function useWarehouseCalendar() {
     },
     staleTime: 30_000,
   });
+}
+
+
+export interface PoCancellationFacts {
+ actorId:string;canDecideException:boolean;poVersion:number;
+ lines:Array<{lineId:string;sku:string;identityMode:"exact_unit"|"quantity";orderedQty:number;receivedQty:number;cancelledQty:number;pendingQty:number;sources:Array<{demandId:string;requestId:string;requestNo:string|null;purpose:string;contextual:boolean;orderedQty:number;activeQty:number;cancelledQty:number;unitChoices:Array<{id:string;unitCode:string;status:string}>;recipients:Array<{recipientId:string;name:string|null;qty:number}>}>}>;
+ events:Array<{id:string;request_id:string;request_version:number;expected_po_version:number;kind:"pending"|"exception_approved"|"exception_refused"|"effective";reason:string;scope:NonNullable<import("@carres/shared").CancelPoInput["cancellation"]>["lines"];supplier_facts:NonNullable<import("@carres/shared").CancelPoInput["cancellation"]>["supplierFacts"];actor_id:string;at:string}>;
+ financeHandoffs:Array<{id:string;poId:string;poVersion:number}>;
+}
+export function usePoCancellations(poId:string) {
+ return useQuery({queryKey:qk.poCancellations(poId),queryFn:()=>apiFetch<PoCancellationFacts>(`/api/operation/pos/${encodeURIComponent(poId)}/cancellations`),staleTime:0});
+}
+export function useRecordPoCancellation(poId:string) {
+ const qc=useQueryClient();return useMutation({mutationFn:(input:import("@carres/shared").CancelPoInput)=>apiFetch<{cancellation:{requestVersion:number;state:string;poVersion:number|null}}>(`/api/operation/pos/${encodeURIComponent(poId)}/cancel`,{method:"POST",body:JSON.stringify(input)}),onSuccess:()=> {
+  void qc.invalidateQueries({queryKey:qk.poCancellations(poId)});
+  void qc.invalidateQueries({queryKey:qk.operation.poRoot()});
+  void qc.invalidateQueries({queryKey:qk.purchaseRequests()});
+  void qc.invalidateQueries({queryKey:qk.operation.work()});
+ }});
 }

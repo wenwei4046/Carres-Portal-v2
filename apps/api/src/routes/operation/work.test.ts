@@ -1,3 +1,4 @@
+import { projectPurchaseOrderCancellationSendWork } from "./work";
 import { describe, expect, it } from "vitest";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
@@ -1323,4 +1324,15 @@ describe("the PO window card — one occurrence per window, never one per Sales 
   it("the per-Sales-Order issue_po and the retired confirm_ready_date are the window card's, not Work's", () => {
     expect([...PURCHASING_WINDOW_OWNED].sort()).toEqual(["confirm_ready_date", "issue_po"]);
   });
+});
+
+
+describe("PO cancellation owns current sending after goods end",()=> {
+ it("keeps one current occurrence after cancelled goods, old send cannot close it",()=> {
+  const po={id:"PO261018-0001",supplier_id:"TEST supplier",status:"cancelled" as const,version:3,cancellation_version:3,cancellation_event_id:"TEST-event",purchase_order_lines:[{qty:2,received_qty:0,cancelled_qty:2}],sends:[{kind:"confirmed_sent" as const,po_version:1,sent_at:"2026-10-18T00:00:00Z",channel:"email"}]};
+  const input={pos:[po],suppliers:[],poDuty:null,today:"2026-10-18"};
+  const rows=projectPurchaseOrderCancellationSendWork(input);expect(rows).toHaveLength(1);expect(rows[0]).toMatchObject({ruleKey:"purchasing.cancellation_send",object:{id:po.id},interaction:{componentKey:"purchasing.po_issue_evidence"}});
+  expect(projectPurchaseOrderCancellationSendWork({...input,pos:[{...po,sends:[...po.sends,{...po.sends[0],po_version:3}]}]})).toHaveLength(0);
+  expect(projectPurchaseOrderCancellationSendWork({...input,pos:[{...po,cancellation_version:2}]})).toHaveLength(0);
+ });
 });
