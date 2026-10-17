@@ -1021,6 +1021,11 @@ transaction backfill or contextual writer/form activation. Isolated replay appli
 atomic create/configuration/resubmit3/3 and three actual CHECK negative controls passed.
 Production read-only preflight found no historical purpose outside the preserved checks.
 Application and authenticated end-to-end verification remain separate obligations.
+**DATABASE APPLIED17Oct2026, 21:22 MYT:** tracker `20261017132212`, SQL MD5
+`a441435a3a5d4f79765f54256fd88be9` equals the committed file. Read-only post-check confirmed
+13 new columns,30/14/Active defaults, unchanged RLS and transaction counts, no contextual requests
+or invented approval scopes, and all73 purchasing function definitions unchanged (aggregate
+fingerprint `67dd6f15b65983ba0131a9198d1c8be4`). PR#2091 carries the exact approved file.
 
 
 **Shared narrow-page UX — OWNER-APPROVED TARGET / NOT BUILT, Jess17Oct2026.**
