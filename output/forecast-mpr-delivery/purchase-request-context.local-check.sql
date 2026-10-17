@@ -199,4 +199,84 @@ begin
  raise notice 'Approval guard: missing snapshot refused, exact snapshot admitted, changed version/distribution refused PASS';
  raise notice 'Context state: exact material facts, unknown approval and quantity/configuration/header-date drift refusal PASS';
 end; $state_test$;
+-- LOCAL synthetic approval only: exercise the real resubmit RPC, never production.
+do $revision_writer_test$
+declare r public.purchase_requests%rowtype; c jsonb; envelope jsonb; key uuid:=gen_random_uuid(); result jsonb; retry jsonb; before_state jsonb; detail text; refused boolean; event_count integer; demand_count integer;
+begin
+ select * into strict r from public.purchase_requests where created_by='fffffff1-0000-4000-8000-000000009698' and request_version=1 and approved_at is not null;
+ perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009698","role":"authenticated","app_metadata":{"role":"operation"}}',true);
+ c:=jsonb_set(r.request_context,'{recipients,0,name}','"TEST revised recipient"');
+ envelope:=jsonb_build_array(jsonb_build_object('request_context',c,'revision_key',key,'expected_version',1,'reason','TEST actual recipient correction'));
+ result:=public.purchasing_resubmit_request(r.id,r.destination_id,r.required_by,p_lines=>envelope);
+ retry:=public.purchasing_resubmit_request(r.id,r.destination_id,r.required_by,p_lines=>envelope);
+ if result is distinct from retry or result->>'req_no' is distinct from r.req_no or result->>'request_version'<>'2' then raise exception 'same-number revision/retry failed'; end if;
+ if not exists(select 1 from public.purchase_requests where id=r.id and request_version=2 and request_context=c and approved_at is null and approved_by is null and approval_scope is null and approval_version is null and round=r.round+1) then raise exception 'revision did not invalidate preceding approval'; end if;
+ if (select count(*) from public.purchase_request_events where request_id=r.id and changes->>'revision_key'=key::text)<>1 then raise exception 'retry duplicated history'; end if;
+ if not exists(select 1 from public.purchase_request_events where request_id=r.id and actor_id=auth.uid() and reason='TEST actual recipient correction' and changes#>'{previous_approval,approval_scope}'=r.approval_scope and changes#>'{before,context}'=r.request_context and changes->'after_context'=c) then raise exception 'revision lost prior approval or before/after evidence'; end if;
+ if (select count(*) from public.purchase_demands where request_id=r.id and cancelled_at is not null)<>3 or (select count(*) from public.purchase_demands where request_id=r.id and cancelled_at is null)<>3 then raise exception 'revision lost demand history'; end if;
+ before_state:=public._purchasing_request_context_state(r.id);
+ refused:=false;
+ begin
+  perform public.purchasing_resubmit_request(r.id,r.destination_id,r.required_by,p_lines=>jsonb_set(envelope,'{0,request_context,recipients,0,name}','"TEST another recipient"'));
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='revision_scope_changed'; end;
+ if not refused then raise exception 'changed retry scope accepted'; end if;
+ refused:=false;
+ begin
+  perform public.purchasing_resubmit_request(r.id,r.destination_id,r.required_by,p_lines=>jsonb_set(envelope,'{0,revision_key}',to_jsonb(gen_random_uuid())));
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='request_version_changed'; end;
+ if not refused then raise exception 'stale revision version accepted'; end if;
+ -- A different pending revision cannot silently mutate this awaiting request.
+ refused:=false;
+ begin
+  perform public.purchasing_resubmit_request(r.id,r.destination_id,r.required_by,p_lines=>jsonb_set(jsonb_set(envelope,'{0,revision_key}',to_jsonb(gen_random_uuid())),'{0,expected_version}','2'));
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='request_revision_unavailable'; end;
+ if not refused then raise exception 'awaiting request silently editable'; end if;
+ -- Returned request revision: a later unknown SKU must undo header, old-line
+ -- cancellations, new demands and version together.
+ update public.purchase_requests set sent_back_at=now(),sent_back_by='fffffff1-0000-4000-8000-000000009699',sent_back_reason='TEST correction' where id=r.id;
+ select count(*) into demand_count from public.purchase_demands where request_id=r.id;
+ c:=jsonb_set(c,'{lines,0,sku}','"TEST-UNKNOWN-REVISION-SKU"');
+ refused:=false;
+ begin
+  perform public.purchasing_resubmit_request(r.id,r.destination_id,r.required_by,p_lines=>jsonb_build_array(jsonb_build_object('request_context',c,'revision_key',gen_random_uuid(),'expected_version',2,'reason','TEST unknown SKU')));
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='unknown_sku'; end;
+ if not refused or public._purchasing_request_context_state(r.id) is distinct from before_state or (select count(*) from public.purchase_demands where request_id=r.id)<>demand_count then raise exception 'later-line revision refusal was not atomic'; end if;
+ -- Complete the returned correction under the same number, then stamp it
+ -- using the actual existing Purchasing Approver fixture and private writer.
+ c:=jsonb_set(r.request_context,'{recipients,0,name}','"TEST final corrected recipient"');
+ result:=public.purchasing_resubmit_request(r.id,r.destination_id,r.required_by,p_lines=>jsonb_build_array(jsonb_build_object('request_context',c,'revision_key',gen_random_uuid(),'expected_version',2,'reason','TEST returned correction')));
+ if result->>'req_no' is distinct from r.req_no or result->>'request_version'<>'3' then raise exception 'returned correction changed permanent identity'; end if;
+ perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009699","role":"authenticated","app_metadata":{"role":"principal"}}',true);
+ before_state:=public._purchasing_stamp_context_approval(r.id);
+ if before_state->>'request_version'<>'3' or not exists(select 1 from public.purchase_requests where id=r.id and approval_version=3 and approved_by=auth.uid() and approval_scope=before_state)
+   or (select count(*) from public.purchase_request_events where request_id=r.id and kind='resubmitted')<>2 then raise exception 'same-number reapproval snapshot/history failed'; end if;
+ refused:=false;
+ begin
+  perform public._purchasing_stamp_context_approval(r.id);
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='request_not_awaiting_approval'; end;
+ if not refused then raise exception 'already-approved request stamped twice'; end if;
+ raise notice 'Private approval writer: actual qualified actor, same-number version3 reapproval, exact snapshot/history and duplicate decision refusal PASS';
+ raise notice 'Revision writer: same number/version, one-event retry, approval invalidation/history, stale/pending refusal and later-SKU atomic rollback PASS';
+end; $revision_writer_test$;
+-- SC material source is read from its actual Case, never the first SO item.
+do $case_source_test$
+declare case_id uuid:=gen_random_uuid(); c jsonb; made jsonb; scope jsonb; refused boolean:=false; detail text;
+begin
+ perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009698","role":"authenticated","app_metadata":{"role":"operation"}}',true);
+ insert into public.service_cases(id,case_no,customer_name,carres_action,what_affected,customer_wants,created_by)
+ values(case_id,'TEST-CONTEXT-CASE','TEST customer','TEST approved procurement scope','TEST specific goods',array['replace'],auth.uid());
+ select value||jsonb_build_object('purpose','service_case','serviceCaseId',case_id,'reason',null,'explanation','') into c from context_fixture;
+ made:=public.purchasing_create_request_with_lines(p_purpose=>'service_case',p_destination_id=>(c#>>'{lines,0,allocations,0,destinationId}')::uuid,
+  p_for_service_case_id=>case_id,p_lines=>jsonb_build_array(jsonb_build_object('request_context',c,'submission_key',gen_random_uuid())),p_fulfilment_intent=>'concrete_need');
+ if made->>'req_no' !~ '^SC[0-9]{6}-[0-9]{4}$' then raise exception 'SC request identity invalid'; end if;
+ perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009699","role":"authenticated","app_metadata":{"role":"principal"}}',true);
+ scope:=public._purchasing_stamp_context_approval((made->>'id')::uuid);
+ if scope#>>'{service_case_source,id}' is distinct from case_id::text or scope#>>'{service_case_source,carres_action}'<>'TEST approved procurement scope' then raise exception 'actual Case source not captured'; end if;
+ begin
+  update public.service_cases set carres_action='TEST changed remedy scope' where id=case_id;
+  perform public._purchasing_assert_request_approval((made->>'id')::uuid);
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='request_approval_changed'; end;
+ if not refused or public._purchasing_assert_request_approval((made->>'id')::uuid) is distinct from scope then raise exception 'Case source drift guard/rollback failed'; end if;
+ raise notice 'SC source: actual Case procurement facts captured; changed remedy invalidates saved approval PASS (formal Case admission still open)';
+end; $case_source_test$;
 rollback;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { purchaseRequestContextSchema, type PurchaseRequestContext } from "./purchase-request-context";
+import { purchaseRequestContextSchema, purchaseRequestSupplierDateIssues, type PurchaseRequestContext } from "./purchase-request-context";
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const recipient = (n: number) => ({ id: id(n), company: "TEST", name: "TEST recipient", phone: "TEST contact", method: "delivery" as const, deliveryDate: "2026-11-20", addressLine1: "TEST street", addressLine2: "TEST block", city: "TEST city", state: "TEST state", postcode: "TEST", buildingType: "TEST", floor: "100A", lift: "has_lift" as const, pickupLocationId: null, collectedBy: "" });
 const context = (): PurchaseRequestContext => ({ version: 1, origin: "manual", purpose: "general_purchase", proceedDate: "2026-10-20", stockDeliveryDate: null, serviceCaseId: null, reason: "purchase_for_others", companyPersonName: "TEST company", projectReference: "", explanation: "", forecastChangeReason: "", recipients: [recipient(1), recipient(2)], lines: [{ id: id(3), sku: "TEST-SKU", qty: 5, attrs: null, recipientNeeds: [{ recipientId: id(1), qty: 3 }, { recipientId: id(2), qty: 2 }], stockProposals: [], allocations: [{ id: id(4), destinationId: id(10), supplierDeliveryDate: "2026-11-10", qty: 3, recipients: [{ recipientId: id(1), qty: 3 }] }, { id: id(5), destinationId: id(11), supplierDeliveryDate: "2026-11-10", qty: 2, recipients: [{ recipientId: id(2), qty: 2 }] }] }] });
@@ -84,5 +84,31 @@ describe("approved purchase request context", () => {
     expect(purchaseRequestContextSchema.safeParse({ ...context(), proceedDate: "2026-02-31" }).success).toBe(false);
     request.lines[0]!.allocations[0]!.recipients[0]!.recipientId = id(999);
     expect(purchaseRequestContextSchema.safeParse(request).success).toBe(false);
+  });
+});
+
+describe("request supplier-date admission uses the one production calendar", () => {
+  const catalog = new Map([["TEST-SKU", { supplierId: id(50), category: "sofa" }]]);
+  const settings = (offDays: number[]) => ({ productionDays: [{ supplierId: id(50), category: "sofa", workingDays: 1 }], suppliers: [{ id: id(50), offDays }] }) as never;
+  it("uses supplier weekdays and the existing holiday set without changing recipient dates", () => {
+    const request = context(); request.proceedDate = "2026-12-24";
+    request.lines[0]!.sku = "TEST-SKU";
+    for (const allocation of request.lines[0]!.allocations) allocation.supplierDeliveryDate = "2026-12-26";
+    const recipients = structuredClone(request.recipients);
+    expect(purchaseRequestSupplierDateIssues(request, settings([0]), catalog)).toEqual([]);
+    expect(purchaseRequestSupplierDateIssues(request, settings([0, 6]), catalog)).toMatchObject([
+      { code: "supplier_date_before_earliest", earliest: "2026-12-28" },
+      { code: "supplier_date_before_earliest", earliest: "2026-12-28" },
+    ]);
+    expect(request.recipients).toEqual(recipients);
+  });
+  it("refuses absent catalog/production instead of guessing seven days", () => {
+    const request = context(); request.lines[0]!.sku = "TEST-SKU";
+    expect(purchaseRequestSupplierDateIssues(request, settings([0]), new Map()).every((issue) => issue.earliest === null)).toBe(true);
+    expect(purchaseRequestSupplierDateIssues(request, { productionDays: [], suppliers: [] }, catalog)).toMatchObject([{ code: "supplier_plan_unavailable" }, { code: "supplier_plan_unavailable" }]);
+  });
+  it("does not invent supplier production for an all-stock proposal", () => {
+    const request = context(); request.lines[0]!.allocations = [];
+    expect(purchaseRequestSupplierDateIssues(request, { productionDays: [], suppliers: [] }, new Map())).toEqual([]);
   });
 });

@@ -5,19 +5,22 @@ import type { PurchaseRequestContext } from "@carres/shared";
 vi.mock("../../lib/supabase", () => ({ userClient: vi.fn() }));
 vi.mock("../../lib/purchasing-settings", () => ({ loadPurchasingSettings: vi.fn(), loadPurchaseRequestSettings: vi.fn() }));
 import { userClient } from "../../lib/supabase";
-import { loadPurchaseRequestSettings } from "../../lib/purchasing-settings";
+import { loadPurchaseRequestSettings, loadPurchasingSettings } from "../../lib/purchasing-settings";
 import app from "../../index";
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const env = { SUPABASE_URL: "https://test.supabase.co", SUPABASE_ANON_KEY: "test-anon", SUPABASE_SERVICE_ROLE_KEY: "test-service", SUPABASE_JWT_SECRET: "unused" };
 const context = (): PurchaseRequestContext => ({ version: 1, origin: "stock_request", purpose: "ready_stock", proceedDate: "2026-11-01", stockDeliveryDate: "2026-12-01", serviceCaseId: null, reason: null, companyPersonName: "", projectReference: "", explanation: "", forecastChangeReason: "", recipients: [], lines: [{ id: id(1), sku: "TEST-SKU", qty: 500, attrs: null, recipientNeeds: [], stockProposals: [], allocations: [{ id: id(2), destinationId: id(3), supplierDeliveryDate: "2026-11-20", qty: 500, recipients: [] }] }] });
 const rpc = vi.fn();
+const catalogSelect = vi.fn();
 async function post(path: string, body: unknown, signedIn = true) {
   const token = signedIn ? await signTestJwt(id(99), { email: "test@carres.test", app_metadata: { role: "operation" } }) : null;
   return app.fetch(new Request(`https://api.test/api/operation/purchasing/requests${path}`, { method: "POST", headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) }), env as never, { waitUntil() {}, passThroughException() {} } as never);
 }
 beforeEach(() => {
   useTestJwks(); rpc.mockReset();
-  vi.mocked(userClient).mockReturnValue({ rpc } as unknown as ReturnType<typeof userClient>);
+  catalogSelect.mockReset(); catalogSelect.mockResolvedValue({ data: [{ sku: "TEST-SKU", supplier_id: id(50), product_models: { category: "sofa" } }], error: null });
+  vi.mocked(loadPurchasingSettings).mockResolvedValue({ productionDays: [{ supplierId: id(50), category: "sofa", workingDays: 7 }], suppliers: [{ id: id(50), offDays: [0] }] } as never);
+  vi.mocked(userClient).mockReturnValue({ rpc, from: () => ({ select: catalogSelect }) } as unknown as ReturnType<typeof userClient>);
   vi.mocked(loadPurchaseRequestSettings).mockResolvedValue({ normalCalendarDays: 30, serviceCalendarDays: 14, manualWhatsappScreenshotRequired: true });
 });
 afterAll(() => _setJwksForTesting(null));
@@ -58,5 +61,51 @@ describe("contextual recipient dates are separate from supplier production", () 
     vi.mocked(loadPurchaseRequestSettings).mockRejectedValueOnce(new Error("unavailable"));
     const response = await post("/plan", { skus: [], proceedDate: "2026-11-01", purpose: "general_purchase" });
     expect(await response.json()).toMatchObject({ recipientEarliest: null, recipientPlanUnavailable: true });
+  });
+});
+
+describe("context revisions keep the canonical same-number writer", () => {
+  it("passes exact scope, expected version, retry key and reason in one RPC", async () => {
+    const request = context();
+    rpc.mockResolvedValue({ data: { id: id(10), req_no: "RS261101-0001", request_version: 3, approval_required: true }, error: null });
+    const response = await post(`/${id(10)}/resubmit`, { revisionKey: id(12), expectedVersion: 2, reason: " TEST correction ", context: request });
+    expect(response.status).toBe(200);
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith("purchasing_resubmit_request", expect.objectContaining({
+      p_id: id(10), p_required_by: "2026-12-01", p_why: null,
+      p_lines: [{ request_context: request, revision_key: id(12), expected_version: 2, reason: "TEST correction" }],
+    }));
+    expect(await response.json()).toMatchObject({ req_no: "RS261101-0001", request_version: 3, approval_required: true });
+  });
+  it.each([
+    { expectedVersion: 0 }, { expectedVersion: 1.5 }, { reason: "  " }, { revisionKey: "invalid" }, { attachments: ["TEST"] },
+  ])("refuses incomplete or extra revision facts before any writer", async (change) => {
+    const response = await post(`/${id(10)}/resubmit`, { revisionKey: id(12), expectedVersion: 1, reason: "TEST", context: context(), ...change });
+    expect(response.status).toBe(400); expect(rpc).not.toHaveBeenCalled();
+  });
+  it("returns the owning refusal instead of claiming revision success", async () => {
+    rpc.mockResolvedValue({ data: null, error: { code: "22023", message: "request changed before revision", details: "request_version_changed" } });
+    const response = await post(`/${id(10)}/resubmit`, { revisionKey: id(12), expectedVersion: 1, reason: "TEST", context: context() });
+    expect(response.ok).toBe(false); expect(rpc).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("context supplier dates reuse the existing planner before the writer", () => {
+  it("refuses missing production settings without inventing a date", async () => {
+    vi.mocked(loadPurchasingSettings).mockResolvedValue({ productionDays: [], suppliers: [] } as never);
+    const response = await post("", { submissionKey: id(11), context: context() });
+    expect(response.status).toBe(422); expect(rpc).not.toHaveBeenCalled();
+    expect(await response.json()).toMatchObject({ issues: [{ code: "supplier_plan_unavailable", earliest: null }] });
+  });
+  it("refuses too-early supplier date for both create and same-number revision", async () => {
+    const request = context(); request.lines[0]!.allocations[0]!.supplierDeliveryDate = "2026-11-02";
+    expect((await post("", { submissionKey: id(11), context: request })).status).toBe(422);
+    expect((await post(`/${id(10)}/resubmit`, { revisionKey: id(12), expectedVersion: 1, reason: "TEST", context: request })).status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+  it("keeps a failed source read unavailable instead of reaching a writer", async () => {
+    catalogSelect.mockResolvedValue({ data: null, error: { message: "unavailable" } });
+    expect((await post("", { submissionKey: id(11), context: context() })).status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
   });
 });

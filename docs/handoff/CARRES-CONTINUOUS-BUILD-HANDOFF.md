@@ -54,23 +54,36 @@ exact draft absolute path is
 It is in the dedicated context checkout, NOT the older delivery checkout. Local commits only;
 controller must inspect these absolute paths rather than its own checkout's handoff.
 
-**Independent local approval work:** private `_purchasing_assert_request_approval` now checks
-an actual saved approval/version/scope against exact current material state; missing approval,
-stale version and changed approved distribution refuse. It never writes approval or reserves
-stock, and is NOT wired into issuance. Canonical decision still fails closed for new context.
-Local owning-SQL rolled-back fixtures passed, including full5 need / stock1 / buy2+2 at two
-actual distinct destinations, exact retry, atomic refusal and legacy approval compatibility.
-Private same-number revision admission now retains exact saved scope for the actual requester,
-requires a change reason and refuses another actor or any partially issued demand (including
-cancelled issued history). Physical stock bindings also fail closed; no new stock permission.
-Local rolled-back negative controls PASS at `/tmp/carres-context-revision-gate.log`.
-This gate does NOT implement the revision write/history/invalidation transaction or stock release;
-those remain open. Log `/tmp/carres-context-approval-guard.log` is earlier snapshot validation.
-This is WIP, not a review-ready writer migration.
-Remaining: shared supplier calendar validation, authoritative SC/forecast source admission,
-canonical approval snapshots and same-number reapproval/history, stock/coverage/partial issue
-admission and versioned send/task facts, then adoption by the existing shared form. PO/Receiving
-standalone page/workflow work remains excluded. No new-context writer is deployed.
+**Independent implementation checkpoint ·18Oct2026 (LOCAL ONLY, not deployed).**
+The SAME canonical resubmit RPC now accepts a strict context revision envelope with expected
+version, retry key and reason. Create/revision reuse ONE private demand projector. Approved
+unissued or returned requests retain their number, increment version/round, cancel old demands
+without deleting them, write exact before/after and preceding approval/actor/time/reason to the
+existing resubmitted event, and atomically clear current approval. Retry returns the saved event;
+changed retry/stale version/awaiting edit are refused. Later unknown SKU rolls back header,
+version, cancellations and demands together. No new public RPC signature or grant.
+Private approval writer uses the actual existing Purchasing Approver gate and records exact
+material scope/version/actor/time. Same-number version3 reapproval and history retention PASS;
+duplicate approval refused. PUBLIC contextual decision remains FAIL-CLOSED until complete
+source/calendar/coverage admission; private functions have no authenticated/anon/public grant.
+Private downstream snapshot guard refuses missing/stale/changed approval. No PO/stock gate is
+claimed integrated. Exact Case procurement facts/evidence are included in material source read;
+a changed Case remedy invalidates saved approval, without guessing the first SO item. This is
+source-drift protection, NOT proof of formal approved Case procurement admission.
+Context create/revision API now use the SAME shared expectedArrivalOf/production settings and
+myHolidaySet to refuse too-early supplier dates, missing production data or unavailable Catalog
+read. It does not invent seven days, use Office calendar or rewrite recipient dates. This is API
+defence ONLY: a direct SQL caller still needs the final canonical calendar validation strategy.
+API context+legacy round tests40/40; shared context/calendar12/12 PASS. Supplier Saturday versus
+Sunday-only weeks and Christmas exclusion use the existing planner. Full SQL owning fixtures
+PASS and roll back at `/tmp/carres-context-source-check.log` (create/retry/RS500/mixed5 stock1
+buy2+2, scope drift, revision and private reapproval, SC source drift). No production writes.
+Remaining before a coherent request-writer SQL review: direct SQL supplier calendar/source
+admission, formal SC procurement scope and forecast fingerprint admission, partial approval
+recipient distribution, current coverage/Stock-owner/partial issue gates and versioned send/task
+facts; then existing-form adoption. No review-ready full writer package yet. PO/Receiving
+standalone page/workflow work remains excluded. Earlier checkpoint paragraphs below are
+historical; they must not be used to infer current writer readiness.
 
 CARRES PORTAL v2 — CONTINUOUS BUILD · checkpoint 2026-10-16 (UI kit lane)
 

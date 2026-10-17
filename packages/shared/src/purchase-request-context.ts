@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { expectedArrivalOf, type PurchasingSettings } from "./purchasing-settings";
 
 /** Purchasing MASTER §5.2, owner15–17Oct. Selection is a proposal, not a stock reservation. */
 export const PURCHASE_REQUEST_REASONS = [
@@ -156,4 +157,37 @@ export const purchaseRequestSubmitSchema = z.object({
   submissionKey: z.string().uuid(),
   context: purchaseRequestContextSchema,
 }).strict();
+/** Same request identity; the SQL owner serialises revision/version and saves history. */
+export const purchaseRequestRevisionSchema = z.object({
+  revisionKey: z.string().uuid(),
+  expectedVersion: z.number().int().min(1).max(2147483646),
+  reason: z.string().trim().min(1),
+  context: purchaseRequestContextSchema,
+}).strict();
 export type PurchaseRequestContext = z.infer<typeof purchaseRequestContextSchema>;
+
+/** Read-time/API defence using the SAME supplier production planner as /plan.
+ * SQL direct-call admission still needs a trustworthy canonical plan contract;
+ * this projection alone is deliberately not claimed as transaction validation.
+ */
+export function purchaseRequestSupplierDateIssues(
+  context: PurchaseRequestContext,
+  settings: Pick<PurchasingSettings, "productionDays" | "suppliers">,
+  catalog: ReadonlyMap<string, { supplierId: string | null; category: string | null }>,
+): Array<{ lineId: string; allocationId: string; code: "supplier_plan_unavailable" | "supplier_date_before_earliest"; earliest: string | null }> {
+  const issues: ReturnType<typeof purchaseRequestSupplierDateIssues> = [];
+  for (const line of context.lines) {
+    if (!line.allocations.length) continue; // Stock proposal is not a new supplier buy.
+    const source = catalog.get(line.sku);
+    const earliest = expectedArrivalOf(settings, {
+      supplierId: source?.supplierId, category: source?.category, fromIso: context.proceedDate,
+    });
+    for (const allocation of line.allocations) {
+      if (earliest === null || allocation.supplierDeliveryDate < earliest) issues.push({
+        lineId: line.id, allocationId: allocation.id,
+        code: earliest === null ? "supplier_plan_unavailable" : "supplier_date_before_earliest", earliest,
+      });
+    }
+  }
+  return issues;
+}

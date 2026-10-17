@@ -3,6 +3,9 @@ import { z } from "zod";
 import {
   DEMAND_PURPOSE_VALUES,
   purchaseRequestSubmitSchema,
+  purchaseRequestRevisionSchema,
+  purchaseRequestSupplierDateIssues,
+  type PurchaseRequestContext,
   expectedArrivalOf,
   isOpsGenericAccount,
   isOtherCreditor,
@@ -95,6 +98,20 @@ function plusCalendarDays(iso: string, n: number): string {
   const d = new Date(`${iso}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
+}
+
+/** Guard contextual writes with the current shared planner. This is an API
+ * defence, not a replacement for transaction-level source/calendar admission. */
+async function contextSupplierDateGuard(sb: ReturnType<typeof userClient>, context: PurchaseRequestContext) {
+  if (!context.lines.some((line) => line.allocations.length)) return [];
+  const settings = await loadPurchasingSettings(sb); // failed read stays unavailable
+  const { data, error } = await sb.from("product_skus").select("sku, supplier_id, product_models(category)");
+  if (error) throw error;
+  const catalog = new Map((data ?? []).map((row) => [row.sku as string, {
+    supplierId: row.supplier_id as string | null,
+    category: (row.product_models as unknown as { category: string | null } | null)?.category ?? null,
+  }]));
+  return purchaseRequestSupplierDateIssues(context, settings, catalog);
 }
 
 /**
@@ -1780,6 +1797,34 @@ manualPurchaseRouter.post("/:id/resubmit", requireOperation, async (c) => {
   } catch {
     return c.json({ error: "invalid_json" }, 400);
   }
+  // Context revisions retain the same public SQL owner and request number.
+  // No legacy flattening, default date floor, per-line writes or browser approval.
+  if (raw && typeof raw === "object" && "context" in raw) {
+    const revision = purchaseRequestRevisionSchema.safeParse(raw);
+    if (!revision.success) return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
+    const b = revision.data;
+    try {
+      const issues = await contextSupplierDateGuard(sb, b.context);
+      if (issues.length) return c.json({ error: "supplier_date_plan_refused", code: "invalid_param", issues }, 422);
+    } catch {
+      return c.json({ error: "supplier_plan_unavailable", code: "invalid_param" }, 422);
+    }
+
+    const { data, error } = await sb.rpc("purchasing_resubmit_request", {
+      p_id: id,
+      p_destination_id: b.context.lines.flatMap((line) => line.allocations)[0]?.destinationId
+        ?? b.context.lines.flatMap((line) => line.stockProposals)[0]?.destinationId,
+      p_required_by: b.context.purpose === "ready_stock" ? b.context.stockDeliveryDate
+        : b.context.recipients.map((recipient) => recipient.deliveryDate).sort()[0],
+      p_why: null, p_purchase_requirement: null,
+      p_for_service_case_id: b.context.serviceCaseId,
+      p_for_staff_user_id: null, p_for_subsidiary_name: null,
+      p_lines: [{ request_context: b.context, revision_key: b.revisionKey,
+        expected_version: b.expectedVersion, reason: b.reason }],
+    });
+    if (error) return fail(c, error);
+    return c.json(data);
+  }
   const parsed = resubmitBody.safeParse(raw);
   if (!parsed.success) {
     return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
@@ -2028,6 +2073,12 @@ manualPurchaseRouter.post("/", requireOperation, async (c) => {
     const submission = purchaseRequestSubmitSchema.safeParse(raw);
     if (!submission.success) {
       return c.json({ error: "invalid_body", code: "invalid_param", fields: submission.error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })) }, 400);
+    }
+    try {
+      const issues = await contextSupplierDateGuard(sb, submission.data.context);
+      if (issues.length) return c.json({ error: "supplier_date_plan_refused", code: "invalid_param", issues }, 422);
+    } catch {
+      return c.json({ error: "supplier_plan_unavailable", code: "invalid_param" }, 422);
     }
     const { data, error } = await sb.rpc("purchasing_create_request_with_lines", {
       p_purpose: submission.data.context.purpose,
