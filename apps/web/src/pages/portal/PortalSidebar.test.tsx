@@ -1752,3 +1752,21 @@ describe("PortalSidebar — common Tasks canvas fit", () => {
     }
   });
 });
+
+describe("PortalSidebar — owner17Oct temporary module rail", () => {
+  it("keeps a module detail64 without changing preference or hiding another panel", () => {
+    const previousWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1025 });
+    localStorage.setItem(COLLAPSE_KEY, "0");
+    try {
+      render(<MemoryRouter initialEntries={["/operation/orders/so/test-order"]}><PortalSidebar compactForCanvas /></MemoryRouter>);
+      expect(screen.getByTestId("portal-sidebar")).toHaveStyle({ width: "64px" });
+      expect(screen.getByRole("button", { name: "Expand menu" })).toBeDisabled();
+      expect(localStorage.getItem(COLLAPSE_KEY)).toBe("0");
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: 1164 });
+      fireEvent(window, new Event("resize"));
+      expect(screen.getByTestId("portal-sidebar")).toHaveStyle({ width: "220px" });
+      expect(localStorage.getItem(COLLAPSE_KEY)).toBe("0");
+    } finally { Object.defineProperty(window, "innerWidth", { configurable: true, value: previousWidth }); }
+  });
+});

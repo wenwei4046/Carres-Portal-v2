@@ -103,7 +103,6 @@ import OperationGuarantees from "./OperationGuarantees";
 // Gmail-style right rail — Calendar (deliveries/day) · Keep notes · Tasks board.
 import ShellHeader, { ShellHeaderContext, useShellHeaderHost } from "./components/ShellHeader";
 import ShellTasks, { useShellTasks } from "./components/ShellTasks";
-import { useTasksHost } from "./tasks/tasks-host";
 import { activeNavTitle } from "@/pages/portal/portal-nav";
 import type { MovementsFilters } from "@/lib/queries";
 
@@ -371,11 +370,7 @@ export default function OperationApp() {
           </div>
         </>
       ) : (
-        <PortalSidebar compactForCanvas={tasksPage === 0}
-          onExpandForCanvas={(expand) => useTasksHost.getState().guard(() => {
-            useShellTasks.getState().setOpen(false);
-            expand();
-          })} />
+        <PortalSidebar compactForCanvas={tasksPage === 0} />
       )}
       <ShellHeaderContext.Provider value={shellHost.value}>
       <div className="flex min-h-0 min-w-0 flex-col overflow-hidden">
