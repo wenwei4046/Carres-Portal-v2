@@ -17,11 +17,11 @@
   // 2 three title rows on one 36-px line; content starts together
   const tb = q('[role=tablist][aria-label=Views]')?.parentElement;
   const rows = [['toolbar', tb], ['Summary title', sum?.children[0]], ['Tasks title', tk?.children[0]]].filter(x => x[1]);
-  rows.forEach(([n, e]) => { const b = e.getBoundingClientRect(); if (px(b.height) !== 36) say(n, 'row height', px(b.height), 36); if (tb && px(b.top) !== px(tb.getBoundingClientRect().top)) say(n, 'top', px(b.top), px(tb.getBoundingClientRect().top)); });
+  rows.forEach(([n, e]) => { const b = e.getBoundingClientRect(), drawer = e.closest('[data-kit=drawer][data-variant$="-panel"]'); if (px(b.height) !== 36) say(n, 'row height', px(b.height), 36); if (drawer) { const d = drawer.getBoundingClientRect(), width = drawer.dataset.variant === 'summary-panel' ? 264 : 320; if (px(d.width) !== width) say(n, 'overlay width', px(d.width), width); if (px(b.top) !== px(d.top) + 1) say(n, 'top inside overlay', px(b.top), px(d.top) + 1); } else if (tb && px(b.top) !== px(tb.getBoundingClientRect().top)) say(n, 'top', px(b.top), px(tb.getBoundingClientRect().top)); });
   // The Tasks body (what follows the 36px title row) starts level with the table. Measured on the body box: the old hunt for a card with an inline
   // border-radius walked out of a class-styled panel (the Portal) and reported top 0 (14 Oct, Code). In the design files the body top is the first card top.
   const table = main?.querySelector('section'), tkCard = tk?.children[1] ?? null, sumCard = sum?.children[1]?.children[0];
-  [['Tasks first card', tkCard], ['Summary first card', sumCard]].forEach(([n, e]) => { if (e && table && !q('main button[aria-label="Back to the list"]') && px(e.getBoundingClientRect().top) !== px(table.getBoundingClientRect().top)) say(n, 'top vs table', px(e.getBoundingClientRect().top), px(table.getBoundingClientRect().top)); });
+  [['Tasks first card', tkCard], ['Summary first card', sumCard]].forEach(([n, e]) => { if (e && table && !e.closest('[data-kit=drawer][data-variant$="-panel"]') && !q('main button[aria-label="Back to the list"]') && px(e.getBoundingClientRect().top) !== px(table.getBoundingClientRect().top)) say(n, 'top vs table', px(e.getBoundingClientRect().top), px(table.getBoundingClientRect().top)); });
   // 3 type ladder
   const txt = (root, pred) => root ? qa('span,button,a').filter(e => root.contains(e) && e.children.length === 0 && e.textContent.trim() && (!pred || pred(e))) : [];
   const chk = (n, e, size, weight) => { if (!e) return; const c = cs(e); if (c.fontSize !== size + 'px') say(n, 'size', c.fontSize, size); if (weight && c.fontWeight !== String(weight)) say(n, 'weight', c.fontWeight, weight); };

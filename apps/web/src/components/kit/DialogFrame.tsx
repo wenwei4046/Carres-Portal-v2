@@ -166,6 +166,7 @@ export default function DialogFrame({
          *  without touching §4.4's ladder. See `dialog-container`. */}
         <Dialog.Content
           ref={setContainer}
+          aria-modal="true"
           data-kit={kind}
           data-variant={variant}
           /* Radix warns when Content carries no Description. Passing undefined
@@ -174,11 +175,17 @@ export default function DialogFrame({
           className={`${taskReview ? "fixed inset-0 flex flex-col bg-white text-c-ink" : `${SURFACE} ${PLACE[place]} ${widthClass}`} ${Z_DIALOG} focus:outline-none`}
           onEscapeKeyDown={taskReview ? (event) => event.preventDefault() : undefined}
           onPointerDownOutside={taskReview ? (event) => event.preventDefault() : undefined}
-          onOpenAutoFocus={() => {
+          onOpenAutoFocus={(event) => {
             // Capture before Radix moves focus into the surface. A parent
             // effect can run afterwards and incorrectly remember Close.
             const active = document.activeElement;
             opener.current = active instanceof HTMLElement ? active : null;
+            // React's native autoFocus fires before a nested focus scope is
+            // active, so the outer Drawer can reclaim it. Honour the existing
+            // field request after Radix has made this scope foreground.
+            const initial = event.target instanceof HTMLElement
+              ? event.target.querySelector<HTMLElement>("[data-kit-autofocus]") : null;
+            if (initial) { event.preventDefault(); initial.focus(); }
           }}
           onCloseAutoFocus={(event) => {
             /* Ours runs FIRST and stops Radix's trigger-focus from running at

@@ -32,7 +32,9 @@ async function measure(page: Page) {
     const box = panel.getBoundingClientRect();
     const shown = [...panel.querySelectorAll("*")].filter((el) => el.getClientRects().length > 0) as HTMLElement[];
     return {
-      width: Math.round(box.width),
+      // Below1100 the existing Drawer owns the 320px surface, including its
+      // border; the retained Tasks contents fill the inner canvas.
+      width: Math.round((panel.closest('[role="dialog"]') ?? panel).getBoundingClientRect().width),
       title: Math.round((panel.children[0] as HTMLElement).getBoundingClientRect().height),
       pageScroll: document.documentElement.scrollWidth - window.innerWidth,
       pastEdge: shown.filter((el) => el.getBoundingClientRect().right > box.right + 1).length,
