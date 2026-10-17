@@ -1,4 +1,4 @@
-import type { PurchaseRequestContext, PurchaseRequestSubmission, PurchaseRequestRevision } from "@carres/shared";
+import type { PurchaseRequestContext, PurchaseRequestSubmission, PurchaseRequestRevision, PurchaseRequestDecision, PurchaseRequestContextReviewRead } from "@carres/shared";
 import type { OutrightFactsFailed, OutrightOrderFacts } from "@carres/shared";
 import { workspaceActivitySettingsResponseSchema, type WorkspaceActivitySettingsResponse } from "@carres/shared";
 import { supabase } from "@/lib/supabase";
@@ -344,6 +344,7 @@ import { uploadCompartmentPhoto, uploadDeliveryProof, uploadModelPhoto } from ".
 
 export const qk = {
   purchaseRequestPlan: (skus: string[], proceedDate: string | null, purpose: string | null, origin: string | null = null, requestId: string | null = null) => ["operation", "purchasing", "requests", "plan", skus.join("|"), proceedDate, purpose, origin, requestId] as const,
+  purchaseRequestContextReview: (id: string) => ["operation", "purchasing", "requests", id, "context-review"] as const,
   purchaseRequests: () => ["operation", "purchasing", "requests"] as const,
   dealers:      () => ["dealers"] as const,
   dealerSelf:   () => ["dealers", "me"] as const,
@@ -5406,15 +5407,21 @@ export function useIssuePurchaseRequests() {
   });
 }
 
+/** Guarded scope transport; no production form mounts this hook yet. */
+export function usePurchaseRequestContextReview(id: string | null) {
+  return useQuery({
+    queryKey: qk.purchaseRequestContextReview(id ?? ""),
+    queryFn: () => apiFetch<PurchaseRequestContextReviewRead>(
+      `/api/operation/purchasing/requests/${id}/context-review`,
+    ),
+    enabled: !!id, staleTime: 0,
+  });
+}
+
 export function useDecidePurchaseRequest() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: {
-      id: string;
-      decision: "approve" | "refuse" | "send_back";
-      reason?: string | null;
-      cuts?: Array<{ id: string; qty: number }> | null;
-    }) =>
+    mutationFn: (input: PurchaseRequestDecision & { id: string }) =>
       apiFetch<{ id: string; decision: string }>(
         `/api/operation/purchasing/requests/${input.id}/decide`,
         {
@@ -5422,7 +5429,7 @@ export function useDecidePurchaseRequest() {
           body: JSON.stringify({
             decision: input.decision,
             reason: input.reason ?? null,
-            cuts: input.cuts ?? null,
+            ...(input.contextReview ? { contextReview: input.contextReview } : { cuts: input.cuts ?? null }),
           }),
         },
       ),

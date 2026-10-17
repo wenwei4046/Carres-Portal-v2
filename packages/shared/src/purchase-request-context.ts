@@ -166,6 +166,44 @@ export const purchaseRequestRevisionSchema = z.object({
   revisionKey: z.string().uuid(), expectedVersion: z.number().int().min(1).max(2147483646),
   reason: z.string().trim().min(1), context: purchaseRequestContextSchema, forecastSource: forecastSourceSchema,
 }).strict().superRefine(requireContextOriginSource);
+/** Opaque owning review is returned verbatim: it is compared by SQL, never
+ * rebuilt from browser totals. Allocation identities survive the review split. */
+export const purchaseRequestApprovalReviewSchema = z.object({
+  expectedVersion: z.number().int().min(1).max(2147483646),
+  reviewScope: z.record(z.unknown()),
+  context: purchaseRequestContextSchema,
+  approvedDistribution: z.array(z.object({
+    lineId: z.string().uuid(), allocationId: z.string().uuid(),
+    kind: z.enum(["purchase", "stock_proposal"]), qty: z.number().int().min(0),
+    recipients: z.array(z.object({ recipientId: z.string().uuid(), qty: z.number().int().positive() }).strict()),
+  }).strict()).nullable(),
+}).strict();
+export const purchaseRequestDecisionSchema = z.object({
+  decision: z.enum(["approve", "refuse", "send_back"]),
+  reason: z.string().max(1000).nullish(),
+  cuts: z.array(z.object({ id: z.string().uuid(), qty: z.number().int().min(0) }).strict()).nullish(),
+  contextReview: purchaseRequestApprovalReviewSchema.optional(),
+}).strict().superRefine((value, ctx) => {
+  if (value.contextReview && value.cuts != null) ctx.addIssue({ code: "custom", path: ["cuts"], message: "Context review already contains the approval distribution" });
+  if (value.contextReview && value.decision !== "approve" && value.contextReview.approvedDistribution !== null) ctx.addIssue({ code: "custom", path: ["contextReview", "approvedDistribution"], message: "This decision grants no purchase quantity" });
+});
+/** Readback is either a complete owning review or explicit unavailable source;
+ * missing state/history never becomes an approvable empty object. */
+const purchaseRequestStoredEventSchema = z.object({
+  round: z.number().int().positive(), kind: z.enum(["sent_back", "resubmitted", "withdrawn", "stock_allocated", "approved", "po_issued"]),
+  actor_id: z.string().uuid().nullable(), occurred_at: z.string(), reason: z.string().nullable(), changes: z.unknown(),
+}).strict();
+export const purchaseRequestContextReviewReadSchema = z.discriminatedUnion("available", [
+  z.object({ available: z.literal(true), review: z.object({
+    request_version: z.number().int().positive(), state: z.object({ context: purchaseRequestContextSchema }).passthrough(),
+    stock_source: z.array(z.record(z.unknown())),
+  }).passthrough(), events: z.array(purchaseRequestStoredEventSchema) }).strict(),
+  z.object({ available: z.literal(false), reason: z.string().min(1), request_version: z.number().int().positive(),
+    request_context: purchaseRequestContextSchema, events: z.array(purchaseRequestStoredEventSchema),
+  }).strict(),
+]);
+export type PurchaseRequestContextReviewRead = z.infer<typeof purchaseRequestContextReviewReadSchema>;
+export type PurchaseRequestDecision = z.infer<typeof purchaseRequestDecisionSchema>;
 export type PurchaseRequestSubmission = z.infer<typeof purchaseRequestSubmitSchema>;
 export type PurchaseRequestRevision = z.infer<typeof purchaseRequestRevisionSchema>;
 export type PurchaseRequestContext = z.infer<typeof purchaseRequestContextSchema>;

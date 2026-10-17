@@ -64,8 +64,9 @@ changed retry/stale version/awaiting edit are refused. Later unknown SKU rolls b
 version, cancellations and demands together. No new public RPC signature or grant.
 Private approval writer uses the actual existing Purchasing Approver gate and records exact
 material scope/version/actor/time. Same-number version3 reapproval and history retention PASS;
-duplicate approval refused. PUBLIC contextual decision remains FAIL-CLOSED until complete
-source/calendar/coverage admission; private functions have no authenticated/anon/public grant.
+duplicate approval refused. The SAME public decide RPC now requires the strict current Review
+envelope for contextual requests; old cuts/null cannot approve them. Private functions retain no
+authenticated/anon/public grant. Contextual issue remains closed; this is LOCAL ONLY.
 Private downstream snapshot guard refuses missing/stale/changed approval. No PO/stock gate is
 claimed integrated. Exact Case procurement facts/evidence are included in material source read;
 a changed Case remedy invalidates saved approval, without guessing the first SO item. This is
@@ -129,27 +130,54 @@ line/SKU/attrs/recipient and root fact. Common demand projector preserves alloca
 version increments, exact before/after/actor/time/reason is stored as an `approved` event. This
 adds `approved` to the existing event-kind CHECK while retaining all four old values. Qualified
 stock1->2/buy4->3 approval keeps need5 and reserves no Unit; stale Review, missing reason and
-full-need reduction refuse. Public approval remains closed pending final issue integration.
+full-need reduction refuse. The canonical public approval door now calls that same orchestrator
+with exact expected version, current Review, full context and separate approved distribution.
+Refusal/send-back uses exact saved version/context without requiring a fresh source, so stale
+source can be repaired. Approval API transport uses one shared strict DTO; competing legacy cuts
+are refused. Guarded unmounted query hook reads the owning Review; unavailable is never empty
+approval. The read retains raw append-only events, including exact approval before/after/actor/
+time/reason. API context+legacy round51/51 PASS; API/web typechecks PASS. Logs
+`/tmp/carres-context-review-api-focused.log`, `...-api-types.log`, `...-web-types.log`.
 Legacy create_demand/cancel_demand/move_request_destination now refuse contextual row edits;
 only whole-request revision/approval can change them. Their local/prod preimages matched
 7822bc46bfe56d0cf47e363fa35ba5b7 /7714a808edd5717cd4ad58cd31c5ff21 /
 fc0bec38981945678a130f1ad8c1b190. New shelf stock does NOT auto-net the deliberate GP remainder.
-**New technical SQL review scope:** nine per-SKU source-write guards cover Stock, Catalog,
-Orders/lines, PO/lines and request/demand sources. They change no NEW/OLD data and grant no
+**New technical SQL review scope:** ten per-SKU source-write guards cover Stock, Catalog,
+Orders/lines, PO/lines, existing PO source rows and request/demand sources. They change no NEW/OLD data and grant no
 role/RLS access, but same-SKU contention now returns existing40001/409 refresh semantics.
 Private keys use try-locks rather than global table freezes; different SKUs stay independent.
 This is UNAPPROVED DRAFT ONLY, never implied by the separate Settings approval. Two-client
 owned-loopback test proved same-SKU Stock insert refused without residue, unrelated SKU insert
 allowed, and the original SKU succeeds after release; all synthetic inserts rolled back. Log
 `/tmp/carres-context-source-concurrency.log`. Critical RS write paths acquire source keys before
-request roots; withdrawal/public issue root ordering still needs completion before review.
+request roots; canonical withdrawal now does the same. Public issue ordering remains unfinished.
 Full owning SQL log `/tmp/carres-context-source-locks.log` (later source/review additions at
 `/tmp/carres-context-origin-review-final.log`); no production writer or transaction changed.
-Remaining: finish source-lock ordering/public issue/date/payload/partial-issue integration,
-wire exact Review/decision/history readback and test negative/concurrency boundaries, then
-assemble the COMPLETE request-writer review package. The public context issue/recorder and
-decision still fail closed. There is NO complete writer approval package yet. Existing-form
-adoption and exact-version send/task facts follow; standalone PO/Receiving redesign excluded.
+**Merged PO source work · LOCAL WIP only.** Purchasing5.4 explicitly keeps one physical PO
+line per SKU/configuration/Deliver To. The EXISTING po_line_sources owner now has an additive
+purchase_demand_id FK, nullable order_id and exact SO-or-MPR owner CHECK; no fake SO, new ledger,
+RLS/role change or historical backfill. One private projection prefers actual generic MPR sources
+and falls back to historical single-demand pointers without double-counting. Coverage locks
+source rows, counts each request's own source quantity, and refuses physical/source totals,
+identity/purpose/site/supplier/configuration or issued-counter drift. All new-context revision/
+approval commitment checks use the same source projection. Existing source-move helper copies
+MPR ownership on split; helper-only split1+1 keeps total2. Existing free-PO readers distinguish
+concrete MPR holds from intentional RS free supply and counted supply from exact Unit supply.
+Reader fixture physical3/request1+2 retains current request's issued1/remainder1; inconsistent/
+over-issued sources refuse. Canonical issue, recorder AND shared PO birth helper remain explicitly
+closed to context/request_sources until complete issue integration. These fixtures do NOT prove
+canonical issue or the complete Deliver To journey. Full local SQL rollback PASS at
+`/tmp/carres-context-merged-source-coverage.log`.
+
+Remaining: integrate exact reviewed request_sources into canonical batch/inner/recorder, retain
+partial-issue recipient distribution + approval/version token + actual issue actor/time, revalidate
+aggregate remainder/current Settings PO date and complete sorted lock ordering; bind concrete
+incoming Units through Stock ownership without double-netting PO coverage; preserve per-request
+forecast own-supply attribution on merged lines; complete PO/Receiving/document readback, then
+assemble the COMPLETE writer approval package. Current draft is NOT ready for SQL approval.
+Existing form adoption stays unmounted; authenticated lifecycle proof and exact-version send/task
+facts follow. Standalone PO/Receiving UI redesign remains excluded. Settings approval is still
+separate and pending; foundation0696 is already consumed and must never be reapplied.
 Earlier checkpoint paragraphs below are
 historical; they must not be used to infer current writer readiness.
 

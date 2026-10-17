@@ -140,3 +140,61 @@ describe("forecast-origin context carries owning source evidence", () => {
     expect(await response.json()).toMatchObject({ forecastSource: null, forecastSourceUnavailable: true });
   });
 });
+
+describe("context review uses the same canonical decision door", () => {
+  const review = () => ({ expectedVersion: 2, reviewScope: { request_version: 2, state: { context: context(), TEST: "owning scope" }, stock_source: [] }, context: context(), approvedDistribution: null });
+  it("passes the exact owning review and full request separately from approved quantities", async () => {
+    rpc.mockResolvedValue({ data: { id: id(10), decision: "approved", request_version: 2 }, error: null });
+    const contextReview = review();
+    contextReview.approvedDistribution = [{ lineId: id(1), allocationId: id(2), kind: "purchase", qty: 400, recipients: [] }] as never;
+    const response = await post(`/${id(10)}/decide`, { decision: "approve", reason: "TEST partial approval", contextReview });
+    expect(response.status).toBe(200);
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith("purchasing_decide_request", {
+      p_id: id(10), p_decision: "approve", p_reason: "TEST partial approval",
+      p_cuts: { expected_version: 2, review_scope: contextReview.reviewScope, request_context: contextReview.context, approved_distribution: contextReview.approvedDistribution },
+    });
+    expect(contextReview.context.lines[0]!.qty).toBe(500);
+  });
+  it("refuses competing cuts, missing version and quantity grants on send-back before any RPC", async () => {
+    expect((await post(`/${id(10)}/decide`, { decision: "approve", cuts: [], contextReview: review() })).status).toBe(400);
+    expect((await post(`/${id(10)}/decide`, { decision: "approve", contextReview: { ...review(), expectedVersion: undefined } })).status).toBe(400);
+    expect((await post(`/${id(10)}/decide`, { decision: "send_back", reason: "TEST repair", contextReview: { ...review(), approvedDistribution: [] } })).status).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+  it.each([["40001", "request_source_busy", 409], ["22023", "request_review_changed", 422]])("retains owning %s refusal without reporting approval", async (code, details, status) => {
+    rpc.mockResolvedValue({ data: null, error: { code, details, message: "This work changed. Refresh and try again." } });
+    const response = await post(`/${id(10)}/decide`, { decision: "approve", contextReview: review() });
+    expect(response.status).toBe(status);
+    expect(await response.json()).toMatchObject({ code: details });
+  });
+  it("allows send-back with exact saved identity and no quantity grant", async () => {
+    rpc.mockResolvedValue({ data: { id: id(10), decision: "send_back" }, error: null });
+    expect((await post(`/${id(10)}/decide`, { decision: "send_back", reason: "TEST refresh source", contextReview: review() })).status).toBe(200);
+    expect(rpc.mock.calls[0]![1].p_cuts.approved_distribution).toBeNull();
+  });
+  async function readReview() {
+    const token = await signTestJwt(id(99), { email: "test@carres.test", app_metadata: { role: "operation" } });
+    return app.fetch(new Request(`https://api.test/api/operation/purchasing/requests/${id(10)}/context-review`, { headers: { Authorization: `Bearer ${token}` } }), env as never, { waitUntil() {}, passThroughException() {} } as never);
+  }
+  it("reads the exact fresh review without creating or approving anything", async () => {
+    const data = { available: true, review: review().reviewScope, events: [] };
+    rpc.mockResolvedValue({ data, error: null });
+    const response = await readReview();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(data);
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith("purchasing_request_context_review", { p_id: id(10) });
+  });
+  it("retains explicit unknown source and refuses missing RPC/data instead of empty approval", async () => {
+    const data = { available: false, reason: "forecast_source_changed", request_version: 2, request_context: context(), events: [] };
+    rpc.mockResolvedValueOnce({ data, error: null });
+    expect(await (await readReview()).json()).toEqual(data);
+    rpc.mockResolvedValueOnce({ data: null, error: null });
+    expect((await readReview()).status).toBe(503);
+    rpc.mockResolvedValueOnce({ data: { available: true, review: {}, events: [] }, error: null });
+    expect((await readReview()).status).toBe(503);
+    rpc.mockResolvedValueOnce({ data: null, error: { code: "42883", message: "not installed" } });
+    expect((await readReview()).ok).toBe(false);
+  });
+});

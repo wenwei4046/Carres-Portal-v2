@@ -129,7 +129,7 @@ begin
  refused:=false;
  begin
    perform public.purchasing_decide_request((made->>'id')::uuid,'approve');
- exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='context_approval_not_ready'; end;
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='context_review_required'; end;
  if not refused or exists(select 1 from public.purchase_requests where id=(made->>'id')::uuid and approved_at is not null) then raise exception 'legacy decision certified an unstamped context'; end if;
  perform public.purchasing_decide_request((legacy->>'id')::uuid,'approve');
  if not exists(select 1 from public.purchase_requests where id=(legacy->>'id')::uuid and approved_at is not null and request_version=0)
@@ -412,6 +412,63 @@ begin
  exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='request_po_coverage_changed'; end;
  if not refused then raise exception 'PO source purpose drift passed'; end if;
  raise notice 'PO coverage reader: exact partial1/remaining1; unproven quantity and source-purpose drift refused PASS (synthetic fixture, not issue proof)';
+
+ -- One physical line can carry two request owners. A generic source replaces
+ -- the legacy pointer, never adds the whole physical quantity to each request.
+ declare other_request uuid:=gen_random_uuid(); other_demand uuid:=gen_random_uuid(); physical uuid; src uuid;
+ begin
+  insert into public.purchase_requests select (jsonb_populate_record(null::public.purchase_requests,to_jsonb(r)||jsonb_build_object(
+   'id',other_request,'req_no','TEST-MERGED-SOURCE','submission_key',null,'request_context',null,'request_version',0,'approval_version',null,'approval_scope',null))).*;
+  insert into public.purchase_demands(id,purpose,sku,supplier_id,destination_id,qty,required_by,remark,po_id,ordered_at,cancelled_at,cancel_reason,created_by,created_at,issued_qty,request_id,approved_qty,cancelled_by,attrs,request_line_id,supplier_allocation_id,stock_proposal_id,fulfilment_kind) select copied.id,copied.purpose,copied.sku,copied.supplier_id,copied.destination_id,copied.qty,copied.required_by,copied.remark,copied.po_id,copied.ordered_at,copied.cancelled_at,copied.cancel_reason,copied.created_by,copied.created_at,copied.issued_qty,copied.request_id,copied.approved_qty,copied.cancelled_by,copied.attrs,copied.request_line_id,copied.supplier_allocation_id,copied.stock_proposal_id,copied.fulfilment_kind from public.purchase_demands pd cross join lateral jsonb_populate_record(null::public.purchase_demands,to_jsonb(pd)||jsonb_build_object(
+   'id',other_demand,'request_id',other_request,'request_line_id',null,'supplier_allocation_id',null,'stock_proposal_id',null,
+   'qty',2,'approved_qty',2,'issued_qty',2,'po_id','TEST-CONTEXT-PARTIAL-PO','ordered_at',now())) copied where pd.id=buy;
+  update public.purchase_order_lines set qty=3 where po_id='TEST-CONTEXT-PARTIAL-PO' returning id into strict physical;
+  insert into public.po_line_sources(po_id,po_line_id,sku,purchase_demand_id,qty)
+   select 'TEST-CONTEXT-PARTIAL-PO',physical,sku,buy,1 from public.purchase_demands where id=buy returning id into src;
+  insert into public.po_line_sources(po_id,po_line_id,sku,purchase_demand_id,qty)
+   select 'TEST-CONTEXT-PARTIAL-PO',physical,sku,other_demand,2 from public.purchase_demands where id=buy;
+  if (select sum(qty) from public._purchasing_po_request_sources(physical))<>3
+    or (select count(*) from public._purchasing_po_request_sources(physical))<>2 then raise exception 'merged source projection duplicated legacy pointer'; end if;
+  coverage:=public._purchasing_context_coverage(r.id,true);
+  if not exists(select 1 from jsonb_array_elements(coverage) x where (x->>'demand_id')::uuid=buy and (x->>'issued_qty')::integer=1 and (x->>'to_buy')::integer=1) then raise exception 'another request consumed current approved remainder'; end if;
+  refused:=false;
+  begin
+   update public.po_line_sources set qty=2 where id=src;
+   perform public._purchasing_context_coverage(r.id,true);
+  exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='request_po_coverage_changed'; end;
+  if not refused then raise exception 'merged source total exceeded physical PO line'; end if;
+  refused:=false;
+  begin
+   insert into public.po_line_sources(po_id,po_line_id,sku,purchase_demand_id,qty)
+    select 'TEST-CONTEXT-PARTIAL-PO',physical,sku,buy,1 from public.purchase_demands where id=buy;
+   update public.purchase_order_lines set qty=4 where id=physical;
+   perform public._purchasing_context_coverage(r.id,true);
+  exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='request_po_coverage_changed'; end;
+  if not refused then raise exception 'duplicate merged demand attribution admitted'; end if;
+  refused:=false;
+  begin
+   perform public._operation_create_po_inner(null,null,jsonb_build_array(jsonb_build_object('request_sources',jsonb_build_array(jsonb_build_object('demand_id',buy,'qty',1)))),null,null,null);
+  exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='context_issue_not_ready'; end;
+  if not refused then raise exception 'alternate PO birth door bypassed incomplete context issue guard'; end if;
+
+  declare landing uuid; moving uuid;
+  begin
+   insert into public.purchase_order_lines(po_id,sku,qty,destination_id,attrs)
+    select pl.po_id,pl.sku,1,pd.destination_id,pl.attrs from public.purchase_order_lines pl
+     cross join lateral(select destination_id from public.purchase_demands where request_id=r.id and destination_id<>pl.destination_id limit 1) pd
+     where pl.id=physical returning id into strict landing;
+   select id into strict moving from public.po_line_sources where po_line_id=physical and purchase_demand_id=other_demand;
+   perform public._po_line_source_move(moving,landing,1);
+   if (select sum(qty) from public.po_line_sources where purchase_demand_id=other_demand)<>2
+     or not exists(select 1 from public.po_line_sources where po_line_id=landing and purchase_demand_id=other_demand and qty=1 and order_id is null)
+     or not exists(select 1 from public.po_line_sources where id=moving and qty=1) then raise exception 'source split lost MPR owner or changed total quantity'; end if;
+   raise notice 'Existing PO source move helper preserves MPR demand owner and total2 across split1+1 PASS (helper only, not full Deliver To walk)';
+  end;
+  raise notice 'Merged PO source reader: physical3 / request1+2, no legacy double-count, per-request remainder1; inconsistent/duplicate source quantities and alternate issue door refused PASS (reader fixture only)';
+  raise exception 'rollback merged reader fixture' using errcode='P0900';
+ exception when sqlstate 'P0900' then null;
+ end;
+
  refused:=false;
  begin
   perform public.purchasing_cancel_demand(buy,'TEST legacy cancellation bypass');
@@ -508,12 +565,18 @@ begin
    jsonb_set(jsonb_set(jsonb_set(jsonb_set(proposed,'{lines,0,qty}','4'),'{lines,0,recipientNeeds,1,qty}','1'),'{lines,0,allocations,1,qty}','1'),'{lines,0,allocations,1,recipients,0,qty}','1')),'TEST forbidden full-need cut');
  exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='approval_need_changed'; end;
  if not refused then raise exception 'approver silently reduced full recipient need'; end if;
- scope:=public._purchasing_approve_context_review(rid,payload,'TEST actual approver stock choice');
+ perform public.purchasing_decide_request(rid,'approve','TEST actual approver stock choice',payload);
+ select approval_scope into strict scope from public.purchase_requests where id=rid;
  if (scope->>'request_version')::integer<>2 or scope#>'{context,lines,0,recipientNeeds}' is distinct from c#>'{lines,0,recipientNeeds}'
   or (scope#>>'{context,lines,0,qty}')::integer<>5 or (select sum(approved_qty) from public.purchase_demands where request_id=rid and fulfilment_kind='purchase' and cancelled_at is null)<>3
   or not exists(select 1 from public.purchase_demands where id=source_stock_id and qty=2 and approved_qty=2) then raise exception 'approver stock adjustment lost full need or stable allocation'; end if;
  if exists(select 1 from public.ops_stock_items where reserved_purchase_demand_id in(select id from public.purchase_demands where request_id=rid)) then raise exception 'proposal approval reserved physical stock'; end if;
  if not exists(select 1 from public.purchase_request_events where request_id=rid and kind='approved' and actor_id=auth.uid() and reason='TEST actual approver stock choice' and changes#>'{before,context}'=c and changes->'after'=scope) then raise exception 'approval before/after/actor/reason not retained'; end if;
+
+ review:=public.purchasing_request_context_review(rid);
+ if review->'available'<>'true'::jsonb or not exists(select 1 from jsonb_array_elements(review->'events') e
+   where e->>'kind'='approved' and e->>'actor_id'=auth.uid()::text and e#>'{changes,before,context}'=c and e#>'{changes,after}'=scope) then
+  raise exception 'public review lost exact immutable approval history'; end if;
  raise notice 'Approval review: stale/reasonless changes refused; qualified approver stock1->2/buy4->3 keeps need5 and allocation identity/history, no Unit reserved PASS';
 end; $approver_stock_test$;
 -- Existing 0695 submit wrapper retains its legacy owner/retry/mark behavior.

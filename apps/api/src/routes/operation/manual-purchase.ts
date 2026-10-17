@@ -4,6 +4,8 @@ import {
   DEMAND_PURPOSE_VALUES,
   purchaseRequestSubmitSchema,
   purchaseRequestRevisionSchema,
+  purchaseRequestDecisionSchema,
+  purchaseRequestContextReviewReadSchema,
   purchaseRequestSupplierDateIssues,
   type PurchaseRequestContext,
   expectedArrivalOf,
@@ -1608,14 +1610,20 @@ manualPurchaseRouter.post("/:id/stock-allocation", requireOperation, async (c) =
   return c.json(data);
 });
 
-const decideBody = z.object({
-  /* R4 (2026-09-16) — `send_back` returns the SAME request to its requester. */
-  decision: z.enum(["approve", "refuse", "send_back"]),
-  reason: z.string().max(1000).nullish(),
-  cuts: z
-    .array(z.object({ id: z.string().uuid(), qty: z.number().int().min(0) }))
-    .nullish(),
+// Unmounted context client reads the current owning scope; unavailable is never
+// converted to an empty approval. Missing RPC stays an error until SQL rollout.
+manualPurchaseRouter.get("/:id/context-review", requireOperation, async (c) => {
+  const id = c.req.param("id");
+  if (!z.string().uuid().safeParse(id).success) return c.json({ error: "invalid_request_id", code: "invalid_param" }, 400);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("purchasing_request_context_review", { p_id: id });
+  if (error) return fail(c, error);
+  const read = purchaseRequestContextReviewReadSchema.safeParse(data);
+  if (!read.success) return c.json({ error: "context_review_unavailable", code: "context_review_unavailable" }, 503);
+  return c.json(read.data);
 });
+
+const decideBody = purchaseRequestDecisionSchema;
 
 manualPurchaseRouter.post("/:id/decide", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -1634,15 +1642,21 @@ manualPurchaseRouter.post("/:id/decide", requireOperation, async (c) => {
   if (!parsed.success) {
     return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
   }
-  const { decision, reason, cuts } = parsed.data;
+  const { decision, reason, cuts, contextReview } = parsed.data;
 
   const { data, error } = await sb.rpc("purchasing_decide_request", {
     p_id: id,
     p_decision: decision,
     p_reason: reason ?? null,
-    p_cuts: cuts && cuts.length > 0 ? cuts : null,
+    p_cuts: contextReview ? {
+      expected_version: contextReview.expectedVersion, review_scope: contextReview.reviewScope,
+      request_context: contextReview.context, approved_distribution: contextReview.approvedDistribution,
+    } : cuts && cuts.length > 0 ? cuts : null,
   });
   if (error) {
+    // Context SQL owns version/source/stock admission. Preserve its refusal tag;
+    // all existing legacy decision wording and approver handling remain below.
+    if (contextReview && error.code !== "42501") return fail(c, error);
     /* THE SAME DOOR, THE SAME WORDS (closure §9): the SQL gate refuses a
        non-approver with a bare 42501 whose message is the single word
        `forbidden` — measured reaching the operator raw on production
