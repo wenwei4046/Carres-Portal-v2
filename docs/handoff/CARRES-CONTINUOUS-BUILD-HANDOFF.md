@@ -16,8 +16,10 @@ production workflow39048405515 SUCCESS. All five production surfaces converged (
 log `/tmp/carres-live-check-production-verification.log`). Authenticated read-only MPR and
 Forecast walks at1025/1164/1440 verified36px toolbar,64/220 navigation,264 Summary/320 Tasks
 overlays and focus return. MPR empty New Task dialog retained focus through resizing and was
-cancelled; nothing saved. Selected SO Batch export menu was NOT conclusively verified live;
-its three targeted local browser cases passed. No real request/order/stock/task or supplier send.
+cancelled; nothing saved. SO Batch production view contained33 sales-order rows, all row selections disabled;
+selected export menu cannot be verified with current live facts. Ordinary Page tools opens;
+no export/download was triggered. Original To buy/By supplier view restored. Its three
+targeted local selection-export browser cases passed. No real request/order/stock/task or supplier send.
 Temporary viewport reset; hidden IAB2/tab2 retained at MPR. Native Chrome left alone.
 
 **One pending SQL review package, no approval inferred.** Exact stable checkout:
@@ -41,13 +43,30 @@ Blocked: production Settings save route/editor rollout. Full context writer/form
 independently unfinished and is not authorised by this package. Existing async question remains
 pending; do not ask again or treat the repeated foundation approval as approval of this hash.
 
+**Exact approval rule and owner-ready question (for controller presentation, not a new ask).**
+`docs/ENGINEERING.md:98`: “Draft SQL never lands in `supabase/migrations/` before Jess approves.”
+Question: “是否批准这份 Settings 保存 SQL（SHA256 b4eb234d…8053774）进入正式迁移及既定验证／应用流程？
+它只新增三个既有采购设置的原子保存与审计函数；应用 SQL 本身不改设置值，不启用请求、审批或采购流程。”
+Inspectable package is THIS file at
+`/Users/chaichiewlim/.codex/worktrees/forecast-mpr-context/Carres-Portal-v2/docs/handoff/CARRES-CONTINUOUS-BUILD-HANDOFF.md`;
+exact draft absolute path is
+`/Users/chaichiewlim/.codex/worktrees/forecast-mpr-context/Carres-Portal-v2/output/forecast-mpr-delivery/purchase-request-settings-writer.draft.sql`.
+It is in the dedicated context checkout, NOT the older delivery checkout. Local commits only;
+controller must inspect these absolute paths rather than its own checkout's handoff.
+
 **Independent local approval work:** private `_purchasing_assert_request_approval` now checks
 an actual saved approval/version/scope against exact current material state; missing approval,
 stale version and changed approved distribution refuse. It never writes approval or reserves
 stock, and is NOT wired into issuance. Canonical decision still fails closed for new context.
 Local owning-SQL rolled-back fixtures passed, including full5 need / stock1 / buy2+2 at two
 actual distinct destinations, exact retry, atomic refusal and legacy approval compatibility.
-Log `/tmp/carres-context-approval-guard.log`. This is WIP, not a review-ready writer migration.
+Private same-number revision admission now retains exact saved scope for the actual requester,
+requires a change reason and refuses another actor or any partially issued demand (including
+cancelled issued history). Physical stock bindings also fail closed; no new stock permission.
+Local rolled-back negative controls PASS at `/tmp/carres-context-revision-gate.log`.
+This gate does NOT implement the revision write/history/invalidation transaction or stock release;
+those remain open. Log `/tmp/carres-context-approval-guard.log` is earlier snapshot validation.
+This is WIP, not a review-ready writer migration.
 Remaining: shared supplier calendar validation, authoritative SC/forecast source admission,
 canonical approval snapshots and same-number reapproval/history, stock/coverage/partial issue
 admission and versioned send/task facts, then adoption by the existing shared form. PO/Receiving

@@ -311,6 +311,40 @@ end;
 $approval$;
 revoke all on function public._purchasing_assert_request_approval(uuid) from public,anon,authenticated;
 
+-- Private admission for the SAME request's approved/unissued revision. The
+-- future resubmit writer must record before/after/actor/reason, invalidate the
+-- old approval and increment version atomically after this gate; no public door
+-- is exposed here. Read request -> demands before inspecting physical bindings.
+create or replace function public._purchasing_request_revision_scope(p_id uuid,p_reason text)
+returns jsonb language plpgsql set search_path=public,pg_temp as $revision$
+declare r public.purchase_requests%rowtype; scope jsonb; actor_role text:=public.app_role();
+begin
+  if actor_role is null or actor_role not in ('operation','principal') then
+    raise exception 'not permitted' using errcode='42501';
+  end if;
+  select * into r from public.purchase_requests where id=p_id for update;
+  if not found then raise exception 'unknown request' using errcode='22023',detail='unknown_request'; end if;
+  if r.created_by is distinct from auth.uid() then
+    raise exception 'only the requester may revise this request' using errcode='42501',detail='not_requester';
+  end if;
+  if coalesce(p_reason,'') !~ '[^[:space:]]' then
+    raise exception 'a change reason is required' using errcode='22023',detail='revision_reason_required';
+  end if;
+  scope:=public._purchasing_assert_request_approval(p_id);
+  -- Include cancelled lines: an issued historical line is still an issued PO.
+  if exists(select 1 from public.purchase_demands where request_id=p_id
+    and (po_id is not null or ordered_at is not null or coalesce(issued_qty,0)>0)) then
+    raise exception 'issued requests use their PO change process' using errcode='22023',detail='request_already_issued';
+  end if;
+  if exists(select 1 from public.ops_stock_items u join public.purchase_demands d on d.id=u.reserved_purchase_demand_id
+    where d.request_id=p_id) then
+    raise exception 'stock binding requires its owning change process' using errcode='22023',detail='request_stock_bound';
+  end if;
+  return scope;
+end;
+$revision$;
+revoke all on function public._purchasing_request_revision_scope(uuid,text) from public,anon,authenticated;
+
 -- WIP canonical create slice. DO NOT REVIEW/APPLY as a finished migration:
 -- Supplier-date minimum must follow productionWorkingDaysFor/expectedArrivalOf
 -- and the SAME myHolidaySet source. Office calendar is for windows/buffer,

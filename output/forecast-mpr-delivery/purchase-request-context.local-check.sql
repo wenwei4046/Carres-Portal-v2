@@ -175,6 +175,27 @@ begin
  exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='request_approval_changed'; end;
  if not refused then raise exception 'changed approved distribution passed'; end if;
  if public._purchasing_assert_request_approval(rid) is distinct from baseline then raise exception 'approval refusals left changes'; end if;
+ -- Same-number revision admission as the actual synthetic requester.
+ perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009698","role":"authenticated","app_metadata":{"role":"operation"}}',true);
+ if public._purchasing_request_revision_scope(rid,'TEST correction') is distinct from baseline then raise exception 'approved unissued revision admission failed'; end if;
+ refused:=false;
+ begin
+   perform public._purchasing_request_revision_scope(rid,'   ');
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='revision_reason_required'; end;
+ if not refused then raise exception 'reasonless revision passed'; end if;
+ refused:=false;
+ begin
+   update public.purchase_demands set issued_qty=1 where request_id=rid;
+   perform public._purchasing_request_revision_scope(rid,'TEST correction');
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='request_already_issued'; end;
+ if not refused then raise exception 'partially issued request passed no-PO revision admission'; end if;
+ perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009699","role":"authenticated","app_metadata":{"role":"principal"}}',true);
+ refused:=false;
+ begin
+   perform public._purchasing_request_revision_scope(rid,'TEST correction');
+ exception when insufficient_privilege then get stacked diagnostics detail=pg_exception_detail; refused:=detail='not_requester'; end;
+ if not refused then raise exception 'different actor passed requester revision admission'; end if;
+ raise notice 'Revision admission: same saved scope retained, missing reason/non-requester/partially issued request refused PASS';
  raise notice 'Approval guard: missing snapshot refused, exact snapshot admitted, changed version/distribution refused PASS';
  raise notice 'Context state: exact material facts, unknown approval and quantity/configuration/header-date drift refusal PASS';
 end; $state_test$;
