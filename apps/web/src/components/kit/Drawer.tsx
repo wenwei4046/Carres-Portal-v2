@@ -17,10 +17,10 @@
  * is `DetailShell`, §1.4's ordered slots, and that is **D0.5c**. This component
  * owns the surface and stops there.
  */
-import { useCallback, useState, type ReactNode, type RefObject } from "react";
+import { useCallback, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import DialogFrame from "./DialogFrame";
-import { DialogContainerScope, useDialogContainer } from "./dialog-container";
+import { DialogContainerScope, PanelDialogPresence, useDialogContainer } from "./dialog-container";
 import { useNarrowModuleCanvas } from "./useNarrowModuleCanvas";
 import { useShellHeader } from "@/pages/operation/components/shell-header-context";
 
@@ -79,14 +79,31 @@ export function ContextualPanelSurface({ children, onHide, panel, open = true }:
   const inheritedContainer = useDialogContainer();
   const small = useNarrowModuleCanvas();
   const inShell = useShellHeader() != null;
-  const narrow = small && inShell;
+  const wantsNarrow = small && inShell;
+  const [narrow, setNarrow] = useState(wantsNarrow);
+  const [childDialogs, setChildDialogs] = useState(0);
+  const holdSurface = useCallback(() => {
+    setChildDialogs((count) => count + 1);
+    return () => setChildDialogs((count) => count - 1);
+  }, []);
+  useLayoutEffect(() => {
+    if (childDialogs === 0) setNarrow(wantsNarrow);
+  }, [wantsNarrow, childDialogs]);
   const [host] = useState(() => document.createElement("div"));
+  const focused = useRef<HTMLElement | null>(null);
   host.className = narrow ? "flex min-h-0 flex-1 flex-col" : "contents";
-  const attach = useCallback((node: HTMLDivElement | null) => { if (node) node.appendChild(host); }, [host]);
+  const attach = useCallback((node: HTMLDivElement | null) => {
+    const active = document.activeElement;
+    if (!node) { focused.current = active instanceof HTMLElement && host.contains(active) ? active : null; return; }
+    const target = active instanceof HTMLElement && host.contains(active) ? active : focused.current;
+    node.appendChild(host);
+    focused.current = null;
+    if (target && host.contains(target)) target.focus({ preventScroll: true });
+  }, [host]);
   const slot = <div ref={attach} className="flex min-h-0 flex-1 flex-col" />;
   return <>
     {narrow && onHide ? <Drawer returnFocusRef={panelOpeners[panel]} variant={panel === "Summary" ? "summary-panel" : "tasks-panel"} open={open} title={panel} onOpenChange={(open) => { if (!open) onHide(); }}>{slot}</Drawer> : open ? <div ref={attach} className="contents" /> : null}
-    {createPortal(<DialogContainerScope container={narrow ? host : inheritedContainer}>{children}</DialogContainerScope>, host)}
+    {createPortal(<PanelDialogPresence.Provider value={holdSurface}><DialogContainerScope container={narrow ? host : inheritedContainer}>{children}</DialogContainerScope></PanelDialogPresence.Provider>, host)}
   </>;
 }
 
