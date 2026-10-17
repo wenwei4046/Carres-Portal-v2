@@ -153,22 +153,26 @@ export const purchaseRequestContextSchema = z.object({
     });
   });
 });
+const forecastSourceSchema = z.array(z.record(z.unknown())).min(1).optional();
+function requireContextOriginSource(value: { context: z.infer<typeof purchaseRequestContextSchema>; forecastSource?: Array<Record<string, unknown>> }, ctx: z.RefinementCtx) {
+  if (value.context.origin === "forecast_suggestion" && !value.forecastSource?.length) ctx.addIssue({ code: "custom", path: ["forecastSource"], message: "Current forecast source required" });
+  if (value.context.origin !== "forecast_suggestion" && value.forecastSource !== undefined) ctx.addIssue({ code: "custom", path: ["forecastSource"], message: "This request has no forecast suggestion source" });
+}
 export const purchaseRequestSubmitSchema = z.object({
-  submissionKey: z.string().uuid(),
-  context: purchaseRequestContextSchema,
-}).strict();
+  submissionKey: z.string().uuid(), context: purchaseRequestContextSchema, forecastSource: forecastSourceSchema,
+}).strict().superRefine(requireContextOriginSource);
 /** Same request identity; the SQL owner serialises revision/version and saves history. */
 export const purchaseRequestRevisionSchema = z.object({
-  revisionKey: z.string().uuid(),
-  expectedVersion: z.number().int().min(1).max(2147483646),
-  reason: z.string().trim().min(1),
-  context: purchaseRequestContextSchema,
-}).strict();
+  revisionKey: z.string().uuid(), expectedVersion: z.number().int().min(1).max(2147483646),
+  reason: z.string().trim().min(1), context: purchaseRequestContextSchema, forecastSource: forecastSourceSchema,
+}).strict().superRefine(requireContextOriginSource);
+export type PurchaseRequestSubmission = z.infer<typeof purchaseRequestSubmitSchema>;
+export type PurchaseRequestRevision = z.infer<typeof purchaseRequestRevisionSchema>;
 export type PurchaseRequestContext = z.infer<typeof purchaseRequestContextSchema>;
 
 /** Read-time/API defence using the SAME supplier production planner as /plan.
- * SQL direct-call admission still needs a trustworthy canonical plan contract;
- * this projection alone is deliberately not claimed as transaction validation.
+ * The draft SQL also verifies sufficient working days against the same settings
+ * and generated holiday source. This projection remains an API defence, not SQL proof.
  */
 export function purchaseRequestSupplierDateIssues(
   context: PurchaseRequestContext,

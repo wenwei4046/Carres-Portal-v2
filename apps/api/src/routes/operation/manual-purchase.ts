@@ -1820,7 +1820,7 @@ manualPurchaseRouter.post("/:id/resubmit", requireOperation, async (c) => {
       p_for_service_case_id: b.context.serviceCaseId,
       p_for_staff_user_id: null, p_for_subsidiary_name: null,
       p_lines: [{ request_context: b.context, revision_key: b.revisionKey,
-        expected_version: b.expectedVersion, reason: b.reason }],
+        expected_version: b.expectedVersion, reason: b.reason, ...(b.forecastSource ? { forecast_source: b.forecastSource } : {}) }],
     });
     if (error) return fail(c, error);
     return c.json(data);
@@ -2091,7 +2091,7 @@ manualPurchaseRouter.post("/", requireOperation, async (c) => {
       p_for_subsidiary_name: null,
       // Extend the existing JSON input without creating an overloaded RPC.
       // SQL normalises the envelope and derives every demand from the context.
-      p_lines: [{ request_context: submission.data.context, submission_key: submission.data.submissionKey }],
+      p_lines: [{ request_context: submission.data.context, submission_key: submission.data.submissionKey, ...(submission.data.forecastSource ? { forecast_source: submission.data.forecastSource } : {}) }],
       p_fulfilment_intent: submission.data.context.purpose === "ready_stock" ? "additional_stock" : "concrete_need",
       p_purchase_requirement: null,
     });
@@ -2261,7 +2261,7 @@ manualPurchaseRouter.post("/:id/lines", requireOperation, async (c) => {
 /** The create form's plan read may name up to this many distinct SKUs —
  *  far above any real request, far below a scraping loop. */
 const planBody = z
-  .object({ skus: z.array(z.string().min(1).max(120)).max(50), proceedDate: z.string().date().optional(), purpose: z.enum(["service_case", "general_purchase", "ready_stock"]).optional() })
+  .object({ skus: z.array(z.string().min(1).max(120)).max(50), proceedDate: z.string().date().optional(), purpose: z.enum(["service_case", "general_purchase", "ready_stock"]).optional(), origin: z.enum(["manual", "stock_request", "forecast_suggestion"]).optional(), requestId: z.string().uuid().optional() })
   .strict();
 
 /**
@@ -2307,13 +2307,26 @@ manualPurchaseRouter.post("/plan", requireOperation, async (c) => {
     } catch { recipientPlanUnavailable = true; }
   }
   const recipientPlan = parsed.data.purpose ? { recipientEarliest, recipientPlanUnavailable } : {};
+  if (parsed.data.origin === "forecast_suggestion" && parsed.data.purpose !== "ready_stock") return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
+  let forecastPlan: { forecastSource: Array<Record<string, unknown>> | null; forecastSourceUnavailable: boolean } | Record<string, never> = {};
+  if (parsed.data.origin === "forecast_suggestion") {
+    if (skus.length === 0) forecastPlan = { forecastSource: null, forecastSourceUnavailable: false };
+    else {
+      try {
+        const source = await sb.rpc("purchasing_request_forecast_sources", { p_skus: skus, p_request_id: parsed.data.requestId ?? null });
+        forecastPlan = source.error || !Array.isArray(source.data) ? { forecastSource: null, forecastSourceUnavailable: true }
+          : { forecastSource: source.data, forecastSourceUnavailable: false };
+      } catch { forecastPlan = { forecastSource: null, forecastSourceUnavailable: true }; }
+    }
+  }
+
   if (skus.length === 0) {
     return c.json({
       proceedDate,
       lines: [],
       deliveryDateDefault: null,
       planUnavailable: false,
-      ...recipientPlan,
+      ...recipientPlan, ...forecastPlan,
     });
   }
 
@@ -2378,7 +2391,7 @@ manualPurchaseRouter.post("/plan", requireOperation, async (c) => {
       )
     : null;
 
-  return c.json({ proceedDate, lines, deliveryDateDefault, planUnavailable, ...recipientPlan });
+  return c.json({ proceedDate, lines, deliveryDateDefault, planUnavailable, ...recipientPlan, ...forecastPlan });
 });
 
 const issueBody = z.object({

@@ -109,12 +109,48 @@ pool_draw060a8774da2abf935f77a7bdc7b1a240; allocate3e74a58de146efa17bf7c527e3508
 record_issueb83f2638d1c868e1d5a01ae5192307b9; batchf84de1ebbd4c4bd4d4d83c56f980eb3b.
 Full local SQL log `/tmp/carres-context-stock-coverage.log`; calendar parity log
 `/tmp/carres-context-calendar-parity.log`. No production SQL modification or real transaction.
-Remaining before coherent full request-writer review: authoritative Forecast source/mark admission
-and fingerprint refresh; complete SC procurement-source interpretation without inventing an
-extra Service approval UUID; approver stock-choice adjustment retaining full need; final public
-decision/PO payload/date/partial issue integration and negative/concurrency controls. Then existing
-form adoption and exact-version send/task facts. No complete writer approval package yet. PO/
-Receiving standalone pages remain excluded. Earlier checkpoint paragraphs below are
+**Latest LOCAL source/approval work (supersedes the preceding remaining list):** Forecast
+source now reads real Catalog, Register population/14-day sales, Stock available units, owning
+PO free units and requests in progress, retaining contributor identities and a snapshot in the
+existing0695 mark. Shared display constants are generated/checked by
+`scripts/check-request-context-forecast-source.mjs`; their PROPOSAL/NOT LAW status is retained.
+They supply a change-reason baseline, not an automatic purchase cap or authority. Manual RS
+remains separate/uncapped; changed forecast500 with a reason and actual approval is exercised.
+Forged/stale sources refuse; own request/own issued supply are excluded during source refresh.
+The existing0695 wrapper and context create/revision use ONE private mark writer. The wrapper's
+production/local preimage matched0a92148a7e68f90aade2555a01c900d2; legacy create/mark/retry
+passed. Shared/API transports now carry exact forecastSource only for forecast-origin context;
+plan reads it through the new gated read RPC. API44/44 and API/web typechecks PASS.
+Authorised revision now reads raw before-facts plus the preceding saved approval separately:
+stale source blocks buying but does not trap a requester trying to correct it. Case/forecast
+source-only same-number refresh preserves old approval/mark history; local controls PASS.
+Private approval Review can change SC/GP stock arrangements while preserving every full-need
+line/SKU/attrs/recipient and root fact. Common demand projector preserves allocation identity;
+version increments, exact before/after/actor/time/reason is stored as an `approved` event. This
+adds `approved` to the existing event-kind CHECK while retaining all four old values. Qualified
+stock1->2/buy4->3 approval keeps need5 and reserves no Unit; stale Review, missing reason and
+full-need reduction refuse. Public approval remains closed pending final issue integration.
+Legacy create_demand/cancel_demand/move_request_destination now refuse contextual row edits;
+only whole-request revision/approval can change them. Their local/prod preimages matched
+7822bc46bfe56d0cf47e363fa35ba5b7 /7714a808edd5717cd4ad58cd31c5ff21 /
+fc0bec38981945678a130f1ad8c1b190. New shelf stock does NOT auto-net the deliberate GP remainder.
+**New technical SQL review scope:** nine per-SKU source-write guards cover Stock, Catalog,
+Orders/lines, PO/lines and request/demand sources. They change no NEW/OLD data and grant no
+role/RLS access, but same-SKU contention now returns existing40001/409 refresh semantics.
+Private keys use try-locks rather than global table freezes; different SKUs stay independent.
+This is UNAPPROVED DRAFT ONLY, never implied by the separate Settings approval. Two-client
+owned-loopback test proved same-SKU Stock insert refused without residue, unrelated SKU insert
+allowed, and the original SKU succeeds after release; all synthetic inserts rolled back. Log
+`/tmp/carres-context-source-concurrency.log`. Critical RS write paths acquire source keys before
+request roots; withdrawal/public issue root ordering still needs completion before review.
+Full owning SQL log `/tmp/carres-context-source-locks.log` (later source/review additions at
+`/tmp/carres-context-origin-review-final.log`); no production writer or transaction changed.
+Remaining: finish source-lock ordering/public issue/date/payload/partial-issue integration,
+wire exact Review/decision/history readback and test negative/concurrency boundaries, then
+assemble the COMPLETE request-writer review package. The public context issue/recorder and
+decision still fail closed. There is NO complete writer approval package yet. Existing-form
+adoption and exact-version send/task facts follow; standalone PO/Receiving redesign excluded.
+Earlier checkpoint paragraphs below are
 historical; they must not be used to infer current writer readiness.
 
 CARRES PORTAL v2 — CONTINUOUS BUILD · checkpoint 2026-10-16 (UI kit lane)

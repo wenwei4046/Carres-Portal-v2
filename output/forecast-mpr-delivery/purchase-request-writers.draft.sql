@@ -4,6 +4,89 @@
 -- Draft contextual request validation: one owning SQL transaction rechecks conservation.
 -- Direct RPC callers must satisfy the same required fields and JSON types as
 -- the shared schema; SQL NULL is never accepted as an omitted required field.
+-- WIP reviewed-kind expansion, preserves every existing history kind.
+alter table public.purchase_request_events drop constraint if exists purchase_request_events_kind_check;
+alter table public.purchase_request_events add constraint purchase_request_events_kind_check
+ check(kind in ('sent_back','resubmitted','withdrawn','stock_allocated','approved'));
+
+-- Per-SKU source consistency only: no business row, status, stock or permission
+-- is written. Same-SKU contention fails atomically with the existing409 refresh
+-- contract; unrelated SKUs remain independent. No global Stock/Orders freeze.
+create or replace function public._purchasing_context_source_locks(p_skus text[])
+returns void language plpgsql set search_path=public,pg_temp as $source_locks$
+declare sku text;
+begin
+ for sku in select distinct s collate "C" from unnest(coalesce(p_skus,'{}')) s where s is not null order by 1 loop
+  if not pg_try_advisory_xact_lock(hashtextextended('purchasing.context.forecast-source:'||sku,0)) then
+   raise exception 'This work changed. Refresh and try again.' using errcode='40001',detail='request_source_busy';
+  end if;
+ end loop;
+end;
+$source_locks$;
+revoke all on function public._purchasing_context_source_locks(text[]) from public,anon,authenticated;
+
+-- Owner-table writes join the same mutex, including inserts (phantoms). The
+-- trigger never changes NEW/OLD and never becomes another source-data writer.
+create or replace function public._purchasing_context_source_write_guard()
+returns trigger language plpgsql security definer set search_path=public,pg_temp as $source_write_guard$
+declare keys text[]:='{}';
+begin
+ if tg_table_name='orders' then
+  select array_agg(distinct l.sku order by l.sku) into keys from public.order_lines l where l.order_id=old.id;
+ elsif tg_table_name='purchase_orders' then
+  select array_agg(distinct l.sku order by l.sku) into keys from public.purchase_order_lines l where l.po_id=old.id;
+ elsif tg_table_name='product_models' then
+  select array_agg(distinct s.sku order by s.sku) into keys from public.product_skus s where s.model_id=old.id;
+ elsif tg_table_name='purchase_requests' then
+  if old.purpose='ready_stock' or (tg_op='UPDATE' and new.purpose='ready_stock') then
+   select array_agg(distinct d.sku order by d.sku) into keys from public.purchase_demands d where d.request_id=old.id;
+  end if;
+ elsif tg_table_name='purchase_demands' then
+  if tg_op<>'INSERT' and old.purpose='ready_stock' then keys:=keys||old.sku; end if;
+  if tg_op<>'DELETE' and new.purpose='ready_stock' then keys:=keys||new.sku; end if;
+ else
+  if tg_op<>'INSERT' then keys:=keys||old.sku; end if;
+  if tg_op<>'DELETE' then keys:=keys||new.sku; end if;
+ end if;
+ perform public._purchasing_context_source_locks(keys);
+ if tg_op='DELETE' then return old; else return new; end if;
+end;
+$source_write_guard$;
+revoke all on function public._purchasing_context_source_write_guard() from public,anon,authenticated;
+
+-- New technical guards; existing owner triggers, business gates and RLS remain.
+drop trigger if exists purchasing_context_source_guard on public.ops_stock_items;
+create trigger purchasing_context_source_guard before insert or update or delete on public.ops_stock_items for each row execute function public._purchasing_context_source_write_guard();
+drop trigger if exists purchasing_context_source_guard on public.purchase_order_lines;
+create trigger purchasing_context_source_guard before insert or update or delete on public.purchase_order_lines for each row execute function public._purchasing_context_source_write_guard();
+drop trigger if exists purchasing_context_source_guard on public.order_lines;
+create trigger purchasing_context_source_guard before insert or update or delete on public.order_lines for each row execute function public._purchasing_context_source_write_guard();
+drop trigger if exists purchasing_context_source_guard on public.product_skus;
+create trigger purchasing_context_source_guard before insert or update or delete on public.product_skus for each row execute function public._purchasing_context_source_write_guard();
+drop trigger if exists purchasing_context_source_guard on public.purchase_demands;
+create trigger purchasing_context_source_guard before insert or update or delete on public.purchase_demands for each row execute function public._purchasing_context_source_write_guard();
+drop trigger if exists purchasing_context_source_guard on public.orders;
+create trigger purchasing_context_source_guard before update of status,placed_at,source_system or delete on public.orders for each row execute function public._purchasing_context_source_write_guard();
+drop trigger if exists purchasing_context_source_guard on public.purchase_orders;
+create trigger purchasing_context_source_guard before update or delete on public.purchase_orders for each row execute function public._purchasing_context_source_write_guard();
+drop trigger if exists purchasing_context_source_guard on public.product_models;
+create trigger purchasing_context_source_guard before update of category,model_key or delete on public.product_models for each row execute function public._purchasing_context_source_write_guard();
+drop trigger if exists purchasing_context_source_guard on public.purchase_requests;
+create trigger purchasing_context_source_guard before update or delete on public.purchase_requests for each row execute function public._purchasing_context_source_write_guard();
+
+-- Before taking a request root lock, its RS writers take the same SKU keys.
+-- New/proposed SKUs are included by the resubmit/create caller as appropriate.
+create or replace function public._purchasing_context_request_source_locks(p_id uuid)
+returns void language plpgsql set search_path=public,pg_temp as $request_source_locks$
+declare keys text[];
+begin
+ select array_agg(distinct d.sku order by d.sku) into keys from public.purchase_demands d join public.purchase_requests r on r.id=d.request_id
+  where r.id=p_id and r.request_version>0 and r.purpose='ready_stock';
+ perform public._purchasing_context_source_locks(keys);
+end;
+$request_source_locks$;
+revoke all on function public._purchasing_context_request_source_locks(uuid) from public,anon,authenticated;
+
 create or replace function public._purchasing_context_object(p_value jsonb, p_shape jsonb)
 returns void language plpgsql set search_path=public,pg_temp as $shape$
 declare k text; expected text;
@@ -251,12 +334,12 @@ begin
   for l in select * from jsonb_array_elements(p_context->'lines') loop
     if jsonb_array_length(l->'allocations')=0 then continue; end if;
     select s.supplier_id,m.category::text as category into source from public.product_skus s
-      join public.product_models m on m.id=s.model_id where s.sku=l->>'sku' for share of s,m;
+      join public.product_models m on m.id=s.model_id where s.sku=l->>'sku' for share of s,m nowait;
     if not found then raise exception 'unknown sku' using errcode='22023',detail='unknown_sku'; end if;
     if source.supplier_id is null or source.category is null then raise exception 'supplier production plan unavailable' using errcode='22023',detail='supplier_plan_unavailable'; end if;
-    select working_days into days from public.purchasing_production_days where supplier_id=source.supplier_id and category=source.category for share;
+    select working_days into days from public.purchasing_production_days where supplier_id=source.supplier_id and category=source.category for share nowait;
     if not found or days is null then raise exception 'supplier production days unavailable' using errcode='22023',detail='supplier_plan_unavailable'; end if;
-    select ss.off_days into off_days from public.purchasing_supplier_settings ss where ss.supplier_id=source.supplier_id for share;
+    select ss.off_days into off_days from public.purchasing_supplier_settings ss where ss.supplier_id=source.supplier_id for share nowait;
     -- Same published fallback as workWeekOffDaysFor, not guessed production days.
     if coalesce(cardinality(off_days),0)=0 then off_days:=array[0]; end if;
     for a in select * from jsonb_array_elements(l->'allocations') loop
@@ -274,19 +357,145 @@ begin
       'supplier_id',source.supplier_id,'category',source.category,'working_days',days,'off_days',off_days,'holiday_dates',holidays));
   end loop;
   return facts;
+exception when lock_not_available then raise exception 'This work changed. Refresh and try again.' using errcode='40001',detail='request_source_busy';
 end;
 $supplier_dates$;
 revoke all on function public._purchasing_check_context_supplier_dates(jsonb,date) from public,anon,authenticated;
 
+-- BEGIN GENERATED EXISTING FORECAST DISPLAY SOURCE
+-- Source: packages/shared/src/forecast-purchase.ts, SHA256 6759e06dd45199f3e237d23f97a01fb9e6942e1db5d030989a213873ad1e3eba
+-- Display baseline only. Changed quantities require reason + actual approval, no automatic cap/permission.
+create or replace function public._purchasing_context_forecast_display_source()
+returns jsonb language sql immutable set search_path=public,pg_temp as $forecast_display$
+ select '{"authority":"existing_forecast_display_proposal_not_purchase_authority","rate_days":14,"level_days":14,"week_days":7,"scope":{"categories":["mattress"],"models":[{"category":"bedframe","modelKey":"jager"}]}}'::jsonb;
+$forecast_display$;
+revoke all on function public._purchasing_context_forecast_display_source() from public,anon,authenticated;
+-- END GENERATED EXISTING FORECAST DISPLAY SOURCE
+
+-- Owning-source facts for the EXISTING forecast display, not a second automatic
+-- buying rule. The suggestion is a baseline for change reason; approval is always
+-- separate and a changed suggestion is not capped by this display formula.
+create or replace function public._purchasing_context_forecast_facts(p_sku text,p_exclude_request uuid default null)
+returns jsonb language plpgsql set search_path=public,pg_temp as $forecast_facts$
+declare policy jsonb:=public._purchasing_context_forecast_display_source(); source record; today date:=(now() at time zone 'Asia/Kuala_Lumpur')::date;
+ sales jsonb; stock jsonb; pos jsonb; requests jsonb; sold bigint; free bigint; on_po bigint; in_progress bigint;
+ level bigint; cap bigint; suggested bigint;
+begin
+ select s.id,s.sku,s.supplier_id,s.variant_kind,s.discontinued_at,m.id as model_id,m.category::text category,lower(m.model_key) model_key,sup.kind::text supplier_kind
+  into source from public.product_skus s join public.product_models m on m.id=s.model_id left join public.suppliers sup on sup.id=s.supplier_id
+  where s.sku=p_sku for share of s,m nowait;
+ if not found or source.supplier_id is null or source.supplier_kind='other_creditor' or source.variant_kind<>'size' or source.discontinued_at is not null
+  or not (exists(select 1 from jsonb_array_elements_text(policy#>'{scope,categories}') c where c=lower(source.category))
+    or exists(select 1 from jsonb_array_elements(policy#>'{scope,models}') m where m->>'category'=lower(source.category) and m->>'modelKey'=source.model_key)) then
+  raise exception 'item is outside the current forecast source' using errcode='22023',detail='forecast_not_stock_item'; end if;
+ -- Exactly the Register population used by readForecastPurchase: no placed/
+ -- cancelled orders or rentals; Malaysia placed date after today-14 through today.
+ select coalesce(jsonb_agg(jsonb_build_object('order_id',o.id,'line_id',l.id,'placed_at',o.placed_at,'qty',l.qty) order by o.id,l.id),'[]'),coalesce(sum(greatest(l.qty,0)),0)
+  into sales,sold from public.orders o join public.order_lines l on l.order_id=o.id where l.sku=p_sku and o.status::text not in ('place','cancelled')
+   and (o.source_system is null or o.source_system<>'rental') and (o.placed_at at time zone 'Asia/Kuala_Lumpur')::date>today-(policy->>'rate_days')::integer
+   and (o.placed_at at time zone 'Asia/Kuala_Lumpur')::date<=today and l.qty>0;
+ select coalesce(jsonb_agg(jsonb_build_object('id',v.id,'qty',v.qty,'warehouse_id',i.warehouse_id) order by v.id),'[]'),coalesce(sum(greatest(v.qty,1)),0)
+  into stock,free from public.stock_unit_register_v v join public.ops_stock_items i on i.id=v.id
+  where v.sku=p_sku and v.availability='available' and v.condition='new' and not exists(
+   select 1 from public.purchase_order_lines pl join public.purchase_demands d on d.id=pl.demand_id where pl.id=i.po_line_id and d.request_id=p_exclude_request);
+ select coalesce(jsonb_agg(jsonb_build_object('po_id',v.po_id,'line_id',v.po_line_id,'version',po.version,'qty',v.free_units) order by v.po_id,v.po_line_id),'[]'),coalesce(sum(greatest(v.free_units,0)),0)
+  into pos,on_po from public.purchasing_po_free_units() v join public.purchase_orders po on po.id=v.po_id join public.purchase_order_lines pl on pl.id=v.po_line_id
+  where v.sku=p_sku and not exists(select 1 from public.purchase_demands d where d.id=pl.demand_id and d.request_id=p_exclude_request);
+ select coalesce(jsonb_agg(jsonb_build_object('request_id',p.request_id,'version',r.request_version,'qty',p.qty) order by p.request_id,p.qty),'[]'),coalesce(sum(p.qty),0)
+  into requests,in_progress from public._purchasing_forecast_in_progress_rows() p join public.purchase_requests r on r.id=p.request_id where p.sku=p_sku and (p_exclude_request is null or p.request_id<>p_exclude_request);
+ level:=ceil(sold::numeric/(policy->>'rate_days')::integer*(policy->>'level_days')::integer);
+ cap:=greatest(1,ceil(sold::numeric/(policy->>'rate_days')::integer*(policy->>'week_days')::integer));
+ suggested:=least(greatest(0,level-free-on_po),cap);
+ return jsonb_build_object('source_version',1,'week',date_trunc('week',today)::date,'sku',p_sku,
+  'catalog',jsonb_build_object('sku_id',source.id,'model_id',source.model_id,'supplier_id',source.supplier_id,'category',source.category,'model_key',source.model_key),
+  'sold14',sold,'free',free,'on_po',on_po,'in_progress',in_progress,'sales',sales,'stock',stock,'pos',pos,'requests',requests,
+  'suggested',suggested,'to_ask',greatest(0,suggested-in_progress),'display_source',policy);
+exception when lock_not_available then raise exception 'This work changed. Refresh and try again.' using errcode='40001',detail='request_source_busy';
+end;
+$forecast_facts$;
+revoke all on function public._purchasing_context_forecast_facts(text,uuid) from public,anon,authenticated;
+
+-- Read the actual current source for selected forecast rows. This is only a
+-- review read; it creates no request, approval, coverage, task or buying authority.
+create or replace function public.purchasing_request_forecast_sources(p_skus text[],p_request_id uuid default null)
+returns jsonb language plpgsql security definer set search_path=public,pg_temp as $forecast_sources$
+declare actor_role text:=public.app_role(); sku text; result jsonb:='[]';
+begin
+ if actor_role is null or actor_role not in ('operation','principal') then raise exception 'not permitted' using errcode='42501'; end if;
+ if p_skus is null or cardinality(p_skus)=0 or exists(select 1 from unnest(p_skus) s where s is null or btrim(s)='')
+  or cardinality(p_skus)<>(select count(distinct s) from unnest(p_skus) s) then raise exception 'exact selected SKUs required' using errcode='22023',detail='invalid_param'; end if;
+ foreach sku in array p_skus loop result:=result||jsonb_build_array(public._purchasing_context_forecast_facts(sku,p_request_id)); end loop;
+ return result;
+end;
+$forecast_sources$;
+revoke all on function public.purchasing_request_forecast_sources(text[],uuid) from public,anon;
+grant execute on function public.purchasing_request_forecast_sources(text[],uuid) to authenticated;
+
+create or replace function public._purchasing_check_context_forecast_source(p_context jsonb,p_sources jsonb,p_exclude_request uuid default null)
+returns jsonb language plpgsql set search_path=public,pg_temp as $check_forecast$
+declare item record; current_source jsonb; seen jsonb; result jsonb:='[]';
+begin
+ if p_context->>'origin'<>'forecast_suggestion' or jsonb_typeof(p_sources) is distinct from 'array'
+  or jsonb_array_length(p_sources)<>(select count(distinct l->>'sku') from jsonb_array_elements(p_context->'lines') l) then
+  raise exception 'exact forecast source required' using errcode='22023',detail='forecast_source_required'; end if;
+ for item in select l->>'sku' as sku,sum((l->>'qty')::integer) as qty from jsonb_array_elements(p_context->'lines') l group by 1 order by 1 loop
+  if (select count(*) from jsonb_array_elements(p_sources) s where s->>'sku'=item.sku)<>1 then raise exception 'exact forecast source required' using errcode='22023',detail='forecast_source_required'; end if;
+  select s into strict seen from jsonb_array_elements(p_sources) s where s->>'sku'=item.sku;
+  current_source:=public._purchasing_context_forecast_facts(item.sku,p_exclude_request);
+  if seen is distinct from current_source then raise exception 'forecast source changed' using errcode='22023',detail='forecast_source_changed'; end if;
+  if item.qty<>(current_source->>'to_ask')::bigint and coalesce(p_context->>'forecastChangeReason','') !~ '[^[:space:]]' then
+   raise exception 'changed forecast quantity requires a reason' using errcode='22023',detail='forecast_change_reason_required'; end if;
+  result:=result||jsonb_build_array(current_source);
+ end loop;
+ return result;
+end;
+$check_forecast$;
+revoke all on function public._purchasing_check_context_forecast_source(jsonb,jsonb,uuid) from public,anon,authenticated;
+
+-- ONE private mark writer, shared by the existing 0695 wrapper and canonical
+-- contextual create/revision. Prior marks remain in the resubmitted event.
+create or replace function public._purchasing_write_forecast_request_mark(p_id uuid,p_week date,p_key uuid,p_lines jsonb,p_revision boolean default false)
+returns void language plpgsql set search_path=public,pg_temp as $write_forecast_mark$
+declare r public.purchase_requests%rowtype; previous public.forecast_purchase_requests%rowtype;
+begin
+ select * into strict r from public.purchase_requests where id=p_id;
+ if r.created_by is distinct from auth.uid() or r.purpose<>'ready_stock' or r.fulfilment_intent<>'additional_stock' then raise exception 'forecast origin disagrees with request' using errcode='22023',detail='forecast_source_changed'; end if;
+ if p_revision then
+  select * into strict previous from public.forecast_purchase_requests where request_id=p_id for update;
+  if previous.created_by is distinct from auth.uid() or previous.submission_key is distinct from p_key then raise exception 'forecast mark identity changed' using errcode='22023',detail='forecast_source_changed'; end if;
+  update public.forecast_purchase_requests set forecast_week=p_week,lines=p_lines where request_id=p_id;
+ else
+  insert into public.forecast_purchase_requests(request_id,forecast_week,submission_key,lines,created_by) values(p_id,p_week,p_key,p_lines,auth.uid());
+ end if;
+end;
+$write_forecast_mark$;
+revoke all on function public._purchasing_write_forecast_request_mark(uuid,date,uuid,jsonb,boolean) from public,anon,authenticated;
+
+create or replace function public._purchasing_context_forecast_mark_lines(p_context jsonb,p_sources jsonb)
+returns jsonb language sql set search_path=public,pg_temp as $mark_lines$
+ select jsonb_agg(jsonb_build_object('sku',l->>'sku','qty',(l->>'qty')::integer,'in_progress',(s->>'in_progress')::integer,
+  'basis',jsonb_build_object('request_line_id',(l->>'id')::uuid,'source_snapshot',s)) order by l->>'id')
+ from jsonb_array_elements(p_context->'lines') l join jsonb_array_elements(p_sources) s on s->>'sku'=l->>'sku';
+$mark_lines$;
+revoke all on function public._purchasing_context_forecast_mark_lines(jsonb,jsonb) from public,anon,authenticated;
+
 create or replace function public._purchasing_request_context_state(p_id uuid)
 returns jsonb language plpgsql set search_path=public,pg_temp as $state$
-declare r public.purchase_requests%rowtype; expected jsonb; actual jsonb; facts jsonb; case_source jsonb; supplier_plan jsonb;
+declare r public.purchase_requests%rowtype; expected jsonb; actual jsonb; facts jsonb; case_source jsonb; supplier_plan jsonb; forecast_sources jsonb; forecast_mark public.forecast_purchase_requests%rowtype;
 begin
   select * into r from public.purchase_requests where id=p_id for update;
   if not found then raise exception 'unknown request' using errcode='22023',detail='unknown_request'; end if;
   if r.request_version<1 or r.request_context is null then raise exception 'no contextual scope' using errcode='22023',detail='context_unavailable'; end if;
   perform public._purchasing_validate_request_context(r.request_context);
   supplier_plan:=public._purchasing_check_context_supplier_dates(r.request_context);
+  if r.request_context->>'origin'='forecast_suggestion' then
+    select * into forecast_mark from public.forecast_purchase_requests where request_id=r.id for share;
+    if not found or forecast_mark.created_by is distinct from r.created_by then raise exception 'forecast source mark unavailable' using errcode='22023',detail='forecast_source_required'; end if;
+    select jsonb_agg(source order by source->>'sku') into forecast_sources from (select distinct l#>'{basis,source_snapshot}' source from jsonb_array_elements(forecast_mark.lines) l) q;
+    forecast_sources:=public._purchasing_check_context_forecast_source(r.request_context,forecast_sources,r.id);
+  elsif exists(select 1 from public.forecast_purchase_requests where request_id=r.id) then
+    raise exception 'request origin disagrees with forecast mark' using errcode='22023',detail='forecast_source_changed';
+  end if;
   if r.purpose is distinct from r.request_context->>'purpose' or r.proceed_date is distinct from (r.request_context->>'proceedDate')::date
     or r.for_service_case_id is distinct from (r.request_context->>'serviceCaseId')::uuid then
     raise exception 'request header changed' using errcode='22023',detail='request_scope_changed';
@@ -338,7 +547,7 @@ begin
     'qty',qty,'approved_qty',approved_qty) order by id),'[]') into facts
   from public.purchase_demands where request_id=p_id and cancelled_at is null;
   return jsonb_build_object('version',1,'request_id',r.id,'request_version',r.request_version,
-    'requester_id',r.created_by,'created_at',r.created_at,'purpose',r.purpose,'proceed_date',r.proceed_date,'context',r.request_context,'service_case_source',case_source,'supplier_plan',supplier_plan,'demands',facts);
+    'requester_id',r.created_by,'created_at',r.created_at,'purpose',r.purpose,'proceed_date',r.proceed_date,'context',r.request_context,'service_case_source',case_source,'supplier_plan',supplier_plan,'forecast_source',case when forecast_sources is null then null else jsonb_build_object('week',forecast_mark.forecast_week,'submission_key',forecast_mark.submission_key,'sources',forecast_sources) end,'demands',facts);
 end;
 $state$;
 revoke all on function public._purchasing_request_context_state(uuid) from public,anon,authenticated;
@@ -424,6 +633,7 @@ create or replace function public._purchasing_stamp_context_approval(p_id uuid,p
 returns jsonb language plpgsql set search_path=public,pg_temp as $stamp$
 declare actor_role text:=public.purchasing_approver_gate(); r public.purchase_requests%rowtype; scope jsonb; distribution jsonb;
 begin
+ perform public._purchasing_context_request_source_locks(p_id);
   select * into r from public.purchase_requests where id=p_id for update;
   if not found then raise exception 'unknown request' using errcode='22023',detail='unknown_request'; end if;
   if r.created_by is not distinct from auth.uid() then raise exception 'you cannot decide a purchase you raised' using errcode='42501',detail='own_request'; end if;
@@ -548,6 +758,22 @@ end;
 $issue_admission$;
 revoke all on function public._purchasing_context_issue_admission(uuid,integer) from public,anon,authenticated;
 
+-- Raw before-state for an authorised revision. A stale source is precisely what
+-- a revision may repair; this read claims NO current approval. The preceding
+-- immutable approval remains separately preserved in the existing event.
+create or replace function public._purchasing_context_revision_before(p_id uuid)
+returns jsonb language plpgsql set search_path=public,pg_temp as $revision_before$
+declare r public.purchase_requests%rowtype; demands jsonb;
+begin
+ select * into strict r from public.purchase_requests where id=p_id for update;
+ perform 1 from public.purchase_demands where request_id=p_id order by id for update;
+ select coalesce(jsonb_agg(to_jsonb(d) order by id),'[]') into demands from public.purchase_demands d where request_id=p_id and cancelled_at is null;
+ return jsonb_build_object('version',1,'request_id',r.id,'request_version',r.request_version,'context',r.request_context,
+  'purpose',r.purpose,'proceed_date',r.proceed_date,'destination_id',r.destination_id,'required_by',r.required_by,'demands',demands,'saved_approval',r.approval_scope,'forecast_mark',(select to_jsonb(f) from public.forecast_purchase_requests f where f.request_id=p_id));
+end;
+$revision_before$;
+revoke all on function public._purchasing_context_revision_before(uuid) from public,anon,authenticated;
+
 -- Private admission for the SAME request's approved/unissued revision. The
 -- future resubmit writer must record before/after/actor/reason, invalidate the
 -- old approval and increment version atomically after this gate; no public door
@@ -567,7 +793,11 @@ begin
   if coalesce(p_reason,'') !~ '[^[:space:]]' then
     raise exception 'a change reason is required' using errcode='22023',detail='revision_reason_required';
   end if;
-  scope:=public._purchasing_assert_request_approval(p_id);
+  if r.approved_at is null or r.approved_by is null or r.refused_at is not null or r.withdrawn_at is not null or r.sent_back_at is not null
+    or r.approval_scope is null or r.approval_version is distinct from r.request_version
+    or r.approval_scope->'context' is distinct from r.request_context or (r.approval_scope->>'request_id')::uuid is distinct from r.id then
+    raise exception 'saved preceding approval unavailable' using errcode='22023',detail='request_approval_unavailable'; end if;
+  scope:=public._purchasing_context_revision_before(p_id);
   -- Include cancelled lines: an issued historical line is still an issued PO.
   if exists(select 1 from public.purchase_demands where request_id=p_id
     and (po_id is not null or ordered_at is not null or coalesce(issued_qty,0)>0))
@@ -587,34 +817,148 @@ revoke all on function public._purchasing_request_revision_scope(uuid,text) from
 -- No public grant and no physical stock allocation. Historical demands stay.
 create or replace function public._purchasing_write_context_demands(p_id uuid,p_context jsonb)
 returns void language plpgsql set search_path=public,pg_temp as $demands$
-declare v_line jsonb; v_supplier uuid; v_allocation jsonb; v_stock jsonb; v_required date;
+declare v_line jsonb; v_supplier uuid; a jsonb; kind text; required date; header_date date; target uuid; kept uuid[]:='{}';
 begin
-  select required_by into strict v_required from public.purchase_requests where id=p_id for update;
-  perform public._purchasing_validate_request_context(p_context);
-  perform public._purchasing_check_context_supplier_dates(p_context);
-    for v_line in select * from jsonb_array_elements(p_context->'lines') loop
-      select supplier_id into v_supplier from public.product_skus where sku=v_line->>'sku';
-      if not found then raise exception 'unknown sku' using errcode='22023',detail='unknown_sku'; end if;
-      if v_supplier is null then raise exception 'sku has no supplier' using errcode='22023',detail='sku_has_no_supplier'; end if;
-      for v_allocation in select * from jsonb_array_elements(v_line->'allocations') loop
-        if (v_allocation->>'supplierDeliveryDate')::date < (p_context->>'proceedDate')::date then raise exception 'supplier date precedes Proceed Date' using errcode='22023',detail='invalid_param'; end if;
-        insert into public.purchase_demands(purpose,sku,supplier_id,destination_id,qty,required_by,request_id,created_by,attrs,
-          request_line_id,supplier_allocation_id,fulfilment_kind)
-        values((p_context->>'purpose'),v_line->>'sku',v_supplier,(v_allocation->>'destinationId')::uuid,(v_allocation->>'qty')::int,
-          (v_allocation->>'supplierDeliveryDate')::date,p_id,auth.uid(),nullif(v_line->'attrs','null'::jsonb),
-          (v_line->>'id')::uuid,(v_allocation->>'id')::uuid,'purchase');
-      end loop;
-      for v_stock in select * from jsonb_array_elements(v_line->'stockProposals') loop
-        -- Proposal only. No Unit, reservation, stock ledger or physical movement.
-        insert into public.purchase_demands(purpose,sku,supplier_id,destination_id,qty,required_by,request_id,created_by,attrs,
-          request_line_id,stock_proposal_id,fulfilment_kind)
-        values((p_context->>'purpose'),v_line->>'sku',v_supplier,(v_stock->>'destinationId')::uuid,(v_stock->>'qty')::int,v_required,
-          p_id,auth.uid(),nullif(v_line->'attrs','null'::jsonb),(v_line->>'id')::uuid,(v_stock->>'id')::uuid,'stock_proposal');
-      end loop;
-    end loop;
+ select required_by into strict header_date from public.purchase_requests where id=p_id for update;
+ perform public._purchasing_validate_request_context(p_context);
+ perform public._purchasing_check_context_supplier_dates(p_context);
+ for v_line in select * from jsonb_array_elements(p_context->'lines') loop
+  select supplier_id into v_supplier from public.product_skus where sku=v_line->>'sku';
+  if not found then raise exception 'unknown sku' using errcode='22023',detail='unknown_sku'; end if;
+  if v_supplier is null then raise exception 'sku has no supplier' using errcode='22023',detail='sku_has_no_supplier'; end if;
+  for a,kind in select x,'purchase'::text from jsonb_array_elements(v_line->'allocations') x union all select x,'stock_proposal'::text from jsonb_array_elements(v_line->'stockProposals') x loop
+   required:=case when kind='purchase' then (a->>'supplierDeliveryDate')::date else header_date end;
+   target:=null;
+   select id into target from public.purchase_demands where request_id=p_id and cancelled_at is null and request_line_id=(v_line->>'id')::uuid
+    and fulfilment_kind=kind and coalesce(supplier_allocation_id,stock_proposal_id)=(a->>'id')::uuid for update;
+   if found then
+    if (select count(*) from public.purchase_demands where request_id=p_id and cancelled_at is null and request_line_id=(v_line->>'id')::uuid and fulfilment_kind=kind and coalesce(supplier_allocation_id,stock_proposal_id)=(a->>'id')::uuid)<>1 then raise exception 'duplicate persisted allocation' using errcode='22023',detail='request_scope_changed'; end if;
+    update public.purchase_demands set supplier_id=v_supplier,destination_id=(a->>'destinationId')::uuid,qty=(a->>'qty')::integer,required_by=required,attrs=nullif(v_line->'attrs','null'::jsonb),approved_qty=null where id=target;
+   else
+    insert into public.purchase_demands(purpose,sku,supplier_id,destination_id,qty,required_by,request_id,created_by,attrs,request_line_id,supplier_allocation_id,stock_proposal_id,fulfilment_kind)
+     values(p_context->>'purpose',v_line->>'sku',v_supplier,(a->>'destinationId')::uuid,(a->>'qty')::integer,required,p_id,auth.uid(),nullif(v_line->'attrs','null'::jsonb),
+      (v_line->>'id')::uuid,case when kind='purchase' then (a->>'id')::uuid end,case when kind='stock_proposal' then (a->>'id')::uuid end,kind) returning id into target;
+   end if;
+   kept:=kept||target;
+  end loop;
+ end loop;
+ update public.purchase_demands set cancelled_at=now(),cancelled_by=auth.uid(),cancel_reason='Replaced by reviewed request scope'
+  where request_id=p_id and cancelled_at is null and not(id=any(kept));
 end;
 $demands$;
 revoke all on function public._purchasing_write_context_demands(uuid,jsonb) from public,anon,authenticated;
+
+-- Live review read only; proposal availability is not a Unit reservation.
+create or replace function public._purchasing_context_review(p_id uuid)
+returns jsonb language plpgsql set search_path=public,pg_temp as $review$
+declare scope jsonb; r public.purchase_requests%rowtype; l jsonb; a jsonb; candidates jsonb; stocks jsonb:='[]';
+begin
+ scope:=public._purchasing_request_context_state(p_id);
+ select * into strict r from public.purchase_requests where id=p_id;
+ for l in select * from jsonb_array_elements(r.request_context->'lines') loop
+  for a in select * from jsonb_array_elements(l->'stockProposals') loop
+   select coalesce(jsonb_agg(jsonb_build_object('id',u.id,'qty',u.qty,'warehouse_id',u.warehouse_id,'condition',u.condition) order by u.id),'[]') into candidates
+    from public.ops_stock_items u left join public.purchase_order_lines pl on pl.id=u.po_line_id
+    where u.warehouse_id=(a->>'locationId')::uuid and public.stock_match_key(u.sku)=public.stock_match_key(l->>'sku')
+     and u.identity_scope='unit' and u.qty=1 and u.reserved_purchase_demand_id is null and u.reserved_order_line_id is null
+     and public.unit_availability(u.status,u.needs_repair,u.hold_reason,u.condition)='available'
+     and nullif(pl.attrs,'{}'::jsonb) is not distinct from nullif(nullif(l->'attrs','null'::jsonb),'{}'::jsonb);
+   stocks:=stocks||jsonb_build_array(jsonb_build_object('lineId',(l->>'id')::uuid,'allocationId',(a->>'id')::uuid,'units',candidates,'availableQty',jsonb_array_length(candidates)));
+  end loop;
+ end loop;
+ return jsonb_build_object('request_version',r.request_version,'state',scope,'stock_source',stocks);
+end;
+$review$;
+revoke all on function public._purchasing_context_review(uuid) from public,anon,authenticated;
+
+-- Public read retains the existing Operation/Principal request-reader permission.
+-- An unavailable source is NOT empty scope and cannot be approved.
+create or replace function public.purchasing_request_context_review(p_id uuid)
+returns jsonb language plpgsql security definer set search_path=public,pg_temp as $review_read$
+declare actor_role text:=public.app_role(); r public.purchase_requests%rowtype; detail text;
+begin
+ if actor_role is null or actor_role not in ('operation','principal') then raise exception 'not permitted' using errcode='42501'; end if;
+ select * into strict r from public.purchase_requests where id=p_id;
+ if r.request_version<1 or r.request_context is null then raise exception 'context unavailable' using errcode='22023',detail='context_unavailable'; end if;
+ begin
+  return jsonb_build_object('available',true,'review',public._purchasing_context_review(p_id));
+ exception when invalid_parameter_value then
+  get stacked diagnostics detail=pg_exception_detail;
+  return jsonb_build_object('available',false,'reason',detail,'request_version',r.request_version,'request_context',r.request_context);
+ end;
+end;
+$review_read$;
+revoke all on function public.purchasing_request_context_review(uuid) from public,anon;
+grant execute on function public.purchasing_request_context_review(uuid) to authenticated;
+
+-- One private approval orchestrator; public decision still stays closed until
+-- complete downstream issuance admission is tested. Existing approver gate only.
+create or replace function public._purchasing_approve_context_review(p_id uuid,p_review jsonb,p_reason text)
+returns jsonb language plpgsql set search_path=public,pg_temp as $approve_review$
+declare actor_role text:=public.purchasing_approver_gate(); r public.purchase_requests%rowtype; current_review jsonb; c jsonb; l jsonb; old_line jsonb; before_state jsonb; scope jsonb; x jsonb; distribution jsonb; target uuid; quantity bigint; location uuid; available integer; stock_group record;
+begin
+ perform public._purchasing_context_request_source_locks(p_id);
+ select * into strict r from public.purchase_requests where id=p_id for update;
+ if r.created_by is not distinct from auth.uid() then raise exception 'cannot approve own request' using errcode='42501',detail='own_request'; end if;
+ if r.approved_at is not null or r.refused_at is not null or r.withdrawn_at is not null or r.sent_back_at is not null then raise exception 'request is not awaiting approval' using errcode='22023',detail='request_not_awaiting_approval'; end if;
+ perform public._purchasing_context_object(p_review,'{"expected_version":"number","review_scope":"object","request_context":"object","approved_distribution":"array|null"}');
+ if (p_review->>'expected_version')::numeric<>r.request_version then raise exception 'request version changed' using errcode='22023',detail='request_version_changed'; end if;
+ current_review:=public._purchasing_context_review(p_id);
+ if current_review is distinct from p_review->'review_scope' then raise exception 'request review changed' using errcode='22023',detail='request_review_changed'; end if;
+ c:=p_review->'request_context';
+ perform public._purchasing_validate_request_context(c);
+ perform public._purchasing_check_context_supplier_dates(c,greatest((now() at time zone 'Asia/Kuala_Lumpur')::date,(c->>'proceedDate')::date));
+ before_state:=public._purchasing_context_revision_before(p_id);
+ if c is distinct from r.request_context then
+  if r.purpose='ready_stock' or (c-'lines') is distinct from (r.request_context-'lines') or jsonb_array_length(c->'lines')<>jsonb_array_length(r.request_context->'lines') then
+   raise exception 'approval may adjust stock choice, not rewrite requested need' using errcode='22023',detail='approval_need_changed'; end if;
+  if coalesce(p_reason,'') !~ '[^[:space:]]' then raise exception 'stock adjustment reason required' using errcode='22023',detail='approval_change_reason_required'; end if;
+  for l in select * from jsonb_array_elements(c->'lines') loop
+   select v into old_line from jsonb_array_elements(r.request_context->'lines') v where (v->>'id')::uuid=(l->>'id')::uuid;
+   if not found then raise exception 'requested line identity changed' using errcode='22023',detail='approval_need_changed'; end if;
+   if (l-'stockProposals'-'allocations') is distinct from (old_line-'stockProposals'-'allocations') or (l->'stockProposals' is not distinct from old_line->'stockProposals' and l->'allocations' is distinct from old_line->'allocations') then
+    raise exception 'approval must retain requested goods/quantity/recipients' using errcode='22023',detail='approval_need_changed'; end if;
+  end loop;
+  if exists(select 1 from public.purchase_demands where request_id=p_id and (po_id is not null or ordered_at is not null or issued_qty>0))
+   or exists(select 1 from public.purchase_order_lines pl join public.purchase_demands d on d.id=pl.demand_id where d.request_id=p_id)
+   or exists(select 1 from public.ops_stock_items u join public.purchase_demands d on d.id=u.reserved_purchase_demand_id where d.request_id=p_id) then
+   raise exception 'committed scope cannot be adjusted here' using errcode='22023',detail='request_already_committed'; end if;
+  update public.purchase_requests set request_context=c,request_version=request_version+1,destination_id=coalesce(
+   (select (a->>'destinationId')::uuid from jsonb_array_elements(c->'lines') proposed_line cross join lateral jsonb_array_elements(proposed_line->'allocations') a limit 1),
+   (select (a->>'destinationId')::uuid from jsonb_array_elements(c->'lines') proposed_line cross join lateral jsonb_array_elements(proposed_line->'stockProposals') a limit 1)) where id=p_id;
+  perform public._purchasing_write_context_demands(p_id,c);
+ end if;
+ -- Translate stable form allocation IDs only after the common projector, so a
+ -- newly reviewed stock split never borrows an old demand's recipient mapping.
+ distribution:=null;
+ if p_review->'approved_distribution'<>'null'::jsonb then
+  distribution:='[]';
+  for x in select * from jsonb_array_elements(p_review->'approved_distribution') loop
+   perform public._purchasing_context_object(x,'{"lineId":"string","allocationId":"string","kind":"string","qty":"number","recipients":"array"}');
+   select id into target from public.purchase_demands where request_id=p_id and cancelled_at is null and request_line_id=(x->>'lineId')::uuid
+    and coalesce(supplier_allocation_id,stock_proposal_id)=(x->>'allocationId')::uuid and fulfilment_kind=x->>'kind';
+   if not found then raise exception 'approved allocation unavailable' using errcode='22023',detail='invalid_approval_distribution'; end if;
+   distribution:=distribution||jsonb_build_array(jsonb_build_object('demandId',target,'qty',x->'qty','recipients',x->'recipients'));
+  end loop;
+ end if;
+ distribution:=public._purchasing_context_approval_distribution(p_id,distribution,false);
+ -- Check the actual currently available pool without reserving it. Saved approval
+ -- excludes the whole shelf: a later shelf increase does not auto-net a GP buy.
+ current_review:=public._purchasing_context_review(p_id);
+ for stock_group in
+  select ss->'units' as pool,sum((v->>'qty')::integer) as qty from jsonb_array_elements(current_review->'stock_source') ss
+   join public.purchase_demands d on d.request_id=p_id and d.cancelled_at is null and d.stock_proposal_id=(ss->>'allocationId')::uuid and d.request_line_id=(ss->>'lineId')::uuid
+   join jsonb_array_elements(distribution) v on (v->>'demandId')::uuid=d.id group by ss->'units'
+ loop
+  if stock_group.qty>jsonb_array_length(stock_group.pool) then raise exception 'stock proposals exceed their shared available pool' using errcode='22023',detail='stock_proposal_unavailable'; end if;
+ end loop;
+ scope:=public._purchasing_stamp_context_approval(p_id,distribution);
+ insert into public.purchase_request_events(request_id,round,kind,actor_id,reason,changes)
+  values(p_id,r.round,'approved',auth.uid(),nullif(btrim(p_reason),''),jsonb_build_object('before',before_state,'after',scope,'review_scope',p_review->'review_scope'));
+ return scope;
+end;
+$approve_review$;
+revoke all on function public._purchasing_approve_context_review(uuid,jsonb,text) from public,anon,authenticated;
 
 -- WIP canonical create slice. DO NOT REVIEW/APPLY as a finished migration:
 -- Supplier-date minimum must follow productionWorkingDaysFor/expectedArrivalOf
@@ -631,7 +975,7 @@ CREATE OR REPLACE FUNCTION public.purchasing_create_request_with_lines(p_purpose
  SET search_path TO 'public', 'pg_temp'
 AS $function$
 declare
-  v_context jsonb; v_submission_key uuid; v_existing public.purchase_requests%rowtype;
+  v_context jsonb; v_forecast_sources jsonb; v_submission_key uuid; v_existing public.purchase_requests%rowtype;
   v_destination uuid; v_required date; v_supplier uuid; v_allocation jsonb; v_stock jsonb;
   v_role public.app_role; v_no text; v_prefix text;
   v_header   jsonb;
@@ -640,12 +984,17 @@ declare
   v_one      jsonb;
   v_line_ids jsonb := '[]'::jsonb;
 begin
+  if p_purpose='ready_stock' then perform pg_advisory_xact_lock(hashtextextended('purchasing.forecast_purchase.submit',0)); end if;
   -- The existing public owner gains one strict context envelope; its legacy
   -- body below is retained byte-for-byte. No overload or alternative request RPC.
   if jsonb_typeof(p_lines)='array' and jsonb_array_length(p_lines)>0
      and (p_lines->0) ? 'request_context' then
     if jsonb_array_length(p_lines)<>1 then raise exception 'one context envelope required' using errcode='22023',detail='invalid_param'; end if;
-    perform public._purchasing_context_object(p_lines->0,'{"request_context":"object","submission_key":"string"}');
+    if p_lines->0->'request_context'->>'origin'='forecast_suggestion' then
+      perform public._purchasing_context_object(p_lines->0,'{"request_context":"object","submission_key":"string","forecast_source":"array"}');
+    else
+      perform public._purchasing_context_object(p_lines->0,'{"request_context":"object","submission_key":"string"}');
+    end if;
     v_context:=p_lines->0->'request_context';
     v_submission_key:=(p_lines->0->>'submission_key')::uuid;
     if v_submission_key is null then raise exception 'submission key required' using errcode='22023',detail='invalid_param'; end if;
@@ -664,7 +1013,10 @@ begin
     perform pg_advisory_xact_lock(hashtextextended(auth.uid()::text||':'||v_submission_key::text,0));
     select * into v_existing from public.purchase_requests where created_by=auth.uid() and submission_key=v_submission_key for update;
     if found then
-      if v_existing.request_context is distinct from v_context then raise exception 'submission scope changed' using errcode='22023',detail='submission_scope_changed'; end if;
+      if v_existing.request_context is distinct from v_context or (v_context->>'origin'='forecast_suggestion' and
+        (select jsonb_agg(x order by x->>'sku') from jsonb_array_elements(p_lines->0->'forecast_source') x) is distinct from
+        (select jsonb_agg(source order by source->>'sku') from (select distinct l#>'{basis,source_snapshot}' source from public.forecast_purchase_requests f cross join lateral jsonb_array_elements(f.lines) l where f.request_id=v_existing.id) q)) then
+        raise exception 'submission scope changed' using errcode='22023',detail='submission_scope_changed'; end if;
       select coalesce(jsonb_agg(id order by created_at,id),'[]') into v_line_ids from public.purchase_demands where request_id=v_existing.id;
       return jsonb_build_object('id',v_existing.id,'req_no',v_existing.req_no,'approval_required',true,'line_ids',v_line_ids,'request_version',v_existing.request_version);
     end if;
@@ -672,7 +1024,10 @@ begin
     perform public._purchasing_validate_request_context(v_context);
     -- Forecast suggestion admission still needs its existing source/fingerprint
     -- transaction. Never admit an untraceable suggestion as a manual top-up.
-    if v_context->>'origin'='forecast_suggestion' then raise exception 'forecast context admission is not ready' using errcode='22023',detail='forecast_context_not_ready'; end if;
+    if v_context->>'origin'='forecast_suggestion' then
+      perform public._purchasing_context_source_locks(array(select l->>'sku' from jsonb_array_elements(v_context->'lines') l));
+      v_forecast_sources:=public._purchasing_check_context_forecast_source(v_context,p_lines->0->'forecast_source');
+    end if;
     select coalesce(
       (select (a->>'destinationId')::uuid from jsonb_array_elements(v_context->'lines') l cross join lateral jsonb_array_elements(l->'allocations') a limit 1),
       (select (a->>'destinationId')::uuid from jsonb_array_elements(v_context->'lines') l cross join lateral jsonb_array_elements(l->'stockProposals') a limit 1)
@@ -690,6 +1045,7 @@ begin
     values(v_id,v_no,p_purpose,v_destination,v_required,p_for_service_case_id,p_fulfilment_intent,true,auth.uid(),v_context,
       (v_context->>'proceedDate')::date,1,v_submission_key);
     perform public._purchasing_write_context_demands(v_id,v_context);
+    if v_forecast_sources is not null then perform public._purchasing_write_forecast_request_mark(v_id,(v_forecast_sources->0->>'week')::date,v_submission_key,public._purchasing_context_forecast_mark_lines(v_context,v_forecast_sources)); end if;
     insert into public.audit_log(role,actor_text,action,ref)
       values(v_role,(select name from public.app_users where id=auth.uid()),'Purchase requested: '||v_no,v_id::text);
     select coalesce(jsonb_agg(id order by created_at,id),'[]') into v_line_ids from public.purchase_demands where request_id=v_id;
@@ -898,8 +1254,8 @@ CREATE OR REPLACE FUNCTION public.purchasing_resubmit_request(p_id uuid, p_desti
  SET search_path TO 'public', 'pg_temp'
 AS $function$
 declare
-  v_context jsonb; v_revision_key uuid; v_expected integer; v_before jsonb; v_after jsonb; v_event public.purchase_request_events%rowtype;
-  v_destination uuid; v_required date; v_retry_key text;
+  v_context jsonb; v_forecast_sources jsonb; v_forecast_key uuid; v_revision_key uuid; v_expected integer; v_before jsonb; v_after jsonb; v_event public.purchase_request_events%rowtype;
+  v_destination uuid; v_required date; v_retry_key text; v_source_changed boolean:=false; v_source_detail text;
   v_role    app_role;
   v_req     purchase_requests%rowtype;
   v_line    jsonb;
@@ -920,6 +1276,10 @@ begin
     raise exception 'not permitted' using errcode = '42501';
   end if;
 
+  perform public._purchasing_context_request_source_locks(p_id);
+  if jsonb_typeof(p_lines)='array' and (p_lines->0)?'request_context' and p_lines->0->'request_context'->>'purpose'='ready_stock' then
+    perform public._purchasing_context_source_locks(array(select l->>'sku' from jsonb_array_elements(p_lines->0->'request_context'->'lines') l));
+  end if;
   select * into v_req from purchase_requests where id = p_id for update;
   if not found then
     raise exception 'unknown request' using errcode = '22023', detail = 'unknown_request';
@@ -928,7 +1288,11 @@ begin
     if jsonb_typeof(p_lines)<>'array' or jsonb_array_length(p_lines)<>1 or not ((p_lines->0)?'request_context') then
       raise exception 'context revision envelope required' using errcode='22023',detail='context_revision_required';
     end if;
-    perform public._purchasing_context_object(p_lines->0,'{"request_context":"object","revision_key":"string","expected_version":"number","reason":"string"}');
+    if p_lines->0->'request_context'->>'origin'='forecast_suggestion' then
+      perform public._purchasing_context_object(p_lines->0,'{"request_context":"object","revision_key":"string","expected_version":"number","reason":"string","forecast_source":"array"}');
+    else
+      perform public._purchasing_context_object(p_lines->0,'{"request_context":"object","revision_key":"string","expected_version":"number","reason":"string"}');
+    end if;
     v_context:=p_lines->0->'request_context'; v_revision_key:=(p_lines->0->>'revision_key')::uuid;
     if (p_lines->0->>'expected_version') !~ '^[1-9][0-9]*$' then raise exception 'expected request version required' using errcode='22023',detail='invalid_param'; end if;
     v_expected:=(p_lines->0->>'expected_version')::integer;
@@ -946,16 +1310,24 @@ begin
     if found then
       if v_event.actor_id is distinct from auth.uid() or v_event.changes->'after_context' is distinct from v_context
         or v_event.changes->>'reason' is distinct from btrim(p_lines->0->>'reason')
-        or (v_event.changes->>'previous_version')::integer is distinct from v_expected then
+        or (v_event.changes->>'previous_version')::integer is distinct from v_expected
+        or (v_context->>'origin'='forecast_suggestion' and (select jsonb_agg(x order by x->>'sku') from jsonb_array_elements(p_lines->0->'forecast_source') x) is distinct from v_event.changes#>'{after,forecast_source,sources}') then
         raise exception 'revision key scope changed' using errcode='22023',detail='revision_scope_changed';
       end if;
       return jsonb_build_object('id',p_id,'req_no',v_req.req_no,'round',v_event.round,'request_version',(v_event.changes->>'request_version')::integer,'approval_required',true);
     end if;
     if v_req.request_version<>v_expected then raise exception 'request changed before revision' using errcode='22023',detail='request_version_changed'; end if;
     if v_req.approved_at is not null then
+      begin
+        perform public._purchasing_assert_request_approval(p_id);
+      exception when invalid_parameter_value then
+        get stacked diagnostics v_source_detail=pg_exception_detail;
+        if v_source_detail not in ('request_source_changed','request_approval_changed','supplier_date_before_earliest','supplier_plan_unavailable','request_scope_changed','forecast_source_changed','forecast_source_required') then raise; end if;
+        v_source_changed:=true;
+      end;
       v_before:=public._purchasing_request_revision_scope(p_id,p_lines->0->>'reason');
     elsif v_req.sent_back_at is not null and v_req.withdrawn_at is null and v_req.refused_at is null then
-      v_before:=public._purchasing_request_context_state(p_id);
+      v_before:=public._purchasing_context_revision_before(p_id);
       if exists(select 1 from public.purchase_demands where request_id=p_id and (po_id is not null or ordered_at is not null or coalesce(issued_qty,0)>0))
         or exists(select 1 from public.purchase_order_lines pl join public.purchase_demands d on d.id=pl.demand_id where d.request_id=p_id)
         or exists(select 1 from public.ops_stock_items u join public.purchase_demands d on d.id=u.reserved_purchase_demand_id where d.request_id=p_id) then
@@ -966,8 +1338,8 @@ begin
     end if;
     perform 1 from public.purchasing_settings where id=1 for share;
     perform public._purchasing_validate_request_context(v_context);
-    if v_context->>'origin'='forecast_suggestion' then raise exception 'forecast context admission is not ready' using errcode='22023',detail='forecast_context_not_ready'; end if;
-    if v_context is not distinct from v_req.request_context then raise exception 'revision has no changes' using errcode='22023',detail='request_unchanged'; end if;
+    if v_context->>'origin'='forecast_suggestion' then v_forecast_sources:=public._purchasing_check_context_forecast_source(v_context,p_lines->0->'forecast_source',p_id); end if;
+    if v_req.approved_at is not null and not v_source_changed and v_context is not distinct from v_req.request_context then raise exception 'revision has no changes' using errcode='22023',detail='request_unchanged'; end if;
     select coalesce(
       (select (a->>'destinationId')::uuid from jsonb_array_elements(v_context->'lines') l cross join lateral jsonb_array_elements(l->'allocations') a limit 1),
       (select (a->>'destinationId')::uuid from jsonb_array_elements(v_context->'lines') l cross join lateral jsonb_array_elements(l->'stockProposals') a limit 1)) into v_destination;
@@ -981,6 +1353,10 @@ begin
       sent_back_at=null,sent_back_by=null,sent_back_reason=null,submitted_at=now(),round=v_req.round+1
       where id=p_id;
     perform public._purchasing_write_context_demands(p_id,v_context);
+    if v_forecast_sources is not null then
+      select submission_key into strict v_forecast_key from public.forecast_purchase_requests where request_id=p_id;
+      perform public._purchasing_write_forecast_request_mark(p_id,(v_forecast_sources->0->>'week')::date,v_forecast_key,public._purchasing_context_forecast_mark_lines(v_context,v_forecast_sources),true);
+    end if;
     v_after:=public._purchasing_request_context_state(p_id);
     insert into public.purchase_request_events(request_id,round,kind,actor_id,reason,changes)
       values(p_id,v_req.round+1,'resubmitted',auth.uid(),btrim(p_lines->0->>'reason'),jsonb_build_object(
@@ -2141,5 +2517,331 @@ begin
     'issued',    v_d.issued_qty,
     'remaining', v_d.remaining_qty
   );
+end;
+$function$;
+
+-- Existing 0695 wrapper, same request owner/behavior, one shared mark writer.
+CREATE OR REPLACE FUNCTION public.purchasing_submit_forecast_requests(p_submission_key uuid, p_forecast_week date, p_destination_id uuid, p_groups jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  v_role   app_role := public.app_role();
+  v_group  jsonb;
+  v_line   jsonb;
+  v_sku    text;
+  v_qty    integer;
+  v_seen   integer;
+  v_now    integer;
+  v_made   jsonb;
+  v_id     uuid;
+  v_out    jsonb := '[]'::jsonb;
+  v_owner  uuid;
+begin
+  if v_role is null or v_role not in ('operation', 'principal') then
+    raise exception 'not permitted' using errcode = '42501';
+  end if;
+  if p_submission_key is null or p_forecast_week is null or p_destination_id is null
+     or p_groups is null or jsonb_typeof(p_groups) <> 'array' or jsonb_array_length(p_groups) = 0 then
+    raise exception 'a forecast submission needs its key, week, destination and lines'
+      using errcode = '22023', detail = 'invalid_forecast_submission';
+  end if;
+
+  -- ONE SUBMISSION AT A TIME. Two people pressing in the same moment run one
+  -- after the other, so the second reads what the first has just asked for.
+  perform pg_advisory_xact_lock(hashtextextended('purchasing.forecast_purchase.submit', 0));
+
+  -- A RETRY ANSWERS WITH WHAT WAS MADE. The first press went through and its
+  -- answer was lost on the way back: the same key returns the same requests
+  -- and nothing is written. A key somebody else used is refused.
+  select f.created_by into v_owner
+    from forecast_purchase_requests f
+   where f.submission_key = p_submission_key
+   limit 1;
+  if found then
+    if v_owner is distinct from auth.uid() then
+      raise exception 'this submission key belongs to another person'
+        using errcode = '22023', detail = 'invalid_forecast_submission';
+    end if;
+    return jsonb_build_object(
+      'replayed', true,
+      'requests', coalesce((
+        select jsonb_agg(jsonb_build_object('id', f.request_id, 'req_no', r.req_no) order by r.created_at, r.req_no)
+          from forecast_purchase_requests f
+          join purchase_requests r on r.id = f.request_id
+         where f.submission_key = p_submission_key), '[]'::jsonb));
+  end if;
+
+  -- NOTHING MOVED UNDER THE CALLER. The caller worked out each quantity from
+  -- what it read as in progress. If that is no longer true for any SKU, the
+  -- whole submission is refused and nothing is written.
+  for v_group in select * from jsonb_array_elements(p_groups)
+  loop
+    if jsonb_typeof(v_group -> 'lines') is distinct from 'array' or jsonb_array_length(v_group -> 'lines') = 0
+       or nullif(v_group ->> 'required_by', '') is null then
+      raise exception 'a forecast request needs its delivery date and lines'
+        using errcode = '22023', detail = 'invalid_forecast_submission';
+    end if;
+    for v_line in select * from jsonb_array_elements(v_group -> 'lines')
+    loop
+      v_sku  := nullif(btrim(coalesce(v_line ->> 'sku', '')), '');
+      v_qty  := (v_line ->> 'qty')::integer;
+      v_seen := coalesce((v_line ->> 'in_progress')::integer, 0);
+      if v_sku is null or v_qty is null or v_qty < 1 or v_seen < 0 then
+        raise exception 'a forecast line needs its SKU and a quantity of at least 1'
+          using errcode = '22023', detail = 'invalid_forecast_submission';
+      end if;
+      select coalesce(sum(p.qty), 0)::integer into v_now
+        from public._purchasing_forecast_in_progress_rows() p
+       where p.sku = v_sku;
+      if v_now <> v_seen then
+        raise exception 'what is in progress for % changed: read %, now %', v_sku, v_seen, v_now
+          using errcode = 'P0001', detail = 'forecast_in_progress_changed', hint = v_sku;
+      end if;
+    end loop;
+  end loop;
+
+  -- EACH REQUEST, THROUGH THE EXISTING DOOR. Every purpose rule, the supplier
+  -- rule of every line and the approval rule run inside it; a refusal there
+  -- takes the whole submission with it.
+  for v_group in select * from jsonb_array_elements(p_groups)
+  loop
+    v_made := public.purchasing_create_request_with_lines(
+      p_purpose              => 'ready_stock',
+      p_destination_id       => p_destination_id,
+      p_required_by          => (v_group ->> 'required_by')::date,
+      p_lines                => (
+        select jsonb_agg(jsonb_build_object(
+                 'sku', l ->> 'sku',
+                 'qty', (l ->> 'qty')::integer,
+                 'required_by', v_group ->> 'required_by'))
+          from jsonb_array_elements(v_group -> 'lines') l),
+      p_fulfilment_intent    => 'additional_stock',
+      p_purchase_requirement => nullif(btrim(coalesce(v_group ->> 'requirement', '')), '')
+    );
+    v_id := (v_made ->> 'id')::uuid;
+    perform public._purchasing_write_forecast_request_mark(v_id,p_forecast_week,p_submission_key,v_group->'lines');
+    v_out := v_out || jsonb_build_object('id', v_id, 'req_no', v_made ->> 'req_no');
+  end loop;
+
+  return jsonb_build_object('replayed', false, 'requests', v_out);
+end;
+$function$;
+
+-- Legacy per-line/header edits cannot silently mutate a contextual whole scope.
+
+CREATE OR REPLACE FUNCTION public.purchasing_create_demand(p_sku text, p_qty integer, p_destination_id uuid, p_required_by date DEFAULT NULL::date, p_remark text DEFAULT NULL::text, p_purpose text DEFAULT 'ready_stock'::text, p_request_id uuid DEFAULT NULL::uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  v_role     app_role;
+  v_supplier uuid;
+  v_id       uuid;
+  v_req      purchase_requests%rowtype;
+begin
+  v_role := public.app_role();
+  if v_role is null or v_role not in ('operation') then
+    raise exception 'not permitted' using errcode = '42501';
+  end if;
+
+  if exists(select 1 from public.purchase_requests r where r.id=p_request_id and (r.request_version>0 or r.request_context is not null)) then
+    raise exception 'context request changes use the whole request revision' using errcode='22023',detail='context_whole_scope_required';
+  end if;
+
+  if p_purpose is null or p_purpose not in
+     ('ready_stock', 'showroom_display', 'service_case',
+      'internal_staff_purchase', 'subsidiary_purchase', 'other_purchase') then
+    raise exception 'purpose % is not a purpose', p_purpose
+      using errcode = '22023', detail = 'unknown_purpose';
+  end if;
+  if p_qty is null or p_qty < 1 then
+    raise exception 'qty must be at least 1' using errcode = '22023', detail = 'invalid_qty';
+  end if;
+
+  if p_request_id is not null then
+    select * into v_req from purchase_requests where id = p_request_id;
+    if not found then
+      raise exception 'unknown request' using errcode = '22023', detail = 'unknown_request';
+    end if;
+    -- A line inherits its header's meaning; a line that contradicts it is a
+    -- second truth (Law D).
+    if v_req.purpose <> p_purpose then
+      raise exception 'line purpose % does not match request %', p_purpose, v_req.purpose
+        using errcode = '22023', detail = 'purpose_mismatch';
+    end if;
+    if v_req.destination_id <> p_destination_id then
+      raise exception 'line destination does not match request'
+        using errcode = '22023', detail = 'destination_mismatch';
+    end if;
+    if v_req.refused_at is not null then
+      raise exception 'request is refused' using errcode = '22023', detail = 'request_refused';
+    end if;
+  end if;
+
+  -- THE SUPPLIER IS DERIVED, NEVER CHOSEN (Jess, 2026-08-03; kept verbatim
+  -- from 0323). A product has exactly one factory; asking a human to pick one
+  -- is asking them to get it wrong.
+  select supplier_id into v_supplier from product_skus where sku = p_sku;
+  if not found then
+    raise exception 'unknown sku %', p_sku using errcode = '22023', detail = 'unknown_sku';
+  end if;
+  if v_supplier is null then
+    raise exception 'sku % has no supplier', p_sku
+      using errcode = '22023', detail = 'sku_has_no_supplier';
+  end if;
+
+  if not exists (
+    select 1 from purchasing_destinations where id = p_destination_id and active
+  ) then
+    raise exception 'unknown destination' using errcode = '22023', detail = 'unknown_destination';
+  end if;
+
+  insert into purchase_demands
+    (purpose, sku, supplier_id, destination_id, qty, required_by, remark,
+     request_id, created_by)
+  values
+    (p_purpose, p_sku, v_supplier, p_destination_id, p_qty, p_required_by,
+     nullif(btrim(coalesce(p_remark, '')), ''), p_request_id, auth.uid())
+  returning id into v_id;
+
+  return jsonb_build_object('id', v_id, 'supplier_id', v_supplier);
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.purchasing_cancel_demand(p_id uuid, p_reason text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  v_role app_role;
+  v_d    purchase_demands;
+begin
+  v_role := public.app_role();
+  if v_role is null or v_role not in ('operation','principal') then
+    raise exception 'not permitted' using errcode = '42501';
+  end if;
+  if coalesce(p_reason,'') !~ '[^[:space:]]' then
+    raise exception 'a reason is required' using errcode = '22023', detail = 'reason_required';
+  end if;
+
+  if exists(select 1 from public.purchase_requests r where r.id=(select request_id from public.purchase_demands where id=p_id) and (r.request_version>0 or r.request_context is not null)) then
+    raise exception 'context request changes use the whole request revision' using errcode='22023',detail='context_whole_scope_required';
+  end if;
+
+  select * into v_d from purchase_demands where id = p_id for update;
+  if not found then
+    raise exception 'demand not found' using errcode = '42P01', detail = 'not_found';
+  end if;
+  if v_d.cancelled_at is not null then
+    raise exception 'already cancelled' using errcode = 'P0001', detail = 'already_cancelled';
+  end if;
+  if v_d.remaining_qty <= 0 then
+    raise exception 'demand % has nothing left to cancel', p_id
+      using errcode = 'P0001', detail = 'nothing_to_cancel';
+  end if;
+
+  update purchase_demands
+     set cancelled_at = now(), cancelled_by = auth.uid(), cancel_reason = btrim(p_reason)
+   where id = p_id;
+
+  select * into v_d from purchase_demands where id = p_id;
+  return jsonb_build_object(
+    'id',        p_id,
+    'cancelled', v_d.remaining_qty,
+    'issued',    v_d.issued_qty
+  );
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.purchasing_move_request_destination(p_id uuid, p_destination_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  v_role     app_role;
+  v_req      purchase_requests%rowtype;
+  v_old_name text;
+  v_new_name text;
+  v_live     int;
+begin
+  v_role := public.app_role();
+  if v_role is null or v_role not in ('operation', 'principal') then
+    raise exception 'not permitted' using errcode = '42501';
+  end if;
+
+  if p_destination_id is null then
+    raise exception 'unknown destination' using errcode = '22023', detail = 'unknown_destination';
+  end if;
+
+  if exists(select 1 from public.purchase_requests r where r.id=p_id and (r.request_version>0 or r.request_context is not null)) then
+    raise exception 'context request changes use the whole request revision' using errcode='22023',detail='context_whole_scope_required';
+  end if;
+
+  select * into v_req from purchase_requests where id = p_id for update;
+  if not found then
+    raise exception 'unknown request' using errcode = '22023', detail = 'unknown_request';
+  end if;
+  if v_req.refused_at is not null then
+    raise exception 'request is refused' using errcode = '22023', detail = 'request_refused';
+  end if;
+
+  -- Lock the lines too: an issue running at the same moment must see either
+  -- the old destination on every row or the new one on every row.
+  perform 1 from purchase_demands where request_id = p_id for update;
+
+  if exists (
+    select 1 from purchase_demands where request_id = p_id and po_id is not null
+  ) then
+    raise exception 'request is already ordered' using errcode = '22023', detail = 'request_ordered';
+  end if;
+
+  select count(*) into v_live
+    from purchase_demands where request_id = p_id and cancelled_at is null;
+  if v_live = 0 and exists (select 1 from purchase_demands where request_id = p_id) then
+    raise exception 'request is not going ahead' using errcode = '22023', detail = 'request_closed';
+  end if;
+
+  select name into v_new_name
+    from purchasing_destinations where id = p_destination_id and active;
+  if not found then
+    if exists (select 1 from purchasing_destinations where id = p_destination_id) then
+      raise exception 'destination is closed' using errcode = '22023', detail = 'inactive_destination';
+    end if;
+    raise exception 'unknown destination' using errcode = '22023', detail = 'unknown_destination';
+  end if;
+
+  if v_req.destination_id = p_destination_id then
+    -- Nothing moves; nothing is written. Not a refusal.
+    return jsonb_build_object('id', p_id, 'req_no', v_req.req_no,
+                              'destination_id', p_destination_id, 'moved', false);
+  end if;
+
+  select name into v_old_name from purchasing_destinations where id = v_req.destination_id;
+
+  update purchase_requests set destination_id = p_destination_id where id = p_id;
+  update purchase_demands
+     set destination_id = p_destination_id
+   where request_id = p_id and cancelled_at is null;
+
+  -- Card 08 §3.7 — the act in plain words, the UUID as the internal ref.
+  insert into audit_log (role, actor_text, action, ref)
+  values (v_role,
+          (select name from app_users where id = auth.uid()),
+          format('Deliver To changed from %s to %s',
+                 coalesce(v_old_name, v_req.destination_id::text), v_new_name),
+          p_id::text);
+
+  return jsonb_build_object('id', p_id, 'req_no', v_req.req_no,
+                            'destination_id', p_destination_id, 'moved', true,
+                            'previous_destination_id', v_req.destination_id);
 end;
 $function$;

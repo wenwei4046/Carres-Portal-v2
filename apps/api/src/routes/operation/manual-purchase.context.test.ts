@@ -109,3 +109,34 @@ describe("context supplier dates reuse the existing planner before the writer", 
     expect(rpc).not.toHaveBeenCalled();
   });
 });
+
+describe("forecast-origin context carries owning source evidence", () => {
+  it("passes the source in the same create envelope without a second request writer", async () => {
+    const request = context(); request.origin = "forecast_suggestion"; request.forecastChangeReason = "TEST changed suggestion";
+    const source = [{ sku: "TEST-SKU", sold14: 4 }]; // transport only; SQL tests verify actual source equality
+    rpc.mockResolvedValue({ data: { id: id(10), req_no: "RS261101-0001", approval_required: true }, error: null });
+    expect((await post("", { submissionKey: id(11), context: request, forecastSource: source })).status).toBe(201);
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith("purchasing_create_request_with_lines", expect.objectContaining({ p_lines: [{ request_context: request, submission_key: id(11), forecast_source: source }] }));
+  });
+  it("refuses missing forecast source and a forecast label on a manual stock request", async () => {
+    const forecast = context(); forecast.origin = "forecast_suggestion";
+    expect((await post("", { submissionKey: id(11), context: forecast })).status).toBe(400);
+    expect((await post("", { submissionKey: id(11), context: context(), forecastSource: [{ sku: "TEST-SKU" }] })).status).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+  it("reads review source with own-request exclusion for a revision", async () => {
+    const source = [{ sku: "TEST-SKU", sold14: 4 }];
+    rpc.mockResolvedValue({ data: source, error: null });
+    const response = await post("/plan", { skus: ["TEST-SKU"], purpose: "ready_stock", origin: "forecast_suggestion", requestId: id(10) });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ forecastSource: source, forecastSourceUnavailable: false });
+    expect(rpc).toHaveBeenCalledWith("purchasing_request_forecast_sources", { p_skus: ["TEST-SKU"], p_request_id: id(10) });
+  });
+  it("keeps failed forecast source unavailable without inventing an empty current source", async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: "unavailable" } });
+    const response = await post("/plan", { skus: ["TEST-SKU"], purpose: "ready_stock", origin: "forecast_suggestion" });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ forecastSource: null, forecastSourceUnavailable: true });
+  });
+});

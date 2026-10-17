@@ -198,7 +198,7 @@ begin
  if not refused then raise exception 'changed supplier production facts reused approval'; end if;
  -- Same-number revision admission as the actual synthetic requester.
  perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009698","role":"authenticated","app_metadata":{"role":"operation"}}',true);
- if public._purchasing_request_revision_scope(rid,'TEST correction') is distinct from baseline then raise exception 'approved unissued revision admission failed'; end if;
+ if public._purchasing_request_revision_scope(rid,'TEST correction')->'saved_approval' is distinct from baseline then raise exception 'approved unissued revision admission failed'; end if;
  refused:=false;
  begin
    perform public._purchasing_request_revision_scope(rid,'   ');
@@ -298,6 +298,14 @@ begin
   perform public._purchasing_assert_request_approval((made->>'id')::uuid);
  exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='request_approval_changed'; end;
  if not refused or public._purchasing_assert_request_approval((made->>'id')::uuid) is distinct from scope then raise exception 'Case source drift guard/rollback failed'; end if;
+ -- Material source drift must block buying, but remain repairable through
+ -- authorised same-number revision rather than trap the requester forever.
+ update public.service_cases set carres_action='TEST newly recorded procurement scope' where id=case_id;
+ perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009698","role":"authenticated","app_metadata":{"role":"operation"}}',true);
+ perform public.purchasing_resubmit_request((made->>'id')::uuid,(c#>>'{lines,0,allocations,0,destinationId}')::uuid,null,
+  p_for_service_case_id=>case_id,p_lines=>jsonb_build_array(jsonb_build_object('request_context',c,'revision_key',gen_random_uuid(),'expected_version',1,'reason','TEST refresh changed actual Case source')));
+ if not exists(select 1 from public.purchase_requests where id=(made->>'id')::uuid and request_version=2 and approved_at is null)
+  or not exists(select 1 from public.purchase_request_events where request_id=(made->>'id')::uuid and changes#>'{previous_approval,approval_scope}'=scope) then raise exception 'changed Case source trapped revision or lost prior approval'; end if;
  raise notice 'SC source: actual Case procurement facts captured; changed remedy invalidates saved approval PASS (formal Case admission still open)';
 end; $case_source_test$;
 -- Partial approval preserves full need and explicitly allocates every approved piece.
@@ -404,6 +412,125 @@ begin
  exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='request_po_coverage_changed'; end;
  if not refused then raise exception 'PO source purpose drift passed'; end if;
  raise notice 'PO coverage reader: exact partial1/remaining1; unproven quantity and source-purpose drift refused PASS (synthetic fixture, not issue proof)';
+ refused:=false;
+ begin
+  perform public.purchasing_cancel_demand(buy,'TEST legacy cancellation bypass');
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='context_whole_scope_required'; end;
+ if not refused then raise exception 'legacy line cancel bypassed whole-scope revision'; end if;
+ refused:=false;
+ begin
+  perform public.purchasing_move_request_destination(r.id,r.destination_id);
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='context_whole_scope_required'; end;
+ if not refused then raise exception 'legacy destination move bypassed whole-scope revision'; end if;
+ refused:=false;
+ begin
+  perform public.purchasing_create_demand(d.sku,1,d.destination_id,d.required_by,null,r.purpose,r.id);
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='context_whole_scope_required'; end;
+ if not refused then raise exception 'legacy line add bypassed whole-scope revision'; end if;
  raise notice 'Stock/coverage: existing Stock writer bound exact approved site/Unit, stock1+buy4; missing/wrong-site/direct-buy-binding/changed Unit refused PASS';
 end; $stock_coverage_test$;
+-- Forecast source comes from its real owners, not a caller's invented snapshot.
+do $forecast_origin_test$
+declare c jsonb; sources jsonb; fake jsonb; sku text; made jsonb; replay jsonb; scope jsonb; key uuid:=gen_random_uuid(); next_key uuid:=gen_random_uuid(); refused boolean:=false; detail text; warehouse uuid; before_n integer;
+begin
+ select s.sku into strict sku from public.product_skus s join public.product_models m on m.id=s.model_id join public.purchasing_production_days p on p.supplier_id=s.supplier_id and p.category=m.category::text
+  where m.category::text='mattress' and s.variant_kind='size' and s.discontinued_at is null order by s.sku limit 1;
+ perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009698","role":"authenticated","app_metadata":{"role":"operation"}}',true);
+ sources:=public.purchasing_request_forecast_sources(array[sku],null);
+ select jsonb_set(value||'{"origin":"forecast_suggestion","forecastChangeReason":"TEST explicit changed suggestion"}'::jsonb,'{lines,0,sku}',to_jsonb(sku)) into c from stock_context_fixture;
+ select count(*) into before_n from public.purchase_requests;
+ begin
+  perform public.purchasing_create_request_with_lines(p_purpose=>'ready_stock',p_destination_id=>(c#>>'{lines,0,allocations,0,destinationId}')::uuid,
+    p_lines=>jsonb_build_array(jsonb_build_object('request_context',jsonb_set(c,'{forecastChangeReason}','""'),'submission_key',key,'forecast_source',sources)),p_fulfilment_intent=>'additional_stock');
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='forecast_change_reason_required'; end;
+ if not refused then raise exception 'changed suggestion lacked reason'; end if;
+ fake:=jsonb_set(sources,'{0,free}','99999'); refused:=false;
+ begin
+  perform public.purchasing_create_request_with_lines(p_purpose=>'ready_stock',p_destination_id=>(c#>>'{lines,0,allocations,0,destinationId}')::uuid,
+    p_lines=>jsonb_build_array(jsonb_build_object('request_context',c,'submission_key',key,'forecast_source',fake)),p_fulfilment_intent=>'additional_stock');
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='forecast_source_changed'; end;
+ if not refused or (select count(*) from public.purchase_requests)<>before_n then raise exception 'invented forecast source admitted or left rows'; end if;
+ made:=public.purchasing_create_request_with_lines(p_purpose=>'ready_stock',p_destination_id=>(c#>>'{lines,0,allocations,0,destinationId}')::uuid,
+    p_lines=>jsonb_build_array(jsonb_build_object('request_context',c,'submission_key',key,'forecast_source',sources)),p_fulfilment_intent=>'additional_stock');
+ replay:=public.purchasing_create_request_with_lines(p_purpose=>'ready_stock',p_destination_id=>(c#>>'{lines,0,allocations,0,destinationId}')::uuid,
+    p_lines=>jsonb_build_array(jsonb_build_object('request_context',c,'submission_key',key,'forecast_source',sources)),p_fulfilment_intent=>'additional_stock');
+ if made->>'id' is distinct from replay->>'id' or made->>'req_no' !~ '^RS[0-9]{6}-[0-9]{4}$' then raise exception 'forecast canonical identity/retry failed'; end if;
+ if not exists(select 1 from public.forecast_purchase_requests f where f.request_id=(made->>'id')::uuid and f.lines#>'{0,basis,source_snapshot}'=sources->0) then raise exception 'actual forecast source mark missing'; end if;
+ perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009699","role":"authenticated","app_metadata":{"role":"principal"}}',true);
+ scope:=public._purchasing_stamp_context_approval((made->>'id')::uuid,null);
+ if scope#>'{forecast_source,sources}' is distinct from sources or (scope#>>'{context,lines,0,qty}')::integer<>500 then raise exception 'forecast source evidence lost or hidden suggestion cap added'; end if;
+ select id into warehouse from public.warehouses order by id limit 1;
+ insert into public.ops_stock_items(sku,warehouse_id,condition,status) values(sku,warehouse,'new','free');
+ refused:=false;
+ begin
+  perform public._purchasing_assert_request_approval((made->>'id')::uuid);
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='forecast_source_changed'; end;
+ if not refused then raise exception 'changed owning stock source reused approval'; end if;
+ -- Refresh the actual changed source under the same number, retaining old mark.
+ sources:=jsonb_build_array(public._purchasing_context_forecast_facts(sku,(made->>'id')::uuid));
+ perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009698","role":"authenticated","app_metadata":{"role":"operation"}}',true);
+ replay:=public.purchasing_resubmit_request((made->>'id')::uuid,(c#>>'{lines,0,allocations,0,destinationId}')::uuid,null,
+  p_lines=>jsonb_build_array(jsonb_build_object('request_context',c,'revision_key',next_key,'expected_version',1,'reason','TEST refresh actual source','forecast_source',sources)));
+ if replay->>'req_no' is distinct from made->>'req_no' or replay->>'request_version'<>'2'
+  or not exists(select 1 from public.purchase_request_events where request_id=(made->>'id')::uuid and changes#>'{previous_approval,approval_scope}'=scope and changes#>'{before,forecast_mark,lines}' is not null) then raise exception 'forecast source revision lost identity/history'; end if;
+ raise notice 'Forecast origin: actual source mark, changed-quantity reason/no hidden cap, retry, forged/stale source refusal and same-number source refresh PASS';
+end; $forecast_origin_test$;
+-- Qualified approval review may change stock arrangements, never the full need.
+do $approver_stock_test$
+declare c jsonb; proposed jsonb; made jsonb; rid uuid; review jsonb; payload jsonb; scope jsonb; location uuid; units uuid[]; refused boolean:=false; detail text; source_stock_id uuid;
+begin
+ select request_context into strict c from public.purchase_requests where request_version=3;
+ select (a->>'locationId')::uuid into strict location from jsonb_array_elements(c->'lines') l cross join lateral jsonb_array_elements(l->'stockProposals') a;
+ insert into public.ops_stock_items(sku,warehouse_id,status,condition) values(c#>>'{lines,0,sku}',location,'free','new');
+ insert into public.ops_stock_items(sku,warehouse_id,status,condition) values(c#>>'{lines,0,sku}',location,'free','new');
+ if (select sum((x->>'to_buy')::integer) from jsonb_array_elements(public._purchasing_context_coverage((select id from public.purchase_requests where request_version=3),true)) x)<>3 then raise exception 'new shelf stock silently netted deliberate GP remainder'; end if;
+ perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009698","role":"authenticated","app_metadata":{"role":"operation"}}',true);
+ made:=public.purchasing_create_request_with_lines(p_purpose=>'general_purchase',p_destination_id=>(c#>>'{lines,0,allocations,0,destinationId}')::uuid,
+  p_lines=>jsonb_build_array(jsonb_build_object('request_context',c,'submission_key',gen_random_uuid())),p_fulfilment_intent=>'concrete_need');
+ rid:=(made->>'id')::uuid;
+ select id into strict source_stock_id from public.purchase_demands where request_id=rid and fulfilment_kind='stock_proposal';
+ review:=public._purchasing_context_review(rid);
+ proposed:=jsonb_set(jsonb_set(jsonb_set(jsonb_set(c,'{lines,0,stockProposals,0,qty}','2'),'{lines,0,stockProposals,0,recipients,0,qty}','2'),'{lines,0,allocations,0,qty}','1'),'{lines,0,allocations,0,recipients,0,qty}','1');
+ payload:=jsonb_build_object('expected_version',1,'review_scope',review,'request_context',proposed,'approved_distribution',null);
+ perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009699","role":"authenticated","app_metadata":{"role":"principal"}}',true);
+ begin
+  perform public._purchasing_approve_context_review(rid,jsonb_set(payload,'{review_scope,request_version}','99'),'TEST stock choice');
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='request_review_changed'; end;
+ if not refused then raise exception 'stale review accepted'; end if;
+ refused:=false;
+ begin
+  perform public._purchasing_approve_context_review(rid,payload,'   ');
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='approval_change_reason_required'; end;
+ if not refused then raise exception 'unexplained stock adjustment accepted'; end if;
+ refused:=false;
+ begin
+  perform public._purchasing_approve_context_review(rid,jsonb_set(payload,'{request_context}',
+   jsonb_set(jsonb_set(jsonb_set(jsonb_set(proposed,'{lines,0,qty}','4'),'{lines,0,recipientNeeds,1,qty}','1'),'{lines,0,allocations,1,qty}','1'),'{lines,0,allocations,1,recipients,0,qty}','1')),'TEST forbidden full-need cut');
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='approval_need_changed'; end;
+ if not refused then raise exception 'approver silently reduced full recipient need'; end if;
+ scope:=public._purchasing_approve_context_review(rid,payload,'TEST actual approver stock choice');
+ if (scope->>'request_version')::integer<>2 or scope#>'{context,lines,0,recipientNeeds}' is distinct from c#>'{lines,0,recipientNeeds}'
+  or (scope#>>'{context,lines,0,qty}')::integer<>5 or (select sum(approved_qty) from public.purchase_demands where request_id=rid and fulfilment_kind='purchase' and cancelled_at is null)<>3
+  or not exists(select 1 from public.purchase_demands where id=source_stock_id and qty=2 and approved_qty=2) then raise exception 'approver stock adjustment lost full need or stable allocation'; end if;
+ if exists(select 1 from public.ops_stock_items where reserved_purchase_demand_id in(select id from public.purchase_demands where request_id=rid)) then raise exception 'proposal approval reserved physical stock'; end if;
+ if not exists(select 1 from public.purchase_request_events where request_id=rid and kind='approved' and actor_id=auth.uid() and reason='TEST actual approver stock choice' and changes#>'{before,context}'=c and changes->'after'=scope) then raise exception 'approval before/after/actor/reason not retained'; end if;
+ raise notice 'Approval review: stale/reasonless changes refused; qualified approver stock1->2/buy4->3 keeps need5 and allocation identity/history, no Unit reserved PASS';
+end; $approver_stock_test$;
+-- Existing 0695 submit wrapper retains its legacy owner/retry/mark behavior.
+do $legacy_forecast_test$
+declare c jsonb; test_sku text; in_progress integer; key uuid:=gen_random_uuid(); groups jsonb; made jsonb; retry jsonb; rid uuid;
+begin
+ select value into c from stock_context_fixture; test_sku:=c#>>'{lines,0,sku}';
+ perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009698","role":"authenticated","app_metadata":{"role":"operation"}}',true);
+ select coalesce(sum(p.qty),0)::integer into in_progress from public._purchasing_forecast_in_progress_rows() p where p.sku=test_sku;
+ groups:=jsonb_build_array(jsonb_build_object('required_by','2026-11-20','requirement','TEST existing legacy forecast wrapper',
+  'lines',jsonb_build_array(jsonb_build_object('sku',test_sku,'qty',1,'in_progress',in_progress,'basis',jsonb_build_object('TEST','legacy source retained')))));
+ made:=public.purchasing_submit_forecast_requests(key,date_trunc('week',current_date)::date,(c#>>'{lines,0,allocations,0,destinationId}')::uuid,groups);
+ retry:=public.purchasing_submit_forecast_requests(key,date_trunc('week',current_date)::date,(c#>>'{lines,0,allocations,0,destinationId}')::uuid,groups);
+ rid:=(made#>>'{requests,0,id}')::uuid;
+ if made->'requests' is distinct from retry->'requests' or retry->>'replayed'<>'true'
+  or not exists(select 1 from public.purchase_requests where id=rid and request_version=0 and request_context is null)
+  or not exists(select 1 from public.forecast_purchase_requests where request_id=rid and lines=groups#>'{0,lines}') then raise exception 'existing 0695 wrapper/retry/mark semantics regressed'; end if;
+ raise notice 'Legacy forecast wrapper: same canonical create/mark/retry, legacy context remains absent PASS';
+end; $legacy_forecast_test$;
 rollback;

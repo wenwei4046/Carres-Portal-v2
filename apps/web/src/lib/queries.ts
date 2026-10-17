@@ -1,4 +1,4 @@
-import type { PurchaseRequestContext } from "@carres/shared";
+import type { PurchaseRequestContext, PurchaseRequestSubmission, PurchaseRequestRevision } from "@carres/shared";
 import type { OutrightFactsFailed, OutrightOrderFacts } from "@carres/shared";
 import { workspaceActivitySettingsResponseSchema, type WorkspaceActivitySettingsResponse } from "@carres/shared";
 import { supabase } from "@/lib/supabase";
@@ -343,7 +343,7 @@ import { withDepartment } from "@/pages/finance/department";
 import { uploadCompartmentPhoto, uploadDeliveryProof, uploadModelPhoto } from "./photo-upload";
 
 export const qk = {
-  purchaseRequestPlan: (skus: string[], proceedDate: string | null, purpose: string | null) => ["operation", "purchasing", "requests", "plan", skus.join("|"), proceedDate, purpose] as const,
+  purchaseRequestPlan: (skus: string[], proceedDate: string | null, purpose: string | null, origin: string | null = null, requestId: string | null = null) => ["operation", "purchasing", "requests", "plan", skus.join("|"), proceedDate, purpose, origin, requestId] as const,
   purchaseRequests: () => ["operation", "purchasing", "requests"] as const,
   dealers:      () => ["dealers"] as const,
   dealerSelf:   () => ["dealers", "me"] as const,
@@ -5338,6 +5338,8 @@ export interface ManualPurchasePlanPayload {
   planUnavailable: boolean;
   recipientEarliest?: string | null;
   recipientPlanUnavailable?: boolean;
+  forecastSource?: Array<Record<string, unknown>> | null;
+  forecastSourceUnavailable?: boolean;
 }
 
 /**
@@ -5346,10 +5348,10 @@ export interface ManualPurchasePlanPayload {
  * POST only because live SKUs carry free text (`Leg 4"`); it reads, creates
  * nothing and reserves nothing.
  */
-export function useManualPurchasePlan(skus: string[], context?: { proceedDate: string; purpose: PurchaseRequestContext["purpose"] }) {
+export function useManualPurchasePlan(skus: string[], context?: { proceedDate: string; purpose: PurchaseRequestContext["purpose"]; origin?: PurchaseRequestContext["origin"]; requestId?: string }) {
   const sorted = [...skus].sort();
   return useQuery<ManualPurchasePlanPayload, ApiError>({
-    queryKey: qk.purchaseRequestPlan(sorted, context?.proceedDate ?? null, context?.purpose ?? null),
+    queryKey: qk.purchaseRequestPlan(sorted, context?.proceedDate ?? null, context?.purpose ?? null, context?.origin ?? null, context?.requestId ?? null),
     queryFn: () =>
       apiFetch<ManualPurchasePlanPayload>(
         "/api/operation/purchasing/requests/plan",
@@ -5504,7 +5506,7 @@ export function useManualPurchaseRegister() {
 export function useSubmitPurchaseRequestContext() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { submissionKey: string; context: PurchaseRequestContext }) =>
+    mutationFn: (body: PurchaseRequestSubmission) =>
       apiFetch<{ id: string; req_no: string; approval_required: boolean; replayed?: boolean }>(
         "/api/operation/purchasing/requests",
         { method: "POST", body: JSON.stringify(body) },
@@ -5512,6 +5514,18 @@ export function useSubmitPurchaseRequestContext() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: qk.purchaseRequests() });
     },
+  });
+}
+
+/** Same canonical resubmit endpoint; this guarded hook is not mounted yet. */
+export function useRevisePurchaseRequestContext() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: PurchaseRequestRevision & { id: string }) =>
+      apiFetch<{ id: string; req_no: string; round: number; request_version: number; approval_required: boolean }>(
+        `/api/operation/purchasing/requests/${id}/resubmit`, { method: "POST", body: JSON.stringify(body) },
+      ),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ["operation", "purchasing", "requests"] }); },
   });
 }
 
