@@ -1012,6 +1012,22 @@ approve an algorithm, weekly task cadence, timed Undo, Skip policy or production
 
 ### 5.2 Two input doors
 
+**Foundation SQL · Jess approved17Oct2026; application adoption NOT BUILT.**
+Migration `0696_a_purchase_request_keeps_its_recipient_and_allocation_scope.sql` is the exact
+approved draft, SHA-256 `c1b34b3a2771e68e1629c665b57823dc7be7ddefc68e6262a63f21ae761dc459`.
+It adds unused request/allocation/approval-scope fields and the approved Settings defaults,
+and preserves every historical purpose while admitting GP in three CHECKs. No RLS change,
+transaction backfill or contextual writer/form activation. Isolated replay applied it; legacy
+atomic create/configuration/resubmit3/3 and three actual CHECK negative controls passed.
+Production read-only preflight found no historical purpose outside the preserved checks.
+Application and authenticated end-to-end verification remain separate obligations.
+**DATABASE APPLIED17Oct2026, 21:22 MYT:** tracker `20261017132212`, SQL MD5
+`a441435a3a5d4f79765f54256fd88be9` equals the committed file. Read-only post-check confirmed
+13 new columns,30/14/Active defaults, unchanged RLS and transaction counts, no contextual requests
+or invented approval scopes, and all73 purchasing function definitions unchanged (aggregate
+fingerprint `67dd6f15b65983ba0131a9198d1c8be4`). PR#2091 carries the exact approved file.
+
+
 **Shared narrow-page UX — OWNER-APPROVED TARGET / NOT BUILT, Jess17Oct2026.**
 Forecast and MPR inherit UI MASTER's17Oct shared Shell contract: below1100, temporary64 menu,
 Summary/Tasks overlay the page rather than shrinking the content, toolbar36 and one line.
