@@ -250,3 +250,40 @@ test("Forecast Purchase: a request cannot be sent while production days are not 
   await expect(review.getByTestId("forecast-review-send")).toBeDisabled();
   await shot(page, "1440 · review, production days not set");
 });
+
+/* Owner17Oct: narrow panels overlay rather than taking list width. */
+test("1025 shared panels overlay the unchanged canvas and restore the saved wide menu", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("carres-menu-collapsed", "0");
+    localStorage.setItem("shell-tasks-open", "0");
+  });
+  await open(page, 1025);
+  const nav = page.getByRole("navigation", { name: "Modules" });
+  await expect.poll(async () => Math.round((await nav.boundingBox())!.width)).toBe(64);
+  const canvasWidth = Math.round((await page.locator(BOX).boundingBox())!.width);
+  await page.locator('[data-testid^="forecast-select-"]:not([disabled])').first().check();
+  const selection = await page.getByTestId("selection-bar").textContent();
+  // Selection owns the toolbar, so return to normal without changing the list.
+  await page.locator('[data-testid^="forecast-select-"]:not([disabled])').first().uncheck();
+  await page.getByTestId("forecast-show-summary").click();
+  const summary = page.getByRole("dialog", { name: "Summary" });
+  await expect(summary).toBeVisible();
+  expect(Math.round((await summary.boundingBox())!.width)).toBe(264);
+  expect(Math.round((await page.locator(BOX).boundingBox())!.width)).toBe(canvasWidth);
+  await page.keyboard.press("Escape");
+  await expect(summary).toHaveCount(0);
+  await expect(page.getByTestId("forecast-show-summary")).toBeFocused();
+  await page.getByRole("button", { name: /^Tasks/ }).first().click();
+  const tasks = page.getByRole("dialog", { name: "Tasks" });
+  await expect(tasks).toBeVisible();
+  expect(Math.round((await tasks.boundingBox())!.width)).toBe(320);
+  expect(Math.round((await page.locator(BOX).boundingBox())!.width)).toBe(canvasWidth);
+  await page.keyboard.press("Escape");
+  await expect(tasks).toHaveCount(0);
+  await page.locator('[data-testid^="forecast-select-"]:not([disabled])').first().check();
+  await expect(page.getByTestId("selection-bar")).toHaveText(selection);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect.poll(async () => Math.round((await nav.boundingBox())!.width)).toBe(220);
+  await expect(page.getByTestId("selection-bar")).toHaveText(selection);
+  expect(await page.evaluate(() => localStorage.getItem("carres-menu-collapsed"))).toBe("0");
+});

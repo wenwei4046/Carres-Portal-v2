@@ -4,7 +4,8 @@ import { describe, expect, it } from "vitest";
 import Button from "./Button";
 import { CMenu } from "@/components/carres/CPopover";
 import Modal from "./Modal";
-import Drawer from "./Drawer";
+import Drawer, { ContextualPanelSurface } from "./Drawer";
+import { ShellHeaderContext } from "@/pages/operation/components/shell-header-context";
 
 function MenuDialog() {
  const [open, setOpen] = useState(false);
@@ -88,4 +89,30 @@ describe("task-wide review focus and dismissal", () => {
   await waitFor(()=>expect(document.body).not.toHaveAttribute("data-scroll-locked"));
   expect(document.querySelector('[role="dialog"]')).toBeNull();
  });
+});
+
+function ResponsivePanel() {
+ const [open, setOpen] = useState(false);
+ return <><Button onClick={() => setOpen(true)}>Open summary</Button>{open && <ContextualPanelSurface panel="Summary" onHide={() => setOpen(false)}><input aria-label="Retained panel input" defaultValue="TEST" /><Button onClick={() => setOpen(false)}>Hide summary</Button></ContextualPanelSurface>}</>;
+}
+it("retains the same input and scroll host when a docked panel becomes an overlay and back", async () => {
+ const originalWidth = window.innerWidth;
+ Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
+ const mounted = render(<ShellHeaderContext.Provider value={{ el: null, claim: () => () => {} }}><ResponsivePanel /></ShellHeaderContext.Provider>);
+ const opener = screen.getByRole("button", { name: "Open summary" });
+ opener.focus(); fireEvent.click(opener);
+ const input = screen.getByRole("textbox", { name: "Retained panel input" });
+ fireEvent.change(input, { target: { value: "TEST unsaved" } });
+ const host = input.parentElement!; host.scrollTop = 42;
+ Object.defineProperty(window, "innerWidth", { configurable: true, value: 1025 });
+ fireEvent(window, new Event("resize"));
+ expect(await screen.findByRole("dialog", { name: "Summary" })).toContainElement(input);
+ expect(input).toHaveValue("TEST unsaved"); expect(host.scrollTop).toBe(42);
+ Object.defineProperty(window, "innerWidth", { configurable: true, value: 1164 });
+ fireEvent(window, new Event("resize"));
+ await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+ expect(screen.getByRole("textbox", { name: "Retained panel input" })).toBe(input);
+ expect(input).toHaveValue("TEST unsaved"); expect(host.scrollTop).toBe(42);
+ mounted.unmount();
+ Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
 });

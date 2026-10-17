@@ -129,7 +129,6 @@ import type { MovementsFilters } from "@/lib/queries";
 export default function OperationApp() {
   const location = useLocation();
   const phone = usePhone();
-  const tasksOpen = useShellTasks((s) => s.open);
   const tasksPage = useShellTasks((s) => s.pageHosts);
   /* The system deals every order to a person (0504) — from the shell, so it
      runs whichever Operations page is opened. */
@@ -372,7 +371,7 @@ export default function OperationApp() {
           </div>
         </>
       ) : (
-        <PortalSidebar compactForCanvas={tasksOpen && tasksPage === 0}
+        <PortalSidebar compactForCanvas={tasksPage === 0}
           onExpandForCanvas={(expand) => useTasksHost.getState().guard(() => {
             useShellTasks.getState().setOpen(false);
             expand();

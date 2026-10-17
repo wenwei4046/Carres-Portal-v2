@@ -662,7 +662,7 @@ export default function UiShowcase() {
         </div>
       </Section>
 
-      <Section id="side-panel" title="Side panel" note="The Summary frame: the 36px title row sits level with the toolbar; the body starts level with the table (36 + 10).">
+      <Section id="side-panel" title="Side panel" note="The Summary frame: 36px title row; body starts at 36 + 10. In the module Shell below1100, the same content opens in the shared264px Drawer; Tasks uses320px. Inputs and scroll survive resizing.">
         <div className="flex gap-3" style={{ height: 360 }}>
           {summary ? (
             <CSidePanel label="Summary" title="Summary" onHide={() => setSummary(false)}>

@@ -8,6 +8,7 @@
 // second `ListPageShell` would draw a page header inside a page header.
 import { useCallback, useEffect, useMemo, useRef, useState , type ReactNode } from "react";
 import "./manual-purchase-create.css";
+import { useTasksHost } from "./tasks/tasks-host";
 import registerStyles from "./ManualPurchaseRegister.module.css";
 import {
   DEMAND_PURPOSES,
@@ -1695,7 +1696,7 @@ export default function OperationManualPurchase() {
                     the edge). `ManualPurchaseRegister.module.css`. */}
                 <button
                   type="button"
-                  onClick={() => setMode("create")}
+                  onClick={() => useTasksHost.getState().guard(() => { useTasksHost.getState().requestDiscard(); setMode("create"); })}
                   data-testid="manual-purchase-new-request"
                   aria-label={MW.newRequest}
                   className={`${registerStyles.create} relative inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-kit-blue-9 px-3 text-body font-semibold text-white hover:opacity-90`}

@@ -17,8 +17,11 @@
  * is `DetailShell`, §1.4's ordered slots, and that is **D0.5c**. This component
  * owns the surface and stops there.
  */
-import type { ReactNode } from "react";
+import { useCallback, useState, type ReactNode, type RefObject } from "react";
+import { createPortal } from "react-dom";
 import DialogFrame from "./DialogFrame";
+import { useNarrowModuleCanvas } from "./useNarrowModuleCanvas";
+import { useShellHeader } from "@/pages/operation/components/shell-header-context";
 
 export default function Drawer({
   open,
@@ -29,6 +32,7 @@ export default function Drawer({
   variant,
   footer,
   children,
+  returnFocusRef,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -36,12 +40,14 @@ export default function Drawer({
   description?: string;
   headerActions?: ReactNode;
   /** Accepted read-only quick-view template. */
-  variant?: "quick-view" | "compact-card";
+  variant?: "quick-view" | "compact-card" | "summary-panel" | "tasks-panel";
   footer?: ReactNode;
   children: ReactNode;
+  returnFocusRef?: RefObject<HTMLElement>;
 }) {
   return (
     <DialogFrame
+      returnFocusRef={returnFocusRef}
       variant={variant}
       kind="drawer"
       place="side"
@@ -55,4 +61,33 @@ export default function Drawer({
       {children}
     </DialogFrame>
   );
+}
+
+const panelOpeners: Record<"Summary" | "Tasks", { current: HTMLElement | null }> = { Summary: { current: null }, Tasks: { current: null } };
+export function rememberPanelOpener(panel: "Summary" | "Tasks", element: HTMLElement) {
+  panelOpeners[panel].current = element;
+}
+
+/** Moving the portal host preserves local inputs and scroll across breakpoint changes. */
+export function ContextualPanelSurface({ children, onHide, panel, open = true }: {
+  children: ReactNode;
+  onHide?: () => void;
+  panel: "Summary" | "Tasks";
+  open?: boolean;
+}) {
+  const small = useNarrowModuleCanvas();
+  const inShell = useShellHeader() != null;
+  const narrow = small && inShell;
+  const [host] = useState(() => document.createElement("div"));
+  host.className = narrow ? "flex min-h-0 flex-1 flex-col" : "contents";
+  const attach = useCallback((node: HTMLDivElement | null) => { if (node) node.appendChild(host); }, [host]);
+  const slot = <div ref={attach} className="flex min-h-0 flex-1 flex-col" />;
+  return <>
+    {narrow && onHide ? <Drawer returnFocusRef={panelOpeners[panel]} variant={panel === "Summary" ? "summary-panel" : "tasks-panel"} open={open} title={panel} onOpenChange={(open) => { if (!open) onHide(); }}>{slot}</Drawer> : open ? <div ref={attach} className="contents" /> : null}
+    {createPortal(children, host)}
+  </>;
+}
+
+export function SummaryPanelSurface({ children, onHide }: { children: ReactNode; onHide?: () => void }) {
+  return <ContextualPanelSurface panel="Summary" onHide={onHide}>{children}</ContextualPanelSurface>;
 }

@@ -14,6 +14,7 @@
  * room from the list (03 §8); from 1280 it may use the spare width.
  */
 import { useEffect } from "react";
+import { ContextualPanelSurface, rememberPanelOpener } from "@/components/kit/Drawer";
 import { create } from "zustand";
 import MIcon from "@/components/carres/MIcon";
 import NewTask from "../tasks/NewTask";
@@ -95,7 +96,7 @@ export function TasksPill({ fallback = false }: { fallback?: boolean } = {}) {
   return (
     <button
       type="button"
-      onClick={() => setOpen(true)}
+      onClick={(event) => { rememberPanelOpener("Tasks", event.currentTarget); setOpen(true); }}
       data-testid="tasks-pill"
       /* Below 768px the phone top bar carries its own Tasks door, so the
          pill hides there: one Tasks control per screen. */
@@ -117,14 +118,14 @@ export default function ShellTasks() {
   const guard = useTasksHost((s) => s.guard);
   const left = useTasksLeft();
   const pageHosts = useShellTasks((s) => s.pageHosts);
-  if (!open || pageHosts > 0) return null;
+  if (pageHosts > 0) return null;
   const now = new Date();
   const weekday = now.toLocaleDateString("en-GB", { weekday: "long" });
-  return (
+  const panel = (
     <aside
       aria-label="Tasks"
       data-testid="shell-tasks"
-      className={`flex min-h-0 shrink-0 flex-col overflow-hidden rounded-lg bg-white ring-1 ring-inset ring-c-border ${
+      className={`max-[1099px]:!w-full max-[1099px]:flex-1 flex min-h-0 shrink-0 flex-col overflow-hidden rounded-lg bg-white ring-1 ring-inset ring-c-border ${
         /* 320 always (01 §2), so opening a task never takes room from the
            list. On a wide screen the opened task may use the spare width. */
         taskOpen ? "w-[320px] min-[1280px]:w-[clamp(366px,32vw,560px)]" : "w-[320px]"
@@ -158,4 +159,5 @@ export default function ShellTasks() {
       </div>
     </aside>
   );
+  return <ContextualPanelSurface panel="Tasks" open={open} onHide={() => guard(() => setOpen(false))}>{panel}</ContextualPanelSurface>;
 }

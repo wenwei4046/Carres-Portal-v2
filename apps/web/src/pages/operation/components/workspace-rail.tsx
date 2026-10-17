@@ -33,6 +33,8 @@ import { useRef,
 } from "react";
 import Icon, { type IconName } from "@/components/kit/Icon";
 import MIcon from "@/components/carres/MIcon";
+import { SummaryPanelSurface, rememberPanelOpener } from "@/components/kit/Drawer";
+import { useShellHeader } from "./shell-header-context";
 
 /* The v4 recipe, typed once so no row in this file drifts from another. */
 const GROUP_LABEL =
@@ -173,7 +175,7 @@ export function ShowFiltersButton({
       aria-label="Show filters"
       title="Show filters"
       data-testid={testId}
-      onClick={onShow}
+      onClick={(event) => { rememberPanelOpener("Summary", event.currentTarget); onShow(); }}
       /* The v4 toolbar icon button: 36 round, no border, body ink, grey hover. */
       className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-c-body hover:bg-c-hover"
     >
@@ -226,11 +228,12 @@ export function FilterRail({
   const card = "relative flex w-[240px] min-h-0 shrink-0 flex-col rounded-lg border border-c-card-border bg-c-card";
   if (header) {
     return (
+      <SummaryPanelSurface onHide={onHide}>
       <RailContext.Provider value={ctx}>
         <aside
           data-testid={testId}
           aria-label={ariaLabel}
-          className={`${card} overflow-hidden ${className ?? ""}`}
+          className={`${card} max-[1099px]:w-full max-[1099px]:flex-1 overflow-hidden ${className ?? ""}`}
         >
           {hide}
           <div
@@ -247,21 +250,24 @@ export function FilterRail({
           </div>
         </aside>
       </RailContext.Provider>
+      </SummaryPanelSurface>
     );
   }
   return (
-    <RailContext.Provider value={ctx}>
+    <SummaryPanelSurface onHide={onHide}>
+      <RailContext.Provider value={ctx}>
       <aside
         data-testid={testId}
         aria-label={ariaLabel}
         /* The collapse toggle sits `top-1.5`, absolutely positioned beside the
            first heading; the first heading leaves it room on the right. */
-        className={`${card} overflow-y-auto p-1.5 [scrollbar-width:thin] ${onHide ? "[&>div:first-of-type>button]:pr-9" : ""} ${className ?? ""}`}
+        className={`${card} max-[1099px]:w-full max-[1099px]:flex-1 overflow-y-auto p-1.5 [scrollbar-width:thin] ${onHide ? "[&>div:first-of-type>button]:pr-9" : ""} ${className ?? ""}`}
       >
         {hide}
         {children}
       </aside>
     </RailContext.Provider>
+      </SummaryPanelSurface>
   );
 }
 
@@ -616,6 +622,7 @@ export function useFilterRailOpen(
   /** The canvas width under which the rail steps aside. A wider list raises it. */
   floatBelow: number = FILTER_RAIL_FLOAT_BELOW_PX,
 ): [boolean, (open: boolean) => void] {
+  const inShell = useShellHeader() != null;
   const limit = useRef(floatBelow);
   const [stored] = useState<string | null>(() => {
     try {
@@ -624,7 +631,7 @@ export function useFilterRailOpen(
       return null;
     }
   });
-  const [open, setOpen] = useState(stored !== "0");
+  const [open, setOpen] = useState(stored !== "0" && (stored != null || !inShell || window.innerWidth >= 1100));
   /* The canvas BECAME narrow after load (the right-hand Tasks area opened, the
      window shrank): the rail would float over the very rows the operator is
      reading, so it steps aside for this visit. Nothing is written to storage —

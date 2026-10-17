@@ -1,3 +1,4 @@
+import { rememberPanelOpener } from "@/components/kit/Drawer";
 /**
  * The list toolbar's small parts (v12 kit): the button that shows a hidden side
  * panel, the round icon button, and a filter chip. The toolbar is one 36px line
@@ -16,7 +17,8 @@ export function CShowPanelButton({ label, onShow, compact = false }: { label: st
   return (
     <button
       type="button"
-      onClick={onShow}
+      data-panel-door={label}
+      onClick={(event) => { if (label === "Summary" || label === "Tasks") rememberPanelOpener(label, event.currentTarget); onShow(); }}
       aria-label={compact ? label : undefined}
       title={compact ? label : undefined}
       className={`flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-c-btn-border bg-white text-[13px] font-medium text-c-ink hover:bg-c-hover ${compact ? "w-8 justify-center" : "px-3"}`}
