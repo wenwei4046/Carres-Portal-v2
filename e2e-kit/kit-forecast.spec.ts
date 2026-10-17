@@ -57,6 +57,7 @@ async function measure(page: Page) {
     const lineCells = [...root.querySelectorAll('[data-testid^="forecast-size-week-2-"]')].map((cell) => cell.getBoundingClientRect());
     const lineDrift = lineCells.length && heads.length ? Math.max(...lineCells.map((cell) => Math.abs(cell.right - heads[heads.length - 1]!.right))) : 0;
     return {
+      toolbarHeight: toolbar?.getBoundingClientRect().height ?? 0,
       toolbarLines: tops.length ? (Math.max(...tops) - Math.min(...tops) > 12 ? 2 : 1) : 0,
       pageScroll: document.documentElement.scrollWidth - window.innerWidth,
       listSpare: scroller.scrollWidth - scroller.clientWidth,
@@ -89,6 +90,7 @@ async function walk(page: Page, label: string) {
     expect(m!.lastPastEdge, `${state}: the last column passes the list's edge`).toBeLessThanOrEqual(0);
     expect(m!.cut, `${state}: values cut with "..."`).toBe(0);
     expect(m!.toolbarLines, `${state}: the toolbar is one line`).toBe(1);
+    expect(m!.toolbarHeight, `${state}: shared toolbar follows the36px MASTER`).toBe(36);
     expect(m!.lineDrift, `${state}: a size line's numbers sit under the model's`).toBeLessThanOrEqual(1);
     expect(await carresCheck(page), `${state}: carres-check.js`).toEqual(PASS);
     await shot(page, `${label} · ${state}`);
@@ -286,4 +288,30 @@ test("1025 shared panels overlay the unchanged canvas and restore the saved wide
   await expect.poll(async () => Math.round((await nav.boundingBox())!.width)).toBe(220);
   await expect(page.getByTestId("selection-bar")).toHaveText(selection);
   expect(await page.evaluate(() => localStorage.getItem("carres-menu-collapsed"))).toBe("0");
+});
+
+
+test("MPR1025 returns focus to its Summary door and keeps the shared36px toolbar", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("carres-menu-collapsed", "0");
+    localStorage.setItem("shell-tasks-open", "0");
+    localStorage.setItem("carres.manualPurchase.filterRail.v2", "0");
+  });
+  await page.setViewportSize({ width: 1025, height: 900 });
+  await page.goto("/manual-purchase-shell-preview.html", { waitUntil: "networkidle" });
+  const door = page.getByTestId("manual-purchase-show-filters");
+  await expect(door).toBeVisible();
+  await expect.poll(async () => Math.round((await page.getByRole("navigation", { name: "Modules" }).boundingBox())!.width)).toBe(64);
+  const canvas = page.getByTestId("mp-register-surface");
+  const before = (await canvas.boundingBox())!.width;
+  expect((await page.getByTestId("work-toolbar").boundingBox())!.height).toBe(36);
+  await door.click();
+  const summary = page.getByRole("dialog", { name: "Summary" });
+  await expect(summary).toBeVisible();
+  expect((await summary.boundingBox())!.width).toBe(264);
+  expect((await canvas.boundingBox())!.width).toBe(before);
+  await summary.getByRole("button", { name: "Hide filters", exact: true }).click();
+  await expect(summary).toHaveCount(0);
+  await expect(door).toBeFocused();
+  expect((await canvas.boundingBox())!.width).toBe(before);
 });

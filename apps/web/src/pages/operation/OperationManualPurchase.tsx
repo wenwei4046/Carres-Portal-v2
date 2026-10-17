@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState , type ReactNode } fr
 import "./manual-purchase-create.css";
 import { useTasksHost } from "./tasks/tasks-host";
 import registerStyles from "./ManualPurchaseRegister.module.css";
+import { CIconButton } from "@/components/carres/CToolbar";
 import {
   DEMAND_PURPOSES,
   DEMAND_PURPOSE_DEFAULT,
@@ -71,7 +72,6 @@ import Button from "@/components/kit/Button";
 import DataTable, { type Column } from "@/components/kit/DataTable";
 import DatePicker from "@/components/kit/DatePicker";
 import EmptyState from "@/components/kit/EmptyState";
-import Icon from "@/components/kit/Icon";
 import Input from "@/components/kit/Input";
 import { SO_HEAD_ROW, SO_ROW, SO_TABLE, SO_TD, SO_TH } from "./components/so-document-table";
 import ConfigureDrawer from "@/pages/dealer/pos/ConfigureDrawer";
@@ -1679,16 +1679,12 @@ export default function OperationManualPurchase() {
             toolbarStart={
               <>
                 {!filterRailOpen && (
-                  <button
-                    type="button"
-                    aria-label="Show filters"
-                    title="Show filters"
+                  <CIconButton
+                    icon="left_panel_open"
+                    label="Show filters"
                     data-testid="manual-purchase-show-filters"
                     onClick={() => setFilterRailVisible(true)}
-                    className="grid h-7 w-7 shrink-0 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
-                  >
-                    <Icon name="panelToggle" />
-                  </button>
+                  />
                 )}
                 {/* Below a 640px canvas the pill keeps its `+` and its full
                     accessible name, and gives the words' width back to the

@@ -18,9 +18,25 @@ read-only authenticated verification of the current purchasing checklist. Earlie
 Manual Purchase” statements below are historical and superseded for this scope. Purchasing §5.2,
 COPY and the same UI MASTER own the approved contract; document baseline PR#2089, head7a6bd332a.
 The narrow-panel amendment supersedes the earlier Tasks-only compact-menu fallback, with shared
-264/320 overlays below1100. Shared implementation is on `codex/forecast-mpr-shell`, not deployed.
-12 Forecast shell browser checks PASS; wider MPR persistence, source/stock/approval/issue/send and
-production proof remain open. Desktop dirty work is preserved. No supplier sending is authorised.
+264/320 overlays below1100. Shared Shell PR#2090 passed exact-head CI39038029507 and Preview39038029521 at
+ae5fd1770d367282498db6abc372cf215b77d923, merged as92378f55a7e7c8c525ef4c68590a5b050c8397ab.
+Production deployment39040933172 passed; all five production surfaces converged to that SHA.
+Authenticated hidden-IAB read-only walks of MPR and Forecast at1025/1164/1440 verified temporary64
+menu and saved220 restoration, Summary264/Tasks320 overlays with unchanged canvas, Forecast Summary
+focus return and Tasks focus return. No request/order/task/supplier write was performed; viewport reset.
+Actual deviations found: both DataGrid toolbars remain40 instead of MASTER36; MPR's legacy Show filters
+button loses close focus. The bounded correction reuses the existing CIconButton and shared DataGrid CSS
+on `codex/forecast-mpr-live-check-fixes`; local Forecast/MPR browser13/13, MPR unit176/176 and web build pass. The changed selected toolbar is also36 and one line. Not deployed until its own exact-head gates, baseline review and release checks.
+Do not call the full page acceptance passed before those corrections are released and read back.
+
+Foundation PR#2091 is merged/deployed (08d5cfb10, migration0696), byte-identical to Jess's approved
+foundation draft SHA256 c1b34b3a2771e68e1629c665b57823dc7be7ddefc68e6262a63f21ae761dc459.
+Production tracker20261017132212; SQL MD5 a441435a3a5d4f79765f54256fd88be9. No RLS/backfill,
+record-count change or purchasing-function change in its immediate read-only post-check.
+Guarded context/Settings work remains local on `codex/forecast-mpr-context` at ee049557b;
+new fields are unmounted, owning context/approval/reapproval/coverage/send writes are not complete.
+The independent Settings SQL review draft there is not approved/applied; foundation approval does not cover it.
+Wider MPR persistence, source/stock/approval/issue/send production proof remains open. Desktop dirty work is preserved. No supplier sending is authorised.
 
 ## 0 · Owner scope carried forward (Jess, 14 Oct 2026 — do not ask her to reconfirm)
 
