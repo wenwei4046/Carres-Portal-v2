@@ -27,6 +27,7 @@ export default function Input({
   error,
   required = false,
   type = "text",
+  autoFocus,
   ...rest
 }: {
   id: string;
@@ -46,6 +47,8 @@ export default function Input({
         aria-invalid={error ? true : undefined}
         aria-describedby={error || hint ? `${id}-msg` : undefined}
         data-kit="input"
+        autoFocus={autoFocus}
+        data-kit-autofocus={autoFocus || undefined}
         className={controlClass(Boolean(error), "single")}
         {...rest}
       />
