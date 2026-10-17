@@ -50,7 +50,7 @@ reset role;
 select set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009698","role":"authenticated","app_metadata":{"role":"operation"}}',true);
 set local role authenticated;
 do $owner$
-declare c jsonb; rs jsonb; made jsonb; replay jsonb; k uuid:=gen_random_uuid(); badkey uuid:=gen_random_uuid(); d uuid; badline jsonb; detail text; refused boolean:=false; before_n integer; legacy jsonb; mixed jsonb; mixed_line jsonb; recipient2 uuid:=gen_random_uuid(); stock_site record; mixed_result jsonb;
+declare c jsonb; rs jsonb; made jsonb; replay jsonb; k uuid:=gen_random_uuid(); badkey uuid:=gen_random_uuid(); d uuid; badline jsonb; detail text; refused boolean:=false; before_n integer; legacy jsonb; mixed jsonb; mixed_line jsonb; recipient2 uuid:=gen_random_uuid(); stock_site record; second_site record; mixed_result jsonb;
 begin
  select value into c from context_fixture; select value into rs from stock_context_fixture;
  d:=(c#>>'{lines,0,allocations,0,destinationId}')::uuid;
@@ -67,19 +67,22 @@ begin
  exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='submission_scope_changed'; end;
  if not refused then raise exception 'changed-scope submission key accepted'; end if;
  select id,warehouse_id into strict stock_site from public.purchasing_destinations where active and warehouse_id is not null order by id limit 1;
+ select id,warehouse_id into strict second_site from public.purchasing_destinations where active and warehouse_id is not null and warehouse_id<>stock_site.warehouse_id order by id limit 1;
  mixed_line:=(c#>'{lines,0}')||jsonb_build_object('id',gen_random_uuid(),
    'recipientNeeds',jsonb_build_array(jsonb_build_object('recipientId',c#>>'{recipients,0,id}','qty',3),jsonb_build_object('recipientId',recipient2,'qty',2)),
    'stockProposals',jsonb_build_array(jsonb_build_object('id',gen_random_uuid(),'locationId',stock_site.warehouse_id,'destinationId',stock_site.id,'qty',1,
      'recipients',jsonb_build_array(jsonb_build_object('recipientId',c#>>'{recipients,0,id}','qty',1)))),
    'allocations',jsonb_build_array(
-     (c#>'{lines,0,allocations,0}')||jsonb_build_object('id',gen_random_uuid(),'qty',2,'recipients',jsonb_build_array(jsonb_build_object('recipientId',c#>>'{recipients,0,id}','qty',2))),
-     (c#>'{lines,0,allocations,0}')||jsonb_build_object('id',gen_random_uuid(),'qty',2,'supplierDeliveryDate','2026-11-11','recipients',jsonb_build_array(jsonb_build_object('recipientId',recipient2,'qty',2)))));
+     (c#>'{lines,0,allocations,0}')||jsonb_build_object('id',gen_random_uuid(),'destinationId',stock_site.id,'qty',2,'recipients',jsonb_build_array(jsonb_build_object('recipientId',c#>>'{recipients,0,id}','qty',2))),
+     (c#>'{lines,0,allocations,0}')||jsonb_build_object('id',gen_random_uuid(),'destinationId',second_site.id,'qty',2,'recipients',jsonb_build_array(jsonb_build_object('recipientId',recipient2,'qty',2)))));
  mixed:=jsonb_set(jsonb_set(c,'{lines}',jsonb_build_array(mixed_line)),'{recipients}',
    jsonb_build_array(c#>'{recipients,0}',(c#>'{recipients,0}')||jsonb_build_object('id',recipient2,'name','TEST second recipient')));
  mixed_result:=public.purchasing_create_request_with_lines(p_purpose=>'general_purchase',p_destination_id=>d,
    p_lines=>jsonb_build_array(jsonb_build_object('request_context',mixed,'submission_key',gen_random_uuid())),p_fulfilment_intent=>'concrete_need');
  if (select sum(qty) from public.purchase_demands where request_id=(mixed_result->>'id')::uuid)<>5
    or (select sum(qty) from public.purchase_demands where request_id=(mixed_result->>'id')::uuid and fulfilment_kind='purchase')<>4
+   or (select sum(qty) from public.purchase_demands where request_id=(mixed_result->>'id')::uuid and fulfilment_kind='purchase' and destination_id=stock_site.id)<>2
+   or (select sum(qty) from public.purchase_demands where request_id=(mixed_result->>'id')::uuid and fulfilment_kind='purchase' and destination_id=second_site.id)<>2
    or (select count(*) from public.purchase_demands where request_id=(mixed_result->>'id')::uuid)<>3 then raise exception 'full5 need, stock1 and split buy2/2 were not retained'; end if;
  refused:=false;
  select jsonb_set(mixed,'{lines,0,stockProposals,0,locationId}',to_jsonb(warehouse_id)) into strict badline
@@ -148,6 +151,31 @@ begin
  select id into strict rid from public.purchase_requests where created_by='fffffff1-0000-4000-8000-000000009698' and purpose='general_purchase' and request_version=1 and jsonb_array_length(request_context#>'{lines,0,stockProposals}')=1;
  baseline:=public._purchasing_request_context_state(rid);
  if jsonb_array_length(baseline->'demands')<>3 or exists(select 1 from public.ops_stock_items where reserved_purchase_demand_id in (select id from public.purchase_demands where request_id=rid)) then raise exception 'mixed-scope proposal lost lineage or reserved Units'; end if;
+ -- Synthetic LOCAL-only saved approval fixtures; the whole script rolls back.
+ refused:=false;
+ begin
+   perform public._purchasing_assert_request_approval(rid);
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='request_approval_unavailable'; end;
+ if not refused then raise exception 'missing snapshot passed approval guard'; end if;
+ update public.purchase_demands set approved_qty=qty where request_id=rid;
+ baseline:=public._purchasing_request_context_state(rid);
+ update public.purchase_requests set approved_at=now(),approved_by='fffffff1-0000-4000-8000-000000009699',
+   approval_version=request_version,approval_scope=baseline where id=rid;
+ if public._purchasing_assert_request_approval(rid) is distinct from baseline then raise exception 'exact approval scope refused'; end if;
+ refused:=false;
+ begin
+   update public.purchase_requests set request_version=request_version+1 where id=rid;
+   perform public._purchasing_assert_request_approval(rid);
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='request_approval_changed'; end;
+ if not refused then raise exception 'stale approval version passed'; end if;
+ refused:=false;
+ begin
+   update public.purchase_demands set approved_qty=approved_qty-1 where request_id=rid;
+   perform public._purchasing_assert_request_approval(rid);
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='request_approval_changed'; end;
+ if not refused then raise exception 'changed approved distribution passed'; end if;
+ if public._purchasing_assert_request_approval(rid) is distinct from baseline then raise exception 'approval refusals left changes'; end if;
+ raise notice 'Approval guard: missing snapshot refused, exact snapshot admitted, changed version/distribution refused PASS';
  raise notice 'Context state: exact material facts, unknown approval and quantity/configuration/header-date drift refusal PASS';
 end; $state_test$;
 rollback;

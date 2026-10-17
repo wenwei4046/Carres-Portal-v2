@@ -9,6 +9,50 @@ Paste everything below the line into a fresh session. It is self-contained.
 
 ---
 
+**Forecast/MPR current checkpoint ·18Oct2026 (supersedes older release status below).**
+#2090 deployed92378f55a7e7c8c525ef4c68590a5b050c8397ab. #2092 exact-head CI39046262388
+and Preview39046262385 passed; merged/deployed2c8b25aab77b60e69e29c752455884897d2958ac,
+production workflow39048405515 SUCCESS. All five production surfaces converged (verification
+log `/tmp/carres-live-check-production-verification.log`). Authenticated read-only MPR and
+Forecast walks at1025/1164/1440 verified36px toolbar,64/220 navigation,264 Summary/320 Tasks
+overlays and focus return. MPR empty New Task dialog retained focus through resizing and was
+cancelled; nothing saved. Selected SO Batch export menu was NOT conclusively verified live;
+its three targeted local browser cases passed. No real request/order/stock/task or supplier send.
+Temporary viewport reset; hidden IAB2/tab2 retained at MPR. Native Chrome left alone.
+
+**One pending SQL review package, no approval inferred.** Exact stable checkout:
+`/Users/chaichiewlim/.codex/worktrees/forecast-mpr-context/Carres-Portal-v2/`.
+Draft `output/forecast-mpr-delivery/purchase-request-settings-writer.draft.sql`, SHA256
+`b4eb234d6f0d855546d606a5f9eef1b8b30aa52a8274948855f0ba8ec8053774`.
+Adds only atomic `purchasing_set_request_settings(integer,integer,boolean)` using existing
+Settings editor permission/audit. All three values required, nonnegative SQL integers; identical
+save no-op. Apply changes no values, roles, RLS, requests, orders, tasks or workflow activation.
+Validation artifacts alongside draft: `purchase-request-settings.local-check.sql` (LOCAL ONLY
+synthetic owner/non-editor; atomic save, three audit rows, no-op, negative refusal; final rollback)
+and `purchase-request-settings.rollback-probe.sql` (single DO; exact reviewed DDL with only
+outer transaction delimiters removed; grants/body md5/no-active-account refusal/unchanged
+values+audit; intentional PROBE_ROLLBACK). The latter passed LOCAL rehearsal and has NOT run
+on production. Expected body md5 b5b2a944a9a531a6673f609fd76ca42d. No production identity is
+impersonated. Recovery: keep previous application; unused additive function may remain, with no
+setting change on installation. After explicit approval: remeasure number across tracker/main/all
+branches, commit exact draft bytes as migration, perform governed rollback probe, verify no
+residue, apply exact committed file through apply_migration, reconcile tracker/file/body md5.
+Blocked: production Settings save route/editor rollout. Full context writer/form/approval remains
+independently unfinished and is not authorised by this package. Existing async question remains
+pending; do not ask again or treat the repeated foundation approval as approval of this hash.
+
+**Independent local approval work:** private `_purchasing_assert_request_approval` now checks
+an actual saved approval/version/scope against exact current material state; missing approval,
+stale version and changed approved distribution refuse. It never writes approval or reserves
+stock, and is NOT wired into issuance. Canonical decision still fails closed for new context.
+Local owning-SQL rolled-back fixtures passed, including full5 need / stock1 / buy2+2 at two
+actual distinct destinations, exact retry, atomic refusal and legacy approval compatibility.
+Log `/tmp/carres-context-approval-guard.log`. This is WIP, not a review-ready writer migration.
+Remaining: shared supplier calendar validation, authoritative SC/forecast source admission,
+canonical approval snapshots and same-number reapproval/history, stock/coverage/partial issue
+admission and versioned send/task facts, then adoption by the existing shared form. PO/Receiving
+standalone page/workflow work remains excluded. No new-context writer is deployed.
+
 CARRES PORTAL v2 — CONTINUOUS BUILD · checkpoint 2026-10-16 (UI kit lane)
 
 **Current publication and delivery:** the ONE physical `docs/ui/MASTER.md` is on main through merged PR #2087, `58047ed1f9624f0a796e6560e3deed1d1c2f1255`; its required CI passed. Root CLAUDE/AGENTS name it, and former01/02/03 paths only redirect. Desktop's bounded startup pointers now read `origin/main` while all existing dirty work is preserved. Earlier “unpublished” baseline paragraphs below are historical. Existing-page fixes continue in the same PR #2086, not a new kit. Current bounded verification: corrected page tracking assertion4/4; shared focus/fields/catalogue/SO reader tests77/77. SO Why uses the existing dialog-container provider: personally opened calendar inside Why, Esc returned to Why, Cancel retained saved facts; no business write. Broader historical findings retain their original scope and are not an all-Portal PASS. The former433px toolbar blocker is fixed in8e2c746a2: existing common shell temporarily uses compact navigation below1100 with Tasks open, preserves stored preference, and guards expansion before hiding Tasks; Workspace is excluded.127 sidebar tests and the original4 targeted1025 browser cases PASS. Developer personally measured nav64/canvas589/cut[]/page1025, expansion/reopen cycle and1164 restoration. This supersedes older pending-toolbar wording below; production proof is not yet claimed.
@@ -18,13 +62,13 @@ read-only authenticated verification of the current purchasing checklist. Earlie
 Manual Purchase” statements below are historical and superseded for this scope. Purchasing §5.2,
 COPY and the same UI MASTER own the approved contract; document baseline PR#2089, head7a6bd332a.
 The narrow-panel amendment supersedes the earlier Tasks-only compact-menu fallback, with shared
-264/320 overlays below1100. Shared implementation PR#2090 is merged as92378f55a7e7c8c525ef4c68590a5b050c8397ab; deployment39040933172 remains in progress.
+264/320 overlays below1100. Shared implementation PR#2090 is merged as92378f55a7e7c8c525ef4c68590a5b050c8397ab; deployment39040933172 passed (see current checkpoint above).
 12 Forecast shell browser checks PASS; wider MPR persistence, source/stock/approval/issue/send and
 production proof remain open. Desktop dirty work is preserved. No supplier sending is authorised.
 
 **Forecast/MPR delivery checkpoint ·17Oct2026:** rule PR#2089 merged and deployed as
 `2a91dd0976ec151b3ae75eaf82d00a000226293e`; all five surfaces converged. Shared Shell PR#2090
-head`ae5fd1770d367282498db6abc372cf215b77d923` passed exact-head full CI39038029507 and Preview39038029521, then merged as92378f55a7e7c8c525ef4c68590a5b050c8397ab: Linux baseline workflow39033445428 passed and generated pictures are committed; Production deployment39040933172 passed and all five production surfaces converged to92378f55a7e7c8c525ef4c68590a5b050c8397ab. Authenticated hidden-IAB walks at1025/1164/1440 verified64 menu/220 restore,264/320 overlays and unchanged canvas; Forecast Summary and Tasks focus return passed. Actual gaps were DataGrid40 instead of36 and MPR Summary focus. Correction PR#2092 final head a39137988a2d2d4a2ba844f94a8eb4581b23794e is NOT merged/deployed: final CI39046262388 is running, Preview39046262385 passed. Full local kit75 passed/64 skipped, MPR unit176, selected export/SO Batch/Payment unit211 and Supplier Claims29 pass; app build passed. The shared selection export is now in existing Page tools, preserving its selected population. Prior776 CI caught3 export-overflow browser cases (now locally passed); priorcbb CI caught one obsolete export-button unit assertion (updated and29 passed). Never treat a failed/older head as final proof. Baseline workflow39042785594 passed on6041;28 reviewed pictures are committed.  Prior head807d8dddd passed full CI39035797198; final patch8cb09f34a additionally preserves focused input after reparenting and holds the panel surface while a child dialog remains open. Focus unit5/5 and real New Task modal resize/save regression pass; web typecheck passed. The full local page acceptance before that narrow patch was74 passed/64 skipped (Linux pictures and unreachable states), not production proof. Foundation PR#2091 head6af013e00 is merged into this branch to reconcile authority and SQL before final CI. Previous CI had passed types/unit/build, but old narrow dock assumptions needed updating. The real nested New Task focus issue was fixed in the shared Input/DialogFrame; browser regression passes. First CI found one obsolete immediate-parent rail assertion;
+head`ae5fd1770d367282498db6abc372cf215b77d923` passed exact-head full CI39038029507 and Preview39038029521, then merged as92378f55a7e7c8c525ef4c68590a5b050c8397ab: Linux baseline workflow39033445428 passed and generated pictures are committed; Production deployment39040933172 passed and all five production surfaces converged to92378f55a7e7c8c525ef4c68590a5b050c8397ab. Authenticated hidden-IAB walks at1025/1164/1440 verified64 menu/220 restore,264/320 overlays and unchanged canvas; Forecast Summary and Tasks focus return passed. Actual gaps were DataGrid40 instead of36 and MPR Summary focus. Correction PR#2092 final head a39137988a2d2d4a2ba844f94a8eb4581b23794e is merged/deployed as2c8b25aab; final CI39046262388 and Preview39046262385 passed (current checkpoint above). Full local kit75 passed/64 skipped, MPR unit176, selected export/SO Batch/Payment unit211 and Supplier Claims29 pass; app build passed. The shared selection export is now in existing Page tools, preserving its selected population. Prior776 CI caught3 export-overflow browser cases (now locally passed); priorcbb CI caught one obsolete export-button unit assertion (updated and29 passed). Never treat a failed/older head as final proof. Baseline workflow39042785594 passed on6041;28 reviewed pictures are committed.  Prior head807d8dddd passed full CI39035797198; final patch8cb09f34a additionally preserves focused input after reparenting and holds the panel surface while a child dialog remains open. Focus unit5/5 and real New Task modal resize/save regression pass; web typecheck passed. The full local page acceptance before that narrow patch was74 passed/64 skipped (Linux pictures and unreachable states), not production proof. Foundation PR#2091 head6af013e00 is merged into this branch to reconcile authority and SQL before final CI. Previous CI had passed types/unit/build, but old narrow dock assumptions needed updating. The real nested New Task focus issue was fixed in the shared Input/DialogFrame; browser regression passes. First CI found one obsolete immediate-parent rail assertion;
 it now checks the real positioning ancestor. Targeted rail/dialog193/193 PASS; prior Forecast
 browser12/12 PASS. Keep required CI on the exact new head. The production read-only walk now has an authenticated hidden IAB tab: browser2/tab2, handle `productionReadTab`; MPR and Tasks loaded successfully after0696. No transaction or task completion was performed. Preserve this tab with markHandoff if needed; viewport was reset after that walk. Repeat the bounded corrected toolbar/focus readback after#2092 deploys, then reset it again. Native Chrome is concurrently controlled by Design; do not navigate or resize it. No credential or token copying.
 

@@ -285,6 +285,32 @@ end;
 $state$;
 revoke all on function public._purchasing_request_context_state(uuid) from public,anon,authenticated;
 
+-- Private downstream admission for a future canonical approval writer. It only
+-- compares saved facts; it never invents a baseline, approves or reserves stock.
+-- NOT wired into legacy issue/stock paths until the complete contextual flow is ready.
+create or replace function public._purchasing_assert_request_approval(p_id uuid)
+returns jsonb language plpgsql set search_path=public,pg_temp as $approval$
+declare r public.purchase_requests%rowtype; current_scope jsonb;
+begin
+  current_scope:=public._purchasing_request_context_state(p_id);
+  select * into strict r from public.purchase_requests where id=p_id;
+  if r.approved_at is null or r.approved_by is null or r.refused_at is not null
+    or r.withdrawn_at is not null or r.sent_back_at is not null
+    or r.approval_version is null or r.approval_scope is null then
+    raise exception 'current request approval is unavailable' using errcode='22023',detail='request_approval_unavailable';
+  end if;
+  if r.approval_version is distinct from r.request_version or r.approval_scope is distinct from current_scope then
+    raise exception 'request changed after approval' using errcode='22023',detail='request_approval_changed';
+  end if;
+  if exists(select 1 from public.purchase_demands where request_id=p_id and cancelled_at is null
+    and (approved_qty is null or approved_qty<0 or approved_qty>qty)) then
+    raise exception 'approved allocation is unavailable' using errcode='22023',detail='request_approval_unavailable';
+  end if;
+  return current_scope;
+end;
+$approval$;
+revoke all on function public._purchasing_assert_request_approval(uuid) from public,anon,authenticated;
+
 -- WIP canonical create slice. DO NOT REVIEW/APPLY as a finished migration:
 -- Supplier-date minimum must follow productionWorkingDaysFor/expectedArrivalOf
 -- and the SAME myHolidaySet source. Office calendar is for windows/buffer,
