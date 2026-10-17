@@ -35,6 +35,24 @@ end; $test$;
 -- Owning-create slice only. LOCAL fixtures, not production transactions.
 update context_fixture set value=jsonb_set(value,'{lines,0,sku}',to_jsonb((select sku from public.product_skus where supplier_id is not null order by sku limit 1)));
 update stock_context_fixture set value=jsonb_set(value,'{lines,0,sku}',(select value#>'{lines,0,sku}' from context_fixture));
+do $calendar_direct_test$
+declare c jsonb; refused boolean:=false; detail text;
+begin
+ select value into c from context_fixture;
+ perform public._purchasing_check_context_supplier_dates(c);
+ begin
+  perform public._purchasing_check_context_supplier_dates(jsonb_set(c,'{lines,0,allocations,0,supplierDeliveryDate}','"2026-10-21"'));
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='supplier_date_before_earliest'; end;
+ if not refused then raise exception 'direct SQL accepted too-early supplier date'; end if;
+ refused:=false;
+ begin
+  delete from public.purchasing_production_days where supplier_id=(select supplier_id from public.product_skus where sku=c#>>'{lines,0,sku}');
+  perform public._purchasing_check_context_supplier_dates(c);
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='supplier_plan_unavailable'; end;
+ if not refused then raise exception 'direct SQL invented missing production plan'; end if;
+ perform public._purchasing_check_context_supplier_dates(c);
+ raise notice 'Direct SQL calendar: too-early date and missing production settings refused; nested rollback retains original settings PASS';
+end; $calendar_direct_test$;
 set local session_replication_role=replica;
 insert into auth.users(id,email) values ('fffffff1-0000-4000-8000-000000009698','TEST-context-owner@carres.test'),('fffffff1-0000-4000-8000-000000009699','TEST-context-manager@carres.test'),('fffffff1-0000-4000-8000-000000009700','TEST-context-assigner@carres.test');
 insert into public.app_users(id,email,name,role,status,is_person) values
@@ -157,10 +175,7 @@ begin
    perform public._purchasing_assert_request_approval(rid);
  exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='request_approval_unavailable'; end;
  if not refused then raise exception 'missing snapshot passed approval guard'; end if;
- update public.purchase_demands set approved_qty=qty where request_id=rid;
- baseline:=public._purchasing_request_context_state(rid);
- update public.purchase_requests set approved_at=now(),approved_by='fffffff1-0000-4000-8000-000000009699',
-   approval_version=request_version,approval_scope=baseline where id=rid;
+ baseline:=public._purchasing_stamp_context_approval(rid,null);
  if public._purchasing_assert_request_approval(rid) is distinct from baseline then raise exception 'exact approval scope refused'; end if;
  refused:=false;
  begin
@@ -175,6 +190,12 @@ begin
  exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='request_approval_changed'; end;
  if not refused then raise exception 'changed approved distribution passed'; end if;
  if public._purchasing_assert_request_approval(rid) is distinct from baseline then raise exception 'approval refusals left changes'; end if;
+ refused:=false;
+ begin
+   update public.purchasing_production_days set working_days=working_days+1 where supplier_id in (select supplier_id from public.purchase_demands where request_id=rid);
+   perform public._purchasing_assert_request_approval(rid);
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='request_approval_changed'; end;
+ if not refused then raise exception 'changed supplier production facts reused approval'; end if;
  -- Same-number revision admission as the actual synthetic requester.
  perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009698","role":"authenticated","app_metadata":{"role":"operation"}}',true);
  if public._purchasing_request_revision_scope(rid,'TEST correction') is distinct from baseline then raise exception 'approved unissued revision admission failed'; end if;
@@ -247,12 +268,12 @@ begin
  result:=public.purchasing_resubmit_request(r.id,r.destination_id,r.required_by,p_lines=>jsonb_build_array(jsonb_build_object('request_context',c,'revision_key',gen_random_uuid(),'expected_version',2,'reason','TEST returned correction')));
  if result->>'req_no' is distinct from r.req_no or result->>'request_version'<>'3' then raise exception 'returned correction changed permanent identity'; end if;
  perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009699","role":"authenticated","app_metadata":{"role":"principal"}}',true);
- before_state:=public._purchasing_stamp_context_approval(r.id);
+ before_state:=public._purchasing_stamp_context_approval(r.id,null);
  if before_state->>'request_version'<>'3' or not exists(select 1 from public.purchase_requests where id=r.id and approval_version=3 and approved_by=auth.uid() and approval_scope=before_state)
    or (select count(*) from public.purchase_request_events where request_id=r.id and kind='resubmitted')<>2 then raise exception 'same-number reapproval snapshot/history failed'; end if;
  refused:=false;
  begin
-  perform public._purchasing_stamp_context_approval(r.id);
+  perform public._purchasing_stamp_context_approval(r.id,null);
  exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='request_not_awaiting_approval'; end;
  if not refused then raise exception 'already-approved request stamped twice'; end if;
  raise notice 'Private approval writer: actual qualified actor, same-number version3 reapproval, exact snapshot/history and duplicate decision refusal PASS';
@@ -270,7 +291,7 @@ begin
   p_for_service_case_id=>case_id,p_lines=>jsonb_build_array(jsonb_build_object('request_context',c,'submission_key',gen_random_uuid())),p_fulfilment_intent=>'concrete_need');
  if made->>'req_no' !~ '^SC[0-9]{6}-[0-9]{4}$' then raise exception 'SC request identity invalid'; end if;
  perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009699","role":"authenticated","app_metadata":{"role":"principal"}}',true);
- scope:=public._purchasing_stamp_context_approval((made->>'id')::uuid);
+ scope:=public._purchasing_stamp_context_approval((made->>'id')::uuid,null);
  if scope#>>'{service_case_source,id}' is distinct from case_id::text or scope#>>'{service_case_source,carres_action}'<>'TEST approved procurement scope' then raise exception 'actual Case source not captured'; end if;
  begin
   update public.service_cases set carres_action='TEST changed remedy scope' where id=case_id;
@@ -279,4 +300,110 @@ begin
  if not refused or public._purchasing_assert_request_approval((made->>'id')::uuid) is distinct from scope then raise exception 'Case source drift guard/rollback failed'; end if;
  raise notice 'SC source: actual Case procurement facts captured; changed remedy invalidates saved approval PASS (formal Case admission still open)';
 end; $case_source_test$;
+-- Partial approval preserves full need and explicitly allocates every approved piece.
+do $partial_test$
+declare c jsonb; made jsonb; rid uuid; dist jsonb; bad jsonb; target uuid; n integer; scope jsonb; refused boolean:=false; detail text;
+begin
+ select request_context into strict c from public.purchase_requests where request_version=3;
+ perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009698","role":"authenticated","app_metadata":{"role":"operation"}}',true);
+ made:=public.purchasing_create_request_with_lines(p_purpose=>'general_purchase',p_destination_id=>(c#>>'{lines,0,allocations,0,destinationId}')::uuid,
+  p_lines=>jsonb_build_array(jsonb_build_object('request_context',c,'submission_key',gen_random_uuid())),p_fulfilment_intent=>'concrete_need');
+ rid:=(made->>'id')::uuid;
+ select id into target from public.purchase_demands where request_id=rid and fulfilment_kind='purchase' order by id limit 1;
+ dist:=public._purchasing_context_approval_distribution(rid,null,false);
+ select (ordinality-1)::integer into n from jsonb_array_elements(dist) with ordinality a where a.value->>'demandId'=target::text;
+ dist:=jsonb_set(jsonb_set(dist,array[n::text,'qty'],'1'),array[n::text,'recipients','0','qty'],'1');
+ perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009699","role":"authenticated","app_metadata":{"role":"principal"}}',true);
+ bad:=jsonb_set(dist,array[n::text,'recipients'],'[]');
+ begin
+  perform public._purchasing_stamp_context_approval(rid,bad);
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='invalid_approval_distribution'; end;
+ if not refused or exists(select 1 from public.purchase_requests where id=rid and approved_at is not null) or exists(select 1 from public.purchase_demands where request_id=rid and approved_qty is not null) then raise exception 'partial approval without recipient allocation was not atomic'; end if;
+ refused:=false;
+ begin
+  bad:=jsonb_set(dist,array[n::text,'recipients','0','recipientId'],to_jsonb(gen_random_uuid()));
+  perform public._purchasing_stamp_context_approval(rid,bad);
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='invalid_approval_distribution'; end;
+ if not refused then raise exception 'unrequested recipient received approval'; end if;
+ scope:=public._purchasing_stamp_context_approval(rid,dist);
+ if (scope#>>'{context,lines,0,qty}')::integer<>5 or (select sum(qty) from public.purchase_demands where request_id=rid)<>5 or (select sum(approved_qty) from public.purchase_demands where request_id=rid)<>4
+  or scope#>'{context,lines,0,recipientNeeds}' is distinct from c#>'{lines,0,recipientNeeds}' then raise exception 'partial approval shrank full need or changed recipients'; end if;
+ if public._purchasing_assert_request_approval(rid) is distinct from scope then raise exception 'exact partial approval snapshot refused'; end if;
+ raise notice 'Partial approval: full need5 retained, approved4 has exact recipient distribution; missing/unrequested recipient refused atomically PASS';
+end; $partial_test$;
+-- Actual existing Stock writer, on LOCAL synthetic Units, all rolled back.
+do $stock_coverage_test$
+declare r public.purchase_requests%rowtype; d public.purchase_demands%rowtype; buy uuid; loc uuid; other_loc uuid; u uuid; wrong uuid; coverage jsonb; refused boolean:=false; detail text; result jsonb;
+begin
+ select * into strict r from public.purchase_requests where request_version=3;
+ select * into strict d from public.purchase_demands where request_id=r.id and cancelled_at is null and fulfilment_kind='stock_proposal';
+ select id into buy from public.purchase_demands where request_id=r.id and cancelled_at is null and fulfilment_kind='purchase' order by id limit 1;
+ select (a->>'locationId')::uuid into strict loc from jsonb_array_elements(r.request_context->'lines') l cross join lateral jsonb_array_elements(l->'stockProposals') a where (a->>'id')::uuid=d.stock_proposal_id;
+ select id into strict other_loc from public.warehouses where id<>loc order by id limit 1;
+ coverage:=public._purchasing_context_coverage(r.id,false);
+ if (select sum((x->>'to_buy')::integer) from jsonb_array_elements(coverage) x)<>4 then raise exception 'stock proposal changed approved residual buy'; end if;
+ begin
+  perform public._purchasing_context_coverage(r.id,true);
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='stock_proposal_not_fulfilled'; end;
+ if not refused then raise exception 'unbound stock proposal was treated as physical coverage'; end if;
+ insert into public.ops_stock_items(sku,warehouse_id,condition,status) values(d.sku,loc,'new','free') returning id into u;
+ insert into public.ops_stock_items(sku,warehouse_id,condition,status) values(d.sku,other_loc,'new','free') returning id into wrong;
+ perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009698","role":"authenticated","app_metadata":{"role":"operation"}}',true);
+ refused:=false;
+ begin
+  perform public.purchasing_allocate_ready_units(d.id,array[wrong],'{}'::uuid[]);
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='stock_proposal_unit_changed'; end;
+ if not refused or exists(select 1 from public.ops_stock_items where id=wrong and status<>'free') then raise exception 'wrong-site Unit admitted or mutated'; end if;
+ result:=public.purchasing_allocate_ready_units(d.id,array[u],'{}'::uuid[]);
+ if not exists(select 1 from public.ops_stock_items where id=u and reserved_purchase_demand_id=d.id and status='reserved' and reserved_ref=r.req_no) then raise exception 'owning Stock writer failed exact proposal binding'; end if;
+ coverage:=public._purchasing_context_coverage(r.id,true);
+ if (select sum((x->>'stock_qty')::integer) from jsonb_array_elements(coverage) x)<>1 or (select sum((x->>'to_buy')::integer) from jsonb_array_elements(coverage) x)<>4 then raise exception 'actual stock1/buy4 coverage did not reconcile'; end if;
+ if (public._purchasing_context_issue_admission(buy,2)->>'to_buy')::integer<>2 then raise exception 'approved buy2 preflight failed'; end if;
+ refused:=false;
+ begin
+  perform public._purchasing_context_issue_admission(buy,3);
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='request_over_issue'; end;
+ if not refused then raise exception 'preflight admitted overbuy'; end if;
+ refused:=false;
+ begin
+  perform public.purchasing_demand_record_issue(buy,1,null);
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='context_issue_not_ready'; end;
+ if not refused or exists(select 1 from public.purchase_demands where request_id=r.id and issued_qty<>0) then raise exception 'legacy recorder bypassed contextual issue gate'; end if;
+ refused:=false;
+ begin
+  perform public.ops_stock_pool_draw(p_ref=>r.req_no,p_reason=>'used_instead_of_ordering',p_item_id=>wrong,p_purchase_demand_id=>buy);
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='stock_proposal_required'; end;
+ if not refused then raise exception 'direct Stock door bound a purchase allocation'; end if;
+ refused:=false;
+ begin
+  update public.ops_stock_items set needs_repair=true where id=u;
+  perform public._purchasing_context_coverage(r.id,true);
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='stock_proposal_unit_changed'; end;
+ if not refused then raise exception 'changed physical Unit reused approved coverage'; end if;
+ -- Synthetic PO rows test the coverage reader only; they do NOT claim
+ -- successful canonical issue. Existing public context issue is still closed.
+ perform set_config('session_replication_role','replica',true);
+ insert into public.purchase_orders(id,supplier_id,warehouse_id,destination_id,purpose)
+  select 'TEST-CONTEXT-PARTIAL-PO',supplier_id,loc,destination_id,purpose from public.purchase_demands where id=buy;
+ insert into public.purchase_order_lines(po_id,sku,qty,demand_id,destination_id,attrs)
+  select 'TEST-CONTEXT-PARTIAL-PO',sku,1,id,destination_id,attrs from public.purchase_demands where id=buy;
+ perform set_config('session_replication_role','origin',true);
+ update public.purchase_demands set issued_qty=1,po_id='TEST-CONTEXT-PARTIAL-PO',ordered_at=now() where id=buy;
+ coverage:=public._purchasing_context_coverage(r.id,true);
+ if not exists(select 1 from jsonb_array_elements(coverage) x where (x->>'demand_id')::uuid=buy and (x->>'issued_qty')::integer=1 and (x->>'to_buy')::integer=1) then raise exception 'partial PO quantity did not reconcile'; end if;
+ refused:=false;
+ begin
+  update public.purchase_demands set issued_qty=2 where id=buy;
+  perform public._purchasing_context_coverage(r.id,true);
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='request_po_coverage_changed'; end;
+ if not refused then raise exception 'unproven PO quantity reduced remaining buy'; end if;
+ refused:=false;
+ begin
+  update public.purchase_orders set purpose='ready_stock' where id='TEST-CONTEXT-PARTIAL-PO';
+  perform public._purchasing_context_coverage(r.id,true);
+ exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail; refused:=detail='request_po_coverage_changed'; end;
+ if not refused then raise exception 'PO source purpose drift passed'; end if;
+ raise notice 'PO coverage reader: exact partial1/remaining1; unproven quantity and source-purpose drift refused PASS (synthetic fixture, not issue proof)';
+ raise notice 'Stock/coverage: existing Stock writer bound exact approved site/Unit, stock1+buy4; missing/wrong-site/direct-buy-binding/changed Unit refused PASS';
+end; $stock_coverage_test$;
 rollback;

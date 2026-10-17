@@ -78,11 +78,43 @@ API context+legacy round tests40/40; shared context/calendar12/12 PASS. Supplier
 Sunday-only weeks and Christmas exclusion use the existing planner. Full SQL owning fixtures
 PASS and roll back at `/tmp/carres-context-source-check.log` (create/retry/RS500/mixed5 stock1
 buy2+2, scope drift, revision and private reapproval, SC source drift). No production writes.
-Remaining before a coherent request-writer SQL review: direct SQL supplier calendar/source
-admission, formal SC procurement scope and forecast fingerprint admission, partial approval
-recipient distribution, current coverage/Stock-owner/partial issue gates and versioned send/task
-facts; then existing-form adoption. No review-ready full writer package yet. PO/Receiving
-standalone page/workflow work remains excluded. Earlier checkpoint paragraphs below are
+**Further LOCAL WIP (18Oct, not SQL approval):** direct SQL supplier-date verification now
+checks sufficient production working days using existing Supplier×Category settings/work week.
+Holiday dates are GENERATED from the existing myHolidaySet via
+`scripts/check-request-context-calendar.mjs`, not another editable calendar;21 dates fingerprint
+0a7afb25af26c9a26b9e39f836dabcc17dcb928cfdbc86454ca189aec1bb2856. It inherits that source's
+provisional/limited-year data. API planner stays expectedArrivalOf. Local loopback-only parity
+integration checked27 combinations (three starts, three supplier weeks including six off-days,
+three leads): exact earliest dates pass, preceding dates refuse, all rollback. Direct SQL missing
+production/too-early negatives pass. Snapshot includes current supplier plan; changed settings
+invalidate old approval. Private partial approval now saves an explicit per-demand recipient
+allocation separately from full requested need; need5/approved4 and wrong/missing-recipient
+atomic refusals pass. Private stamp signature is now(uuid,jsonb), not the earlier uuid-only WIP.
+Existing Stock allocation and low-level pool draw now call private contextual admission first,
+with their original permissions/signatures/body retained for legacy rows. Exact approved stock
+proposal, actual warehouse, normalized SKU, configuration provenance, quantity and Unit health
+are checked under request->demands->Units locks. Unit lock contention returns40001. Actual
+owning Stock writer bound synthetic local Unit at its approved site; coverage reconciled stock1
+and buy4. Wrong site, direct bind-to-purchase allocation and changed Unit refused. No preapproval
+physical reservation. Counted goods still inherit existing Unit-only binding limitation.
+Current exact coverage reads owning Unit bindings and PO demand lineage, supplier/config/site/
+purpose and quantities. It never nets generic shelf totals against a deliberate buy. Synthetic
+PO-reader fixture proved partial issued1/remaining1 and wrong source/unproven-quantity refusal;
+this is NOT successful canonical PO issuance. Private issue preflight checks approved residual,
+fulfilled physical stock proposals and current-clock feasibility for only unissued allocations.
+PUBLIC contextual issue and its direct recorder now explicitly fail closed with
+context_issue_not_ready until the complete origin/payload integration is ready. No live PO issue.
+The four Stock/issue preimages matched production18Oct via read-only source-md5 checks:
+pool_draw060a8774da2abf935f77a7bdc7b1a240; allocate3e74a58de146efa17bf7c527e3508b47;
+record_issueb83f2638d1c868e1d5a01ae5192307b9; batchf84de1ebbd4c4bd4d4d83c56f980eb3b.
+Full local SQL log `/tmp/carres-context-stock-coverage.log`; calendar parity log
+`/tmp/carres-context-calendar-parity.log`. No production SQL modification or real transaction.
+Remaining before coherent full request-writer review: authoritative Forecast source/mark admission
+and fingerprint refresh; complete SC procurement-source interpretation without inventing an
+extra Service approval UUID; approver stock-choice adjustment retaining full need; final public
+decision/PO payload/date/partial issue integration and negative/concurrency controls. Then existing
+form adoption and exact-version send/task facts. No complete writer approval package yet. PO/
+Receiving standalone pages remain excluded. Earlier checkpoint paragraphs below are
 historical; they must not be used to infer current writer readiness.
 
 CARRES PORTAL v2 — CONTINUOUS BUILD · checkpoint 2026-10-16 (UI kit lane)
