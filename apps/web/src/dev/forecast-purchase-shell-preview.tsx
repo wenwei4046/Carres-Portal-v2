@@ -130,7 +130,7 @@ createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[`/operation?tab=forecast-purchase${params.get("show") ? `&show=${params.get("show")}` : ""}`]}>
         <Routes>
-          <Route path="/operation/*" element={<OperationApp />} />
+          <Route path="/operation/*" element={<OperationApp purchaseRequestContext={params.get("requestFlow")==="1"} />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>
