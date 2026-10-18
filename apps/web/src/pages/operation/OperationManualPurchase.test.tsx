@@ -2618,7 +2618,7 @@ describe("the row expansion — goods, their Status, and their own Ready Stock",
     fireEvent.click(screen.getByTestId(`mp-expand-${REQ2}`));
     const box = await screen.findByTestId(`mp-expansion-${REQ2}`);
     // The absence names itself; `—` would not say WHY the cell is empty.
-    expect(box.textContent).toContain("Not ordered yet");
+    expect(box.textContent).toContain("No PO yet");
     expect(box.textContent).toContain("Need PO");
   });
 
@@ -3569,10 +3569,10 @@ describe("Card 05 · the object detail", () => {
     expect(within(table).getByTestId("mp-object-po-1")).toHaveTextContent("Same as PO");
   });
 
-  it("no PO lineage reads `Not ordered yet` — never an inference", async () => {
+  it("no PO lineage reads `No PO yet` — never an inference", async () => {
     await openObject();
     expect(screen.getByTestId("mp-object-not-ordered")).toHaveTextContent(
-      "Not ordered yet",
+      "No PO yet",
     );
   });
 

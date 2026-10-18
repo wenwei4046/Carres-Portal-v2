@@ -1,3 +1,4 @@
+import { poReviewDraftLines } from "./po-review-draft";
 import layoutStyles from "./SoBatchRegister.module.css";
 import PoSupplierBundle from "./PoSupplierBundle";
 // design-standard: not-a-list-page — this is the 50/50 ISSUE surface
@@ -5,7 +6,7 @@ import PoSupplierBundle from "./PoSupplierBundle";
 // ONE purchase order being checked before it is sent, sitting beside that
 // document's own preview; a ListPageShell would wrap a second page chrome
 // around a surface whose whole point is document + work, side by side.
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   purchasingRefusal,
   SO_BATCH_PURCHASE_WORDS as W,
@@ -67,6 +68,9 @@ export interface SoBatchIssueWorkspaceProps {
    * that follows is the same one for both lanes.
    */
   onIssue?: () => Promise<{ pos: IssuedPo[] }>;
+  /** Source lane's scoped fields within this SAME work/PDF review. */
+  reviewFields?: (document: SoBatchDocument) => ReactNode;
+  sourceBlocker?: { wrong: string; todo: string } | null;
   /** The way back to the list this journey started from. Absent: SO Batch's. */
   backLabel?: string;
   supplierBundle?: boolean;
@@ -83,6 +87,8 @@ export default function SoBatchIssueWorkspace({
   onBack,
   onDone,
   onIssue,
+  reviewFields,
+  sourceBlocker,
   backLabel,
   supplierBundle = false,
   roundWindow,
@@ -163,13 +169,7 @@ export default function SoBatchIssueWorkspace({
       delivery_method: current.deliveryMethod ?? (current.supplierKind === "factory_pickup" ? "we_collect" : current.supplierKind === "own_logistics" ? "supplier_delivers" : null),
       terms: null,
       so_refs: [...new Set(current.lines.flatMap((line) => line.so == null ? [] : [line.so]))],
-      lines: current.lines.flatMap((line) => line.parts.map((part) => ({
-        sku: part.sku,
-        description: [line.item, line.variant].filter(Boolean).join(" · "),
-        qty: part.qty,
-        unit: "unit",
-        sources: [{ so: line.so, qty: part.qty }],
-      }))),
+      lines: poReviewDraftLines(current),
     };
   }, [current, destinations]);
   const [draftPdf, setDraftPdf] = useState<{ data: PoTemplateData; url?: string; error?: string } | null>(null);
@@ -202,6 +202,7 @@ export default function SoBatchIssueWorkspace({
    * fixing them is one pass.
    */
   const blocker = useMemo<{ wrong: string; todo: string } | null>(() => {
+    if (sourceBlocker) return sourceBlocker;
     for (const doc of documents) {
       if (doc.supplierKind === "factory_pickup" && !doc.supplierCollection) {
         return purchasingRefusal("pickup_partner_required", {
@@ -229,7 +230,7 @@ export default function SoBatchIssueWorkspace({
       }
     }
     return null;
-  }, [documents, destinationName]);
+  }, [documents, destinationName, sourceBlocker]);
 
   /**
    * ONE REQUEST FOR EVERY DOCUMENT (§7.3), carrying selections only. The
@@ -474,6 +475,7 @@ export default function SoBatchIssueWorkspace({
                   then the goods. Boxed like the Sales Order page — the
                   owner chose that LOOK for every Purchasing page ("got box …
                   I want follow", 2026-09-26). */}
+              {reviewFields?.(current)}
               <div className="mt-3">
               <Block title="Purchase order">
                 <div className="grid grid-cols-1 gap-3 min-[560px]:grid-cols-2" data-testid="so-batch-issue-facts">

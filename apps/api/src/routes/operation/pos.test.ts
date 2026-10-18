@@ -120,6 +120,7 @@ describe("GET /api/operation/pos", () => {
       grns?: Record<string, unknown>[];
       referencedDestinations?: Record<string, unknown>[];
       onPoLineRange?: (phase: "start" | "end") => void;
+      cancellationReleased?: boolean;
     } = {},
   ) {
     const eq = vi.fn().mockReturnThis();
@@ -203,6 +204,7 @@ describe("GET /api/operation/pos", () => {
     const requestSelect = vi.fn(() => ({ in: requestIn }));
 
     vi.mocked(userClient).mockReturnValue({
+      rpc: vi.fn(async()=>({data:{version:1,requestFlow:true,cancellation:lineage.cancellationReleased??false,serviceExecution:false},error:null})),
       from: vi.fn((table: string) => {
         if (table === "po_supplier_promises") return { select: promiseSelect };
         // 0585 · the day-before check's evidence rides the register read.
@@ -382,6 +384,41 @@ describe("GET /api/operation/pos", () => {
     expect(res.status).toBe(200);
     expect(maximum).toBeGreaterThan(1);
     expect(maximum).toBeLessThanOrEqual(4);
+  });
+
+  it("keeps two MPR quantities on one physical line without a fake SO or duplicate total", async () => {
+    const row = { ...PO_ROW, so: null, so_refs: null, purchase_order_lines: [{ ...PO_ROW.purchase_order_lines[0], demand_id: null }] };
+    mockPosList([row as unknown as typeof PO_ROW], [], [], [], {
+      poLineSources: [1, 2].map(n => ({ po_id: "PO-2030", po_line_id: "line-a", order_id: null, order_line_id: null, so: null, purchase_demand_id: `demand-${n}`, qty: 1 })),
+      demands: [1, 2].map(n => ({ id: `demand-${n}`, request_id: `request-${n}`, purpose: "general_purchase" })),
+      requests: [1, 2].map(n => ({ id: `request-${n}`, created_at: "2026-10-18T00:00:00Z", req_no: `GP-TEST-${n}` })),
+    });
+    const res = await app.fetch(new Request("http://t/api/operation/pos", { headers: { Authorization: `Bearer ${await makeJwt("operation")}` } }), env);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { pos: Array<{ sources: Array<{ reference: string }>; purchase_order_lines: Array<{ governed_sources: Array<{ reference: string; qty: number; kind: string }> }> }> };
+    expect(body.pos[0]!.sources.map(s => s.reference)).toEqual(["GP-TEST-1", "GP-TEST-2"]);
+    expect(body.pos[0]!.purchase_order_lines[0]!.governed_sources).toEqual(expect.arrayContaining([expect.objectContaining({ reference: "GP-TEST-1", qty: 1, kind: "manual_purchase" }), expect.objectContaining({ reference: "GP-TEST-2", qty: 1, kind: "manual_purchase" })]));
+    expect(body.pos[0]!.purchase_order_lines[0]!.governed_sources.reduce((n, s) => n + s.qty, 0)).toBe(2);
+  });
+
+  it.each(["2026-10-21", null])("modern MPR source keeps selected Proceed Date %s distinct from actual submission", async (proceedDate) => {
+    const row={...PO_ROW,so:null,purchase_order_lines:[{...PO_ROW.purchase_order_lines[0],demand_id:"demand-1"}]};
+    mockPosList([row as unknown as typeof PO_ROW],[],[],[],{
+      demands:[{id:"demand-1",request_id:"request-1",purpose:"general_purchase"}],
+      requests:[{id:"request-1",created_at:"2026-10-18T02:00:00Z",request_version:1,proceed_date:proceedDate,req_no:"GP-TEST"}],
+    });
+    const response=await app.fetch(new Request("http://t/api/operation/pos",{headers:{Authorization:`Bearer ${await makeJwt("operation")}`}}),env);
+    expect(response.status).toBe(200);
+    const body=await response.json() as any;
+    expect(body.pos[0].sources).toEqual(expect.arrayContaining([expect.objectContaining({kind:"manual_purchase",proceed_date:proceedDate})]));
+    expect(body.pos[0].purchase_order_lines[0].governed_sources).toEqual(expect.arrayContaining([expect.objectContaining({kind:"manual_purchase",proceed_date:proceedDate})]));
+  });
+
+  it.each([false,true])("modern source alone cannot advertise cancellation; release=%s",async released=>{
+    const row={...PO_ROW,so:null,purchase_order_lines:[{...PO_ROW.purchase_order_lines[0],demand_id:"demand-1"}]};
+    mockPosList([row as unknown as typeof PO_ROW],[],[],[],{demands:[{id:"demand-1",request_id:"request-1",purpose:"general_purchase"}],requests:[{id:"request-1",request_version:1,req_no:"GP-TEST"}],cancellationReleased:released});
+    const res=await app.fetch(new Request("http://t/api/operation/pos",{headers:{Authorization:`Bearer ${await makeJwt("operation")}`}}),env);
+    expect(res.status).toBe(200);expect((await res.json() as any).pos[0].contextual_cancellation_available).toBe(released);
   });
 
   it("returns governed SO and Manual Purchase lineage instead of guessing from display fields", async () => {
@@ -3350,4 +3387,42 @@ describe("supplier email dispatch", () => {
     expect(await response.json()).toMatchObject({ status, code: `email_${status}` });
     expect(db.rpc.mock.calls.filter(call => call[0] === "purchasing_confirm_po_sent")).toHaveLength(0);
   });
+});
+
+
+describe("existing PO revision exact contextual source transport", () => {
+  const lineId="fffffff1-0000-4000-8000-000000000001";
+  const source={demandId:"fffffff1-0000-4000-8000-000000000002",qty:3,requestVersion:1,approvalVersion:1,approvalToken:"a".repeat(32),recipients:[]};
+  it("passes explicit source/version through the SAME revision RPC, legacy shape remains unchanged", async () => {
+    const rpc=vi.fn(async()=>({data:{version:2},error:null}));vi.mocked(userClient).mockReturnValue({rpc} as never);
+    for(const contextual of [false,true]) {
+      const res=await app.fetch(new Request("https://api.test/api/operation/pos/TEST/revise",{method:"POST",headers:{Authorization:`Bearer ${await makeJwt("operation")}`,"Content-Type":"application/json"},body:JSON.stringify({reason:"TEST source growth",lines:[{lineId,qty:3,destinationId:null,...(contextual?{expectedPoVersion:1,requestSources:[source]}:{})}]})}),env);
+      expect(res.status).toBe(200);
+      expect(rpc).toHaveBeenLastCalledWith("purchasing_revise_po",{p_po_id:"TEST",p_reason:"TEST source growth",p_lines:[{line_id:lineId,qty:3,destination_id:null,...(contextual?{expected_po_version:1,request_sources:[{demand_id:source.demandId,qty:3,request_version:1,approval_version:1,approval_token:source.approvalToken,recipients:[]}]}:{})}]});
+    }
+  });
+  it.each(["missing version","duplicate source","wrong total"])("refuses %s before SQL", async(kind)=> {
+    const rpc=vi.fn();vi.mocked(userClient).mockReturnValue({rpc} as never);
+    const res=await app.fetch(new Request("https://api.test/api/operation/pos/TEST/revise",{method:"POST",headers:{Authorization:`Bearer ${await makeJwt("operation")}`,"Content-Type":"application/json"},body:JSON.stringify({reason:"TEST invalid source",lines:[{lineId,qty:kind==="wrong total"?4:3,destinationId:null,...(kind==="missing version"?{}:{expectedPoVersion:1}),requestSources:kind==="duplicate source"?[source,source]:[source]}]})}),env);
+    expect(res.status).toBe(422);expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("qualified cancellation stays on the existing PO door",()=> {
+ const cancellation={action:"complete",key:"fffffff1-0000-4000-8000-000000009701",requestId:"fffffff1-0000-4000-8000-000000009702",expectedRequestVersion:0,expectedPoVersion:2,decisionReason:"",supplierFacts:{supplierStatement:"agreed",fee:"no",shipped:false,evidence:["TEST supplier email.pdf"]},lines:[{lineId:"fffffff1-0000-4000-8000-000000009703",qty:1,receivedQty:0,unitIds:[],sources:[{demandId:"fffffff1-0000-4000-8000-000000009704",qty:1,recipients:[]}]}]};
+ it("passes the exact facts to the qualified overload without granting the reason-only signature evidence",async()=> {
+  const rpc=vi.fn(async()=>({data:{state:"effective",poVersion:3},error:null}));vi.mocked(userClient).mockReturnValue({rpc} as never);
+  const response=await app.fetch(new Request("https://api.test/api/operation/pos/TEST/cancel",{method:"POST",headers:{Authorization:`Bearer ${await makeJwt("operation")}`,"Content-Type":"application/json"},body:JSON.stringify({reason:"TEST supplier agreed",cancellation})}),env);
+  expect(response.status).toBe(200);expect(rpc).toHaveBeenCalledWith("operation_cancel_po",{p_po_id:"TEST",p_reason:"TEST supplier agreed",p_cancellation:cancellation});
+  expect(await response.json()).toEqual({cancellation:{state:"effective",poVersion:3}});
+ });
+ it("lets Finance read only the owning money-free cancellation continuation, no PO write",async()=> {
+  const rpc=vi.fn(async()=>({data:{lines:[],events:[],financeHandoffs:[{sourceType:"po_cancellation",ownerModule:"finance",state:"needs_finance_review"}]},error:null}));vi.mocked(userClient).mockReturnValue({rpc} as never);
+  const token=await makeJwt("finance");
+  const response=await app.fetch(new Request("https://api.test/api/operation/pos/TEST/cancellations",{headers:{Authorization:`Bearer ${token}`}}),env);
+  expect(response.status).toBe(200);expect(rpc).toHaveBeenCalledWith("purchasing_po_cancellation_facts",{p_po_id:"TEST"});
+  rpc.mockClear();
+  const write=await app.fetch(new Request("https://api.test/api/operation/pos/TEST/cancel",{method:"POST",headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},body:JSON.stringify({reason:"TEST no Finance PO write",cancellation})}),env);
+  expect(write.status).toBe(403);expect(rpc).not.toHaveBeenCalled();
+ });
 });

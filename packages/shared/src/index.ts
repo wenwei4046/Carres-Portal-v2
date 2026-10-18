@@ -63,6 +63,7 @@ export {
   type MonthlyDemandView,
 } from "./monthly-demand";
 export * from "./forecast-purchase";
+export * from "./purchase-request-context";
 export { readFailureWords, type ReadFailureSurface, type ReadFailureWords } from "./read-failure";
 export { routeGoodsLinesOf, type RouteGoodsFacts, type RouteGoodsLine, type RouteGoodsSource } from "./sales-order-route-goods";
 export { routeDeliveryScopesOf, type RouteScopeFacts } from "./sales-order-route-scopes";
@@ -119,6 +120,7 @@ export {
   purchasingUpdateDestinationInput,
   purchasingSetSupplierCollectionInput,
   purchasingSetNumberInput,
+  purchasingSetRequestSettingsInput,
   purchasingSetPoDaysInput,
   purchasingSetReadyStockPriorityInput,
   purchasingSetPoWindowsInput,
@@ -145,6 +147,7 @@ export {
   type PurchasingUpdateDestinationInput,
   type PurchasingSetSupplierCollectionInput,
   type PurchasingSetNumberInput,
+  type PurchasingSetRequestSettingsInput,
   type PurchasingSetPoDaysInput,
   type PurchasingSetPoWindowsInput,
   type PurchasingSetSupplierPoCutoffInput,
@@ -3447,3 +3450,5 @@ export { documentDisplayNumber } from "./document-display";
 export { dateMatchesPreset, matchesRegisterColumnFilters } from "./register-column-query";
 export type { DatePreset, RegisterColumnQuery, RegisterColumnFact } from "./register-column-query";
 export * from "./courier-dispatch";
+
+export { purchaseRequestReleaseSchema, type PurchaseRequestRelease } from "./purchase-request-context";

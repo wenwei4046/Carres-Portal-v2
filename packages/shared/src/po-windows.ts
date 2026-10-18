@@ -215,6 +215,7 @@ export interface ExpectedArrivalLine {
   id: string;
   qty: number;
   receivedQty: number;
+  cancelledQty?: number;
 }
 
 export interface ExpectedArrival {
@@ -246,7 +247,7 @@ export function poExpectedArrivalsOf(po: {
   const poLevel = rows.filter((p) => !p.po_line_id).sort((a, b) => b.recorded_at.localeCompare(a.recorded_at))[0] ?? null;
   const out: ExpectedArrival[] = [];
   for (const line of po.lines) {
-    const still = Number(line.qty) - Number(line.receivedQty);
+    const still = Number(line.qty) - Number(line.receivedQty) - Number(line.cancelledQty??0);
     if (!(still > 0)) continue;
     const own = rows.filter((p) => p.po_line_id === line.id).sort((a, b) => b.recorded_at.localeCompare(a.recorded_at));
     const newest = own[0];

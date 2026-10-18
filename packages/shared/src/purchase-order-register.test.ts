@@ -294,3 +294,15 @@ describe("Purchase Orders listing groups and Expected Delivery Date", () => {
       .not.toContain("supplier_date_changed");
   });
 });
+
+
+describe("effective cancelled balance preserves its exact-version send",()=> {
+ it("retains ordered/received truth, closes only goods and keeps current cancellation sending",()=> {
+  const input={id:"PO261018-0001",supplierName:"TEST supplier",status:"cancelled",version:3,cancellationVersion:3,lines:[{qty:2,receivedQty:0,cancelledQty:2}],sends:[{kind:"confirmed_sent",poVersion:1,sentAt:"2026-10-18T00:00:00Z",channel:"email",recipient:"TEST@example.test"}]} as Parameters<typeof purchaseOrderRegisterFacts>[0];
+  const facts=purchaseOrderRegisterFacts(input,"2026-10-18");
+  expect(facts.quantities).toEqual({ordered:2,received:0,open:0});expect(facts.operationStatus).toBe("Cancelled");expect(facts.filters).toContain("pdf_not_sent");
+  expect(purchaseOrderWork(input,facts)?.action).toContain("Send");
+  const sent=purchaseOrderRegisterFacts({...input,sends:[...input.sends,{...input.sends[0],poVersion:3}]},"2026-10-18");
+  expect(sent.filters).not.toContain("pdf_not_sent");expect(purchaseOrderWork({...input,sends:[...input.sends,{...input.sends[0],poVersion:3}]},sent)).toBeNull();
+ });
+});

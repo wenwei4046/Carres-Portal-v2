@@ -3,6 +3,7 @@ import { sellableOf } from "./stock";
 import { HTTPException } from "hono/http-exception";
 import {
   countWorkingDays,
+  poDocumentNumberOf,
   myHolidaySet,
   operationWorkItemFromProjection,
   OPERATION_WORK_INCLUDE_WORKSPACE,
@@ -524,6 +525,8 @@ interface ManualPurchaseRegisterSource {
     /** `MPR250924-4827` (0546); absent on an older API. */
     req_no?: string | null;
     purpose: string;
+    request_version?: number | null;
+    request_context?: unknown;
     destination_id: string | null;
     why: string | null;
     approval_required: boolean;
@@ -539,12 +542,16 @@ interface ManualPurchaseRegisterSource {
   }>;
   lines: Array<{
     request_id: string;
+    context_read_available?: boolean;
+    context_admission_current?: boolean;
+    context_to_buy?: number;
     qty: number;
     approved_qty: number | null;
     issued_qty: number;
     cancelled_at: string | null;
     po_id: string | null;
     po_ids?: string[];
+    active_po_ids?: string[];
     received?: boolean;
     supplier_id: string | null;
     order_by: string | null;
@@ -592,7 +599,24 @@ interface PurchaseOrderWorkSource {
     duty_name?: string | null;
     acting_name?: string | null;
   }>;
-  purchase_order_lines: Array<{ id?: string; qty: number; received_qty: number }>;
+  purchase_order_lines: Array<{ id?: string; qty: number; received_qty: number; cancelled_qty?:number }>;
+  cancellation_version?:number|null;
+  cancellation_event_id?:string|null;
+}
+
+export function projectPurchaseOrderCancellationSendWork(input:{pos:readonly PurchaseOrderWorkSource[];suppliers:readonly {id:string;name:string|null}[];poDuty:WorkspaceDutyResolution|null;today:string}):OperationWorkItem[] {
+ return input.pos.flatMap(po=> {
+  const version=po.version??1;
+  if(po.cancellation_version!==version || !po.cancellation_event_id || (po.sends??[]).some(send=>send.kind==="confirmed_sent"&&send.po_version===version)) return [];
+  const owner=input.poDuty;const supplier=input.suppliers.find(row=>row.id===po.supplier_id)?.name??"Supplier";
+  const item:WorkItem={ruleKey:"purchasing.cancellation_send",module:"purchasing",orderId:po.id,soRef:po.id,
+   action:`Send ${poDocumentNumberOf(po.id,version)} to ${supplier}`,ownerRule:"po_duty",ownerDutyKey:"po_duty",normalOwner:owner?.normalOwner??null,activeCover:owner?.activeCover??null,actingPerson:owner?.actingPerson??null,
+   ownerState:owner?.state??"not_assigned",ownerName:owner?.actingPerson?.name??null,ownerUserId:owner?.actingPerson?.userId??null,...(owner?.actingPerson?{}:{ownerDuty:"PO Duty"}),tone:"info",locked:false,broken:false,dueIso:null,workingDaysLate:0};
+  return [operationWorkItemFromProjection(item,{object:{kind:"purchase_order",id:po.id,label:po.id},problem:"Sending not confirmed",recipient:supplier,
+   requiredResult:"Current PO version marked as sent",destination:`/operation?tab=purchase-orders&po=${encodeURIComponent(po.id)}`,today:input.today,
+   occurrenceKey:`cancellation:${po.cancellation_event_id}:${version}`,sourceVersion:`${po.id}:${version}:${po.cancellation_event_id}`,
+   interaction:{mode:"embedded",actionKey:"purchasing.confirm_po_sent",componentKey:"purchasing.po_issue_evidence",capability:"POST /api/operation/pos/:id/confirm-sent",inputContract:"ConfirmPoSentInput",evidenceContract:"po_sends confirmed_sent for the rendered version",idempotencyKey:"po_id + po_version",staleVersion:"ConfirmPoSentInput.poVersion",staleRefusal:"stale_po_version",successReceipt:"PO sent to supplier",fallbackDestination:`/operation?tab=purchase-orders&po=${encodeURIComponent(po.id)}`}})];
+ });
 }
 
 export function projectPurchaseOrderReplyWork(input: {
@@ -618,7 +642,7 @@ export function projectPurchaseOrderReplyWork(input: {
       promises: po.promises ?? [],
       lines: po.purchase_order_lines.map((line, index) => ({
         id: line.id ?? `${po.id}#${index}`,
-        qty: Number(line.qty), receivedQty: Number(line.received_qty),
+        qty: Number(line.qty), receivedQty: Number(line.received_qty),cancelledQty:line.cancelled_qty,
       })),
     }).map((arrival) => arrival.arrival);
     const items = purchaseOrderReplyWorkItems({
@@ -632,6 +656,7 @@ export function projectPurchaseOrderReplyWork(input: {
       lines: po.purchase_order_lines.map((line) => ({
         qty: line.qty,
         receivedQty: line.received_qty,
+        cancelledQty:line.cancelled_qty,
       })),
       sends: (po.sends ?? []).map((send) => ({
         kind: send.kind,
@@ -1101,7 +1126,7 @@ export function receivingWorkSourceFromModuleFacts(data: {
 
 export function manualPurchaseWorkInputsFromRegister(
   data: ManualPurchaseRegisterSource,
-): Array<ManualPurchaseWorkInput & { recipient: string | null; poIds: string[]; unsentPoId: string | null }> {
+): Array<ManualPurchaseWorkInput & { recipient: string | null; poIds: string[]; unsentPoId: string | null; continueInPoId: string | null }> {
   const destination = new Map(data.destinations.map((row) => [row.id, row.name]));
   const supplier = new Map(data.suppliers.map((row) => [row.id, row.name]));
   const user = new Map(data.users.map((row) => [row.id, row.name]));
@@ -1110,7 +1135,11 @@ export function manualPurchaseWorkInputsFromRegister(
   return data.requests.map((request) => {
     const lines = data.lines.filter((line) => line.request_id === request.id);
     const live = lines.filter((line) => line.cancelled_at === null);
-    const poIds = [...new Set(live.flatMap((line) => line.po_ids ?? (line.po_id ? [line.po_id] : [])))];
+    const contextual = Number(request.request_version ?? 0) > 0 || request.request_context != null;
+    if (contextual && request.approved_at != null && (live.length === 0 || live.some(line => line.context_read_available !== true || !Number.isInteger(line.context_to_buy)))) {
+      throw new Error("Manual Purchase coverage could not be loaded");
+    }
+    const poIds = [...new Set(live.flatMap((line) => line.active_po_ids ?? line.po_ids ?? (line.po_id ? [line.po_id] : [])))];
     const supplierNames = live.map((line) =>
       line.supplier_id ? (supplier.get(line.supplier_id) ?? "") : "",
     );
@@ -1150,19 +1179,13 @@ export function manualPurchaseWorkInputsFromRegister(
           received: line.received ?? false,
         })),
       }).kind,
-      remainingQty: live.reduce(
-        (total, line) =>
-          total +
-          manualPurchaseLineRemainingOf({
-            qty: line.qty,
-            approvedQty: line.approved_qty,
-            issuedQty: line.issued_qty,
-          }),
-        0,
-      ),
+      remainingQty: contextual ? live.reduce((total,line) => total + (line.context_to_buy ?? 0),0) : live.reduce(
+        (total,line) => total + manualPurchaseLineRemainingOf({ qty: line.qty, approvedQty: line.approved_qty, issuedQty: line.issued_qty }), 0),
       orderBy: manualPurchaseOrderByOf(live.map((line) => line.order_by)),
       poIds,
       unsentPoId: poIds.find((id) => sent.get(id) !== true) ?? null,
+      continueInPoId: contextual && request.purpose === "ready_stock" && live.some(line => line.context_admission_current === false)
+        ? live.filter(line => (line.context_to_buy ?? 0) > 0).flatMap(line => line.active_po_ids ?? line.po_ids ?? (line.po_id ? [line.po_id] : []))[0] ?? null : null,
       hasPos: poIds.length > 0,
       posAllSent: poIds.length > 0 && poIds.every((id) => sent.get(id) === true),
       recipient: manualPurchaseSupplierSummary(supplierNames),
@@ -1296,7 +1319,7 @@ export function projectSalesOrderWork(input: {
 }
 
 export function projectManualPurchaseWork(input: {
-  requests: readonly (ManualPurchaseWorkInput & { recipient?: string | null; unsentPoId?: string | null })[];
+  requests: readonly (ManualPurchaseWorkInput & { recipient?: string | null; unsentPoId?: string | null; continueInPoId?: string | null })[];
   approver: { userId: string; name: string | null } | null;
   poDuty: WorkspaceDutyResolution | null;
   today: string;
@@ -1317,7 +1340,7 @@ export function projectManualPurchaseWork(input: {
       office,
     ).map((item) => {
       const approval = item.ruleKey === "manual_purchase.approve";
-      return operationWorkItemFromProjection(item, {
+      return operationWorkItemFromProjection(!approval && request.continueInPoId ? { ...item, action: "Revise quantity or Deliver To" } : item, {
         object: {
           kind: "manual_purchase",
           id: request.requestId,
@@ -1331,10 +1354,12 @@ export function projectManualPurchaseWork(input: {
         recipient: request.recipient ?? null,
         requiredResult: approval
           ? "Purchase decision recorded"
-          : "Current PO version marked as sent",
+          : request.continueInPoId ? ORDER_RESULT.issue_po : "Current PO version marked as sent",
         // Approval opens its decision; uncovered demand opens the request.
         // Sending opens the first existing unsent PO, never a second buy.
-        destination: !approval && request.remainingQty === 0 && request.unsentPoId
+        destination: !approval && request.continueInPoId
+          ? `/operation/procurement?po=${encodeURIComponent(request.continueInPoId)}`
+          : !approval && request.remainingQty === 0 && request.unsentPoId
           ? `/operation/procurement?po=${encodeURIComponent(request.unsentPoId)}`
           : `/operation?tab=manual-purchase&mp=${encodeURIComponent(request.requestId)}${approval ? "&section=approval" : ""}`,
         today: input.today,
@@ -2058,6 +2083,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
     loadWorkSource("purchasing", observedAt, async () => [
       ...manualItems,
       ...purchaseOrderItems,
+      ...projectPurchaseOrderCancellationSendWork({pos:pos.pos as PurchaseOrderWorkSource[],suppliers:suppliers.suppliers,poDuty,today}),
       ...arrivalCheckItems,
       ...projectPoWindowWork({
         read: await readInternal<SoBatchPurchaseResponse>(internal, "/purchase/demands", c),
@@ -2401,6 +2427,7 @@ export async function probePurchaseOrderWork(
   const office = workFeedCalendarsOf(await officeCalendarOf(c)).office;
   const items = [
     ...projectPurchaseOrderReplyWork({ pos: [po], suppliers: [], poDuty: null, today, office }),
+    ...projectPurchaseOrderCancellationSendWork({pos:[po],suppliers:[],poDuty:null,today}),
     ...projectPurchaseOrderArrivalCheckWork({ pos: [po as PurchaseOrderArrivalSource], suppliers: [], poDuty: null, today, office }),
   ];
   const { currentId } = await readWorkLedger(c, ledger, items.map((item) => item.id));

@@ -1,3 +1,7 @@
+import PoCancellationFields from "./PoCancellationFields";
+import Loading from "@/components/kit/Loading";
+import KitModal from "@/components/kit/Modal";
+import KitButton from "@/components/kit/Button";
 // design-standard: not-a-list-page — this page uses the approved full-bleed
 // Register engine (components/register/DataGrid), which already owns search,
 // filters, columns, export and footer. ListPageShell would add a second set of
@@ -347,7 +351,7 @@ function supplierDateOf(po: operationPoListRow): string | null {
 function arrivalFactsOf(po: operationPoListRow, today: string, office: WorkingDayOptions) {
   const version = po.version ?? 1;
   const lines = (po.purchase_order_lines ?? []).map((line, i) => ({
-    id: line.id ?? `${po.id}#${i}`, qty: Number(line.qty ?? 0), receivedQty: Number(line.received_qty ?? 0),
+    id: line.id ?? `${po.id}#${i}`, qty: Number(line.qty ?? 0), receivedQty: Number(line.received_qty ?? 0),cancelledQty:line.cancelled_qty,
   }));
   const arrivals = poExpectedArrivalsOf({
     version, officialDeliveryDate: po.official_delivery_date ?? null, etaDate: po.eta_date ?? null,
@@ -380,6 +384,7 @@ function toRegisterInput(po: operationPoListRow, supplierName: string, today: st
     supplierName,
     status: po.status,
     version: po.version ?? 1,
+    cancellationVersion:po.cancellation_version,
     supplierDate: supplierDateOf(po),
     expectedArrivals: summary.answeredLines > 0 || arrival.dates.length > 0 ? arrival.dates : null,
     changedLines: summary.changed,
@@ -391,6 +396,7 @@ function toRegisterInput(po: operationPoListRow, supplierName: string, today: st
       ? po.purchase_order_lines.map((line) => ({
           qty: line.qty ?? null,
           receivedQty: line.received_qty ?? null,
+          cancelledQty:line.cancelled_qty,
         }))
       : null,
     sends: (po.sends ?? []).map((send) => ({
@@ -1210,7 +1216,7 @@ export default function PurchaseOrdersPage() {
   const contextMenu = (row: RegisterRow): DataGridContextMenuItem[] =>
     documentRowMenu({
       view: () => openObject(row),
-      print: row.po.status === "cancelled"
+      print: row.po.status === "cancelled" && row.po.cancellation_version!==row.facts.version
         ? undefined
         : () => {
             setPdfProblem(null);
@@ -1474,7 +1480,7 @@ function ReceiptsDialog({
  *  stored identity opens nothing — it prints its governed label as a fact. */
 function sourceHref(source: SourceRef): string | null {
   if (source.kind === "sales_order") return source.orderId ? `/operation/orders/so/${source.orderId}` : null;
-  return source.requestId ? `/operation?tab=manual-purchase&request=${encodeURIComponent(source.requestId)}` : null;
+  return source.requestId ? `/operation?tab=manual-purchase&mp=${encodeURIComponent(source.requestId)}` : null;
 }
 
 /** The first arrival this PO recorded — the sort key for Goods Received Date.
@@ -1628,7 +1634,7 @@ async function downloadOfficialPdf(poId: string): Promise<void> {
 
 const OBJECT_VIEWS = ["Document", "Revisions", "History", "Order Route", "Sales Order"] as const;
 type ObjectView = (typeof OBJECT_VIEWS)[number];
-type DocumentMode = "read" | "issue" | "revise" | "deliverTo";
+type DocumentMode = "read" | "issue" | "revise" | "deliverTo" | "cancel";
 
 function PurchaseOrderObject({
   row,
@@ -1673,24 +1679,33 @@ function PurchaseOrderObject({
     }, { replace: true });
   };
   const [mode, setMode] = useState<DocumentMode>("read");
+  const [cancellationDirty, setCancellationDirty] = useState(false);
+  const [discardCancellation, setDiscardCancellation] = useState(false);
+  const afterDiscard = useRef<(() => void) | null>(null);
+  const leaveDocument = (action: () => void) => {
+    if (mode === "cancel" && cancellationDirty) {
+      afterDiscard.current = action;
+      setDiscardCancellation(true);
+    } else action();
+  };
   const [pdfProblem, setPdfProblem] = useState<string | null>(null);
   const [pdfAction, setPdfAction] = useState<string | null>(null);
   /* Cancelled is the one document state with no official PDF to show. */
-  const cancelled = row.po.status === "cancelled";
+  const cancelled = row.po.status === "cancelled" && row.po.cancellation_version!==row.facts.version;
   const unitsQ = useOperationPoUnits(row.id);
   const receivingQ = usePoReceiving(row.id);
   const claimsQ = useOperationSupplierClaims("all", row.id);
   const auditQ = useOperationPoAudit(row.id);
   const recordOpen = useRecordSend(row.id);
   const po = row.po;
-  const issueNeeded = row.facts.currentSend == null && po.status !== "cancelled";
+  const issueNeeded = row.facts.currentSend == null && (po.status !== "cancelled" || po.cancellation_version===row.facts.version);
 
   return (
     <div className="po-detail-style flex h-full min-h-0 flex-col bg-kit-canvas" data-testid="purchase-order-object">
       <PurchasingTabs />
       <header className="shrink-0 border-b border-kit-slate-5 bg-white px-4 pt-3">
         <div className="flex flex-wrap items-start gap-3">
-          <button type="button" aria-label="Back to Purchase Orders" className="mt-1 text-kit-slate-11 hover:text-kit-slate-12" onClick={onBack}>
+          <button type="button" aria-label="Back to Purchase Orders" className="mt-1 text-kit-slate-11 hover:text-kit-slate-12" onClick={() => leaveDocument(onBack)}>
             <ArrowLeft size={18} />
           </button>
           <div className="min-w-0 flex-1">
@@ -1754,6 +1769,7 @@ function PurchaseOrderObject({
                 items={[
                   { key: "revise", label: "Revise quantity or Deliver To", onSelect: () => setMode("revise") },
                   { key: "deliverTo", label: "Change Deliver To", onSelect: () => setMode("deliverTo") },
+                  ...(po.contextual_cancellation_available?[{key:"cancel",label:"Cancel goods not received",onSelect:()=>setMode("cancel")}]:[]),
                 ]}
               />
             ) : null}
@@ -1775,7 +1791,7 @@ function PurchaseOrderObject({
               key={item}
               type="button"
               className={`${SEGMENT} ${view === item ? SEGMENT_ON : SEGMENT_OFF}`}
-              onClick={() => { setView(item); setMode("read"); }}
+              onClick={() => leaveDocument(() => { setView(item); setMode("read"); })}
             >
               {item}
             </button>
@@ -1802,10 +1818,10 @@ function PurchaseOrderObject({
             <section className="min-w-0 border border-kit-slate-5 bg-white p-4">
               <div className="mb-3 flex items-center justify-between border-b border-kit-slate-5 pb-3">
                 <div>
-                  <h2 className="text-strong">{mode === "issue" ? "Issue purchase order" : mode === "deliverTo" ? "Change Deliver To" : "Revise purchase order"}</h2>
+                  <h2 className="text-strong">{mode === "issue" ? "Issue purchase order" : mode === "deliverTo" ? "Change Deliver To" : mode === "cancel" ? "Cancel goods not received" : "Revise purchase order"}</h2>
                   <p className="text-meta text-kit-slate-11">Check the official document beside these fields before you finish.</p>
                 </div>
-                <button type="button" aria-label="Close document work" onClick={() => setMode("read")}><X size={16} /></button>
+                <button type="button" aria-label="Close document work" onClick={() => leaveDocument(() => setMode("read"))}><X size={16} /></button>
               </div>
               {mode === "issue" ? (
                 <PoIssueEvidence
@@ -1836,6 +1852,8 @@ function PurchaseOrderObject({
                   onOpened={(channel) => recordOpen.mutate({ channel })}
                   onConfirmed={() => { onChanged(); setMode("read"); }}
                 />
+              ) : mode === "cancel" ? (
+                <PoCancellationFields poId={po.id} onDirtyChange={setCancellationDirty} onSaved={()=>{setCancellationDirty(false);onChanged();setMode("read");}} onCancel={()=>leaveDocument(()=>setMode("read"))} renderProblem={(problem,action,onRetry)=><ReadProblem problem={problem} action={action} onRetry={onRetry}/>}/>
               ) : mode === "deliverTo" ? (
                 <ChangeDeliverToForm
                   po={po}
@@ -1856,7 +1874,7 @@ function PurchaseOrderObject({
                 />
               )}
             </section>
-            <OfficialPreview poId={po.id} />
+            <OfficialPreview poId={po.id} version={po.version??1} />
           </div>
         ) : view === "Document" ? (
           <DocumentView
@@ -1955,6 +1973,13 @@ function PurchaseOrderObject({
           />
         )}
       </main>
+      <KitModal open={discardCancellation} onOpenChange={setDiscardCancellation} title="Discard" footer={<>
+        <KitButton onClick={() => setDiscardCancellation(false)}>Cancel</KitButton>
+        <KitButton variant="primary" onClick={() => {
+          setDiscardCancellation(false); setCancellationDirty(false);
+          const action = afterDiscard.current; afterDiscard.current = null; action?.();
+        }}>Discard</KitButton>
+      </>}>Not saved</KitModal>
     </div>
   );
 }
@@ -1970,7 +1995,7 @@ function PurchaseOrderObject({
  */
 function CurrentAction({ row, owner, onIssue }: { row: RegisterRow; owner: { userId: string; name: string | null } | null; onIssue: (() => void) | null }) {
   const state = row.facts.operationStatus;
-  if (state === "Cancelled" || (state === "Completed" && !onIssue)) return null;
+  if ((state === "Cancelled" || state === "Completed") && !onIssue) return null;
   const fact = row.work?.problem ?? (onIssue ? "Sending not confirmed" : null);
   const displayedNumber = displayedIdentity(row);
   const action = row.work?.action?.replace(poDocumentNumberOf(row.id, row.facts.version), displayedNumber)
@@ -2075,7 +2100,7 @@ function DocumentView({ row, owner, onIssue, units, receiving, claims, destinati
             sku: line.sku,
             item: [line.model_name, line.size].filter(Boolean).join(" · ") || line.sku,
             itemDetail: lineConfigBits(line.attrs as Record<string, unknown> | null | undefined).join(" · ") || undefined,
-            qty: Number(line.qty ?? 0),
+            qty: Number(line.qty ?? 0)-Number(line.cancelled_qty??0),
             receivedQty: Number(line.received_qty ?? 0),
             unitIds: unitsOf(line).map((u) => u.unit_code).sort((a, b) => a.localeCompare(b)),
           }))}
@@ -2140,9 +2165,9 @@ function DocumentView({ row, owner, onIssue, units, receiving, claims, destinati
                       ? destinations.find((destination) => destination.id === line.destination_id)?.name ?? <Absence />
                       : row.deliverTo === "Not recorded" ? <Absence /> : row.deliverTo
                   }</td>
-                  <td className={`${SO_TD} tabular-nums`}>{line.qty}</td>
+                  <td className={`${SO_TD} tabular-nums`}>{line.qty}{Number(line.cancelled_qty??0)>0 ? <div className="text-meta text-kit-slate-11">Cancelled Qty {line.cancelled_qty}</div>:null}</td>
                   <td className={`${SO_TD} tabular-nums`}>{line.received_qty}</td>
-                  <td className={`${SO_TD} tabular-nums`}>{Math.max(0, line.qty - line.received_qty)}</td>
+                  <td className={`${SO_TD} tabular-nums`}>{line.pending_qty ?? Math.max(0, line.qty-line.received_qty-(line.cancelled_qty??0))}</td>
                 </tr>
               ))}
             </tbody>
@@ -2170,12 +2195,12 @@ function DocumentView({ row, owner, onIssue, units, receiving, claims, destinati
         {/* A cancelled purchase order has no official document to preview —
             0402 refuses to print one by design. Saying so beats mounting a frame
             that can only fill with an error strip. */}
-        {row.po.status === "cancelled" ? (
+        {row.po.status === "cancelled" && row.po.cancellation_version!==row.facts.version ? (
           <p className="text-body text-kit-slate-11" data-testid="po-cancelled-no-document">
             A cancelled purchase order has no official document.
           </p>
         ) : (
-          <OfficialPreview poId={po.id} />
+          <OfficialPreview poId={po.id} version={po.version??1} />
         )}
         </div>
       </Block>
@@ -2251,7 +2276,7 @@ function RouteProblem({ title, problem, action, onRetry }: { title: string; prob
   return <div className="border-l-2 border-kit-red-9 bg-kit-red-3 p-3"><div className="text-meta text-kit-slate-11">{title}</div><ReadProblem problem={problem} action={action} onRetry={onRetry} /></div>;
 }
 
-function OfficialPreview({ poId }: { poId: string }) {
+function OfficialPreview({ poId, version }: { poId: string; version: number }) {
   /* The same blob `Download PDF` saves, painted as pages. The header already
      names the PO, so the paper carries no caption strip of its own. */
   const [refusal, setRefusal] = useState<{ wrong: string; todo: string } | null>(null);
@@ -2269,7 +2294,7 @@ function OfficialPreview({ poId }: { poId: string }) {
       throw error;
     }
   }, [poId]);
-  const { pdfError, setPane, retry } = usePdfCanvases(poId, render);
+  const { pdfLoading, pdfError, setPane, retry } = usePdfCanvases(`${poId}:${version}`, render);
   return (
     <div className="mx-auto w-full max-w-[700px]">
       {pdfError ? (
@@ -2277,7 +2302,8 @@ function OfficialPreview({ poId }: { poId: string }) {
           <ReadProblem problem={refusal?.wrong ?? "The official PDF could not be opened"} action={refusal?.todo ?? "Try again. If it still fails, ask the system owner to check the PO document."} onRetry={retry} />
         </div>
       ) : null}
-      <div ref={setPane} data-testid="pdf-pane" aria-label="Official purchase order preview" />
+      {pdfLoading ? <Loading variant="skeleton" label="Loading" /> : null}
+      <div ref={setPane} data-testid="pdf-pane" aria-busy={pdfLoading} aria-label="Official purchase order preview" />
     </div>
   );
 }

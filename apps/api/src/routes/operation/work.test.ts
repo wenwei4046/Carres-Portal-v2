@@ -1,3 +1,4 @@
+import { projectPurchaseOrderCancellationSendWork } from "./work";
 import { describe, expect, it } from "vitest";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
@@ -499,6 +500,32 @@ describe("operation Work response composition", () => {
       mode: "open_module",
       fallbackDestination: "/operation/delivery-orders/DO-2041",
     });
+  });
+
+  it("does not require sending a cancelled historical PO again once active coverage is fully sent", () => {
+    const inputs = manualPurchaseWorkInputsFromRegister({
+      requests: [{ id: "TEST-r", purpose: "ready_stock", destination_id: "TEST-d", why: "", approval_required: true,
+        approved_at: "2026-10-18T00:00:00Z", refused_at: null, refuse_reason: null, for_service_case_id: null, for_staff_user_id: null, for_subsidiary_name: null }],
+      lines: [{ request_id: "TEST-r", qty: 2, approved_qty: 2, issued_qty: 2, cancelled_at: null, po_id: "TEST-active", po_ids: ["TEST-cancelled", "TEST-active"],
+        active_po_ids: ["TEST-active"], supplier_id: "TEST-s", order_by: "2026-11-01" }],
+      destinations: [], suppliers: [], users: [], serviceCases: [], pos: [{ id: "TEST-cancelled", sent: false }, { id: "TEST-active", sent: true }],
+    });
+    expect(inputs[0]?.poIds).toEqual(["TEST-active"]);
+    expect(inputs[0]?.posAllSent).toBe(true);
+    expect(inputs[0]?.remainingQty).toBe(0);
+  });
+
+  it("uses owning contextual To buy and refuses unknown coverage instead of completing work", () => {
+    const data = {
+      requests: [{ id: "TEST-r", purpose: "general_purchase", request_version: 2, destination_id: "TEST-d", why: "", approval_required: true,
+        approved_at: "2026-10-18T00:00:00Z", refused_at: null, refuse_reason: null, for_service_case_id: null, for_staff_user_id: null, for_subsidiary_name: null }],
+      lines: [{ request_id: "TEST-r", qty: 2, approved_qty: 2, issued_qty: 0, cancelled_at: null, po_id: null, supplier_id: "TEST-s", order_by: null, context_read_available: true, context_to_buy: 0 },
+        { request_id: "TEST-r", qty: 3, approved_qty: 3, issued_qty: 1, cancelled_at: null, po_id: "TEST-PO", supplier_id: "TEST-s", order_by: null, context_read_available: true, context_to_buy: 2 }],
+      destinations: [], suppliers: [], users: [], serviceCases: [], pos: [{ id: "TEST-PO", sent: true }],
+    };
+    expect(manualPurchaseWorkInputsFromRegister(data)[0]).toMatchObject({ remainingQty: 2, hasPos: true, posAllSent: true });
+    data.lines[0]!.context_read_available = false;
+    expect(() => manualPurchaseWorkInputsFromRegister(data)).toThrow("coverage could not be loaded");
   });
 
   it("derives Manual Purchase projector input from the module register facts", () => {
@@ -1297,4 +1324,15 @@ describe("the PO window card — one occurrence per window, never one per Sales 
   it("the per-Sales-Order issue_po and the retired confirm_ready_date are the window card's, not Work's", () => {
     expect([...PURCHASING_WINDOW_OWNED].sort()).toEqual(["confirm_ready_date", "issue_po"]);
   });
+});
+
+
+describe("PO cancellation owns current sending after goods end",()=> {
+ it("keeps one current occurrence after cancelled goods, old send cannot close it",()=> {
+  const po={id:"PO261018-0001",supplier_id:"TEST supplier",status:"cancelled" as const,version:3,cancellation_version:3,cancellation_event_id:"TEST-event",purchase_order_lines:[{qty:2,received_qty:0,cancelled_qty:2}],sends:[{kind:"confirmed_sent" as const,po_version:1,sent_at:"2026-10-18T00:00:00Z",channel:"email"}]};
+  const input={pos:[po],suppliers:[],poDuty:null,today:"2026-10-18"};
+  const rows=projectPurchaseOrderCancellationSendWork(input);expect(rows).toHaveLength(1);expect(rows[0]).toMatchObject({ruleKey:"purchasing.cancellation_send",object:{id:po.id},interaction:{componentKey:"purchasing.po_issue_evidence"}});
+  expect(projectPurchaseOrderCancellationSendWork({...input,pos:[{...po,sends:[...po.sends,{...po.sends[0],po_version:3}]}]})).toHaveLength(0);
+  expect(projectPurchaseOrderCancellationSendWork({...input,pos:[{...po,cancellation_version:2}]})).toHaveLength(0);
+ });
 });

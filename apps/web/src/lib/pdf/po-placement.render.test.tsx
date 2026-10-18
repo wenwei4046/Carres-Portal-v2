@@ -1,12 +1,12 @@
 // @vitest-environment node
-/** Opt-in render of the real documents produced by po-placement-lifecycle.integration. */
+/** Opt-in render of the saved document facts from owned local lifecycle fixtures. */
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { PoTemplateData } from "./types";
 const dir = process.env.PO_PLACEMENT_ARTIFACTS;
 describe.skipIf(!dir)("PO placement document rendering", () => {
-  it("renders both source lanes through the shipped price-free template", async () => {
+  it("renders supplied owning documents through the shipped price-free template", async () => {
     const { Font, pdf } = await import("@react-pdf/renderer");
     Font.register({ family: "Noto Sans SC", fonts: [400, 500, 600, 700].map(weight => ({
       src: path.join(process.env.NOTO_DIR!, `noto${weight}.ttf`), fontWeight: weight,

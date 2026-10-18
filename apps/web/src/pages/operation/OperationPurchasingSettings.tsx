@@ -28,6 +28,7 @@ import {
   useSetSupplierAddress,
   useSetSupplierChannel,
   useSetPurchasingNumber,
+  useSetPurchaseRequestSettings,
   useSetPurchasingPoDays,
   useSetReadyStockPriority,
   useSetPurchasingPoWindows,
@@ -400,6 +401,9 @@ export default function OperationPurchasingSettings({
 
         <div className="mb-8 max-w-[860px]" data-testid="ready-stock-priority-settings">
           <ReadyStockPrioritySection key={data.readyStockPriority ?? "unavailable"} settings={data} canEdit={canEdit} />
+        </div>
+        <div className="mb-8 max-w-[860px]" data-testid="purchase-request-settings">
+          <PurchaseRequestSettingsSection settings={data} canEdit={canEdit} />
         </div>
         <div className="mb-8 max-w-[860px]" data-testid="deliver-to-settings">
           <Block
@@ -1197,6 +1201,35 @@ export default function OperationPurchasingSettings({
  * rewrites an issued PO; the SQL door records the old and new value, and the
  * history line reads it in clock words.
  */
+function PurchaseRequestSettingsSection({ settings, canEdit }: { settings: PurchasingSettingsResponse; canEdit: boolean }) {
+  const saved = settings.requestSettings;
+  const save = useSetPurchaseRequestSettings();
+  const [normal, setNormal] = useState(saved ? String(saved.normalDays) : "");
+  const [service, setService] = useState(saved ? String(saved.serviceDays) : "");
+  const [screenshot, setScreenshot] = useState(saved ? (saved.manualWhatsappScreenshotRequired ? "active" : "inactive") : "");
+  const [problem, setProblem] = useState<string | null>(null);
+  const validDays = (text: string) => text.trim() !== "" && Number.isInteger(Number(text)) && Number(text) >= 0 && Number(text) <= 2147483647;
+  const dirty = saved && (normal !== String(saved.normalDays) || service !== String(saved.serviceDays) || screenshot !== (saved.manualWhatsappScreenshotRequired ? "active" : "inactive"));
+  return <Block title="Purchase requests" subtitle="Customer Original Delivery Date is planned from the selected Proceed Date, in calendar days.">
+    {saved ? <>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Input id="request-normal-days" label="Normal / Ready Stock" hint="Calendar days after Proceed Date" type="number" min={0} step={1} value={normal} disabled={!canEdit || save.isPending} onChange={(event) => setNormal(event.target.value)} />
+        <Input id="request-service-days" label="Service Case" hint="Calendar days after Proceed Date" type="number" min={0} step={1} value={service} disabled={!canEdit || save.isPending} onChange={(event) => setService(event.target.value)} />
+        <Select id="request-whatsapp-screenshot" label="Manual WhatsApp screenshot" value={screenshot} disabled={!canEdit || save.isPending} onValueChange={setScreenshot} options={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]} />
+      </div>
+      {canEdit && <div className="flex justify-end py-3"><Button loading={save.isPending} disabled={!dirty || !validDays(normal) || !validDays(service) || !screenshot} onClick={async () => {
+        setProblem(null);
+        try { await save.mutateAsync({ normalDays: Number(normal), serviceDays: Number(service), manualWhatsappScreenshotRequired: screenshot === "active" }); }
+        catch { setProblem("Not confirmed · Try again"); }
+      }}>Save</Button></div>}
+      <ChangeLine settings={settings} settingKey="purchase_request_normal_days" />
+      <ChangeLine settings={settings} settingKey="purchase_request_service_days" />
+      <ChangeLine settings={settings} settingKey="po_manual_whatsapp_screenshot_required" />
+    </> : <p className="text-meta text-kit-slate-11">Not available</p>}
+    {problem && <p role="alert" className="text-meta text-kit-red-11">{problem}</p>}
+  </Block>;
+}
+
 function ReadyStockPrioritySection({ settings, canEdit }: { settings: PurchasingSettingsResponse; canEdit: boolean }) {
   const save = useSetReadyStockPriority();
   const [draft, setDraft] = useState(settings.readyStockPriority ?? "");

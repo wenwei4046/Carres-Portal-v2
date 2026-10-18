@@ -208,7 +208,7 @@ function ReadMode({
         </span>
       </div>
 
-      {/* RECEIVING SUMMARY — the five governed quantity words. Each fact
+      {/* RECEIVING SUMMARY — the governed quantity words, including effective cancellation. Each fact
           prints its own number; the operator never subtracts (owner
           correction 2026-08-29). */}
       <Section title="Receiving Summary">
@@ -238,6 +238,7 @@ function ReadMode({
             {summary.wrongItemQty}
           </span>
         </Prop>
+        {(summary.cancelledQty??0)>0 ? <Prop label="Cancelled Qty"><span className="tabular-nums" data-testid="summary-cancelled-qty">{summary.cancelledQty}</span></Prop> : null}
         <Prop label="Pending Delivery Qty">
           <span
             className={summary.pendingDeliveryQty > 0 ? "tabular-nums" : "tabular-nums text-kit-slate-9"}

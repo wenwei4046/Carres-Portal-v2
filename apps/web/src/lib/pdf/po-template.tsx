@@ -412,6 +412,7 @@ export function PoTemplate(data: PoTemplateData) {
       const so = soCell(line);
       const units = line.unit_codes ?? [];
       const runs = unitRuns(units);
+      const cancelledRuns=unitRuns(line.cancelled_unit_codes??[]);
       const a = (line.attrs ?? {}) as { color?: string; gap?: string; fabric_name?: string };
       const bits: string[] = [];
       if (a.color) bits.push(a.color);
@@ -421,8 +422,8 @@ export function PoTemplate(data: PoTemplateData) {
       /* COPY-STANDARD: an exact-unit line with no Unit IDs is a defect the
          operator must see before sending; a quantity line's Unit ID cell draws nothing
          (no dash anywhere, owner ruling 2026-09-26). */
-      const missingUnits = !draft && line.identity_mode === "exact_unit" && units.length === 0;
-      const stacked = Math.max(so.length, runs.length, missingUnits ? 3 : 1, 1 + (bits.length > 0 ? 1 : 0));
+      const missingUnits = !draft && line.identity_mode === "exact_unit" && units.length === 0 && Number(line.cancelled_qty??0)<line.qty;
+      const stacked = Math.max(so.length, runs.length, missingUnits ? 3 : 1, 1 + (bits.length > 0 ? 1 : 0) + (Number(line.cancelled_qty??0)>0?1+cancelledRuns.length:0));
       blocks.push({
         h: Math.max(EST_ROW, 4 + stacked * EST_LINE),
         node: (
@@ -455,6 +456,10 @@ export function PoTemplate(data: PoTemplateData) {
                 {showVariant ? ` · ${line.description}` : ""}
               </Text>
               {bits.length > 0 ? <Text style={styles.descSub}>{bits.join(" · ")}</Text> : null}
+              {Number(line.cancelled_qty??0)>0 ? <>
+                <Text style={styles.descSub}>Cancelled Qty {line.cancelled_qty} · Received Qty {line.received_qty??0} · Pending Delivery Qty {line.pending_qty??Math.max(0,line.qty-(line.received_qty??0)-(line.cancelled_qty??0))}</Text>
+                {cancelledRuns.map(run=><Text key={`cancelled-${run.first}`} style={styles.descSub}>Cancelled: <UnitCode code={run.first}/>{run.last?<Text> to <UnitCode code={run.last}/></Text>:null}</Text>)}
+              </> : null}
             </View>
             <View style={styles.bQty}><Text style={styles.cellQty}>{line.qty}</Text></View>
           </View>

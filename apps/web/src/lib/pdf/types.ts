@@ -235,6 +235,10 @@ export type PoTemplateData = {
     sku: string;
     description: string;
     qty: number;
+    cancelled_qty?:number;
+    received_qty?:number;
+    pending_qty?:number;
+    cancelled_unit_codes?:string[];
     unit: string;
     /** Effective governed destination for this goods line. Older document
      * payloads may omit it, in which case the PO-level destination applies. */

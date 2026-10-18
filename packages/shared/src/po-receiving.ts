@@ -49,6 +49,7 @@ export type PoReceivingState =
  *  shape — nullable/absent tolerated so a pre-0283 payload degrades to zero
  *  issues rather than NaN). */
 export interface PoReceivingLine {
+  cancelled_qty?: number | null;
   qty?: number | null;
   received_qty?: number | null;
   damaged_qty?: number | null;
@@ -60,7 +61,7 @@ export interface PoReceivingProgress {
   ordered: number;
   /** Good units booked into stock. */
   received: number;
-  /** Ordered minus received — the supplier still owes these. NEVER "missing". */
+  /** Ordered minus received and effective cancelled — the supplier still owes these. NEVER "missing". */
   pendingDelivery: number;
   /** Units that arrived broken (cumulative across every DO on this PO). */
   damaged: number;
@@ -105,7 +106,7 @@ export function poReceivingProgress(
     const r = Math.max(0, Math.min(q, n(l.received_qty)));
     ordered += q;
     received += r;
-    pendingDelivery += q - r;
+    pendingDelivery += poLineReportable(l);
     damaged += Math.max(0, n(l.damaged_qty));
     wrongItem += Math.max(0, n(l.wrong_item_qty));
   }
@@ -158,5 +159,5 @@ export function poReceivingProgress(
 export function poLineReportable(line: PoReceivingLine): number {
   const q = Math.max(0, n(line.qty));
   const r = Math.max(0, Math.min(q, n(line.received_qty)));
-  return q - r;
+  return Math.max(0,q-r-Math.max(0,n(line.cancelled_qty)));
 }

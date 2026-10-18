@@ -81,6 +81,7 @@ export interface SupplierCallLine {
   sku: string;
   qty: number;
   receivedQty: number;
+  cancelledQty?: number;
   /**
    * `purchase_order_lines.short_since` (0306) — the day this line last took a
    * SHORT delivery, stamped server-side by a trigger so every door that writes
@@ -183,7 +184,7 @@ function day(iso: string | null | undefined): string | null {
 /** Units this line still owes. Clamped, so a stray over-receipt cannot make a
  *  balance read as negative (the same guard `poReceivingProgress` applies). */
 function outstandingOf(l: SupplierCallLine): number {
-  const q = Math.max(0, Number(l.qty ?? 0));
+  const q = Math.max(0, Number(l.qty ?? 0)-Number(l.cancelledQty ?? 0));
   const r = Math.max(0, Math.min(q, Number(l.receivedQty ?? 0)));
   return q - r;
 }
@@ -349,7 +350,7 @@ export function balanceDeliveryCallsOf(
 
   const out: PurchasingOpenCall[] = [];
   for (const l of po.lines) {
-    const q = Math.max(0, Number(l.qty ?? 0));
+    const q = Math.max(0, Number(l.qty ?? 0)-Number(l.cancelledQty ?? 0));
     const r = Math.max(0, Math.min(q, Number(l.receivedQty ?? 0)));
     // §9: part-received = SOME good units in and some still owed. A line with
     // nothing in has no balance yet; a full line has no balance left.

@@ -1,3 +1,6 @@
+import { purchaseRequestReleaseSchema } from "@carres/shared";
+import { purchaseRequestStockOffersSchema, type PurchaseRequestStockOffer } from "@carres/shared";
+import type { PurchaseRequestContext, PurchaseRequestSubmission, PurchaseRequestRevision, PurchaseRequestDecision, PurchaseRequestContextReviewRead, PurchaseRequestIssue } from "@carres/shared";
 import type { OutrightFactsFailed, OutrightOrderFacts } from "@carres/shared";
 import { workspaceActivitySettingsResponseSchema, type WorkspaceActivitySettingsResponse } from "@carres/shared";
 import { supabase } from "@/lib/supabase";
@@ -342,6 +345,12 @@ import { withDepartment } from "@/pages/finance/department";
 import { uploadCompartmentPhoto, uploadDeliveryProof, uploadModelPhoto } from "./photo-upload";
 
 export const qk = {
+  purchaseRequestRelease: () => ["operation","purchasing","requests","context-release"] as const,
+  poCancellations:(id:string)=>["operation","pos",id,"cancellations"] as const,
+  purchaseRequestPlan: (skus: string[], proceedDate: string | null, purpose: string | null, origin: string | null = null, requestId: string | null = null) => ["operation", "purchasing", "requests", "plan", skus.join("|"), proceedDate, purpose, origin, requestId] as const,
+  purchaseRequestItems: () => ["to-order", "pick-items"] as const,
+  purchaseRequestContextReview: (id: string) => ["operation", "purchasing", "requests", id, "context-review"] as const,
+  purchaseRequests: () => ["operation", "purchasing", "requests"] as const,
   dealers:      () => ["dealers"] as const,
   dealerSelf:   () => ["dealers", "me"] as const,
   orders:       (filters?: OrderFilters) => ["orders", filters ?? {}] as const,
@@ -448,6 +457,7 @@ export const qk = {
   // `List*Query` zod-derived shapes from `@carres/shared` so a wrong key fails
   // typecheck at the call site rather than silently breaking cache reads.
   operation: {
+    poRoot:()=>["operation","pos"] as const,
     workspaceAssignmentHistory: (duty: string) => ["operation", "workspace-assignment-history", duty] as const,
     workActivitySettings: () => ["operation", "work-activity-settings"] as const,
     work:      () => ["operation", "work"] as const,
@@ -3352,6 +3362,7 @@ export interface operationOrderDetailResponse {
 /** Row in GET /api/operation/pos. `purchase_order_lines(...)` is the embedded
  *  PostgREST nested resource. */
 export interface operationPoListRow {
+  contextual_cancellation_available?:boolean;
   id: string;
   supplier_id: string;
   warehouse_id: string;
@@ -3387,6 +3398,8 @@ export interface operationPoListRow {
    *  DERIVED from this against the latest send — never stored. */
   revised_at?: string | null;
   placed_at: string;
+  cancellation_version?:number|null;
+  cancellation_event_id?:string|null;
   purchase_order_lines: {
     // 0076 (Loo 2026-05-10): line UUID — primary key after migration. Used
     // by ReceivePOModal as the recv-state key (replacing sku) so multi-
@@ -3396,6 +3409,8 @@ export interface operationPoListRow {
     sku: string;
     qty: number;
     received_qty: number;
+    cancelled_qty?:number;
+    pending_qty?:number;
     /** 0442 — the Catalog stock identity mode SNAPSHOTTED at issue.
      *  `exact_unit`: the line owns one permanent Unit ID per piece;
      *  `quantity`: counted goods, no Unit IDs (the column prints `—`). */
@@ -5046,6 +5061,13 @@ export function usePurchaseToday(
 
 export interface PurchaseRequestRow {
   id: string;
+  /** Context read-back is validated before adoption; absence stays legacy.
+   * Approval coverage is not inferred from approved_at or an empty snapshot. */
+  request_context?: unknown;
+  request_version?: number | null;
+  proceed_date?: string | null;
+  approval_scope?: unknown;
+  approval_version?: number | null;
   /** Legacy compatibility only (Card 08, 2026-09-04): historical rows keep
    *  their stored REQ/MPR value; new rows are null. No operator-facing
    *  component may consume it — the UUID is the identity. */
@@ -5096,6 +5118,11 @@ export interface PurchaseRequestRow {
 }
 
 export interface PurchaseRequestLineRow {
+  /** Exact contextual allocation lineage; absent on historical requests. */
+  request_line_id?: string | null;
+  supplier_allocation_id?: string | null;
+  stock_proposal_id?: string | null;
+  fulfilment_kind?: "purchase" | "stock_proposal" | null;
   id: string;
   request_id: string;
   sku: string;
@@ -5114,6 +5141,11 @@ export interface PurchaseRequestLineRow {
    * treated as 0, which is what it was.
    */
   stock_reserved_qty?: number;
+  /** Exact owning contextual coverage; absent/false is unknown, never zero. */
+  context_read_available?: boolean;
+  context_admission_current?: boolean;
+  context_to_buy?: number;
+  context_stock_qty?: number;
   required_by: string | null;
   remark: string | null;
   /** 0591 — the line's configuration, chosen like a Sales portal line
@@ -5150,6 +5182,8 @@ export interface PurchaseRequestLineRow {
   /** Card 04 — the line's REAL PO lineage (`purchase_order_lines.demand_id`
    *  plus the demand's own po_id), never an inference. */
   po_ids?: string[];
+  /** Current non-cancelled coverage; po_ids retains historical lineage. */
+  active_po_ids?: string[];
   /**
    * ⭐ ONE ENTRY PER PURCHASE ORDER THIS LINE ACTUALLY WENT ONTO, carrying
    * THAT document's own quantity and destination (settled design, owner
@@ -5270,6 +5304,7 @@ export interface ManualPurchaseDetailPayload {
   /** R3 / R4 — what THIS caller may do to the round (the SQL doors decide). */
   canWithdraw?: boolean;
   canEditAndSendAgain?: boolean;
+  context_can_edit_and_send_again?: boolean;
   /** `unit_cost` is present ONLY for the approver — the same screen renders
    *  for both roles, minus the money, never a permission error. */
   lines: Array<PurchaseRequestLineRow & { unit_cost?: number | null }>;
@@ -5278,6 +5313,7 @@ export interface ManualPurchaseDetailPayload {
   pos: Array<{
     id: string;
     po_no: string;
+    status?: string | null;
     placed_at: string | null;
     /** D5 — the CURRENT version's marked-sent time; null = Sending not confirmed. */
     marked_sent_at?: string | null;
@@ -5290,6 +5326,8 @@ export interface ManualPurchaseDetailPayload {
   /** Card 05 §3.7 — stored-fact events only; words live in the shared
    *  `manualPurchaseHistoryRecord` arithmetic. */
   history: ManualPurchaseHistoryEvent[];
+  /** Exact structured snapshots for the guarded context review. */
+  context_events?: PurchaseRequestContextReviewRead["events"];
   /** `active` rides so the Deliver To door offers only open places; a closed
    *  one still resolves to its name on a request that named it. */
   destinations: Array<{ id: string; name: string; active?: boolean }>;
@@ -5301,6 +5339,7 @@ export interface ManualPurchaseDetailPayload {
   /** Card 03 §3 — the real action owner's name on the object too. */
   approvers: Array<{ id: string; name: string | null }>;
   canApprove: boolean;
+  context_can_approve?: boolean;
   /** Card 06 — the same server date plan the Register reads. */
   todayIso?: string;
   planUnavailable?: boolean;
@@ -5326,6 +5365,10 @@ export interface ManualPurchasePlanPayload {
    *  and has complete Settings. */
   deliveryDateDefault: string | null;
   planUnavailable: boolean;
+  recipientEarliest?: string | null;
+  recipientPlanUnavailable?: boolean;
+  forecastSource?: Array<Record<string, unknown>> | null;
+  forecastSourceUnavailable?: boolean;
 }
 
 /**
@@ -5334,14 +5377,32 @@ export interface ManualPurchasePlanPayload {
  * POST only because live SKUs carry free text (`Leg 4"`); it reads, creates
  * nothing and reserves nothing.
  */
-export function useManualPurchasePlan(skus: string[]) {
+/** Exact configuration/line key prevents reusing another configured SKU's pool. */
+export function usePurchaseRequestStockOffers(lines: Array<Pick<PurchaseRequestContext["lines"][number], "id" | "sku" | "attrs">>, enabled = false) {
+  return useQuery({
+    queryKey: ["operation", "purchasing", "requests", "stock-offers", lines], enabled,
+    queryFn: async (): Promise<PurchaseRequestStockOffer[]> => {
+      // Transport-sized reads do not cap the number of requested configurations.
+      const chunks = Array.from({ length: Math.ceil(lines.length / 50) }, (_, index) => lines.slice(index * 50, (index + 1) * 50));
+      const reads = await Promise.all(chunks.map(async chunk => {
+        const response = await apiFetch<{ offers: unknown }>("/api/operation/purchasing/requests/stock-offers", { method: "POST", body: JSON.stringify({ lines: chunk }) });
+        return purchaseRequestStockOffersSchema.parse(response.offers);
+      }));
+      const offers = purchaseRequestStockOffersSchema.parse(reads.flat());
+      if (offers.some(offer => !lines.some(line => line.id === offer.lineId))) throw new Error("Could not be loaded");
+      return offers;
+    }, staleTime: 0,
+  });
+}
+
+export function useManualPurchasePlan(skus: string[], context?: { proceedDate: string; purpose: PurchaseRequestContext["purpose"]; origin?: PurchaseRequestContext["origin"]; requestId?: string }) {
   const sorted = [...skus].sort();
   return useQuery<ManualPurchasePlanPayload, ApiError>({
-    queryKey: ["operation", "purchasing", "requests", "plan", sorted.join("|")],
+    queryKey: qk.purchaseRequestPlan(sorted, context?.proceedDate ?? null, context?.purpose ?? null, context?.origin ?? null, context?.requestId ?? null),
     queryFn: () =>
       apiFetch<ManualPurchasePlanPayload>(
         "/api/operation/purchasing/requests/plan",
-        { method: "POST", body: JSON.stringify({ skus: sorted }) },
+        { method: "POST", body: JSON.stringify({ skus: sorted, ...context }) },
       ),
     staleTime: 30_000,
   });
@@ -5362,10 +5423,7 @@ export function useManualPurchaseDetail(id: string | null) {
 export function useIssuePurchaseRequests() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: {
-      requestIds: string[];
-      together: boolean;
-    }) =>
+    mutationFn: (input: PurchaseRequestIssue) =>
       apiFetch<{
         poIds: string[];
         documents: number;
@@ -5392,15 +5450,21 @@ export function useIssuePurchaseRequests() {
   });
 }
 
+/** Guarded scope transport; no production form mounts this hook yet. */
+export function usePurchaseRequestContextReview(id: string | null) {
+  return useQuery({
+    queryKey: qk.purchaseRequestContextReview(id ?? ""),
+    queryFn: () => apiFetch<PurchaseRequestContextReviewRead>(
+      `/api/operation/purchasing/requests/${id}/context-review`,
+    ),
+    enabled: !!id, staleTime: 0,
+  });
+}
+
 export function useDecidePurchaseRequest() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: {
-      id: string;
-      decision: "approve" | "refuse" | "send_back";
-      reason?: string | null;
-      cuts?: Array<{ id: string; qty: number }> | null;
-    }) =>
+    mutationFn: (input: PurchaseRequestDecision & { id: string }) =>
       apiFetch<{ id: string; decision: string }>(
         `/api/operation/purchasing/requests/${input.id}/decide`,
         {
@@ -5408,7 +5472,7 @@ export function useDecidePurchaseRequest() {
           body: JSON.stringify({
             decision: input.decision,
             reason: input.reason ?? null,
-            cuts: input.cuts ?? null,
+            ...(input.contextReview ? { contextReview: input.contextReview } : { cuts: input.cuts ?? null }),
           }),
         },
       ),
@@ -5485,6 +5549,33 @@ export function useManualPurchaseRegister() {
     queryFn: () =>
       apiFetch<ManualPurchaseRegisterPayload>("/api/operation/purchasing/requests"),
     staleTime: 30_000,
+  });
+}
+
+/** The contextual request is one atomic submission through the existing owner. */
+export function useSubmitPurchaseRequestContext() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: PurchaseRequestSubmission) =>
+      apiFetch<{ id: string; req_no: string; approval_required: boolean; replayed?: boolean }>(
+        "/api/operation/purchasing/requests",
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: qk.purchaseRequests() });
+    },
+  });
+}
+
+/** Same canonical resubmit endpoint; this guarded hook is not mounted yet. */
+export function useRevisePurchaseRequestContext() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: PurchaseRequestRevision & { id: string }) =>
+      apiFetch<{ id: string; req_no: string; round: number; request_version: number; approval_required: boolean }>(
+        `/api/operation/purchasing/requests/${id}/resubmit`, { method: "POST", body: JSON.stringify(body) },
+      ),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ["operation", "purchasing", "requests"] }); },
   });
 }
 
@@ -5733,6 +5824,12 @@ function usePurchasingSettingsMutation<TInput>(path: string) {
 
 export function useSetPurchasingNumber() {
   return usePurchasingSettingsMutation<PurchasingSetNumberInput>("/number");
+}
+/** Guarded with contextual form adoption: requires its approved audited Settings writer. */
+export function useSetPurchaseRequestSettings() {
+  return usePurchasingSettingsMutation<{
+    normalDays: number; serviceDays: number; manualWhatsappScreenshotRequired: boolean;
+  }>("/request-settings");
 }
 export function useSetPurchasingPoDays() {
   return usePurchasingSettingsMutation<PurchasingSetPoDaysInput>("/po-days");
@@ -12642,4 +12739,28 @@ export function useWarehouseCalendar() {
     },
     staleTime: 30_000,
   });
+}
+
+
+export interface PoCancellationFacts {
+ actorId:string;canDecideException:boolean;poVersion:number;
+ lines:Array<{lineId:string;sku:string;identityMode:"exact_unit"|"quantity";orderedQty:number;receivedQty:number;cancelledQty:number;pendingQty:number;sources:Array<{demandId:string;requestId:string;requestNo:string|null;purpose:string;contextual:boolean;orderedQty:number;activeQty:number;cancelledQty:number;unitChoices:Array<{id:string;unitCode:string;status:string}>;recipients:Array<{recipientId:string;name:string|null;qty:number}>}>}>;
+ events:Array<{id:string;request_id:string;request_version:number;expected_po_version:number;kind:"pending"|"exception_approved"|"exception_refused"|"effective";reason:string;scope:NonNullable<import("@carres/shared").CancelPoInput["cancellation"]>["lines"];supplier_facts:NonNullable<import("@carres/shared").CancelPoInput["cancellation"]>["supplierFacts"];actor_id:string;at:string}>;
+ financeHandoffs:Array<{id:string;poId:string;poVersion:number}>;
+}
+export function usePoCancellations(poId:string) {
+ return useQuery({queryKey:qk.poCancellations(poId),queryFn:()=>apiFetch<PoCancellationFacts>(`/api/operation/pos/${encodeURIComponent(poId)}/cancellations`),staleTime:0});
+}
+export function useRecordPoCancellation(poId:string) {
+ const qc=useQueryClient();return useMutation({mutationFn:(input:import("@carres/shared").CancelPoInput)=>apiFetch<{cancellation:{requestVersion:number;state:string;poVersion:number|null}}>(`/api/operation/pos/${encodeURIComponent(poId)}/cancel`,{method:"POST",body:JSON.stringify(input)}),onSuccess:()=> {
+  void qc.invalidateQueries({queryKey:qk.poCancellations(poId)});
+  void qc.invalidateQueries({queryKey:qk.operation.poRoot()});
+  void qc.invalidateQueries({queryKey:qk.purchaseRequests()});
+  void qc.invalidateQueries({queryKey:qk.operation.work()});
+ }});
+}
+
+/** Fresh DB release fact; cached/failed reads cannot opt the root into writes. */
+export function usePurchaseRequestRelease() {
+ return useQuery({queryKey:qk.purchaseRequestRelease(),queryFn:async()=>purchaseRequestReleaseSchema.parse(await apiFetch("/api/operation/purchasing/requests/context-release")),staleTime:0,retry:false});
 }

@@ -28,6 +28,7 @@
  *
  * PURE — no I/O, no clock.
  */
+import { poLineReportable } from "./po-receiving";
 import { docNumber } from "./doc-number";
 import { documentDisplayNumber } from "./document-display";
 import { catalogCategoryWordOf } from "./line-category";
@@ -498,7 +499,7 @@ export function receivingExtraQty(
 }
 
 /**
- * RECEIVING SUMMARY — the five governed quantity words for a source's lines
+ * RECEIVING SUMMARY — the governed quantity words, including effective cancellation for a source's lines
  * (`purchasing/MASTER.md` §5.8 / COPY-STANDARD): each fact prints its own
  * number; the operator never subtracts. Damaged/wrong never reduce
  * `Pending Delivery Qty`.
@@ -509,12 +510,14 @@ export interface ReceivingSummary {
   damagedQty: number;
   wrongItemQty: number;
   pendingDeliveryQty: number;
+  cancelledQty?: number;
 }
 
 export function receivingSummaryOf(
   poLines: readonly {
     qty: number;
     received_qty: number;
+    cancelled_qty?: number | null;
     damaged_qty?: number | null;
     wrong_item_qty?: number | null;
   }[],
@@ -523,7 +526,11 @@ export function receivingSummaryOf(
   let receivedQty = 0;
   let damagedQty = 0;
   let wrongItemQty = 0;
+  let cancelledQty = 0;
+  let pendingDeliveryQty = 0;
   for (const l of poLines) {
+    cancelledQty += Math.max(0,num(l.cancelled_qty));
+    pendingDeliveryQty += poLineReportable(l);
     orderQty += Math.max(0, num(l.qty));
     receivedQty += Math.max(0, num(l.received_qty));
     damagedQty += Math.max(0, num(l.damaged_qty));
@@ -534,7 +541,8 @@ export function receivingSummaryOf(
     receivedQty,
     damagedQty,
     wrongItemQty,
-    pendingDeliveryQty: Math.max(0, orderQty - receivedQty),
+    pendingDeliveryQty,
+    ...(cancelledQty > 0 ? {cancelledQty} : {}),
   };
 }
 

@@ -2,6 +2,7 @@ import { Hono, type Context } from "hono";
 import {
   purchasingCreateDestinationInput,
   purchasingSetNumberInput,
+  purchasingSetRequestSettingsInput,
   purchasingSetPoDaysInput,
   purchasingSetReadyStockPriorityInput,
   purchasingSetPoWindowsInput,
@@ -18,7 +19,7 @@ import {
 import { z } from "zod";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { canEditSettings as canEditSection, requireSettingsEditor } from "../../lib/settings-editor";
-import { loadPoWindows, loadPurchasingSettings } from "../../lib/purchasing-settings";
+import { loadPoWindows, loadPurchasingSettings, loadPurchaseRequestSettings } from "../../lib/purchasing-settings";
 import { parseJsonBody, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -61,15 +62,21 @@ async function readSettingsOnlyNumber(sb: ReturnType<typeof userClient>, column:
  * Settings can never show a window the engine does not use.
  */
 async function loadSettingsWithWindows(sb: ReturnType<typeof userClient>) {
-  const [settings, windows, repair, claimWait, claimExtra] = await Promise.all([
+  const [settings, windows, repair, claimWait, claimExtra, requestSettings] = await Promise.all([
     loadPurchasingSettings(sb),
     loadPoWindows(sb),
     readSettingsOnlyNumber(sb, "repair_return_working_days"),
     readSettingsOnlyNumber(sb, "claim_reply_waiting_days"),
     readSettingsOnlyNumber(sb, "claim_escalation_extra_days"),
+    loadPurchaseRequestSettings(sb).catch(() => null),
   ]);
   return {
     ...settings,
+    ...(requestSettings == null ? {} : { requestSettings: {
+      normalDays: requestSettings.normalCalendarDays,
+      serviceDays: requestSettings.serviceCalendarDays,
+      manualWhatsappScreenshotRequired: requestSettings.manualWhatsappScreenshotRequired,
+    } }),
     ...(repair == null ? {} : { repairReturnWorkingDays: repair }),
     ...(claimWait == null ? {} : { claimReplyWaitingDays: claimWait }),
     ...(claimExtra == null ? {} : { claimEscalationExtraDays: claimExtra }),
@@ -130,6 +137,20 @@ purchasingSettingsRouter.put("/number", requireSettingsEditor("purchasing"), asy
   const { error } = await sb.rpc("purchasing_set_number", {
     p_key: parsed.data.key,
     p_value: parsed.data.value,
+  });
+  if (error) return fail(c, error);
+  return respondWithSettings(c);
+});
+
+// Kept on the guarded context branch until the matching Settings writer is
+// approved and installed. No direct table write or second editor permission.
+purchasingSettingsRouter.put("/request-settings", requireSettingsEditor("purchasing"), async (c) => {
+  const parsed = await parseJsonBody(c, purchasingSetRequestSettingsInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const { error } = await userClient(c.env, c.var.auth.jwt).rpc("purchasing_set_request_settings", {
+    p_normal_days: parsed.data.normalDays,
+    p_service_days: parsed.data.serviceDays,
+    p_manual_whatsapp_screenshot_required: parsed.data.manualWhatsappScreenshotRequired,
   });
   if (error) return fail(c, error);
   return respondWithSettings(c);

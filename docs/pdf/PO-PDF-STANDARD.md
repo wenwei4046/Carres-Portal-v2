@@ -46,6 +46,14 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
   issuance or supplier promise; the draft/no-send treatment remains. The issue
   door revalidates and records the actual dates on successful issuance.
 
+- **Effective outstanding cancellation (Purchasing §5.8.1 approved target; LOCAL implementation,
+  production acceptance owed):** keep the same PO number and five columns. Its next version keeps
+  original Order Qty, names Cancelled Qty, Received Qty and Pending Delivery Qty in the existing
+  description detail, and identifies actual retired Unit IDs. A completely cancelled exact-unit
+  line has no active Unit IDs; this is not a missing-ID defect. Keep prior sent version payloads
+  and rendering unchanged. Only a qualified effective cancellation version may be printed/sent
+  after whole unreceived cancellation; legacy status-only cancelled POs retain their refusal.
+
 - **Money is ABSENT, structurally.** The payload (0307) carries no RM figure;
   the template cannot print one. The source-scan test enforces it.
 - **EVERY PAGE PRINTS THE SAME FULL HEADER, AND THE NUMBER CARRIES ITS

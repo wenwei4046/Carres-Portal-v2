@@ -1,0 +1,137 @@
+import { describe, expect, it } from "vitest";
+import { purchaseRequestContextSchema, purchaseRequestContextHistory, purchaseRequestSupplierDateIssues, type PurchaseRequestContext } from "./purchase-request-context";
+const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+const recipient = (n: number) => ({ id: id(n), company: "TEST", name: "TEST recipient", phone: "TEST contact", method: "delivery" as const, deliveryDate: "2026-11-20", addressLine1: "TEST street", addressLine2: "TEST block", city: "TEST city", state: "TEST state", postcode: "TEST", buildingType: "TEST", floor: "100A", lift: "has_lift" as const, pickupLocationId: null, collectedBy: "" });
+const context = (): PurchaseRequestContext => ({ version: 1, origin: "manual", purpose: "general_purchase", proceedDate: "2026-10-20", stockDeliveryDate: null, serviceCaseId: null, reason: "purchase_for_others", companyPersonName: "TEST company", projectReference: "", explanation: "", forecastChangeReason: "", recipients: [recipient(1), recipient(2)], lines: [{ id: id(3), sku: "TEST-SKU", qty: 5, attrs: null, recipientNeeds: [{ recipientId: id(1), qty: 3 }, { recipientId: id(2), qty: 2 }], stockProposals: [], allocations: [{ id: id(4), destinationId: id(10), supplierDeliveryDate: "2026-11-10", qty: 3, recipients: [{ recipientId: id(1), qty: 3 }] }, { id: id(5), destinationId: id(11), supplierDeliveryDate: "2026-11-10", qty: 2, recipients: [{ recipientId: id(2), qty: 2 }] }] }] });
+describe("approved purchase request context", () => {
+  it("keeps same SKU5 split3/2, then stock1 leaves purchase2/2 and recipient need3/2", () => {
+    const request = context();
+    expect(purchaseRequestContextSchema.safeParse(request).success).toBe(true);
+    request.lines[0]!.stockProposals = [{ id: id(20), locationId: id(10), destinationId: id(10), qty: 1, recipients: [{ recipientId: id(1), qty: 1 }] }];
+    request.lines[0]!.allocations[0]!.qty = 2;
+    request.lines[0]!.allocations[0]!.recipients[0]!.qty = 2;
+    const parsed = purchaseRequestContextSchema.parse(request);
+    expect(parsed.lines[0]!.qty).toBe(5);
+    expect(parsed.lines[0]!.allocations.map((allocation) => allocation.qty)).toEqual([2, 2]);
+    expect(parsed.lines[0]!.recipientNeeds.map((need) => need.qty)).toEqual([3, 2]);
+    // Same total, wrong recipient: this must fail rather than silently swap the goods.
+    request.lines[0]!.stockProposals[0]!.recipients[0]!.recipientId = id(2);
+    expect(purchaseRequestContextSchema.safeParse(request).success).toBe(false);
+  });
+  it("keeps recipient need when the whole item is supplied from stock", () => {
+    const request = context(); const line = request.lines[0]!;
+    line.allocations = [];
+    line.stockProposals = [{ id: id(20), locationId: id(10), destinationId: id(10), qty: 5, recipients: [{ recipientId: id(1), qty: 3 }, { recipientId: id(2), qty: 2 }] }];
+    expect(purchaseRequestContextSchema.safeParse(request).success).toBe(true);
+    line.stockProposals[0]!.recipients = [];
+    expect(purchaseRequestContextSchema.safeParse(request).success).toBe(false);
+  });
+  it("rejects duplicate stock identities and duplicated recipient rows even when quantities balance", () => {
+    const request = context(); const line = request.lines[0]!;
+    line.allocations = [];
+    line.stockProposals = [{ id: id(20), locationId: id(10), destinationId: id(10), qty: 5, recipients: [{ recipientId: id(1), qty: 1 }, { recipientId: id(1), qty: 2 }, { recipientId: id(2), qty: 2 }] }];
+    expect(purchaseRequestContextSchema.safeParse(request).success).toBe(false);
+    line.stockProposals = [
+      { id: id(20), locationId: id(10), destinationId: id(10), qty: 3, recipients: [{ recipientId: id(1), qty: 3 }] },
+      { id: id(20), locationId: id(11), destinationId: id(11), qty: 2, recipients: [{ recipientId: id(2), qty: 2 }] },
+    ];
+    expect(purchaseRequestContextSchema.safeParse(request).success).toBe(false);
+  });
+  it("requires delivery Address2/Floor/Lift without imposing a floor cap", () => {
+    expect(purchaseRequestContextSchema.safeParse(context()).success).toBe(true);
+    for (const field of ["addressLine2", "floor", "lift"] as const) {
+      const request = context();
+      Object.assign(request.recipients[0]!, { [field]: field === "lift" ? null : "" });
+      expect(purchaseRequestContextSchema.safeParse(request).success, field).toBe(false);
+    }
+  });
+  it("requires the actual pickup site and collector instead of a delivery address", () => {
+    const request = context(); const person = request.recipients[0]!;
+    person.method = "self_pickup"; person.addressLine2 = ""; person.floor = ""; person.lift = null;
+    expect(purchaseRequestContextSchema.safeParse(request).success).toBe(false);
+    person.pickupLocationId = id(10); person.collectedBy = "TEST collector";
+    expect(purchaseRequestContextSchema.safeParse(request).success).toBe(true);
+  });
+  it("requires the GP reason and its dependent fields", () => {
+    const request = context(); request.companyPersonName = "";
+    expect(purchaseRequestContextSchema.safeParse(request).success).toBe(false);
+    request.reason = "other";
+    expect(purchaseRequestContextSchema.safeParse(request).success).toBe(false);
+    request.explanation = "TEST business reason";
+    expect(purchaseRequestContextSchema.safeParse(request).success).toBe(true);
+  });
+  it("requires the actual SC and explicit goods without inventing an extra approval gate", () => {
+    const request = context(); Object.assign(request, { purpose: "service_case", reason: null, companyPersonName: "" });
+    expect(purchaseRequestContextSchema.safeParse(request).success).toBe(false);
+    request.serviceCaseId = id(30);
+    // Existing Jess MPR approval binds the explicit lines; no new decision UUID is invented.
+    expect(purchaseRequestContextSchema.safeParse(request).success).toBe(true);
+  });
+  it("accepts manual RS outside forecast quantity caps, without invented recipients or reason", () => {
+    const request = context(); Object.assign(request, { purpose: "ready_stock", origin: "stock_request", stockDeliveryDate: "2026-11-20", reason: null, companyPersonName: "", recipients: [] });
+    const line = request.lines[0]!; line.qty = 500; line.recipientNeeds = []; line.allocations = [{ ...line.allocations[0]!, qty: 500, recipients: [] }];
+    expect(purchaseRequestContextSchema.safeParse(request).success).toBe(true);
+    request.stockDeliveryDate = null;
+    expect(purchaseRequestContextSchema.safeParse(request).success).toBe(false);
+    request.stockDeliveryDate = "2026-11-20";
+    request.recipients = [recipient(1)];
+    expect(purchaseRequestContextSchema.safeParse(request).success).toBe(false);
+  });
+  it("rejects duplicate IDs, unknown recipients, attachments and impossible dates", () => {
+    const request = context(); request.lines[0]!.allocations[1]!.id = id(4);
+    expect(purchaseRequestContextSchema.safeParse(request).success).toBe(false);
+    expect(purchaseRequestContextSchema.safeParse({ ...context(), attachments: ["TEST"] }).success).toBe(false);
+    expect(purchaseRequestContextSchema.safeParse({ ...context(), proceedDate: "2026-02-31" }).success).toBe(false);
+    request.lines[0]!.allocations[0]!.recipients[0]!.recipientId = id(999);
+    expect(purchaseRequestContextSchema.safeParse(request).success).toBe(false);
+  });
+});
+
+describe("request supplier-date admission uses the one production calendar", () => {
+  const catalog = new Map([["TEST-SKU", { supplierId: id(50), category: "sofa" }]]);
+  const settings = (offDays: number[]) => ({ productionDays: [{ supplierId: id(50), category: "sofa", workingDays: 1 }], suppliers: [{ id: id(50), offDays }] }) as never;
+  it("uses supplier weekdays and the existing holiday set without changing recipient dates", () => {
+    const request = context(); request.proceedDate = "2026-12-24";
+    request.lines[0]!.sku = "TEST-SKU";
+    for (const allocation of request.lines[0]!.allocations) allocation.supplierDeliveryDate = "2026-12-26";
+    const recipients = structuredClone(request.recipients);
+    expect(purchaseRequestSupplierDateIssues(request, settings([0]), catalog)).toEqual([]);
+    expect(purchaseRequestSupplierDateIssues(request, settings([0, 6]), catalog)).toMatchObject([
+      { code: "supplier_date_before_earliest", earliest: "2026-12-28" },
+      { code: "supplier_date_before_earliest", earliest: "2026-12-28" },
+    ]);
+    expect(request.recipients).toEqual(recipients);
+  });
+  it("refuses absent catalog/production instead of guessing seven days", () => {
+    const request = context(); request.lines[0]!.sku = "TEST-SKU";
+    expect(purchaseRequestSupplierDateIssues(request, settings([0]), new Map()).every((issue) => issue.earliest === null)).toBe(true);
+    expect(purchaseRequestSupplierDateIssues(request, { productionDays: [], suppliers: [] }, catalog)).toMatchObject([{ code: "supplier_plan_unavailable" }, { code: "supplier_plan_unavailable" }]);
+  });
+  it("does not invent supplier production for an all-stock proposal", () => {
+    const request = context(); request.lines[0]!.allocations = [];
+    expect(purchaseRequestSupplierDateIssues(request, { productionDays: [], suppliers: [] }, new Map())).toEqual([]);
+  });
+});
+
+
+describe("context history retains original need and exact issued source quantities", () => {
+  const event = (kind: string, changes: unknown) => ({ kind, changes, round: 1, actor_id: id(99), occurred_at: "2026-10-18T00:00:00Z", reason: "TEST actual reason" });
+  it("does not recount replacement rows or duplicate a batch-summary PO", () => {
+    const c = context();
+    const events = [event("resubmitted", { before: { context: c }, after_context: c }),
+      event("approved", { before: { context: c }, after: { context: c, approved_distribution: [{ qty: 2 }, { qty: 2 }] } }),
+      event("po_issued", { record_type: "po_issue", po_id: "PO-TEST", allocations: [{ qty: 1 }] }),
+      event("po_issued", { record_type: "issue_batch", po_ids: ["PO-TEST"] }),
+      event("po_issued", { record_type: "po_source_change", po_id: "PO-TEST", po_version: 2, before_scope: [], after_scope: [] })];
+    const read = purchaseRequestContextHistory(c, 2, events)!;
+    expect(read.initialUnits).toBe(5);
+    expect(read.events.filter(e => e.kind === "approved")).toMatchObject([{ requested_units: 5, approved_units: 4, actorId: id(99), reason: "TEST actual reason" }]);
+    expect(read.events.filter(e => e.kind === "po_issued")).toMatchObject([{ po_no: "PO-TEST", units: 1 }]);
+    expect(read.events.filter(e => e.kind === "resubmitted")).toMatchObject([{ changes: ["TEST actual reason"] }]);
+  });
+  it("keeps missing original/reapproval/issue evidence unknown", () => {
+    expect(purchaseRequestContextHistory(context(), 2, [])).toBeNull();
+    expect(purchaseRequestContextHistory(context(), 1, [event("approved", {})])).toBeNull();
+    expect(purchaseRequestContextHistory(context(), 1, [event("po_issued", { record_type: "po_issue", po_id: "PO-TEST", allocations: [] })])).toBeNull();
+  });
+});

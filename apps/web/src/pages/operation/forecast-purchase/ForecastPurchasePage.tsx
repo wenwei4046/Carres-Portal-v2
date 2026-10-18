@@ -36,7 +36,7 @@
  * the size as the request it is. `Ordered` means on a PO.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   forecastPurchaseModels,
@@ -61,6 +61,7 @@ import ItemRows from "@/components/register/ItemRows";
 import RowTick from "@/components/register/RowTick";
 import TwoLineCell from "@/components/register/TwoLineCell";
 import { FilterRail, ShowFiltersButton, useFilterRailOpen } from "../components/workspace-rail";
+import ForecastRequestWorkspace from "./ForecastRequestWorkspace";
 import PurchasingTabs from "../PurchasingTabs";
 import { FORECAST_PURCHASE as W, monthWord, pcs, requestStateWord, weekdayWord } from "./forecast-purchase-words";
 import styles from "./ForecastPurchase.module.css";
@@ -100,7 +101,9 @@ function Num({ value, strong = false, tone = "ink", testId }: { value: number; s
 const soldTone = (n: number) => (n > 0 ? "ink" : "none") as "ink" | "none";
 const weekTone = (n: number, week: number) => (week === 0 ? "ink" : n > 0 ? "forecast" : "none") as "ink" | "forecast" | "none";
 
-export default function ForecastPurchasePage() {
+export default function ForecastPurchasePage({contextFlow=false}:{contextFlow?:boolean}={}) {
+  const navigate=useNavigate();
+  const [requestSelection,setRequestSelection]=useState<ForecastPurchaseSizeRow[]|null>(null);
   const [params, setParams] = useSearchParams();
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["forecast-purchase"],
@@ -338,6 +341,8 @@ export default function ForecastPurchasePage() {
 
   const emptyMessage = isError ? W.couldNotRead : models.length === 0 ? W.empty : show === "suggested" ? W.nothingSuggested : show === "ordered" ? W.nothingOrdered : W.empty;
 
+  if(contextFlow&&requestSelection!==null)return <ForecastRequestWorkspace selection={requestSelection} onDone={id=>{if(id)navigate(`/operation?tab=manual-purchase&mp=${encodeURIComponent(id)}`);else setRequestSelection(null);void refetch();}}/>;
+
   return (
     <div className={`${styles.page} flex h-full min-h-0 w-full flex-1 flex-col`} data-testid="forecast-purchase-page">
       <PurchasingTabs />
@@ -421,6 +426,7 @@ export default function ForecastPurchasePage() {
               searchPlaceholder={W.search}
               exportName={W.page}
               toolbarStart={<>
+                {contextFlow?<Button data-testid="forecast-new-stock-request" onClick={()=>setRequestSelection([])}>+ New stock request</Button>:null}
                 {!railOpen ? <ShowFiltersButton onShow={() => setRailOpen(true)} testId="forecast-show-summary" /> : null}
                 <Tabs variant="segmented" label={W.showLabel} value={show} onValueChange={setShow}
                   tabs={[{ value: "suggested", label: W.showSuggested }, { value: "ordered", label: W.showOrdered }, { value: "all", label: W.showAll }]} />
@@ -460,9 +466,9 @@ export default function ForecastPurchasePage() {
               selectionSummary={() => W.selected(chosen.length, chosenPcs)}
               selectionPrimary={chosen.length > 0 ? (
                 <span className="flex shrink-0 items-center gap-2" data-testid="forecast-selection-actions">
-                  <Button variant="primary" size="md" data-testid="forecast-review-open" onClick={() => setReviewOpen(true)}>
+                  <Button variant="primary" size="md" data-testid="forecast-review-open" onClick={() => contextFlow?setRequestSelection(chosen):setReviewOpen(true)}>
                     <MIcon name="shopping_cart" size={18} />
-                    {W.reviewButton(chosenRequests)}
+                    {contextFlow?"Review":W.reviewButton(chosenRequests)}
                   </Button>
                   {viewMenu(true)}
                 </span>

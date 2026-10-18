@@ -125,7 +125,7 @@ import type { MovementsFilters } from "@/lib/queries";
  * the movement log already filtered to the row they clicked. Mirrors the
  * proto's `movementsPrefill` state in `reference/proto/operation.jsx` line 15.
  */
-export default function OperationApp() {
+export default function OperationApp({purchaseRequestContext=false}:{purchaseRequestContext?:boolean}={}) {
   const location = useLocation();
   const phone = usePhone();
   const tasksPage = useShellTasks((s) => s.pageHosts);
@@ -594,10 +594,10 @@ export default function OperationApp() {
             )}
             {/* Purchasing → Manual Purchase — the typed request lane
                 (CARD-2026-08-18-manual-purchase). */}
-            {tab === "manual-purchase" && <OperationManualPurchase />}
+            {tab === "manual-purchase" && <OperationManualPurchase contextFlow={purchaseRequestContext} />}
             {/* Forecast Purchase · Outright: the weekly stock suggestion
                 (owner 13 Oct 2026; Purchasing MASTER §9.14). */}
-            {tab === "forecast-purchase" && <ForecastPurchasePage />}
+            {tab === "forecast-purchase" && <ForecastPurchasePage contextFlow={purchaseRequestContext} />}
             {tab === "catalog" &&
               (role === "principal" ? (
                 <Navigate

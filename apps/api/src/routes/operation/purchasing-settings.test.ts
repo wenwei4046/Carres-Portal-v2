@@ -12,10 +12,10 @@ vi.mock("../../lib/settings-editor", () => ({
   requireSettingsEditor: () => async (_c: unknown, next: () => Promise<void>) => { await next(); },
 }));
 vi.mock("../../lib/duties", () => ({ myDuties: vi.fn().mockResolvedValue([]) }));
-vi.mock("../../lib/purchasing-settings", () => ({ loadPurchasingSettings: vi.fn(), loadPoWindows: vi.fn() }));
+vi.mock("../../lib/purchasing-settings", () => ({ loadPurchasingSettings: vi.fn(), loadPoWindows: vi.fn(), loadPurchaseRequestSettings: vi.fn() }));
 
 import { userClient } from "../../lib/supabase";
-import { loadPoWindows, loadPurchasingSettings } from "../../lib/purchasing-settings";
+import { loadPoWindows, loadPurchasingSettings, loadPurchaseRequestSettings } from "../../lib/purchasing-settings";
 import purchasingSettingsRouter from "./purchasing-settings";
 
 const DESTINATION_ID = "33333333-0000-0000-0000-000000000003";
@@ -65,6 +65,7 @@ function testApp(who: { role: string; email: string } = { role: "principal", ema
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(loadPurchaseRequestSettings).mockRejectedValue(new Error("unavailable"));
   vi.mocked(loadPurchasingSettings).mockResolvedValue(response);
   vi.mocked(loadPoWindows).mockResolvedValue({
     settings: { first: "11:30", second: "16:00", secondEnabled: true },
@@ -465,5 +466,30 @@ describe("Supplier channels", () => {
       body: JSON.stringify({ supplierId: SUPPLIER_ID, kind: "contactEmail", text: "supplier@example.com" }),
     });
     expect(res.ok).toBe(false);
+  });
+});
+
+
+describe("context request Settings · guarded adoption", () => {
+  it("reads actual zero days and Inactive without inventing defaults", async () => {
+    vi.mocked(loadPurchaseRequestSettings).mockResolvedValue({ normalCalendarDays: 0, serviceCalendarDays: 14, manualWhatsappScreenshotRequired: false });
+    const result = await testApp().request("/settings");
+    expect(result.status).toBe(200);
+    const body = await result.json() as { requestSettings: unknown };
+    expect(body.requestSettings).toEqual({ normalDays: 0, serviceDays: 14, manualWhatsappScreenshotRequired: false });
+  });
+  it("submits all three facts to one audited writer and reads them back", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    vi.mocked(loadPurchaseRequestSettings).mockResolvedValue({ normalCalendarDays: 30, serviceCalendarDays: 14, manualWhatsappScreenshotRequired: true });
+    const result = await testApp().request("/settings/request-settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ normalDays: 30, serviceDays: 14, manualWhatsappScreenshotRequired: true }) });
+    expect(result.status).toBe(200);
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith("purchasing_set_request_settings", { p_normal_days: 30, p_service_days: 14, p_manual_whatsapp_screenshot_required: true });
+  });
+  it("refuses negative days before calling a writer", async () => {
+    const rpc = vi.fn(); vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const result = await testApp().request("/settings/request-settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ normalDays: -1, serviceDays: 14, manualWhatsappScreenshotRequired: true }) });
+    expect(result.status).toBe(422); expect(rpc).not.toHaveBeenCalled();
   });
 });

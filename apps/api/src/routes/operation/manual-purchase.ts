@@ -2,6 +2,18 @@ import { Hono, type Context } from "hono";
 import { z } from "zod";
 import {
   DEMAND_PURPOSE_VALUES,
+  purchaseRequestSubmitSchema,
+  purchaseRequestContextSchema,
+  purchaseRequestReleaseSchema,
+  purchaseRequestRevisionSchema,
+  purchaseRequestDecisionSchema,
+  purchaseRequestIssueSchema,
+  purchaseRequestContextHistory,
+  purchaseRequestContextReviewReadSchema,
+  purchaseRequestStockLinesSchema,
+  purchaseRequestStockOffersSchema,
+  purchaseRequestSupplierDateIssues,
+  type PurchaseRequestContext,
   expectedArrivalOf,
   isOpsGenericAccount,
   isOtherCreditor,
@@ -25,12 +37,14 @@ import {
   type ManualPurchaseStockResponse,
   type ManualPurchaseStockUnit,
 } from "@carres/shared";
+import { stampRequestContextCoverage } from "../../lib/purchasing-context-coverage";
 import { requireOperation } from "../../lib/auth-guards";
 import { resolveActorNames } from "../../lib/actor-names";
 import { purchasingActorMayIssue } from "../../lib/purchasing-po-authority";
 import { readFreeStock } from "../../lib/purchase-demand-read";
 import {
   loadPurchasingSettings,
+  loadPurchaseRequestSettings,
   type LoadedPurchasingSettings,
 } from "../../lib/purchasing-settings";
 import { forecastIssueRefusal, forecastItemWord } from "../../lib/forecast-purchase-read";
@@ -66,6 +80,20 @@ import { todayIsoMYT } from "../../lib/delivery-order-issue";
  */
 const manualPurchaseRouter = new Hono<AppEnv>();
 
+// Readiness is a DB release fact, never a URL/user/Settings switch. A missing
+// activation RPC keeps the existing production composition available.
+manualPurchaseRouter.get("/context-release", requireOperation, async (c) => {
+ const result = await userClient(c.env,c.var.auth.jwt).rpc("purchasing_request_context_release");
+ if (result.error) {
+  if (["42883","PGRST202"].includes(result.error.code)) return c.json({version:1,requestFlow:false,cancellation:false,serviceExecution:false});
+  return c.json({error:"request_release_unavailable",message:"Not available"},503);
+ }
+ const parsed=purchaseRequestReleaseSchema.safeParse(result.data);
+ if (!parsed.success) return c.json({error:"request_release_unavailable",message:"Not available"},503);
+ return c.json(parsed.data);
+});
+
+
 /**
  * EVERY REFUSAL LEAVES IN THE APPROVED TWO LINES (closure §9).
  *
@@ -87,12 +115,35 @@ function refuse(
   return c.json(refusalBody(code, facts), status);
 }
 
+/** New context refusal tags retain their status and the existing governed
+ * Purchasing fallback words; raw SQL implementation messages are not UI copy. */
+function contextRefusal(c: Context<AppEnv>, error: Parameters<typeof mapPgError>[0]) {
+  const mapped = mapPgError(error);
+  const code = String(error.details ?? mapped.body.code ?? "rpc_failed");
+  if (["request_context_not_enabled","service_case_execution_source_unverified","cancellation_not_released"].includes(code)) return c.json({ error: code, code, message: "Not available" }, 503);
+  return c.json(refusalBody(code), mapped.status);
+}
+
 /** `iso` + n CALENDAR days — the same day arithmetic `earliest_sell_days`
  *  is counted in (0422). No working-day walk: the number is calendar days. */
 function plusCalendarDays(iso: string, n: number): string {
   const d = new Date(`${iso}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
+}
+
+/** Guard contextual writes with the current shared planner. This is an API
+ * defence, not a replacement for transaction-level source/calendar admission. */
+async function contextSupplierDateGuard(sb: ReturnType<typeof userClient>, context: PurchaseRequestContext) {
+  if (!context.lines.some((line) => line.allocations.length)) return [];
+  const settings = await loadPurchasingSettings(sb); // failed read stays unavailable
+  const { data, error } = await sb.from("product_skus").select("sku, supplier_id, product_models(category)");
+  if (error) throw error;
+  const catalog = new Map((data ?? []).map((row) => [row.sku as string, {
+    supplierId: row.supplier_id as string | null,
+    category: (row.product_models as unknown as { category: string | null } | null)?.category ?? null,
+  }]));
+  return purchaseRequestSupplierDateIssues(context, settings, catalog);
 }
 
 /**
@@ -306,6 +357,7 @@ async function withCatalogAndLineage(
         id: string;
         po_no: string;
         version: number | null;
+        status?: string | null;
         /** 0428/0430 — the ORIGINAL supplier-facing date, never `eta_date`. */
         official_delivery_date: string | null;
         supplier_id: string | null;
@@ -349,14 +401,56 @@ async function withCatalogAndLineage(
   const directPoIds = lines
     .map((l) => l.po_id as string | null)
     .filter((v): v is string => v != null);
-  const { data: lineagePoLines, error: lineageErr } =
+  const { data: legacyPoLines, error: lineageErr } =
     lineIds.length > 0
       ? await sb
           .from("purchase_order_lines")
-          .select("po_id, demand_id, qty, destination_id")
+          .select("id, po_id, demand_id, qty, destination_id")
           .in("demand_id", lineIds)
       : { data: [] as Array<Record<string, unknown>>, error: null };
   if (lineageErr) return { error: lineageErr };
+  let lineagePoLines: Array<Record<string, unknown>> = legacyPoLines ?? [];
+  const sourceIssued = lines.filter(l => l.request_line_id != null || Number(l.issued_qty ?? 0) > 0);
+  const contextIssued = sourceIssued.filter(l => l.request_line_id != null);
+  const sourcePoStatus = new Map<string, string>();
+  if (sourceIssued.length) {
+    const sourceRead = await sb.from("po_line_sources").select("po_line_id, purchase_demand_id, qty").in("purchase_demand_id", sourceIssued.map(l => l.id as string));
+    if (sourceRead.error) return { error: sourceRead.error };
+    const sourceIds = [...new Set((sourceRead.data ?? []).map(s => s.po_line_id as string))];
+    const physicalRead = sourceIds.length ? await sb.from("purchase_order_lines").select("id, po_id, destination_id, qty, received_qty").in("id", sourceIds) : { data: [], error: null };
+    if (physicalRead.error) return { error: physicalRead.error };
+    const physical = new Map((physicalRead.data ?? []).map(pl => [pl.id as string, pl]));
+    if (contextIssued.length && (physicalRead.data ?? []).length) {
+      const headers = await sb.from("purchase_orders").select("id, status").in("id", [...new Set((physicalRead.data ?? []).map(pl => pl.po_id as string))]);
+      if (headers.error) return { error: headers.error };
+      for (const po of headers.data ?? []) if (typeof po.status === "string" && po.status.length) sourcePoStatus.set(po.id as string, po.status);
+    }
+    const cancellationByLine=new Map<string,{cancelledQty:number;sources:Array<{demandId:string;activeQty:number;cancelledQty:number;orderedQty:number}>}>();
+    if(contextIssued.length && physical.size) {
+      const facts=await sb.rpc("purchasing_po_cancellations",{p_po_ids:[...new Set((physicalRead.data??[]).map(pl=>pl.po_id as string))]});
+      if(facts.error || !Array.isArray(facts.data)) return {error:facts.error??{message:"Cancellation source could not be loaded"}};
+      for(const observed of facts.data) for(const line of observed.facts?.lines??[]) {
+        const original=physical.get(line.lineId);
+        if(!original || original.qty!==line.orderedQty || original.received_qty!==line.receivedQty || !Number.isInteger(line.cancelledQty) || !Array.isArray(line.sources)) return {error:{message:"This work changed. Refresh and try again."}};
+        cancellationByLine.set(line.lineId,line);
+      }
+    }
+    const attributed: Array<Record<string, unknown>> = [];
+    for (const source of sourceRead.data ?? []) {
+      const pl = physical.get(source.po_line_id as string);
+      if (!pl) return { error: { message: "This work changed. Refresh and try again." } };
+      const cancellation=cancellationByLine.get(String(pl.id));
+      const cancelledSource=cancellation?.sources.find(value=>value.demandId===source.purchase_demand_id);
+      if(cancellation && (!cancelledSource || cancelledSource.orderedQty!==source.qty || !Number.isInteger(cancelledSource.activeQty) || cancelledSource.activeQty<0)) return {error:{message:"This work changed. Refresh and try again."}};
+      attributed.push({ ...pl, demand_id: source.purchase_demand_id, qty:cancelledSource?.activeQty??source.qty, original_qty:source.qty, cancelled_qty:cancelledSource?.cancelledQty??0, physical_qty:pl.qty,physical_active_qty:Number(pl.qty)-(cancellation?.cancelledQty??0) });
+    }
+    for (const line of contextIssued) {
+      if (attributed.some(pl => pl.demand_id === line.id && !sourcePoStatus.has(pl.po_id as string))) return { error: { message: "This work changed. Refresh and try again." } };
+      if (attributed.filter(pl => pl.demand_id === line.id && sourcePoStatus.get(pl.po_id as string) !== "cancelled").reduce((n, pl) => n + Number(pl.qty), 0) !== Number(line.issued_qty)) return { error: { message: "This work changed. Refresh and try again." } };
+    }
+    const genericPhysicalIds = new Set(sourceIds);
+    lineagePoLines = [...lineagePoLines.filter(pl => !genericPhysicalIds.has(pl.id as string)), ...attributed];
+  }
   const poIdsByDemand = new Map<string, Set<string>>();
   const orderedByPo = new Map<string, number>();
   const lineageDemands = new Set<string>();
@@ -377,7 +471,7 @@ async function withCatalogAndLineage(
    */
   const allocationsByDemand = new Map<
     string,
-    Array<{ poId: string; qty: number; destinationId: string | null }>
+    Array<{ poId: string; qty: number; originalQty?: number; cancelledQty?: number; destinationId: string | null }>
   >();
   for (const pl of lineagePoLines ?? []) {
     const d = pl.demand_id as string | null;
@@ -395,6 +489,8 @@ async function withCatalogAndLineage(
       {
         poId: pl.po_id as string,
         qty: Number(pl.qty ?? 0),
+        originalQty:Number(pl.original_qty??pl.qty??0),
+        cancelledQty:Number(pl.cancelled_qty??0),
         destinationId: (pl.destination_id as string | null) ?? null,
       },
     ]);
@@ -402,15 +498,18 @@ async function withCatalogAndLineage(
   /* A pre-0361 issue left no `demand_id` on the PO line; the demand's own
      `po_id` + `issued_qty` is the only stored account of that document. */
   for (const l of lines) {
-    if (l.po_id != null && !lineageDemands.has(l.id as string)) {
+    const knownQty = (allocationsByDemand.get(l.id as string) ?? []).reduce((n, a) => n + a.qty, 0);
+    const legacyResidual = Math.max(0, Number(l.issued_qty ?? 0) - knownQty);
+    if (l.po_id != null && (!lineageDemands.has(l.id as string) || (l.request_line_id == null && legacyResidual > 0))) {
       orderedByPo.set(
         l.po_id as string,
-        (orderedByPo.get(l.po_id as string) ?? 0) + Number(l.issued_qty ?? 0),
+        (orderedByPo.get(l.po_id as string) ?? 0) + legacyResidual,
       );
       allocationsByDemand.set(l.id as string, [
+        ...(allocationsByDemand.get(l.id as string) ?? []),
         {
           poId: l.po_id as string,
-          qty: Number(l.issued_qty ?? 0),
+          qty: legacyResidual,
           destinationId: (l.destination_id as string | null) ?? null,
         },
       ]);
@@ -426,6 +525,7 @@ async function withCatalogAndLineage(
     id: string;
     po_no: string;
     version: number | null;
+        status?: string | null;
     official_delivery_date: string | null;
     supplier_id: string | null;
   }> = [];
@@ -439,13 +539,14 @@ async function withCatalogAndLineage(
        sibling column reads exactly this field. */
     const poRes = await sb
       .from("purchase_orders")
-      .select("id, version, official_delivery_date, supplier_id")
+      .select("id, version, status, official_delivery_date, supplier_id")
       .in("id", allPoIds);
     if (poRes.error) return { error: poRes.error };
     pos = (poRes.data ?? []).map((p) => ({
       id: p.id as string,
       po_no: p.id as string,
       version: (p.version as number | null) ?? null,
+      ...(p.status != null ? { status: p.status as string } : {}),
       official_delivery_date: (p.official_delivery_date as string | null) ?? null,
       supplier_id: (p.supplier_id as string | null) ?? null,
     }));
@@ -459,9 +560,15 @@ async function withCatalogAndLineage(
       const cat = catalogBySku.get(l.sku as string);
       return {
         ...l,
+        ...(l.request_line_id != null && l.fulfilment_kind === "purchase" ? {
+          received: Number(l.approved_qty ?? 0) > 0 && Number(l.issued_qty ?? 0) >= Number(l.approved_qty)
+            && lineagePoLines.filter(pl => pl.demand_id === l.id && Number(pl.qty)>0 && sourcePoStatus.get(pl.po_id as string) !== "cancelled").length > 0
+            && lineagePoLines.filter(pl => pl.demand_id === l.id && Number(pl.qty)>0 && sourcePoStatus.get(pl.po_id as string) !== "cancelled").every(pl => Number(pl.received_qty ?? 0) >= Number(pl.physical_active_qty ?? pl.physical_qty ?? pl.qty)),
+        } : {}),
         category: cat?.category ?? null,
         item_label: cat?.itemLabel ?? (l.sku as string),
         po_ids: [...poIds],
+        ...(l.request_line_id != null ? { active_po_ids: [...poIds].filter(id => sourcePoStatus.has(id) && sourcePoStatus.get(id) !== "cancelled" && lineagePoLines.some(pl=>pl.demand_id===l.id && pl.po_id===id && Number(pl.qty)>0)) } : {}),
         /* One entry per purchase order this line actually went onto, with
            THAT document's quantity and destination. Empty = nothing issued. */
         allocations: allocationsByDemand.get(l.id as string) ?? [],
@@ -516,7 +623,7 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
        approved_at, approved_by, refused_at, refused_by, refuse_reason,
        withdrawn_at, sent_back_at, sent_back_reason, submitted_at, round,
        for_service_case_id, for_staff_user_id, for_subsidiary_name,
-       created_by, created_at`,
+       created_by, created_at, request_context, request_version, proceed_date, approval_version`,
     )
     .order("created_at", { ascending: false })
     .limit(500);
@@ -552,7 +659,7 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
             .select(
               `id, request_id, sku, supplier_id, destination_id, qty, approved_qty,
                issued_qty, remaining_qty, required_by, remark, attrs, po_id, cancelled_at,
-               cancel_reason`,
+               cancel_reason, request_line_id, fulfilment_kind`,
             )
             .in("request_id", ids);
           if (res.error) return { error: res.error };
@@ -632,10 +739,13 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
       id: p.id,
       po_no: p.po_no,
       sent: sentVersions.has(`${p.id}::${p.version ?? 1}`),
+      ...(p.status != null ? { status: p.status } : {}),
       official_delivery_date: p.official_delivery_date,
       supplier_id: p.supplier_id,
     }));
   }
+
+  lines = await stampRequestContextCoverage(sb, requests ?? [], lines);
 
   /* Card 06 §3 — the ONE server date projection stamps every line. The plan
      failing to load costs the timing facts, never the Register (the honest
@@ -903,7 +1013,7 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     .select(
       `id, sku, supplier_id, destination_id, qty, approved_qty, issued_qty,
        remaining_qty, required_by, remark, attrs, po_id, cancelled_at, cancel_reason,
-       cancelled_by`,
+       cancelled_by, request_line_id, supplier_allocation_id, stock_proposal_id, fulfilment_kind`,
     )
     .eq("request_id", id);
   if (lineErr) return fail(c, lineErr);
@@ -913,7 +1023,7 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
      Register calls (Card 05 §3.3/§3.6; Law D). */
   const enriched = await withCatalogAndLineage(sb, stamped);
   if (enriched.error) return fail(c, enriched.error);
-  stamped = enriched.lines;
+  stamped = await stampRequestContextCoverage(sb, [request], enriched.lines);
 
   /* Card 06 §3/§6 — the SAME server date projection the Register reads, so
      the object's `Order by {date}` fact can never disagree with the row. */
@@ -965,12 +1075,17 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     .order("occurred_at", { ascending: true });
   const roundEvents = (eventsRes.error ? [] : (eventsRes.data ?? [])) as Array<{
     round: number;
-    kind: "sent_back" | "resubmitted" | "withdrawn";
+    kind: "sent_back" | "resubmitted" | "withdrawn" | "stock_allocated" | "approved" | "po_issued";
     actor_id: string | null;
     occurred_at: string;
     reason: string | null;
     changes: unknown;
   }>;
+
+  const hasContext = Number(request.request_version ?? 0) > 0 || request.request_context != null;
+  if (hasContext && eventsRes.error) return fail(c, eventsRes.error);
+  const contextHistory = hasContext ? purchaseRequestContextHistory(request.request_context, Number(request.request_version), roundEvents) : null;
+  if (hasContext && !contextHistory) return c.json({ error: "context_history_unavailable", code: "context_history_unavailable" }, 503);
 
   /**
    * WHO IS AN INDIVIDUAL (Card 05 §3.2; STAFF IDENTITY LAW 2026-08-27) — the
@@ -1023,7 +1138,7 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
   if (enriched.pos.length > 0) {
     const poIds = enriched.pos.map((p) => p.id);
     const [poRes, promRes, sendRes] = await Promise.all([
-      sb.from("purchase_orders").select("id, placed_at, official_delivery_date, version").in("id", poIds),
+      sb.from("purchase_orders").select("id, placed_at, official_delivery_date, version, status").in("id", poIds),
       sb
         .from("po_supplier_promises")
         .select("po_id, kind, answer, about_date, previous_date, new_date, reason, recorded_at, po_version, channel, recipient, evidence, reported_by, reported_at, recorded_by")
@@ -1061,6 +1176,7 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
         po_no: p.id as string,
         placed_at: (p.placed_at as string | null) ?? null,
         marked_sent_at: markedSentAt,
+        ...(p.status != null ? { status: p.status as string } : {}),
         po_delivery_date: originalDate,
         // This compact connected-document view adds a column only for a change.
         supplier_delivery_date: supplierDate !== originalDate ? supplierDate : null,
@@ -1086,9 +1202,9 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     kind: "created",
     occurred_at: request.created_at,
     ...withActor(request.created_by as string | null),
-    units: (stamped ?? []).reduce((n, l) => n + Number(l.qty ?? 0), 0),
+    units: contextHistory?.initialUnits ?? (stamped ?? []).reduce((n, l) => n + Number(l.qty ?? 0), 0),
   });
-  if (request.approved_at != null) {
+  if (!hasContext && request.approved_at != null) {
     history.push({
       kind: "approved",
       occurred_at: request.approved_at,
@@ -1111,7 +1227,7 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
   /* D4 — a line marked not going ahead names who marked it (0522). A line
      cancelled before 0522 has no stored actor and reads the audit defect. */
   for (const l of stamped) {
-    if (l.cancelled_at != null) {
+    if (!hasContext && l.cancelled_at != null) {
       history.push({
         kind: "line_not_going_ahead",
         occurred_at: l.cancelled_at,
@@ -1122,7 +1238,22 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     }
   }
   /* R3 / R4 — every round, as stored. */
+  if (contextHistory) {
+    for (const e of contextHistory.events) {
+      const { actorId, ...facts } = e;
+      history.push({ ...facts, ...withActor(actorId) });
+    }
+  } else {
+  const recordedPoIds = new Set<string>();
   for (const e of roundEvents) {
+    if (e.kind === "po_issued") {
+      const proof = e.changes as { record_type?: string; po_id?: string; allocations?: Array<{ qty: number }> } | null;
+      if (proof?.record_type === "po_issue" && proof.po_id && Array.isArray(proof.allocations)) {
+        history.push({ kind: "po_issued", occurred_at: e.occurred_at, ...withActor(e.actor_id), po_no: proof.po_id, units: proof.allocations.reduce((n, a) => n + Number(a.qty), 0) });
+        recordedPoIds.add(proof.po_id);
+      }
+      continue;
+    }
     history.push({
       kind: e.kind,
       occurred_at: e.occurred_at,
@@ -1133,6 +1264,7 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     });
   }
   for (const p of pos) {
+    if (recordedPoIds.has(p.id)) continue;
     history.push({
       kind: "po_issued",
       occurred_at: p.placed_at ?? request.created_at,
@@ -1141,6 +1273,8 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
       po_no: p.po_no,
       units: p.ordered_qty,
     });
+  }
+
   }
 
   const requestedBy = resolveIdentity(request.created_by as string | null);
@@ -1161,7 +1295,8 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
      * decide what renders, so a control is never offered and then refused.
      */
     canWithdraw: isRequester && undecided && !liveIssued,
-    canEditAndSendAgain: isRequester && undecided && request.sent_back_at != null,
+    canEditAndSendAgain: !hasContext && isRequester && undecided && request.sent_back_at != null,
+    ...(hasContext ? { context_can_edit_and_send_again: isRequester && undecided && request.sent_back_at != null && !liveIssued } : {}),
     /** The REQUEST section's `Requested By` — the real individual only; a
      *  shared-account record answers null and the reader states the defect. */
     requested_by_name: requestedBy?.name ?? null,
@@ -1173,6 +1308,7 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     })),
     pos,
     history,
+    ...(hasContext ? { context_events: roundEvents } : {}),
     destinations: dests.data ?? [],
     /* The collection rule per collected supplier — the object's Deliver To
        door applies the same lock the create form applies (1083). */
@@ -1181,7 +1317,8 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     users: (users.data ?? []).map((u) => ({ id: u.id, name: u.name })),
     approvers,
     /* Owner ruling 2026-09-18: nobody decides a purchase they raised. */
-    canApprove: approver && request.created_by !== c.var.auth.id,
+    canApprove: !hasContext && approver && request.created_by !== c.var.auth.id,
+    ...(hasContext ? { context_can_approve: approver && request.created_by !== c.var.auth.id } : {}),
     todayIso: todayIsoMYT(),
     planUnavailable,
   });
@@ -1358,7 +1495,7 @@ manualPurchaseRouter.get("/:id/stock-allocation", requireOperation, async (c) =>
   const { data: request, error: reqErr } = await sb
     .from("purchase_requests")
     .select(
-      "id, req_no, fulfilment_intent, approved_at, refused_at, withdrawn_at, sent_back_at",
+      "id, req_no, fulfilment_intent, approved_at, refused_at, withdrawn_at, sent_back_at, request_context, request_version, proceed_date, purpose, approval_version",
     )
     .eq("id", id)
     .maybeSingle();
@@ -1369,7 +1506,7 @@ manualPurchaseRouter.get("/:id/stock-allocation", requireOperation, async (c) =>
 
   const { data: lineRows, error: lineErr } = await sb
     .from("purchase_demands")
-    .select("id, sku, qty, approved_qty, issued_qty, cancelled_at")
+    .select("id, sku, qty, approved_qty, issued_qty, cancelled_at, request_line_id, stock_proposal_id, fulfilment_kind, destination_id")
     .eq("request_id", id);
   if (lineErr) return fail(c, lineErr);
   const lines = (lineRows ?? []) as Array<{
@@ -1379,6 +1516,10 @@ manualPurchaseRouter.get("/:id/stock-allocation", requireOperation, async (c) =>
     approved_qty: number | null;
     issued_qty: number;
     cancelled_at: string | null;
+    request_line_id?: string | null;
+    stock_proposal_id?: string | null;
+    fulfilment_kind?: string | null;
+    destination_id?: string | null;
   }>;
 
   /* The Catalog's human words, read whole and matched here — never `.in()`
@@ -1424,7 +1565,30 @@ manualPurchaseRouter.get("/:id/stock-allocation", requireOperation, async (c) =>
     }
   }
 
-  const { freeUnitsByKey } = await readFreeStock(sb);
+  const contextual = Number(request.request_version ?? 0) > 0 || request.request_context != null;
+  let qualifiedByDemand: Map<string,Set<string>> | null = null;
+  if (contextual) {
+    const saved = purchaseRequestContextSchema.safeParse(request.request_context);
+    if (!saved.success) return c.json({ error: "stock_source_unavailable" },503);
+    const source = await sb.rpc("purchasing_request_context_review", { p_id: id });
+    const review = !source.error ? purchaseRequestContextReviewReadSchema.safeParse(source.data) : null;
+    if (!review?.success || JSON.stringify(review.data.available ? review.data.review.state.context : review.data.request_context) !== JSON.stringify(saved.data)
+      || (review.data.available ? review.data.review.request_version : review.data.request_version) !== request.request_version
+      || (request.approved_at != null && (review.data.available ? review.data.approval?.approval_version !== request.approval_version : review.data.approval_scope_valid !== true))) return c.json({ error: "stock_source_unavailable" },503);
+    const stock = await sb.rpc("purchasing_request_stock_offers", { p_lines: saved.data.lines });
+    const offers = !stock.error ? purchaseRequestStockOffersSchema.safeParse(stock.data) : null;
+    if (!offers?.success) return c.json({ error: "stock_source_unavailable" },503);
+    qualifiedByDemand = new Map();
+    for (const line of lines) {
+      const requestedLine = saved.data.lines.find(value => value.id === line.request_line_id);
+      const proposal = requestedLine?.stockProposals.find(value => value.id === line.stock_proposal_id);
+      if (line.fulfilment_kind === "stock_proposal" && (!proposal || proposal.destinationId !== line.destination_id)) return c.json({ error: "stock_source_unavailable" },503);
+      const units = proposal ? offers.data.filter(offer => offer.lineId === requestedLine!.id && offer.locationId === proposal.locationId && offer.destinationId === proposal.destinationId).flatMap(offer => offer.units.map(unit => unit.id)) : [];
+      qualifiedByDemand.set(line.id,new Set(units));
+    }
+  }
+  const { freeUnitsByKey } = await readFreeStock(sb,contextual);
+
 
   const approved =
     request.approved_at != null &&
@@ -1444,9 +1608,9 @@ manualPurchaseRouter.get("/:id/stock-allocation", requireOperation, async (c) =>
       reservedQty,
       cancelled: l.cancelled_at != null,
     });
-    const free = freeUnitsByKey.get(stockMatchKey(l.sku)) ?? [];
+    const free = (freeUnitsByKey.get(stockMatchKey(l.sku)) ?? []).filter(unit => qualifiedByDemand == null || qualifiedByDemand.get(l.id)?.has(unit.id));
     const availableQty = free.reduce((n, u) => n + Math.max(1, u.qty), 0);
-    const stockBlock = manualPurchaseStockBlockOf({
+    const stockBlock = contextual && intent !== "additional_stock" && l.fulfilment_kind !== "stock_proposal" ? "stock_not_approved" as const : manualPurchaseStockBlockOf({
       approved,
       intent,
       hasReference: reference != null,
@@ -1589,14 +1753,20 @@ manualPurchaseRouter.post("/:id/stock-allocation", requireOperation, async (c) =
   return c.json(data);
 });
 
-const decideBody = z.object({
-  /* R4 (2026-09-16) — `send_back` returns the SAME request to its requester. */
-  decision: z.enum(["approve", "refuse", "send_back"]),
-  reason: z.string().max(1000).nullish(),
-  cuts: z
-    .array(z.object({ id: z.string().uuid(), qty: z.number().int().min(0) }))
-    .nullish(),
+// Unmounted context client reads the current owning scope; unavailable is never
+// converted to an empty approval. Missing RPC stays an error until SQL rollout.
+manualPurchaseRouter.get("/:id/context-review", requireOperation, async (c) => {
+  const id = c.req.param("id");
+  if (!z.string().uuid().safeParse(id).success) return c.json({ error: "invalid_request_id", code: "invalid_param" }, 400);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("purchasing_request_context_review", { p_id: id });
+  if (error) return fail(c, error);
+  const read = purchaseRequestContextReviewReadSchema.safeParse(data);
+  if (!read.success) return c.json({ error: "context_review_unavailable", code: "context_review_unavailable" }, 503);
+  return c.json(read.data);
 });
+
+const decideBody = purchaseRequestDecisionSchema;
 
 manualPurchaseRouter.post("/:id/decide", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -1615,15 +1785,21 @@ manualPurchaseRouter.post("/:id/decide", requireOperation, async (c) => {
   if (!parsed.success) {
     return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
   }
-  const { decision, reason, cuts } = parsed.data;
+  const { decision, reason, cuts, contextReview } = parsed.data;
 
   const { data, error } = await sb.rpc("purchasing_decide_request", {
     p_id: id,
     p_decision: decision,
     p_reason: reason ?? null,
-    p_cuts: cuts && cuts.length > 0 ? cuts : null,
+    p_cuts: contextReview ? {
+      expected_version: contextReview.expectedVersion, review_scope: contextReview.reviewScope,
+      request_context: contextReview.context, approved_distribution: contextReview.approvedDistribution,
+    } : cuts && cuts.length > 0 ? cuts : null,
   });
   if (error) {
+    // Context SQL owns version/source/stock admission. Preserve its refusal tag;
+    // all existing legacy decision wording and approver handling remain below.
+    if (contextReview && error.code !== "42501") return contextRefusal(c, error);
     /* THE SAME DOOR, THE SAME WORDS (closure §9): the SQL gate refuses a
        non-approver with a bare 42501 whose message is the single word
        `forbidden` — measured reaching the operator raw on production
@@ -1777,6 +1953,34 @@ manualPurchaseRouter.post("/:id/resubmit", requireOperation, async (c) => {
     raw = await c.req.json();
   } catch {
     return c.json({ error: "invalid_json" }, 400);
+  }
+  // Context revisions retain the same public SQL owner and request number.
+  // No legacy flattening, default date floor, per-line writes or browser approval.
+  if (raw && typeof raw === "object" && "context" in raw) {
+    const revision = purchaseRequestRevisionSchema.safeParse(raw);
+    if (!revision.success) return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
+    const b = revision.data;
+    try {
+      const issues = await contextSupplierDateGuard(sb, b.context);
+      if (issues.length) return c.json({ error: "supplier_date_plan_refused", code: "invalid_param", issues }, 422);
+    } catch {
+      return c.json({ error: "supplier_plan_unavailable", code: "invalid_param" }, 422);
+    }
+
+    const { data, error } = await sb.rpc("purchasing_resubmit_request", {
+      p_id: id,
+      p_destination_id: b.context.lines.flatMap((line) => line.allocations)[0]?.destinationId
+        ?? b.context.lines.flatMap((line) => line.stockProposals)[0]?.destinationId,
+      p_required_by: b.context.purpose === "ready_stock" ? b.context.stockDeliveryDate
+        : b.context.recipients.map((recipient) => recipient.deliveryDate).sort()[0],
+      p_why: null, p_purchase_requirement: null,
+      p_for_service_case_id: b.context.serviceCaseId,
+      p_for_staff_user_id: null, p_for_subsidiary_name: null,
+      p_lines: [{ request_context: b.context, revision_key: b.revisionKey,
+        expected_version: b.expectedVersion, reason: b.reason, ...(b.forecastSource ? { forecast_source: b.forecastSource } : {}) }],
+    });
+    if (error) return contextRefusal(c, error);
+    return c.json(data);
   }
   const parsed = resubmitBody.safeParse(raw);
   if (!parsed.success) {
@@ -2019,6 +2223,38 @@ manualPurchaseRouter.post("/", requireOperation, async (c) => {
   } catch {
     return c.json({ error: "invalid_json" }, 400);
   }
+  /* The contextual form uses the SAME atomic request owner. The SQL door owns
+     duplicate submissions, source scope, dates, allocations and all writes. A
+     request is never decomposed into client-side per-line transactions. */
+  if (raw && typeof raw === "object" && "context" in raw) {
+    const submission = purchaseRequestSubmitSchema.safeParse(raw);
+    if (!submission.success) {
+      return c.json({ error: "invalid_body", code: "invalid_param", fields: submission.error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })) }, 400);
+    }
+    try {
+      const issues = await contextSupplierDateGuard(sb, submission.data.context);
+      if (issues.length) return c.json({ error: "supplier_date_plan_refused", code: "invalid_param", issues }, 422);
+    } catch {
+      return c.json({ error: "supplier_plan_unavailable", code: "invalid_param" }, 422);
+    }
+    const { data, error } = await sb.rpc("purchasing_create_request_with_lines", {
+      p_purpose: submission.data.context.purpose,
+      p_destination_id: submission.data.context.lines.flatMap((line) => line.allocations)[0]?.destinationId
+        ?? submission.data.context.lines.flatMap((line) => line.stockProposals)[0]?.destinationId,
+      p_required_by: submission.data.context.lines.flatMap((line) => line.allocations)[0]?.supplierDeliveryDate ?? null,
+      p_why: null,
+      p_for_service_case_id: submission.data.context.serviceCaseId,
+      p_for_staff_user_id: null,
+      p_for_subsidiary_name: null,
+      // Extend the existing JSON input without creating an overloaded RPC.
+      // SQL normalises the envelope and derives every demand from the context.
+      p_lines: [{ request_context: submission.data.context, submission_key: submission.data.submissionKey, ...(submission.data.forecastSource ? { forecast_source: submission.data.forecastSource } : {}) }],
+      p_fulfilment_intent: submission.data.context.purpose === "ready_stock" ? "additional_stock" : "concrete_need",
+      p_purchase_requirement: null,
+    });
+    if (error) return contextRefusal(c, error);
+    return c.json(data, 201);
+  }
   const parsed = headerBody.safeParse(raw);
   if (!parsed.success) {
     return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
@@ -2179,10 +2415,24 @@ manualPurchaseRouter.post("/:id/lines", requireOperation, async (c) => {
   return c.json(data);
 });
 
+/** Qualified exact-config stock proposals. Same SQL reader as saved Review;
+ * caller's JWT/owning role only. Failed/invalid source is never empty stock. */
+manualPurchaseRouter.post("/stock-offers", requireOperation, async (c) => {
+  let raw: unknown;
+  try { raw = await c.req.json(); } catch { return c.json({ error: "invalid_json" }, 400); }
+  const input = z.object({ lines: purchaseRequestStockLinesSchema }).strict().safeParse(raw);
+  if (!input.success) return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
+  const source = await userClient(c.env, c.var.auth.jwt).rpc("purchasing_request_stock_offers", { p_lines: input.data.lines });
+  if (source.error) return fail(c, source.error);
+  const offers = purchaseRequestStockOffersSchema.safeParse(source.data);
+  if (!offers.success || offers.data.some(offer => !input.data.lines.some(line => line.id === offer.lineId))) return c.json({ error: "stock_source_unavailable" }, 503);
+  return c.json({ offers: offers.data });
+});
+
 /** The create form's plan read may name up to this many distinct SKUs —
  *  far above any real request, far below a scraping loop. */
 const planBody = z
-  .object({ skus: z.array(z.string().min(1).max(120)).max(50) })
+  .object({ skus: z.array(z.string().min(1).max(120)).max(50), proceedDate: z.string().date().optional(), purpose: z.enum(["service_case", "general_purchase", "ready_stock"]).optional(), origin: z.enum(["manual", "stock_request", "forecast_suggestion"]).optional(), requestId: z.string().uuid().optional() })
   .strict();
 
 /**
@@ -2216,17 +2466,41 @@ manualPurchaseRouter.post("/plan", requireOperation, async (c) => {
     return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
   }
   const skus = [...new Set(parsed.data.skus)];
-  const proceedDate = todayIsoMYT();
+  const proceedDate = parsed.data.proceedDate ?? todayIsoMYT();
+  const sb = userClient(c.env, c.var.auth.jwt);
+  let recipientEarliest: string | null = null;
+  let recipientPlanUnavailable = false;
+  if (parsed.data.purpose) {
+    try {
+      const requestSettings = await loadPurchaseRequestSettings(sb);
+      recipientEarliest = plusCalendarDays(proceedDate, parsed.data.purpose === "service_case"
+        ? requestSettings.serviceCalendarDays : requestSettings.normalCalendarDays);
+    } catch { recipientPlanUnavailable = true; }
+  }
+  const recipientPlan = parsed.data.purpose ? { recipientEarliest, recipientPlanUnavailable } : {};
+  if (parsed.data.origin === "forecast_suggestion" && parsed.data.purpose !== "ready_stock") return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
+  let forecastPlan: { forecastSource: Array<Record<string, unknown>> | null; forecastSourceUnavailable: boolean } | Record<string, never> = {};
+  if (parsed.data.origin === "forecast_suggestion") {
+    if (skus.length === 0) forecastPlan = { forecastSource: null, forecastSourceUnavailable: false };
+    else {
+      try {
+        const source = await sb.rpc("purchasing_request_forecast_sources", { p_skus: skus, p_request_id: parsed.data.requestId ?? null });
+        forecastPlan = source.error || !Array.isArray(source.data) ? { forecastSource: null, forecastSourceUnavailable: true }
+          : { forecastSource: source.data, forecastSourceUnavailable: false };
+      } catch { forecastPlan = { forecastSource: null, forecastSourceUnavailable: true }; }
+    }
+  }
+
   if (skus.length === 0) {
     return c.json({
       proceedDate,
       lines: [],
       deliveryDateDefault: null,
       planUnavailable: false,
+      ...recipientPlan, ...forecastPlan,
     });
   }
 
-  const sb = userClient(c.env, c.var.auth.jwt);
   let settings: LoadedPurchasingSettings | null = null;
   let planUnavailable = false;
   try {
@@ -2288,27 +2562,10 @@ manualPurchaseRouter.post("/plan", requireOperation, async (c) => {
       )
     : null;
 
-  return c.json({ proceedDate, lines, deliveryDateDefault, planUnavailable });
+  return c.json({ proceedDate, lines, deliveryDateDefault, planUnavailable, ...recipientPlan, ...forecastPlan });
 });
 
-const issueBody = z.object({
-  requestIds: z.array(z.string().uuid()).min(1).max(20),
-  /** The consolidation OFFER's answer. Declinable by design (card §6):
-   *  `false` issues one document per request. */
-  together: z.boolean(),
-  /**
-   * ⭐ THE CHOSEN GOODS LINES (owner ruling 2026-09-18) — optional, and its
-   * absence means *every eligible line of the named requests*, which is what
-   * the parent tick has always meant.
-   *
-   * A request that carries three items and needs two of them bought could not
-   * say so while the tick lived only on the parent row. A line named here that
-   * does not belong to a named request is refused; the server still recomputes
-   * every quantity from its own read, so this NARROWS the issue and can never
-   * widen it.
-   */
-  demandIds: z.array(z.string().uuid()).max(200).optional(),
-});
+const issueBody = purchaseRequestIssueSchema;
 
 /**
  * ISSUE — approved requests become purchase orders, THE SAME DAY (card §6:
@@ -2336,13 +2593,23 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
   if (!parsed.success) {
     return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
   }
-  const { requestIds, together, demandIds } = parsed.data;
+  const { requestIds, together, demandIds, contextIssue } = parsed.data;
 
   /* Manual Purchase and SO Batch Purchase ask the same governed capability;
      the creation RPC asks again at the database boundary. */
   const authority = await purchasingActorMayIssue(sb, c.var.auth.id);
   if (authority.error) return fail(c, authority.error);
   if (!authority.mayIssue) return refuse(c, 403, "not_po_duty");
+
+  if (contextIssue) {
+    const { data: retry, error: retryError } = await sb.rpc("purchasing_request_issue_retry", { p_key: contextIssue.key, p_client_input: parsed.data });
+    if (retryError) return contextRefusal(c, retryError);
+    if (retry !== null) {
+      const result = z.object({ po_ids: z.array(z.string()).min(1) }).strict().safeParse(retry);
+      if (!result.success) return c.json({ error: "issue_result_unavailable", code: "issue_result_unavailable" }, 503);
+      return c.json({ poIds: result.data.po_ids, documents: result.data.po_ids.length });
+    }
+  }
 
   const { data: requests, error: reqErr } = await sb
     .from("purchase_requests")
@@ -2390,10 +2657,18 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
     }
   }
 
+  const contextRequests = new Map((requests ?? []).filter(r => Number(r.request_version ?? 0) > 0 || r.request_context != null).map(r => [r.id as string, r]));
+  const reviewedRequests = new Map(contextIssue?.requests.map(r => [r.id, r]) ?? []);
+  if (contextRequests.size && (!contextIssue || reviewedRequests.size !== contextRequests.size
+    || [...contextRequests].some(([id, r]) => !reviewedRequests.has(id) || reviewedRequests.get(id)!.requestVersion !== r.request_version || reviewedRequests.get(id)!.approvalVersion !== r.approval_version))) {
+    return c.json({ error: "request_approval_changed", code: "request_approval_changed" }, 409);
+  }
+  if (!contextRequests.size && contextIssue) return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
+  const issueOverrides = new Map(contextIssue?.allocations?.map(a => [a.demandId, a]) ?? []);
   const { data: allLines, error: lineErr } = await sb
     .from("purchase_demands")
     .select(
-      "id, request_id, sku, supplier_id, destination_id, qty, approved_qty, issued_qty, required_by, cancelled_at, attrs",
+      "id, request_id, sku, supplier_id, destination_id, qty, approved_qty, issued_qty, required_by, cancelled_at, attrs, fulfilment_kind",
     )
     .in("request_id", requestIds);
   if (lineErr) return fail(c, lineErr);
@@ -2439,6 +2714,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
 
   const toIssue = (allLines ?? [])
     .filter((l) => l.cancelled_at === null)
+    .filter((l) => !contextRequests.has(l.request_id as string) || l.fulfilment_kind === "purchase")
     .filter((l) => chosenLines == null || chosenLines.has(l.id as string))
     .map((l) => ({
       ...l,
@@ -2448,12 +2724,18 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
           qty: Number(l.qty),
           approvedQty: l.approved_qty == null ? null : Number(l.approved_qty),
           issuedQty: Number(l.issued_qty ?? 0),
-        }) - (heldByDemand.get(l.id as string) ?? 0),
+        }) - (contextRequests.has(l.request_id as string) ? 0 : (heldByDemand.get(l.id as string) ?? 0)),
       ),
     }))
     .filter((l) => l.issueQty > 0);
   if (toIssue.length === 0) {
     return refuse(c, 409, "nothing_to_issue");
+  }
+
+  for (const [id, allocation] of issueOverrides) {
+    const line = toIssue.find(l => l.id === id);
+    if (!line || !contextRequests.has(line.request_id as string) || allocation.qty > line.issueQty) return c.json({ error: "request_over_issue", code: "request_over_issue" }, 422);
+    line.issueQty = allocation.qty;
   }
 
   /* ⭐ FORECAST PURCHASE — THE RECHECK BEFORE A PO IS ISSUED (owner ruling
@@ -2474,11 +2756,12 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
      the PO is refused by name and the request goes back for a new decision
      through its own send back or withdraw door. A forecast that cannot be
      read refuses the issue; a PO is never issued against a number nobody read. */
+  if (toIssue.some(l => !contextRequests.has(l.request_id as string))) {
   try {
     const stopped = await forecastIssueRefusal(
       sb,
       todayIsoMYT(),
-      toIssue.map((l) => ({ requestId: l.request_id as string, sku: l.sku as string, issueQty: l.issueQty })),
+      toIssue.filter(l => !contextRequests.has(l.request_id as string)).map((l) => ({ requestId: l.request_id as string, sku: l.sku as string, issueQty: l.issueQty })),
     );
     if (stopped) {
       const sku = await forecastItemWord(sb, stopped.sku);
@@ -2487,6 +2770,8 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
     }
   } catch (e) {
     return fail(c, ((e as { pg?: unknown }).pg ?? { message: (e as Error).message }) as Parameters<typeof fail>[1]);
+  }
+
   }
 
   // The catalog facts: supplier truth, cost, category (for the ETA).
@@ -2611,6 +2896,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
   /* ⭐ A Deliver To with no address is refused BEFORE the PO exists: the PO
      document refuses it (`destination_address_missing`), but only when the
      PDF is drawn, after the PO number is spent. Same rule as SO Batch. */
+  const destinationWarehouses = new Map<string, string>();
   const groupDestinationIds = [...new Set([...groups.values()].map((g) => g.destinationId))];
   if (groupDestinationIds.length > 0) {
     const { data: destRows, error: destErr } = await sb
@@ -2619,6 +2905,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
       .in("id", groupDestinationIds);
     if (destErr) return fail(c, destErr);
     for (const d of (destRows ?? []) as Record<string, unknown>[]) {
+      if (d.warehouse_id != null) destinationWarehouses.set(d.id as string, d.warehouse_id as string);
       const wh = d.warehouses as { address?: string | null } | { address?: string | null }[] | null;
       const whAddress = Array.isArray(wh) ? wh[0]?.address : wh?.address;
       const address = d.warehouse_id != null ? whAddress ?? null : (d.address as string | null) ?? null;
@@ -2666,7 +2953,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
     }
     governedPos.push({
       supplier_id: first.supplierId,
-      warehouse_id: warehouse.id as string,
+      warehouse_id: group.lines.some(l => contextRequests.has(l.request_id as string)) ? destinationWarehouses.get(group.destinationId) ?? warehouse.id as string : warehouse.id as string,
       destination_id: group.destinationId,
       /* ⭐ THE PO DELIVERY DATE IS THE SETTINGS DATE — OWNER CORRECTION
          (Jess, 2026-09-22), replacing Card 06 §7's "the approved Manual
@@ -2721,10 +3008,36 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
     });
   }
 
+  if (contextIssue) {
+    const canonical = (value: unknown): unknown => Array.isArray(value) ? value.map(canonical)
+      : value && typeof value === "object" ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, val]) => [key, canonical(val)])) : value;
+    for (const po of governedPos) {
+      po.context_issue_key = contextIssue.key;
+      po.context_client_input = parsed.data;
+      const merged = new Map<string, Record<string, unknown>>();
+      const output: Record<string, unknown>[] = [];
+      for (const line of po.lines as Array<Record<string, unknown>>) {
+        const owner = (allLines ?? []).find(l => l.id === line.demand_id);
+        if (!owner) { output.push(line); continue; }
+        const reviewed = reviewedRequests.get(owner.request_id as string);
+        const override = issueOverrides.get(owner.id as string);
+        const source = { demand_id: owner.id, qty: line.qty, request_version: reviewed?.requestVersion ?? 0,
+          approval_version: reviewed?.approvalVersion ?? null, approval_token: reviewed?.approvalToken ?? null, recipients: override?.recipients ?? null };
+        const attrs = line.attrs && typeof line.attrs === "object" && !Array.isArray(line.attrs) && Object.keys(line.attrs).length ? line.attrs : null;
+        const key = `${line.sku}|${JSON.stringify(canonical(attrs))}`;
+        const saved = merged.get(key);
+        if (saved) { saved.qty = Number(saved.qty) + Number(line.qty); (saved.request_sources as unknown[]).push(source); }
+        else { const { demand_id: _demand, ...physical } = line; const next = { ...physical, request_sources: [source] }; merged.set(key, next); output.push(next); }
+      }
+      po.lines = output;
+    }
+  }
+
   const { data: batch, error: batchErr } = await sb.rpc("purchasing_issue_pos_batch", {
     p_pos: governedPos,
   });
   if (batchErr) {
+    if (contextIssue) return contextRefusal(c, batchErr);
     /* ⭐ THE SAME DOOR, THE SAME WORDS (0379/0380; closure §1 · §9). This lane
        used to call the creation authority with NO duty check at all, and any
        Postgres message it raised reached the operator raw. Both are closed: the

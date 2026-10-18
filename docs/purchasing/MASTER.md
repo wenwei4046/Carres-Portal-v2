@@ -1453,7 +1453,23 @@ KEEP the complete supplier setup and category-specific working-calendar law abov
 
 Recommended supplier-performance acceptance connects §12's existing reporting target: disclose denominator, partial/late receipt treatment, expected-versus-actual date source, calendar and as-of/coverage before showing a rate. No recorded defect is not automatically proven perfect quality; no accepted receipts is not zero-percent performance. Supplier retirement/block behavior must distinguish new procurement admission from continuing existing receipt/claim/repair/return obligations; exact admission policy remains a review decision, not an adopted foreign status rule. No second scoring engine or blanket stop of existing operational work.
 
-### 5.6 Issue means the PDF was actually sent
+### 5.6 Issue and supplier sending are separate
+
+**Shared sending target — owner9–17Oct2026 · APPROVED TARGET / NOT BUILT.**
+Issuance creates the governed PO; supplier sending records a separate actual result. Reuse one
+shared Send PO journey for SO Batch, MPR and RS. Each PO/version retains its own Sent / Failed /
+Unknown result, actual channel, recipient, actor and server time. Unknown is reconciled before
+resending; opening WhatsApp/Email, downloading or viewing a PDF is not sending. A supplier batch
+can be partial; Tasks close only from its saved per-PO facts. This does not activate automatic
+transport or authorise real supplier messages during testing.
+
+**Manual WhatsApp screenshot — owner9Oct, reaffirmed17Oct · APPROVED TARGET / NOT BUILT.**
+PUR-16 defaults Active and the authorised Settings editor may set Inactive. Active requires a
+conversation screenshot for an actual manual WhatsApp sending confirmation; Inactive does not.
+Both retain exact PO version, channel, recipient, actor and server time. Changes are audited,
+affect subsequent confirmations and preserve historical evidence. This scoped setting does not
+weaken Email, supplier-answer or other-module evidence rules. The canonical Settings inventory is
+`Carres Settings List.md`; a draft schema/default is not runtime proof.
 
 **Sending evidence is built; revised visible copy BUILT 2026-09-17 (SLICE 1) · authenticated walk OWED (approved Jess, 2026-09-17).**
 The shared communication area records version, channel, recipient, actor and time. The new button

@@ -1,0 +1,11 @@
+import { beforeEach, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+const state=vi.hoisted(()=>({data:undefined as any,isPending:false,isError:false,isFetching:false}));
+vi.mock("@/lib/queries",()=>({usePurchaseRequestRelease:()=>state}));
+vi.mock("./OperationApp",()=>({default:({purchaseRequestContext}:any)=><div data-testid="operation-root" data-context={String(purchaseRequestContext)}/>}));
+import RequestFlowOperationApp from "./RequestFlowOperationApp";
+beforeEach(()=>{state.data=undefined;state.isPending=false;state.isError=false;state.isFetching=false;});
+it("waits for first release read before offering a legacy/new create entry",()=>{state.isPending=true;render(<RequestFlowOperationApp/>);expect(screen.queryByTestId("operation-root")).not.toBeInTheDocument();});
+it("missing or failed release never opens the new flow",()=>{state.isError=true;render(<RequestFlowOperationApp/>);expect(screen.getByTestId("operation-root")).toHaveAttribute("data-context","false");});
+it("exact DB activation mounts the shared Forecast/MPR composition",()=>{state.data={version:1,requestFlow:true,cancellation:false,serviceExecution:false};render(<RequestFlowOperationApp/>);expect(screen.getByTestId("operation-root")).toHaveAttribute("data-context","true");});
+it("background read failure retains the open context composition and drafts",()=>{state.data={version:1,requestFlow:true,cancellation:false,serviceExecution:false};const view=render(<RequestFlowOperationApp/>);const root=screen.getByTestId("operation-root");state.isFetching=true;view.rerender(<RequestFlowOperationApp/>);state.isFetching=false;state.isError=true;view.rerender(<RequestFlowOperationApp/>);expect(screen.getByTestId("operation-root")).toBe(root);expect(root).toHaveAttribute("data-context","true");});
