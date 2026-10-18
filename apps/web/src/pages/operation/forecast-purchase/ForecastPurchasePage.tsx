@@ -63,6 +63,7 @@ import TwoLineCell from "@/components/register/TwoLineCell";
 import { FilterRail, ShowFiltersButton, useFilterRailOpen } from "../components/workspace-rail";
 import ForecastRequestWorkspace from "./ForecastRequestWorkspace";
 import PurchasingTabs from "../PurchasingTabs";
+import { TasksPill } from "../components/ShellTasks";
 import { FORECAST_PURCHASE as W, monthWord, pcs, requestStateWord, weekdayWord } from "./forecast-purchase-words";
 import styles from "./ForecastPurchase.module.css";
 
@@ -431,7 +432,7 @@ export default function ForecastPurchasePage({contextFlow=false}:{contextFlow?:b
                 <Tabs variant="segmented" label={W.showLabel} value={show} onValueChange={setShow}
                   tabs={[{ value: "suggested", label: W.showSuggested }, { value: "ordered", label: W.showOrdered }, { value: "all", label: W.showAll }]} />
               </>}
-              toolbarEnd={<div className={`${styles.toolbarTools} flex min-w-0 flex-wrap items-center gap-2`}>{viewMenu(false)}</div>}
+              toolbarEnd={<div className={`${styles.toolbarTools} flex min-w-0 flex-wrap items-center gap-2`}>{viewMenu(false)}<TasksPill /></div>}
               expandable={{
                 flush: true,
                 testId: (m) => `forecast-expand-${m.modelId}`,

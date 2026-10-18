@@ -239,8 +239,8 @@ describe("Forecast Purchase · Outright", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(screen.queryByTestId("selection-bar")).not.toBeInTheDocument();
     await waitFor(() => expect(vi.mocked(apiFetch).mock.calls.filter(([url]) => url === FORECAST).length).toBeGreaterThan(1));
-    // Every call was the read or the forecast's submit door: no request door, no plan, no issue.
-    expect(new Set(vi.mocked(apiFetch).mock.calls.map(([url]) => url))).toEqual(new Set([FORECAST, SUBMIT]));
+    // The shared Tasks control also reads Work; the only business write remains forecast submit.
+    expect(new Set(vi.mocked(apiFetch).mock.calls.map(([url]) => url))).toEqual(new Set([FORECAST, SUBMIT, "/api/operation/work?include=workspace"]));
   });
 
   it("a press whose answer was lost is pressed again with the SAME key; after a refusal the next press is a new ask", async () => {
