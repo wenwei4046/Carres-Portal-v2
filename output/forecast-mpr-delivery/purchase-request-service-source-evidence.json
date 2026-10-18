@@ -100,12 +100,18 @@
     "local_controls": "Existing SC procurement fixture captures actual Case facts, unchanged Purchasing scope stays readable, changed Case action invalidates saved scope, authorised unissued same-number repair retains old approval history. TEST text saying approved procurement scope does not manufacture a qualified Service remedy approval.",
     "activation_limit": "No reliable typed producer currently classifies a new/changed formal remedy versus already-authorised unchanged follow-up. All new-context activation stays closed pending that owning read contract. No purpose=service_case blanket-denial predicate or applicant self-certified authorisation is added.",
     "source_locations": [
-      "docs/service/MASTER.md \u00a77.4",
+      "docs/service/MASTER.md §7.4",
       "docs/ERP-ARCHITECTURE.md module ownership and Service Case decision gate",
       "apps/api/src/routes/ops/service-cases.ts progress/evidence/PATCH",
       "apps/api/src/routes/ops/service-notes.ts",
       "apps/api/src/routes/principal/approvals.ts",
       "packages/shared/src/workspace-duties-catalogue.ts service_case_approver"
     ]
+  },
+  "qualified_existing_unchanged_local_proof": {
+    "status": "LOCAL SYNTHETIC SOURCE PROOF ONLY; no production authorisation or new producer contract",
+    "fixture": "purchase-request-context.local-check.sql case_source_test",
+    "facts": "Actual owning Case row plus preceding generic approvals.other record linked by Case reference/context; existing approval_decide records resolved service_case_approver actor/time/outcome. Exact unchanged Purchasing approval/coverage remains readable. Later Case action change invalidates Purchasing snapshot and leaves old authorisation/history intact.",
+    "limit": "TEST payload shape is not adopted as a production Service contract and no application Service approval module/Decision UUID requirement was introduced. New/changed formal-remedy admission still needs the qualified existing owning representation/read contract; upload attribution/text alone remains insufficient."
   }
 }

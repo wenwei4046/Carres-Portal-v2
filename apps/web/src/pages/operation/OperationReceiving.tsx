@@ -1,4 +1,4 @@
-import { GOODS_ABSENCE_WORDS } from "@carres/shared";
+import { poLineReportable, GOODS_ABSENCE_WORDS } from "@carres/shared";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
@@ -68,7 +68,7 @@ import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
 function poStillOwes(po: operationPoListRow): boolean {
   if (po.status !== "open") return false;
   const lines = po.purchase_order_lines ?? [];
-  return lines.some((l) => (l.received_qty ?? 0) < (l.qty ?? 0));
+  return lines.some((l) => poLineReportable(l)>0);
 }
 
 /** The three `Received with` rows, in the owner's order and words. */

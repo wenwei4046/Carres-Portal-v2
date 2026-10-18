@@ -1,11 +1,11 @@
 -- REVIEW / LOCAL REHEARSAL ONLY. NOT APPROVED. Never execute on production before approval.
--- Exact draft SHA256 bc0a271221ca82412e911a311b00ac2220fdc8778dfdd6f4f0103472bcae69aa. Deliberate final exception rolls ALL DDL back.
+-- Exact draft SHA256 475a87f26feacfa2080aa337ae13a275a6054da2b71e8bd3de019f6ba958e8f1. Deliberate final exception rolls ALL DDL back.
 -- Relative before/after checks only; no fixed production transaction-count assumptions.
 do $request_writer_probe$
 declare before_cancellations bigint:=0; after_cancellations bigint; before_counts jsonb; before_rls text; before_policies text; before_settings text; item jsonb; function_oid regprocedure; invalid_refused boolean:=false; no_account_refused boolean:=false; closed_refused boolean:=false; closed_tag text; trigger_count integer;
 begin
  if to_regclass('public.po_goods_cancellation_events') is not null then execute 'select count(*) from public.po_goods_cancellation_events' into before_cancellations; end if;
- before_counts:=jsonb_build_object('requests',(select count(*) from public.purchase_requests),'demands',(select count(*) from public.purchase_demands),'events',(select count(*) from public.purchase_request_events),'pos',(select count(*) from public.purchase_orders),'po_lines',(select count(*) from public.purchase_order_lines),'po_sources',(select count(*) from public.po_line_sources),'units',(select count(*) from public.ops_stock_items),'audit',(select count(*) from public.audit_log)); before_rls:=(select md5(string_agg(c.relname||':'||c.relrowsecurity::text,',' order by c.relname)) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in('r','p') and c.relname<>'po_goods_cancellation_events'); before_policies:=(select md5(coalesce(string_agg(tablename||':'||policyname||':'||coalesce(qual,'')||':'||coalesce(with_check,''),',' order by tablename,policyname),'')) from pg_policies where schemaname='public' and tablename<>'po_goods_cancellation_events'); before_settings:=(select md5(to_jsonb(s)::text) from public.purchasing_settings s where id=1);
+ before_counts:=jsonb_build_object('requests',(select count(*) from public.purchase_requests),'demands',(select count(*) from public.purchase_demands),'events',(select count(*) from public.purchase_request_events),'pos',(select count(*) from public.purchase_orders),'po_lines',(select count(*) from public.purchase_order_lines),'po_sources',(select count(*) from public.po_line_sources),'units',(select count(*) from public.ops_stock_items),'audit',(select count(*) from public.audit_log),'receipts',(select count(*) from public.warehouse_receipts),'receiving_events',(select count(*) from public.receiving_events),'claims',(select count(*) from public.supplier_claims),'approvals',(select count(*) from public.approvals)); before_rls:=(select md5(string_agg(c.relname||':'||c.relrowsecurity::text,',' order by c.relname)) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in('r','p') and c.relname<>'po_goods_cancellation_events'); before_policies:=(select md5(coalesce(string_agg(tablename||':'||policyname||':'||coalesce(qual,'')||':'||coalesce(with_check,''),',' order by tablename,policyname),'')) from pg_policies where schemaname='public' and tablename<>'po_goods_cancellation_events'); before_settings:=(select md5(to_jsonb(s)::text) from public.purchasing_settings s where id=1);
  execute $carres_exact_context_writer_ddl$-- WORK IN PROGRESS, NOT APPROVED, NOT A MIGRATION. Never apply to production.
 -- Core canonical create/revision/approval/Stock/partial-issue/readback is implemented
 -- and rehearsed locally. Explicit rollout gaps remain in the adjacent review JSON.
@@ -5553,6 +5553,720 @@ $function$
 ;
 revoke all on function public.purchasing_require_reply_evidence() from public,anon,authenticated;
 grant execute on function public.purchasing_require_reply_evidence() to authenticated;
+
+-- Existing Receiving writer/validator consume the same effective pending scope.
+-- Source customer need/thread satisfaction still follows actual receipts; no
+-- cancellation is mistaken for goods received. Existing signatures/ACL retained.
+CREATE OR REPLACE FUNCTION public.warehouse_receipt_validate_lines(p_po_id text, p_lines jsonb, p_uid uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  v_line jsonb; v_line_id uuid; v_recv int; v_damaged int; v_wrong int;
+  v_type text; v_pol purchase_order_lines; v_reportable int;
+  v_counted int := 0; v_clean jsonb := '[]'::jsonb;
+  v_units jsonb; v_unit jsonb; v_ucode text; v_uitem ops_stock_items;
+  v_outcome text; v_u_recv int; v_u_dmg int; v_u_wrong int; v_u_notrecv int;
+  v_seen text[]; v_clean_units jsonb; v_has_units boolean;
+begin
+  if p_lines is null or jsonb_typeof(p_lines) <> 'array' or jsonb_array_length(p_lines) = 0 then
+    raise exception 'p_lines required (at least one line)'
+      using errcode = '22023', detail = 'invalid_input';
+  end if;
+  for v_line in select * from jsonb_array_elements(p_lines) loop
+    v_line_id := nullif(v_line->>'id', '')::uuid;
+    v_recv    := coalesce(nullif(v_line->>'received_now', '')::int, 0);
+    v_damaged := coalesce(nullif(v_line->>'damaged_qty', '')::int, 0);
+    v_wrong   := coalesce(nullif(v_line->>'wrong_item_qty', '')::int, 0);
+    if v_line_id is null then
+      raise exception 'invalid line: missing id' using errcode = '22023', detail = 'invalid_line';
+    end if;
+    if v_recv < 0 or v_damaged < 0 or v_wrong < 0 then
+      raise exception 'invalid line: negative quantity' using errcode = '22023', detail = 'invalid_line';
+    end if;
+    select * into v_pol from purchase_order_lines where id = v_line_id and po_id = p_po_id;
+    if not found then
+      raise exception 'PO line not found for id=%', v_line_id using errcode = '42P01', detail = 'po_line_not_found';
+    end if;
+    if v_pol.identity_mode is null then
+      raise exception 'line % has no stock identity mode — set it for the SKU in Catalog', v_pol.sku
+        using errcode = 'P0001', detail = 'line_identity_mode_missing';
+    end if;
+    v_reportable := public._purchasing_po_line_pending_qty(v_pol.id);
+
+    v_units := v_line->'units';
+    v_has_units := v_units is not null and jsonb_typeof(v_units) = 'array'
+                   and jsonb_array_length(v_units) > 0;
+    v_clean_units := '[]'::jsonb;
+
+    -- ⭐ 0444 · THE MODE DECIDES THE SHAPE. Neither path can be forced by the
+    -- shape of the submission.
+    if v_pol.identity_mode = 'quantity' then
+      if v_has_units then
+        raise exception 'line % is counted by quantity — it has no Unit IDs to scan', v_pol.sku
+          using errcode = 'P0001', detail = 'quantity_line_takes_no_units';
+      end if;
+      if v_recv + v_damaged + v_wrong > v_reportable then
+        raise exception 'line % counts % units but the PO still owes %',
+                        v_pol.sku, v_recv + v_damaged + v_wrong, v_reportable
+          using errcode = 'P0001', detail = 'line_over_reported';
+      end if;
+    else
+      if not v_has_units then
+        raise exception 'line % is traced by Unit ID — record one result for each expected Unit', v_pol.sku
+          using errcode = 'P0001', detail = 'exact_unit_line_needs_units';
+      end if;
+      -- Per-Unit outcomes. The unit list and the quantities are ONE fact: the
+      -- quantities are re-derived from the outcomes so the two can never
+      -- disagree.
+      v_seen := '{}'::text[];
+      v_u_recv := 0; v_u_dmg := 0; v_u_wrong := 0; v_u_notrecv := 0;
+      for v_unit in select * from jsonb_array_elements(v_units) loop
+        v_ucode := public.normalise_unit_id(coalesce(v_unit->>'unit_code', ''));
+        v_outcome := coalesce(v_unit->>'outcome', '');
+        if v_outcome not in ('received','received_with_issue','not_received') then
+          raise exception 'unit % has no valid outcome', coalesce(v_unit->>'unit_code','?')
+            using errcode = '22023', detail = 'unit_outcome_invalid';
+        end if;
+        select * into v_uitem from ops_stock_items
+         where public.normalise_unit_id(unit_code) = v_ucode
+           and identity_scope = 'unit';
+        if not found then
+          raise exception 'Unit % is not a Carres Unit ID', coalesce(v_unit->>'unit_code','?')
+            using errcode = 'P0001', detail = 'unit_unknown';
+        end if;
+        if v_uitem.po_no is distinct from p_po_id then
+          -- A Unit on another PO/CO or unknown to this source.
+          raise exception 'Unit % does not belong to %', v_uitem.unit_code, p_po_id
+            using errcode = 'P0001', detail = 'unit_not_on_this_po';
+        end if;
+        if v_uitem.po_line_id is distinct from v_line_id then
+          raise exception 'Unit % belongs to another line of %, not %', v_uitem.unit_code, p_po_id, v_pol.sku
+            using errcode = 'P0001', detail = 'unit_not_on_this_line';
+        end if;
+        if v_uitem.unit_code = any(v_seen) then
+          raise exception 'Unit % was scanned twice', v_uitem.unit_code
+            using errcode = 'P0001', detail = 'unit_scanned_twice';
+        end if;
+        v_seen := v_seen || v_uitem.unit_code;
+        if v_uitem.status <> 'incoming' then
+          raise exception 'Unit % was already received (session for %)', v_uitem.unit_code, p_po_id
+            using errcode = 'P0001', detail = 'unit_already_received';
+        end if;
+        if v_outcome = 'received' then v_u_recv := v_u_recv + 1;
+        elsif v_outcome = 'not_received' then v_u_notrecv := v_u_notrecv + 1;
+        else
+          if coalesce(v_unit->>'issue_kind', '') = 'wrong_item' then v_u_wrong := v_u_wrong + 1;
+          else v_u_dmg := v_u_dmg + 1;
+          end if;
+        end if;
+        v_clean_units := v_clean_units || jsonb_build_array(jsonb_build_object(
+          'stock_item_id', v_uitem.id,
+          'unit_code', v_uitem.unit_code,
+          'outcome', v_outcome,
+          'issue_kind', case when v_outcome = 'received_with_issue'
+                             then coalesce(nullif(v_unit->>'issue_kind',''), 'damaged')
+                             else null end,
+          'note', nullif(btrim(coalesce(v_unit->>'note','')), '')));
+      end loop;
+      -- The scanned outcomes ARE the quantities (Expected = Received + Not
+      -- received; Received with issue is a subset of Received, split by kind).
+      v_recv := v_u_recv; v_damaged := v_u_dmg; v_wrong := v_u_wrong;
+      if v_recv + v_damaged + v_wrong > v_reportable then
+        raise exception 'line % scans % received units but the PO still owes %',
+                        v_pol.sku, v_recv + v_damaged + v_wrong, v_reportable
+          using errcode = 'P0001', detail = 'line_over_reported';
+      end if;
+    end if;
+
+    if v_damaged > 0 then
+      if jsonb_array_length(public.supplier_claim_photo_entries(v_line->'damaged_photos', p_uid)) = 0 then
+        raise exception 'damaged units on % need at least one photo', v_pol.sku
+          using errcode = 'P0001', detail = 'damaged_photo_required';
+      end if;
+    end if;
+    if v_wrong > 0 then
+      v_type := nullif(btrim(coalesce(v_line->>'wrong_item_claim_type', '')), '');
+      if v_type is null then
+        raise exception 'wrong-item units on % need a claim type', v_pol.sku
+          using errcode = 'P0001', detail = 'wrong_item_type_required';
+      end if;
+      if not public.supplier_claim_type_allowed(public.claim_product_category(v_pol.sku), v_type) then
+        raise exception 'claim type % is not offered for %', v_type, v_pol.sku
+          using errcode = 'P0001', detail = 'wrong_item_type_invalid';
+      end if;
+      if jsonb_array_length(public.supplier_claim_photo_entries(v_line->'wrong_item_photos', p_uid)) = 0 then
+        raise exception 'wrong-item units on % need at least one photo', v_pol.sku
+          using errcode = 'P0001', detail = 'wrong_item_photo_required';
+      end if;
+    end if;
+    v_counted := v_counted + v_recv + v_damaged + v_wrong;
+    if v_recv + v_damaged + v_wrong > 0
+       or jsonb_array_length(v_clean_units) > 0 then
+      v_clean := v_clean || jsonb_build_array(jsonb_build_object(
+        'id', v_line_id, 'sku', v_pol.sku, 'received_now', v_recv,
+        'damaged_qty', v_damaged, 'wrong_item_qty', v_wrong,
+        'wrong_item_claim_type', case when v_wrong > 0 then v_type else null end,
+        'damaged_photos', coalesce(v_line->'damaged_photos', '[]'::jsonb),
+        'wrong_item_photos', coalesce(v_line->'wrong_item_photos', '[]'::jsonb),
+        'units', v_clean_units));
+    end if;
+  end loop;
+  if v_counted = 0 then
+    raise exception 'count at least one unit before sending this'
+      using errcode = 'P0001', detail = 'nothing_counted';
+  end if;
+  return jsonb_build_object('lines', v_clean, 'counted', v_counted);
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.operation_receive_po_with_do(p_po_id text, p_do_file_path text, p_do_number text, p_lines jsonb, p_actual_site_id uuid DEFAULT NULL::uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  v_po                 purchase_orders;
+  v_role               app_role;
+  v_uid                uuid;
+  v_actor              text;
+  v_was_relocated      boolean;
+  v_is_own             boolean := false;
+  v_posts_stock        boolean := false;
+  v_supplier_name      text;
+  v_line               jsonb;
+  v_line_id            uuid;
+  v_received_qty       int;
+  v_damaged_add        int;
+  v_wrong_add          int;
+  v_damaged_total      int := 0;
+  v_wrong_total        int := 0;
+  v_claims_created     int := 0;
+  v_damaged_claim      uuid;
+  v_wrong_claim        uuid;
+  v_category           text;
+  v_wrong_type         text;
+  v_photos             jsonb;
+  v_existing_line      purchase_order_lines;
+  v_sku                text;
+  v_delta              int;
+  v_freed              int;
+  v_minted             int;
+  v_held               int;
+  v_units_held         int := 0;
+  v_lines_updated      int := 0;
+  v_thread             record;
+  v_target_thread_stage operation_stage;
+  v_target_sup_status  po_sup_status;
+  v_threads_advanced   int := 0;
+  v_reserve            record;
+  v_thread_satisfied   boolean;
+  v_outstanding        int;
+  -- 0426 anchors
+  v_site               uuid;
+  v_recv_ids           uuid[];
+  v_dmg_ids            uuid[];
+  v_wrong_ids          uuid[];
+  v_ownership          text;
+  -- 0444
+  v_mode               text;
+  v_named              int;
+  v_rest               int;
+begin
+  if p_po_id is null or length(btrim(p_po_id)) = 0 then
+    raise exception 'p_po_id required' using errcode = '22023', detail = 'invalid_input';
+  end if;
+  if p_do_file_path is null or coalesce(p_do_file_path, '') !~ '[^[:space:]]' then
+    raise exception 'p_do_file_path required' using errcode = '22023', detail = 'invalid_input';
+  end if;
+  if p_do_number is null or coalesce(p_do_number, '') !~ '[^[:space:]]' then
+    raise exception 'p_do_number required' using errcode = '22023', detail = 'invalid_input';
+  end if;
+  if p_lines is null or jsonb_array_length(p_lines) = 0 then
+    raise exception 'p_lines required (at least one line)' using errcode = '22023', detail = 'invalid_input';
+  end if;
+
+  v_uid  := auth.uid();
+  v_role := public.app_role();
+
+  if (v_role is null or v_role not in ('operation', 'principal', 'partner')) then
+    raise exception 'forbidden: only logistics/principal/partner can receive POs'
+      using errcode = '42501', detail = 'forbidden';
+  end if;
+
+  if v_role = 'partner' then
+    select * into v_po from purchase_orders
+     where id = p_po_id and procurement_partner_id = public.app_partner_id()
+     for update;
+  else
+    select * into v_po from purchase_orders where id = p_po_id for update;
+  end if;
+  if not found then
+    raise exception 'PO not found or not assigned to caller'
+      using errcode = '42501', detail = 'po_not_found_or_cross_tenant';
+  end if;
+
+  if v_po.status = 'received' then
+    raise exception 'PO already fully received'
+      using errcode = '22023', detail = 'already_received';
+  end if;
+
+  -- 0426 · the Actual Site: where the goods PHYSICALLY landed. It never
+  -- rewrites the PO's Deliver To; it decides where the stock consequence
+  -- posts. Null = the PO's own booked warehouse, exactly as before.
+  if p_actual_site_id is not null and not exists (
+    select 1 from warehouses where id = p_actual_site_id
+  ) then
+    raise exception 'actual site not found' using errcode = '22023', detail = 'actual_site_invalid';
+  end if;
+  v_site := coalesce(p_actual_site_id, v_po.warehouse_id);
+
+  -- 0426 · consignment: a consignment source's received Units remain
+  -- SUPPLIER-OWNED (0366's ownership contract) and receipt creates no
+  -- payable — the engine touches no Finance/AP record either way.
+  v_ownership := case when v_po.is_consignment then 'supplier_consignment'
+                      else 'carres_owned' end;
+
+  v_was_relocated := v_po.sup_status = 'relocated';
+  v_actor := coalesce((select name from app_users where id = v_uid), initcap(v_role::text));
+
+  -- R4: the per-unit register is Carres-owned scope — read at the PHYSICAL
+  -- site (0426), because that is where the units land.
+  select (kind = 'own') into v_is_own from warehouses where id = v_site;
+  -- P4: goods become Carres stock when they physically land at a Carres
+  -- warehouse. Without an Actual Site override that is still the original
+  -- rule (destination books into the PO's warehouse); with one, the recorded
+  -- physical arrival wins (owner instruction 2026-09-04: valid received
+  -- Units enter Inventory at the Actual Site).
+  select (pd.warehouse_id is not null and pd.warehouse_id = v_po.warehouse_id)
+    into v_posts_stock
+    from purchasing_destinations pd
+   where pd.id = v_po.destination_id;
+  v_posts_stock := coalesce(v_posts_stock, false) or p_actual_site_id is not null;
+  v_is_own := coalesce(v_is_own, false);
+  select name into v_supplier_name from suppliers where id = v_po.supplier_id;
+
+  for v_line in select * from jsonb_array_elements(p_lines) loop
+    v_line_id := nullif(v_line->>'id', '')::uuid;
+    v_received_qty := nullif(v_line->>'received_qty', '')::int;
+    v_damaged_add := coalesce(nullif(v_line->>'damaged_qty', '')::int, 0);
+    v_wrong_add   := coalesce(nullif(v_line->>'wrong_item_qty', '')::int, 0);
+    v_damaged_claim := null;
+    v_wrong_claim   := null;
+
+    -- 0426 · the exact Units this line named, split by outcome. Empty arrays
+    -- mean a quantity line (governed interchangeable goods) and the original
+    -- oldest-first behaviour holds.
+    select coalesce(array_agg((u->>'stock_item_id')::uuid), '{}'::uuid[])
+      into v_recv_ids
+      from jsonb_array_elements(coalesce(v_line->'units', '[]'::jsonb)) u
+     where u->>'outcome' = 'received';
+    select coalesce(array_agg((u->>'stock_item_id')::uuid), '{}'::uuid[])
+      into v_dmg_ids
+      from jsonb_array_elements(coalesce(v_line->'units', '[]'::jsonb)) u
+     where u->>'outcome' = 'received_with_issue' and u->>'issue_kind' = 'damaged';
+    select coalesce(array_agg((u->>'stock_item_id')::uuid), '{}'::uuid[])
+      into v_wrong_ids
+      from jsonb_array_elements(coalesce(v_line->'units', '[]'::jsonb)) u
+     where u->>'outcome' = 'received_with_issue' and u->>'issue_kind' = 'wrong_item';
+
+    if v_line_id is null or v_received_qty is null or v_received_qty < 0 then
+      raise exception 'invalid line: id=%, received_qty=%', v_line_id, v_received_qty
+        using errcode = '22023', detail = 'invalid_line';
+    end if;
+    if v_damaged_add < 0 or v_wrong_add < 0 then
+      raise exception 'invalid line: damaged_qty=%, wrong_item_qty=%', v_damaged_add, v_wrong_add
+        using errcode = '22023', detail = 'invalid_line';
+    end if;
+
+    select * into v_existing_line from purchase_order_lines
+     where id = v_line_id and po_id = p_po_id for update;
+    if not found then
+      raise exception 'PO line not found for id=%', v_line_id using errcode = '42P01', detail = 'po_line_not_found';
+    end if;
+
+    v_sku := v_existing_line.sku;
+
+    if v_received_qty > v_existing_line.received_qty + public._purchasing_po_line_pending_qty(v_line_id) then
+      raise exception 'over-received: % > uncancelled commitment %', v_received_qty, v_existing_line.received_qty + public._purchasing_po_line_pending_qty(v_line_id)
+        using errcode = 'P0001', detail = 'over_received';
+    end if;
+
+    if v_received_qty + v_damaged_add + v_wrong_add > v_existing_line.received_qty + public._purchasing_po_line_pending_qty(v_line_id) then
+      raise exception 'reported % units on a line of % (received % + damaged % + wrong %)',
+                      v_received_qty + v_damaged_add + v_wrong_add, v_existing_line.received_qty + public._purchasing_po_line_pending_qty(v_line_id),
+                      v_received_qty, v_damaged_add, v_wrong_add
+        using errcode = 'P0001', detail = 'report_exceeds_ordered';
+    end if;
+
+    v_delta := v_received_qty - v_existing_line.received_qty;
+    if v_delta < 0 then
+      raise exception 'received_qty must be >= currently received (%)', v_existing_line.received_qty
+        using errcode = 'P0001', detail = 'received_qty_decrease';
+    end if;
+
+    -- ⭐ 0444 · THE MODE DECIDES, AT THE ENGINE TOO. A direct caller cannot
+    -- take the quantity path for a traceable line by leaving `units` out,
+    -- nor name Units against a quantity line. For an exact-unit line the
+    -- named outcomes ARE the quantities — the counts must agree exactly.
+    v_mode  := v_existing_line.identity_mode;
+    v_named := cardinality(v_recv_ids) + cardinality(v_dmg_ids) + cardinality(v_wrong_ids);
+    if v_mode is null then
+      raise exception 'line % has no stock identity mode — set it for the SKU in Catalog', v_sku
+        using errcode = 'P0001', detail = 'line_identity_mode_missing';
+    end if;
+    if v_mode = 'quantity' and v_named > 0 then
+      raise exception 'line % is counted by quantity — it has no Unit IDs to scan', v_sku
+        using errcode = 'P0001', detail = 'quantity_line_takes_no_units';
+    end if;
+    if v_mode = 'exact_unit' then
+      if v_named = 0 and (v_delta > 0 or v_damaged_add > 0 or v_wrong_add > 0) then
+        raise exception 'line % is traced by Unit ID — record one result for each expected Unit', v_sku
+          using errcode = 'P0001', detail = 'exact_unit_line_needs_units';
+      end if;
+      if cardinality(v_recv_ids) <> v_delta
+         or cardinality(v_dmg_ids) <> v_damaged_add
+         or cardinality(v_wrong_ids) <> v_wrong_add then
+        raise exception 'line % names % received, % damaged and % wrong Units but reports %, % and %',
+                        v_sku, cardinality(v_recv_ids), cardinality(v_dmg_ids), cardinality(v_wrong_ids),
+                        v_delta, v_damaged_add, v_wrong_add
+          using errcode = 'P0001', detail = 'unit_outcomes_mismatch';
+      end if;
+      -- Every named Unit must be THIS line's, still incoming.
+      if exists (
+        select 1 from unnest(v_recv_ids || v_dmg_ids || v_wrong_ids) as x(id)
+          left join ops_stock_items u on u.id = x.id
+         where u.id is null or u.po_line_id is distinct from v_line_id
+            or u.identity_scope <> 'unit' or u.status <> 'incoming'
+      ) then
+        raise exception 'a named Unit on % is not an incoming Unit of this line', v_sku
+          using errcode = 'P0001', detail = 'unit_not_on_this_line';
+      end if;
+    end if;
+
+    if v_damaged_add > 0 or v_wrong_add > 0 then
+      v_category := public.claim_product_category(v_sku);
+    end if;
+
+    if v_damaged_add > 0 then
+      v_photos := public.supplier_claim_photo_entries(v_line->'damaged_photos', v_uid);
+      if jsonb_array_length(v_photos) = 0 then
+        raise exception 'damaged units on % need at least one photo', v_sku
+          using errcode = 'P0001', detail = 'claim_evidence_required';
+      end if;
+      insert into supplier_claims (
+        po_id, po_line_id, supplier_id, sku, product_category,
+        claim_type, qty, do_number, photos, reported_by
+      ) values (
+        p_po_id, v_line_id, v_po.supplier_id, v_sku, v_category,
+        'damaged', v_damaged_add, btrim(p_do_number), v_photos, v_uid
+      )
+      returning id into v_damaged_claim;
+      v_claims_created := v_claims_created + 1;
+    end if;
+
+    if v_wrong_add > 0 then
+      v_wrong_type := nullif(btrim(coalesce(v_line->>'wrong_item_claim_type', '')), '');
+      if v_wrong_type is null then
+        raise exception 'wrong-item units on % need a claim type', v_sku
+          using errcode = 'P0001', detail = 'claim_type_required';
+      end if;
+      if not public.supplier_claim_type_allowed(v_category, v_wrong_type) then
+        raise exception 'claim type % is not offered for a % item', v_wrong_type, v_category
+          using errcode = 'P0001', detail = 'claim_type_invalid';
+      end if;
+      v_photos := public.supplier_claim_photo_entries(v_line->'wrong_item_photos', v_uid);
+      if jsonb_array_length(v_photos) = 0 then
+        raise exception 'wrong-item units on % need at least one photo', v_sku
+          using errcode = 'P0001', detail = 'claim_evidence_required';
+      end if;
+      insert into supplier_claims (
+        po_id, po_line_id, supplier_id, sku, product_category,
+        claim_type, qty, do_number, photos, reported_by
+      ) values (
+        p_po_id, v_line_id, v_po.supplier_id, v_sku, v_category,
+        v_wrong_type, v_wrong_add, btrim(p_do_number), v_photos, v_uid
+      )
+      returning id into v_wrong_claim;
+      v_claims_created := v_claims_created + 1;
+    end if;
+
+    update purchase_order_lines
+       set received_qty   = v_received_qty,
+           damaged_qty    = damaged_qty + v_damaged_add,
+           wrong_item_qty = wrong_item_qty + v_wrong_add
+     where id = v_line_id;
+
+    v_damaged_total := v_damaged_total + v_damaged_add;
+    v_wrong_total   := v_wrong_total + v_wrong_add;
+
+    if v_delta > 0 and v_posts_stock then
+      -- 0366 · the unit register is the ONE inventory authority: stock posts by
+      -- flipping/minting Units only. `stock_balances` is derived by the rollup
+      -- triggers on `ops_stock_items` — a direct write here is refused by
+      -- `trg_stock_balances_derived_only` (this replaces the pre-0366 balance
+      -- write the previous engine definition still carried).
+
+      -- 0426 · EXACT-UNIT flips first (ERP-ARCHITECTURE §3.4): the scanned
+      -- `Received` Units become free at the Actual Site. A quantity line
+      -- keeps the oldest-first flip.
+      if cardinality(v_recv_ids) > 0 then
+        with freed as (
+          update ops_stock_items
+             set status = 'free', warehouse_id = v_site, updated_at = now(),
+                 ownership = case when v_po.is_consignment
+                                  then 'supplier_consignment' else ownership end,
+                 supplier = coalesce(nullif(btrim(coalesce(supplier, '')), ''), v_supplier_name)
+           where id = any(v_recv_ids) and status = 'incoming'
+          returning 1
+        )
+        select count(*) into v_freed from freed;
+        if v_freed <> cardinality(v_recv_ids) then
+          raise exception 'a scanned unit on % was already received — reload and count again', v_sku
+            using errcode = 'P0001', detail = 'unit_already_received';
+        end if;
+      else
+        -- 0444 · QUANTITY LINE. Units minted for this line before 0442 (fake
+        -- IDs the old issue path gave interchangeable goods) are permanent:
+        -- they flip oldest-first, by LINE, until none are left. The rest of
+        -- the received count becomes ONE bulk register row — counted goods,
+        -- no Unit ID. Nothing is minted as a Unit.
+        with freed as (
+          update ops_stock_items
+             set status = 'free', warehouse_id = v_site, updated_at = now(),
+                 ownership = case when v_po.is_consignment
+                                  then 'supplier_consignment' else ownership end,
+                 supplier = coalesce(nullif(btrim(coalesce(supplier, '')), ''), v_supplier_name)
+           where id in (
+             select id from ops_stock_items
+              where po_line_id = v_line_id and identity_scope = 'unit' and status = 'incoming'
+              order by created_at
+              limit v_delta
+           )
+          returning 1
+        )
+        select count(*) into v_freed from freed;
+        v_rest := v_delta - v_freed;
+        if v_rest > 0 then
+          insert into ops_stock_items
+            (unit_code, sku, warehouse_id, status, ownership, supplier, po_no, po_line_id,
+             identity_scope, qty, source_ref, date_in)
+          values
+            (public.gen_quantity_key(), v_sku, v_site, 'free', v_ownership,
+             v_supplier_name, p_po_id, v_line_id,
+             'quantity', v_rest, btrim(p_do_number), current_date);
+        end if;
+      end if;
+
+      -- 0444 · no shortfall mint: Receiving never creates an identity.
+      v_minted := 0;
+
+      v_lines_updated := v_lines_updated + 1;
+    end if;
+
+    -- Quarantine the claimed units — the EXACT scanned ones when named,
+    -- otherwise oldest-first, after the free-flip as before.
+    if v_damaged_claim is not null then
+      if cardinality(v_dmg_ids) > 0 then
+        with held as (
+          update ops_stock_items
+             set status = 'on_hold', hold_reason = 'damaged',
+                 hold_claim_id = v_damaged_claim, held_at = now(),
+                 warehouse_id = v_site, updated_at = now()
+           where id = any(v_dmg_ids) and status = 'incoming'
+          returning 1
+        )
+        select count(*) into v_held from held;
+        if v_held <> cardinality(v_dmg_ids) then
+          raise exception 'a damaged unit on % was already received — reload and count again', v_sku
+            using errcode = 'P0001', detail = 'unit_already_received';
+        end if;
+      else
+        -- 0444 · quantity line: legacy line-bound Units first, then one bulk
+        -- controlled row for the rest. Received-with-issue goods are present
+        -- but unavailable; they never become a Unit.
+        with held as (
+          update ops_stock_items
+             set status = 'on_hold', hold_reason = 'damaged',
+                 hold_claim_id = v_damaged_claim, held_at = now(),
+                 warehouse_id = v_site, updated_at = now()
+           where id in (
+             select id from ops_stock_items
+              where po_line_id = v_line_id and identity_scope = 'unit' and status = 'incoming'
+              order by created_at
+              limit v_damaged_add
+           )
+          returning 1
+        )
+        select count(*) into v_held from held;
+        v_rest := v_damaged_add - v_held;
+        if v_rest > 0 and v_posts_stock then
+          insert into ops_stock_items
+            (unit_code, sku, warehouse_id, status, ownership, supplier, po_no, po_line_id,
+             identity_scope, qty, hold_reason, hold_claim_id, held_at, source_ref, date_in)
+          values
+            (public.gen_quantity_key(), v_sku, v_site, 'on_hold', v_ownership,
+             v_supplier_name, p_po_id, v_line_id,
+             'quantity', v_rest, 'damaged', v_damaged_claim, now(), btrim(p_do_number), current_date);
+          v_held := v_held + v_rest;
+        end if;
+      end if;
+      v_units_held := v_units_held + v_held;
+    end if;
+
+    if v_wrong_claim is not null then
+      if cardinality(v_wrong_ids) > 0 then
+        with held as (
+          update ops_stock_items
+             set status = 'on_hold', hold_reason = 'wrong_item',
+                 hold_claim_id = v_wrong_claim, held_at = now(),
+                 warehouse_id = v_site, updated_at = now()
+           where id = any(v_wrong_ids) and status = 'incoming'
+          returning 1
+        )
+        select count(*) into v_held from held;
+        if v_held <> cardinality(v_wrong_ids) then
+          raise exception 'a wrong-item unit on % was already received — reload and count again', v_sku
+            using errcode = 'P0001', detail = 'unit_already_received';
+        end if;
+      else
+        with held as (
+          update ops_stock_items
+             set status = 'on_hold', hold_reason = 'wrong_item',
+                 hold_claim_id = v_wrong_claim, held_at = now(),
+                 warehouse_id = v_site, updated_at = now()
+           where id in (
+             select id from ops_stock_items
+              where po_line_id = v_line_id and identity_scope = 'unit' and status = 'incoming'
+              order by created_at
+              limit v_wrong_add
+           )
+          returning 1
+        )
+        select count(*) into v_held from held;
+        v_rest := v_wrong_add - v_held;
+        if v_rest > 0 and v_posts_stock then
+          insert into ops_stock_items
+            (unit_code, sku, warehouse_id, status, ownership, supplier, po_no, po_line_id,
+             identity_scope, qty, hold_reason, hold_claim_id, held_at, source_ref, date_in)
+          values
+            (public.gen_quantity_key(), v_sku, v_site, 'on_hold', v_ownership,
+             v_supplier_name, p_po_id, v_line_id,
+             'quantity', v_rest, 'wrong_item', v_wrong_claim, now(), btrim(p_do_number), current_date);
+          v_held := v_held + v_rest;
+        end if;
+      end if;
+      v_units_held := v_units_held + v_held;
+    end if;
+  end loop;
+
+  for v_thread in
+    select * from order_supplier_threads
+     where po_id = p_po_id and operation_stage = 'in_production'
+  loop
+    select coalesce(bool_and(pol.received_qty >= pol.qty), true)
+      into v_thread_satisfied
+      from order_lines ol
+      join product_skus ps on ps.sku = ol.sku
+      join product_models pm on pm.id = ps.model_id
+      left join purchase_order_lines pol
+        on pol.po_id = p_po_id and pol.sku = ol.sku
+     where ol.order_id = v_thread.order_id
+       and ps.supplier_id = v_thread.supplier_id
+       and pm.category::text = v_thread.category;
+
+    if not v_thread_satisfied then
+      continue;
+    end if;
+
+    if v_was_relocated then
+      v_target_thread_stage := 'waiting';
+    else
+      v_target_thread_stage := case when v_thread.sop_name = 'SOFA_SPECIAL'
+                                    then 'dispatched'
+                                    else 'ready_to_dispatch'
+                               end;
+    end if;
+
+    update order_supplier_threads
+       set operation_stage = v_target_thread_stage,
+           warehouse_id    = v_site,
+           reserved_at     = now(),
+           updated_at      = now()
+     where id = v_thread.id;
+
+    v_threads_advanced := v_threads_advanced + 1;
+
+    -- 0366 · `reserved` is the Sales Order's exact-Unit binding, owned by the
+    -- Stock reserve door (`status = 'reserved'` + `reserved_ref`), never an
+    -- aggregate counter. The pre-0366 `stock_balances.reserved` increment the
+    -- previous engine definition carried is removed — a receiving advances the
+    -- thread; the dispatch flow binds its exact Units.
+  end loop;
+
+  select count(*) into v_outstanding
+    from purchase_order_lines where po_id = p_po_id and public._purchasing_po_line_pending_qty(id)>0;
+
+  if v_outstanding = 0 then
+    if v_was_relocated then
+      v_target_sup_status := 'at_warehouse_waiting';
+    else
+      v_target_sup_status := 'delivered';
+    end if;
+
+    update purchase_orders
+       set status         = 'received',
+           sup_status     = v_target_sup_status,
+           do_file_path   = p_do_file_path,
+           do_uploaded_at = now(),
+           do_uploaded_by = v_uid,
+           updated_at     = now()
+     where id = p_po_id;
+  else
+    update purchase_orders
+       set do_file_path   = p_do_file_path,
+           do_uploaded_at = now(),
+           do_uploaded_by = v_uid,
+           updated_at     = now()
+     where id = p_po_id;
+  end if;
+
+  insert into po_history (po_id, text, by_role)
+  values (p_po_id,
+          format('Received with DO %s (%s path) — %s line(s), %s thread(s)%s',
+                 btrim(p_do_number),
+                 case when v_was_relocated then 'relocated→at_warehouse_waiting' else 'normal→delivered' end,
+                 v_lines_updated, v_threads_advanced,
+                 case when v_damaged_total + v_wrong_total > 0
+                      then format(' · issue: %s damaged, %s wrong item · %s supplier claim(s) opened · %s unit(s) on hold',
+                                  v_damaged_total, v_wrong_total, v_claims_created, v_units_held)
+                      else '' end),
+          v_role);
+
+  insert into audit_log (role, actor_text, action, ref)
+  values (v_role, v_actor,
+          format('Received PO %s with DO %s', p_po_id, btrim(p_do_number)), p_po_id);
+
+  return jsonb_build_object(
+    'po_id',             p_po_id,
+    'do_file_path',      p_do_file_path,
+    'do_number',         btrim(p_do_number),
+    'lines_updated',     v_lines_updated,
+    'threads_advanced',  v_threads_advanced,
+    'po_status',         (select status from purchase_orders where id = p_po_id),
+    'sup_status',        (select sup_status from purchase_orders where id = p_po_id),
+    'was_relocated',     v_was_relocated,
+    'damaged_qty',       v_damaged_total,
+    'wrong_item_qty',    v_wrong_total,
+    'claims_created',    v_claims_created,
+    'units_held',        v_units_held,
+    'actual_site_id',    v_site
+  );
+end;
+$function$;
 $carres_exact_context_writer_ddl$;
  if not (select relrowsecurity from pg_class where oid='public.po_goods_cancellation_events'::regclass)
   or not has_table_privilege('authenticated','public.po_goods_cancellation_events','SELECT')
@@ -5564,7 +6278,7 @@ $carres_exact_context_writer_ddl$;
  if not exists(select 1 from pg_trigger t where t.tgrelid='public.po_goods_cancellation_events'::regclass and t.tgname='po_goods_cancellation_events_immutable' and t.tgenabled='O' and t.tgtype=58 and t.tgfoid='public._purchasing_cancellation_immutable()'::regprocedure) then raise exception 'immutable cancellation ledger guard missing'; end if;
  select count(*) into after_cancellations from public.po_goods_cancellation_events;
  if before_cancellations<>after_cancellations then raise exception 'installation wrote cancellation business facts'; end if;
- for item in select * from jsonb_array_elements('[{"signature":"_operation_create_po_inner(uuid, uuid, jsonb, date, integer[], text, uuid, uuid)","body_md5":"5bf1d8ad6d7b6382f2b398780c85e2a9","security_definer":true,"authenticated_execute":false,"anon_execute":false},{"signature":"_operation_create_po_inner_admitted(uuid, uuid, jsonb, date, integer[], text, uuid, uuid, jsonb)","body_md5":"c54e9e184ed0e165f073e5a446cbb50a","security_definer":true,"authenticated_execute":false,"anon_execute":false},{"signature":"_po_line_source_move(uuid, uuid, integer)","body_md5":"c8ea1128f0a1f94b5c023398ed9e05aa","security_definer":true,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_approve_context_review(uuid, jsonb, text)","body_md5":"f8751a2ec8712acfcd21ff9b608f40f5","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_assert_request_approval(uuid)","body_md5":"389ee4d926d0e20a2e87156eb8867cd8","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_cancellation_immutable()","body_md5":"480cd802ade74ced23f3b912c8638500","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_cancelled_scope_receipt_guard()","body_md5":"128a3ad9fc50cd8ed0162e36d0f38b25","security_definer":true,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_check_context_forecast_source(jsonb, jsonb, uuid)","body_md5":"e256082d8ece6e698c339641be748bac","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_check_context_supplier_dates(jsonb, date)","body_md5":"db96f0d29a0d19aa3f7b42a0f5640d3d","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_approval_distribution(uuid, jsonb, boolean)","body_md5":"15067025d697826dc9e4594e60bc96a1","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_committed_rs_coverage(uuid)","body_md5":"ea181c7c3ccf4ac59cc0032c18443ea1","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_coverage(uuid, boolean)","body_md5":"61872e7bc123ab179eaaba7c3bfe87f4","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_coverage_admitted(uuid, boolean, jsonb)","body_md5":"6533f6cb3efa4f50e1234532dad15852","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_forecast_display_source()","body_md5":"1b8984a3b5a6a0806c154c7037dfce2b","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_forecast_facts(text, uuid)","body_md5":"36c5538c49523289aeec96f5a37f8d84","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_forecast_mark_lines(jsonb, jsonb)","body_md5":"c4eea86f800104ab665f1c18fb60db61","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_holiday_dates()","body_md5":"d083206a1ba3745e7345af7f1f749490","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_issue_admission(uuid, integer)","body_md5":"09ca8df4e75fd2a6c6155f321b149887","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_issue_preflight(jsonb)","body_md5":"f380e1ae96bb0488b3c5ffa2f66c3dfd","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_legacy_issue_scope(uuid)","body_md5":"ba2f5f4cd9bec14c2ff58340e0b8670d","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_object(jsonb, jsonb)","body_md5":"6f74dc6a503365536009a172ab8f3510","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_own_po_free(uuid, uuid)","body_md5":"eb470c61da4c4a4ebc91ea54f7e6940e","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_po_destination_matches(uuid, uuid, uuid)","body_md5":"34fd8803c83272818638304146fa7338","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_po_source_scope(text)","body_md5":"0f1ebff6d959eb165ff52352fd7cabf9","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_record_issued_source(uuid, integer, text)","body_md5":"1d79c2c85ca7f6cdd0694205aef114f7","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_remaining_recipients(uuid, uuid, jsonb)","body_md5":"976861914fa189d0439bcd99d1ecca37","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_request_source_locks(uuid)","body_md5":"01ed5d83e4e5b1aa9a72a60eae80864b","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_review(uuid)","body_md5":"c8c23dee9cd655d7b98c9564348ace0a","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_revision_before(uuid)","body_md5":"16953ceb0b2cfbe708eb4de4c6789ac6","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_source_locks(text[])","body_md5":"3f68cfa43c615400763552bef5b260e4","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_source_write_guard()","body_md5":"858cb3fef1abaeb8d5d4d9072365a992","security_definer":true,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_stock_admission(uuid, uuid[], boolean)","body_md5":"7afe47537a404876f88977eeb225f5fe","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_stock_offers(jsonb)","body_md5":"cb54c72108391e97062acf902cbc80c4","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_unit_demand(uuid)","body_md5":"17a749c4b9b7986a9771e37b1c3f4994","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_writer_admission()","body_md5":"799b52f12579bdf2fd9a7b95285b6508","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_po_demand_cancelled_qty(uuid, uuid)","body_md5":"6947c458a7d70820312465906adf9862","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_po_issued_recipients(text, uuid)","body_md5":"e7aa3f91fc8369d0ef1433ebad066a25","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_po_line_cancelled_qty(uuid)","body_md5":"3b9098732577ba76c4b5381bd728d601","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_po_line_pending_qty(uuid)","body_md5":"5f7ecef6d40cd931589c1749217c7349","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_po_request_active_sources(uuid)","body_md5":"8ca3f0ce5c358d00e3ded55070285686","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_po_request_sources(uuid)","body_md5":"6a08039e063699407a37e2dd19dccdd6","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_request_context_state(uuid)","body_md5":"85a7228cdced6b259af4e76acf918eaf","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_request_revision_scope(uuid, text)","body_md5":"4dc15b1a0c4644edc6693c0b0e3f62f7","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_stamp_context_approval(uuid, jsonb)","body_md5":"ea667f3b5c8e685ab0d3219648e08e04","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_validate_request_context(jsonb)","body_md5":"034f65a27d66e53de70405e24e3ad9e2","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_write_context_demands(uuid, jsonb)","body_md5":"d9f3ef5331d81b535f62750632f221ef","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_write_forecast_request_mark(uuid, date, uuid, jsonb, boolean)","body_md5":"1584e591b390427330f7b7705776dbdb","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"operation_cancel_po(text, text)","body_md5":"b87a096a846f821ea9b54df82776737f","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"operation_cancel_po(text, text, jsonb)","body_md5":"0656f26250b23327f20c2a3f123ce60b","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"ops_stock_bound_incoming_arrives()","body_md5":"f5c86179ab15b232c996e21dea3456d2","security_definer":false,"authenticated_execute":true,"anon_execute":true},{"signature":"ops_stock_pool_draw(text, text, text, uuid, text, text, uuid, uuid, uuid)","body_md5":"0c61156c1df3028b776da794b8db4a3d","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_allocate_ready_units(uuid, uuid[], uuid[])","body_md5":"088f5eb7630cc9f7889b9b480c90f0d4","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_cancel_demand(uuid, text)","body_md5":"2dd965f910515b21fabc0b45db761eaf","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_change_po_deliver_to(text, uuid, integer, uuid, text, text[])","body_md5":"018e548a0079e098cf7b159fb88fb5db","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_confirm_po_sent(text, integer, text, text, text)","body_md5":"b1e35c6b998a77e070a1c0809ae9b5f8","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_create_demand(text, integer, uuid, date, text, text, uuid)","body_md5":"596e927e0d6a49a76a9686eb4ab005af","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_create_request_with_lines(text, uuid, text, date, uuid, uuid, text, jsonb, text, text)","body_md5":"aebf7a327b5526e47c5d4558a6a24306","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_decide_request(uuid, text, text, jsonb)","body_md5":"3cce60d8c6c4bf013da39752e8addaa7","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_demand_record_issue(uuid, integer, text)","body_md5":"a0a8cf0e6abf205acef3287ec4f123e4","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_issue_pos_batch(jsonb)","body_md5":"e0460c396fdc85821675b27c223ed542","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_move_request_destination(uuid, uuid)","body_md5":"c8ba7c10b7f62373842a50785010dd4b","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_po_cancellation_facts(text)","body_md5":"bfa80a455d6f0cfb4b347b7bb29ad334","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_po_cancellations(text[])","body_md5":"b18b67efe69b1eddea6bc09f5288db6c","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_po_document(text)","body_md5":"cbbf66cc6cd4cf296eb863b1ced4fd35","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_po_free_units()","body_md5":"bf4d0c8d7e62ed6e4932f86db7739181","security_definer":false,"authenticated_execute":true,"anon_execute":true},{"signature":"purchasing_po_line_free_units(uuid)","body_md5":"516f4c9fde8a6f37574e5d5a22a1296b","security_definer":false,"authenticated_execute":true,"anon_execute":true},{"signature":"purchasing_record_supplier_answers(text, jsonb)","body_md5":"ceeb303c3788f9e379d91e880b2f16e6","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_request_context_review(uuid)","body_md5":"829241a3a53c1633ba75727ce9379078","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_request_forecast_sources(text[], uuid)","body_md5":"7ba9722f24efa6e24d0a86be0e913b81","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_request_issue_retry(uuid, jsonb)","body_md5":"e389ad2bed8958c427bdc36d2f98bc26","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_request_stock_offers(jsonb)","body_md5":"b84285c414014f19f2795ad592bb002a","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_require_reply_evidence()","body_md5":"86158e48562d0e04b7de239770cde22f","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_resubmit_request(uuid, uuid, date, text, uuid, uuid, text, jsonb, text)","body_md5":"34ace934d87852a1194d42384461fb12","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_revise_po(text, text, jsonb)","body_md5":"0f762cd03d22c774e83c1fdeff58590e","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_submit_forecast_requests(uuid, date, uuid, jsonb)","body_md5":"ed6b4cb29abf9ed6c3a78100f0de6c22","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_withdraw_request(uuid)","body_md5":"6adf9046fd793e403e49912c680b7574","security_definer":true,"authenticated_execute":true,"anon_execute":false}]'::jsonb) loop
+ for item in select * from jsonb_array_elements('[{"signature":"_operation_create_po_inner(uuid, uuid, jsonb, date, integer[], text, uuid, uuid)","body_md5":"5bf1d8ad6d7b6382f2b398780c85e2a9","security_definer":true,"authenticated_execute":false,"anon_execute":false},{"signature":"_operation_create_po_inner_admitted(uuid, uuid, jsonb, date, integer[], text, uuid, uuid, jsonb)","body_md5":"c54e9e184ed0e165f073e5a446cbb50a","security_definer":true,"authenticated_execute":false,"anon_execute":false},{"signature":"_po_line_source_move(uuid, uuid, integer)","body_md5":"c8ea1128f0a1f94b5c023398ed9e05aa","security_definer":true,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_approve_context_review(uuid, jsonb, text)","body_md5":"f8751a2ec8712acfcd21ff9b608f40f5","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_assert_request_approval(uuid)","body_md5":"389ee4d926d0e20a2e87156eb8867cd8","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_cancellation_immutable()","body_md5":"480cd802ade74ced23f3b912c8638500","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_cancelled_scope_receipt_guard()","body_md5":"128a3ad9fc50cd8ed0162e36d0f38b25","security_definer":true,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_check_context_forecast_source(jsonb, jsonb, uuid)","body_md5":"e256082d8ece6e698c339641be748bac","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_check_context_supplier_dates(jsonb, date)","body_md5":"db96f0d29a0d19aa3f7b42a0f5640d3d","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_approval_distribution(uuid, jsonb, boolean)","body_md5":"15067025d697826dc9e4594e60bc96a1","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_committed_rs_coverage(uuid)","body_md5":"ea181c7c3ccf4ac59cc0032c18443ea1","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_coverage(uuid, boolean)","body_md5":"61872e7bc123ab179eaaba7c3bfe87f4","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_coverage_admitted(uuid, boolean, jsonb)","body_md5":"6533f6cb3efa4f50e1234532dad15852","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_forecast_display_source()","body_md5":"1b8984a3b5a6a0806c154c7037dfce2b","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_forecast_facts(text, uuid)","body_md5":"36c5538c49523289aeec96f5a37f8d84","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_forecast_mark_lines(jsonb, jsonb)","body_md5":"c4eea86f800104ab665f1c18fb60db61","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_holiday_dates()","body_md5":"d083206a1ba3745e7345af7f1f749490","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_issue_admission(uuid, integer)","body_md5":"09ca8df4e75fd2a6c6155f321b149887","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_issue_preflight(jsonb)","body_md5":"f380e1ae96bb0488b3c5ffa2f66c3dfd","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_legacy_issue_scope(uuid)","body_md5":"ba2f5f4cd9bec14c2ff58340e0b8670d","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_object(jsonb, jsonb)","body_md5":"6f74dc6a503365536009a172ab8f3510","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_own_po_free(uuid, uuid)","body_md5":"eb470c61da4c4a4ebc91ea54f7e6940e","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_po_destination_matches(uuid, uuid, uuid)","body_md5":"34fd8803c83272818638304146fa7338","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_po_source_scope(text)","body_md5":"0f1ebff6d959eb165ff52352fd7cabf9","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_record_issued_source(uuid, integer, text)","body_md5":"1d79c2c85ca7f6cdd0694205aef114f7","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_remaining_recipients(uuid, uuid, jsonb)","body_md5":"976861914fa189d0439bcd99d1ecca37","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_request_source_locks(uuid)","body_md5":"01ed5d83e4e5b1aa9a72a60eae80864b","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_review(uuid)","body_md5":"c8c23dee9cd655d7b98c9564348ace0a","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_revision_before(uuid)","body_md5":"16953ceb0b2cfbe708eb4de4c6789ac6","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_source_locks(text[])","body_md5":"3f68cfa43c615400763552bef5b260e4","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_source_write_guard()","body_md5":"858cb3fef1abaeb8d5d4d9072365a992","security_definer":true,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_stock_admission(uuid, uuid[], boolean)","body_md5":"7afe47537a404876f88977eeb225f5fe","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_stock_offers(jsonb)","body_md5":"cb54c72108391e97062acf902cbc80c4","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_unit_demand(uuid)","body_md5":"17a749c4b9b7986a9771e37b1c3f4994","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_context_writer_admission()","body_md5":"799b52f12579bdf2fd9a7b95285b6508","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_po_demand_cancelled_qty(uuid, uuid)","body_md5":"6947c458a7d70820312465906adf9862","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_po_issued_recipients(text, uuid)","body_md5":"e7aa3f91fc8369d0ef1433ebad066a25","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_po_line_cancelled_qty(uuid)","body_md5":"3b9098732577ba76c4b5381bd728d601","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_po_line_pending_qty(uuid)","body_md5":"5f7ecef6d40cd931589c1749217c7349","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_po_request_active_sources(uuid)","body_md5":"8ca3f0ce5c358d00e3ded55070285686","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_po_request_sources(uuid)","body_md5":"6a08039e063699407a37e2dd19dccdd6","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_request_context_state(uuid)","body_md5":"85a7228cdced6b259af4e76acf918eaf","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_request_revision_scope(uuid, text)","body_md5":"4dc15b1a0c4644edc6693c0b0e3f62f7","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_stamp_context_approval(uuid, jsonb)","body_md5":"ea667f3b5c8e685ab0d3219648e08e04","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_validate_request_context(jsonb)","body_md5":"034f65a27d66e53de70405e24e3ad9e2","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_write_context_demands(uuid, jsonb)","body_md5":"d9f3ef5331d81b535f62750632f221ef","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"_purchasing_write_forecast_request_mark(uuid, date, uuid, jsonb, boolean)","body_md5":"1584e591b390427330f7b7705776dbdb","security_definer":false,"authenticated_execute":false,"anon_execute":false},{"signature":"operation_cancel_po(text, text)","body_md5":"b87a096a846f821ea9b54df82776737f","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"operation_cancel_po(text, text, jsonb)","body_md5":"0656f26250b23327f20c2a3f123ce60b","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"operation_receive_po_with_do(text, text, text, jsonb, uuid)","body_md5":"bfd7b8fdfd8588a43ff372e839f304d6","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"ops_stock_bound_incoming_arrives()","body_md5":"f5c86179ab15b232c996e21dea3456d2","security_definer":false,"authenticated_execute":true,"anon_execute":true},{"signature":"ops_stock_pool_draw(text, text, text, uuid, text, text, uuid, uuid, uuid)","body_md5":"0c61156c1df3028b776da794b8db4a3d","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_allocate_ready_units(uuid, uuid[], uuid[])","body_md5":"088f5eb7630cc9f7889b9b480c90f0d4","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_cancel_demand(uuid, text)","body_md5":"2dd965f910515b21fabc0b45db761eaf","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_change_po_deliver_to(text, uuid, integer, uuid, text, text[])","body_md5":"018e548a0079e098cf7b159fb88fb5db","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_confirm_po_sent(text, integer, text, text, text)","body_md5":"b1e35c6b998a77e070a1c0809ae9b5f8","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_create_demand(text, integer, uuid, date, text, text, uuid)","body_md5":"596e927e0d6a49a76a9686eb4ab005af","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_create_request_with_lines(text, uuid, text, date, uuid, uuid, text, jsonb, text, text)","body_md5":"aebf7a327b5526e47c5d4558a6a24306","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_decide_request(uuid, text, text, jsonb)","body_md5":"3cce60d8c6c4bf013da39752e8addaa7","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_demand_record_issue(uuid, integer, text)","body_md5":"a0a8cf0e6abf205acef3287ec4f123e4","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_issue_pos_batch(jsonb)","body_md5":"e0460c396fdc85821675b27c223ed542","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_move_request_destination(uuid, uuid)","body_md5":"c8ba7c10b7f62373842a50785010dd4b","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_po_cancellation_facts(text)","body_md5":"bfa80a455d6f0cfb4b347b7bb29ad334","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_po_cancellations(text[])","body_md5":"b18b67efe69b1eddea6bc09f5288db6c","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_po_document(text)","body_md5":"cbbf66cc6cd4cf296eb863b1ced4fd35","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_po_free_units()","body_md5":"bf4d0c8d7e62ed6e4932f86db7739181","security_definer":false,"authenticated_execute":true,"anon_execute":true},{"signature":"purchasing_po_line_free_units(uuid)","body_md5":"516f4c9fde8a6f37574e5d5a22a1296b","security_definer":false,"authenticated_execute":true,"anon_execute":true},{"signature":"purchasing_record_supplier_answers(text, jsonb)","body_md5":"ceeb303c3788f9e379d91e880b2f16e6","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_request_context_review(uuid)","body_md5":"829241a3a53c1633ba75727ce9379078","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_request_forecast_sources(text[], uuid)","body_md5":"7ba9722f24efa6e24d0a86be0e913b81","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_request_issue_retry(uuid, jsonb)","body_md5":"e389ad2bed8958c427bdc36d2f98bc26","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_request_stock_offers(jsonb)","body_md5":"b84285c414014f19f2795ad592bb002a","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_require_reply_evidence()","body_md5":"86158e48562d0e04b7de239770cde22f","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_resubmit_request(uuid, uuid, date, text, uuid, uuid, text, jsonb, text)","body_md5":"34ace934d87852a1194d42384461fb12","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_revise_po(text, text, jsonb)","body_md5":"0f762cd03d22c774e83c1fdeff58590e","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_submit_forecast_requests(uuid, date, uuid, jsonb)","body_md5":"ed6b4cb29abf9ed6c3a78100f0de6c22","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"purchasing_withdraw_request(uuid)","body_md5":"6adf9046fd793e403e49912c680b7574","security_definer":true,"authenticated_execute":true,"anon_execute":false},{"signature":"warehouse_receipt_validate_lines(text, jsonb, uuid)","body_md5":"8176ddcb39829dd2899c3c9c531f0287","security_definer":true,"authenticated_execute":false,"anon_execute":false}]'::jsonb) loop
   function_oid:=to_regprocedure('public.'||(item->>'signature'));
   if function_oid is null or (select md5(replace(prosrc,chr(13),'')) from pg_proc where pg_proc.oid=function_oid) is distinct from item->>'body_md5'
     or (select prosecdef from pg_proc where pg_proc.oid=function_oid) is distinct from (item->>'security_definer')::boolean
@@ -5583,7 +6297,7 @@ $carres_exact_context_writer_ddl$;
  perform set_config('request.jwt.claims','{}',true); perform set_config('request.jwt.claim.sub','',true);
  begin perform public.purchasing_issue_pos_batch('[]'::jsonb); exception when insufficient_privilege then no_account_refused:=true; end;
  if not no_account_refused then raise exception 'no-account issue negative control did not fire'; end if;
- if before_counts is distinct from jsonb_build_object('requests',(select count(*) from public.purchase_requests),'demands',(select count(*) from public.purchase_demands),'events',(select count(*) from public.purchase_request_events),'pos',(select count(*) from public.purchase_orders),'po_lines',(select count(*) from public.purchase_order_lines),'po_sources',(select count(*) from public.po_line_sources),'units',(select count(*) from public.ops_stock_items),'audit',(select count(*) from public.audit_log)) or before_rls is distinct from (select md5(string_agg(c.relname||':'||c.relrowsecurity::text,',' order by c.relname)) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in('r','p') and c.relname<>'po_goods_cancellation_events') or before_policies is distinct from (select md5(coalesce(string_agg(tablename||':'||policyname||':'||coalesce(qual,'')||':'||coalesce(with_check,''),',' order by tablename,policyname),'')) from pg_policies where schemaname='public' and tablename<>'po_goods_cancellation_events') or before_settings is distinct from (select md5(to_jsonb(s)::text) from public.purchasing_settings s where id=1) then raise exception 'writer installation changed business rows, settings or RLS'; end if;
+ if before_counts is distinct from jsonb_build_object('requests',(select count(*) from public.purchase_requests),'demands',(select count(*) from public.purchase_demands),'events',(select count(*) from public.purchase_request_events),'pos',(select count(*) from public.purchase_orders),'po_lines',(select count(*) from public.purchase_order_lines),'po_sources',(select count(*) from public.po_line_sources),'units',(select count(*) from public.ops_stock_items),'audit',(select count(*) from public.audit_log),'receipts',(select count(*) from public.warehouse_receipts),'receiving_events',(select count(*) from public.receiving_events),'claims',(select count(*) from public.supplier_claims),'approvals',(select count(*) from public.approvals)) or before_rls is distinct from (select md5(string_agg(c.relname||':'||c.relrowsecurity::text,',' order by c.relname)) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in('r','p') and c.relname<>'po_goods_cancellation_events') or before_policies is distinct from (select md5(coalesce(string_agg(tablename||':'||policyname||':'||coalesce(qual,'')||':'||coalesce(with_check,''),',' order by tablename,policyname),'')) from pg_policies where schemaname='public' and tablename<>'po_goods_cancellation_events') or before_settings is distinct from (select md5(to_jsonb(s)::text) from public.purchasing_settings s where id=1) then raise exception 'writer installation changed business rows, settings or RLS'; end if;
  raise exception 'PROBE_ROLLBACK context writer: exact DDL/functions/grants/13 source guards; default-closed/invalid-scope/no-account controls PASS; business rows/settings/existing RLS unchanged; new readonly immutable cancellation ledger checked';
 end;
 $request_writer_probe$;

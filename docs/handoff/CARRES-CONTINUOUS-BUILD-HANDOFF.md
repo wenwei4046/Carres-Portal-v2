@@ -9,6 +9,39 @@ Paste everything below the line into a fresh session. It is self-contained.
 
 ---
 
+**LATEST FINITE CHECK SLICE ·18Oct2026 · LOCAL, no activation/production writes.**
+SQL candidate now SHA256475a87f26feacfa2080aa337ae13a275a6054da2b71e8bd3de019f6ba958e8f1,
+78 functions/grants. New exact probe PASS with deliberate PROBE_ROLLBACK,13 source guards,
+default-CLOSED, unchanged purchasing/receiving/claims/approval counts/settings/existingRLS and
+new ledger readonly/immutable checks. Review JSON/checker updated; no SQL approval requested.
+Finite Shell896 actual OperationApp PASS: sidebar collapsed, real Tasks overlay visible, page
+canvas808 before/after, no overflow/read errors, draft retained and Escape closes. Images+JSON in
+existing local-test-documents/cancellations. GP strengthened boundary1/1 after combined GP/RS2/2.
+SC local owning-record proof: pre-existing generic approval through actual approval_decide by the
+resolved Service Case Approver, Case reference/context/actor/time verified before Purchasing;
+unchanged procurement snapshot/coverage readable, changed Case invalidates it. TEST payload is not
+a newly adopted Service contract/module; new/changed remedy representation remains a precise gap.
+Receiving ACTUAL defect fixed within SAME helpers/validator/receive engine: effective cancelled
+qty no longer reportable/due; original ordered/received preserved, Cancelled Qty visible. Existing
+Office RPC positive receives active Unit1 after original2/cancel1; actual source date/site and
+separate TEST signed DO/arrival evidence fields kept; retired Unit never restored; existing Extra1
+stored on GRN only, NOT claimed controlled custody. Shared36/UI82 PASS, API/web typechecks PASS.
+Whole cancelled late Extra-only was checked and remains SAFE BLOCKER (po_not_open). A tentative
+zero-normal GRN/Find-PO exception was WITHDRAWN before commit: §5.8.1 requires existing discrepancy
+path and §7.3/known gap requires real controlled unavailable custody, not JSON-only Extra. §7.3
+leaves extra resolution/warehouse confirmation in separate draftPR1910, not commissioned here.
+No office_receive_post change/new helper/status exception/extra Stock/GRN semantics remains;
+owned local Office function restored to its baseline. Reuse a demonstrated existing Receiving/Stock
+custody/discrepancy contract with exact PO/Units or qty/date/site/DO/evidence/claim; do not build a
+new Receiving module. Normal available stock and cancelled Units stay protected.
+Finance review artifact is finance_notification_adapter_proposal in SAME review JSON: concrete
+files/components/events/access and evidence membership, no Finance edit or external message.
+Remaining actual gates only: narrow Finance receiver + file access (coordinate only with human
+authorisation); qualified new/changed SC source contract (unchanged authorised procurement stays);
+isolated Storage byte/provider proof; whole-cancel late-arrival existing custody handoff; pending
+Settings and ONE final usable-workflow SQL/release review. Installation is not activation. Do not
+repeat passed finite checks or reopen unrelated scope. Earlier checkpoints below are historical.
+
 **CURRENT ·18Oct2026 · effective PO cancellation review slice, LOCAL ONLY.**
 
 Same isolated `forecast-mpr-context` checkout, branch `codex/forecast-mpr-context`; original

@@ -186,6 +186,36 @@ describe.skipIf(!enabled)("owned local browser → actual API → PostgreSQL lif
       await browserExpect(cancellationEditor).toHaveCount(0);
       expect(await db.json("reset role; select jsonb_build_object('tasks',(select count(*) from public.ops_tasks),'work_events',(select count(*) from public.work_occurrence_events));")).toEqual(taskCounts);
       expect(apiErrors).toEqual([]);
+      if(purpose==="general_purchase") {
+       // One full current-flow Shell boundary walk. All requests stay in the
+       // owned TEST API transport; DEV disables the assignment sweep.
+       const priorErrors=apiErrors.length;
+       await page.setViewportSize({width:896,height:1000});
+       await page.goto(`${process.env.MPR_CONTEXT_BASE_URL??"http://localhost:5437"}/manual-purchase-context-preview.html?transport=local&entry=shell&po=${encodeURIComponent(priorPoId)}`);
+       await browserExpect(page.getByTestId("purchase-order-object")).toBeVisible({timeout:60000});
+       await page.getByTestId("po-object-edit").focus();await page.keyboard.press("Enter");
+       await page.getByRole("menuitem",{name:"Cancel goods not received"}).click();
+       const fields=page.getByTestId("po-cancellation-fields");await browserExpect(fields).toBeVisible();
+       await fields.getByLabel(/^Reason/).fill("TEST retained across Shell Tasks overlay");
+       const tasks=page.getByTestId("tasks-pill").first();
+       await browserExpect(tasks).toBeVisible();
+       const canvasBefore=await page.getByTestId("purchase-order-object").boundingBox();
+       await browserExpect(page.getByTestId("portal-sidebar")).toHaveAttribute("data-collapsed","true");
+       await tasks.click();
+       await browserExpect(page.getByTestId("shell-tasks")).toBeVisible();
+       const canvasWithTasks=await page.getByTestId("purchase-order-object").boundingBox();
+       expect(canvasWithTasks?.width).toBe(canvasBefore?.width);
+       await page.screenshot({path:`${output}/LOCAL-TEST-GP-shell-896-tasks.png`,fullPage:true});
+       await browserExpect(fields.getByLabel(/^Reason/)).toHaveValue("TEST retained across Shell Tasks overlay");
+       await page.keyboard.press("Escape");
+       await browserExpect(fields.getByLabel(/^Reason/)).toHaveValue("TEST retained across Shell Tasks overlay");
+       await browserExpect(page.getByTestId("shell-tasks")).not.toBeVisible();
+       const width=await page.evaluate(()=>document.documentElement.scrollWidth);
+       expect(width).toBeLessThanOrEqual(896);
+       await page.screenshot({path:`${output}/LOCAL-TEST-GP-shell-896.png`,fullPage:true});
+       writeFileSync(`${output}/LOCAL-TEST-GP-shell-896.json`,JSON.stringify({viewport:896,width,retainedDraft:true,tasksOverlayOpened:true,canvasWidth:canvasBefore?.width,canvasWithTasksWidth:canvasWithTasks?.width,sidebarCollapsed:true,escapeClosed:true,readErrors:apiErrors.slice(priorErrors),environment:"actual OperationApp Shell and PO editor; owned TEST API/PG; no production transport or global legacy Work-source completeness claim"},null,2));
+       expect(await db.json("reset role; select jsonb_build_object('tasks',(select count(*) from public.ops_tasks),'work_events',(select count(*) from public.work_occurrence_events));")).toEqual(taskCounts);
+      }
     }catch(error){
       console.error("LOCAL browser TEST state",(await page.locator("body").innerText()).slice(-6500),JSON.stringify({apiErrors,pageErrors}));
       await page.screenshot({path:"/tmp/carres-context-api-browser-failed.png",fullPage:true});throw error;

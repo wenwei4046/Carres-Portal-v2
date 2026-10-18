@@ -1,9 +1,9 @@
 /** DEV ENTRY ONLY; absent from index.html/build graph. Same owning Workspace and
  * object, explicit default-off props. In-memory TEST transport, no SQL/provider;
  * this proves actual page/PDF/keyboard rendering, not production or DB lifecycle. */
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { PurchaseRequestContext } from "@carres/shared";
 import { useAuth } from "@/lib/auth";
@@ -25,6 +25,8 @@ const destinations = localSeed?.destinations ?? [{ id: id(3), name: "TEST Carres
 const offers = [{ lineId: id(4), locationId: id(20), destinationId: id(3), name: "TEST Carres Klang", available: 2,
   units: [21,22].map(n => ({ id: id(n), qty: 1, warehouse_id: id(20), condition: "new" })) }];
 const realFetch = window.fetch.bind(window);
+const OperationShell=lazy(()=>import("@/pages/operation/OperationApp"));
+const shellEntry=new URLSearchParams(location.search).get("entry")==="shell";
 const poEntry=new URLSearchParams(location.search).get("entry")==="po";
 const poEntryId=new URLSearchParams(location.search).get("po")??"";
 const registerEntry = new URLSearchParams(location.search).get("entry") === "register";
@@ -77,6 +79,7 @@ useAuth.setState({ role: localSeed?.actor.role ?? "operation", hydrated: true, l
 function Preview() {
   const [context, setContext] = useState(initial); const [object, setObject] = useState(false);
   const [actualId,setActualId] = useState(id(10)); const [localRegister,setLocalRegister] = useState(false);
+  if(shellEntry)return <Suspense fallback={<p>Loading</p>}><OperationShell/></Suspense>;
   return <div className="flex h-screen min-h-0 flex-col bg-base-100">{poEntry ? <PurchaseOrdersPage/> : registerEntry || localRegister ? <OperationManualPurchase contextFlow /> : object ? <ManualPurchaseObject id={actualId} contextFlow
     registerHeading={null} position={null} onStep={() => {}} onBack={() => { setObject(false); if (localTransport) setLocalRegister(true); }} onEditAndSendAgain={() => {}} /> : <CreateRequestWorkspace editId={null}
     destinations={destinations} defaultDestinationId={null} supplierCollections={[]} suppliers={localSeed?.suppliers ?? [{ name: "TEST supplier", address: "TEST supplier address" }]}
@@ -89,4 +92,4 @@ const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mu
   return client.invalidateQueries();
 };
 (window as unknown as { __mprLocalRefresh: () => Promise<void> }).__mprLocalRefresh = () => client.invalidateQueries();
-createRoot(document.getElementById("root")!).render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[poEntry?`/operation/procurement?po=${encodeURIComponent(poEntryId)}`:"/operation?tab=manual-purchase"]}><Preview /></MemoryRouter></QueryClientProvider>);
+createRoot(document.getElementById("root")!).render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[poEntry||shellEntry?`/operation/procurement?po=${encodeURIComponent(poEntryId)}`:"/operation?tab=manual-purchase"]}><Routes><Route path="/operation/*" element={<Preview/>}/></Routes></MemoryRouter></QueryClientProvider>);

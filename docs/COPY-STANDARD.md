@@ -2084,7 +2084,7 @@ do not take the five-string shape.
 | Word | Where | Why this word |
 |---|---|---|
 | `Receiving Summary` | workspace section | **Never `Progress`** (Jess): the section answers *what has this PO taken in*, a count, not a stage. |
-| `Order Qty` · `Received Qty` · `Damaged Qty` · `Wrong Item Qty` · `Pending Delivery Qty` | receiving quantities | Each fact prints its own number. The operator never subtracts to learn what is still due; damaged, wrong and extra goods never reduce Pending Delivery Qty or create available Stock. |
+| `Order Qty` · `Received Qty` · `Damaged Qty` · `Wrong Item Qty` · `Pending Delivery Qty` · effective `Cancelled Qty` | receiving quantities | Show Cancelled Qty when an effective outstanding cancellation exists (§5.8.1); preserve original Order Qty and Received Qty. Each fact prints its own number. The operator never subtracts to learn what is still due; damaged, wrong and extra goods never reduce Pending Delivery Qty or create available Stock. |
 | `Start Receiving` | primary action | A PRIMARY ACTION, never a section — the operator's whole job here is one press. |
 | `Receiving Details` | the strip Receiving Mode adds | What this delivery was, as opposed to what was on it. |
 | `Goods Received Date` | field | The Business Date Dictionary's own word — the physical arrival date and time, which is not when the goods were keyed in. Owner correction 2026-09-06: the retired spelling `Goods Received At` may not appear on any Receiving surface, filter, table, export, GRN or report. |

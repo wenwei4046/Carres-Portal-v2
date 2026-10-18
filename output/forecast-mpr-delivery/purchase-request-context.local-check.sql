@@ -312,18 +312,34 @@ begin
 end; $revision_writer_test$;
 -- SC material source is read from its actual Case, never the first SO item.
 do $case_source_test$
-declare case_id uuid:=gen_random_uuid(); c jsonb; made jsonb; scope jsonb; refused boolean:=false; detail text;
+declare case_id uuid:=gen_random_uuid(); prior_authorisation uuid:=gen_random_uuid(); c jsonb; made jsonb; scope jsonb; authorised_row public.approvals%rowtype; refused boolean:=false; detail text;
 begin
  perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009698","role":"authenticated","app_metadata":{"role":"operation"}}',true);
  insert into public.service_cases(id,case_no,customer_name,carres_action,what_affected,customer_wants,created_by)
  values(case_id,'TEST-CONTEXT-CASE','TEST customer','TEST approved procurement scope','TEST specific goods',array['replace'],auth.uid());
  select value||jsonb_build_object('purpose','service_case','serviceCaseId',case_id,'reason',null,'explanation','') into c from context_fixture;
+ -- TEST-only existing general approval, linked to the actual owning Case,
+ -- decided BEFORE procurement by the qualified shared Service Case Approver.
+ -- This proves unchanged consumption only; no Service approval producer/UUID
+ -- requirement or production payload convention is introduced.
+ insert into public.approvals(id,kind,title,refers_to,payload,created_by)
+ values(prior_authorisation,'other','TEST prior Case authorisation','TEST-CONTEXT-CASE',jsonb_build_object('case_id',case_id,'context',c,'carres_action','TEST approved procurement scope'),auth.uid());
+ perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009700","role":"authenticated","app_metadata":{"role":"principal"}}',true);
+ perform public.workspace_assign_duty('service_case_approver','fffffff1-0000-4000-8000-000000009699',current_date,null,'TEST existing authorisation source; rollback');
+ perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009699","role":"authenticated","app_metadata":{"role":"principal"}}',true);
+ select * into authorised_row from public.approval_decide(prior_authorisation,'approved','TEST explicit existing Case scope before procurement');
+ if authorised_row.status<>'approved' or authorised_row.decided_by is distinct from (public.workspace_resolve_duty('service_case_approver')->>'actor_user_id')::uuid
+  or authorised_row.payload->'context' is distinct from c or authorised_row.payload->>'case_id'<>case_id::text then raise exception 'prior Case authorisation not verifiable'; end if;
+ perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009698","role":"authenticated","app_metadata":{"role":"operation"}}',true);
  made:=public.purchasing_create_request_with_lines(p_purpose=>'service_case',p_destination_id=>(c#>>'{lines,0,allocations,0,destinationId}')::uuid,
   p_for_service_case_id=>case_id,p_lines=>jsonb_build_array(jsonb_build_object('request_context',c,'submission_key',gen_random_uuid())),p_fulfilment_intent=>'concrete_need');
  if made->>'req_no' !~ '^SC[0-9]{6}-[0-9]{4}$' then raise exception 'SC request identity invalid'; end if;
  perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009699","role":"authenticated","app_metadata":{"role":"principal"}}',true);
  scope:=public._purchasing_stamp_context_approval((made->>'id')::uuid,null);
  if scope#>>'{service_case_source,id}' is distinct from case_id::text or scope#>>'{service_case_source,carres_action}'<>'TEST approved procurement scope' then raise exception 'actual Case source not captured'; end if;
+ if public._purchasing_assert_request_approval((made->>'id')::uuid) is distinct from scope or (select status from public.approvals where id=prior_authorisation)<>'approved'
+  or public._purchasing_context_coverage((made->>'id')::uuid,true) is null then raise exception 'verified unchanged Case procurement path unavailable'; end if;
+ raise notice 'Existing authorised SC LOCAL: actual owning Case plus earlier general approval by resolved Service Case Approver, exact unchanged procurement approval/coverage readable; no new Service producer or blanket gate PASS';
 
  begin
   update public.service_cases set carres_action='TEST changed remedy scope' where id=case_id;
@@ -583,6 +599,31 @@ begin
     begin update public.ops_stock_items set status='free' where id=chosen;
     exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail;refused:=detail='cancelled_scope_arrival_requires_discrepancy'; end;
     if not refused then raise exception 'retired cancelled Unit became available on later arrival'; end if;
+    -- Existing office Receiving after a partial effective cancellation. This
+    -- nested attempt rolls back, retaining the surrounding full-cancel test.
+    declare receipt jsonb; active_code text; retired_code text; no_receipt bigint;
+    begin
+     select unit_code into strict active_code from public.ops_stock_items where id=other_unit;
+     select unit_code into strict retired_code from public.ops_stock_items where id=chosen;
+     no_receipt:=(select count(*) from public.warehouse_receipts where po_id=merged_po);
+     refused:=false;
+     begin perform public.warehouse_receipt_validate_lines(merged_po,jsonb_build_array(jsonb_build_object('id',physical,'received_now',2,'damaged_qty',0,'wrong_item_qty',0,'units',jsonb_build_array(jsonb_build_object('unit_code',active_code,'outcome','received'),jsonb_build_object('unit_code',retired_code,'outcome','received')))),auth.uid());
+     exception when others then get stacked diagnostics detail=pg_exception_detail;refused:=detail in('unit_already_received','unit_not_incoming','line_over_reported'); end;
+     if not refused or (select count(*) from public.warehouse_receipts where po_id=merged_po)<>no_receipt then raise exception 'cancelled Unit admitted as normal Receiving'; end if;
+     insert into storage.objects(bucket_id,name) values('delivery-orders',merged_po||'/TEST-signed-DO.pdf'),('delivery-orders',merged_po||'/TEST-arrival.jpg');
+     receipt:=public.office_receive_post(merged_po,'TEST-DO-active-after-cancel',merged_po||'/TEST-signed-DO.pdf','TEST actual existing Receiving after cancellation',
+      jsonb_build_array(jsonb_build_object('id',physical,'received_now',1,'damaged_qty',0,'wrong_item_qty',0,'units',jsonb_build_array(jsonb_build_object('unit_code',active_code,'outcome','received')))),
+      p_actual_site_id=>(select warehouse_id from public.purchase_orders where id=merged_po),
+      p_goods_received_at=>(now() at time zone 'Asia/Kuala_Lumpur')::date,
+      p_arrival_evidence=>jsonb_build_array(jsonb_build_object('path',merged_po||'/TEST-arrival.jpg','kind','photo')),
+      p_extra_lines=>jsonb_build_array(jsonb_build_object('sku',(select sku from public.purchase_order_lines where id=physical),'qty',1,'note','TEST late cancelled goods, discrepancy only')),
+      p_save_key=>gen_random_uuid());
+     if receipt->>'receipt_id' is null or (select qty from public.purchase_order_lines where id=physical)<>2 or (select received_qty from public.purchase_order_lines where id=physical)<>1 or public._purchasing_po_line_pending_qty(physical)<>0
+      or (select status from public.ops_stock_items where id=chosen)<>'voided' or (select status from public.purchase_orders where id=merged_po)<>'received'
+      or not exists(select 1 from public.warehouse_receipts where id=(receipt->>'receipt_id')::uuid and extra_lines#>>'{0,qty}'='1' and do_file_path=merged_po||'/TEST-signed-DO.pdf' and arrival_evidence#>>'{0,path}'=merged_po||'/TEST-arrival.jpg') then raise exception 'existing Receiving failed cancelled balance/source/discrepancy conservation'; end if;
+     raise notice 'Existing office Receiving LOCAL: active Unit received1, original2/cancelled1/pending0, retired Unit refused, extra1 recorded on governed GRN only; no cancelled Unit restored PASS';
+     raise exception 'rollback actual Receiving test' using errcode='P0911';
+    exception when sqlstate 'P0911' then null; end;
     -- Supplier inability is a direct evidenced refusal to supply, no second
     -- supplier-agreement or extra owner vote is imposed on this ordinary case.
     input:=jsonb_set(jsonb_set(jsonb_set(jsonb_set(input,'{key}',to_jsonb(gen_random_uuid())),'{requestId}',to_jsonb(gen_random_uuid())),'{expectedRequestVersion}','0'),'{expectedPoVersion}','2');
@@ -598,6 +639,15 @@ begin
     select count(*) into before_events from public.po_goods_cancellation_events;
     retry_result:=public.operation_cancel_po(merged_po,'TEST supplier cannot supply the other outstanding source',input);
     if retry_result->>'replayed'<>'true' or (select count(*) from public.po_goods_cancellation_events)<>before_events then raise exception 'effective retry duplicated cancellation'; end if;
+    -- §5.8.1 +7.3: whole cancelled late extras need existing controlled
+    -- unavailable custody/claim handoff. Do NOT open a JSON-only GRN bypass.
+    refused:=false;
+    begin perform public.office_receive_post(merged_po,'TEST-LATE-extra-only',merged_po||'/TEST-cancellation.pdf','TEST no invented late-extra receipt',
+      jsonb_build_array(jsonb_build_object('id',physical,'received_now',0,'damaged_qty',0,'wrong_item_qty',0,'units','[]'::jsonb)),
+      p_extra_lines=>jsonb_build_array(jsonb_build_object('sku',(select sku from public.purchase_order_lines where id=physical),'qty',1)));
+    exception when invalid_parameter_value then get stacked diagnostics detail=pg_exception_detail;refused:=detail='po_not_open'; end;
+    if not refused or (select received_qty from public.purchase_order_lines where id=physical)<>0 or exists(select 1 from public.ops_stock_items where po_no=merged_po and status<>'voided') then raise exception 'late-extra unsafe bypass or cancelled stock restoration'; end if;
+    raise notice 'Whole cancelled late Extra-only LOCAL: existing source safely refuses, no GRN/available stock/Unit restoration invented. Controlled-custody handoff remains bounded existing Receiving/Stock dependency';
     raise notice 'Effective cancellation LOCAL: pending retains coverage; ordinary agreement/no-fee and evidenced inability complete without extra vote; partial1/full2 retain ordered2/source/history/approval, exact Units retired, current V2/V3 sends and V1 immutable, unknown facts/late availability refused; finance facts traceable PASS';
     raise exception 'rollback effective cancellation acceptance only' using errcode='P0906';
    exception when sqlstate 'P0906' then null; end;

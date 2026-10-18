@@ -1,3 +1,4 @@
+import { poLineReportable } from "./po-receiving";
 import { matchesRegisterColumnFilters, type RegisterColumnQuery, type RegisterColumnFact } from "./register-column-query";
 /**
  * The Receiving page's ONE register arithmetic (owner correction 2026-09-06,
@@ -241,7 +242,7 @@ export function expectedArrivalCounts(
     version?: number | null;
     promises?: readonly PoDatePromise[] | null;
     purchase_order_lines?:
-      | readonly { qty: number | null; received_qty: number | null }[]
+      | readonly { qty: number | null; received_qty: number | null; cancelled_qty?: number | null }[]
       | null;
   }[],
 ): Record<string, number> {
@@ -249,7 +250,7 @@ export function expectedArrivalCounts(
   for (const po of pos) {
     if (po.status !== "open") continue;
     const lines = po.purchase_order_lines ?? [];
-    const owes = lines.some((l) => (l.received_qty ?? 0) < (l.qty ?? 0));
+    const owes = lines.some((l) => poLineReportable(l)>0);
     if (!owes) continue;
     const date = poSupplierDeliveryDateOf(po.promises, po.version ?? 1);
     if (!date) continue;
