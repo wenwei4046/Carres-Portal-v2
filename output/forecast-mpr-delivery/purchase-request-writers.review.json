@@ -1069,5 +1069,64 @@
       "apps/web/src/pages/operation/purchase-orders/PurchaseOrdersPage.tsx"
     ],
     "tests": "78 focused entry/adapter/cache-retention/source-link cases PASS; PO page69 also PASS after source-link fix. No unchanged SQL/receiving/896 tests repeated. Final web typecheck PASS (exit0; /tmp/carres-activation-frozen-web-types-confirmed.log)."
+  },
+  "consolidated_sql_approval_manifest": {
+    "status": "ONE CONSOLIDATED INVENTORY; NOT YET A FINAL USABLE-WORKFLOW APPROVAL REQUEST. No approval inferred or solicited here.",
+    "main_compared": "2c8b25aab77b60e69e29c752455884897d2958ac",
+    "foundation": "0696 already applied; expressly excluded from approval and repeat application.",
+    "exact_existing_candidates": [
+      {
+        "file": "purchase-request-settings-writer.draft.sql",
+        "absolute_path": "/Users/chaichiewlim/.codex/worktrees/forecast-mpr-context/Carres-Portal-v2/output/forecast-mpr-delivery/purchase-request-settings-writer.draft.sql",
+        "sha256": "b4eb234d6f0d855546d606a5f9eef1b8b30aa52a8274948855f0ba8ec8053774",
+        "scope": "One atomic audited editor for approved normal/RS30-day, SC14-day and manual WhatsApp screenshot Active defaults. Apply creates editor only; it does not save new values. Existing authorised Settings editor gate; no new role/RLS/backfill.",
+        "approval_statement_for_consolidation_only": "Approve the exact Settings writer bytes identified by this SHA-256 to enter the governed migration, rolled-back production verification and exact-file apply process. This is the previously pending Settings approval, consolidated here, not a repeated request."
+      },
+      {
+        "file": "purchase-request-writers.draft.sql",
+        "absolute_path": "/Users/chaichiewlim/.codex/worktrees/forecast-mpr-context/Carres-Portal-v2/output/forecast-mpr-delivery/purchase-request-writers.draft.sql",
+        "sha256": "475a87f26feacfa2080aa337ae13a275a6054da2b71e8bd3de019f6ba958e8f1",
+        "scope": "Canonical request creation/revision, existing approval/reapproval, stock coverage, exact partial PO source and document/send/Work readback; 78 function/grant assertions and13 source guards. Includes cancellation implementation but global contextual admission CLOSED. New immutable cancellation ledger has scoped internal Operation/Principal/Finance SELECT only; no authenticated/anon direct writes, no Storage extension.",
+        "approval_statement_for_consolidation_only": "Approve the exact request-writer SQL bytes identified by this SHA-256, including replacement of the two named CHECK constraints and only the new cancellation-ledger RLS policy/immutable guards, to enter the governed migration/probe/apply process. This does not authorise opening contextual admission or cancelling goods before its required Finance handoff is usable."
+      }
+    ],
+    "required_explicit_ddl_consent": {
+      "constraint_replacement": "purchase_request_events_kind_check and po_line_sources_exact_source_owner are dropped/recreated; po_line_sources.order_id becomes nullable only under exclusive SO-or-request-demand source CHECK. No business table/record DROP/TRUNCATE/DELETE is requested.",
+      "rls": "Explain/approve new po_goods_cancellation_events RLS: app_role Operation/Principal/Finance SELECT; existing table policies unchanged. Ledger immutable UPDATE/DELETE/TRUNCATE rejection. No Finance Storage read grant is in these bytes.",
+      "source_guards": "13 source-lock guard triggers plus cancelled receipt guards; preserve legacy and enforce same-SKU transaction consistency. Existing function replacement and grants are enumerated by78 signatures in functions inventory.",
+      "apply_boundary": "No migration numbering reserved. Re-measure tracker/main/all-branch MAX and production preimages before committing approved migration files; production rollback probe and exact committed-file apply through apply_migration only; then CI/deploy/read-only authenticated verification."
+    },
+    "activation": {
+      "exact_file": null,
+      "sha256": null,
+      "approval_statement": null,
+      "reason": "No safe ordinary-only activation SQL exists yet. Current no-argument private admission is shared by ordinary contextual writes and cancellation. A no-op replacement would expose cancellation before mandatory Finance notification and could expose new/changed SC scope without source proof. Do not manufacture a hash or call these closed bytes an activation package.",
+      "smallest_remaining_implementation": "Separate the executable readiness boundary for ordinary approved GP/RS request/stock/PO/send from contextual cancellation and new/changed Service remedies; enforce the boundary on server/RPC as well as entry composition. Preserve existing authorised unchanged SC procurement through its existing owning door/approval; do not treat new remedy verification as a global buying prerequisite. This is release gating, not new approval policy. Then bind exact activation bytes and targeted negative controls to this SAME manifest before the ONE final human approval request."
+    },
+    "release_scope": {
+      "ordinary": "GP/RS creation, existing qualified approve/reapprove, stock allocations and remaining buying, exact PO/PDF/shared send and source-derived Tasks are the primary release path. Historical authorised unchanged SC uses existing qualified source/approval, no new Decision UUID.",
+      "cancellation": "Keep actual contextual cancellation unavailable until existing required Finance notification/source/evidence handoff is actionable. Do not weaken notification or require a new Finance settlement/module for ordinary buying.",
+      "late_extra": "Pre-existing whole-cancel extra-only receipt refusal is an explicit limitation, not ordinary activation blocker; no new Receiving/Stock work."
+    },
+    "actually_missing_owner_decisions": [
+      {
+        "item": "Settings writer",
+        "state": "Specific exact approval remains pending; consolidated above, not asked again."
+      },
+      {
+        "item": "Request/activation SQL",
+        "state": "Final exact coherent release approval remains pending; activation bytes must be completed first. Controller consolidates; no interim closed-installation question."
+      },
+      {
+        "item": "Finance-owner coordination",
+        "state": "Only necessary to release actual cancellation: human authorisation to coordinate with YH before Finance edits/messages per Finance MASTER5. No such message has been sent."
+      }
+    ],
+    "evidence_or_environment_not_owner_decisions": [
+      "New/changed SC remedy source representation: demonstrate qualified actor/time/exact scope using existing Case/history/Service Note/evidence/approval if that branch is released; do not ask for a new Service system.",
+      "Provide/configure isolated Storage endpoint for actual upload bytes, denied foreign access, failure/retry and same-form save; no test-double proof or production supplier sends.",
+      "Complete ordinary-only executable activation boundary and one exact activation hash: engineering work, not an owner business decision."
+    ],
+    "draft_pr_boundary": "Reviewable inactive code only; no unapproved SQL in supabase/migrations, no production root opt-in, no merge/deploy until applicable SQL/release gates satisfied. CI required checks only; no repeated whole-site exploratory acceptance."
   }
 }
