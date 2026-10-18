@@ -638,7 +638,8 @@
     "effective_cancellation": "BUILT LOCAL but independently NOT RELEASED; Finance notification/scoped files remain mandatory for that action alone. No longer a global buying prerequisite.",
     "sql_identity": "Exact 475a87f26feacfa2080aa337ae13a275a6054da2b71e8bd3de019f6ba958e8f1;78 function/grant assertions,13 source guards; final canonical fixture ROLLBACK and deliberate exact PROBE_ROLLBACK PASS. Existing RLS unchanged, new immutable readonly cancellation ledger checked separately.",
     "final_types": "Shared/API/web typechecks PASS for new release/root boundary. API204, root4, affected source read27 and route24 PASS. Required exact-head CI must pass after push.",
-    "latest_source_readback": "PASS:153 PO API cases + GP/RS actual signed browser/API/PG2/2 with planned Proceed Date on header/line sources; final API8GB typecheck PASS. No SQL byte change, Finance code or production action."
+    "latest_source_readback": "PASS:153 PO API cases + GP/RS actual signed browser/API/PG2/2 with planned Proceed Date on header/line sources; final API8GB typecheck PASS. No SQL byte change, Finance code or production action.",
+    "required_ci": "Head9966bac31: API4495 passed/404 skipped; web7120 passed/4 skipped and2 obsolete No-PO copy assertions failed. Both expectations now match COPY-STANDARD1573 No PO yet; targeted2/2 PASS,174 unrelated cases not repeated. SQL3-file hashes unchanged; new exact-head CI required."
   },
   "production_preimages_2026_10_18_read_only": {
     "project": "kfprgpjpaffedghytstl",
@@ -875,6 +876,9 @@
     },
     "packages/shared/src/purchase-request-context.ts": {
       "sha256": "96fa7a3bb040a70afd2916ff4843c721324bb57e0db331b8a88600c4d00b893b"
+    },
+    "apps/web/src/pages/operation/OperationManualPurchase.test.tsx": {
+      "sha256": "c5ee7eedaf26f4a73e2ee7f2533e146639c6483250a3945aa97c8013b980f7db"
     }
   },
   "release_dependency_table": [
