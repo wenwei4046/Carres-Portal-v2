@@ -2138,6 +2138,29 @@ dictionary with the approved Receiving build; each is registered here so no chat
 | `Previous` · `Next` | GRN Register footer page moves | One server page back / forward; disabled at the ends rather than hidden. |
 | `{date} — {n} expected supplier arrival(s)` | the rail Calendar day's aria sentence | The marker COUNT said in words — colour is never the only signal (owner correction 2026-09-06, second ruling). |
 
+### Case remedy approval — narrow build authorised 18 Oct 2026
+
+Service MASTER §7.4 owns the existing decision rule. This vocabulary adds no approval layer,
+stock movement, customer promise or Finance action. Reuse the existing Case evidence and kit controls.
+
+| Place | Use exactly |
+|---|---|
+| Case section and qualified owner | `Case approval` · `Service Case Approver` · `Not assigned` |
+| Preparing the existing formal decision | `Prepare remedy proposal` · `Manual Purchase Request` · `Policy` · `Policy version` · `Policy result` · `Remedy` · `Movement` · `Charge` · `Amount (RM)` · `Payer` · `Reason` · `Case evidence` |
+| Existing results and actions | `Eligible` · `Not eligible` · `Free` · `Charged` · `Need approval` · `Approved` · `Refused` · `Send for approval` · `Decision reason` · `Approve` · `Refuse` · `Cancel` |
+| Unsaved Case facts | `Save the Case changes before reviewing its remedy.` |
+| Missing linked request | `Create the linked Manual Purchase Request before preparing its remedy proposal.` |
+| Read failure | `Case approvals could not be loaded.` · `Try again` |
+| Purchasing Task for a submitted Case remedy | `Review Case remedy` · `Case remedy requires a decision` · `Exact Case remedy approved or refused` — opens the exact existing Case, owned by Service Case Approver; existing next-Office-working-day ready-approval deadline |
+| Changed decision scope | `The Case or requested goods changed. Prepare a new proposal.` |
+| Missing evidence | `Add the evidence to the existing Case before submitting.` · `Case evidence {n} could not be loaded.` |
+| Charged proposal's recorded payer response | `Accepted by` · `Accepted on` · `Acceptance evidence` — actual payer response supported by an existing Case file, separate from the staff recorder and Case approver |
+
+Remedy and movement options retain Service MASTER §7.4's existing terms; the customer-side
+movement definitions below remain distinct from Purchasing's supplier-side decisions. Historical
+decisions show the actual deciding person and recorded date/time. Routine follow-up does not create
+another approval. A change to stock/buy allocation alone stays with Purchasing review.
+
 ### Supplier Claim decision words — owner boundary confirmed 2026-09-14
 
 `docs/purchasing/MASTER.md` §7.3 and §9.5 own the stock-claim flow. A Supplier Claim starts

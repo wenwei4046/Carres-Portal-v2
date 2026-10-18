@@ -9,6 +9,32 @@ Paste everything below the line into a fresh session. It is self-contained.
 
 ---
 
+**LATEST REPAIR APPLIED AND LIVE VERIFIED ·18Oct2026.**
+Jess explicitly approved exact18c256c328ff8cedb2ec56ff62e6553bd8c37dd49167dfc0186ba33a2688ecc5 in controller chat.0700 committed/pushed a82948daf before governed probe/apply.
+Probe: original42501 negative control; authenticated Operation reads38 lines after repair; same stock arithmetic, unchanged invoker/ACL/private-helper protection. Post-rollback baseline unchanged.
+APPLIED tracker20261018074151; exact committed fileMD59843a1e312890371c23dc75686a94bca; body94e4dd0261f30f2acc8f27b8e3c24baf verified.
+Live Operation Forecast at erp.carresofficial.com/operation?tab=forecast-purchase now loads7 real models and expanded sizes/On PO data. PR2095 CI39108658992/Preview39108659012 SUCCESS exacta829; merged007c76e585f724ce0303c35c4b31981ea07827ff. Production39109929096 SUCCESS; all five canonical services converged007c76e585f724ce0303c35c4b31981ea07827ff at2026-10-18T08:19:54Z. Bounded release complete; full originalSC/cancellation goal remains incomplete. No repeat tests/reapply/redeploy needed. No new checks/reapply.
+Older Forecast approval/error holds below are historical and superseded. Full contextualSC/cancellation remain incomplete.
+
+**PRODUCTION DATABASE APPLIED ·18Oct2026 · release c161cf875708f3b4aadb3bc66ded84fd311fcebe.**
+Authorised migrations0697/0698/0699 applied successfully through apply_migration.
+Trackers:0697=20261018062722 (MD5 f87371f9dd54c2c7b34747353b57241e),
+0698=20261018062729 (MD5 afcb4ef26fe7452fb553debacf2acc15),
+0699=20261018062737 (MD5 803c887de447e834880ca13a1c91f331).
+Production rollback probe passed by expected deliberate exception; baseline unchanged after rollback.
+Post-apply tracker bytes, all82 function bodies/security/grants, new ledger RLS and scoped SELECT verified.
+Preview39103996088 SUCCESS; mandatory exact-head CI39103996109 SUCCESS.
+PR2093 merged18Oct2026 06:47:12UTC as1c0ebc73bb4859bb237e6110f5fb94e0a1d0d675.
+Production deployment39105276618 SUCCESS: all five production surfaces converged to1c0ebc73 at06:58:11UTC.
+Authenticated Operation on erp.carresofficial.com: MPR list4 records and new GP/SC form render; requester/date, recipients/items/PO review visible; no save.
+Forecast live read FAIL: purchasing_po_free_units calls purchasing_po_line_free_units which calls private _purchasing_po_line_cancelled_qty; authenticated42501 reproduced read-only.
+Narrow repair draft forecast-authenticated-read-repair.draft.sql keeps invoker/grants/RLS and inlines same ledger SUM. Approval required by ENGINEERING5 before formal migration.
+Live Tasks139 and Workspace Purchasing91 render; existing Issue PO task opens exact Ready Stock request detail, approved state, SKU/qty and stock/PO coverage. Forecast new-stock RS form renders (fixed purpose/proceed/delivery/items). No business writes.
+Forecast list repair approval pending in controller by Jess explicit delegation; no further Code approval question. Do not claim Forecast usable/full release done.
+Next: required CI success, ready/merge PR2093, production workflow, authenticated read-only verification.
+This evidence update stays LOCAL to avoid a prose-only CI restart. No reapply/reapproval.
+SC contextual execution and contextual cancellation remain held as disclosed below.
+
 **LATEST ·18Oct2026 · HUMAN RESUMED EXACT THREE-SQL DEPLOYMENT.**
 Jess directly instructed I WANT DEPLOY NOW after the presented3-file approval list. Controller
 explicitly authorised the exact b4eb/475a/fb1f bytes and previously disclosed constraints/new-ledger
@@ -943,3 +969,13 @@ segmented control, states, documents, CompactModuleCard, task parts) · `compone
 `Carres UI kit lane — CONTINUOUS BUILD. Read CLAUDE.md, docs/ui/MASTER.md "How design and Code
 work" and §7, and docs/handoff/CARRES-CONTINUOUS-BUILD-HANDOFF.md. Start at §4.1 and follow §4 in
 order; bring only §5 decisions to the owner, one at a time. Do not start Manual Purchase Request.`
+
+### 18 Oct 2026 · narrow SC remedy execution extension — awaiting exact SQL approval
+
+Jess's explicit controller-relayed approval authorises the bounded existing Case Approver decision → existing SC Purchasing/Stock/PO connection; not the full Service/entitlement module. Active branch `codex/service-case-purchase-approval` in the isolated forecast-mpr-context checkout; production remains `007c76e585f724ce0303c35c4b31981ea07827ff` (Forecast fix live). Desktop work preserved.
+
+One exact SQL approval package is with the controller (`01a11f2b-d894-73b2-a461-1c0996bc4621`); controller presented the human question, no answer yet. Draft `output/forecast-mpr-delivery/service-case-remedy-approval.draft.sql`, SHA256 `667a43d1a981dc6c29a1eb38fbdaa50190afd8feabb36acbc2fa598a316a508d`; review/10-function manifest/probe draft in that same output folder. No formal migration/production apply before exact human approval. Adds immutable Case binding/history over existing approvals, a restrictive approvals SELECT policy and 3 authenticated role/duty-gated RPCs; replaces 3 existing context/execution/release bodies. No new role/duty/Storage/Finance permission. Purchasing remains separately approved; requested2 proven Stock1+PO1, thirdgood denied; routine follow-up and stock/buy-only Purchasing revision preserve Case vote.
+
+Tasks and Workspace use the same bounded Purchasing-source occurrence for a submitted current Case remedy, assigned through existing Service Case Approver and opening exact existing Case. Existing completion writer closes only after actual saved decision. Due comes from immutable proposal timestamp + existing next Office working day using stored Office calendar (§7.9). MPR opens its exact linked Case. Native owned-local Case page confirms real approver name, source evidence, requester no decision, unsaved facts block action, discard/keep preserves unsent remedy. Existing legacy Case modal is not full Service kit adoption. TEST local transport/Storage signing is not provider proof; production walk stays read-only. Full proposal_accepted/showroom producer and complete entitlement engine remain outside this narrow slice. Finance cancellation waits actual YH agreement, not part of SC release. Ask further human questions only in controller; never ask Jess again in Code.
+
+18 Oct controller relayed explicit human exact-SQL approval for667a43d1…508d and deployment. Fresh scan: tracker/main/all2134refs(324distinct migration trees) MAX0700; next formal0701 is byte-identical. Production preimages match reviewed guards; before-probe counts Cases1/approvals0/MPR4/demands9/PO66/Units479, tracker615. Forecast toolbar correction also reuses the SAME TasksPill as Sales Order at toolbar end, suppressing header fallback; identical count/permissions, no new component. Prior statement implying different count scope was corrected. No SQL bytes changed. Deployment proof to follow.

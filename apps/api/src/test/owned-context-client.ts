@@ -72,7 +72,7 @@ export class OwnedContextDatabase {
       if (!/^[a-z_][a-z0-9_]*$/.test(table)) throw new Error("Invalid TEST table identifier");
       let fields = "*"; let single = false; let count = false; let head = false;
       const filters: Array<(row:any)=>boolean> = []; const orders: Array<{ key:string; ascending:boolean }> = []; let begin = 0; let end = Infinity;
-      const field = (row:any,key:string) => key.split(".").reduce((value,part)=>value?.[part],row);
+      const field = (row:any,key:string) => key.replaceAll("->>",".").replaceAll("->",".").split(".").reduce((value,part)=>value?.[part],row);
       const query: any = {
         select(value = "*",options: any = {}) { fields=value;count=options.count != null;head=options.head===true;return query; },
         eq(key:string,value:unknown) { filters.push(row=>field(row,key)===value);return query; },

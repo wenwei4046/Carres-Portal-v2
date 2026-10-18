@@ -76,6 +76,20 @@ export function purchasingRefusal(
   const dest = some(facts.destination, "that place");
 
   switch (code) {
+    case "service_remedy_approval_required":
+      return { wrong: "The Case remedy has no current approval.", todo: "Open the linked Service Case and ask its approver to review the exact remedy and goods." };
+    case "service_scope_changed":
+      return { wrong: "The Case or requested goods changed after approval.", todo: "Open the linked Service Case and send the changed remedy for approval." };
+    case "service_evidence_required":
+      return { wrong: "The approved Case evidence is missing.", todo: "Open the linked Service Case and restore its evidence before arranging the goods." };
+    case "service_units_changed":
+    case "service_units_required":
+      return { wrong: "The affected Case Units are missing or changed.", todo: "Open the linked Service Case and check the affected Units before sending the remedy for approval." };
+    case "not_service_case_approver":
+      return { wrong: "Only the Service Case Approver may decide this remedy.", todo: "Ask the assigned Service Case Approver to review it in the linked Case." };
+    case "payer_acceptance_required":
+      return { wrong: "The charged remedy has no recorded payer acceptance.", todo: "Open the linked Service Case and record who accepted the charge, the date and its evidence." };
+
     // ── WHO MAY ACT (0627 · owner ruling 2026-09-29) ──────────────────────
     /* Every active Operation person may issue; PO Duty is the normal owner,
        not the permission. The code keeps its wire spelling. */
