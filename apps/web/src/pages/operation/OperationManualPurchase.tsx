@@ -4462,6 +4462,7 @@ export function ManualPurchaseObject({
                 {savedContext.projectReference && <Fact label="Project name / reference">{savedContext.projectReference}</Fact>}
               </>}
               {savedContext?.purpose === "general_purchase" && savedContext.reason === "other" && <Fact label="Explanation">{savedContext.explanation}</Fact>}
+              {request.for_service_case_id && <Fact label="Service Case"><Button variant="neutral" onClick={()=>navigate(`/operation?tab=service-notes&case=${encodeURIComponent(request.for_service_case_id!)}`)}>{d.serviceCaseNo??"Open Service Case"}</Button></Fact>}
               <Fact label={MW.colDeliverTo} testId="mp-detail-deliver-to">
                 <DeliverToFact
                   requestId={request.id}

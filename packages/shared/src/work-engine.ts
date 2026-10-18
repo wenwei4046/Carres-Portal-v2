@@ -94,7 +94,8 @@ export type WorkOwnerRule =
    * `workItemsForOrder`; Card 9's recorded boundary): */
   | "grn_duty" // the effective GRN Duty resolution from Workspace
   | "claim_month_po_duty" // the holder of the month the claim was OPENED — forever
-  | "purchasing_approver";
+  | "purchasing_approver"
+  | "service_case_approver";
 
 export interface WorkRuleDefinition {
   key: string;
@@ -306,6 +307,7 @@ export const ORDER_WORK_RULES: readonly WorkRuleDefinition[] = [
  *  Receiving rail, the Claims queue) and join the composed feed when their
  *  server feeds are wired (Card 9's recorded boundary). */
 export const MODULE_WORK_RULES: readonly WorkRuleDefinition[] = [
+  { key: "service_case.remedy_approve", module: "purchasing", trigger: "a linked SC purchase has a current submitted Case remedy proposal", owner: "the existing Service Case Approver duty holder", ownerRule: "service_case_approver", action: "Review Case remedy", dueRule: "next Office working day after the ready proposal was recorded (Service §7.9)", completionFact: "the exact immutable Case remedy approval record is approved or refused" },
   {
     key: "manual_purchase.approve",
     module: "purchasing",
@@ -611,6 +613,7 @@ const WORK_COMPLETION_STATEMENTS: Readonly<Record<string, string>> = {
   collect_loan_item: "The loan item is recorded as returned",
   resolve_payment_exception: "The payment exception is cleared with evidence",
   ask_delivery_date: "The requested delivery date or governed no-date answer is recorded",
+  "service_case.remedy_approve": "The exact Case remedy decision is recorded",
   "manual_purchase.approve": "The approval or refusal decision is recorded",
   "manual_purchase.issue_po": "Every linked current PO version marked as sent",
   "purchasing.cancellation_send": "Current cancellation PO version marked as sent",

@@ -21,6 +21,9 @@ import CaseOrderLink from "./CaseOrderLink";
 import CaseEvidenceGallery from "./CaseEvidenceGallery";
 import CaseFollowUps from "./CaseFollowUps";
 import CaseDeadline from "./CaseDeadline";
+import CaseRemedyApproval from "./CaseRemedyApproval";
+import Modal from "@/components/kit/Modal";
+import Button from "@/components/kit/Button";
 
 /**
  * Create / edit a Service Case (病历).
@@ -43,6 +46,10 @@ export default function ServiceCaseModal({
   onSaved: () => void;
 }) {
   const qc = useQueryClient();
+  const [remedyDirty,setRemedyDirty]=useState(false);
+  const [remedyBusy,setRemedyBusy]=useState(false);
+  const [discardRemedy,setDiscardRemedy]=useState(false);
+  const requestClose=()=>{if(remedyBusy)return;if(remedyDirty)setDiscardRemedy(true);else onClose();};
 
   const configQ = useQuery<ServiceCaseConfig>({
     queryKey: ["ops", "service-cases", "config"],
@@ -147,11 +154,11 @@ export default function ServiceCaseModal({
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["ops", "service-cases"] });
-      onSaved();
+      if (!remedyDirty) onSaved();
     },
   });
 
-  const canSave = customerName.trim().length > 0 && !saveMut.isPending;
+  const canSave = customerName.trim().length > 0 && !saveMut.isPending && !remedyBusy;
 
   /**
    * S3 — may this case be closed? The same shared answer the server's gate
@@ -178,7 +185,7 @@ export default function ServiceCaseModal({
           <h2 className="text-strong text-base-900">
             {mode === "create" ? "New Case" : "Edit Case"}
           </h2>
-          <button type="button" onClick={onClose} className="text-base-400 hover:text-base-700">
+          <button type="button" onClick={requestClose} disabled={remedyBusy} className="text-base-400 hover:text-base-700">
             <X size={20} />
           </button>
         </div>
@@ -363,6 +370,12 @@ export default function ServiceCaseModal({
             />
           )}
 
+          {mode === "edit" && id && existingQ.data && <CaseRemedyApproval caseId={id} onDirtyChange={setRemedyDirty} onBusyChange={setRemedyBusy} disabled={
+            carresAction !== (existingQ.data.carresAction ?? "") || whatAffected !== (existingQ.data.whatAffected ?? "") || incurredCharges !== (existingQ.data.incurredCharges ?? "") ||
+            customerName !== (existingQ.data.customerName ?? "") || customerPhone !== (existingQ.data.customerPhone ?? "") || customerAddress !== (existingQ.data.customerAddress ?? "") ||
+            caseTypeId !== (existingQ.data.caseTypeId ?? "") || statusId !== (existingQ.data.statusId ?? "") || whatHappened !== (existingQ.data.whatHappened ?? "") || openedAt !== (existingQ.data.openedAt ?? appTodayIso())
+          }/>}
+
           {/* S2 — the evidence the case was filed with, each file naming who
               uploaded it and when. Edit mode only: on create the wizard owns
               the checklist, and this modal no longer creates cases anyway. */}
@@ -403,7 +416,7 @@ export default function ServiceCaseModal({
 
         {/* Footer */}
         <div className="flex justify-end gap-2 border-t border-base-200 px-6 py-4">
-          <button type="button" onClick={onClose} className="btn-secondary text-body py-1.5">
+          <button type="button" onClick={requestClose} disabled={remedyBusy} className="btn-secondary text-body py-1.5">
             Cancel
           </button>
           <button type="button" onClick={() => saveMut.mutate()} disabled={!canSave}
@@ -412,6 +425,7 @@ export default function ServiceCaseModal({
           </button>
         </div>
       </div>
+      <Modal open={discardRemedy} onOpenChange={setDiscardRemedy} title="Discard" footer={<><Button onClick={()=>setDiscardRemedy(false)}>Cancel</Button><Button variant="primary" onClick={onClose}>Discard</Button></>}>Not saved</Modal>
     </div>
   );
 }

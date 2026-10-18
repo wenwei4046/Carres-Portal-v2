@@ -1,3 +1,4 @@
+import { loadCaseRemedyWork } from "../../lib/service-case-remedy-work";
 import { Hono, type Context } from "hono";
 import { sellableOf } from "./stock";
 import { HTTPException } from "hono/http-exception";
@@ -194,7 +195,7 @@ function collectionActorOf(resolution: WorkspaceDutyResolution | null | undefine
 /** Settings → Office for this request, as the caller (RLS). Never throws: an
  *  unreadable calendar — or a request with no database at all — answers the
  *  owner defaults (`readOfficeCalendar`'s own fail-safe). */
-async function officeCalendarOf(c: Context<AppEnv>): Promise<OfficeCalendar> {
+export async function officeCalendarOf(c: Context<AppEnv>): Promise<OfficeCalendar> {
   try {
     return (await readOfficeCalendar(userClient(c.env, c.var.auth.jwt))).calendar;
   } catch {
@@ -2082,6 +2083,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
         !PURCHASING_WINDOW_OWNED.has(item.ruleKey))),
     loadWorkSource("purchasing", observedAt, async () => [
       ...manualItems,
+      ...(await loadCaseRemedyWork(c,today,calendars.office)),
       ...purchaseOrderItems,
       ...projectPurchaseOrderCancellationSendWork({pos:pos.pos as PurchaseOrderWorkSource[],suppliers:suppliers.suppliers,poDuty,today}),
       ...arrivalCheckItems,

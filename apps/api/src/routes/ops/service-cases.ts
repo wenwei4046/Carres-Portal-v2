@@ -36,6 +36,7 @@ import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 import { parseBody } from "../../lib/route-helpers";
 import { todayIsoMYT } from "../../lib/delivery-order-issue";
+import serviceCaseRemedyRouter from "./service-case-remedy";
 
 /**
  * Service Cases (SC) — migration 0210. The case / 病历 parent layer above
@@ -61,6 +62,7 @@ import { todayIsoMYT } from "../../lib/delivery-order-issue";
  */
 
 const scRouter = new Hono<AppEnv>();
+scRouter.route("/:id/remedy", serviceCaseRemedyRouter);
 
 /**
  * J2 adds `orders(so)` to the embed: order_id is the permanent link key but it
