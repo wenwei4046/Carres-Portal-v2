@@ -48,7 +48,17 @@ export default function CaseRemedyApproval({ caseId, disabled=false, onDirtyChan
    {disabled&&<p role="status" className="text-body text-c-secondary">Save the Case changes before reviewing its remedy.</p>}
    {read.data.proposals.map(p=><div key={p.id} className="space-y-2">
     <p className="text-strong text-c-ink">{p.status==="pending"?"Need approval":p.status==="approved"?"Approved":"Refused"}</p>
-    {p.payload.scope.context.lines.map((l,i)=><p key={i} className="text-body text-c-ink">{l.sku} · {l.qty}</p>)}
+    {p.payload.scope.context.lines.map((line,i)=><div key={i} className="space-y-1">
+     <p className="text-body text-c-ink">{line.sku} · {line.qty}</p>
+     {Object.entries(line.attrs??{}).map(([name,value])=><p key={name} className="text-body text-c-secondary">{name.replaceAll("_"," ")}: {typeof value==="object"?JSON.stringify(value):String(value)}</p>)}
+     {line.recipientNeeds.map(need=>{const recipient=p.payload.scope.context.recipients.find(r=>r.id===need.recipientId);return <p key={need.recipientId} className="text-body text-c-secondary">{recipient?.name??"Recipient not recorded"} · {need.qty} pcs</p>;})}
+    </div>)}
+    {p.payload.scope.context.recipients.map(recipient=><div key={recipient.id} className="space-y-1">
+     <p className="text-body text-c-ink">{[recipient.company,recipient.name,recipient.phone].filter(Boolean).join(" · ")}</p>
+     <p className="text-body text-c-secondary">{recipient.method==="delivery"?"Delivery":"Self pickup"} · {fmtDate(recipient.deliveryDate)}</p>
+     {recipient.method==="delivery"?<><p className="break-words text-body text-c-secondary">{[recipient.addressLine1,recipient.addressLine2,recipient.city,recipient.state,recipient.postcode].filter(Boolean).join(", ")}</p><p className="text-body text-c-secondary">{recipient.buildingType} · Floor {recipient.floor} · {recipient.lift==="has_lift"?"Has lift":"No lift"}</p></>:<p className="text-body text-c-secondary">Collected by {recipient.collectedBy} · Check pickup location in the linked request.</p>}
+    </div>)}
+    <Link to={`/operation?tab=manual-purchase&mp=${encodeURIComponent(p.payload.proposal.requestId)}`} className="block text-body text-kit-blue-11">Open Manual Purchase Request</Link>
     <p className="text-body text-c-secondary">{SERVICE_CASE_REMEDIES.find(x=>x.value===p.payload.proposal.remedy)?.label} · {SERVICE_CASE_MOVEMENTS.find(x=>x.value===p.payload.proposal.movement)?.label}</p>
     <p className="text-body text-c-secondary">{p.payload.proposal.policy} · {p.payload.proposal.policyVersion} · {p.payload.proposal.policyResult==="eligible"?"Eligible":"Not eligible"}</p>
     <p className="text-body text-c-secondary">{p.payload.proposal.charge==="free"?"Free":`Charged RM ${p.payload.proposal.amount?.toFixed(2)} · ${p.payload.proposal.payer}`}</p>
