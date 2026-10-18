@@ -1524,8 +1524,29 @@ div:first-child > .columnsMenuGroup {
 .rootReference[data-presentation-tools] .searchInput {
   text-overflow: ellipsis;
 }
+/* Reuse the reserved condition bar's contained overflow contract: the
+   reference toolbar remains one 36px row; controls keep their intrinsic
+   widths instead of shrinking a parent over its fixed-width children. */
 .rootReference[data-presentation-tools] .toolbar:not(.selectionBar) {
+  height: 36px;
+  min-height: 36px;
   flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-head-line) transparent;
+}
+.rootReference[data-presentation-tools] .toolbar:not(.selectionBar) > :not(.searchResponsiveBox):not(.searchWrap) {
+  flex-shrink: 0;
+}
+/*32px controls plus a visible 4px horizontal track fit the existing 36px row.
+  overflow:auto adds no track when the contents already fit. */
+.rootReference[data-presentation-tools] .toolbar:not(.selectionBar)::-webkit-scrollbar {
+  height: 4px;
+}
+.rootReference[data-presentation-tools] .toolbar:not(.selectionBar)::-webkit-scrollbar-thumb {
+  background: var(--c-head-line);
+  border-radius: var(--radius-round);
 }
 .rootReference[data-presentation-tools] .toolbar > .searchResponsiveBox {
   order: 2;

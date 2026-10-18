@@ -315,3 +315,45 @@ test("MPR1025 returns focus to its Summary door and keeps the shared36px toolbar
   await expect(door).toBeFocused();
   expect((await canvas.boundingBox())!.width).toBe(before);
 });
+
+
+// The released request-flow action adds real width. A narrower window must
+// keep its View, Page tools and Tasks as separate reachable controls.
+test("request-flow toolbar keeps its controls separate at801 and preserves desktop fit", async ({page})=>{
+ await page.addInitScript(()=>{
+  localStorage.setItem("carres-menu-collapsed","0");
+  localStorage.setItem("shell-tasks-open","0");
+  localStorage.setItem("carres.forecastPurchase.summary.open","0");
+ });
+ for(const width of [801,...WIDTHS]){
+  await page.setViewportSize({width,height:900});
+  await page.goto(`${PAGE}?requestFlow=1`,{waitUntil:"networkidle"});
+  const toolbar=page.getByTestId("work-toolbar");
+  const view=page.getByRole("button",{name:"View: By model · Outright",exact:true});
+  const tools=page.getByRole("button",{name:"Page tools",exact:true});
+  const tasks=page.getByTestId("tasks-pill");
+  await expect(page.getByTestId("forecast-new-stock-request")).toBeVisible();
+  await expect(tasks).toBeVisible();
+  const v=(await view.boundingBox())!;const t=(await tools.boundingBox())!;const k=(await tasks.boundingBox())!;
+  expect(v.x+v.width,`View overlaps Page tools at${width}`).toBeLessThanOrEqual(t.x+1);
+  expect(t.x+t.width,`Page tools overlaps Tasks at${width}`).toBeLessThanOrEqual(k.x+1);
+  expect((await toolbar.boundingBox())!.height).toBe(36);
+  expect(await toolbar.evaluate(bar=>{const r=bar.getBoundingClientRect();return [...bar.querySelectorAll("button")].filter(e=>Math.round(e.getBoundingClientRect().height)===32).every(e=>{const b=e.getBoundingClientRect();return b.top>=r.top-1&&b.bottom<=r.top+bar.clientHeight+1;});})).toBe(true);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBe(0);
+  const overflow=await toolbar.evaluate(e=>e.scrollWidth-e.clientWidth);
+  if(width===801){
+   expect(overflow).toBeGreaterThan(0);
+   await view.click();const viewMenu=page.getByRole("menu",{name:"Forecast Purchase view"});await expect(viewMenu).toBeVisible();
+   expect(await viewMenu.evaluate(e=>!!e.closest('[data-testid="work-toolbar"]'))).toBe(false);
+   await expect(viewMenu.getByTestId("forecast-view-outright")).toBeVisible();await page.keyboard.press("Escape");
+   await expect(viewMenu).toHaveCount(0);await expect(view).toBeFocused();
+   await tools.focus();await expect(tools).toBeFocused();await page.keyboard.press("Tab");await expect(tasks).toBeFocused();
+   const b=(await toolbar.boundingBox())!;const focused=(await tasks.boundingBox())!;
+   expect(focused.x).toBeGreaterThanOrEqual(b.x-1);expect(focused.x+focused.width).toBeLessThanOrEqual(b.x+b.width+1);
+   await tools.click();const menu=page.getByRole("menu",{name:"Page tools"});await expect(menu).toBeVisible();
+   expect(await menu.evaluate(e=>!!e.closest('[data-testid="work-toolbar"]'))).toBe(false);
+   await expect(menu.getByRole("menuitem",{name:"Export",exact:true})).toBeVisible();
+   await shot(page,"forecast-request-flow-801-tools");await page.keyboard.press("Escape");
+  }else expect(overflow,`Unnecessary toolbar scroll at${width}`).toBeLessThanOrEqual(1);
+ }
+});
