@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { APP_ROLES } from "./principal-accounts";
 
 /**
  * Login form payload — sent from apps/web Login page directly to Supabase Auth
@@ -20,10 +21,7 @@ export type LoginPayload = z.infer<typeof loginSchema>;
 export const meResponseSchema = z.object({
   id: z.string().uuid(),
   email: z.string().email(),
-  role: z.enum([
-    "principal", "dealer", "salesperson", "showroom",
-    "operation", "supplier", "partner", "finance", "bd", "hr",
-  ]),
+  role: z.enum(APP_ROLES),
   dealerId: z.string().uuid().nullable(),
   supplierId: z.string().uuid().nullable(),
   partnerId: z.string().uuid().nullable(),
