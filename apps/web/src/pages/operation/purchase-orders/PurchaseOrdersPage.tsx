@@ -1480,7 +1480,7 @@ function ReceiptsDialog({
  *  stored identity opens nothing — it prints its governed label as a fact. */
 function sourceHref(source: SourceRef): string | null {
   if (source.kind === "sales_order") return source.orderId ? `/operation/orders/so/${source.orderId}` : null;
-  return source.requestId ? `/operation?tab=manual-purchase&request=${encodeURIComponent(source.requestId)}` : null;
+  return source.requestId ? `/operation?tab=manual-purchase&mp=${encodeURIComponent(source.requestId)}` : null;
 }
 
 /** The first arrival this PO recorded — the sort key for Goods Received Date.

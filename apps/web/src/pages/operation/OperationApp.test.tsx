@@ -81,7 +81,7 @@ vi.mock("./OperationToOrder", () => ({
   default: () => <div data-testid="to-order-stub">to-order</div>,
 }));
 vi.mock("./OperationManualPurchase", () => ({
-  default: () => <div data-testid="manual-purchase-stub">manual-purchase</div>,
+  default: ({contextFlow}:{contextFlow?:boolean}) => <div data-testid="manual-purchase-stub" data-context-flow={String(contextFlow)}>manual-purchase</div>,
 }));
 // CARD-2026-09-04-delivery-01 — Monitor draws its own Destination Header and
 // self-fetches; this suite only asks which route mounts it, and whether the
@@ -176,11 +176,11 @@ function expectOneHeader() {
   expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
 }
 
-function renderApp(initialPath: string) {
+function renderApp(initialPath: string,purchaseRequestContext?:boolean) {
   return render(
     <MemoryRouter initialEntries={[initialPath]}>
       <Routes>
-        <Route path="/operation/*" element={<OperationApp />} />
+        <Route path="/operation/*" element={<OperationApp purchaseRequestContext={purchaseRequestContext}/>} />
       </Routes>
       <LocationProbe />
     </MemoryRouter>,
@@ -631,4 +631,15 @@ describe("Staff & Duties relocation", () => {
     expectOneHeader();
     expect(screen.getByTestId("shell-title")).toHaveTextContent("Settings/Staff & Duties");
   });
+});
+
+
+it.each([false,true])("Manual Purchase route forwards the explicit context composition flag %s",enabled=>{
+ renderApp("/operation?tab=manual-purchase",enabled);
+ expect(screen.getByTestId("manual-purchase-stub")).toHaveAttribute("data-context-flow",String(enabled));
+});
+
+it("production caller with no context opt-in remains on legacy composition",()=>{
+ renderApp("/operation?tab=manual-purchase");
+ expect(screen.getByTestId("manual-purchase-stub")).toHaveAttribute("data-context-flow","false");
 });

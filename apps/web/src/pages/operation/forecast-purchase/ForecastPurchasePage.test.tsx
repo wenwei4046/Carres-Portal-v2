@@ -16,6 +16,7 @@ vi.mock("@/lib/api", async (original) => ({ ...(await original<typeof import("@/
 vi.mock("@/components/kit/Toast", async (original) => ({ ...(await original<typeof import("@/components/kit/Toast")>()), notify: vi.fn() }));
 import { ApiError, apiFetch } from "@/lib/api";
 import { notify } from "@/components/kit/Toast";
+vi.mock("./ForecastRequestWorkspace",()=>({default:({selection}:{selection:Array<{sku:string;toAsk:number}>})=><pre data-testid="forecast-context-workspace">{JSON.stringify(selection)}</pre>}));
 import ForecastPurchasePage from "./ForecastPurchasePage";
 
 const size = (over: Partial<ForecastPurchaseSize>): ForecastPurchaseSize => ({
@@ -49,7 +50,7 @@ const FORECAST = "/api/operation/purchase/forecast";
 const SUBMIT = "/api/operation/purchase/forecast/requests";
 type Sent = { submissionKey: string; lines: Array<{ sku: string; qty: number }> };
 type Answers = { forecast?: () => Promise<unknown>; submit?: (body: Sent) => unknown };
-function mount(path = "/operation?tab=forecast-purchase", answers: Answers | (() => Promise<unknown>) = {}) {
+function mount(path = "/operation?tab=forecast-purchase", answers: Answers | (() => Promise<unknown>) = {}, contextFlow=false) {
   const a: Answers = typeof answers === "function" ? { forecast: answers } : answers;
   vi.mocked(apiFetch).mockImplementation((async (url: string, init?: RequestInit) => {
     const body = init?.body ? JSON.parse(String(init.body)) : null;
@@ -60,7 +61,7 @@ function mount(path = "/operation?tab=forecast-purchase", answers: Answers | (()
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[path]}><ForecastPurchasePage /></MemoryRouter>
+      <MemoryRouter initialEntries={[path]}><ForecastPurchasePage contextFlow={contextFlow}/></MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -311,4 +312,20 @@ describe("Forecast Purchase · Outright", () => {
     mount(undefined, async () => ({ ...PAYLOAD, sizes: [] }));
     expect(await screen.findByText(/there is nothing to suggest/)).toBeInTheDocument();
   });
+});
+
+
+it("opted-in + New stock request opens the same request composition with an unrestricted empty selection",async()=>{
+ mount(undefined,{},true);
+ fireEvent.click(await screen.findByTestId("forecast-new-stock-request"));
+ expect(screen.getByTestId("forecast-context-workspace")).toHaveTextContent("[]");
+ expect(vi.mocked(apiFetch).mock.calls.some(([url,init])=>url===SUBMIT&&init?.method==="POST")).toBe(false);
+});
+it("opted-in forecast selection opens structured request review and never invokes the legacy submit",async()=>{
+ mount(undefined,{},true);
+ fireEvent.click(await screen.findByTestId("forecast-select-a"));
+ fireEvent.click(screen.getByTestId("forecast-review-open"));
+ const rows=JSON.parse(screen.getByTestId("forecast-context-workspace").textContent!);
+ expect(rows.length).toBeGreaterThan(0);expect(rows.every((row:any)=>row.toAsk>0&&row.sku)).toBe(true);
+ expect(vi.mocked(apiFetch).mock.calls.some(([url,init])=>url===SUBMIT&&init?.method==="POST")).toBe(false);
 });

@@ -9,7 +9,23 @@ Paste everything below the line into a fresh session. It is self-contained.
 
 ---
 
-**LATEST FINITE CHECK SLICE ·18Oct2026 · LOCAL, no activation/production writes.**
+**LATEST BOUNDED RELEASE PLAN ·18Oct2026 · LOCAL, default OFF; no SQL approval or activation.**
+Forecast selected suggestions and manual New stock request now enter the SAME existing request
+Workspace/Review; one default-false OperationApp prop forwards the opt-in to Forecast and MPR.
+Production root passes no opt-in. PO source links now use owning `mp` parameter. Focused entry,
+adapter, retained-draft and link checks78/78 PASS; PO page69/69 PASS after link fix. These are
+local entry proofs, not a fresh Forecast-parent browser-save or production acceptance claim.
+Exact candidate and final bounded sequence are in existing purchase-request-writers.review.json
+`bounded_activation_plan`; SQL bytes unchanged475a87f…58e8f1 /78 functions. Passed scope frozen.
+Whole-cancel late extra-only refusal PRE-EXISTED (0601:372 open-PO guard;0444:254 counted gate).
+It is NOT a new regression or blocker for ordinary GP/RS or verifiable unchanged SC procurement;
+it prevents claiming complete late-cancelled-arrival handling. Retain safe refusal and disclose it;
+no new Receiving/Stock design in this release. Combined admission remains CLOSED while applicable
+Finance notification/access, new/changed SC source and isolated provider proof remain unresolved.
+Settings approval still pending; only final exact usable-workflow SQL/release approval may open
+its governed path. Never repeat0696 or infer writer/Settings approval from foundation approval.
+
+**PREVIOUS FINITE CHECK SLICE ·18Oct2026 · LOCAL, no activation/production writes.**
 SQL candidate now SHA256475a87f26feacfa2080aa337ae13a275a6054da2b71e8bd3de019f6ba958e8f1,
 78 functions/grants. New exact probe PASS with deliberate PROBE_ROLLBACK,13 source guards,
 default-CLOSED, unchanged purchasing/receiving/claims/approval counts/settings/existingRLS and
@@ -26,7 +42,7 @@ qty no longer reportable/due; original ordered/received preserved, Cancelled Qty
 Office RPC positive receives active Unit1 after original2/cancel1; actual source date/site and
 separate TEST signed DO/arrival evidence fields kept; retired Unit never restored; existing Extra1
 stored on GRN only, NOT claimed controlled custody. Shared36/UI82 PASS, API/web typechecks PASS.
-Whole cancelled late Extra-only was checked and remains SAFE BLOCKER (po_not_open). A tentative
+Whole cancelled late Extra-only was checked and retains its pre-existing safe refusal (po_not_open). A tentative
 zero-normal GRN/Find-PO exception was WITHDRAWN before commit: §5.8.1 requires existing discrepancy
 path and §7.3/known gap requires real controlled unavailable custody, not JSON-only Extra. §7.3
 leaves extra resolution/warehouse confirmation in separate draftPR1910, not commissioned here.
@@ -38,7 +54,7 @@ Finance review artifact is finance_notification_adapter_proposal in SAME review 
 files/components/events/access and evidence membership, no Finance edit or external message.
 Remaining actual gates only: narrow Finance receiver + file access (coordinate only with human
 authorisation); qualified new/changed SC source contract (unchanged authorised procurement stays);
-isolated Storage byte/provider proof; whole-cancel late-arrival existing custody handoff; pending
+isolated Storage byte/provider proof; pending
 Settings and ONE final usable-workflow SQL/release review. Installation is not activation. Do not
 repeat passed finite checks or reopen unrelated scope. Earlier checkpoints below are historical.
 
