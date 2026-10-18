@@ -315,7 +315,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       requestIds,
       (ids) => sb
         .from("purchase_requests")
-        .select("id, created_at, req_no, request_version")
+        .select("id, created_at, req_no, request_version, proceed_date")
         .in("id", ids)
         .order("id"),
     );
@@ -327,9 +327,13 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       if (Number(request.request_version ?? 0)>0) modernRequestIds.add(String(request.id));
       requestFactsById.set(request.id as string, {
         proceedDate:
-          typeof request.created_at === "string"
-            ? request.created_at.slice(0, 10)
-            : null,
+          typeof request.proceed_date === "string"
+            ? request.proceed_date.slice(0, 10)
+            : Number(request.request_version ?? 0) > 0
+              ? null
+              : typeof request.created_at === "string"
+                ? request.created_at.slice(0, 10)
+                : null,
         reqNo:
           typeof request.req_no === "string" && request.req_no.trim() !== ""
             ? request.req_no.trim()

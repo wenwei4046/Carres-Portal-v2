@@ -399,6 +399,19 @@ describe("GET /api/operation/pos", () => {
     expect(body.pos[0]!.purchase_order_lines[0]!.governed_sources.reduce((n, s) => n + s.qty, 0)).toBe(2);
   });
 
+  it.each(["2026-10-21", null])("modern MPR source keeps selected Proceed Date %s distinct from actual submission", async (proceedDate) => {
+    const row={...PO_ROW,so:null,purchase_order_lines:[{...PO_ROW.purchase_order_lines[0],demand_id:"demand-1"}]};
+    mockPosList([row as unknown as typeof PO_ROW],[],[],[],{
+      demands:[{id:"demand-1",request_id:"request-1",purpose:"general_purchase"}],
+      requests:[{id:"request-1",created_at:"2026-10-18T02:00:00Z",request_version:1,proceed_date:proceedDate,req_no:"GP-TEST"}],
+    });
+    const response=await app.fetch(new Request("http://t/api/operation/pos",{headers:{Authorization:`Bearer ${await makeJwt("operation")}`}}),env);
+    expect(response.status).toBe(200);
+    const body=await response.json() as any;
+    expect(body.pos[0].sources).toEqual(expect.arrayContaining([expect.objectContaining({kind:"manual_purchase",proceed_date:proceedDate})]));
+    expect(body.pos[0].purchase_order_lines[0].governed_sources).toEqual(expect.arrayContaining([expect.objectContaining({kind:"manual_purchase",proceed_date:proceedDate})]));
+  });
+
   it("returns governed SO and Manual Purchase lineage instead of guessing from display fields", async () => {
     const row = {
       ...PO_ROW,

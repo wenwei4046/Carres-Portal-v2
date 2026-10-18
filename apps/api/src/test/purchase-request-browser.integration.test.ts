@@ -85,7 +85,7 @@ describe.skipIf(!enabled)("owned local browser → actual API → PostgreSQL lif
       expect(afterResponse.status,JSON.stringify(after)).toBe(200);
       const work=manualPurchaseWorkInputsFromRegister({...after,requests:after.requests.filter((row:any)=>row.id===newId),lines:after.lines.filter((line:any)=>line.request_id===newId)});
       expect(work[0]).toMatchObject({remainingQty:left,hasPos:true,posAllSent:true});
-      const saved=await db.json(`select jsonb_build_object('request_version',request_version,'approval_version',approval_version,'need',request_context#>'{lines,0,qty}') from public.purchase_requests where id='${newId}';`);
+      const saved=await db.json(`select jsonb_build_object('request_version',request_version,'approval_version',approval_version,'proceed_date',proceed_date,'need',request_context#>'{lines,0,qty}') from public.purchase_requests where id='${newId}';`);
       expect(saved).toMatchObject({request_version:1,approval_version:1,need});
       // SAME existing parent revision API after the browser-issued PO. Explicit
       // source proof adds one within unchanged approval; old send remains V1.
@@ -148,6 +148,8 @@ describe.skipIf(!enabled)("owned local browser → actual API → PostgreSQL lif
       expect(afterCancellationWork[0]).toMatchObject({remainingQty:1,hasPos:true,posAllSent:false});
       const cancellationPoRead=await request(`/api/operation/pos?status=all&poId=${priorPoId}`);const cancellationPo=await cancellationPoRead.json() as any;
       expect(cancellationPoRead.status,JSON.stringify(cancellationPo)).toBe(200);expect(cancellationPo.pos[0]).toMatchObject({cancellation_version:document.version+2,purchase_order_lines:[{qty:2,received_qty:0,cancelled_qty:1,pending_qty:1}]});
+      expect(cancellationPo.pos[0].sources).toEqual(expect.arrayContaining([expect.objectContaining({request_id:newId,proceed_date:saved.proceed_date})]));
+      expect(cancellationPo.pos[0].purchase_order_lines[0].governed_sources).toEqual(expect.arrayContaining([expect.objectContaining({request_id:newId,proceed_date:saved.proceed_date})]));
       const cancellationSendWork=projectPurchaseOrderCancellationSendWork({pos:cancellationPo.pos,suppliers:register.suppliers,poDuty:null,today:"2026-10-18"});
       expect(cancellationSendWork.filter(item=>item.object.id===priorPoId)).toHaveLength(1);
       expect(cancellationSendWork.find(item=>item.object.id===priorPoId)).toMatchObject({ruleKey:"purchasing.cancellation_send",interaction:{componentKey:"purchasing.po_issue_evidence"}});

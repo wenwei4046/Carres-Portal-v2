@@ -87,9 +87,31 @@ production contact; coordinate only the owning Finance/SC handoff dependencies. 
 foundation recap, rejection-only cancellation result or Settings question. Exact current package is
 reviewable but neither approved nor production activation-ready. No automatic deployment permitted.
 
+**ACTIVATION CLARIFICATION ·18Oct2026 afterccaa40f3f.**
+No closed-installation-only SQL question will be submitted as usable Forecast/MPR. Existing review
+approval_request_draft is WITHHELD; only one final usable-workflow request after bounded actual
+activation dependencies. See activation_checklist and finance_notification_adapter_proposal in SAME
+review JSON. No new guide/audit cycle. Settings remains pending; no activation or production write.
+Independent readback fix completed: current owner15–17Oct §5.2 replaces legacy9.2 date semantics.
+Modern PO lineage now reads selected purchase_requests.proceed_date; missing modern date staysnull,
+legacy created_at compatibility retained.153 PO API cases and GP/RS browser2/2 PASS with exact
+saved date asserted on header and line sources; quantities/approval unchanged. Final API8GB typecheck PASS. No SQL draft byte change: bc0a…e69aa remains candidate, not final activation SQL.
+Finance adapter is notification/access only, no settlement/newmodule. Concrete current access gaps:
+Finance cannot enter Operation PO page and current delivery_orders_read excludes Finance (owned
+local policy + migration0302). Reuse shared TaskView/source surface for money-free owning facts;
+qualified Finance discovery of effective immutable events; scoped read ONLY for files referenced by
+those effective events with short-lived user-JWT viewing, reviewed in final exactSQL. Currentbc0a
+contains NO Finance Storage policy extension. No Ops fake task/public URL/service-role bypass.
+No acknowledgement/completion/settlement writer invented. No Finance edit or YH/chat message without
+human authorisation. SC source contract only new/changed formal-remedy subset; existing authorised
+unchanged procurement remains distinguished and no new Service module. Actual Storage runtime
+absent is a limited verification gap, NOT a missing uploader. Future conditional source-editor/
+Finance settlement branches are excluded from the activation checklist unless actually required.
+
 **Bounded dependency clarification ·18Oct2026 afterf930209c3.**
 Current same review JSON now includes release_dependency_table, finance_receiver_evidence,
-isolated_upload_runtime_evidence and one prepared (NOT SUBMITTED) exact SQL approval request.
+isolated_upload_runtime_evidence; its earlier closed-installation request is now WITHHELD by
+the activation clarification above.
 Finance Work receiver is a narrow5.8.1 notification/access adapter, not a Finance settlement/module
 build. Shared finance_duty/TaskView/occurrence/source-link grammar exists; current Operation Work
 and0694 routes/RLS exclude Finance, so a fake Ops task does not deliver it. Notes-to-follow-up
@@ -101,8 +123,9 @@ No Docker/Podman/Colima/Orb/Supabase executable or repo config.toml/isolated Sto
 available here. Real Storage bytes/RLS provider acceptance is therefore NOT VERIFIED; actual shared
 uploader/signing source is reusable. Do not replace this evidence with a Storage-shaped mock or
 use production as TEST. No new infra, service account, provider contact, production read/write or
-activation in this clarification. Closed-installation approval request is prepared with full exact
-path/SHA and stated RLS impact, not submitted as a complete production vertical slice.
+activation in this clarification. Current exact SQL remains a review candidate; no closed-only
+approval will be requested as usable delivery. The final usable-workflow request awaits only the
+actual activation_checklist, not unrelated Finance/Service work.
 
 **Latest follow-on ·18Oct2026 · LOCAL, production activation CLOSED.**
 Prior checkpoints `aba2adb33` and `fa7bdbdc6` are local only. Follow-on preserves all work in the same
