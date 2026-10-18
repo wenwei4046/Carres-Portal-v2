@@ -92,7 +92,9 @@ function makeSb(tables: Tables, rpc: ReturnType<typeof vi.fn> = vi.fn()) {
       }
       if (fn === "purchasing_actor_may_issue") return { data: true, error: null };
       const out = rpc(fn, args);
-      return out ?? { data: null, error: null };
+      if (out != null) return out;
+      if (fn === "purchasing_po_cancellations") return { data: [], error: null };
+      return { data: null, error: null };
     }),
   } as unknown as ReturnType<typeof userClient>;
 }
@@ -511,7 +513,7 @@ describe("context source readback across merged and partial POs", () => {
     const res = await call(""); expect(res.status).toBe(200);
     const body = await res.json() as { linesUnavailable: boolean; lines: Array<{ received: boolean; allocations: Array<{ poId: string; qty: number }> }> };
     expect(body.linesUnavailable).toBe(false);
-    expect(body.lines[0]!.allocations).toEqual([{ poId: "PO-CONTEXT-A", qty: 1, destinationId: DEST }, { poId: "PO-CONTEXT-B", qty: 1, destinationId: DEST }]);
+    expect(body.lines[0]!.allocations).toEqual([{ poId: "PO-CONTEXT-A", qty: 1, originalQty: 1, cancelledQty: 0, destinationId: DEST }, { poId: "PO-CONTEXT-B", qty: 1, originalQty: 1, cancelledQty: 0, destinationId: DEST }]);
     expect(body.lines[0]!.received).toBe(false);
   });
   it("preserves cancelled PO lineage while counting only active coverage for remainder and Work", async () => {
@@ -524,6 +526,12 @@ describe("context source readback across merged and partial POs", () => {
     expect(body.lines[0]!.po_ids).toEqual(["PO-CONTEXT-A", "PO-CONTEXT-B"]);
     expect(body.lines[0]!.active_po_ids).toEqual(["PO-CONTEXT-B"]);
     expect(body.lines[0]!.received).toBe(false);
+  });
+  it("keeps failed cancellation source unavailable rather than claiming zero cancellation",async()=>{
+    const rpc=vi.fn().mockResolvedValue({data:null,error:{code:"57014",message:"TEST cancellation read unavailable"}});
+    vi.mocked(userClient).mockReturnValue(makeSb(tables(),rpc));
+    const response=await call("");const body=await response.json() as {linesUnavailable:boolean;lines:unknown[]};
+    expect(body.linesUnavailable).toBe(true);expect(body.lines).toEqual([]);
   });
   it("keeps missing attribution unknown rather than borrowing the physical line's whole quantity", async () => {
     vi.mocked(userClient).mockReturnValue(makeSb(tables({ error: { code: "57014", message: "TEST source read unavailable" } })));
@@ -538,7 +546,7 @@ describe("context source readback across merged and partial POs", () => {
     vi.mocked(userClient).mockReturnValue(makeSb(data));
     const res = await call(""); const body = await res.json() as { linesUnavailable: boolean; lines: Array<{ allocations: Array<{ poId: string; qty: number }> }> };
     expect(body.linesUnavailable).toBe(false);
-    expect(body.lines[0]!.allocations).toEqual([{ poId: "PO-CONTEXT-B", qty: 1, destinationId: DEST }, { poId: "PO-CONTEXT-A", qty: 2, destinationId: DEST }]);
+    expect(body.lines[0]!.allocations).toEqual([{ poId: "PO-CONTEXT-B", qty: 1, originalQty: 1, cancelledQty: 0, destinationId: DEST }, { poId: "PO-CONTEXT-A", qty: 2, destinationId: DEST }]);
   });
 
 });

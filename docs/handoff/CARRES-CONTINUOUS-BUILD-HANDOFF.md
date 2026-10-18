@@ -9,6 +9,31 @@ Paste everything below the line into a fresh session. It is self-contained.
 
 ---
 
+**LATEST EXACT ACTIVATION CANDIDATE ·18Oct2026 · PR2093 DRAFT / NO SQL APPROVAL.**
+Current main2c8b25aab reconciled, including its actual shared toolbar/focus and reviewed Linux
+baselines. Root now reads signed DB release state; no activation RPC => legacy composition.
+Core writer remains475a87f…58e8f1/78; Settingsb4eb234d…8053774 still pending. Exact activation
+companion SHA256fb1f3713ace59eb1feb5ab7abe8429a13fe4661d43a43be09046e54af1e103c9.
+ONE consolidated_sql_approval_manifest in existing review JSON includes all3 hashes, explicit
+CHECK/new-ledger-RLS consent, actual activation, application boundary and governed apply sequence.
+Controller consolidates ONE human approval item; no closed-installation-only/Settings repeat.
+Combined exact3-file local probe PASS deliberatePROBE_ROLLBACK82; business/settings unchanged,
+post-rollback original closed gate restored/release RPC absent. New finite boundary fixture PASS.
+GP/RS create/review/approve/reapprove/Stock/partial PO/PDF/send/Tasks is primary release path;
+SC draft/submission/Purchasing review stays in scope, prior authorised unchanged legacy SC doors
+unchanged. NEW contextual SC PO/Stock execution alone refuses until real qualified Service-source
+binding is proved. No TEST generic-approval shape adopted as law/new UUID/new approval cycle.
+FULL SC DELIVERY REMAINS INCOMPLETE; preserve objective rather than label it GP/RS-only complete.
+Contextual cancellation is independently closed/not advertised pending required Finance handoff;
+Finance/Storage coordination is not a global normal-buying prerequisite. Late-extra refusal is
+pre-existing, disclosed limitation. No new Service/Finance/Receiving module is commissioned.
+API204/root4/affected source27/route24 PASS; shared/API/web types PASS. Initial PR2093 CI failed
+stale fixture/route assertions: fixed source mocks, explicit unknown-read negative retained. New
+exact-head required CI still needed. PR2094 separately restores canonical Warehouse identity enum,
+never Warehouse Operation access; its17 auth cases PASS, required CI pending at checkpoint.
+Do not reapply0696, activate SQL, send suppliers or complete/save production Tasks.
+Earlier release plans below are historical where they differ.
+
 **LATEST BOUNDED RELEASE PLAN ·18Oct2026 · LOCAL, default OFF; no SQL approval or activation.**
 Forecast selected suggestions and manual New stock request now enter the SAME existing request
 Workspace/Review; one default-false OperationApp prop forwards the opt-in to Forecast and MPR.

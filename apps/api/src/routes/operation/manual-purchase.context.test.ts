@@ -239,3 +239,16 @@ describe("qualified Stock proposal source", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 });
+
+
+describe("governed release discovery",()=>{
+ async function read(role="operation") {
+  const jwt=await signTestJwt(id(99),{email:"TEST-release@carres.test",app_metadata:{role}});
+  return app.fetch(new Request("https://api.test/api/operation/purchasing/requests/context-release",{headers:{Authorization:`Bearer ${jwt}`}}),env as never);
+ }
+ it.each(["42883","PGRST202"])("missing activation RPC %s retains the closed legacy composition",async code=>{rpc.mockResolvedValue({data:null,error:{code}});const res=await read();expect(res.status).toBe(200);expect(await res.json()).toEqual({version:1,requestFlow:false,cancellation:false,serviceExecution:false});});
+ it("returns only validated exact DB release facts",async()=>{const state={version:1,requestFlow:true,cancellation:false,serviceExecution:false};rpc.mockResolvedValue({data:state,error:null});const res=await read();expect(res.status).toBe(200);expect(await res.json()).toEqual(state);expect(rpc).toHaveBeenCalledWith("purchasing_request_context_release");});
+ it.each([{data:null,error:{code:"08006"}},{data:{version:1,requestFlow:"true"},error:null}])("read failure/malformed data never manufactures activation",async result=>{rpc.mockResolvedValue(result);expect((await read()).status).toBe(503);});
+ it.each(["warehouse","finance"])("%s gains no Operation release entry",async role=>{expect((await read(role)).status).toBe(403);expect(rpc).not.toHaveBeenCalled();});
+ it.each(["service_case_execution_source_unverified","cancellation_not_released"])("preserves exact closed-execution refusal %s",async details=>{rpc.mockResolvedValue({data:null,error:{code:"55000",details}});const response=await post("",{submissionKey:id(11),context:context()});expect(response.status).toBe(503);expect(await response.json()).toMatchObject({code:details,message:"Not available"});});
+});

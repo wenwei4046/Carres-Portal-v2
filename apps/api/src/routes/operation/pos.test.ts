@@ -120,6 +120,7 @@ describe("GET /api/operation/pos", () => {
       grns?: Record<string, unknown>[];
       referencedDestinations?: Record<string, unknown>[];
       onPoLineRange?: (phase: "start" | "end") => void;
+      cancellationReleased?: boolean;
     } = {},
   ) {
     const eq = vi.fn().mockReturnThis();
@@ -203,6 +204,7 @@ describe("GET /api/operation/pos", () => {
     const requestSelect = vi.fn(() => ({ in: requestIn }));
 
     vi.mocked(userClient).mockReturnValue({
+      rpc: vi.fn(async()=>({data:{version:1,requestFlow:true,cancellation:lineage.cancellationReleased??false,serviceExecution:false},error:null})),
       from: vi.fn((table: string) => {
         if (table === "po_supplier_promises") return { select: promiseSelect };
         // 0585 · the day-before check's evidence rides the register read.
@@ -410,6 +412,13 @@ describe("GET /api/operation/pos", () => {
     const body=await response.json() as any;
     expect(body.pos[0].sources).toEqual(expect.arrayContaining([expect.objectContaining({kind:"manual_purchase",proceed_date:proceedDate})]));
     expect(body.pos[0].purchase_order_lines[0].governed_sources).toEqual(expect.arrayContaining([expect.objectContaining({kind:"manual_purchase",proceed_date:proceedDate})]));
+  });
+
+  it.each([false,true])("modern source alone cannot advertise cancellation; release=%s",async released=>{
+    const row={...PO_ROW,so:null,purchase_order_lines:[{...PO_ROW.purchase_order_lines[0],demand_id:"demand-1"}]};
+    mockPosList([row as unknown as typeof PO_ROW],[],[],[],{demands:[{id:"demand-1",request_id:"request-1",purpose:"general_purchase"}],requests:[{id:"request-1",request_version:1,req_no:"GP-TEST"}],cancellationReleased:released});
+    const res=await app.fetch(new Request("http://t/api/operation/pos",{headers:{Authorization:`Bearer ${await makeJwt("operation")}`}}),env);
+    expect(res.status).toBe(200);expect((await res.json() as any).pos[0].contextual_cancellation_available).toBe(released);
   });
 
   it("returns governed SO and Manual Purchase lineage instead of guessing from display fields", async () => {

@@ -4,6 +4,7 @@ import {
   DEMAND_PURPOSE_VALUES,
   purchaseRequestSubmitSchema,
   purchaseRequestContextSchema,
+  purchaseRequestReleaseSchema,
   purchaseRequestRevisionSchema,
   purchaseRequestDecisionSchema,
   purchaseRequestIssueSchema,
@@ -79,6 +80,20 @@ import { todayIsoMYT } from "../../lib/delivery-order-issue";
  */
 const manualPurchaseRouter = new Hono<AppEnv>();
 
+// Readiness is a DB release fact, never a URL/user/Settings switch. A missing
+// activation RPC keeps the existing production composition available.
+manualPurchaseRouter.get("/context-release", requireOperation, async (c) => {
+ const result = await userClient(c.env,c.var.auth.jwt).rpc("purchasing_request_context_release");
+ if (result.error) {
+  if (["42883","PGRST202"].includes(result.error.code)) return c.json({version:1,requestFlow:false,cancellation:false,serviceExecution:false});
+  return c.json({error:"request_release_unavailable",message:"Not available"},503);
+ }
+ const parsed=purchaseRequestReleaseSchema.safeParse(result.data);
+ if (!parsed.success) return c.json({error:"request_release_unavailable",message:"Not available"},503);
+ return c.json(parsed.data);
+});
+
+
 /**
  * EVERY REFUSAL LEAVES IN THE APPROVED TWO LINES (closure §9).
  *
@@ -105,7 +120,7 @@ function refuse(
 function contextRefusal(c: Context<AppEnv>, error: Parameters<typeof mapPgError>[0]) {
   const mapped = mapPgError(error);
   const code = String(error.details ?? mapped.body.code ?? "rpc_failed");
-  if (code === "request_context_not_enabled") return c.json({ error: code, code, message: "Not available" }, 503);
+  if (["request_context_not_enabled","service_case_execution_source_unverified","cancellation_not_released"].includes(code)) return c.json({ error: code, code, message: "Not available" }, 503);
   return c.json(refusalBody(code), mapped.status);
 }
 

@@ -582,7 +582,7 @@ describe("the superseded buying surfaces are gone, not hidden", () => {
 
   it("Manual Purchase is still its own route and never appears inside this page", async () => {
     const app = readFileSync(join(HERE, "OperationApp.tsx"), "utf8");
-    expect(app).toContain('tab === "manual-purchase" && <OperationManualPurchase />');
+    expect(app).toContain('tab === "manual-purchase" && <OperationManualPurchase contextFlow={purchaseRequestContext} />');
     apiFetch.mockResolvedValue(payload());
     renderPage();
     await screen.findByTestId("so-batch-page");

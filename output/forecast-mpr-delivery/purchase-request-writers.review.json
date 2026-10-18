@@ -1,5 +1,5 @@
 {
-  "status": "EXACT CLOSED-INSTALLATION REVIEW PACKAGE; NOT APPROVED; NOT A MIGRATION; ACTIVATION STILL BLOCKED",
+  "status": "CORE475a CLOSED INSTALLATION + EXACT BOUNDED ACTIVATION COMPANION READY FOR ONE CONSOLIDATED REVIEW; NO SQL APPROVAL OR PRODUCTION ACTIVATION",
   "draft_sha256": "475a87f26feacfa2080aa337ae13a275a6054da2b71e8bd3de019f6ba958e8f1",
   "draft_file_md5": "afcb4ef26fe7452fb553debacf2acc15",
   "validation_environment": "Owned loopback replay only; all synthetic business fixtures roll back; no production writes",
@@ -633,11 +633,11 @@
   },
   "review_readiness": {
     "closed_installation": "READY TO INSPECT the exact default-CLOSED package, function/grant fingerprints, preconditions and rolled-back local probe; no approval/application requested by this update. Production original preimages, tracker/main/all-branch MAX and all release checks must be remeasured before any authorised application.",
-    "activation": "NOT READY. Exact closed installation review only; no activation inferred from foundation approval. Ordinary GP/RS existing MPR residual and qualified same-PO cancellation are verified locally. Finance actionable consumer, formal new/changed SC authority read contract, current live-page/provider and production acceptance remain as bounded_release_scope.",
+    "activation": "See consolidated_sql_approval_manifest: actual activation bytes open GP/RS execution and all three request/review flows, independently hold contextual cancellation/new SC execution. Pending one exact human approval and required release gates. Full SC/cancellation completion not claimed.",
     "settings": "Separate pending exact b4eb234d6f0d855546d606a5f9eef1b8b30aa52a8274948855f0ba8ec8053774; no repeated question or inferred approval.",
-    "effective_cancellation": "LOCAL writer/read/balance/current document/send Work and actual object/editor1440/390/keyboard/discard verified; actionable Finance consumer, qualified new/changed SC contract, upload-provider/full Shell and production/Receiving acceptance remain release blockers.",
+    "effective_cancellation": "BUILT LOCAL but independently NOT RELEASED; Finance notification/scoped files remain mandatory for that action alone. No longer a global buying prerequisite.",
     "sql_identity": "Exact 475a87f26feacfa2080aa337ae13a275a6054da2b71e8bd3de019f6ba958e8f1;78 function/grant assertions,13 source guards; final canonical fixture ROLLBACK and deliberate exact PROBE_ROLLBACK PASS. Existing RLS unchanged, new immutable readonly cancellation ledger checked separately.",
-    "final_types": "API and web typechecks PASS for retained pending/receiving/Shell changes; no SQL approval/activation or production claim. Temporary extra-only changes were withdrawn.",
+    "final_types": "Shared/API/web typechecks PASS for new release/root boundary. API204, root4, affected source read27 and route24 PASS. Required exact-head CI must pass after push.",
     "latest_source_readback": "PASS:153 PO API cases + GP/RS actual signed browser/API/PG2/2 with planned Proceed Date on header/line sources; final API8GB typecheck PASS. No SQL byte change, Finance code or production action."
   },
   "production_preimages_2026_10_18_read_only": {
@@ -734,6 +734,18 @@
     },
     "local-test-documents/cancellations/LOCAL-TEST-GP-shell-896.json": {
       "sha256": "eeaf64b76e5b498c16d3e50a411c8df1b02fdafa5ff15993bc6eab0ca872c07b"
+    },
+    "purchase-request-activation.draft.sql": {
+      "sha256": "fb1f3713ace59eb1feb5ab7abe8429a13fe4661d43a43be09046e54af1e103c9"
+    },
+    "purchase-request-activation.local-check.sql": {
+      "sha256": "933007f185f7a7d4cd244a1a36ebbce17258e97e3638a6310691334b881ffa7c"
+    },
+    "purchase-request-release.rollback-probe.sql": {
+      "sha256": "8afc88c14c850fc3fcd3773e8efb6fbf37b108adae8ca1e360c6a6270cbecabb"
+    },
+    "purchase-request-release.functions.json": {
+      "sha256": "4cdb840c449738d131bbf045f114a6b62699e64701d53d8e0f28fe8439a1bd1b"
     }
   },
   "bounded_release_scope": {
@@ -784,10 +796,10 @@
       "sha256": "ceaf9c2304fa1f13daa0dfe9985635f07fc5701edff429b8b800733ca029ea05"
     },
     "apps/api/src/routes/operation/pos.ts": {
-      "sha256": "5c453afb4cb0eaa64137ae0a79a68426da572825fa96a069fecfb567f33e26c5"
+      "sha256": "146263d40deb90de3378337b3846039658d2efa10a85f6aabb6930b835f5f461"
     },
     "apps/api/src/routes/operation/pos.test.ts": {
-      "sha256": "464b6e21b3bfd1d35bd8377da78aa8e273e95c6e856ea9d8ded83291044a0470"
+      "sha256": "3ce0addaa8e52cdd947aec2c66046825e46d682395656be93bef4f82483f3dbf"
     },
     "apps/web/src/pages/operation/OperationReceiving.tsx": {
       "sha256": "04c89d8730f5439f1de8712d0112f4fcaaff8cc292a9b5eb965b607dbf24744e"
@@ -833,6 +845,36 @@
     },
     "apps/web/src/pages/operation/purchase-orders/PurchaseOrdersPage.tsx": {
       "sha256": "453d89d85ed183873c4db0a94af1dee9a8a73b534c60f544e7936607e4b114cf"
+    },
+    "apps/api/src/routes/operation/manual-purchase.context.test.ts": {
+      "sha256": "1242f22dd75cd20129bd6e5811544e15cb8cf3d3ba533599daf106fd3dab6514"
+    },
+    "apps/api/src/routes/operation/manual-purchase.ts": {
+      "sha256": "ccc5d5c851658410a47e114d97d84e1d91623da564bb0c9c23cb74f0181df648"
+    },
+    "apps/api/src/routes/operation/manual-purchase-round2.test.ts": {
+      "sha256": "84c32b59195cf88c075bc6cd1b457f680f117d541665ed3e64577f9fe928a27f"
+    },
+    "apps/web/src/App.tsx": {
+      "sha256": "2f59365a900f054664cfa35f57269b30d7eb2295f185f8928ede34eab430a0bb"
+    },
+    "apps/web/src/lib/queries.ts": {
+      "sha256": "b2f82e7acdcc2c2c5be94d5f4f02f88a278756f616898bb595b1df35d07c4181"
+    },
+    "apps/web/src/pages/operation/RequestFlowOperationApp.tsx": {
+      "sha256": "1e94e4dd758d56ee8a08c2230701fc02f273e465bd75c9d14dd41020e4fc53c1"
+    },
+    "apps/web/src/pages/operation/RequestFlowOperationApp.test.tsx": {
+      "sha256": "a9b1f2bff6a59b0b2e140b569d960e30ee6ad64d7623e0939e0eb286a9a58fda"
+    },
+    "apps/web/src/pages/operation/OperationToOrder.test.tsx": {
+      "sha256": "56a8bdc78167cdc5745e8dfb0836baf12351b737d308c4810d8638bca2a2f026"
+    },
+    "packages/shared/src/index.ts": {
+      "sha256": "e6364861f1495515ef2cb5aea98e06158843719d1f4549fcdc5199b5f3c8a661"
+    },
+    "packages/shared/src/purchase-request-context.ts": {
+      "sha256": "96fa7a3bb040a70afd2916ff4843c721324bb57e0db331b8a88600c4d00b893b"
     }
   },
   "release_dependency_table": [
@@ -901,16 +943,8 @@
     "claim_limit": "Metadata fixtures are not actual uploaded bytes. A Storage-shaped mock would not close this provider acceptance gap and is not labelled real upload. Reuse a supplied isolated Storage endpoint/service to prove bytes, RLS, failure/retry and same-form save; do not use production as TEST."
   },
   "approval_request_draft": {
-    "status": "WITHHELD until exact exposed usable scope and only the applicable Finance/SC-source/upload conditions are substantiated; no closed-installation-only question.",
-    "candidate_draft_absolute_path": "/Users/chaichiewlim/.codex/worktrees/forecast-mpr-context/Carres-Portal-v2/output/forecast-mpr-delivery/purchase-request-writers.draft.sql",
-    "candidate_sha256": "475a87f26feacfa2080aa337ae13a275a6054da2b71e8bd3de019f6ba958e8f1",
-    "installation_vs_activation": "Current exact default-CLOSED SQL has passed local installation/probe checks. That does not deliver usable Forecast/MPR or authorise enabling contextFlow/private admission.",
-    "final_request_boundary": "One coherent final SQL review must describe actual usable approved Forecast/MPR scope, required cancellation notification/source/evidence access, grants/RLS impact and exact final bytes. Final hash may differ when the bounded receiver/evidence contract is implemented. Do not submit the existing default-closed draft as if activation were ready.",
-    "not_requested": [
-      "No repeat0696 approval/application",
-      "No repeated Settings question",
-      "No production probe/write, activation or supplier send now"
-    ]
+    "status": "SUPERSEDED by consolidated_sql_approval_manifest containing all three exact files, actual activation bytes and ONE controller-facing consent statement. No question submitted here.",
+    "foundation": "0696 excluded; Settings still unapproved, consolidated without repeat question."
   },
   "finance_notification_adapter_proposal": {
     "status": "PRECISE BOUNDED PROPOSAL ONLY; NO FINANCE CODE OR STORAGE RLS CHANGE, NO EXTERNAL CHAT MESSAGE",
@@ -1013,7 +1047,7 @@
     }
   },
   "bounded_activation_plan": {
-    "status": "FINAL BOUNDED PLAN / PASSED SCOPE FROZEN; NO ACTIVATION OR SQL APPROVAL REQUEST",
+    "status": "SUPERSEDED by consolidated_sql_approval_manifest actual bounded activation companion; prior full-scope gap record retained as history.",
     "candidate_review_absolute_path": "/Users/chaichiewlim/.codex/worktrees/forecast-mpr-context/Carres-Portal-v2/output/forecast-mpr-delivery/purchase-request-writers.review.json",
     "candidate_sql_absolute_path": "/Users/chaichiewlim/.codex/worktrees/forecast-mpr-context/Carres-Portal-v2/output/forecast-mpr-delivery/purchase-request-writers.draft.sql",
     "candidate_sql_sha256": "475a87f26feacfa2080aa337ae13a275a6054da2b71e8bd3de019f6ba958e8f1",
@@ -1060,7 +1094,7 @@
     "freeze": "Do not re-run passed checks without code changes, reopen ordinary source-editor branches or design new Receiving/Stock/Finance/Service capabilities."
   },
   "application_wiring": {
-    "classification": "BUILT LOCAL / EXPLICIT DEFAULT OFF / NO PRODUCTION ROOT OPT-IN",
+    "classification": "BUILT LOCAL / ROOT NOW FOLLOWS QUALIFIED DB RELEASE / ABSENT ACTIVATION RPC REMAINS CLOSED",
     "files": [
       "apps/web/src/pages/operation/OperationApp.tsx",
       "apps/web/src/pages/operation/forecast-purchase/ForecastPurchasePage.tsx",
@@ -1068,10 +1102,11 @@
       "apps/web/src/pages/operation/purchase-orders/PoCancellationFields.tsx",
       "apps/web/src/pages/operation/purchase-orders/PurchaseOrdersPage.tsx"
     ],
-    "tests": "78 focused entry/adapter/cache-retention/source-link cases PASS; PO page69 also PASS after source-link fix. No unchanged SQL/receiving/896 tests repeated. Final web typecheck PASS (exit0; /tmp/carres-activation-frozen-web-types-confirmed.log)."
+    "tests": "78 focused entry/adapter/cache-retention/source-link cases PASS; PO page69 also PASS after source-link fix. No unchanged SQL/receiving/896 tests repeated. Final web typecheck PASS (exit0; /tmp/carres-activation-frozen-web-types-confirmed.log).",
+    "release_root": "apps/web/src/pages/operation/RequestFlowOperationApp.tsx -> signed release query -> existing OperationApp prop; server/RPC boundaries independent of UI."
   },
   "consolidated_sql_approval_manifest": {
-    "status": "ONE CONSOLIDATED INVENTORY; NOT YET A FINAL USABLE-WORKFLOW APPROVAL REQUEST. No approval inferred or solicited here.",
+    "status": "FINAL EXACT BOUNDED ACTIVATION CANDIDATE / ALL THREE SQL FILES UNAPPROVED. Controller consolidates ONE approval item; not a claim that full SC/cancellation delivery is complete.",
     "main_compared": "2c8b25aab77b60e69e29c752455884897d2958ac",
     "foundation": "0696 already applied; expressly excluded from approval and repeat application.",
     "exact_existing_candidates": [
@@ -1088,45 +1123,58 @@
         "sha256": "475a87f26feacfa2080aa337ae13a275a6054da2b71e8bd3de019f6ba958e8f1",
         "scope": "Canonical request creation/revision, existing approval/reapproval, stock coverage, exact partial PO source and document/send/Work readback; 78 function/grant assertions and13 source guards. Includes cancellation implementation but global contextual admission CLOSED. New immutable cancellation ledger has scoped internal Operation/Principal/Finance SELECT only; no authenticated/anon direct writes, no Storage extension.",
         "approval_statement_for_consolidation_only": "Approve the exact request-writer SQL bytes identified by this SHA-256, including replacement of the two named CHECK constraints and only the new cancellation-ledger RLS policy/immutable guards, to enter the governed migration/probe/apply process. This does not authorise opening contextual admission or cancelling goods before its required Finance handoff is usable."
+      },
+      {
+        "file": "purchase-request-activation.draft.sql",
+        "absolute_path": "/Users/chaichiewlim/.codex/worktrees/forecast-mpr-context/Carres-Portal-v2/output/forecast-mpr-delivery/purchase-request-activation.draft.sql",
+        "sha256": "fb1f3713ace59eb1feb5ab7abe8429a13fe4661d43a43be09046e54af1e103c9",
+        "scope": "Open requestFlow for GP/RS execution and GP/RS/SC submission/procurement review; preserve legacy authorised unchanged SC doors. Independently close contextual cancellation and unproven NEW contextual SC PO/Stock execution. Add read-only qualified release discovery for root and PO action visibility; no RLS/Storage/business writes.",
+        "approval_statement_for_consolidation_only": "Approve these exact activation bytes and bounded availability: GP/RS buying and all three request/review flows, with cancellation and unverified new contextual SC execution unavailable. This is not approval to bypass Service/Finance or a full-SC completion claim."
       }
     ],
     "required_explicit_ddl_consent": {
       "constraint_replacement": "purchase_request_events_kind_check and po_line_sources_exact_source_owner are dropped/recreated; po_line_sources.order_id becomes nullable only under exclusive SO-or-request-demand source CHECK. No business table/record DROP/TRUNCATE/DELETE is requested.",
       "rls": "Explain/approve new po_goods_cancellation_events RLS: app_role Operation/Principal/Finance SELECT; existing table policies unchanged. Ledger immutable UPDATE/DELETE/TRUNCATE rejection. No Finance Storage read grant is in these bytes.",
       "source_guards": "13 source-lock guard triggers plus cancelled receipt guards; preserve legacy and enforce same-SKU transaction consistency. Existing function replacement and grants are enumerated by78 signatures in functions inventory.",
-      "apply_boundary": "No migration numbering reserved. Re-measure tracker/main/all-branch MAX and production preimages before committing approved migration files; production rollback probe and exact committed-file apply through apply_migration only; then CI/deploy/read-only authenticated verification."
+      "apply_boundary": "No migration numbering reserved. Re-measure tracker/main/all-branch MAX and production preimages before committing approved migration files; production rollback probe and exact committed-file apply through apply_migration only; then CI/deploy/read-only authenticated verification.",
+      "activation": "Six reviewed function preimages; five guarded existing implementations and private request admission updated; three new private/read-only release helpers. Authenticated execute only on read-only qualified release RPC; no new business permission or user-configurable bypass."
     },
     "activation": {
-      "exact_file": null,
-      "sha256": null,
-      "approval_statement": null,
-      "reason": "No safe ordinary-only activation SQL exists yet. Current no-argument private admission is shared by ordinary contextual writes and cancellation. A no-op replacement would expose cancellation before mandatory Finance notification and could expose new/changed SC scope without source proof. Do not manufacture a hash or call these closed bytes an activation package.",
-      "smallest_remaining_implementation": "Separate the executable readiness boundary for ordinary approved GP/RS request/stock/PO/send from contextual cancellation and new/changed Service remedies; enforce the boundary on server/RPC as well as entry composition. Preserve existing authorised unchanged SC procurement through its existing owning door/approval; do not treat new remedy verification as a global buying prerequisite. This is release gating, not new approval policy. Then bind exact activation bytes and targeted negative controls to this SAME manifest before the ONE final human approval request."
+      "exact_file": "purchase-request-activation.draft.sql",
+      "absolute_path": "/Users/chaichiewlim/.codex/worktrees/forecast-mpr-context/Carres-Portal-v2/output/forecast-mpr-delivery/purchase-request-activation.draft.sql",
+      "sha256": "fb1f3713ace59eb1feb5ab7abe8429a13fe4661d43a43be09046e54af1e103c9",
+      "function_assertions_after_combined_apply": 82,
+      "preimages": "Six exact closed-writer function body MD5s asserted before any override. Activation only follows the reviewed core writer file, never an unrelated production body.",
+      "server_rpc_boundary": "Private request admission opens only after independent cancellation admission is closed and canonical new-SC PO preflight/issue admission and both Stock draw/allocation writers enforce execution-source availability. Release read RPC is Operation/Principal only; no public/anonymous/private-writer grant. Client cannot bypass through URL/GUC/Settings.",
+      "app_root": "RequestFlowOperationApp reads signed GET /purchasing/requests/context-release; absent RPC returns closed legacy composition; invalid/failing uncached reads never enable it. Cached background failures preserve open form instead of losing draft. Every write rechecks SQL. PO reader advertises cancellation only when its DB release flag is true.",
+      "approval_statement": "Included only in the single combined approval statement below; no separate activation question."
     },
     "release_scope": {
-      "ordinary": "GP/RS creation, existing qualified approve/reapprove, stock allocations and remaining buying, exact PO/PDF/shared send and source-derived Tasks are the primary release path. Historical authorised unchanged SC uses existing qualified source/approval, no new Decision UUID.",
-      "cancellation": "Keep actual contextual cancellation unavailable until existing required Finance notification/source/evidence handoff is actionable. Do not weaken notification or require a new Finance settlement/module for ordinary buying.",
-      "late_extra": "Pre-existing whole-cancel extra-only receipt refusal is an explicit limitation, not ordinary activation blocker; no new Receiving/Stock work."
+      "ordinary": "GP/RS create/approve/reapprove/stock/partial remaining buy/PO/PDF/shared send/source-derived Tasks. Existing permissions and exact source/supplier/date/quantity conservation remain. API/root follows DB release state only.",
+      "cancellation": "Actual contextual cancellation independently refuses cancellation_not_released and is not advertised from mere modern source presence. Existing mandatory Finance notification is preserved as its release condition; no Finance module is a prerequisite to ordinary buying.",
+      "late_extra": "Pre-existing whole-cancel extra-only receipt refusal is an explicit limitation, not ordinary activation blocker; no new Receiving/Stock work.",
+      "sc": "SC remains in scope: new contextual draft/submission and governed Purchasing review work; prior authorised unchanged legacy SC procurement keeps existing execution doors. No real generic approval currently substantiates an adopted producer/consumer binding for NEW contextual SC execution, so actual new-context PO/Stock execution alone refuses service_case_execution_source_unverified. No new UUID, approval cycle, Service UI or TEST payload law. FULL SC DELIVERY IS EXPLICITLY INCOMPLETE until real qualified source evidence can be consumed; approval of this bounded release does not close that objective."
     },
     "actually_missing_owner_decisions": [
       {
-        "item": "Settings writer",
-        "state": "Specific exact approval remains pending; consolidated above, not asked again."
-      },
-      {
-        "item": "Request/activation SQL",
-        "state": "Final exact coherent release approval remains pending; activation bytes must be completed first. Controller consolidates; no interim closed-installation question."
-      },
-      {
-        "item": "Finance-owner coordination",
-        "state": "Only necessary to release actual cancellation: human authorisation to coordinate with YH before Finance edits/messages per Finance MASTER5. No such message has been sent."
+        "item": "ONE combined exact SQL and bounded release consent",
+        "state": "Settings approval remains pending and is folded into the single statement below with writers and actual activation bytes; no separate/repeated Settings or closed-installation question. Foundation0696 excluded."
       }
     ],
     "evidence_or_environment_not_owner_decisions": [
-      "New/changed SC remedy source representation: demonstrate qualified actor/time/exact scope using existing Case/history/Service Note/evidence/approval if that branch is released; do not ask for a new Service system.",
-      "Provide/configure isolated Storage endpoint for actual upload bytes, denied foreign access, failure/retry and same-form save; no test-double proof or production supplier sends.",
-      "Complete ordinary-only executable activation boundary and one exact activation hash: engineering work, not an owner business decision."
+      "NEW contextual SC execution: actual generic approvals/Case/history/evidence/Service Note may be reused only when exact source/recorded scope/deciding actor/time and authority at that time can be substantiated. Existing actual record scan had no verifiable candidate; synthetic fixture keys are not adopted as a producer convention. Request/submission/Purchasing review remain available; full SC completion stays open.",
+      "Actual cancellation: Finance-owner coordination and actionable scoped notification/evidence access remain required only before releasing that action. No YH message/Finance edit authorised or performed.",
+      "Isolated Storage real bytes/foreign-file denial/failure retry/same-form save remain unverified. Existing uploader is retained; no new provider/RLS operation in this ordinary activation SQL and no provider proof claimed.",
+      "Exact-head required CI and post-approval schema/preimage/migrationMAX/rollback-probe/apply/deploy/authenticated read-only verification are engineering gates, not additional business decisions."
     ],
-    "draft_pr_boundary": "Reviewable inactive code only; no unapproved SQL in supabase/migrations, no production root opt-in, no merge/deploy until applicable SQL/release gates satisfied. CI required checks only; no repeated whole-site exploratory acceptance."
+    "draft_pr_boundary": "PR2093 remains draft until exact human SQL consent and release gates. Three unapproved SQL files remain in output, never migrations. Code root is wired but cannot enable without the approved activation RPC/body. No production transactions, supplier send or Task completion is authorised by this manifest.",
+    "combined_approval_statement_for_controller": "I approve the exact three SQL files listed in this manifest by their full SHA-256 hashes: Settings writer, request writers, and bounded activation. This includes replacing purchase_request_events_kind_check and po_line_sources_exact_source_owner, the exclusive SO-or-request-demand source constraint, source/receipt guards, and RLS/SELECT grants only for the new immutable cancellation ledger as described. No existing-table RLS or Storage access is broadened; no business record DROP/TRUNCATE/DELETE/backfill or supplier send is authorised. Proceed through the governed production rollback probe/negative controls, migration-MAX and preimage checks, exact committed-file apply, required CI, merge/deploy and authenticated read-only verification. Enable ordinary GP/RS execution and all three request/submission/Purchasing-review flows; preserve existing authorised unchanged legacy SC. Keep actual contextual cancellation and unverified NEW contextual SC PO/Stock execution unavailable. Full SC and cancellation delivery remain explicitly incomplete, with their existing Service/Finance requirements intact. Foundation0696 must not be reapplied.",
+    "combined_probe": {
+      "file": "purchase-request-release.rollback-probe.sql",
+      "inventory_file": "purchase-request-release.functions.json",
+      "assertions": 82,
+      "local_result": "PASS via deliberate exit3 PROBE_ROLLBACK82; exact three files; business/settings unchanged; cancellation and signed-out negative controls. Post-rollback private admission MD5 restored799b52f12579bdf2fd9a7b95285b6508; release RPC absent.",
+      "local_boundary_result": "purchase-request-activation.local-check.sql PASS: scoped release/ACL, actual canonical SC PO/Stock refusal, GP/RS and legacy SC admission preserved; final ROLLBACK. No production SQL."
+    }
   }
 }

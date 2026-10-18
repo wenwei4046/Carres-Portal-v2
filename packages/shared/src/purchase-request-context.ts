@@ -318,3 +318,9 @@ export function purchaseRequestSupplierDateIssues(
   }
   return issues;
 }
+
+/** Executable release state, read from the governed DB activation only. */
+export const purchaseRequestReleaseSchema = z.object({
+ version: z.literal(1), requestFlow: z.boolean(), cancellation: z.boolean(), serviceExecution: z.boolean(),
+}).strict();
+export type PurchaseRequestRelease = z.infer<typeof purchaseRequestReleaseSchema>;

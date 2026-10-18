@@ -1,3 +1,4 @@
+import { purchaseRequestReleaseSchema } from "@carres/shared";
 import { purchaseRequestStockOffersSchema, type PurchaseRequestStockOffer } from "@carres/shared";
 import type { PurchaseRequestContext, PurchaseRequestSubmission, PurchaseRequestRevision, PurchaseRequestDecision, PurchaseRequestContextReviewRead, PurchaseRequestIssue } from "@carres/shared";
 import type { OutrightFactsFailed, OutrightOrderFacts } from "@carres/shared";
@@ -344,6 +345,7 @@ import { withDepartment } from "@/pages/finance/department";
 import { uploadCompartmentPhoto, uploadDeliveryProof, uploadModelPhoto } from "./photo-upload";
 
 export const qk = {
+  purchaseRequestRelease: () => ["operation","purchasing","requests","context-release"] as const,
   poCancellations:(id:string)=>["operation","pos",id,"cancellations"] as const,
   purchaseRequestPlan: (skus: string[], proceedDate: string | null, purpose: string | null, origin: string | null = null, requestId: string | null = null) => ["operation", "purchasing", "requests", "plan", skus.join("|"), proceedDate, purpose, origin, requestId] as const,
   purchaseRequestItems: () => ["to-order", "pick-items"] as const,
@@ -12756,4 +12758,9 @@ export function useRecordPoCancellation(poId:string) {
   void qc.invalidateQueries({queryKey:qk.purchaseRequests()});
   void qc.invalidateQueries({queryKey:qk.operation.work()});
  }});
+}
+
+/** Fresh DB release fact; cached/failed reads cannot opt the root into writes. */
+export function usePurchaseRequestRelease() {
+ return useQuery({queryKey:qk.purchaseRequestRelease(),queryFn:async()=>purchaseRequestReleaseSchema.parse(await apiFetch("/api/operation/purchasing/requests/context-release")),staleTime:0,retry:false});
 }

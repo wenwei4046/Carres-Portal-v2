@@ -343,7 +343,10 @@ operationPosRouter.get("/", requireOperation, async (c) => {
   }
   // Context cancellation is authoritative by immutable PO events. Version1
   // cannot have an effective cancellation (completion always mints Version2+).
-  for(const po of pos) po.contextual_cancellation_available=(linesByPo.get(String(po.id))??[]).some(line=>[line.demand_id,...(poSourcesByLine.get(String(line.id))??[]).map(source=>source.purchase_demand_id)].some(id=>modernRequestIds.has(demandById.get(String(id))?.requestId??"")));
+  // Do not advertise an exceptional action merely because its source exists.
+  const release = modernRequestIds.size ? await sb.rpc("purchasing_request_context_release") : null;
+  const cancellationReleased=release?.error==null && release?.data?.version===1 && release?.data?.requestFlow===true && release?.data?.cancellation===true;
+  for(const po of pos) po.contextual_cancellation_available=cancellationReleased&&(linesByPo.get(String(po.id))??[]).some(line=>[line.demand_id,...(poSourcesByLine.get(String(line.id))??[]).map(source=>source.purchase_demand_id)].some(id=>modernRequestIds.has(demandById.get(String(id))?.requestId??"")));
   const cancellationCandidates=pos.filter(po => Number(po.version ?? 1)>1 && (linesByPo.get(String(po.id))??[]).some(line => {
     const ids=[line.demand_id,...(poSourcesByLine.get(String(line.id))??[]).map(source=>source.purchase_demand_id)];
     return ids.some(id=>modernRequestIds.has(demandById.get(String(id))?.requestId??""));
