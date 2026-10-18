@@ -1,5 +1,5 @@
 {
-  "status": "CORE475a CLOSED INSTALLATION + EXACT BOUNDED ACTIVATION COMPANION READY FOR ONE CONSOLIDATED REVIEW; NO SQL APPROVAL OR PRODUCTION ACTIVATION",
+  "status": "HUMAN DEPLOYMENT AUTHORISED FOR THE EXACT THREE SQL FILES; GOVERNED PROBE/APPLY/CI/DEPLOY IN PROGRESS; FULL SC/CANCELLATION NOT COMPLETE",
   "draft_sha256": "475a87f26feacfa2080aa337ae13a275a6054da2b71e8bd3de019f6ba958e8f1",
   "draft_file_md5": "afcb4ef26fe7452fb553debacf2acc15",
   "validation_environment": "Owned loopback replay only; all synthetic business fixtures roll back; no production writes",
@@ -1180,5 +1180,29 @@
       "local_result": "PASS via deliberate exit3 PROBE_ROLLBACK82; exact three files; business/settings unchanged; cancellation and signed-out negative controls. Post-rollback private admission MD5 restored799b52f12579bdf2fd9a7b95285b6508; release RPC absent.",
       "local_boundary_result": "purchase-request-activation.local-check.sql PASS: scoped release/ACL, actual canonical SC PO/Stock refusal, GP/RS and legacy SC admission preserved; final ROLLBACK. No production SQL."
     }
+  },
+  "owner_release_authorisation": {
+    "date_myt": "2026-10-18",
+    "evidence": "Controller relayed Jess direct instruction: COMPLETE? TELL ME WHAT YOU STUCK? I WANT DEPLOY NOW !!!, after the already-presented exact three-SQL approval list; controller explicitly confirms proceed with those exact frozen files and previously disclosed CHECK/new-ledger scoped RLS/bounded activation. This authorises the governed deployment path; it does not authorise0696 repeat, new scope, supplier messages or real-order write tests.",
+    "files": [
+      {
+        "draft": "purchase-request-settings-writer.draft.sql",
+        "migration": "supabase/migrations/0697_purchase_request_settings_have_one_audited_editor.sql",
+        "sha256": "b4eb234d6f0d855546d606a5f9eef1b8b30aa52a8274948855f0ba8ec8053774"
+      },
+      {
+        "draft": "purchase-request-writers.draft.sql",
+        "migration": "supabase/migrations/0698_purchase_requests_keep_their_approved_scope_through_execution.sql",
+        "sha256": "475a87f26feacfa2080aa337ae13a275a6054da2b71e8bd3de019f6ba958e8f1"
+      },
+      {
+        "draft": "purchase-request-activation.draft.sql",
+        "migration": "supabase/migrations/0699_purchase_requests_open_only_the_ready_execution_paths.sql",
+        "sha256": "fb1f3713ace59eb1feb5ab7abe8429a13fe4661d43a43be09046e54af1e103c9"
+      }
+    ],
+    "migration_number_basis": "Fresh production tracker tail0696; all fetched refs/history and all current worktree migration files MAX0696; choose0697–0699. Current authority unchanged from1354bd5b; three existing PO function preimages match review, new cancellation ledger/release RPC absent before apply.",
+    "release_ci_before_numbering": "PR2093 aba3a9fdb8b8e87627f2a1923dba816c963271ee required verify39090466166 and Preview39090466167 SUCCESS; required CI will run on the final committed migration head.",
+    "bounded_scope": "New contextual SC execution/cancellation remain unavailable/incomplete exactly as disclosed; normal GP/RS and all3 draft/submission/Purchasing-review flows plus existing authorised unchanged legacy SC preserved."
   }
 }

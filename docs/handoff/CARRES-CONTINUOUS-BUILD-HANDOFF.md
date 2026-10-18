@@ -9,6 +9,70 @@ Paste everything below the line into a fresh session. It is self-contained.
 
 ---
 
+**LATEST ·18Oct2026 · HUMAN RESUMED EXACT THREE-SQL DEPLOYMENT.**
+Jess directly instructed I WANT DEPLOY NOW after the presented3-file approval list. Controller
+explicitly authorised the exact b4eb/475a/fb1f bytes and previously disclosed constraints/new-ledger
+scoped RLS/bounded activation. Do not repeat the approval question or0696. Historical hold below
+is superseded by this human instruction, not by an automatic heartbeat.
+Fresh tracker/main/all-ref/history/current-worktree migrationMAX0696; assigned0697 Settings,
+0698 writers,0699 bounded activation, byte-identical to the authorised drafts. Current authority
+unchanged frommain1354; original3 PO function preimages match; cancellation ledger absent.
+Proceed only mandatory ENGINEERING5 probe/negative/apply/tracker fingerprints, final requiredCI,
+ready/merge/deploy and authenticated read-only proof. Preserve original Desktop dirty work.
+Full SC/cancellation remain incomplete/held as disclosed; no new features, supplier messages or
+real-order/production Task write tests authorised.
+
+**FROZEN RELEASE HOLD ·18Oct2026 · exact green PR2093; HUMAN SQL APPROVAL UNANSWERED.**
+
+PR2093 remains DRAFT at `aba3a9fdb8b8e87627f2a1923dba816c963271ee`.
+Required CI39090466166 SUCCESS03:02:20Z and Preview39090466167 SUCCESS on this exact head.
+Affected full MPR test file176/176 PASS; no further tests/restarts or application/SQL changes.
+This checkpoint is a LOCAL handoff update, intentionally uncommitted/unpushed so the reviewed
+release head stays the exact green SHA; do not manufacture another CI cycle for this note.
+
+Independent auth repair PR2094 is merged/deployed as1354bd5b0382f8bf8e0d9c697b2ebdb4eb19b29f.
+Exact-head verify39088911277 +preview39088910061 passed; production39090690841 SUCCESS and
+all five canonical services converged to1354bd5b. Actual authenticated Pages-origin reads:
+/me now renders rolewarehouse without the previous API500/invalid_enum_value; root routes to
+/warehouse/incoming; /operation still correctly redirects this Warehouse identity to /me.
+Controller independently confirmed the bound Warehouse Incoming list loads. This is identity/
+routing proof only, NOT Forecast/MPR or complete Warehouse acceptance. No account/role/permission
+change, business transaction, supplier send or production Task save/completion. Evidence is in
+PR2094 description. No further Warehouse audit is authorised/needed for this repair.
+
+The ONE already-presented combined SQL request is still unanswered. Exact frozen SHA256s:
+Settings `b4eb234d6f0d855546d606a5f9eef1b8b30aa52a8274948855f0ba8ec8053774`;
+writers `475a87f26feacfa2080aa337ae13a275a6054da2b71e8bd3de019f6ba958e8f1`;
+activation `fb1f3713ace59eb1feb5ab7abe8429a13fe4661d43a43be09046e54af1e103c9`.
+Same review JSON consolidated_sql_approval_manifest contains exact files, explicit CHECK/new-ledger
+RLS consent and one combined statement. Controller's owner-readable Desktop output/
+Forecast-MPR-Release-Approval-18Oct.md is explanatory only, not another authority or consent.
+Do not ask Settings/foundation/closed-installation questions again. Automatic heartbeat/goal/
+controller continuation messages are NOT human SQL consent. Do not apply any of the3 files,
+land them in migrations, merge/deploy2093 or open its gates until actual human consent and the
+existing governed release sequence.0696 is already applied and must NEVER be reapplied.
+
+FULL ORIGINAL FORECAST/MPR GOAL IS NOT ACHIEVED. Do not narrow success to GP/RS:
+- Exact activation prepares GP/RS execution plus all3 request/submission/Purchasing-review flows;
+  existing authorised unchanged legacy SC execution doors are preserved. NEW contextual SC PO/
+  Stock execution remains unavailable pending a real qualified Service source binding (Case,
+  exact recorded scope, actual decider/time and authority at decision). No new UUID/approval
+  cycle or synthetic generic-approval fixture shape is adopted as law. Full SC stays incomplete.
+- Actual contextual cancellation independently remains closed/not advertised until required
+  actionable Finance notification and scoped evidence access are delivered. Finance-owner/YH
+  coordination requires human authorisation; none sent/Finance-edited. No new Finance module/
+  settlement/CN/DN is a normal-buying prerequisite; required cancellation notification is intact.
+- Actual isolated Storage bytes, foreign-file denial and upload failure/retry/provider acceptance
+  remain unproved. Existing uploader retained; metadata mocks are not provider proof. No blanket
+  ordinary buying block is inferred from this finite evidence limit.
+- Whole-cancel extra-only receipt refusal predates this change: disclose the limitation; do not
+  turn it into a new Receiving/Stock module or a GP/RS activation blocker.
+
+Independent authorised work is exhausted. HOLD the frozen release for the actual consolidated
+human SQL answer; do not reopen passed scope, restart broad tests or invent more tasks. The
+controller has marked the overall goal BLOCKED after the repeated same SQL approval barrier,
+not paused or complete. Earlier checkpoints below are historical where they differ.
+
 **LATEST EXACT ACTIVATION CANDIDATE ·18Oct2026 · PR2093 DRAFT / NO SQL APPROVAL.**
 Current main2c8b25aab reconciled, including its actual shared toolbar/focus and reviewed Linux
 baselines. Root now reads signed DB release state; no activation RPC => legacy composition.
