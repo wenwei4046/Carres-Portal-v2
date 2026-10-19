@@ -4,6 +4,7 @@ import type { PurchaseRequestContext, PurchaseRequestSubmission, PurchaseRequest
 import type { OutrightFactsFailed, OutrightOrderFacts } from "@carres/shared";
 import { workspaceActivitySettingsResponseSchema, type WorkspaceActivitySettingsResponse } from "@carres/shared";
 import { supabase } from "@/lib/supabase";
+import { invalidateReceivingReads } from "./receiving-reads";
 import {
   keepPreviousData,
   useInfiniteQuery,
@@ -4664,10 +4665,7 @@ export function useReceivingAmendMutation(
       }),
     ...opts,
     onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.operation.receivingSession(id) });
-      await qc.invalidateQueries({ queryKey: ["operation", "warehouse-receipts"] });
-      await qc.invalidateQueries({ queryKey: ["operation", "pos"] });
-      await qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true });
+      await invalidateReceivingReads(qc);
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -4688,11 +4686,7 @@ export function useReceivingVoidMutation(
       }),
     ...opts,
     onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.operation.receivingSession(id) });
-      await qc.invalidateQueries({ queryKey: ["operation", "warehouse-receipts"] });
-      await qc.invalidateQueries({ queryKey: ["operation", "pos"] });
-      await qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true });
-      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      await invalidateReceivingReads(qc);
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -4851,12 +4845,7 @@ export function useWarehouseReceiptReviewMutation(
       ),
     ...opts,
     onSuccess: async (...args) => {
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ["operation", "warehouse-receipts"] }),
-        qc.invalidateQueries({ queryKey: ["operation", "pos"] }),
-        qc.invalidateQueries({ queryKey: ["operation", "supplier-claims"] }),
-        qc.invalidateQueries({ queryKey: ["operation", "warehouse"] }),
-      ]);
+      await invalidateReceivingReads(qc);
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -8943,34 +8932,7 @@ export function useOfficeReceiveMutation(
       }),
     ...opts,
     onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.operation.poReceiving(poId) });
-      await qc.invalidateQueries({ queryKey: qk.operation.po(poId), exact: true });
-      await qc.invalidateQueries({ queryKey: ["operation", "pos"] });
-      await qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true });
-      await qc.invalidateQueries({ queryKey: qk.operation.stockAlerts() });
-      await qc.invalidateQueries({ queryKey: ["operation", "movements"] });
-      await qc.invalidateQueries({ queryKey: ["operation", "supplier-claims"] });
-      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
-      /* THE REGISTER THAT PROVES THE SAVE (YH, 2026-09-02, defect 19).
-         Nine keys were invalidated and NOT this one - the receipts list, which
-         is cached for 30 seconds. So the operator posted a receipt, opened
-         Goods Received to confirm it was filed, and found no new record and an
-         unchanged count. That register is the page own proof the delivery
-         happened, and an operator who cannot see the proof receives the same
-         goods a second time.
-         The warehouse door sibling mutation already invalidated it, so the two
-         doors behaved differently after the same act - which is the worse half:
-         whether your delivery appears depended on which screen filed it. */
-      await qc.invalidateQueries({ queryKey: ["operation", "warehouse-receipts"] });
-      /* THE PAGE THE OPERATOR IS STANDING ON (2026-09-15).
-         Receiving can now be worked WITHOUT leaving Inbound, and Inbound's
-         own query was not in this list — so the operator saved a receipt,
-         came back to the Register, and read the same `Pending Delivery Qty`
-         they had just settled. The Arrival Schedule reads the same endpoint
-         under its own key and was equally stale. */
-      await qc.invalidateQueries({ queryKey: ["operation", "warehouse-inbound"] });
-      await qc.invalidateQueries({ queryKey: ["operation", "warehouse-schedule"] });
-      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
+      await invalidateReceivingReads(qc);
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });

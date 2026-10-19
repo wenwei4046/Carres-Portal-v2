@@ -2436,6 +2436,30 @@ export async function probePurchaseOrderWork(
   return items.map((item) => ({ ...item, id: currentId.get(item.id) ?? item.id }));
 }
 
+/** One physical report, using the feed's own projector/calendar and occurrence ledger. */
+export async function probeReceivingWork(
+  c: Context<AppEnv>, receiptId: string, ledger: WorkLedger = supabaseWorkLedger,
+): Promise<OperationWorkItem[] | null> {
+  const { data: row, error } = await userClient(c.env, c.var.auth.jwt).from("warehouse_receipts")
+    .select("id,po_id,status,goods_received_at,submitted_at,actual_site_id,warehouse_id")
+    .eq("id", receiptId).maybeSingle();
+  if (error) throw new Error("Receiving Work could not be read");
+  if (!row) return null;
+  if (row.status !== "submitted") return [];
+  const source = receivingWorkSourceFromModuleFacts({ receipts: [{ ...row, supplier_name: null }] });
+  const site = row.actual_site_id ?? row.warehouse_id;
+  const [settings, calendar] = await Promise.all([
+    readWarehouseReceivingSettings(userClient(c.env, c.var.auth.jwt), site ? [site] : []), deliveryCalendarFor(c),
+  ]);
+  const today = todayIsoMYT();
+  const items = projectReceivingWork({ source, duty: null, today,
+    workingDaysLate: (due, report) => warehouseReceivingDaysLate(due, today,
+      report?.site_id ? settings.get(report.site_id) ?? null : null, deliveryHolidaySet(calendar)),
+  });
+  const { currentId } = await readWorkLedger(c, ledger, items.map(item => item.id));
+  return items.map(item => ({ ...item, id: currentId.get(item.id) ?? item.id }));
+}
+
 /** The SO Batch read and supplier doors, read as the caller — the window
  *  probe and completion facts see exactly what the Work feed sees. */
 async function readPoWindowSource(c: Context<AppEnv>): Promise<{

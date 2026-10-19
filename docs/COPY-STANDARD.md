@@ -5754,7 +5754,8 @@ Receiving placement; UI MASTER owns Calendar. No posting/permission change is im
 
 | Surface | Approved words | Meaning |
 |---|---|---|
-| Receiving left-rail views | `GRN Records` · `Receiving Differences` | Formal receipts; source-linked discrepancy view, not a second Work queue |
+| Receiving left-rail views — Jess confirmed19Oct2026 | `Not received` · `Received` · `Differences` | Default Not received reads sent current-version POs with eligible pending goods, including partial receipts; earliest due first. Received retains the former GRN Records population/history/cancelled semantics. Differences retains its existing discrepancy population. No duplicate receipt writer or manual task completion |
+| Not received columns — same owner confirmation | `PO No` · `Supplier` · `Items` · `Due` · `Received` · `Check in` | Due shows the earliest outstanding governed arrival; `Late {n}d` is elapsed calendar days, not a new Work/calendar rule. Received shows accepted n / original ordered m. Check in opens the existing Receiving workspace for that PO; PO No opens the owning Purchase Order |
 | Shared list toolbar | `Search` · `Table` · `Cards` · `Page tools` · `Columns` | Reuse shared controls and existing action availability |
 | Right Working Panel sections | `Receipt details` · `Items & quantities` · `Evidence` · `Related records` · `History` | Receiving-owned facts and permitted actions |
 | Shared Calendar | `All modules` · `Filter by module` · `Filter by location` | Authorised implemented dated events; one owner/event/count; no duplicate Receiving arrival |

@@ -533,7 +533,7 @@ function postedDetail(over?: {
 
 /* ── Render helpers ────────────────────────────────────────────────────────── */
 
-function renderWithProviders(ui: React.ReactElement, entry = "/operation?tab=receiving") {
+function renderWithProviders(ui: React.ReactElement, entry = "/operation?tab=receiving&view=records") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return renderOpen(
     <MemoryRouter initialEntries={[entry]}>
@@ -607,10 +607,21 @@ afterEach(() => {
 /* ═══ THE REGISTER ═════════════════════════════════════════════════════════ */
 
 describe("OperationReceiving — the formal GRN Register", () => {
-  it("uses the two approved views without duplicate column filters in the rail", () => {
+  it("defaults to Not received and opens the existing receipt workspace for its exact sent PO", () => {
+    const source = po({ id: "PO-READY", supplier_id: "sup-oh", lines: [{ id: "line-ready", sku: "TEST", qty: 5, received_qty: 2 }] });
+    Object.assign(source, { version: 1, sends: [{ kind: "confirmed_sent", po_version: 1, channel: "whatsapp", sent_at: "2026-09-01T00:00:00Z" }] });
+    h.pos = [source];
+    renderPage("/operation?tab=receiving");
+    expect(screen.getByText("2/5")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^Check in$/ }));
+    expect(screen.getByTestId("receiving-po-view")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Start Receiving$/ })).toBeInTheDocument();
+  });
+
+  it("uses the three owner-approved views without duplicate column filters in the rail", () => {
     renderPage();
     const rail = within(screen.getByTestId("receiving-rail"));
-    expect(rail.getAllByRole("button").map(button => button.textContent)).toEqual(["GRN Records", "Receiving Differences"]);
+    expect(rail.getAllByRole("button").map(button => button.textContent)).toEqual(["Not received", "Received", "Differences"]);
     expect(rail.queryAllByRole("checkbox")).toHaveLength(0);
     for (const label of ["Filter GRN Doc Date", "Filter Supplier", "Filter Goods arrived at"]) expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
   });
@@ -865,7 +876,7 @@ describe("OperationReceiving — the formal GRN Register", () => {
     h.pos = [];
     h.posLoading = true;
     renderPage("/operation?tab=receiving&po=PO-2001");
-    expect(screen.getByText("Loading…")).toHaveAttribute("role", "status");
+    expect(screen.getByRole("status")).toHaveTextContent("Loading…");
     expect(screen.queryByTestId("receiving-po-missing")).not.toBeInTheDocument();
     expect(screen.queryByTestId("receiving-po-view")).not.toBeInTheDocument();
   });

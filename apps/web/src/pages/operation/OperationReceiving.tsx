@@ -46,6 +46,7 @@ import Tabs from "@/components/kit/Tabs";
 import Drawer from "@/components/kit/Drawer";
 import PurchasingTabs from "./PurchasingTabs";
 import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
+import NotReceivedRegister from "./components/NotReceivedRegister";
 // ⭐ HEADER PALETTE MATCHES THE PURCHASING REGISTERS (owner request 2026-09-15)
 // — the same approved light slate blue-grey table header as SO Batch
 // Purchase / Manual Purchase / Purchase Orders, so one colour means
@@ -91,7 +92,11 @@ function weekLabel(from: string, to: string): string {
 
 export default function OperationReceiving() {
   const [params, setParams] = useSearchParams();
-  const view = params.get("view") === "differences" ? "differences" : "records";
+  // Keep historical Records/Differences URLs; only an unscoped entrance defaults to Not received.
+  const rawView = params.get("view");
+  const legacyRecordScope = ["category", "supplier", "site", "received", "from", "to", "cancelled"].some(key => params.has(key));
+  const view = rawView === "differences" ? "differences"
+    : rawView === "records" || rawView === "received" || (!rawView && legacyRecordScope) ? "records" : "not_received";
   const sessionId = params.get("session");
   const poId = params.get("po");
   const arrivalId = params.get("arrival");
@@ -149,7 +154,7 @@ export default function OperationReceiving() {
   }, [filterKey]);
 
   const registerFilters = {
-    view: view as "records" | "differences",
+    view: view === "differences" ? "differences" as const : "records" as const,
     offset,
     limit: presentation === "cards" ? 12 : 50,
     columns: columnQuery,
@@ -877,9 +882,10 @@ export default function OperationReceiving() {
           openObject ? "invisible h-0 flex-none overflow-hidden p-0" : "",
         ].join(" ")}
         data-testid="receiving-register"
+        aria-hidden={Boolean(openObject) || undefined}
       >
         <FilterRail testId="receiving-rail">
-          {([['records', 'GRN Records'], ['differences', 'Receiving Differences']] as const).map(([key, label]) =>
+          {([['not_received', 'Not received'], ['records', 'Received'], ['differences', 'Differences']] as const).map(([key, label]) =>
             <RailItem key={key} label={label} active={view === key} testId={`receiving-view-${key}`}
               onClick={() => { const next = new URLSearchParams(params); next.set("view", key); if (key === "differences") next.delete("cancelled"); setOffset(0); setQuickReceipt(null); setParams(next); }} />)}
         </FilterRail>
@@ -897,7 +903,11 @@ export default function OperationReceiving() {
           className="flex min-h-0 min-w-0 flex-1 flex-col pl-2"
           data-testid="receiving-register-column"
         >
-          {registerQ.isError ? (
+          {view === "not_received" ? <NotReceivedRegister pos={pos} suppliers={supplierById}
+            loading={posQ.isLoading || suppliersQ.isLoading} error={posQ.isError || suppliersQ.isError}
+            canReceive={!dutyQ.isLoading && Boolean(dutyQ.data?.allowed)}
+            retry={() => { void posQ.refetch(); void suppliersQ.refetch(); }} sessionKey={`${registerSessionKey}-not-received`}
+            onReceive={id => { const next = new URLSearchParams(params); next.set("po", id); setParams(next); }} /> : registerQ.isError ? (
             /* A failure sentence is never the empty sentence (COPY-STANDARD
                2026-08-28): what broke, then the act that fixes it. */
             <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-white">

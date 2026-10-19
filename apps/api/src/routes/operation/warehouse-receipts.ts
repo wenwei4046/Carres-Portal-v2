@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { receivingPostedWorkCompletion } from "../../lib/receiving-work-completion";
 import { z } from "zod";
 import {
   arrivalReceivingInput,
@@ -1051,7 +1052,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
  * "zero ops typing" promise quietly withdrawn — a count ops disagrees with goes
  * BACK, with a reason, to the only people who can look at the goods again.
  */
-warehouseReceiptsRouter.post("/:id/check-in", requireOperation, async (c) => {
+warehouseReceiptsRouter.post("/:id/check-in", requireOperation, receivingPostedWorkCompletion(), async (c) => {
   // The optional body carries only the Actual Site — everything counted was
   // decided by the person who held the pallet. Absent body = original flow.
   // Validated as a UUID here, so a malformed value is the caller's 422 and
