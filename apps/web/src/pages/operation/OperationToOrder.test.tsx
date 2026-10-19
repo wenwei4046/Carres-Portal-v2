@@ -39,7 +39,7 @@ vi.mock("sonner", async () => {
 });
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
-  return { ...actual, apiFetch: (...a: unknown[]) => apiFetch(...a) };
+  return { ...actual, apiFetch: (...a: unknown[]) => String(a[0]).endsWith("/send-evidence-policy") ? Promise.resolve({ required: false, available: true }) : apiFetch(...a) };
 });
 vi.mock("./components/GlobalTopBar", () => ({ TopBarIcons: () => null }));
 /* The 50/50 renders the REAL PO template; @react-pdf is exercised in its own
