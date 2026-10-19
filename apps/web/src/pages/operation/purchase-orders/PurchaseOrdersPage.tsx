@@ -1826,7 +1826,7 @@ function PurchaseOrderObject({
             <section className="min-w-0 border border-kit-slate-5 bg-white p-4">
               <div className="mb-3 flex items-center justify-between border-b border-kit-slate-5 pb-3">
                 <div>
-                  <h2 className="text-strong">{mode === "issue" ? "Issue purchase order" : mode === "deliverTo" ? "Change Deliver To" : mode === "cancel" ? "Cancel goods not received" : "Revise purchase order"}</h2>
+                  <h2 className="text-strong">{mode === "issue" ? "Confirm PO sent to supplier" : mode === "deliverTo" ? "Change Deliver To" : mode === "cancel" ? "Cancel goods not received" : "Revise purchase order"}</h2>
                   <p className="text-meta text-kit-slate-11">Check the official document beside these fields before you finish.</p>
                 </div>
                 <button type="button" aria-label="Close document work" onClick={() => leaveDocument(() => setMode("read"))}><X size={16} /></button>

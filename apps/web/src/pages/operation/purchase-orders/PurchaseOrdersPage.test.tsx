@@ -1274,6 +1274,7 @@ describe("Purchase Order object", () => {
   it("opens the existing supplier send journey with this exact PO and version", () => {
     renderPage("/operation/procurement?po=PO-20260828-4827");
     fireEvent.click(screen.getByRole("button", { name: "Issue current PDF" }));
+    expect(screen.getByRole("heading", { name: "Confirm PO sent to supplier" })).toBeInTheDocument();
     expect(screen.getByTestId("po-issue-evidence")).toHaveAttribute("data-po", "PO-20260828-4827");
     expect(screen.getByTestId("po-issue-evidence")).toHaveAttribute("data-version", "2");
   });
