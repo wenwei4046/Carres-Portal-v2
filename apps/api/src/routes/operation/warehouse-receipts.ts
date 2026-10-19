@@ -1,3 +1,4 @@
+import receivingExtraRouter from "./receiving-extra";
 import { Hono } from "hono";
 import { receivingPostedWorkCompletion } from "../../lib/receiving-work-completion";
 import { z } from "zod";
@@ -54,6 +55,7 @@ import { repairOrderReturnWorkCompletion } from "../../lib/repair-order-work";
  * the only lock.
  */
 const warehouseReceiptsRouter = new Hono<AppEnv>();
+warehouseReceiptsRouter.route("/", receivingExtraRouter);
 
 // Source receipts remain a Receiving operation, under the same GRN Duty gate.
 warehouseReceiptsRouter.post(

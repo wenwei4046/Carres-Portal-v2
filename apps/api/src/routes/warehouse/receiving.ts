@@ -5,6 +5,7 @@ import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 import { rpcWithArrivalTime } from "../../lib/receiving-time";
+import warehouseConfirmationRouter from "./confirmation";
 
 /**
  * /api/warehouse — R6 of the receiving & claim queue
@@ -112,4 +113,5 @@ warehouseReceivingRouter.post("/receipts", requireWarehouse, async (c) => {
   return c.json(data ?? {}, 201);
 });
 
+warehouseReceivingRouter.route("/", warehouseConfirmationRouter);
 export default warehouseReceivingRouter;

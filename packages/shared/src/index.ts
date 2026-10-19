@@ -1280,6 +1280,14 @@ export {
 } from "./receiving-register";
 export {
   warehouseSubmitReceiptInput,
+  warehouseConfirmationReportInput,
+  warehouseConfirmReceiptInput,
+  warehouseConfirmationResult,
+  receivingExtraCustodyEvidence,
+  receivingExtraCustodyNote,
+  type WarehouseConfirmationReportInput,
+  type WarehouseConfirmReceiptInput,
+  type WarehouseConfirmationResult,
   warehouseReceiptReturnInput,
   type WarehouseSubmitReceiptInput,
   type WarehouseReceiptReturnInput,
