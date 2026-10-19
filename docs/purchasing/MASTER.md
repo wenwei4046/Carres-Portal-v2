@@ -2472,6 +2472,20 @@ preserved U1-000-010's GP261019-3843 reservation. This separate draft does not c
 prove production admission/upgrade, implement unknown-delivery intake UI, permit Site/non-PO source
 reclassification, or close the remaining Extra/Stock/account lifecycle gaps above.
 
+**Stock/Extra continuation — 2026-10-20, separate SQL REVIEW DRAFTS / NOT APPLIED.** The Stock-owned
+candidate proves only an exact usable Unit with one unambiguous original SO source, using the
+existing reserve door and shared coverage arithmetic; cancellation/reduced/unclear source is kept
+for handling. The Office companion preserves the same source-lock order. A separate Extra candidate
+accepts explicitly identified posted Extra against an existing admitted PO line by calling the
+existing `office_receive_post` writer, then stores the original custody-to-GRN/line link atomically.
+The local rollback probe produced a real model GRN, preserved original Extra and GP promises, reused
+the same retry, and refused accepting the same quantity twice. Its return-link door accepts only a
+canonical approved Purchase Return Unit's actual evidenced handover of those accepted goods; an
+absent handover was refused. A positive return walk, API/UI integration, independent unposted Extra
+custody and direct unknown/count-only Extra return remain unbuilt/unverified. No note, document
+issue or link creates a Work Done fact. These candidates do not establish whole Receiving completion,
+production SQL approval, exact-main upgrade or release readiness.
+
 
 **Register list PDF — BUILT ON RELEASE BRANCH / NOT YET DEPLOYED, 2026-10-05.**
 The authenticated Receiving list PDF action opened no preview or error. The shared grid previously
