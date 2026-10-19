@@ -25,6 +25,7 @@ export interface WarehouseConfirmationReportRow {
 }
 export interface WarehouseConfirmationHistoryRow {
   id: string; receipt_id: string; event: string; event_at: string; actor_name: string | null;
+  line_labels?:Record<string,string>;unit_labels?:Record<string,string>;
   payload: {report?: unknown; revision?: number; reason?: string; grn_no?:string};
 }
 export function useWarehouseConfirmationReports(enabled: boolean) {
