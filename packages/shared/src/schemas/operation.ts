@@ -1,3 +1,4 @@
+import { poSendEvidencePathSchema } from "../po-send-evidence";
 import { PO_DELAY_REASONS } from "../po-workspace";
 import { z } from 'zod';
 
@@ -134,8 +135,9 @@ export const confirmPoSentInput = z.object({
    * is refused, not believed.
    */
   poVersion: z.number().int().positive(),
+  evidencePath: poSendEvidencePathSchema.optional(),
   note: z.string().trim().max(300).optional(),
-}).strict();
+}).strict().refine(value => !value.evidencePath || value.channel === "whatsapp", { path: ["evidencePath"], message: "WhatsApp screenshot" });
 export type ConfirmPoSentInput = z.infer<typeof confirmPoSentInput>;
 
 /** Human-confirmed supplier email: one selected supplier, independent rendered PO PDFs. */

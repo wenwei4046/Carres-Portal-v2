@@ -316,7 +316,7 @@ describe("Communication Truthfulness · the PO workspace claims only what it saw
       );
     }
     // It still supplies the supplier's real doors, because it knows the supplier.
-    expect(src).toMatch(/doors=\{doorsForIssuedPo\(/);
+    expect(src).toContain("<PoSupplierResultContent");
   });
 
   it("hands over a PDF, never the payload behind it", () => {

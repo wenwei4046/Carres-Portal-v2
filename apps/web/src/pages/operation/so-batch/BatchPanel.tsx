@@ -1,3 +1,4 @@
+import PoSendProofFields, { usePoSendProof, PoSendEvidenceButton } from "../components/PoSendEvidence";
 /**
  * THE BATCH PANEL — the Tasks working panel for ONE batch (one dated PO
  * window): its suppliers' POs to send and its lines to buy (owner directive
@@ -177,6 +178,7 @@ const itemsOf = (document: PoTemplateData | null) => document ? T.items(document
  *  2026-10-06): the kit has no step badge, so none is drawn inline. */
 export function BatchPanel({ item, windowKey, host }: { item: BatchPanelItem; windowKey: string; host: WorkPanelHost }) {
   const queryClient = useQueryClient();
+  const proof = usePoSendProof();
   const navigate = useNavigate();
   const userId = useAuth((state) => state.user?.id ?? "unidentified");
   const attemptsKey = emailAttemptsKeyOf(userId);
@@ -279,6 +281,7 @@ export function BatchPanel({ item, windowKey, host }: { item: BatchPanelItem; wi
   const [unticked, setUnticked] = useState<ReadonlySet<string>>(new Set());
   const ticked = unsent.filter((fact) => !unticked.has(fact.po.id));
   const tickedReady = ticked.filter((fact) => fact.document);
+  const proofDocuments = tickedReady.map(fact => ({ id: fact.po.id, version: fact.document!.version }));
   const contact = rows[0]?.po;
   const [channel, setChannel] = useState<"whatsapp" | "email" | null>(null);
   const activeChannel = channel ?? (contact?.poSendChannel === "email" ? "email" : "whatsapp");
@@ -372,11 +375,11 @@ export function BatchPanel({ item, windowKey, host }: { item: BatchPanelItem; wi
   }
 
   async function recordWhatsApp() {
-    if (!contact || !tickedReady.length) return;
+    if (!contact || !tickedReady.length || !proof.ready("whatsapp", proofDocuments)) return;
     setBusy(true); setError(null);
     const recipient = contact.whatsappGroupUrl?.trim() || contact.contact?.trim() || "";
     try {
-      for (const fact of tickedReady) await confirmPoSent(fact.po.id, fact.document!.version, "whatsapp", recipient);
+      for (const fact of tickedReady) await confirmPoSent(fact.po.id, fact.document!.version, "whatsapp", recipient, proof.path({ id: fact.po.id, version: fact.document!.version }));
       setConfirming(false);
       setUnticked(new Set());
       afterSend(tickedReady.length, "WhatsApp");
@@ -515,7 +518,8 @@ export function BatchPanel({ item, windowKey, host }: { item: BatchPanelItem; wi
               </div>
             </Step>
             <Step n={3} state={allHeld && opened ? "current" : "pending"} data-testid="batch-whatsapp-step-record">
-              <div className="flex"><Button variant="primary" data-testid="batch-record" onClick={() => setConfirming(true)}><Icon name="confirm" size={16} />{T.recordSent(tickedReady.length)}</Button></div>
+              <PoSendProofFields proof={proof} documents={proofDocuments} channel="whatsapp" disabled={busy} />
+              <div className="flex"><Button disabled={!proof.ready("whatsapp", proofDocuments)} variant="primary" data-testid="batch-record" onClick={() => setConfirming(true)}><Icon name="confirm" size={16} />{T.recordSent(tickedReady.length)}</Button></div>
             </Step>
           </StepList>
         </div> : <div className="flex flex-col gap-2" data-testid="batch-email">
@@ -653,7 +657,7 @@ export function BatchPanel({ item, windowKey, host }: { item: BatchPanelItem; wi
     />
     <Modal open={confirming} onOpenChange={setConfirming} title={T.confirmTitle}
       footer={<><Button onClick={() => setConfirming(false)}>Cancel</Button>
-        <Button variant="primary" loading={busy} disabled={!tickedReady.length} data-testid="batch-record-confirm" onClick={() => void recordWhatsApp()}>{T.recordN(tickedReady.length)}</Button></>}>
+        <Button variant="primary" loading={busy} disabled={!tickedReady.length || !proof.ready("whatsapp", proofDocuments)} data-testid="batch-record-confirm" onClick={() => void recordWhatsApp()}>{T.recordN(tickedReady.length)}</Button></>}>
       <div className="flex flex-col gap-1" data-testid="batch-record-list">
         {tickedReady.map((fact) => <span key={fact.po.id} className="text-body">{documentDisplayNumber(`${fact.document!.po_number}-V${fact.document!.version}`)}</span>)}
         {ticked.length < unsent.length && <span className="text-meta text-kit-slate-11">{T.notTicked}</span>}
@@ -663,6 +667,7 @@ export function BatchPanel({ item, windowKey, host }: { item: BatchPanelItem; wi
       <div className="flex flex-col gap-2">
         {rows.flatMap((fact) => fact.sends.map((send, index) => <span key={`${fact.po.id}-${index}`} className="text-meta">
           {documentDisplayNumber(`${fact.po.id}${send.po_version ? `-V${send.po_version}` : ""}`)} · {send.kind === "confirmed_sent" ? "PO sent to supplier" : `${CHANNEL_WORD[send.channel] ?? send.channel} opened`} · {timeOf(send.sent_at)}
+          <PoSendEvidenceButton poId={fact.po.id} note={send.note} context={`${fact.po.id} · V${send.po_version}`} />
         </span>))}
         {pickedEmailAttempts.map((attempt) => <span key={attempt.id} className="text-meta">{attempt.documents.map((document) => documentDisplayNumber(`${document.id}-V${document.version}`)).join(", ")} · Email · {attempt.status === "unknown" ? "Sending not confirmed" : "PO sent to supplier"}</span>)}
       </div>

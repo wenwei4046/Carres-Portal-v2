@@ -16,6 +16,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import OperationApp from "@/pages/operation/OperationApp";
+import { poSendEvidenceNote, readPoSendEvidence } from "@carres/shared";
 import { testTasksFeed } from "./tasks-feed-fixture";
 import { appTodayIso } from "@/lib/fmt-date";
 import "@/index.css";
@@ -63,7 +64,7 @@ const pos = Array.from({ length: 26 }, (_, n) => {
         : [{ kind: "sales_order", reference: `SO-${1300 + i}`, order_id: `o${i}` }],
     grns: kind === "completed" ? [{ id: `g${i}`, grn_no: `GRN-202609${day}-${7000 + i}` }] : i % 5 === 0 ? [{ id: `g${i}a`, grn_no: `GRN-202609${day}-${7100 + i}` }, { id: `g${i}b`, grn_no: `GRN-202609${day}-${7200 + i}` }] : [],
     sends: marked
-      ? [{ channel: i % 2 ? "whatsapp" : "email", note: null, sent_at: `2026-09-${day}T06:00:00Z`, kind: "confirmed_sent", recipient: supplier.whatsapp_group_url ?? "po@nicefuture.my", po_version: version, sent_by_name: "Yu Jun", duty_name: "Yu Jun", acting_name: null, po_revisions: null }]
+      ? [{ channel: i % 2 ? "whatsapp" : "email", note: null as string | null, sent_at: `2026-09-${day}T06:00:00Z`, kind: "confirmed_sent", recipient: supplier.whatsapp_group_url ?? "po@nicefuture.my", po_version: version, sent_by_name: "Yu Jun", duty_name: "Yu Jun", acting_name: null, po_revisions: null }]
       : [],
     promises: kind === "issued" && i % 3 === 0 && original
       ? [{ kind: "tomorrow_delivery", answer: i % 2 ? "delayed" : "shipping", about_date: original, previous_date: original, new_date: i % 2 ? `2026-11-${String(1 + (i % 20)).padStart(2, "0")}` : null, reason: i % 2 ? "Production Delay" : null, po_version: version, channel: "whatsapp", recipient: "Factory", evidence: "x/reply.png", reported_by: "Factory staff", reported_at: "2026-09-10T03:00:00Z", recorded_by: "u", recorded_by_name: "Yu Jun", recorded_at: "2026-09-10T03:10:00Z" }]
@@ -74,9 +75,23 @@ const pos = Array.from({ length: 26 }, (_, n) => {
 
 let layouts: Array<{ id: string; name: string; layout: unknown; is_default: boolean }> = [];
 
+let uploadAttempts = 0, saveAttempts = 0;
+const uploadedScreenshots = new Map<string, string>();
+const previewParams = new URLSearchParams(window.location.search);
 const realFetch = window.fetch.bind(window);
 window.fetch = async (input, init) => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  // TEST transport only: uploaded bytes stay in this tab, never at a provider.
+  const uploadPrefix = "/storage/v1/object/upload/sign/delivery-orders/";
+  if (new URL(url, window.location.origin).hostname === "placeholder.supabase.co" && url.includes(uploadPrefix)) {
+    const path = decodeURIComponent(new URL(url).pathname.split(uploadPrefix)[1]);
+    const body = init?.body;
+    const file = body instanceof FormData ? [...body.values()].find(value => value instanceof Blob) : body;
+    if (!(file instanceof Blob)) return new Response("TEST upload missing", { status: 422 });
+    if ((previewParams.get("upload") === "fail" || previewParams.get("upload") === "fail-once" && uploadAttempts++ === 0)) return new Response("TEST upload refused", { status: 503 });
+    uploadedScreenshots.set(path, URL.createObjectURL(file));
+    return new Response(JSON.stringify({ Key: `delivery-orders/${path}` }), { headers: { "content-type": "application/json" } });
+  }
   if (!url.includes("127.0.0.1:88") && !url.includes("localhost:88")) return realFetch(input, init);
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -103,7 +118,34 @@ window.fetch = async (input, init) => {
       messageTemplate: "Please build this purchase order.",
     });
   }
-  // Read-only TEST transport: no provider or operational mutation is available.
+  // Fixed TEST confirmation fixture. This does not prove production persistence.
+  if (url.includes("/api/operation/pos/send-evidence-policy")) return json({ required: previewParams.get("proof") !== "inactive", available: true });
+  if (url.includes("/api/storage/dos/sign-upload")) {
+    const body = JSON.parse(String(init?.body ?? "{}"));
+    const path = body.kind === "send"
+      ? `po-send/${body.po_id}/V${body.po_version}/11111111-1111-4111-8111-111111111111/${crypto.randomUUID()}.${body.mime_type === "image/jpeg" ? "jpg" : "png"}`
+      : `${body.po_id}/${crypto.randomUUID()}-answer-${body.do_number}.png`;
+    return json({ path, token: "TEST-only" });
+  }
+  const savedProof = /\/api\/operation\/pos\/([^/?]+)\/send-evidence/.exec(url);
+  if (savedProof) {
+    const po = pos.find(row => row.id === decodeURIComponent(savedProof[1]));
+    const path = new URL(url).searchParams.get("path") ?? "";
+    return po?.sends.some(send => readPoSendEvidence(send.note)?.path === path) && uploadedScreenshots.has(path)
+      ? json({ url: uploadedScreenshots.get(path) }) : json({ code: "not_found" }, 404);
+  }
+  const confirm = /\/api\/operation\/pos\/([^/?]+)\/confirm-sent/.exec(url);
+  if (confirm) {
+    const po = pos.find(row => row.id === decodeURIComponent(confirm[1]));
+    const body = JSON.parse(String(init?.body ?? "{}"));
+    if ((previewParams.get("save") === "fail" || previewParams.get("save") === "fail-once" && saveAttempts++ === 0)) return json({ message: "TEST save refused", action: "Try again" }, 503);
+    if (!po || body.poVersion !== po.version) return json({ code: "stale_po_version" }, 409);
+    if (body.channel === "whatsapp" && previewParams.get("proof") !== "inactive" && !uploadedScreenshots.has(body.evidencePath)) return json({ code: "po_send_screenshot_required", message: "WhatsApp screenshot is missing", action: "Upload WhatsApp screenshot" }, 422);
+    po.sends.push({ channel: body.channel, note: body.evidencePath ? poSendEvidenceNote(body.evidencePath) : null, sent_at: new Date().toISOString(), kind: "confirmed_sent", recipient: body.recipient, po_version: po.version, sent_by_name: "TEST Staff", duty_name: "TEST Staff", acting_name: null, po_revisions: null });
+    return json({ ok: true });
+  }
+  // All other operational mutations and provider sends remain unavailable.
+
   if ((init?.method ?? "GET").toUpperCase() !== "GET") return json({ message: "This TEST preview does not save business records" }, 405);
   if (/\/api\/operation\/work(\?|$)/.test(url)) return json(testTasksFeed({ id: "11111111-1111-4111-8111-111111111111", name: "TEST Staff", email: "preview@carres.local" }));
   if (url.includes("/email-capability")) return json({ configured: true });

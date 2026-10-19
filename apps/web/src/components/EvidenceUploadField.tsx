@@ -184,7 +184,7 @@ export default function EvidenceUploadField<E extends { path: string; kind: stri
       <input
         type="file"
         accept={[...imageMimes, ...videoMimes, ...pdfMimes].join(",")}
-        multiple
+        multiple={maxFiles > 1}
         onChange={handlePick}
         disabled={disabled}
         aria-label={ariaLabel}
@@ -197,11 +197,10 @@ export default function EvidenceUploadField<E extends { path: string; kind: stri
             no video never promises a 0 MB video. Unchanged for every caller
             that passes photos and videos. */}
         {[
-          imageMimes.length ? `Photos (JPG, PNG, WEBP) up to ${mb(imageMaxBytes)}` : null,
+          imageMimes.length ? `Photos (${imageMimes.map(mime => (({ "image/jpeg": "JPG", "image/png": "PNG", "image/webp": "WEBP" } as Record<string, string>)[mime] ?? mime)).join(", ")}) up to ${mb(imageMaxBytes)}` : null,
           videoMimes.length ? `videos (MP4, MOV, WEBM) up to ${mb(videoMaxBytes)}` : null,
           pdfMimes.length ? `PDF up to ${mb(pdfMaxBytes ?? imageMaxBytes)}` : null,
-        ].filter(Boolean).join(" · ")} · up to {maxFiles} files. Pick several
-        at once, or add more later.
+        ].filter(Boolean).join(" · ")} · {maxFiles === 1 ? "1 file." : `up to ${maxFiles} files. Pick several at once, or add more later.`}
       </p>
       {files.length > 0 && (
         <ul className="mt-1 grid gap-1">

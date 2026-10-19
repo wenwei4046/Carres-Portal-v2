@@ -6,7 +6,7 @@ import PoSupplierBundle, { readPoSupplierPreparation, type PoSupplierPreparation
 const api = vi.hoisted(() => vi.fn());
 const renderPdf = vi.hoisted(() => vi.fn());
 const zip = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/api", async () => ({ ...await vi.importActual<typeof import("@/lib/api")>("@/lib/api"), apiFetch: api }));
+vi.mock("@/lib/api", async () => ({ ...await vi.importActual<typeof import("@/lib/api")>("@/lib/api"), apiFetch: (path: string, ...args: unknown[]) => path.endsWith("/send-evidence-policy") ? Promise.resolve({ required: false, available: true }) : api(path, ...args) }));
 vi.mock("@/lib/pdf/render", () => ({ renderPoPdf: renderPdf }));
 vi.mock("@/lib/purchasing/po-bundle", async () => {
   const actual = await vi.importActual<typeof import("@/lib/purchasing/po-bundle")>("@/lib/purchasing/po-bundle");

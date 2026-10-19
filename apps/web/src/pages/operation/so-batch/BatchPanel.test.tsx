@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { PurchaseDemandRow, SoBatchOrderRow, SoBatchPurchaseResponse } from "@carres/shared";
 
 const api = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/api", async () => ({ ...await vi.importActual<typeof import("@/lib/api")>("@/lib/api"), apiFetch: api }));
+vi.mock("@/lib/api", async () => ({ ...await vi.importActual<typeof import("@/lib/api")>("@/lib/api"), apiFetch: (path: string, ...args: unknown[]) => path.endsWith("/send-evidence-policy") ? Promise.resolve({ required: false, available: true }) : api(path, ...args) }));
 vi.mock("@/lib/pdf/render", () => ({ renderPoPdf: async () => {
   const pdf = new Blob(["%PDF-1.4"], { type: "application/pdf" });
   Object.defineProperty(pdf, "arrayBuffer", { value: async () => new TextEncoder().encode("%PDF-1.4").buffer });
@@ -188,10 +188,10 @@ describe("BatchPanel — opened by window key from any page", () => {
     expect(within(steps).getAllByRole("listitem").map((li) => li.textContent)).toEqual([
       "10 of 2 downloadedDownload PDFs (2)",
       "2Send the PDF, then press PO sent to supplier.Copy messageOpen WhatsApp group",
-      "3PO sent to supplier (2)",
+      expect.stringContaining("PO sent to supplier (2)"),
     ]);
     expect(within(steps).getAllByRole("listitem").map((li) => li.getAttribute("data-state"))).toEqual(["current", "pending", "pending"]);
-    expect(within(card).getByTestId("batch-whatsapp-step-record")).toHaveTextContent(/^3PO sent to supplier \(2\)$/);
+    expect(within(card).getByTestId("batch-whatsapp-step-record")).toHaveTextContent(/PO sent to supplier \(2\)/);
   });
 
   it("records only the ticked PO; the task stays open and the other stays to send", async () => {
