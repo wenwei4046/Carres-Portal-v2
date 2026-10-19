@@ -36,7 +36,7 @@ describe("Warehouse explicit final confirmation",()=>{
   const exact={...po,lines:[{...po.lines[0],identity_mode:"exact_unit" as const}],expected_units:[{id:"unit",po_line_id:id,unit_code:"U1-000-301",sku:"TEST-QTY",status:"incoming"}]};
   render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false},mutations:{retry:false}}})}><WarehouseConfirmationModal po={exact} saved={{saveKey:"00000000-0000-4000-8000-000000000203",result:{...blocked,status:"draft"},report:{poId:po.po_id,lines:[{id,units:[{unitCode:"U1-000-301",outcome:"received_with_issue",issueKind:"damaged"}]}]}}} onClose={vi.fn()}/></QueryClientProvider>);
   fireEvent.keyDown(screen.getByRole("combobox",{name:"U1-000-301"}),{key:"Enter"});
-  fireEvent.click(await screen.findByRole("option",{name:"Received",exact:true}));
+  fireEvent.click(await screen.findByRole("option",{name:/^Received$/}));
   confirm();fireEvent.click(screen.getByRole("button",{name:"Save Receiving"}));
   await waitFor(()=>expect(apiFetch).toHaveBeenCalled());
   const body=JSON.parse(vi.mocked(apiFetch).mock.calls[0][1]!.body as string);
