@@ -2200,7 +2200,7 @@ function refusalOf(error: { code?: string; details?: string | null; message: str
   return new WorkLedgerRefusal("ledger_failed", error.message);
 }
 
-async function readWorkLedgerRows(sb: SupabaseClient, occurrenceIds: readonly string[]): Promise<WorkOccurrenceEvent[]> {
+export async function readWorkLedgerRows(sb: SupabaseClient, occurrenceIds: readonly string[]): Promise<WorkOccurrenceEvent[]> {
     const rows: WorkOccurrenceEvent[] = [];
     for (let i = 0; i < occurrenceIds.length; i += LEDGER_CHUNK) {
       const ids = occurrenceIds.slice(i, i + LEDGER_CHUNK);
@@ -2582,8 +2582,11 @@ ledger: WorkLedger = supabaseWorkLedger,
   const receiptActors=new Map<string,Set<string>>();
   for(const event of missingActors){
     const parsed=parseWorkOccurrenceId(event.occurrenceId);
-    if(parsed?.module!=="receiving" || !event.actorId)continue;
-    const receiptId=parsed.objectId;
+    if(!parsed || !event.actorId)continue;
+    const causalRepairReceipt=parsed.module==="purchasing" && parsed.ruleKey==="repair_order.return_date_passed"
+      ? /(?:^|;)warehouse_receipts=([0-9a-f-]{36})(?:;|$)/i.exec(event.resultReference ?? "")?.[1] : null;
+    const receiptId=parsed.module==="receiving" ? parsed.objectId : causalRepairReceipt;
+    if(!receiptId)continue;
     if(!receiptActors.has(receiptId))receiptActors.set(receiptId,new Set());
     receiptActors.get(receiptId)!.add(event.actorId);
   }

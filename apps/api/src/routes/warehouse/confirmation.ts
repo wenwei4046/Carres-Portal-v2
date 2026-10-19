@@ -1,3 +1,4 @@
+import { warehouseRepairReturnTargets } from "../../lib/warehouse-repair-return-work";
 import { Hono } from "hono";
 import { z } from "zod";
 import { warehouseConfirmReceiptInput, warehouseConfirmationResult } from "@carres/shared";
@@ -6,7 +7,7 @@ import { requireWarehouse } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import { receivingCompletionSpec } from "../../lib/receiving-work-completion";
-import { withWorkCompletion, workCompletionDeps } from "../../lib/work-completion";
+import { withWorkCompletion, workCompletionDeps, type WorkCompletionTarget } from "../../lib/work-completion";
 import type { AppEnv } from "../../types";
 
 const router = new Hono<AppEnv>();
@@ -71,7 +72,12 @@ router.post("/receipts/confirm", requireWarehouse, async c => {
   const parsed = await parseJsonBody(c, warehouseConfirmReceiptInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const body = parsed.data;
-  return withWorkCompletion(c, [{ spec: receivingCompletionSpec(), objectIds: body.receiptId ? [body.receiptId] : [] }], async () => {
+  const targets:WorkCompletionTarget[]=[{spec:receivingCompletionSpec(),objectIds:body.receiptId?[body.receiptId]:[]}];
+  if(body.report.arrivalSourceId && z.string().uuid().safeParse(body.report.arrivalSourceId).success){
+    try {targets.push(...await warehouseRepairReturnTargets(c,body.report.arrivalSourceId));}
+    catch {console.error("Repair return Work observation unavailable; physical confirmation retains its own admission");}
+  }
+  return withWorkCompletion(c, targets, async () => {
     const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("warehouse_confirm_receipt", {
       p_report: warehouseConfirmationReportToWire(body.report), p_save_key: body.saveKey,
       p_receipt_id: body.receiptId ?? null, p_revision: body.revision ?? null,

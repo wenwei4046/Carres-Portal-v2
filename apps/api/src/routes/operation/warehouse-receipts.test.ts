@@ -960,7 +960,7 @@ describe("GET /:id — one Receiving Session / GRN record", () => {
     vi.mocked(userClient).mockReturnValue(sb as never);
     const response=await req(`/api/operation/warehouse-receipts/${RECEIPT}`,"GET",await makeJwt("operation"));
     expect(response.status).toBe(200);
-    expect((await response.json()).arrival_source).toMatchObject({id:sourceId,source_no:"TR-20261019-2771"});
+    expect(((await response.json()) as {arrival_source:unknown}).arrival_source).toMatchObject({id:sourceId,source_no:"TR-20261019-2771"});
     expect(selects.some(value=>value.includes("ops_stock_items!arrival_source_units_stock_item_id_fkey"))).toBe(true);
   });
 

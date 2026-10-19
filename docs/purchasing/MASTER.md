@@ -2452,7 +2452,10 @@ company-count functions remain unchanged. Posted Extra has an immutable custody 
 append-only investigation notes; notes do not mean acceptance, return, available Stock or completion.
 These facts do not complete the approved target: independent custody of unposted Extra and its
 acceptance/return lifecycle, source re-identification, pure `po_line_sources` auto-reservation through
-Stock, and Warehouse repair-return causal Work completion remain open. Real individual Warehouse
+Stock remain open. Warehouse repair-return now observes the existing RO projector under a scoped
+source attestation and completes only from this actor’s causal posted-event marker; the isolated
+walk preserved the original Work date and same-key retry created no duplicate. Historical RO age
+was a synthetic local TEST fixture; no Work completion was seeded. Real individual Warehouse
 admission/activation is also not complete. The broad SQL is an external review candidate, not a
 migration: exact current-main constraint upgrade/rollback is unverified and production SQL approval
 is pending separately from the frozen attachment-only fix. Model proof is not upgrade proof or
