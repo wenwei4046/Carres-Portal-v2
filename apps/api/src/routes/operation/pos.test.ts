@@ -9,13 +9,14 @@ import { assertRpcCallShape } from "../../test-utils/assert-rpc";
 
 vi.mock("../../lib/supabase", () => ({
   userClient: vi.fn(),
+  adminClient: vi.fn(),
 }));
 
 vi.mock("../../lib/po-email-attempts", () => ({ preparePoEmailAttempt: vi.fn(), recordPoEmailOutcome: vi.fn(), readPoEmailAttempts: vi.fn() }));
 import { preparePoEmailAttempt, recordPoEmailOutcome, readPoEmailAttempts } from "../../lib/po-email-attempts";
 vi.mock("../../lib/supplier-email", () => ({ sendSupplierPoEmail: vi.fn() }));
 import { sendSupplierPoEmail } from "../../lib/supplier-email";
-import { userClient } from "../../lib/supabase";
+import { adminClient, userClient } from "../../lib/supabase";
 
 const SUPABASE_URL = "https://test.supabase.co";
 const KID = "test-kid-1";
@@ -3424,5 +3425,28 @@ describe("qualified cancellation stays on the existing PO door",()=> {
   rpc.mockClear();
   const write=await app.fetch(new Request("https://api.test/api/operation/pos/TEST/cancel",{method:"POST",headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},body:JSON.stringify({reason:"TEST no Finance PO write",cancellation})}),env);
   expect(write.status).toBe(403);expect(rpc).not.toHaveBeenCalled();
+ });
+});
+
+describe("scoped cancellation Finance handoff",()=>{
+ const proof="TEST/proof.pdf";
+ const facts={events:[{id:"effective-1",kind:"effective"}],financeHandoffs:[{id:"effective-1",poId:"TEST",poVersion:3,evidence:[proof]}]};
+ it("is ready without claiming delivery and signs only an exact effective attachment",async()=>{
+  const rpc=vi.fn(async()=>({data:facts,error:null}));vi.mocked(userClient).mockReturnValue({rpc} as never);
+  const sign=vi.fn(async()=>({data:{signedUrl:"https://storage.test/scoped"},error:null}));
+  vi.mocked(adminClient).mockReturnValue({storage:{from:()=>({createSignedUrl:sign})}} as never);
+  const headers={Authorization:`Bearer ${await makeJwt("finance")}`};
+  const ready=await app.fetch(new Request("https://api.test/api/operation/pos/TEST/cancellations/finance-handoff",{headers}),env);
+  expect(ready.status).toBe(200);expect(await ready.json()).toMatchObject({connection:{state:"not_connected"},items:[{idempotencyKey:"po_cancellation:effective-1:3"}]});
+  const read=(event:string,path:string)=>app.fetch(new Request(`https://api.test/api/operation/pos/TEST/cancellations/${event}/evidence?path=${encodeURIComponent(path)}`,{headers}),env);
+  expect((await read("effective-1",proof)).status).toBe(200);expect(sign).toHaveBeenCalledWith(proof,300);
+  sign.mockClear();
+  for(const [event,path] of [["pending-1",proof],["effective-1","TEST/unrelated.pdf"],["effective-1","FOREIGN/proof.pdf"],["effective-1","TEST/../proof.pdf"]])expect((await read(event,path)).status).toBe(404);
+  expect(sign).not.toHaveBeenCalled();
+ });
+ it.each(["dealer","warehouse","partner"])("refuses %s before the source or privileged signer",async(role)=>{
+  const rpc=vi.fn();vi.mocked(userClient).mockReturnValue({rpc} as never);vi.mocked(adminClient).mockClear();
+  const response=await app.fetch(new Request("https://api.test/api/operation/pos/TEST/cancellations/effective-1/evidence?path=TEST%2Fproof.pdf",{headers:{Authorization:`Bearer ${await makeJwt(role)}`}}),env);
+  expect(response.status).toBe(403);expect(rpc).not.toHaveBeenCalled();expect(adminClient).not.toHaveBeenCalled();
  });
 });
