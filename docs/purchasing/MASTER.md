@@ -2441,6 +2441,24 @@ Staff selects purpose
 
 ### 7.3 Receiving and later defect
 
+**Receiving confirmation delivery status — 2026-10-19, draft PR #2100; BUILT IN ISOLATED TARGET-SCHEMA MODEL / NOT DEPLOYED.**
+The individual Warehouse path now uses an explicit readiness door, retains incomplete physical
+reports without a GRN, and corrects the same receipt/revision before the one posting engine.
+The isolated authenticated walk proved Warehouse-owned DO/damage uploads, PO receipt/Claim,
+existing explicit Unit reservation preservation, Transfer arrival without a fabricated PO or Unit,
+and the original blocked report's GRN Duty Work completing under the actual Warehouse actor.
+Normal Duty, dated cover, actual confirmer and receiving company remain separate facts. The
+company-count functions remain unchanged. Posted Extra has an immutable custody snapshot and
+append-only investigation notes; notes do not mean acceptance, return, available Stock or completion.
+These facts do not complete the approved target: independent custody of unposted Extra and its
+acceptance/return lifecycle, source re-identification, pure `po_line_sources` auto-reservation through
+Stock, and Warehouse repair-return causal Work completion remain open. Real individual Warehouse
+admission/activation is also not complete. The broad SQL is an external review candidate, not a
+migration: exact current-main constraint upgrade/rollback is unverified and production SQL approval
+is pending separately from the frozen attachment-only fix. Model proof is not upgrade proof or
+production verification. Final-head CI and this actual preview's approval remain release gates.
+
+
 **Register list PDF — BUILT ON RELEASE BRANCH / NOT YET DEPLOYED, 2026-10-05.**
 The authenticated Receiving list PDF action opened no preview or error. The shared grid previously
 called `window.open` after asynchronous population loading/rendering and ignored a blocked return.

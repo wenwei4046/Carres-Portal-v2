@@ -347,7 +347,7 @@ export interface WarehouseReceiptRow {
    *  (posted_by). Never collapsed into one name. */
   posted_duty_holder_name?: string | null;
   posted_duty_cover_name?: string | null;
-  posted_authority?: "grn_duty" | "cover" | "superuser" | "operation_staff" | null;
+  posted_authority?: "grn_duty" | "cover" | "superuser" | "operation_staff" | "warehouse_confirmation" | null;
   /** 0601 — Goods Received Date as a time point; null on an older record
    *  (`Time not recorded`, never back-filled). */
   goods_received_time?: string | null;
@@ -366,6 +366,9 @@ export interface WarehouseReceiptRow {
  *  it. Notice what is NOT here: price, cost, the customer order, the supplier's
  *  contact. A warehouse sees what it must count and nothing else. */
 export interface WarehouseIncomingLine {
+  /** Canonical uncancelled outstanding commitment; supplied by the confirmation source RPC. */
+  pending_qty?: number;
+  cancelled_qty?: number;
   id: string;
   sku: string;
   qty: number;
@@ -641,6 +644,7 @@ export const RECEIVING_AUTHORITY_LABEL: Record<string, string> = {
   superuser: "Operations Superuser",
   /** 0601 — every active Operation staff member may post (owner 2026-09-25). */
   operation_staff: "Operation staff",
+  warehouse_confirmation: "Warehouse",
 };
 
 /**
@@ -680,6 +684,7 @@ export interface ReceivingWorkSource {
     id: string;
     po_id: string;
     supplier_name: string | null;
+    blocked?: boolean;
     goods_received_at?: string;
     submitted_at: string;
     /** The Site that physically received (`actual_site_id`, else the PO's
@@ -730,7 +735,7 @@ export function receivingWorkItems(
       module: "receiving",
       soRef: `Receiving · ${r.supplier_name ?? r.po_id}`,
       orderId: r.id,
-      action: RECEIVING_WORK_WORDS.rowLine(r.po_id, r.supplier_name ?? "the supplier"),
+      action: r.blocked ? "Open Receiving" : RECEIVING_WORK_WORDS.rowLine(r.po_id, r.supplier_name ?? "the supplier"),
       ...owner,
       tone: "warning",
       locked: false,

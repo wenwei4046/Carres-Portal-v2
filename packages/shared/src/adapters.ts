@@ -1075,7 +1075,7 @@ export function warehouseConfirmationReportToWire(r: import("./schemas/warehouse
       stock_item_id: unit.stockItemId, outcome: unit.outcome, issue_kind: unit.issueKind, note: unit.note,
     })),
     do_number: r.doNumber, do_file_path: r.doFilePath, note: r.note,
-    goods_received_time: r.goodsReceivedTime, goods_received_at: r.goodsReceivedAt,
+    goods_received_time: r.goodsReceivedTime, goods_received_at: r.goodsReceivedAt, goods_received_clock: r.goodsReceivedClock,
     arrival_evidence: r.arrivalEvidence, extra_lines: r.extraLines,
     lines: r.lines?.map((line) => ({
       id: line.id, received_now: line.receivedNow, damaged_qty: line.damagedQty,
@@ -1103,11 +1103,11 @@ export function warehouseConfirmationReportFromWire(value: unknown) {
   const report = {
     poId: r.po_id, actualSiteId: r.actual_site_id, arrivalSourceId: r.arrival_source_id,
     handoverPerson: r.handover_person, doNumber: r.do_number, doFilePath: r.do_file_path,
-    goodsReceivedTime: r.goods_received_time, goodsReceivedAt: r.goods_received_at,
+    goodsReceivedTime: r.goods_received_time, goodsReceivedAt: r.goods_received_at, goodsReceivedClock: r.goods_received_clock,
     note: r.note ?? undefined, arrivalEvidence: r.arrival_evidence, extraLines: r.extra_lines,
     arrivalUnits: Array.isArray(r.arrival_units) ? r.arrival_units.map((entry) => {
       const u = obj(entry);
-      return { stockItemId: u.stock_item_id, outcome: u.outcome, issueKind: u.issue_kind ?? undefined, note: u.note ?? undefined };
+      return { stockItemId: u.stock_item_id, outcome: u.outcome, issueKind: u.issue_kind, note: u.note };
     }) : r.arrival_units,
     lines: Array.isArray(r.lines) ? r.lines.map((entry) => {
       const l = obj(entry);
@@ -1116,7 +1116,7 @@ export function warehouseConfirmationReportFromWire(value: unknown) {
         wrongItemClaimType: l.wrong_item_claim_type ?? undefined,
         units: Array.isArray(l.units) ? l.units.map((entry) => {
           const u = obj(entry);
-          return { unitCode: u.unit_code, outcome: u.outcome, issueKind: u.issue_kind ?? undefined, note: u.note ?? undefined };
+          return { unitCode: u.unit_code, outcome: u.outcome, issueKind: u.issue_kind, note: u.note };
         }) : l.units,
       };
     }) : r.lines,

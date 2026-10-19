@@ -4298,6 +4298,9 @@ export function useWarehouseSubmitReceiptMutation(
 /** The ops queue row: one filed count, with the names a human needs and the
  *  one sentence the shared module composes. */
 export interface WarehouseReceiptQueueRow {
+  raw_report?: unknown;
+  validation_blockers?: Array<{code:string;message:string}>;
+  save_key?: string | null;
   arrival_source_id?: string | null;
   id: string;
   po_id: string | null;
@@ -4331,7 +4334,7 @@ export interface WarehouseReceiptQueueRow {
   actual_site_name?: string | null;
   posted_duty_holder_name?: string | null;
   posted_duty_cover_name?: string | null;
-  posted_authority?: "grn_duty" | "cover" | "superuser" | "operation_staff" | null;
+  posted_authority?: "grn_duty" | "cover" | "superuser" | "operation_staff" | "warehouse_confirmation" | null;
   /** 0601 — Goods Received Date as a time point; null on an older record
    *  (`Time not recorded`, never back-filled). */
   goods_received_time?: string | null;
@@ -4586,6 +4589,8 @@ export function useReceivingDuty(
 /** GET /api/operation/warehouse-receipts/:id — one Receiving Session / GRN
  *  record: the row, its per-Unit results, its source PO and its events. */
 export interface ReceivingSessionDetail {
+  arrival_source?: {id:string;source_no:string;kind:string;claim_id:string|null;units:Array<{stock_item_id:string;unit:{unit_code:string;sku:string}|null}>} | null;
+  reported_source?: {id:string;lines:Array<{id:string;sku:string}>} | null;
   /** null/absent means unavailable, not an empty relationship list. */
   related_records?: { claims: Array<{ id: string; claim_no: string | null }>; returns: Array<{ id: string; pr_no: string }> } | null;
   receipt: WarehouseReceiptQueueRow & {

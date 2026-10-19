@@ -1,3 +1,4 @@
+import { receivingActorNames } from "../../lib/receiving-actor-names";
 import { Hono } from "hono";
 import { z } from "zod";
 import { requireOperation } from "../../lib/auth-guards";
@@ -53,8 +54,13 @@ router.get("/:id/extra-custody", requireOperation, async c => {
   };
   const actorIds = [...new Set([...custody.rows.map(row => row.recorded_by), ...notes.rows.map(row => row.actor_id)].filter((id): id is string => typeof id === "string"))];
   const sites = [...new Set(custody.rows.map(row => row.actual_site_id).filter((id): id is string => typeof id === "string"))];
-  const [actorNames, siteNames] = await Promise.all([names("app_users", actorIds, "name"), names("warehouses", sites, "name")]);
-  return c.json({ custody: custody.rows, notes: notes.rows, actorNames, siteNames });
+  const holders = [...new Set(custody.rows.map(row => row.holder_party_id).filter((id): id is string => typeof id === "string"))];
+  const [actorNames, siteNames, holderNames] = await Promise.all([names("app_users", actorIds, "name"), names("warehouses", sites, "name"), names("stock_operating_parties", holders, "name")]);
+  try {
+    const recorded = await receivingActorNames(sb, id.data, actorIds);
+    Object.assign(actorNames, recorded ?? {});
+  } catch { return c.json({ code: "receiving_extra_actor_names_unavailable" }, 503); }
+  return c.json({ custody: custody.rows, notes: notes.rows, actorNames, siteNames, holderNames });
 });
 
 router.post("/:id/extra-custody/:custodyId/notes", requireOperation, async c => {

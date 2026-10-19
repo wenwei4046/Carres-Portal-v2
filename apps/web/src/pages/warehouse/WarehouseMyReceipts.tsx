@@ -1,3 +1,6 @@
+import { useWarehouseConfirmationReadiness } from "@/lib/warehouse-confirmation";
+import WarehouseConfirmationReports from "./WarehouseConfirmationReports";
+import Button from "@/components/kit/Button";
 import {
   supplierClaimTypeLabel,
   warehouseReceiptStatusLabel,
@@ -28,7 +31,7 @@ const STATUS_PILL: Record<WarehouseReceiptStatus, string> = {
   returned: "pill-overdue",
 };
 
-export default function WarehouseMyReceipts() {
+function LegacyWarehouseMyReceipts() {
   const { data, isLoading, isError, error, refetch } = useWarehouseMyReceipts();
   const receipts = data?.receipts ?? [];
 
@@ -174,4 +177,12 @@ function Th({ children }: { children: React.ReactNode }) {
       {children}
     </th>
   );
+}
+
+export default function WarehouseMyReceipts() {
+  const readiness=useWarehouseConfirmationReadiness();
+  if(readiness.isPending)return <p role="status">Loading…</p>;
+  if(readiness.data?.mode==="legacy_count")return <LegacyWarehouseMyReceipts/>;
+  if(readiness.data?.mode==="confirmation")return <WarehouseConfirmationReports/>;
+  return <div role="alert"><p>{readiness.isError?"Could not be loaded":"Not available yet"}</p><Button onClick={()=>void readiness.refetch()}>Try again</Button></div>;
 }

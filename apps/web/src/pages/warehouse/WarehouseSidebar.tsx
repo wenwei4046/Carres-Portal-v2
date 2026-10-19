@@ -1,3 +1,4 @@
+import { useWarehouseConfirmationReadiness, useWarehouseConfirmationSources, useWarehouseConfirmationArrivals } from "@/lib/warehouse-confirmation";
 import { Link, NavLink } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import CarresLockup from "@/components/CarresLockup";
@@ -27,8 +28,12 @@ export default function WarehouseSidebar() {
   const email = session?.user?.email ?? "";
   const initials = email.slice(0, 2).toUpperCase();
 
-  const { data } = useWarehouseIncoming();
-  const toCount = (data?.pos ?? []).filter((p) => !p.open_receipt_id).length;
+  const legacy = useWarehouseIncoming();
+  const readiness = useWarehouseConfirmationReadiness();
+  const confirmation = useWarehouseConfirmationSources(readiness.data?.mode === "confirmation");
+  const arrivals = useWarehouseConfirmationArrivals(readiness.data?.mode === "confirmation");
+  const data = readiness.data?.mode === "confirmation" ? confirmation.data : legacy.data;
+  const toCount = (data?.pos ?? []).filter((p) => !p.open_receipt_id).length + (readiness.data?.mode === "confirmation" ? arrivals.data?.sources.length ?? 0 : 0);
   const warehouseName = data?.warehouse?.name ?? "Warehouse";
 
   return (

@@ -116,10 +116,10 @@ export const warehouseConfirmationReportInput = warehouseSubmitReceiptInput.part
   arrivalSourceId: z.string().uuid().nullish(),
   handoverPerson: z.string().max(200).optional(),
   arrivalUnits: z.array(z.object({
-    stockItemId: z.string().uuid(),
-    outcome: z.enum(["received", "received_with_issue", "not_received"]),
-    issueKind: z.enum(["damaged", "wrong_item"]).optional(),
-    note: z.string().max(300).optional(),
+    stockItemId: z.string().max(100).nullish(),
+    outcome: z.enum(["received", "received_with_issue", "not_received"]).nullish(),
+    issueKind: z.enum(["damaged", "wrong_item"]).nullish(),
+    note: z.string().max(300).nullish(),
   }).strict()).max(200).optional(),
   poId: z.string().max(100).nullish(),
   actualSiteId: z.string().uuid().nullish(),
@@ -127,6 +127,8 @@ export const warehouseConfirmationReportInput = warehouseSubmitReceiptInput.part
   doFilePath: z.string().max(500).nullish(),
   goodsReceivedTime: z.string().datetime({ offset: true }).nullish(),
   goodsReceivedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
+  goodsReceivedClock: z.string().regex(/^\d{2}:\d{2}$/).nullish(),
+  extraLines: z.array(z.object({sku:z.string().max(120).nullish(),qty:z.number().int().nonnegative().nullish(),note:z.string().max(300).optional()}).strict()).max(50).optional(),
   lines: z.array(warehouseSubmitReceiptInput.shape.lines.element.extend({
     id: z.string().max(100).nullish(),
     receivedNow: z.number().int().nonnegative().nullish(),
@@ -177,8 +179,14 @@ export const receivingExtraCustodyNote = z.object({
 /** Read-only physical custody evidence; no inventory identity or disposition. */
 export const receivingExtraCustodyEvidence = z.object({
   custody: z.array(z.object({ id: z.string(), reported_sku: z.string(), reported_qty: z.number().int().positive(),
-    reported_note: z.string().nullable(), actual_site_id: z.string(), goods_received_at: z.string() })),
+    reported_note: z.string().nullable(), actual_site_id: z.string(), goods_received_at: z.string(),
+    holder_party_id: z.string().nullable().optional(), recorded_by: z.string().optional(), recorded_at: z.string().optional() })),
   siteNames: z.record(z.string()),
+  holderNames: z.record(z.string()).optional(),
   notes: z.array(receivingExtraCustodyNote.omit({ request_key: true })),
   actorNames: z.record(z.string()),
+});
+
+export const warehouseConfirmationReadiness = z.object({
+  mode: z.enum(["legacy_count", "confirmation", "unavailable"]), reason: z.string().nullable(),
 });

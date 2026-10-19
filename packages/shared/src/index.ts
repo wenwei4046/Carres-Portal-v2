@@ -1283,6 +1283,7 @@ export {
   warehouseConfirmationReportInput,
   warehouseConfirmReceiptInput,
   warehouseConfirmationResult,
+  warehouseConfirmationReadiness,
   receivingExtraCustodyEvidence,
   receivingExtraCustodyNote,
   type WarehouseConfirmationReportInput,

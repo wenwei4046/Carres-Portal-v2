@@ -948,6 +948,22 @@ describe("GET /:id — one Receiving Session / GRN record", () => {
     void_reason: null,
   };
 
+  it("opens a non-PO source using the expected Unit relation, not replacement lineage", async () => {
+    const sourceId = "00000000-0000-0000-0000-00000000fa01";
+    const tables = detailTables();
+    const sb = makeSb({...tables,
+      warehouse_receipts: {single:{data:{...DETAIL_ROW,po_id:null,arrival_source_id:sourceId},error:null}},
+      arrival_sources: {single:{data:{id:sourceId,source_no:"TR-20261019-2771",kind:"transfer",claim_id:null,units:[]},error:null}},
+    });
+    const from=sb.from.bind(sb);const selects:string[]=[];
+    sb.from=(table:string)=>{const builder=from(table);if(table==="arrival_sources"){const select=builder.select as (columns:string)=>unknown;builder.select=(columns:string)=>{selects.push(columns);return select(columns);};}return builder;};
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const response=await req(`/api/operation/warehouse-receipts/${RECEIPT}`,"GET",await makeJwt("operation"));
+    expect(response.status).toBe(200);
+    expect((await response.json()).arrival_source).toMatchObject({id:sourceId,source_no:"TR-20261019-2771"});
+    expect(selects.some(value=>value.includes("ops_stock_items!arrival_source_units_stock_item_id_fkey"))).toBe(true);
+  });
+
   it("reads exact receipt-linked claims and direct or claim-linked returns without duplicates", async () => {
     const sb = makeSb({ ...detailTables(),
       supplier_claims: { list: { data: [{ id: "claim-1", claim_no: "SC-202610-001" }], error: null } },

@@ -1,3 +1,4 @@
+import { readWarehouseReceivingWorkFact } from "./receiving-work-facts";
 import type { MiddlewareHandler } from "hono";
 import type { AppEnv } from "../types";
 import { userClient } from "./supabase";
@@ -25,6 +26,10 @@ export function receivingCompletionSpec(): WorkCompletionSpec<ReceivingPostFacts
     rules: ["receiving.check_in"],
     probe: async (c, id) => (await import("../routes/operation/work")).probeReceivingWork(c, id),
     readFacts: async (c, id, since) => {
+      if(c.var.auth.role === "warehouse"){
+        const scoped=await readWarehouseReceivingWorkFact(c,id,since);
+        return {receiptId:id,status:scoped.receipt.status,grnNo:scoped.receipt.grn_no,postedBy:scoped.receipt.posted_by,actorId:c.var.auth.id,postedEventId:scoped.posted_event_id};
+      }
       const sb = userClient(c.env, c.var.auth.jwt);
       const [receipt, events] = await Promise.all([
         sb.from("warehouse_receipts").select("id,status,grn_no,posted_by").eq("id", id).maybeSingle(),

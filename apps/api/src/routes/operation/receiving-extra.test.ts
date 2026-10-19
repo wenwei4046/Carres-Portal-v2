@@ -22,7 +22,7 @@ function db(opts: { missing?: boolean; noCustody?: boolean; foreign?: boolean; m
       range: async (from: number, to: number) => ({ ...result(), data: result().data.slice(from, to + 1) }),
       maybeSingle: async () => ({ ...result(), data: result().data[0] ?? null }) };
     return q;
-  }, rpc: async () => opts.missingWriter ? { data: null, error: { code: "PGRST202", message: "receiving_extra_custody_note not deployed" } } : { data: opts.wrongAck ? { ...note, actor_id: site } : note, error: null } };
+  }, rpc: async (name: string) => name === "receiving_receipt_actor_names" ? {data:{},error:null} : opts.missingWriter ? { data: null, error: { code: "PGRST202", message: "receiving_extra_custody_note not deployed" } } : { data: opts.wrongAck ? { ...note, actor_id: site } : note, error: null } };
 }
 const app = new Hono<AppEnv>();
 app.use("*", async (c, next) => { c.set("auth", { id: actor, jwt: "TEST", email: "test@example.invalid", role: c.req.header("x-test-role") ?? "operation" } as never); await next(); });

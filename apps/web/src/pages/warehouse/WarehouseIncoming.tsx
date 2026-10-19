@@ -1,9 +1,15 @@
+import WarehouseConfirmationIncoming from "./WarehouseConfirmationIncoming";
 import { useState } from "react";
-import { poReceivingProgress } from "@carres/shared";
+import { poReceivingProgress, type WarehouseIncomingPo } from "@carres/shared";
 import { useWarehouseIncoming } from "@/lib/queries";
 import { fmtDate } from "@/lib/fmt-date";
 import PageHeader from "@/components/PageHeader";
 import WarehouseCountModal from "./WarehouseCountModal";
+import WarehouseConfirmationModal from "./WarehouseConfirmationModal";
+import { useWarehouseConfirmationReadiness, useWarehouseConfirmationSources } from "@/lib/warehouse-confirmation";
+import Modal from "@/components/kit/Modal";
+import Button from "@/components/kit/Button";
+import { ApiError } from "@/lib/api";
 
 /**
  * WarehouseIncoming — R6: what is coming to THIS warehouse, and the form to
@@ -19,13 +25,20 @@ import WarehouseCountModal from "./WarehouseCountModal";
  * offering a second form would only produce an error the clerk cannot fix.
  */
 export default function WarehouseIncoming() {
-  const [countPoId, setCountPoId] = useState<string | null>(null);
-  const { data, isLoading, isError, error, refetch } = useWarehouseIncoming();
+  const [countPo, setCountPo] = useState<WarehouseIncomingPo | null>(null);
+  const legacy = useWarehouseIncoming();
+  const readiness = useWarehouseConfirmationReadiness();
+  const confirmation = useWarehouseConfirmationSources(readiness.data?.mode === "confirmation");
+  const current = readiness.data?.mode === "confirmation" ? confirmation : legacy;
+  const data = current.data;
+  const isLoading = readiness.isPending || current.isLoading;
+  const isError = readiness.isError || readiness.data?.mode === "unavailable" || current.isError;
+  const error = readiness.error ?? current.error;
+  const refetch = () => readiness.isError ? readiness.refetch() : current.refetch();
 
   const pos = data?.pos ?? [];
-  const countPo = countPoId
-    ? (pos.find((p) => p.po_id === countPoId) ?? null)
-    : null;
+
+  if (readiness.data?.mode === "confirmation") return <WarehouseConfirmationIncoming/>;
 
   if (isLoading) {
     return (
@@ -46,9 +59,9 @@ export default function WarehouseIncoming() {
   if (isError) {
     return (
       <div className="px-9 py-8">
-        <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-body">
+        <div role="alert" className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-body">
           <div className="text-destructive font-semibold mb-2">
-            Couldn&rsquo;t load what is coming in
+            Could not be loaded
           </div>
           <div className="text-meta text-base-700 mb-3">
             {(error as Error | undefined)?.message ?? "Unknown error"}
@@ -58,7 +71,7 @@ export default function WarehouseIncoming() {
             onClick={() => void refetch()}
             className="btn-secondary text-label py-1.5 px-3"
           >
-            Retry
+            Try again
           </button>
         </div>
       </div>
@@ -74,8 +87,7 @@ export default function WarehouseIncoming() {
         className="mb-3"
       />
       <div className="text-body text-base-600 mb-[18px]">
-        Goods on their way here. Count what the driver brings, then Carres checks
-        it in.
+        Goods on their way here. Count what the driver brings.
       </div>
 
       <div className="bg-white border border-base-200 rounded overflow-auto">
@@ -107,6 +119,7 @@ export default function WarehouseIncoming() {
                 po.lines.map((l) => ({
                   qty: l.qty,
                   received_qty: l.received_qty,
+                  cancelled_qty: l.cancelled_qty,
                   damaged_qty: l.damaged_qty,
                   wrong_item_qty: l.wrong_item_qty,
                 })),
@@ -152,7 +165,7 @@ export default function WarehouseIncoming() {
                     ) : (
                       <button
                         type="button"
-                        onClick={() => setCountPoId(po.po_id)}
+                        onClick={() => setCountPo(po)}
                         className="btn-primary text-label py-1.5 px-3"
                         data-testid={`warehouse-count-${po.po_id}`}
                       >
@@ -168,7 +181,7 @@ export default function WarehouseIncoming() {
       </div>
 
       {countPo && (
-        <WarehouseCountModal po={countPo} onClose={() => setCountPoId(null)} />
+        <WarehouseReceivingEntry po={countPo} onClose={() => setCountPo(null)} />
       )}
     </div>
   );
@@ -180,4 +193,22 @@ function Th({ children }: { children: React.ReactNode }) {
       {children}
     </th>
   );
+}
+
+/** Admission is read before choosing an entry. An error never selects legacy submission. */
+function WarehouseReceivingEntry({po,onClose}:{po:WarehouseIncomingPo;onClose:()=>void}) {
+  const readiness = useWarehouseConfirmationReadiness();
+  const sources = useWarehouseConfirmationSources(readiness.data?.mode === "confirmation");
+  if (readiness.data?.mode === "legacy_count") return <WarehouseCountModal po={po} onClose={onClose}/>;
+  const loading = readiness.isPending || (readiness.data?.mode === "confirmation" && sources.isPending);
+  const source = sources.data?.pos.find(item => item.po_id === po.po_id);
+  if (readiness.data?.mode === "confirmation" && source && !sources.isError)
+    return <WarehouseConfirmationModal po={source} site={sources.data?.warehouse ?? undefined} onClose={onClose}/>;
+  const error = readiness.error ?? sources.error;
+  const denied = error instanceof ApiError && error.status === 403;
+  const unavailable = readiness.data?.mode === "unavailable" || (error instanceof ApiError && error.status === 503) || (!loading && !error && !source);
+  return <Modal open title="Receiving" onOpenChange={open=>{if(!open)onClose();}} footer={<Button onClick={onClose}>Close</Button>}>
+    {loading ? <p role="status">Loading…</p> : <><p role="alert">{unavailable || denied ? "Not available yet" : "Could not be loaded"}</p>
+      {!denied && <Button onClick={()=>void (readiness.isError ? readiness.refetch() : sources.refetch())}>Try again</Button>}</>}
+  </Modal>;
 }
