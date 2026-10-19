@@ -189,6 +189,21 @@ type RailFilter = {
 };
 const RAIL_CLEAR: RailFilter = { facet: null, supplier: null, deliverTo: null };
 
+type PoListingReturn = { params: string; selectedKeys: string[]; filter: RailFilter };
+/** Router entry state survives a related-module visit; the grid already keeps
+ * its own search, column filters and per-presentation scroll in sessionKey. */
+function poListingReturnOf(state: unknown): PoListingReturn | null {
+  if (!state || typeof state !== "object") return null;
+  const value = (state as { poListingReturn?: unknown }).poListingReturn;
+  if (!value || typeof value !== "object") return null;
+  const saved = value as Partial<PoListingReturn>;
+  if (typeof saved.params !== "string" || !Array.isArray(saved.selectedKeys) || !saved.selectedKeys.every(key => typeof key === "string") || !saved.filter) return null;
+  const { facet, supplier, deliverTo } = saved.filter;
+  if ((facet !== null && !RAIL_ROWS.some(row => row.key === facet)) ||
+      (supplier !== null && typeof supplier !== "string") || (deliverTo !== null && typeof deliverTo !== "string")) return null;
+  return { params: saved.params, selectedKeys: saved.selectedKeys, filter: { facet, supplier, deliverTo } };
+}
+
 /**
  * One governed reference behind the PO, as the `SO No / MPR No` column reads
  * it: the real document number and the door it opens. Card 08 §3.5's label
@@ -450,7 +465,8 @@ export default function PurchaseOrdersPage() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const [filter, setFilter] = useState<RailFilter>(RAIL_CLEAR);
+  const restoredListing = poListingReturnOf(location.state);
+  const [filter, setFilter] = useState<RailFilter>(() => restoredListing?.filter ?? RAIL_CLEAR);
   /* The personal saved-layout pilot (ui MASTER §6.7 rule 4). A failed read
      leaves the Columns menu without saved layouts; the register still works. */
   const layoutsQ = useRegisterLayouts("purchase_orders");
@@ -518,8 +534,8 @@ export default function PurchaseOrdersPage() {
     setOverviewRoom(el.clientWidth);
     return () => observer.disconnect();
   });
-  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
-  const listingReturnParams = useRef<string | null>(null);
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set(restoredListing?.selectedKeys ?? []));
+  const listingReturnParams = useRef<string | null>(restoredListing?.params ?? null);
   const toggleRow = (id: string) => setSelectedKeys((previous) => {
     const next = new Set(previous);
     if (next.has(id)) next.delete(id); else next.add(id);
@@ -741,7 +757,9 @@ export default function PurchaseOrdersPage() {
       if (view) next.set("view", view);
       else next.delete("view");
       return next;
-    });
+    }, { state: { ...location.state, poListingReturn: {
+      params: params.toString(), selectedKeys: [...selectedKeys], filter,
+    } satisfies PoListingReturn } });
   };
   /** The actual receipt, in Receiving, which owns it. */
   const openReceipt = (receiptId: string) =>

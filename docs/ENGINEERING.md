@@ -90,6 +90,8 @@ summary < 500ms · operation 4-column kanban < 200ms.
 
 ## 5 · Migrations
 
+**Applied tail · 19 Oct 2026, PO lane (PR2099; application release still pending).** Jess explicitly approved exact PUR16 SHA256`80cbcbfc38941a4683a6721885296c0928153df92f8da453ce8cd289232a4052` and cancellation-only SHA256`48ed5514dba784d687f3a4e59c41a7e2f6a509bfa36a39b4a2060772037784e7`, including activation while Finance remains not_connected. Fresh tracker/main/all2143refs (1395commits/325migration trees) MAX0701 allocated0702/0703. Committed files are byte-identical. Governed atomic production probe `probe_0702_0703_rolled_back_do_not_track` returned intentional PROBE_ROLLBACK/PASS: exact5bodies/ACL/readiness/unauthenticated guards and old-writer/closed-gate negative controls; no business fixtures/writes; counts unchanged and no probe tracker row. Canonical functional positive/refusal evidence is owned-local, not a production business transaction. Exact files then applied through apply_migration:0702 tracker20261019043029/fileMD5`96144137c0ec09930bb1559d81ee8950`;0703 tracker20261019043035/fileMD5`0239fefaa1f74ff7d79b251d50a5bc79`. All5live function bodies reconcile to committed SQL; PUR16 required/available true, cancellation true, requestFlow/serviceExecution unchanged. PO66/send10/cancellation0 and CasePICcolumns0 unchanged. No CasePIC combined draft applied; no supplier message/Finance ACK/settlement. Next number must be freshly remeasured beyond0703.
+
 ```
 Draft  →  review business impact  →  commit the exact file  →  merge-ready verification
        →  apply  →  deploy dependent code  →  verify production
