@@ -39,7 +39,8 @@ import { requireOperation } from "../../lib/auth-guards";
 import { chunk, todayIso } from "../../lib/purchase-demand-read";
 import { supplierPoFactsOf, type SupplierFactRows } from "../../lib/supplier-card-facts";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
-import { userClient } from "../../lib/supabase";
+import { adminClient, userClient } from "../../lib/supabase";
+import { cancellationFinanceHandoff } from "../../lib/po-cancellation-finance-handoff";
 import { skuCategories } from "../../lib/sku-categories";
 import { setTermsDaysInput } from "@carres/shared/schemas/finance-ap";
 import type { AppEnv } from "../../types";
@@ -2252,16 +2253,41 @@ async function autoReserveReceivedToSourceOrder(
   }
 }
 
-operationPosRouter.get("/:id/cancellations", async(c,next)=> {
+const cancellationReadGuard: typeof requireOperation = async(c,next)=> {
   // Finance consumes only this money-free owning cancellation record. This
   // does not open other Operation routes or grant settlement/PO write rights.
   if(c.var.auth.role === "finance") return next();
   return requireOperation(c,next);
-}, async(c)=> {
+};
+operationPosRouter.get("/:id/cancellations", cancellationReadGuard, async(c)=> {
   const sb=userClient(c.env,c.var.auth.jwt);
   const {data,error}=await sb.rpc("purchasing_po_cancellation_facts",{p_po_id:c.req.param("id")});
   if(error){const mapped=mapPgError(error);return c.json(mapped.body,mapped.status);}
-  return c.json(data);
+  return c.json({...data,financeConnection:{state:"not_connected",message:"Finance connection pending"},financeHandoffUrl:`/api/operation/pos/${encodeURIComponent(c.req.param("id"))}/cancellations/finance-handoff`});
+});
+
+operationPosRouter.get("/:id/cancellations/finance-handoff", cancellationReadGuard, async(c)=> {
+  const {data,error}=await userClient(c.env,c.var.auth.jwt).rpc("purchasing_po_cancellation_facts",{p_po_id:c.req.param("id")});
+  if(error){const mapped=mapPgError(error);return c.json(mapped.body,mapped.status);}
+  try { return c.json(cancellationFinanceHandoff(c.req.param("id"),data)); }
+  catch { return c.json({message:"Cancellation handoff could not be read"},502); }
+});
+
+// Finance receives access to ONE ledger-referenced cancellation attachment,
+// never arbitrary bucket paths, a bucket list or a Storage policy expansion.
+operationPosRouter.get("/:id/cancellations/:eventId/evidence", cancellationReadGuard, async(c)=> {
+  const poId=c.req.param("id");const path=c.req.query("path")??"";
+  const {data,error}=await userClient(c.env,c.var.auth.jwt).rpc("purchasing_po_cancellation_facts",{p_po_id:poId});
+  if(error){const mapped=mapPgError(error);return c.json(mapped.body,mapped.status);}
+  let handoff;
+  try {handoff=cancellationFinanceHandoff(poId,data);}catch{return c.json({message:"Cancellation handoff could not be read"},502);}
+  const item=handoff.items.find(row=>row.id===c.req.param("eventId"));
+  if(!path.startsWith(`${poId}/`)||path.split("/").some(part=>part===".."||part===".")||!item?.evidence.some(file=>file.path===path)) {
+    return c.json({message:"Cancellation evidence not found"},404);
+  }
+  const signed=await adminClient(c.env).storage.from("delivery-orders").createSignedUrl(path,300);
+  if(signed.error||!signed.data?.signedUrl)return c.json({message:"Cancellation evidence could not be read"},502);
+  return c.json({url:signed.data.signedUrl,expiresIn:300});
 });
 
 // ----- POST /:id/cancel -----

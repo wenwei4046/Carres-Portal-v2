@@ -1,0 +1,47 @@
+{
+  "status": "DRAFT ONLY / exact owner SQL approval required",
+  "sha256": "96a430c594e3682c1c09a30e40198994c2be685d89dcb05064a4c3bf64a537a2",
+  "file": "/Users/chaichiewlim/.codex/worktrees/forecast-mpr-context/Carres-Portal-v2/output/forecast-mpr-delivery/service-case-pic.draft.sql",
+  "base": "4d8b5e9e0754bc451a519df2047753d7d4bfa17b",
+  "new_columns": [
+    "service_cases.owner_user_id nullable FK app_users; no inferred owner",
+    "service_cases.owner_revision integer default0",
+    "service_cases.owner_events jsonb array default[]"
+  ],
+  "new_trigger": "service_case_owner_guard rejects direct authenticated ownership changes and retains append-only history",
+  "new_functions": [
+    "_service_case_owner_guard() private",
+    "workspace_resolve_service_case_owner(uuid) authenticated Operation/Principal read, shared person/recorded-leave checks",
+    "service_case_set_pic(uuid,uuid,integer,text,uuid) authenticated active Operation/Principal assignment through existing Case edit rights; eligible active Operation/Principal target; reason/version/key/actual actor/history",
+    "_service_case_pic_may_decide(uuid) private"
+  ],
+  "replaced_functions": [
+    "service_case_remedy_read(uuid): Case PIC current resolver/candidates/history, canDecide Case-specific",
+    "service_case_remedy_decide(uuid,jsonb): early role/person check; current PIC checked after Case row lock; owner/revision snapshot on new decision only"
+  ],
+  "unchanged": [
+    "all RLS and Storage policies",
+    "all existing Purchasing approval/execution guards",
+    "all previous Case approval/progress/history",
+    "company-wide duty assignments and catalogue",
+    "0697\u20130701 exact files and applied tracker rows",
+    "Finance module/writers/acknowledgements"
+  ],
+  "production_preimages": {
+    "service_case_remedy_read": "cb6805c74f8fa3154dcaa746e29d7e18",
+    "service_case_remedy_decide": "91a05885cd188d5355fca8291a732bdb",
+    "new_objects": "absent",
+    "tracker_tail": "20261018122506"
+  },
+  "verification": [
+    "owned PostgreSQL exact-role compile+CasePIC assertions PASS in outer rollback",
+    "missingPIC does not infer creator; duty-only actor denied; direct owner patch denied; stale version denied; assignment retry no duplicate",
+    "actual PIC decision records PIC/revision; reassignment retains previous decision history; Purchasing not approved by Case decision",
+    "targeted API/Work/Finance contract+evidence tests PASS; UI preserves failed assignment input; reviewer no concrete blocker (static only)",
+    "negative control PASS: replacing PIC helper with old duty helper causes PIC assertion failure; full rollback",
+    "signed API+owned PostgreSQL integration PASS; native keyboard picker/dirty-discard/explicit saved TEST PIC+still pending decision verified; native1280 page overflow0",
+    "11 targeted UI tests PASS; API and web typechecks PASS (8GB local compiler heap); lint PASS",
+    "owned native fixture rollback verified: owner_user_id absent after closing host"
+  ],
+  "rollout": "After exact approval only: fresh global numbering scan, byte-identical formal migration commit/push, exact-file atomic production rollback probe incl negative controls, verify no persisted effects, governed apply_migration once, body/ACL/source reconciliation, dependent PR release gates/merge/deploy and signed read-only proof. No real PIC appointment, business decision, PO/Stock write or supplier message during verification."
+}

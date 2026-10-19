@@ -99,6 +99,7 @@ function CancellationEditor({poId,data,refresh,onSaved,onCancel,renderProblem,on
  }
  const entries:EvidenceEntry[]=facts.evidence.map(path=>({path,kind:/\.pdf$/i.test(path)?"pdf":/\.(mp4|webm|mov)$/i.test(path)?"video":"photo"}));
  return <div className="flex flex-col gap-3" data-testid="po-cancellation-fields">
+  {!!data.financeHandoffs?.length&&<p role="status" className="text-body text-c-secondary">Finance connection pending</p>}
   {[...cases.values()].some(event=>event.kind!=="effective")?<Select disabled={record.isPending} id="po-cancel-case" label="History" value={caseChoice} onValueChange={value=>leaveDraft(()=>chooseCase(value))} options={[{value:"new",label:"New"},...[...cases.values()].filter(event=>event.kind!=="effective").map(event=>({value:event.request_id,label:`${fmtDate(event.at)} · ${event.reason}`}))]}/>:null}
   <Textarea id="po-cancel-reason" label="Reason" value={reason} required onChange={event=>setReason(event.target.value)} disabled={record.isPending}/>
   {data.lines.filter(line=>line.pendingQty>0||lines.some(selected=>selected.lineId===line.lineId)).map(line=><fieldset key={line.lineId} className="flex flex-col gap-3 border-b border-kit-slate-5 pb-3">

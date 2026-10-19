@@ -1,0 +1,50 @@
+[
+  {
+    "anon": false,
+    "args": "",
+    "name": "_service_case_owner_guard",
+    "bodyMd5": "bcabcbc4dbe29498c85d2d9f96a80204",
+    "definer": false,
+    "authenticated": false
+  },
+  {
+    "anon": false,
+    "args": "p_case_id uuid",
+    "name": "_service_case_pic_may_decide",
+    "bodyMd5": "fa2feacfe27af487191cbb1434dc8381",
+    "definer": false,
+    "authenticated": false
+  },
+  {
+    "anon": false,
+    "args": "p_case_id uuid, p_decision jsonb",
+    "name": "service_case_remedy_decide",
+    "bodyMd5": "df13286e360e9b1a5acf667a8bb2aaa9",
+    "definer": true,
+    "authenticated": true
+  },
+  {
+    "anon": false,
+    "args": "p_case_id uuid",
+    "name": "service_case_remedy_read",
+    "bodyMd5": "7704539ad3be153c0e9b3e3fde67e77c",
+    "definer": true,
+    "authenticated": true
+  },
+  {
+    "anon": false,
+    "args": "p_case_id uuid, p_owner_id uuid, p_expected_revision integer, p_reason text, p_key uuid",
+    "name": "service_case_set_pic",
+    "bodyMd5": "91cbcb89d72364e06639aa069b316d18",
+    "definer": true,
+    "authenticated": true
+  },
+  {
+    "anon": false,
+    "args": "p_case_id uuid",
+    "name": "workspace_resolve_service_case_owner",
+    "bodyMd5": "ba3aa9df9caf186f38376b856f08b05e",
+    "definer": true,
+    "authenticated": true
+  }
+]

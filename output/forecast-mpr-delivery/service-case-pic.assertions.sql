@@ -1,0 +1,40 @@
+do $test$
+declare cid uuid:=gen_random_uuid(); c jsonb; made jsonb; rid uuid; p jsonb; key uuid:=gen_random_uuid(); assign_key uuid:=gen_random_uuid(); result jsonb; history jsonb; denied boolean; current_user_id uuid:='fffffff1-0000-4000-8000-000000009698';
+begin
+ select request_context into strict c from public.purchase_requests where for_service_case_id='fffffff2-0000-4000-8000-000000000001' limit 1;
+ c:=jsonb_set(c,'{serviceCaseId}',to_jsonb(cid));
+ insert into public.service_cases(id,case_no,customer_name,carres_action,what_affected,product_sku,customer_wants,evidence,created_by)
+ select cid,'TEST-PIC-'||left(cid::text,8),'TEST customer','TEST replace goods','TEST exact goods',product_sku,customer_wants,jsonb_build_array(jsonb_build_object('slot','all_surfaces','path',cid||'/TEST.jpg','kind','photo','at',now(),'by',current_user_id,'by_role','operation')),current_user_id from public.service_cases where id='fffffff2-0000-4000-8000-000000000001';
+ insert into storage.objects(bucket_id,name) values('service-case-evidence',cid||'/TEST.jpg');
+ perform set_config('request.jwt.claims',jsonb_build_object('sub',current_user_id,'role','authenticated','app_metadata',jsonb_build_object('role','operation'))::text,true);
+ made:=public.purchasing_create_request_with_lines(p_purpose=>'service_case',p_destination_id=>(c#>>'{lines,0,allocations,0,destinationId}')::uuid,p_for_service_case_id=>cid,p_lines=>jsonb_build_array(jsonb_build_object('request_context',c,'submission_key',gen_random_uuid())),p_fulfilment_intent=>'concrete_need');
+ rid:=(made->>'id')::uuid;
+ p:=jsonb_build_object('key',key,'requestId',rid,'expectedRequestVersion',1,'affectedUnits','[]'::jsonb,'policy','TEST policy','policyVersion','TEST version','policyResult','eligible','remedy','replace','movement','replace_first','charge','free','amount',null,'payer','','payerAcceptance',null,'reason','TEST exact goods','evidence',jsonb_build_array(cid||'/TEST.jpg'));
+ execute 'set local role authenticated';
+ perform public.service_case_remedy_propose(cid,p);
+ if (public.service_case_remedy_read(cid)->>'canDecide')::boolean then raise exception 'Creator inferred as PIC'; end if;
+ denied:=false;begin perform public.service_case_remedy_decide(cid,jsonb_build_object('approvalId',key,'status','approved','reason',''));exception when insufficient_privilege then denied:=true;end;if not denied then raise exception 'Missing PIC admitted';end if;
+ result:=public.service_case_set_pic(cid,current_user_id,0,'TEST recorded exact Case handler',assign_key);
+ if result->>'actor_user_id'<>current_user_id::text or result->>'revision'<>'1' then raise exception 'PIC assignment not recorded';end if;
+ perform public.service_case_set_pic(cid,current_user_id,0,'TEST recorded exact Case handler',assign_key);
+ if (public.service_case_remedy_read(cid)->>'canDecide')::boolean is not true then raise exception 'PIC not admitted';end if;
+ denied:=false;begin update public.service_cases set owner_user_id='fffffff1-0000-4000-8000-000000009699' where id=cid;exception when insufficient_privilege then denied:=true;end;if not denied then raise exception 'Direct owner patch admitted';end if;
+ perform set_config('request.jwt.claims','{"sub":"fffffff1-0000-4000-8000-000000009699","role":"authenticated","app_metadata":{"role":"principal"}}',true);
+ denied:=false;begin perform public.service_case_remedy_decide(cid,jsonb_build_object('approvalId',key,'status','approved','reason',''));exception when insufficient_privilege then denied:=true;end;if not denied then raise exception 'Company duty bypasses Case PIC';end if;
+ perform set_config('request.jwt.claims',jsonb_build_object('sub',current_user_id,'role','authenticated','app_metadata',jsonb_build_object('role','operation'))::text,true);
+ result:=public.service_case_remedy_decide(cid,jsonb_build_object('approvalId',key,'status','approved','reason','TEST PIC reviewed'));
+ if result->>'status'<>'approved' then raise exception 'PIC decision failed';end if;
+ execute 'reset role';
+ if exists(select 1 from public.purchase_requests where id=rid and approved_at is not null) then raise exception 'Case decision approved Purchasing';end if;
+ select remedy_approval_events into history from public.service_cases where id=cid;
+ if not exists(select 1 from jsonb_array_elements(history) e where e->>'kind'='approved' and e->>'by'=current_user_id::text and e->>'ownerUserId'=current_user_id::text and e->>'ownerRevision'='1') then raise exception 'Decision PIC snapshot missing';end if;
+ execute 'set local role authenticated';
+ denied:=false;begin perform public.service_case_set_pic(cid,'fffffff1-0000-4000-8000-000000009699',0,'TEST stale',gen_random_uuid());exception when serialization_failure then denied:=true;end;if not denied then raise exception 'Stale assignment admitted';end if;
+ perform public.service_case_set_pic(cid,'fffffff1-0000-4000-8000-000000009699',1,'TEST explicit reassignment',gen_random_uuid());
+ if (public.service_case_remedy_read(cid)->>'canDecide')::boolean then raise exception 'Prior PIC retained authority';end if;
+ execute 'reset role';
+ if (select remedy_approval_events from public.service_cases where id=cid) is distinct from history then raise exception 'Reassignment changed approval history';end if;
+ if (select jsonb_array_length(owner_events) from public.service_cases where id=cid)<>2 then raise exception 'Assignment retry duplicated history';end if;
+ raise notice 'Case PIC PASS: no creator inference; explicit versioned assignment and retry; direct patch/stale change/company-wide duty denied; exact PIC decision and snapshot; independent Purchasing approval retained; prior history unchanged by reassignment';
+end;
+$test$;

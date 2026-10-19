@@ -1,6 +1,6 @@
 import { caseRemedyCompletion } from "../../lib/service-case-remedy-work";
 import { Hono } from "hono";
-import { serviceCaseRemedyDecisionSchema, serviceCaseRemedyProposalSchema } from "@carres/shared";
+import { serviceCasePicSchema, serviceCaseRemedyDecisionSchema, serviceCaseRemedyProposalSchema } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
@@ -11,6 +11,13 @@ router.use("*", requireOperationOrPrincipal);
 router.get("/", async c => {
   const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("service_case_remedy_read", { p_case_id: c.req.param("id") });
   return error ? fail(c, error) : c.json(data);
+});
+router.post("/pic", async c => {
+  const parsed=serviceCasePicSchema.safeParse(await c.req.json().catch(()=>null));
+  if(!parsed.success)return c.json({error:"invalid_body",message:parsed.error.issues[0]?.message},400);
+  const p=parsed.data;
+  const {data,error}=await userClient(c.env,c.var.auth.jwt).rpc("service_case_set_pic",{p_case_id:c.req.param("id"),p_owner_id:p.ownerId,p_expected_revision:p.expectedRevision,p_reason:p.reason,p_key:p.key});
+  return error?fail(c,error):c.json(data);
 });
 router.post("/proposals", async c => {
   const parsed = serviceCaseRemedyProposalSchema.safeParse(await c.req.json().catch(() => null));

@@ -29,3 +29,18 @@ it("requires saved Case facts before acting on a proposal",async()=>{
 it("treats a failed approval read as unknown, with a retry",async()=>{
  vi.mocked(apiFetch).mockRejectedValue(new Error("TEST unavailable"));mount();expect(await screen.findByText("Case approvals could not be loaded.")).toBeInTheDocument();expect(screen.getByRole("button",{name:"Try again"})).toBeInTheDocument();
 });
+it("records an explicit Case PIC without inferring the creator and retains failed input",async()=>{
+ const next="00000000-0000-4000-8000-000000000002";
+ const read={...state(false),canAssignPic:true,approver:{normal_user_id:null,normal_user_name:null,revision:0},ownerCandidates:[{id:next,name:"TEST Case handler"}]};
+ vi.mocked(apiFetch).mockImplementation(async(path)=>{if(String(path).endsWith("/pic"))throw new Error("TEST assignment changed");return (String(path).endsWith("/evidence")?{evidence:[]}:read) as never;});
+ mount();await screen.findByText("Case PIC: Not assigned");fireEvent.click(screen.getByRole("button",{name:"Assign PIC"}));
+ expect(screen.getByRole("button",{name:"Save"})).toBeDisabled();
+ fireEvent.click(screen.getByRole("combobox",{name:"Case PIC"}));
+ fireEvent.click(await screen.findByRole("option",{name:"TEST Case handler"}));
+ fireEvent.change(screen.getByLabelText("Reason"),{target:{value:"TEST exact Case handler"}});
+ fireEvent.click(screen.getByRole("button",{name:"Save"}));
+ await screen.findByText("TEST assignment changed");expect(screen.getByLabelText("Reason")).toHaveValue("TEST exact Case handler");
+ const call=vi.mocked(apiFetch).mock.calls.find(([path])=>String(path).endsWith("/pic"));
+ expect(JSON.parse((call?.[1] as RequestInit).body as string)).toMatchObject({ownerId:next,expectedRevision:0,reason:"TEST exact Case handler"});
+ expect(screen.queryByRole("button",{name:"Approve"})).not.toBeInTheDocument();
+});

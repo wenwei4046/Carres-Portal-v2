@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { SERVICE_CASE_MOVEMENTS, SERVICE_CASE_REMEDIES, serviceCaseRemedyProposalSchema, type CaseEvidenceListResponse, type ServiceCaseRemedyDecision, type ServiceCaseRemedyState } from "@carres/shared";
@@ -12,6 +12,7 @@ import Select from "@/components/kit/Select";
 import Checkbox from "@/components/kit/Checkbox";
 import Loading from "@/components/kit/Loading";
 import DatePicker from "@/components/kit/DatePicker";
+import Modal from "@/components/kit/Modal";
 
 /** Only the existing Case's formal decision; this neither approves a purchase
  * nor performs Stock, Delivery, Finance or customer communication work. */
@@ -27,14 +28,24 @@ export default function CaseRemedyApproval({ caseId, disabled=false, onDirtyChan
  const [acceptedBy,setAcceptedBy]=useState(""); const [acceptedOn,setAcceptedOn]=useState<string|null>(null); const [acceptanceFile,setAcceptanceFile]=useState("");
  const [evidence,setEvidence]=useState<string[]>([]); const [affectedUnits,setAffectedUnits]=useState<string[]>([]);
  const [decisionReasons,setDecisionReasons]=useState<Record<string,string>>({}); const [problem,setProblem]=useState<string|null>(null);
+ const [picEdit,setPicEdit]=useState<{ownerId:string;baseline:string;revision:number;reason:string}|null>(null);
+ const [discardPic,setDiscardPic]=useState(false);
+ const picAttempt=useRef<{signature:string;key:string}|null>(null);
+ const assignPic=useMutation({mutationFn:async()=>{
+  if(!picEdit)throw new Error("Choose the Case PIC");
+  const body={ownerId:picEdit.ownerId,expectedRevision:picEdit.revision,reason:picEdit.reason.trim()};const signature=JSON.stringify(body);
+  if(picAttempt.current?.signature!==signature)picAttempt.current={signature,key:crypto.randomUUID()};
+  return apiFetch(`${endpoint}/pic`,{method:"POST",body:JSON.stringify({...body,key:picAttempt.current.key})});
+ },onSuccess:()=>{setPicEdit(null);setProblem(null);void qc.invalidateQueries({queryKey});void qc.invalidateQueries({queryKey:["operation","work"]});},onError:(e:Error)=>setProblem(e.message)});
  const propose=useMutation({mutationFn:(body:unknown)=>apiFetch(`${endpoint}/proposals`,{method:"POST",body:JSON.stringify(body)}),onSuccess:()=>{setEditing(false);setKey(crypto.randomUUID());setProblem(null);void qc.invalidateQueries({queryKey});},onError:(e:Error)=>setProblem(e.message)});
  const decide=useMutation({mutationFn:(body:ServiceCaseRemedyDecision)=>apiFetch(`${endpoint}/decisions`,{method:"POST",body:JSON.stringify(body)}),onSuccess:(_result,body)=>{setProblem(null);setDecisionReasons(previous=>({...previous,[body.approvalId]:""}));void qc.invalidateQueries({queryKey});},onError:(e:Error)=>setProblem(e.message)});
- const dirty=(editing&&Boolean(requestId||policy||policyVersion||policyResult||remedy||movement||charge||amount||payer||reason||acceptedBy||acceptedOn||acceptanceFile||evidence.length||affectedUnits.length))||Object.values(decisionReasons).some(r=>r.trim())||propose.isPending||decide.isPending;
+ const dirty=Boolean(picEdit&&(picEdit.ownerId!==picEdit.baseline||picEdit.reason))||(editing&&Boolean(requestId||policy||policyVersion||policyResult||remedy||movement||charge||amount||payer||reason||acceptedBy||acceptedOn||acceptanceFile||evidence.length||affectedUnits.length))||Object.values(decisionReasons).some(r=>r.trim())||propose.isPending||decide.isPending||assignPic.isPending;
  useEffect(()=>{onDirtyChange?.(dirty);return()=>onDirtyChange?.(false);},[dirty,onDirtyChange]);
- useEffect(()=>{onBusyChange?.(propose.isPending||decide.isPending);return()=>onBusyChange?.(false);},[propose.isPending,decide.isPending,onBusyChange]);
+ useEffect(()=>{onBusyChange?.(propose.isPending||decide.isPending||assignPic.isPending);return()=>onBusyChange?.(false);},[propose.isPending,decide.isPending,assignPic.isPending,onBusyChange]);
  useEffect(()=>{if(!dirty)return;const protect=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue="";};window.addEventListener("beforeunload",protect);return()=>window.removeEventListener("beforeunload",protect);},[dirty]);
  const request=read.data?.requests.find(r=>r.id===requestId);
- const locked=disabled||propose.isPending||decide.isPending;
+ const busy=disabled||propose.isPending||decide.isPending||assignPic.isPending;
+ const locked=busy||picEdit!==null;
  const toggle=(values:string[],value:string,on:boolean)=>on?[...values,value]:values.filter(x=>x!==value);
  function sendProposal() {
   const selectedEvidence=charge==="charged"&&acceptanceFile?Array.from(new Set([...evidence,acceptanceFile])):evidence;
@@ -44,7 +55,16 @@ export default function CaseRemedyApproval({ caseId, disabled=false, onDirtyChan
  }
  return <Block title="Case approval">
   {read.isPending?<Loading label="Loading Case approvals"/>:read.isError?<div role="alert"><p>Case approvals could not be loaded.</p><Button onClick={()=>void read.refetch()}>Try again</Button></div>:read.data?<div className="space-y-3">
-   <p className="text-body text-c-secondary">Service Case Approver: {read.data.approver?.actorName??read.data.approver?.acting_user_name??read.data.approver?.normal_user_name??"Not assigned"}</p>
+   <p className="text-body text-c-secondary">Case PIC: {read.data.approver?.normal_user_name??read.data.approver?.actorName??"Not assigned"}</p>
+   {read.data.approver.state==="unavailable"&&<p role="status" className="text-body text-c-secondary">Case PIC is unavailable.</p>}
+   {read.data.canAssignPic&&!picEdit&&!editing&&<Button disabled={locked} onClick={()=>{const ownerId=read.data?.approver.normal_user_id??"";setPicEdit({ownerId,baseline:ownerId,revision:read.data?.approver.revision??0,reason:""});}}>Assign PIC</Button>}
+   {picEdit&&<div className="space-y-3">
+    <Select id="case-pic" label="Case PIC" value={picEdit.ownerId} onValueChange={ownerId=>setPicEdit({...picEdit,ownerId})} options={(read.data.ownerCandidates??[]).map(p=>({value:p.id,label:p.name}))} disabled={busy}/>
+    <Textarea id="case-pic-reason" label="Reason" value={picEdit.reason} onChange={e=>setPicEdit({...picEdit,reason:e.target.value})} disabled={busy}/>
+    <Button variant="primary" disabled={busy||!picEdit.ownerId||picEdit.ownerId===picEdit.baseline||!picEdit.reason.trim()} loading={assignPic.isPending} onClick={()=>assignPic.mutate()}>Save</Button>
+    <Button disabled={busy} onClick={()=>{if(picEdit.ownerId!==picEdit.baseline||picEdit.reason)setDiscardPic(true);else setPicEdit(null);}}>Cancel</Button>
+   </div>}
+   <Modal open={discardPic} onOpenChange={setDiscardPic} title="Discard" footer={<><Button onClick={()=>setDiscardPic(false)}>Cancel</Button><Button variant="primary" onClick={()=>{setPicEdit(null);setDiscardPic(false);}}>Discard</Button></>}>Not saved</Modal>
    {disabled&&<p role="status" className="text-body text-c-secondary">Save the Case changes before reviewing its remedy.</p>}
    {read.data.proposals.map(p=><div key={p.id} className="space-y-2">
     <p className="text-strong text-c-ink">{p.status==="pending"?"Need approval":p.status==="approved"?"Approved":"Refused"}</p>

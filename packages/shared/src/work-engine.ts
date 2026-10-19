@@ -95,7 +95,8 @@ export type WorkOwnerRule =
   | "grn_duty" // the effective GRN Duty resolution from Workspace
   | "claim_month_po_duty" // the holder of the month the claim was OPENED — forever
   | "purchasing_approver"
-  | "service_case_approver";
+  | "service_case_approver"
+  | "service_case_pic";
 
 export interface WorkRuleDefinition {
   key: string;
@@ -307,7 +308,7 @@ export const ORDER_WORK_RULES: readonly WorkRuleDefinition[] = [
  *  Receiving rail, the Claims queue) and join the composed feed when their
  *  server feeds are wired (Card 9's recorded boundary). */
 export const MODULE_WORK_RULES: readonly WorkRuleDefinition[] = [
-  { key: "service_case.remedy_approve", module: "purchasing", trigger: "a linked SC purchase has a current submitted Case remedy proposal", owner: "the existing Service Case Approver duty holder", ownerRule: "service_case_approver", action: "Review Case remedy", dueRule: "next Office working day after the ready proposal was recorded (Service §7.9)", completionFact: "the exact immutable Case remedy approval record is approved or refused" },
+  { key: "service_case.remedy_approve", module: "purchasing", trigger: "a linked SC purchase has a current submitted Case remedy proposal", owner: "the PIC recorded on this Service Case", ownerRule: "service_case_pic", action: "Review Case remedy", dueRule: "next Office working day after the ready proposal was recorded (Service §7.9)", completionFact: "the exact immutable Case remedy approval record is approved or refused" },
   {
     key: "manual_purchase.approve",
     module: "purchasing",

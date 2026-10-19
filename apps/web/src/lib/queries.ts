@@ -12747,6 +12747,7 @@ export interface PoCancellationFacts {
  lines:Array<{lineId:string;sku:string;identityMode:"exact_unit"|"quantity";orderedQty:number;receivedQty:number;cancelledQty:number;pendingQty:number;sources:Array<{demandId:string;requestId:string;requestNo:string|null;purpose:string;contextual:boolean;orderedQty:number;activeQty:number;cancelledQty:number;unitChoices:Array<{id:string;unitCode:string;status:string}>;recipients:Array<{recipientId:string;name:string|null;qty:number}>}>}>;
  events:Array<{id:string;request_id:string;request_version:number;expected_po_version:number;kind:"pending"|"exception_approved"|"exception_refused"|"effective";reason:string;scope:NonNullable<import("@carres/shared").CancelPoInput["cancellation"]>["lines"];supplier_facts:NonNullable<import("@carres/shared").CancelPoInput["cancellation"]>["supplierFacts"];actor_id:string;at:string}>;
  financeHandoffs:Array<{id:string;poId:string;poVersion:number}>;
+ financeConnection?:{state:"not_connected";message:string};
 }
 export function usePoCancellations(poId:string) {
  return useQuery({queryKey:qk.poCancellations(poId),queryFn:()=>apiFetch<PoCancellationFacts>(`/api/operation/pos/${encodeURIComponent(poId)}/cancellations`),staleTime:0});

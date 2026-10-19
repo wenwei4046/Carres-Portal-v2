@@ -218,7 +218,7 @@ The governed Duty catalogue is business-specific, not one fake `ERP Owner`:
 | Delivery charge approval | `Delivery Charge Approver` |
 | Payment exception | `Payment Approver` |
 | Stock adjustment | `Stock Adjustment Approver` |
-| Service Case decision | `Service Case Approver` |
+| Service Case decision | The recorded Case PIC for the commissioned SC procurement remedy continuation (owner correction 19 Oct 2026, Service §7.4); other Service exception scopes retain their separately governed authority |
 | Sales Order has no PIC and routine Delivery work must remain visible | `Delivery Duty` fallback only — never the routine owner |
 
 **ASSIGNMENT AND ACTUAL WORK — OWNER RULING 2026-09-29 / APPROVED TARGET / NOT BUILT.**

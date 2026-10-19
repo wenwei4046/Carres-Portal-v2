@@ -36,6 +36,7 @@ async function freshCase(){
  const context=await db.json(`select jsonb_set(request_context,'{serviceCaseId}',to_jsonb('${id}'::text)) from public.purchase_requests where for_service_case_id='fffffff2-0000-4000-8000-000000000001' limit 1;`);
  const request=await db.client(owner).rpc("purchasing_create_request_with_lines",{p_purpose:"service_case",p_destination_id:context.lines[0].allocations[0].destinationId,p_for_service_case_id:id,p_lines:[{request_context:context,submission_key:randomUUID()}],p_fulfilment_intent:"concrete_need"});
  expect(request.error).toBeNull();
+ const assigned=await db.client(owner).rpc("service_case_set_pic",{p_case_id:id,p_owner_id:approver.id,p_expected_revision:0,p_reason:"TEST explicit Case PIC; outer rollback",p_key:randomUUID()});expect(assigned.error).toBeNull();
  return {id,requestId:request.data.id as string};
 }
 describe.skipIf(!databaseUrl)("Case remedy signed API / owned PostgreSQL",()=>{
@@ -43,6 +44,7 @@ describe.skipIf(!databaseUrl)("Case remedy signed API / owned PostgreSQL",()=>{
   db=new OwnedContextDatabase(databaseUrl!);
   const fixture=readFileSync(new URL("service-case-remedy.local-check.sql",root),"utf8").replace("\\ir service-case-remedy-approval.draft.sql",()=>readFileSync(new URL("service-case-remedy-approval.draft.sql",root),"utf8")).replace("\\ir service-case-remedy.assertions.sql",()=>readFileSync(new URL("service-case-remedy.assertions.sql",root),"utf8"));
   await db.start(fixture);
+  await db.json("reset role; "+readFileSync(new URL("service-case-pic.draft.sql",root),"utf8")+"; select 'true'::jsonb;");
   useTestJwks();
   vi.mocked(userClient).mockImplementation((_env,jwt)=>{const claims=JSON.parse(Buffer.from(jwt.split(".")[1],"base64url").toString());return db.client({id:claims.sub,role:claims.app_metadata.role,email:claims.email}) as never;});
   vi.mocked(adminClient).mockReturnValue({rpc:async(name:string,args:Record<string,unknown>)=>{
@@ -87,8 +89,8 @@ describe.skipIf(!databaseUrl)("Case remedy signed API / owned PostgreSQL",()=>{
    res.writeHead(response.status,{"Content-Type":response.headers.get("Content-Type")??"application/json"});res.end(await response.text());
   });
   await new Promise<void>(resolve=>server!.listen(43127,"127.0.0.1",resolve));
-  const marker=new URL("service-case-native.done",root);if(existsSync(marker))unlinkSync(marker);
-  writeFileSync(new URL("service-case-native.runtime.json",root),JSON.stringify({url:"http://127.0.0.1:5447/service-case-remedy-preview.html",caseId:source.id,environment:"owned loopback, TEST Storage signing, outer rollback"}));
-  await new Promise<void>(resolve=>{const watcher=watch(root,(_event,name)=>{if(String(name)==="service-case-native.done"&&existsSync(marker)){watcher.close();resolve();}});});
+  const markerName=process.env.CARRES_SC_NATIVE_MARKER??"service-case-native.done";const marker=new URL(markerName,root);if(existsSync(marker))unlinkSync(marker);
+  writeFileSync(new URL(markerName.replace(/\.done$/,".runtime.json"),root),JSON.stringify({url:"http://127.0.0.1:5447/service-case-remedy-preview.html",caseId:source.id,environment:"owned loopback, TEST Storage signing, outer rollback"}));
+  await new Promise<void>(resolve=>{const watcher=watch(root,(_event,name)=>{if(String(name)===markerName&&existsSync(marker)){watcher.close();resolve();}});});
  },600000);
 });

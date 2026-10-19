@@ -27,8 +27,18 @@ it("does not let Warehouse reach a Case decision read", async () => {
 it("refuses browser-authored decision stamps before reaching SQL", async () => {
  expect((await call("/decisions", { approvalId: caseId, status: "approved", reason: "", decidedBy: caseId })).status).toBe(400); expect(rpc).not.toHaveBeenCalled();
 });
-it("preserves the SQL duty refusal instead of approving through a privileged client", async () => {
- rpc.mockResolvedValue({ data: null, error: { code: "42501", message: "Only the Service Case Approver may decide", details: "not_service_case_approver" } });
+it("preserves the SQL Case PIC refusal instead of approving through a privileged client", async () => {
+ rpc.mockResolvedValue({ data: null, error: { code: "42501", message: "Only this Case PIC may decide", details: "not_service_case_pic" } });
  expect((await call("/decisions", { approvalId: caseId, status: "approved", reason: "" })).status).toBe(403);
  expect(adminClient).not.toHaveBeenCalled();
+});
+it("records explicit Case PIC via the caller and refuses forged assignment history",async()=>{
+ const body={ownerId:caseId,expectedRevision:0,reason:"TEST explicit Case handler",key:caseId};
+ rpc.mockResolvedValue({data:{normal_user_id:caseId,revision:1},error:null});
+ expect((await call("/pic",body)).status).toBe(200);
+ expect(rpc).toHaveBeenCalledWith("service_case_set_pic",{p_case_id:caseId,p_owner_id:caseId,p_expected_revision:0,p_reason:body.reason,p_key:caseId});
+ rpc.mockClear();expect((await call("/pic",{...body,by:caseId})).status).toBe(400);expect(rpc).not.toHaveBeenCalled();expect(adminClient).not.toHaveBeenCalled();
+});
+it("does not give Finance Case PIC assignment",async()=>{
+ expect((await call("/pic",{ownerId:caseId,expectedRevision:0,reason:"TEST",key:caseId},"finance")).status).toBe(403);expect(rpc).not.toHaveBeenCalled();
 });

@@ -12,7 +12,7 @@ export function projectCaseRemedyWork(state:ServiceCaseRemedyState,today:string,
  return state.proposals.filter(p=>p.status==="pending"&&p.scopeCurrent).map(p=>{
  const at=state.events.find(e=>e.approvalId===p.id&&e.kind==="proposed")?.at;const due=at?addWorkingDays(klDateOfIso(at),1,office):null;
  return operationWorkItemFromProjection({
-  ruleKey:"service_case.remedy_approve",module:"purchasing",soRef:state.caseNo??"Service Case",orderId:p.id,action:"Review Case remedy",ownerRule:"service_case_approver",ownerDutyKey:"service_case_approver",normalOwner:normal,activeCover:cover,actingPerson:person,ownerState:person?(cover?"covered":"primary"):"not_assigned",ownerName:person?.name??null,ownerUserId:person?.userId??null,tone:"warning",locked:false,broken:false,dueIso:due,workingDaysLate:0,
+  ruleKey:"service_case.remedy_approve",module:"purchasing",soRef:state.caseNo??"Service Case",orderId:p.id,action:"Review Case remedy",ownerRule:"service_case_pic",ownerDutyKey:null,normalOwner:normal,activeCover:cover,actingPerson:person,ownerState:person?(cover?"covered":"primary"):"not_assigned",ownerName:person?.name??null,ownerUserId:person?.userId??null,tone:"warning",locked:false,broken:false,dueIso:due,workingDaysLate:0,
  },{object:{kind:"service_case_remedy",id:p.id,label:state.caseNo??"Service Case"},problem:"Case remedy requires a decision",recipient:null,requiredResult:"Exact Case remedy approved or refused",destination:`/operation?tab=service-notes&case=${encodeURIComponent(state.caseId)}`,today,noDateReason:due?null:"The proposal submission date could not be read.",sourceVersion:p.id});});
 }
 async function readCase(c:Context<AppEnv>,id:string):Promise<ServiceCaseRemedyState>{

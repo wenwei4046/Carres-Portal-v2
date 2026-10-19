@@ -2,6 +2,10 @@ import { z } from "zod";
 import type { PurchaseRequestContext } from "./purchase-request-context";
 
 const words = z.string().trim().min(1).max(1000);
+export const serviceCasePicSchema = z.object({
+  ownerId: z.string().uuid(), expectedRevision: z.number().int().nonnegative(),
+  reason: words, key: z.string().uuid(),
+}).strict();
 /** Case-owned proposal; the database captures the exact linked request and Case
  * facts. Neither an uploader stamp nor a browser-authored approval is authority. */
 export const serviceCaseRemedyProposalSchema = z.object({
@@ -44,7 +48,10 @@ export interface ServiceCaseRemedyState {
   caseNo?: string | null;
   canDecide: boolean;
   canPropose: boolean;
-  approver: { normal_user_id?: string | null; acting_user_id?: string | null; is_cover?: boolean; actor_user_id?: string | null; actorName?: string | null; acting_user_name?: string | null; normal_user_name?: string | null };
+  canAssignPic?: boolean;
+  ownerCandidates?: Array<{id:string;name:string}>;
+  ownerHistory?: Array<{key:string;from:string|null;to:string;by:string;at:string;reason:string}>;
+  approver: { revision?:number; state?:string; owner_rule?:string; normal_user_id?: string | null; acting_user_id?: string | null; is_cover?: boolean; actor_user_id?: string | null; actorName?: string | null; acting_user_name?: string | null; normal_user_name?: string | null };
   evidence: Array<{ path: string; slot: string }>;
   units: Array<{ id: string; code: string | null; sku: string }>;
   requests: Array<{ id: string; number: string | null; version: number; context: PurchaseRequestContext }>;
