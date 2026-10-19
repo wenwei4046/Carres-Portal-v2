@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { fireEvent, render, screen, within, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, within, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -21,6 +21,7 @@ vi.mock("react-router-dom", async () => ({
   useNavigate: () => navigate,
 }));
 const refetch = vi.fn();
+const refreshPurchasingReads = vi.hoisted(() => vi.fn());
 const reviseMutate = vi.fn();
 const termsMutate = vi.fn();
 const supplierDateMutate = vi.fn();
@@ -270,6 +271,7 @@ vi.mock("@/lib/queries", () => ({
 vi.mock("../components/PoIssueEvidence", () => ({
   default: () => <div data-testid="po-issue-evidence">Issue evidence</div>,
   doorsForIssuedPo: () => ({}),
+  refreshPurchasingReads,
   CHANNEL_WORD: { whatsapp: "WhatsApp", email: "Email", print: "Printed" },
 }));
 
@@ -1269,6 +1271,9 @@ describe("Purchase Order object", () => {
       },
       expect.any(Object),
     );
+    refreshPurchasingReads.mockClear();
+    act(() => reviseMutate.mock.calls.at(-1)![1].onSuccess());
+    expect(refreshPurchasingReads).toHaveBeenCalledTimes(1);
   });
 
   it("opens the existing supplier send journey with this exact PO and version", () => {

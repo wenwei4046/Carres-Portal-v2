@@ -88,7 +88,7 @@ import {
 import { workspaceDutyActor } from "../workspace-duty-owner";
 import { useOfficeDays } from "@/lib/deadline-queries";
 import PurchasingTabs from "../PurchasingTabs";
-import { CHANNEL_WORD } from "../components/PoIssueEvidence";
+import { CHANNEL_WORD, refreshPurchasingReads } from "../components/PoIssueEvidence";
 import { PoSupplierResultContent } from "../so-batch/PoSupplierResultPanel";
 import ChangeDeliverToForm from "./ChangeDeliverToForm";
 import GoodsMiniTable, { goodsCategoryOf, type GoodsMiniLine } from "../components/GoodsMiniTable";
@@ -703,7 +703,7 @@ export default function PurchaseOrdersPage() {
             return next;
           });
         }}
-        onChanged={() => void posQ.refetch()}
+        onChanged={() => { refreshPurchasingReads(); void posQ.refetch(); }}
       />
     );
   }
