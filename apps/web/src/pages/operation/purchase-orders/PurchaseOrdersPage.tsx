@@ -2005,7 +2005,7 @@ function CurrentAction({ row, owner, onIssue }: { row: RegisterRow; owner: { use
       {fact && action ? (
         <div className="flex flex-wrap items-center gap-3" data-testid="po-object-work">
           <OwnerBadge userId={owner?.userId ?? null} name={owner?.name ?? null} />
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 basis-48 grow">
             <div className="text-strong text-kit-slate-12">{fact}</div>
             <div className="text-meta text-kit-slate-11">{action}</div>
           </div>
