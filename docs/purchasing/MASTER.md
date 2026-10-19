@@ -2478,8 +2478,14 @@ existing reserve door and shared coverage arithmetic; cancellation/reduced/uncle
 for handling. The Office companion preserves the same source-lock order. A separate Extra candidate
 accepts explicitly identified posted Extra against an existing admitted PO line by calling the
 existing `office_receive_post` writer, then stores the original custody-to-GRN/line link atomically.
-The local rollback probe produced a real model GRN, preserved original Extra and GP promises, reused
-the same retry, and refused accepting the same quantity twice. Its return-link door accepts only a
+**That initial Extra acceptance candidate is WITHDRAWN / UNSAFE:** its local GRN/retry probe proved
+mechanics, not Purchasing acceptance authority or physical source provenance. GRN post authority,
+a selected PO line and free text cannot establish that the observed Extra belongs to those goods,
+supplier and source. The safe blocked replacement refuses before writes until a governed Purchasing
+resolution binds the original custody occurrence/version, verified goods, supplier/party, exact source
+and line, quantity, authorised decision/version and evidence. No SKU equality is used to invent this
+link. Two text-only arbitrary source attempts were refused with receipt/Stock/PO/custody unchanged.
+Existing unposted report source correction is unchanged. The draft return-link door accepts only a
 canonical approved Purchase Return Unit's actual evidenced handover of those accepted goods; an
 absent handover was refused. A positive return walk, API/UI integration, independent unposted Extra
 custody and direct unknown/count-only Extra return remain unbuilt/unverified. No note, document
