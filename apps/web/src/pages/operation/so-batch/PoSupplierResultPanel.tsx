@@ -51,7 +51,7 @@ export default function PoSupplierResultPanel({ open, onOpenChange, pos, roundWi
  * the round panel can hold the very same controls (§5.6.1 "one send area").
  * A PDF opened here counts as held for the first step, at the version shown.
  */
-export function PoSupplierResultContent({ open, onClose, pos, roundWindow, onChanged, initialPreparation, title }: {
+export function PoSupplierResultContent({ open, onClose, pos, roundWindow, onChanged, initialPreparation, title, showOpenObject = true }: {
   open: boolean;
   onClose: () => void;
   pos: readonly IssuedPo[];
@@ -59,6 +59,7 @@ export function PoSupplierResultContent({ open, onClose, pos, roundWindow, onCha
   onChanged: () => void;
   initialPreparation?: PoSupplierPreparation;
   title?: string;
+  showOpenObject?: boolean;
 }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -86,7 +87,7 @@ export function PoSupplierResultContent({ open, onClose, pos, roundWindow, onCha
     <div className="flex flex-col gap-3" data-testid="po-supplier-result-panel">
       <PoSupplierBundle pos={pos} roundWindow={roundWindow} onEvidenceChanged={onChanged} initialPreparation={initialPreparation} title={title} reviewed={reviewed}
         onOpenSettings={() => { onClose(); navigate("/operation/settings/purchasing"); }}
-        onOpenObject={(id, preparation, sourcePos) => { onClose(); navigate(`/operation/procurement?po=${encodeURIComponent(id)}`, { state: { soBatchReturn: { path: `${location.pathname}${location.search}`, pos: sourcePos, preparation } } }); }} onPreview={(_id, po) => { setCurrent(po); setPdfOpen(true); }} />
+        onOpenObject={showOpenObject ? (id, preparation, sourcePos) => { onClose(); navigate(`/operation/procurement?po=${encodeURIComponent(id)}`, { state: { soBatchReturn: { path: `${location.pathname}${location.search}`, pos: sourcePos, preparation } } }); } : undefined} onPreview={(_id, po) => { setCurrent(po); setPdfOpen(true); }} />
       {current && error && <div role="alert" className="text-meta text-kit-red-11">{error}</div>}
     </div>
     <Modal open={open && pdfOpen} onOpenChange={setPdfOpen} title={document ? documentDisplayNumber(`${document.po_number}-V${document.version}`) : current ? documentDisplayNumber(current.id) : "Purchase Orders"} width="viewer">

@@ -512,6 +512,8 @@ describe("human-triggered supplier email", () => {
     render(<PoSupplierBundle pos={pos} onPreview={() => {}} />);
     await waitFor(() => expect(screen.getByRole("button", { name: "Send Email" })).toBeEnabled());
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.getByTestId("po-bundle-attempt-failed-attempt")).toHaveTextContent("Failed");
+    expect(screen.getByTestId("po-bundle-attempt-failed-attempt")).toHaveTextContent("PO-001-V1");
     expect(api.mock.calls.filter(call => call[0].endsWith("supplier-email"))).toHaveLength(0);
   });
   it("a definite permission refusal leaves no uncertain dispatch record", async () => {

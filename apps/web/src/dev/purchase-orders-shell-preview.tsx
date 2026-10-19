@@ -16,6 +16,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import OperationApp from "@/pages/operation/OperationApp";
+import { testTasksFeed } from "./tasks-feed-fixture";
 import "@/index.css";
 
 const SUPPLIERS = [
@@ -101,6 +102,22 @@ window.fetch = async (input, init) => {
       messageTemplate: "Please build this purchase order.",
     });
   }
+  // Read-only TEST transport: no provider or operational mutation is available.
+  if ((init?.method ?? "GET").toUpperCase() !== "GET") return json({ message: "This TEST preview does not save business records" }, 405);
+  if (/\/api\/operation\/work(\?|$)/.test(url)) return json(testTasksFeed({ id: "11111111-1111-4111-8111-111111111111", name: "TEST Staff", email: "preview@carres.local" }));
+  if (url.includes("/email-capability")) return json({ configured: true });
+  const sendRead = /\/api\/operation\/pos\/([^/?]+)\/(sends|email-attempts|receiving|audit)/.exec(url);
+  if (sendRead) {
+    const po = pos.find(p => p.id === decodeURIComponent(sendRead[1]!));
+    if (!po) return json({ message: "Purchase Order not found" }, 404);
+    if (sendRead[2] === "sends") return json({ sends: po.sends });
+    if (sendRead[2] === "email-attempts") {
+      const outcome = po.id.endsWith("4002") ? "failed" : po.id.endsWith("4005") ? "unknown" : null;
+      return json({ attempts: outcome ? [{ id: `TEST-attempt-${po.id}`, status: outcome, recipient: "test@example.invalid", at: "2026-10-19T01:00:00Z", documents: [{ id: po.id, version: po.version, recorded: false }] }] : [] });
+    }
+    if (sendRead[2] === "receiving") return json({ sessions: [], events: [], expected_units: [] });
+    return json({ revisions: [], history: [] });
+  }
   /* The official paper beside the facts: the same money-free payload the
      server composes (`purchasing_po_document`), built from the fixture PO so
      the object page draws a real PDF instead of an empty half. */
@@ -118,6 +135,7 @@ window.fetch = async (input, init) => {
   }
   const print = /\/api\/operation\/pos\/([^/?]+)\/print-data/.exec(url);
   if (print) {
+    if (new URL(url).searchParams.has("version")) return json({ code: "version_document_missing", message: "No kept document for this PO version" }, 404);
     const po = pos.find((p) => p.id === decodeURIComponent(print[1]!));
     if (!po) return json({ code: "po_not_found", message: "Purchase Order not found." }, 404);
     const supplier = SUPPLIERS.find((s) => s.id === po.supplier_id)!;
@@ -139,7 +157,7 @@ window.fetch = async (input, init) => {
   if (url.includes("/api/operation/suppliers")) return json({ suppliers: SUPPLIERS.map((s) => ({ ...s, kind: "own_logistics", cat_covered: [], lead_time: null })) });
   if (url.includes("/api/operation/warehouse")) return json({ warehouses: [{ id: "w1", name: "Carres Klang", address: "Klang" }] });
   if (url.includes("/api/operation/workspace-duties")) {
-    return json({ can_assign: false, duties: [{ key: "po_duty", label: "PO Duty", resolution: { duty_key: "po_duty", normal_user_id: "u-duty", normal_user_name: "Yu Jun", acting_user_id: null, acting_user_name: null, actor_user_id: "u-duty", is_cover: false, source: "assignment" }, assignments: [], covers: [] }] });
+    return json({ can_assign: false, duties: [{ key: "po_duty", label: "PO Duty", resolution: { duty_key: "po_duty", normal_user_id: "11111111-1111-4111-8111-111111111111", normal_user_name: "Yu Jun", acting_user_id: null, acting_user_name: null, actor_user_id: "11111111-1111-4111-8111-111111111111", is_cover: false, source: "assignment" }, assignments: [], covers: [] }] });
   }
   if (url.includes("/api/operation/supplier-claims")) return json({ claims: [], counts: { open: 0, closed: 0, all: 0 } });
   return json(url.includes("/rest/") ? [] : {});
@@ -147,8 +165,8 @@ window.fetch = async (input, init) => {
 
 useAuth.setState({
   role: "operation", hydrated: true, loading: false,
-  user: { id: "u-duty", email: "preview@carres.local" } as never,
-  session: { access_token: "preview", user: { id: "u-duty", email: "preview@carres.local" } } as never,
+  user: { id: "11111111-1111-4111-8111-111111111111", email: "preview@carres.local" } as never,
+  session: { access_token: "preview", user: { id: "11111111-1111-4111-8111-111111111111", email: "preview@carres.local" } } as never,
 });
 
 const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });

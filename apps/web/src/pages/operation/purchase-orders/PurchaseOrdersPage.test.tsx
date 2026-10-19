@@ -30,6 +30,7 @@ let requiredLoading = false;
 let connectionLoading = false;
 let connectionEmpty = false;
 let receivingReturnReason: string | null = null;
+let secondReceipt = false;
 type TestPromise = {
   po_version?: number; channel?: string; recipient?: string; evidence?: string;
   reported_by?: string; reported_at?: string; recorded_by?: string;
@@ -251,7 +252,7 @@ vi.mock("@/lib/queries", () => ({
     refetch,
   }),
   useOperationPoUnits: () => ({ isLoading: connectionLoading, isError: false, refetch, data: connectionLoading ? undefined : { units: connectionEmpty ? [] : [{ unit_code: "U1-000-001", sku: "MAT-K-001", status: "incoming", po_line_id: "line-1" }, { unit_code: "U1-000-002", sku: "MAT-K-001", status: "incoming", po_line_id: "line-1" }] } }),
-  usePoReceiving: () => ({ isLoading: connectionLoading, isError: connectionError, refetch, data: connectionError || connectionLoading ? undefined : { sessions: connectionEmpty ? [] : [{ id: "receipt-1", do_number: "DO-SUP-9", status: "posted", goods_received_at: "2026-08-28", return_reason: receivingReturnReason }], events: [] } }),
+  usePoReceiving: () => ({ isLoading: connectionLoading, isError: connectionError, refetch, data: connectionError || connectionLoading ? undefined : { sessions: connectionEmpty ? [] : [{ id: "receipt-1", do_number: "DO-SUP-9", status: "posted", goods_received_at: "2026-08-28", return_reason: receivingReturnReason }, ...(secondReceipt ? [{ id: "receipt-2", do_number: "DO-SUP-10", status: "posted", goods_received_at: "2026-08-29", return_reason: null }] : [])], events: [] } }),
   useOperationSupplierClaims: () => ({ isLoading: connectionLoading, isError: connectionError, refetch, data: connectionError || connectionLoading ? undefined : { claims: connectionEmpty ? [] : [{ id: "claim-1", claim_no: "SC-1001", requested_action: "return", status: "open" }], counts: { open: connectionEmpty ? 0 : 1, closed: 0, all: connectionEmpty ? 0 : 1 } } }),
   useOperationPoAudit: () => ({ isError: auditError, refetch, data: auditError ? undefined : { revisions: [{ id: "rev-1", rev_no: 1, reason: "Deliver To changed", created_at: "2026-08-28T09:00:00Z", actor_name: "Yee Jean" }], history: [{ id: "hist-1", text: "Purchase order revised", occurred_at: "2026-08-28T09:00:00Z", actor_name: "Yee Jean", by_role: "operation" }] } }),
   useRecordSend: () => ({ mutate: vi.fn() }),
@@ -272,6 +273,10 @@ vi.mock("../components/PoIssueEvidence", () => ({
   CHANNEL_WORD: { whatsapp: "WhatsApp", email: "Email", print: "Printed" },
 }));
 
+vi.mock("../so-batch/PoSupplierResultPanel", () => ({
+  PoSupplierResultContent: ({ pos }: { pos: Array<{ id: string; version: number }> }) => <div data-testid="po-issue-evidence" data-po={pos[0]?.id} data-version={pos[0]?.version}>Shared supplier send</div>,
+}));
+
 vi.mock("@/lib/api", () => ({ apiFetch: vi.fn().mockResolvedValue({}) }));
 /* The embedded Sales Order tab is proven in its own test; here only its input. */
 vi.mock("../components/EmbeddedSalesOrders", async () => ({
@@ -281,6 +286,7 @@ vi.mock("../components/EmbeddedSalesOrders", async () => ({
 vi.mock("@/lib/purchasing/po-bundle", () => ({ prepareSelectedPoDocuments: vi.fn(), zipPoBundle: vi.fn() }));
 import { prepareSelectedPoDocuments, zipPoBundle } from "@/lib/purchasing/po-bundle";
 vi.mock("@/lib/pdf/render", () => ({ renderPoPdf: vi.fn() }));
+import { renderPoPdf } from "@/lib/pdf/render";
 
 import PurchaseOrdersPage from "./PurchaseOrdersPage";
 import { apiFetch } from "@/lib/api";
@@ -313,6 +319,7 @@ beforeEach(() => {
   connectionLoading = false;
   connectionEmpty = false;
   receivingReturnReason = null;
+  secondReceipt = false;
   reviseMutate.mockReset();
   termsMutate.mockReset();
   queryData.destinations.splice(
@@ -1031,6 +1038,16 @@ describe("Purchase Order object", () => {
     expect(screen.getByText("Carres Penang")).toBeInTheDocument();
   });
 
+  it("opens each connected receipt and claim by its own identity from the PO", () => {
+    secondReceipt = true;
+    receivingReturnReason = "Wrong item";
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    expect(screen.getByRole("link", { name: "DO-SUP-9" })).toHaveAttribute("href", "/operation?tab=receiving&session=receipt-1");
+    expect(screen.getByRole("link", { name: "DO-SUP-10" })).toHaveAttribute("href", "/operation?tab=receiving&session=receipt-2");
+    expect(screen.getByRole("link", { name: "SC-1001" })).toHaveAttribute("href", "/operation?tab=claims&claim=claim-1");
+    expect(screen.getByRole("link", { name: "Receiving return" })).toHaveAttribute("href", "/operation?tab=receiving&session=receipt-1");
+  });
+
   it("does not call loading connections empty", () => {
     connectionLoading = true;
     renderPage("/operation/procurement?po=PO-20260828-4827");
@@ -1236,6 +1253,23 @@ describe("Purchase Order object", () => {
       },
       expect.any(Object),
     );
+  });
+
+  it("opens the existing supplier send journey with this exact PO and version", () => {
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    fireEvent.click(screen.getByRole("button", { name: "Issue current PDF" }));
+    expect(screen.getByTestId("po-issue-evidence")).toHaveAttribute("data-po", "PO-20260828-4827");
+    expect(screen.getByTestId("po-issue-evidence")).toHaveAttribute("data-version", "2");
+  });
+
+  it("refuses a newer live PDF under the displayed version in preview and download", async () => {
+    vi.mocked(renderPoPdf).mockClear();
+    vi.mocked(apiFetch).mockResolvedValue({ po_id: "PO-20260828-4827", version: 3 });
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    expect(await screen.findByText("PO-20260828-4827 changed after you opened it.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Download PDF" }));
+    await waitFor(() => expect(screen.getAllByText("PO-20260828-4827 changed after you opened it.")).toHaveLength(2));
+    expect(renderPoPdf).not.toHaveBeenCalled();
   });
 
   it("explains a failed official PDF download in two lines", async () => {

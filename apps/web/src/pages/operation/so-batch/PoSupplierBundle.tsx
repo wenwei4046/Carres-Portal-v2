@@ -19,7 +19,7 @@ import { CHANNEL_WORD, confirmedSendFor, doorsForIssuedPo, refreshPurchasingRead
 
 import {
   confirmPoSent, dispatchSupplierEmail, documentFailureOf, emailAttemptsKeyOf, loadPoDocument, loadPoSendFacts, mergeEmailAttempts,
-  readEmailAttempts, recordEmailEvidence, SupplierEmailFailure, type EmailAttempt,
+  readEmailAttempts, recordEmailEvidence, SupplierEmailFailure, type EmailAttempt, type FailedEmailAttempt,
 } from "./po-supplier-send";
 
 /** Presentation only. Fresh owning reads still supply every document/version and send fact. */
@@ -80,6 +80,7 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
   const [documentFailures, setDocumentFailures] = useState<Array<{ id: string; message: string; settings?: boolean }>>([]);
   const [documentRefresh, setDocumentRefresh] = useState(0);
   const [sendHistory, setSendHistory] = useState<Record<string, PoSendEvidence[]>>({});
+  const [failedAttempts, setFailedAttempts] = useState<FailedEmailAttempt[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyRefresh, setHistoryRefresh] = useState(0);
   const [historyFailed, setHistoryFailed] = useState<string[]>([]);
@@ -167,15 +168,17 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
     setHistoryLoading(true);
     setSendHistory({});
     setHistoryFailed([]);
+    setFailedAttempts([]);
     void Promise.allSettled(supplierPos.map(async po => {
       const facts = await loadPoSendFacts(po, emailConfigured);
-      return [po.id, facts.sends, facts.attempts, facts.failed] as const;
+      return [po.id, facts.sends, facts.attempts, facts.failed, facts.failedRecords] as const;
     })).then(results => {
       if (cancelled) return;
       setSendHistory(Object.fromEntries(results.flatMap(result => result.status === "fulfilled" ? [[result.value[0], result.value[1]]] : [])));
       const restored = results.flatMap(result => result.status === "fulfilled" ? result.value[2] : []);
       const failed = new Set(results.flatMap(result => result.status === "fulfilled" ? result.value[3] : []));
       setEmailAttempts(previous => mergeEmailAttempts(previous, restored, failed));
+      setFailedAttempts([...new Map(results.flatMap(result => result.status === "fulfilled" ? result.value[4] : []).map(attempt => [attempt.id, attempt])).values()]);
       setHistoryLoading(false);
       setHistoryFailed(results.flatMap((result, index) => result.status === "rejected" ? [supplierPos[index].id] : []));
     });
@@ -465,6 +468,13 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
         {historyFailed.map(id => <div key={id} role="alert" className="text-meta text-kit-red-11">{id} · Evidence could not be loaded</div>)}
         <Button onClick={() => setHistoryRefresh(value => value + 1)}>Try again</Button>
       </div>}
+      {[...failedAttempts, ...emailAttempts].filter(attempt => attempt.documents.some(document => supplierPos.some(po => po.id === document.id))).map(attempt => (
+        <div key={attempt.id} data-testid={`po-bundle-attempt-${attempt.id}`} className="flex flex-col gap-1 border-t border-c-row-line pt-3">
+          <div className="text-body text-c-ink">{attempt.status === "failed" ? "Failed" : attempt.status === "unknown" ? "Unknown" : "Sent"}</div>
+          {attempt.documents.filter(document => supplierPos.some(po => po.id === document.id)).map(document => <div key={document.id} className="text-meta text-c-body">{documentDisplayNumber(`${document.id}-V${document.version}`)} · Email · {attempt.recipient}</div>)}
+          <div className="text-meta text-c-secondary">{attempt.at ? fmtDate(attempt.at, { time: true }) : "Time not recorded"}{attempt.actorName ? ` · ${attempt.actorName}` : ""}</div>
+        </div>
+      ))}
       {supplierPos.some(po => sendHistory[po.id]?.length) && <div className="flex flex-col gap-2 border-t border-c-row-line pt-3" data-testid="po-bundle-history">
         <div className="text-body font-medium text-c-ink">History</div>
         {supplierPos.flatMap(po => (sendHistory[po.id] ?? []).map((event, index) => <div key={`${po.id}-${index}`} className="flex flex-col gap-1">
