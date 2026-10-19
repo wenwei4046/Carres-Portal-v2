@@ -907,6 +907,7 @@ export default function OperationReceiving() {
             loading={posQ.isLoading || suppliersQ.isLoading} error={posQ.isError || suppliersQ.isError}
             canReceive={!dutyQ.isLoading && Boolean(dutyQ.data?.allowed)}
             retry={() => { void posQ.refetch(); void suppliersQ.refetch(); }} sessionKey={`${registerSessionKey}-not-received`}
+            onReport={openSession}
             onReceive={id => { const next = new URLSearchParams(params); next.set("po", id); setParams(next); }} /> : registerQ.isError ? (
             /* A failure sentence is never the empty sentence (COPY-STANDARD
                2026-08-28): what broke, then the act that fixes it. */

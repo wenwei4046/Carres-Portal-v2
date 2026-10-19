@@ -1,8 +1,10 @@
-import { useMemo } from "react";
+// design-standard: not-a-list-page — child view inside OperationReceiving’s existing ListPageShell; no nested page shell.
+import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { appTodayIso } from "@/lib/fmt-date";
 import { daysBetween, documentDisplayNumber, poExpectedArrivalsOf, purchaseOrderRegisterFacts } from "@carres/shared";
-import type { operationPoListRow, SupplierRow } from "@/lib/queries";
+import type { operationPoListRow, PoReceivingResponse, SupplierRow } from "@/lib/queries";
+import { apiFetch } from "@/lib/api";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { REGISTER_FIELD_WIDTH as W } from "@/components/register/register-field-widths";
 import Button from "@/components/kit/Button";
@@ -40,11 +42,27 @@ export function notReceivedRows(pos: operationPoListRow[], suppliers: Map<string
   return { rows, unknown };
 }
 
-export default function NotReceivedRegister({ pos, suppliers, loading, error, retry, onReceive, sessionKey, canReceive }: {
+export default function NotReceivedRegister({ pos, suppliers, loading, error, retry, onReceive, onReport, sessionKey, canReceive }: {
   pos: operationPoListRow[]; suppliers: Map<string, SupplierRow>; loading: boolean; error: boolean;
-  retry: () => void; onReceive: (id: string) => void; sessionKey: string; canReceive: boolean;
+  retry: () => void; onReceive: (id: string) => void; onReport: (id: string) => void; sessionKey: string; canReceive: boolean;
 }) {
   const today = appTodayIso();
+  const [opening, setOpening] = useState<string | null>(null);
+  const [openError, setOpenError] = useState(false);
+  const start = useCallback(async (id: string) => {
+    if (opening) return;
+    setOpening(id); setOpenError(false);
+    try {
+      const result = await apiFetch<PoReceivingResponse>(`/api/operation/pos/${encodeURIComponent(id)}/receiving`);
+      if (!Array.isArray(result.sessions)) throw new Error("Receiving reports could not be read");
+      const reports = result.sessions.filter(session => session.status === "submitted");
+      if (reports.length > 1) throw new Error("Receiving report scope is ambiguous");
+      // The warehouse already counted this delivery: check in THAT report, never create another receipt.
+      if (reports[0]) onReport(reports[0].id);
+      else onReceive(id);
+    } catch { setOpenError(true); }
+    finally { setOpening(null); }
+  }, [opening, onReceive, onReport]);
   const { rows, unknown } = useMemo(() => notReceivedRows(pos, suppliers, today), [pos, suppliers, today]);
   const columns = useMemo<DataGridColumn<NotReceivedRow>[]>(() => [
     { key: "po", label: "PO No", width: Math.max(180, W.documentNo), minWidth: 180, sortable: true,
@@ -56,11 +74,12 @@ export default function NotReceivedRegister({ pos, suppliers, loading, error, re
         warn={!!row.due && row.due < today} sub={row.due && row.due < today ? `Late ${daysBetween(row.due, today)}d` : undefined} /> },
     { key: "received", label: "Received", width: W.qty * 2, accessor: row => <span className="tabular-nums" title={`Pending Delivery Qty ${row.pending}`}>{row.received}/{row.ordered}</span> },
     { key: "receive", label: "Check in", width: W.date, sortable: false, filterable: false,
-      accessor: row => <Button disabled={!canReceive} onClick={() => onReceive(row.id)}>Check in</Button> },
-  ], [onReceive, today, canReceive]);
+      accessor: row => <Button disabled={!canReceive || opening !== null} loading={opening === row.id} onClick={() => void start(row.id)}>Check in</Button> },
+  ], [start, today, canReceive, opening]);
   if (loading) return <p role="status">Loading…</p>;
   if (error) return <div role="alert"><p>Receiving could not be opened</p><Button onClick={retry}>Try again</Button></div>;
   return <>
+    {openError && <p role="alert">Receiving could not be opened</p>}
     {unknown > 0 && <div role="alert"><p>Some information could not be loaded.</p><Button onClick={retry}>Try again</Button></div>}
     <DataGrid appearance="reference" rows={rows} columns={columns} rowKey={row => row.id}
       sessionKey={sessionKey} storageKey="carres.receiving.not-received.v1" searchPlaceholder="Search"

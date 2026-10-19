@@ -607,15 +607,40 @@ afterEach(() => {
 /* ═══ THE REGISTER ═════════════════════════════════════════════════════════ */
 
 describe("OperationReceiving — the formal GRN Register", () => {
-  it("defaults to Not received and opens the existing receipt workspace for its exact sent PO", () => {
+  it("defaults to Not received and opens the existing receipt workspace for its exact sent PO", async () => {
     const source = po({ id: "PO-READY", supplier_id: "sup-oh", lines: [{ id: "line-ready", sku: "TEST", qty: 5, received_qty: 2 }] });
     Object.assign(source, { version: 1, sends: [{ kind: "confirmed_sent", po_version: 1, channel: "whatsapp", sent_at: "2026-09-01T00:00:00Z" }] });
     h.pos = [source];
+    apiFetchMock.mockResolvedValue({ sessions: [] });
     renderPage("/operation?tab=receiving");
     expect(screen.getByText("2/5")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /^Check in$/ }));
-    expect(screen.getByTestId("receiving-po-view")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("receiving-po-view")).toBeInTheDocument());
     expect(screen.getByRole("button", { name: /^Start Receiving$/ })).toBeInTheDocument();
+  });
+
+  it("checks in the existing submitted report instead of opening a second Office receipt", async () => {
+    const source = po({ id: "PO-READY", supplier_id: "sup-oh", lines: [{ id: "line-ready", sku: "TEST", qty: 2, received_qty: 0 }] });
+    Object.assign(source, { version: 1, sends: [{ kind: "confirmed_sent", po_version: 1, channel: "whatsapp", sent_at: "2026-09-01T00:00:00Z" }] });
+    h.pos = [source];
+    h.sessionDetail = postedDetail({ receipt: { id: "report-existing", status: "submitted", grn_no: null } });
+    apiFetchMock.mockResolvedValue({ sessions: [{ id: "report-existing", status: "submitted" }] });
+    renderPage("/operation?tab=receiving");
+    fireEvent.click(screen.getByRole("button", { name: /^Check in$/ }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /^Save Receiving$/ })).toBeInTheDocument());
+    expect(screen.queryByTestId("receiving-po-view")).not.toBeInTheDocument();
+  });
+
+  it("does not open Office receiving when the existing reports cannot be read", async () => {
+    const source = po({ id: "PO-READY", supplier_id: "sup-oh", lines: [{ id: "line-ready", sku: "TEST", qty: 2, received_qty: 0 }] });
+    Object.assign(source, { version: 1, sends: [{ kind: "confirmed_sent", po_version: 1, channel: "whatsapp", sent_at: "2026-09-01T00:00:00Z" }] });
+    h.pos = [source];
+    apiFetchMock.mockResolvedValue({});
+    renderPage("/operation?tab=receiving");
+    fireEvent.click(screen.getByRole("button", { name: /^Check in$/ }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Receiving could not be opened"));
+    expect(screen.queryByTestId("receiving-po-view")).not.toBeInTheDocument();
+    expect(h.officeReceive).toEqual([]);
   });
 
   it("uses the three owner-approved views without duplicate column filters in the rail", () => {
@@ -1449,6 +1474,16 @@ describe("ReceivingRecord — the posted GRN, the review, the two doors", () => 
     );
     // A recorded issue opens the door to its claims.
     expect(screen.getByTestId("record-open-claims")).toBeInTheDocument();
+  });
+
+  it("opens only this GRN's exact linked Claim and Return, retaining PO scope", () => {
+    h.sessionDetail = { ...postedDetail(), related_records: {
+      claims: [{ id: "claim-exact", claim_no: "SC-TEST" }],
+      returns: [{ id: "return-exact", pr_no: "PR-TEST" }],
+    } };
+    renderRecord();
+    expect(screen.getByTestId("record-open-claims")).toHaveAttribute("href", "/operation?tab=claims&po=PO-2001&claim=claim-exact");
+    expect(screen.getByRole("link", { name: "PR-TEST" })).toHaveAttribute("href", "/operation?tab=purchase-returns&pr=return-exact");
   });
 
   it("a Valid GRN is 50/50 — Receiving Record left, the OFFICIAL preview with Print and Download PDF right, one header only", () => {
