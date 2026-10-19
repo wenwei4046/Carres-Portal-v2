@@ -1,6 +1,6 @@
 // design-standard: list-page — existing ListPageShell and DataGrid; no separate rail for own report history.
 import { lazy, Suspense, useMemo, useRef, useState } from "react";
-import { documentDisplayNumber, warehouseReceiptStatusLabel, RECEIVING_UNIT_OUTCOME_LABEL, type WarehouseConfirmationResult, type WarehouseReceiptStatus } from "@carres/shared";
+import { documentDisplayNumber, warehouseReceiptStatusLabel, RECEIVING_UNIT_OUTCOME_LABEL, type WarehouseConfirmationResult, type WarehouseIncomingPo, type WarehouseReceiptStatus } from "@carres/shared";
 import { warehouseConfirmationReportFromWire } from "@carres/shared/adapters";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import ListPageShell from "@/components/ListPageShell";
@@ -11,17 +11,24 @@ import SavedEvidenceViewer from "@/components/kit/SavedEvidenceViewer";
 import { DocSection, Prop } from "@/pages/operation/components/workspace-doc";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
-import { useWarehouseConfirmationReports, useWarehouseConfirmationSources, useWarehouseConfirmationArrivals, useWarehouseConfirmationHistory, type WarehouseConfirmationReportRow, type WarehouseConfirmationHistoryRow } from "@/lib/warehouse-confirmation";
+import { useWarehouseConfirmationReports, useWarehouseConfirmationSources, useWarehouseConfirmationArrivals, useWarehouseConfirmationHistory, type WarehouseConfirmationReportRow, type WarehouseConfirmationHistoryRow, type WarehouseArrivalSource } from "@/lib/warehouse-confirmation";
 import WarehouseConfirmationModal from "./WarehouseConfirmationModal";
 import WarehouseArrivalConfirmationModal from "./WarehouseArrivalConfirmationModal";
+import WarehousePoCorrectionPicker from "./WarehousePoCorrectionPicker";
+import type { WarehouseReportDraft } from "@/lib/warehouse-report-correction";
 const PdfPreview = lazy(()=>import("@/components/kit/PdfPreview"));
+
+type ReportEditor = {site:{id:string;name:string};saved:WarehouseReportDraft} & (
+  {kind:"po";po:WarehouseIncomingPo}|{kind:"arrival";arrival:WarehouseArrivalSource}
+);
 
 export default function WarehouseConfirmationReports() {
   const query=useWarehouseConfirmationReports(true);
   const sources=useWarehouseConfirmationSources(true);
   const arrivals=useWarehouseConfirmationArrivals(true);
   const [selected,setSelected]=useState<WarehouseConfirmationReportRow|null>(null);
-  const [editing,setEditing]=useState(false);
+  const [editor,setEditor]=useState<ReportEditor|null>(null);
+  const [findingSource,setFindingSource]=useState(false);
   const columns=useMemo<DataGridColumn<WarehouseConfirmationReportRow>[]>(()=>[
     {key:"source",label:"Document",width:180,minWidth:180,accessor:row=>documentDisplayNumber(row.po_id ?? row.source_no ?? warehouseConfirmationReportFromWire(row.raw_report)?.poId ?? "Not recorded"),searchValue:row=>String(row.po_id ?? warehouseConfirmationReportFromWire(row.raw_report)?.poId ?? "")},
     {key:"supplier",label:"Supplier",width:200,minWidth:160,accessor:row=>row.supplier_name ?? "Not recorded"},
@@ -33,18 +40,32 @@ export default function WarehouseConfirmationReports() {
   const parsed=selected ? warehouseConfirmationReportFromWire(selected.raw_report) : null;
   const source=parsed?.poId ? sources.data?.pos.find(po=>po.po_id===parsed.poId) : null;
   const arrival=parsed?.arrivalSourceId?arrivals.data?.sources.find(source=>source.id===parsed.arrivalSourceId):null;
-  const result:WarehouseConfirmationResult|null=selected?.status==="draft" && Array.isArray(selected.blockers) && selected.blockers.length ? {id:selected.id,receipt_id:selected.id,status:"draft",grn_no:null,revision:selected.revision,already_saved:true,blockers:selected.blockers} : null;
+  const result:WarehouseConfirmationResult|null=selected?.status==="draft" && !selected.grn_no && Array.isArray(selected.blockers) && selected.blockers.length ? {id:selected.id,receipt_id:selected.id,status:"draft",grn_no:null,revision:selected.revision,already_saved:true,blockers:selected.blockers} : null;
+  const site=sources.data?.warehouse;
+  const sameSite=Boolean(site && (!parsed?.actualSiteId || parsed.actualSiteId===site.id));
+  const editable=Boolean(selected && parsed && result && selected.save_key && sameSite);
+  const closeReport=()=>{setEditor(null);setFindingSource(false);setSelected(null);void query.refetch();};
+  const edit=()=>{
+    if(!selected?.save_key || !parsed || !result || !site || !sameSite)return;
+    const saved={saveKey:selected.save_key,result,report:parsed};
+    if(source)setEditor({kind:"po",po:source,site:{...site},saved});
+    else if(arrival)setEditor({kind:"arrival",arrival,site:{...site},saved});
+  };
+  const sourceError=sources.isError?sources.error ?? new Error("source read unavailable"):query.isError?query.error ?? new Error("reports read unavailable"):null;
   return <ListPageShell register title="My receiving">
     {query.isPending ? <p role="status">Loading…</p> : query.isError ? <div role="alert"><p>Could not be loaded</p><Button onClick={()=>void query.refetch()}>Try again</Button></div> :
-      <DataGrid appearance="reference" rows={query.data.receipts} columns={columns} rowKey={row=>row.id} sessionKey="warehouse-confirmation-reports" storageKey="carres.warehouse.confirmation-reports" searchPlaceholder="Search" emptyMessage="No receiving activity yet." onRowClick={row=>{setSelected(row);setEditing(false);}}/>}
-    {selected && editing && parsed && source && result && selected.save_key ? <WarehouseConfirmationModal key={selected.id} po={source} site={sources.data?.warehouse ?? undefined} saved={{saveKey:selected.save_key,result,report:parsed}} onClose={()=>{setEditing(false);setSelected(null);void query.refetch();}}/> : selected && editing && parsed && arrival && result && selected.save_key ? <WarehouseArrivalConfirmationModal key={selected.id} source={arrival} site={sources.data?.warehouse??undefined} saved={{saveKey:selected.save_key,result,report:parsed}} onClose={()=>{setEditing(false);setSelected(null);void query.refetch();}}/> : selected && <Modal open title={selected.grn_no ? documentDisplayNumber(selected.grn_no) : "Receiving"} width="wide" onOpenChange={open=>{if(!open)setSelected(null);}}
-      footer={<><Button onClick={()=>setSelected(null)}>Close</Button>{selected.status==="draft" && <Button variant="primary" disabled={(!source && !arrival) || !parsed || !result || !selected.save_key || sources.isError || arrivals.isError} onClick={()=>setEditing(true)}>Edit</Button>}</>}>
-      <p className="text-body">{selected.grn_no ? "Receiving saved" : "Receiving report saved. No GRN created."}</p>
-      <Prop label="Document">{documentDisplayNumber(selected.po_id ?? selected.source_no ?? parsed?.poId ?? "Not recorded")}</Prop>
-      {(selected.blockers ?? []).map(blocker=><p key={blocker.code} role="status" className="text-body text-kit-red-11">{blocker.message}</p>)}
-      {selected.status==="draft" && ((!source && !arrival) || sources.isError || arrivals.isError) && <div role="alert"><p>{sources.isError ? "Could not be loaded" : "Not available. Go back and reload."}</p><Button onClick={()=>void sources.refetch()}>Try again</Button></div>}
-      <WarehouseReportHistory receiptId={selected.id}/>
-    </Modal>}
+      <DataGrid appearance="reference" rows={query.data.receipts} columns={columns} rowKey={row=>row.id} sessionKey="warehouse-confirmation-reports" storageKey="carres.warehouse.confirmation-reports" searchPlaceholder="Search" emptyMessage="No receiving activity yet." onRowClick={row=>{setSelected(row);setEditor(null);setFindingSource(false);}}/>}
+    {selected && editor?.kind==="po" ? <WarehouseConfirmationModal key={selected.id} po={editor.po} site={editor.site} saved={editor.saved} onClose={closeReport}/>
+      :selected && editor?.kind==="arrival" ? <WarehouseArrivalConfirmationModal key={selected.id} source={editor.arrival} site={editor.site} saved={editor.saved} onClose={closeReport}/>
+      :selected && findingSource ? <WarehousePoCorrectionPicker report={selected} pos={sources.data?.pos??[]} reports={query.data?.receipts??[]} site={site??undefined} loading={sources.isPending||query.isPending} error={sourceError} onRetry={()=>void Promise.all([sources.refetch(),query.refetch()])} onCancel={()=>setFindingSource(false)} onChoose={(po,saved)=>{if(!site)return;setFindingSource(false);setEditor({kind:"po",po,site:{...site},saved});}}/>
+      :selected && <Modal open title={selected.grn_no ? documentDisplayNumber(selected.grn_no) : "Receiving"} width="wide" onOpenChange={open=>{if(!open)closeReport();}}
+        footer={<><Button onClick={closeReport}>Close</Button>{editable&&!parsed?.arrivalSourceId&&<Button variant={source||arrival?undefined:"primary"} onClick={()=>setFindingSource(true)}>Find PO or CO</Button>}{selected.status==="draft" && (source||arrival) && <Button variant="primary" disabled={!editable || (!source && !arrival) || sources.isError || arrivals.isError} onClick={edit}>Edit</Button>}</>}>
+        <p className="text-body">{selected.grn_no ? "Receiving saved" : "Receiving report saved. No GRN created."}</p>
+        <Prop label="Document">{documentDisplayNumber(selected.po_id ?? selected.source_no ?? parsed?.poId ?? "Not recorded")}</Prop>
+        {(selected.blockers ?? []).map(blocker=><p key={blocker.code} role="status" className="text-body text-kit-red-11">{blocker.message}</p>)}
+        {selected.status==="draft" && (sources.isPending||arrivals.isPending) ? <p role="status">Loading…</p> : selected.status==="draft" && (sources.isError||arrivals.isError) ? <div role="alert"><p>Could not be loaded</p><Button onClick={()=>void Promise.all([sources.refetch(),arrivals.refetch()])}>Try again</Button></div> : selected.status==="draft" && ((!source&&!arrival)&&(!editable||parsed?.arrivalSourceId)||!sameSite) ? <p role="alert">Not available. Go back and reload.</p> : null}
+        <WarehouseReportHistory receiptId={selected.id}/>
+      </Modal>}
   </ListPageShell>;
 }
 
@@ -95,6 +116,7 @@ export function WarehouseReportSnapshot({event}:{event:WarehouseConfirmationHist
  const unitRows=[...(report.lines??[]).flatMap((line,l)=>(line.units??[]).map((unit,u)=>({key:`po:${l}:${u}`,cells:{unit:unit.unitCode||"Not recorded",outcome:outcome(unit.outcome),problem:unit.issueKind==="damaged"?"Damaged":unit.issueKind==="wrong_item"?"Wrong item":"Not recorded"}}))),
   ...(report.arrivalUnits??[]).map((unit,i)=>({key:`arrival:${i}`,cells:{unit:unit.stockItemId?event.unit_labels?.[unit.stockItemId]??"Not recorded":"Not recorded",outcome:outcome(unit.outcome),problem:unit.issueKind==="damaged"?"Damaged":unit.issueKind==="wrong_item"?"Wrong item":"Not recorded"}}))];
  return <div className="my-3">
+  {report.poId&&<Prop label="Reported PO No">{report.poId}</Prop>}
   <Prop label="Goods Received Date">{report.goodsReceivedTime?fmtDate(report.goodsReceivedTime,{time:true}):report.goodsReceivedAt?fmtDate(report.goodsReceivedAt):"Not recorded"}</Prop>
   {!report.goodsReceivedTime&&<Prop label="Time">{report.goodsReceivedClock||"Not recorded"}</Prop>}
   <Prop label="Handover document number">{report.doNumber||"Not recorded"}</Prop>

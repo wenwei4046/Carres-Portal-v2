@@ -2462,6 +2462,17 @@ is pending separately from the frozen attachment-only fix. Model proof is not up
 production verification. Final-head CI and this actual preview's approval remain release gates.
 
 
+**PO/CO report source correction — 2026-10-20, separate source-correction branch DRAFT / ISOLATED MODEL ONLY.**
+An unposted individual Warehouse report can explicitly choose an admitted PO/CO using the existing
+source reader, then recheck physical results through the same confirmation modal/writer. Receipt,
+save key and revision remain the original; old source counts/Unit outcomes/photos are never mapped
+to the new source by SKU. History preserves each reported source and count. The local native walk
+changed an unidentified report to PO261019-8402, posted the same receipt as GRN-261020-4518 and
+preserved U1-000-010's GP261019-3843 reservation. This separate draft does not change frozen PR2100,
+prove production admission/upgrade, implement unknown-delivery intake UI, permit Site/non-PO source
+reclassification, or close the remaining Extra/Stock/account lifecycle gaps above.
+
+
 **Register list PDF — BUILT ON RELEASE BRANCH / NOT YET DEPLOYED, 2026-10-05.**
 The authenticated Receiving list PDF action opened no preview or error. The shared grid previously
 called `window.open` after asynchronous population loading/rendering and ignored a blocked return.
