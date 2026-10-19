@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { receivingExtraCustodyEvidence, receivingExtraCustodyNote } from "@carres/shared";
+import { documentDisplayNumber, receivingExtraCustodyEvidence, receivingExtraCustodyNote } from "@carres/shared";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ApiError, apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
@@ -7,14 +8,19 @@ import DocumentTable from "@/components/kit/DocumentTable";
 import Modal from "@/components/kit/Modal";
 import Textarea from "@/components/kit/Textarea";
 import Button from "@/components/kit/Button";
-import { DocSection } from "@/pages/operation/components/workspace-doc";
+import { DocSection, Prop } from "@/pages/operation/components/workspace-doc";
 
 type NoteDraft = { text: string; key: string; state: "idle" | "saving" | "uncertain" };
 
 /** Original physical observation; never an available-stock or purchasing decision. */
 export default function ReceivingExtraCustody({ receiptId, hasExtra = true }: { receiptId: string; hasExtra?: boolean }) {
   const query = useQuery({ queryKey: ["receiving-extra-custody", receiptId], retry: false,
-    queryFn: async () => receivingExtraCustodyEvidence.parse(await apiFetch(`/api/operation/warehouse-receipts/${receiptId}/extra-custody`)) });
+    queryFn: async () => {
+      const evidence = receivingExtraCustodyEvidence.parse(await apiFetch(`/api/operation/warehouse-receipts/${receiptId}/extra-custody`));
+      if (evidence.recorded_with && evidence.recorded_with.receipt_id !== receiptId)
+        throw new Error("Original Receiving identity does not match this observation");
+      return evidence;
+    } });
   const [leaveGuard, setLeaveGuard] = useState(false);
   const saving = useRef(false);
   const [selected, setSelected] = useState<string | null>(null);
@@ -61,6 +67,12 @@ export default function ReceivingExtraCustody({ receiptId, hasExtra = true }: { 
     <Button type="button" onClick={() => void query.refetch()}>Try again</Button></DocSection>;
   if (!query.data.custody.length) return null;
   return <DocSection title="Extra goods">
+    {query.data.recorded_with && <>
+      <Prop label="Recorded with">{query.data.recorded_with.grn_no
+        ? <Link className="text-kit-blue-11 hover:underline" to={`/operation?tab=receiving&session=${encodeURIComponent(query.data.recorded_with.receipt_id)}`}>{documentDisplayNumber(query.data.recorded_with.grn_no)}</Link>
+        : "No GRN yet"}</Prop>
+      <p className="text-meta text-kit-slate-11 mb-2">This is the original receiving report. It does not confirm the source of the extra goods.</p>
+    </>}
     <DocumentTable label="Extra goods" columns={[
       { key: "sku", label: "SKU" }, { key: "qty", label: "Extra Qty", numeric: true },
       { key: "site", label: "Goods arrived at" }, { key: "date", label: "Goods Received Date" },

@@ -43,6 +43,11 @@ describe("Receiving extra observations are not a disposition", () => {
     const r = await request(); expect(r.status).toBe(200);
     expect(await r.json()).toMatchObject({ custody: [{ id: custodyId, reported_qty: 2 }], notes: [], actorNames: {} });
   });
+  it("links only the original receiving report without claiming it resolves the Extra source", async () => {
+    vi.mocked(userClient).mockReturnValue(db() as never);
+    const r = await request();
+    expect(await r.json()).toMatchObject({ recorded_with: { receipt_id: receiptId, grn_no: "GRN-TEST" } });
+  });
   it("cannot append a note to another receipt's custody record", async () => {
     vi.mocked(userClient).mockReturnValue(db({ foreign: true }) as never);
     const r = await request(`/${custodyId}/notes`, { note: note.note, key }); expect(r.status).toBe(404);

@@ -1,13 +1,26 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
 import ReceivingExtraCustody from "./ReceivingExtraCustody";
 import { ApiError, apiFetch } from "@/lib/api";
 vi.mock("@/lib/api", async () => ({ ...(await vi.importActual("@/lib/api")), apiFetch: vi.fn() }));
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
-function show() { return render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><ReceivingExtraCustody receiptId="receipt-1" /></QueryClientProvider>); }
+function show(receiptId = "receipt-1") { return render(<MemoryRouter><QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><ReceivingExtraCustody receiptId={receiptId} /></QueryClientProvider></MemoryRouter>); }
 const evidence = { custody: [{ id: "custody-1", reported_sku: "EXTRA", reported_qty: 2, reported_note: null, actual_site_id: "site", goods_received_at: "2026-10-05" }], notes: [], actorNames: {}, siteNames: { site: "Klang" } };
 describe("Receiving extra-goods evidence", () => {
+  it("opens the original receiving without presenting it as verified Extra provenance or a disposition", async () => {
+    const receipt = "00000000-0000-4000-8000-000000000201";
+    vi.mocked(apiFetch).mockResolvedValue({ ...evidence, recorded_with: { receipt_id: receipt, grn_no: "GRN-20261019-5181" } }); show(receipt);
+    expect(await screen.findByRole("link", { name: "GRN-261019-5181" })).toHaveAttribute("href", `/operation?tab=receiving&session=${receipt}`);
+    expect(screen.getByText("This is the original receiving report. It does not confirm the source of the extra goods.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Accept|Return|Done/ })).not.toBeInTheDocument();
+  });
+  it("refuses an original-report link belonging to a different receipt", async () => {
+    vi.mocked(apiFetch).mockResolvedValue({ ...evidence, recorded_with: { receipt_id: "00000000-0000-4000-8000-000000000202", grn_no: "GRN-20261019-5181" } }); show();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not be loaded");
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  });
   it("reads the receipt's custody observation with its actual Site and quantity", async () => {
     vi.mocked(apiFetch).mockResolvedValue(evidence); show();
     expect(await screen.findByRole("table", { name: "Extra goods" })).toBeInTheDocument();

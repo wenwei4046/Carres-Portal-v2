@@ -18,7 +18,7 @@ router.get("/:id/extra-custody", requireOperation, async c => {
   const id = uuid.safeParse(c.req.param("id"));
   if (!id.success) return c.json({ message: "Invalid Receiving" }, 422);
   const sb = userClient(c.env, c.var.auth.jwt);
-  const receipt = await sb.from("warehouse_receipts").select("id,extra_lines").eq("id", id.data).maybeSingle();
+  const receipt = await sb.from("warehouse_receipts").select("id,grn_no,extra_lines").eq("id", id.data).maybeSingle();
   if (receipt.error) { const m = mapPgError(receipt.error); return c.json(m.body, m.status); }
   if (!receipt.data) return c.json({ message: "Receiving not found" }, 404);
   const custody = await readAllPages((from, to) => sb.from("receiving_extra_custody").select("*").eq("receipt_id", id.data).order("extra_ordinal").order("id").range(from, to));
@@ -60,7 +60,9 @@ router.get("/:id/extra-custody", requireOperation, async c => {
     const recorded = await receivingActorNames(sb, id.data, actorIds);
     Object.assign(actorNames, recorded ?? {});
   } catch { return c.json({ code: "receiving_extra_actor_names_unavailable" }, 503); }
-  return c.json({ custody: custody.rows, notes: notes.rows, actorNames, siteNames, holderNames });
+  // This is observation provenance only, never a verified source for the Extra goods.
+  return c.json({ custody: custody.rows, notes: notes.rows, actorNames, siteNames, holderNames,
+    recorded_with: { receipt_id: id.data, grn_no: receipt.data.grn_no ?? null } });
 });
 
 router.post("/:id/extra-custody/:custodyId/notes", requireOperation, async c => {

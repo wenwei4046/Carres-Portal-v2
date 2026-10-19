@@ -178,6 +178,7 @@ export const receivingExtraCustodyNote = z.object({
 
 /** Read-only physical custody evidence; no inventory identity or disposition. */
 export const receivingExtraCustodyEvidence = z.object({
+  recorded_with: z.object({ receipt_id: z.string().uuid(), grn_no: z.string().nullable() }).nullable().optional(),
   custody: z.array(z.object({ id: z.string(), reported_sku: z.string(), reported_qty: z.number().int().positive(),
     reported_note: z.string().nullable(), actual_site_id: z.string(), goods_received_at: z.string(),
     holder_party_id: z.string().nullable().optional(), recorded_by: z.string().optional(), recorded_at: z.string().optional() })),
