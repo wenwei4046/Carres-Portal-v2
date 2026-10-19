@@ -17,6 +17,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import OperationApp from "@/pages/operation/OperationApp";
 import { testTasksFeed } from "./tasks-feed-fixture";
+import { appTodayIso } from "@/lib/fmt-date";
 import "@/index.css";
 
 const SUPPLIERS = [
@@ -169,11 +170,16 @@ useAuth.setState({
   session: { access_token: "preview", user: { id: "11111111-1111-4111-8111-111111111111", email: "preview@carres.local" } } as never,
 });
 
+// Match the other shell fixtures: the first-entry reminder is tested separately.
+if (new URLSearchParams(window.location.search).get("reminder") !== "1") {
+  try { window.localStorage.setItem("carres.pendingWork.shownOn.11111111-1111-4111-8111-111111111111", appTodayIso()); } catch { /* storage unavailable */ }
+}
+
 const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={["/operation/procurement"]}>
+      <MemoryRouter initialEntries={[`/operation/procurement${window.location.search}`]}>
         <Routes>
           <Route path="/operation/*" element={<OperationApp />} />
         </Routes>

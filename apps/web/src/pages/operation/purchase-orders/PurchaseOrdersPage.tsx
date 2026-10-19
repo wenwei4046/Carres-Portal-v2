@@ -173,7 +173,7 @@ const weekdayOf = (iso: string) => fmtDate(iso).split(",")[0] ?? "";
 const PO_OVERVIEW_FIXED = { items: 76, source: 102, poDate: 88, delivery: 112, status: 162 } as const;
 const PO_OVERVIEW_FIXED_TOTAL = Object.values(PO_OVERVIEW_FIXED).reduce((sum, width) => sum + width, 0);
 const PO_OVERVIEW_LEAD = 92;
-const PO_OVERVIEW_PO_MIN = 146;
+const PO_OVERVIEW_PO_MIN = 180;
 
 const PO_GROUPS = [
   { key: "not_marked_as_sent", label: "Confirm PO sent to supplier", alwaysOpen: true },
@@ -794,7 +794,8 @@ export default function PurchaseOrdersPage() {
       key: "po",
       chooserGroup: "Document",
       label: "PO No",
-      width: 170,
+      width: 180,
+      minWidth: 180,
       sortable: true,
       filterType: "numbering",
       /* ⭐ THE NUMBER OPENS THE PO, AND NOTHING ELSE SHARES IT (§6.8). The

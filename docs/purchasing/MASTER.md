@@ -4487,7 +4487,7 @@ PO Doc Date · PO Delivery Date · Status
   `Supplier Confirmed Delivery Date`, `Goods Received Date`, `GRN No`, `PO Version`) stay in
   `Table`, in the goods rows and on the PO. The package's `Supplier deadline` is the Portal's `PO
   Delivery Date`; its `PO no.` and `Sales orders` headings are not Portal words.
-- Widths: five fixed columns and `PO No` taking the rest, never under 146, so `Status` stays in
+- Widths: five fixed columns and `PO No` taking the rest, never under 180 (current shared Identifier minimum), so `Status` stays in
   view with no side scroll at 1025, 1164 and 1440 (measured 12 Oct 2026 on the fixture preview).
   An open row's goods table is wider than the list: it scrolls sideways inside itself and never
   widens the list, so `Status` stays in view with a row open (measured at the same three widths).

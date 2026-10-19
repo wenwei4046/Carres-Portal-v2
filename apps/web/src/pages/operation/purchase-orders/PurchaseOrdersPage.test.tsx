@@ -1238,11 +1238,11 @@ describe("Purchase Order object", () => {
     fireEvent.change(screen.getByLabelText("Why"), { target: { value: "Changed quantity" } });
     fireEvent.click(screen.getByRole("button", { name: "Close document work" }));
     const dialog = screen.getByRole("dialog", { name: "Discard" });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel", exact: true }));
+    fireEvent.click(within(dialog).getByRole("button", { name: /^Cancel$/ }));
     expect(screen.getByLabelText("Qty for MAT-K-001")).toHaveValue(4);
     expect(screen.getByLabelText("Why")).toHaveValue("Changed quantity");
     fireEvent.click(screen.getByRole("button", { name: "Close document work" }));
-    fireEvent.click(within(screen.getByRole("dialog", { name: "Discard" })).getByRole("button", { name: "Discard", exact: true }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Discard" })).getByRole("button", { name: /^Discard$/ }));
     expect(screen.queryByLabelText("Why")).not.toBeInTheDocument();
     expect(reviseMutate).not.toHaveBeenCalled();
   });
