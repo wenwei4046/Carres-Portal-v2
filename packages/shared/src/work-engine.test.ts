@@ -242,8 +242,13 @@ describe("WORK_RULES — five parts, or no entry", () => {
     }
   });
 
-  it("cross-module rules name their duty-derived owners, never a stored assignee", () => {
+  it("cross-module rules name their authoritative duty or scoped Case PIC owner", () => {
     for (const r of MODULE_WORK_RULES) {
+      if (r.key === "service_case.remedy_approve") {
+        expect(r.ownerRule).toBe("service_case_pic");
+        expect(r.owner).toBe("the PIC recorded on this Service Case");
+        continue;
+      }
       expect(r.owner).toMatch(/duty|holder/i);
     }
   });
