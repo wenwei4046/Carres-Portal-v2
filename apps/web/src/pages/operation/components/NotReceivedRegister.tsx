@@ -48,10 +48,10 @@ export default function NotReceivedRegister({ pos, suppliers, loading, error, re
 }) {
   const today = appTodayIso();
   const [opening, setOpening] = useState<string | null>(null);
-  const [openError, setOpenError] = useState(false);
+  const [openError, setOpenError] = useState<string | null>(null);
   const start = useCallback(async (id: string) => {
     if (opening) return;
-    setOpening(id); setOpenError(false);
+    setOpening(id); setOpenError(null);
     try {
       const result = await apiFetch<PoReceivingResponse>(`/api/operation/pos/${encodeURIComponent(id)}/receiving`);
       if (!Array.isArray(result.sessions)) throw new Error("Receiving reports could not be read");
@@ -60,7 +60,7 @@ export default function NotReceivedRegister({ pos, suppliers, loading, error, re
       // The warehouse already counted this delivery: check in THAT report, never create another receipt.
       if (reports[0]) onReport(reports[0].id);
       else onReceive(id);
-    } catch { setOpenError(true); }
+    } catch { setOpenError(id); }
     finally { setOpening(null); }
   }, [opening, onReceive, onReport]);
   const { rows, unknown } = useMemo(() => notReceivedRows(pos, suppliers, today), [pos, suppliers, today]);
@@ -79,7 +79,7 @@ export default function NotReceivedRegister({ pos, suppliers, loading, error, re
   if (loading) return <p role="status">Loading…</p>;
   if (error) return <div role="alert"><p>Receiving could not be opened</p><Button onClick={retry}>Try again</Button></div>;
   return <>
-    {openError && <p role="alert">Receiving could not be opened</p>}
+    {openError && <div role="alert"><p>Receiving could not be opened</p><Button disabled={opening !== null} onClick={() => { if (openError) void start(openError); }}>Try again</Button></div>}
     {unknown > 0 && <div role="alert"><p>Some information could not be loaded.</p><Button onClick={retry}>Try again</Button></div>}
     <DataGrid toolbarStart={toolbarStart} appearance="reference" rows={rows} columns={columns} rowKey={row => row.id}
       sessionKey={sessionKey} storageKey="carres.receiving.not-received.v1" searchPlaceholder="Search"

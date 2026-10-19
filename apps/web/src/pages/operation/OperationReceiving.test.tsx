@@ -641,6 +641,10 @@ describe("OperationReceiving — the formal GRN Register", () => {
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Receiving could not be opened"));
     expect(screen.queryByTestId("receiving-po-view")).not.toBeInTheDocument();
     expect(h.officeReceive).toEqual([]);
+    apiFetchMock.mockResolvedValue({ sessions: [] });
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(screen.getByTestId("receiving-po-view")).toBeInTheDocument());
+    expect(screen.getByTestId("receiving-po-view")).toHaveTextContent("PO-READY");
   });
 
   it("uses the three owner-approved views without duplicate column filters in the rail", () => {
