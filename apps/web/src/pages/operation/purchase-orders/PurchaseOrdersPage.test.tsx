@@ -1017,8 +1017,8 @@ describe("Purchase Order object", () => {
     const send = queryData.pos[0]!.sends[0]!;
     Object.assign(send, { note: JSON.stringify({ type: "po_send_evidence", path: "po-send/PO-20260828-4827/V1/00000000-0000-0000-0000-00000000f004/00000000-0000-0000-0000-000000000001.png" }) });
     renderPage("/operation/procurement?po=PO-20260828-4827");
-    fireEvent.click(screen.getByRole("button", { name: "History", exact: true }));
-    expect(screen.getByRole("button", { name: "WhatsApp screenshot", exact: true })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^History$/ }));
+    expect(screen.getByRole("button", { name: /^WhatsApp screenshot$/ })).toBeInTheDocument();
     expect(screen.getByText("PO-260828-4827-V1 · Hooka Purchasing Group")).toBeInTheDocument();
   });
 
