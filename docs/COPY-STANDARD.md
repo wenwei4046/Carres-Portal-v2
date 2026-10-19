@@ -1681,6 +1681,7 @@ on somebody who does not work in it* — binds every module.
 | Context | Words |
 |---|---|
 | Per-PO actual sending result | `Sent` · `Failed` · `Unknown`; retain the exact PO version, channel, recipient, person and time. Unknown must be reconciled before resend. |
+| Manual WhatsApp proof copy · implementation draft, pending owner preview approval | `WhatsApp screenshot` · `WhatsApp screenshot is missing` · `Upload WhatsApp screenshot`; uploaded evidence remains tied to the exact PO/version and reopens from saved sending history. |
 | Manual WhatsApp proof setting · PUR-16 | `Active` · `Inactive`; default Active. Scope is manual WhatsApp sending confirmation only; opening/downloading does not record a send. |
 | Request recipient date settings | Normal/RS30 calendar days and SC14 calendar days after selected Proceed Date, from Settings. Supplier production dates remain separate. |
 

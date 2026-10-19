@@ -1,3 +1,4 @@
+import PoSendProofFields, { usePoSendProof, PoSendEvidenceButton } from "../components/PoSendEvidence";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SO_BATCH_TASK_WORDS as T, documentDisplayNumber, purchasingRefusal } from "@carres/shared";
 import Button from "@/components/kit/Button";
@@ -19,7 +20,7 @@ import { CHANNEL_WORD, confirmedSendFor, doorsForIssuedPo, refreshPurchasingRead
 
 import {
   confirmPoSent, dispatchSupplierEmail, documentFailureOf, emailAttemptsKeyOf, loadPoDocument, loadPoSendFacts, mergeEmailAttempts,
-  readEmailAttempts, recordEmailEvidence, SupplierEmailFailure, type EmailAttempt,
+  readEmailAttempts, recordEmailEvidence, SupplierEmailFailure, type EmailAttempt, type FailedEmailAttempt,
 } from "./po-supplier-send";
 
 /** Presentation only. Fresh owning reads still supply every document/version and send fact. */
@@ -53,6 +54,7 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
   onOpenObject?: (id: string, preparation: PoSupplierPreparation, sourcePos: readonly IssuedPo[]) => void;
   initialPreparation?: PoSupplierPreparation;
 }) {
+  const proof = usePoSendProof();
   const userId = useAuth(state => state.user?.id ?? "unidentified");
   const attemptsKey = emailAttemptsKeyOf(userId);
   const attemptsStorageKey = useRef(attemptsKey);
@@ -80,6 +82,7 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
   const [documentFailures, setDocumentFailures] = useState<Array<{ id: string; message: string; settings?: boolean }>>([]);
   const [documentRefresh, setDocumentRefresh] = useState(0);
   const [sendHistory, setSendHistory] = useState<Record<string, PoSendEvidence[]>>({});
+  const [failedAttempts, setFailedAttempts] = useState<FailedEmailAttempt[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyRefresh, setHistoryRefresh] = useState(0);
   const [historyFailed, setHistoryFailed] = useState<string[]>([]);
@@ -124,7 +127,8 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
   const stepOne: StepState = allSent || allHeld ? "done" : "current";
   const stepTwo: StepState = allSent || channelOpened ? "done" : allHeld ? "current" : "pending";
   const stepThree: StepState = allSent ? "done" : allHeld && channelOpened ? "current" : "pending";
-  const mayRecord = ready && !recording && !historyLoading && historyFailed.length === 0 && toRecord.length > 0 && recipient.length > 0;
+  const proofDocuments = toRecord.filter(po => Number.isInteger(versionOf(po))).map(po => ({ id: po.id, version: versionOf(po)! }));
+  const mayRecord = proof.ready(channel, proofDocuments) && ready && !recording && !historyLoading && historyFailed.length === 0 && toRecord.length > 0 && recipient.length > 0;
 
   useEffect(() => {
     if (attemptsStorageKey.current !== attemptsKey) {
@@ -167,15 +171,17 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
     setHistoryLoading(true);
     setSendHistory({});
     setHistoryFailed([]);
+    setFailedAttempts([]);
     void Promise.allSettled(supplierPos.map(async po => {
       const facts = await loadPoSendFacts(po, emailConfigured);
-      return [po.id, facts.sends, facts.attempts, facts.failed] as const;
+      return [po.id, facts.sends, facts.attempts, facts.failed, facts.failedRecords] as const;
     })).then(results => {
       if (cancelled) return;
       setSendHistory(Object.fromEntries(results.flatMap(result => result.status === "fulfilled" ? [[result.value[0], result.value[1]]] : [])));
       const restored = results.flatMap(result => result.status === "fulfilled" ? result.value[2] : []);
       const failed = new Set(results.flatMap(result => result.status === "fulfilled" ? result.value[3] : []));
       setEmailAttempts(previous => mergeEmailAttempts(previous, restored, failed));
+      setFailedAttempts([...new Map(results.flatMap(result => result.status === "fulfilled" ? result.value[4] : []).map(attempt => [attempt.id, attempt])).values()]);
       setHistoryLoading(false);
       setHistoryFailed(results.flatMap((result, index) => result.status === "rejected" ? [supplierPos[index].id] : []));
     });
@@ -333,7 +339,7 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
     setError(null);
     const failures: Array<{ id: string; wrong: string; todo: string }> = [];
     for (const po of toRecord) {
-      try { await confirmPoSent(po.id, versionOf(po)!, channel === "email" ? "email" : "whatsapp", recipient); }
+      try { await confirmPoSent(po.id, versionOf(po)!, channel === "email" ? "email" : "whatsapp", recipient, proof.path({ id: po.id, version: versionOf(po)! })); }
       catch (failure) {
         const body = (failure as { body?: { message?: string; action?: string; code?: string } }).body;
         const fallback = purchasingRefusal(body?.code, { po: po.id, supplier: po.supplierName, version: versionOf(po) });
@@ -443,6 +449,7 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
           {copied && <div className="text-meta text-c-secondary">Copied. Contact result is unchanged.</div>}
         </Step>
         <Step n={3} state={stepThree} title={allSent ? "PO sent to supplier" : undefined} data-testid="po-bundle-step-record">
+          <PoSendProofFields proof={proof} documents={proofDocuments} channel={channel} disabled={recording} />
           {!allSent && <div className="flex flex-col items-start gap-1">
             <Button variant="primary" size="sm" icon="confirm" disabled={!mayRecord} loading={recording} data-testid="po-bundle-record"
               onClick={() => setRecordOpen(true)}>{T.recordSent(toRecord.length)}</Button>
@@ -465,12 +472,20 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
         {historyFailed.map(id => <div key={id} role="alert" className="text-meta text-kit-red-11">{id} · Evidence could not be loaded</div>)}
         <Button onClick={() => setHistoryRefresh(value => value + 1)}>Try again</Button>
       </div>}
+      {[...failedAttempts, ...emailAttempts].filter(attempt => attempt.documents.some(document => supplierPos.some(po => po.id === document.id))).map(attempt => (
+        <div key={attempt.id} data-testid={`po-bundle-attempt-${attempt.id}`} className="flex flex-col gap-1 border-t border-c-row-line pt-3">
+          <div className="text-body text-c-ink">{attempt.status === "failed" ? "Failed" : attempt.status === "unknown" ? "Unknown" : "Sent"}</div>
+          {attempt.documents.filter(document => supplierPos.some(po => po.id === document.id)).map(document => <div key={document.id} className="text-meta text-c-body">{documentDisplayNumber(`${document.id}-V${document.version}`)} · Email · {attempt.recipient}</div>)}
+          <div className="text-meta text-c-secondary">{attempt.at ? fmtDate(attempt.at, { time: true }) : "Time not recorded"}{attempt.actorName ? ` · ${attempt.actorName}` : ""}</div>
+        </div>
+      ))}
       {supplierPos.some(po => sendHistory[po.id]?.length) && <div className="flex flex-col gap-2 border-t border-c-row-line pt-3" data-testid="po-bundle-history">
         <div className="text-body font-medium text-c-ink">History</div>
         {supplierPos.flatMap(po => (sendHistory[po.id] ?? []).map((event, index) => <div key={`${po.id}-${index}`} className="flex flex-col gap-1">
           <div className="text-body text-c-ink">{event.kind === "confirmed_sent" ? "PO sent to supplier" : `${CHANNEL_WORD[event.channel] ?? event.channel} opened`}</div>
           <div className="text-meta text-c-body">{documentDisplayNumber(`${po.id}${event.po_version ? `-V${event.po_version}` : ""}`)} · {CHANNEL_WORD[event.channel] ?? event.channel}</div>
           <div className="text-meta text-c-secondary">{fmtDate(event.sent_at, { time: true })}{event.sent_by_name ? ` · ${event.sent_by_name}` : ""}</div>
+          <PoSendEvidenceButton poId={po.id} note={event.note} context={`${po.id} · V${event.po_version} · ${event.recipient ?? "Not recorded"}`} />
         </div>))}
       </div>}
     </div>

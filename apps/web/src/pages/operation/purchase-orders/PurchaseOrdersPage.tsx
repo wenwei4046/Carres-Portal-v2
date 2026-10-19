@@ -1,4 +1,5 @@
 import PoCancellationFields from "./PoCancellationFields";
+import { PoSendEvidenceButton } from "../components/PoSendEvidence";
 import Loading from "@/components/kit/Loading";
 import KitModal from "@/components/kit/Modal";
 import KitButton from "@/components/kit/Button";
@@ -36,6 +37,7 @@ import {
   GOODS_CATEGORY_WORDS,
   documentDisplayNumber,
   poDocumentNumberOf,
+  readPoSendEvidence,
 } from "@carres/shared";
 import { Link, useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import {
@@ -77,7 +79,6 @@ import {
   useOperationSuppliers,
   useOperationWarehouse,
   usePoReceiving,
-  useRecordSend,
   useRegisterLayouts,
   useRevisePo,
   useSaveRegisterLayout,
@@ -89,7 +90,8 @@ import {
 import { workspaceDutyActor } from "../workspace-duty-owner";
 import { useOfficeDays } from "@/lib/deadline-queries";
 import PurchasingTabs from "../PurchasingTabs";
-import PoIssueEvidence, { CHANNEL_WORD, doorsForIssuedPo } from "../components/PoIssueEvidence";
+import { CHANNEL_WORD, refreshPurchasingReads } from "../components/PoIssueEvidence";
+import { PoSupplierResultContent } from "../so-batch/PoSupplierResultPanel";
 import ChangeDeliverToForm from "./ChangeDeliverToForm";
 import GoodsMiniTable, { goodsCategoryOf, type GoodsMiniLine } from "../components/GoodsMiniTable";
 import { lineConfigBits } from "../../dealer/new-order/special-addons-picker";
@@ -173,7 +175,7 @@ const weekdayOf = (iso: string) => fmtDate(iso).split(",")[0] ?? "";
 const PO_OVERVIEW_FIXED = { items: 76, source: 102, poDate: 88, delivery: 112, status: 162 } as const;
 const PO_OVERVIEW_FIXED_TOTAL = Object.values(PO_OVERVIEW_FIXED).reduce((sum, width) => sum + width, 0);
 const PO_OVERVIEW_LEAD = 92;
-const PO_OVERVIEW_PO_MIN = 146;
+const PO_OVERVIEW_PO_MIN = 180;
 
 const PO_GROUPS = [
   { key: "not_marked_as_sent", label: "Confirm PO sent to supplier", alwaysOpen: true },
@@ -188,6 +190,21 @@ type RailFilter = {
   deliverTo: string | null;
 };
 const RAIL_CLEAR: RailFilter = { facet: null, supplier: null, deliverTo: null };
+
+type PoListingReturn = { params: string; selectedKeys: string[]; filter: RailFilter };
+/** Router entry state survives a related-module visit; the grid already keeps
+ * its own search, column filters and per-presentation scroll in sessionKey. */
+function poListingReturnOf(state: unknown): PoListingReturn | null {
+  if (!state || typeof state !== "object") return null;
+  const value = (state as { poListingReturn?: unknown }).poListingReturn;
+  if (!value || typeof value !== "object") return null;
+  const saved = value as Partial<PoListingReturn>;
+  if (typeof saved.params !== "string" || !Array.isArray(saved.selectedKeys) || !saved.selectedKeys.every(key => typeof key === "string") || !saved.filter) return null;
+  const { facet, supplier, deliverTo } = saved.filter;
+  if ((facet !== null && !RAIL_ROWS.some(row => row.key === facet)) ||
+      (supplier !== null && typeof supplier !== "string") || (deliverTo !== null && typeof deliverTo !== "string")) return null;
+  return { params: saved.params, selectedKeys: saved.selectedKeys, filter: { facet, supplier, deliverTo } };
+}
 
 /**
  * One governed reference behind the PO, as the `SO No / MPR No` column reads
@@ -450,7 +467,8 @@ export default function PurchaseOrdersPage() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const [filter, setFilter] = useState<RailFilter>(RAIL_CLEAR);
+  const restoredListing = poListingReturnOf(location.state);
+  const [filter, setFilter] = useState<RailFilter>(() => restoredListing?.filter ?? RAIL_CLEAR);
   /* The personal saved-layout pilot (ui MASTER §6.7 rule 4). A failed read
      leaves the Columns menu without saved layouts; the register still works. */
   const layoutsQ = useRegisterLayouts("purchase_orders");
@@ -518,8 +536,8 @@ export default function PurchaseOrdersPage() {
     setOverviewRoom(el.clientWidth);
     return () => observer.disconnect();
   });
-  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
-  const listingReturnParams = useRef<string | null>(null);
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set(restoredListing?.selectedKeys ?? []));
+  const listingReturnParams = useRef<string | null>(restoredListing?.params ?? null);
   const toggleRow = (id: string) => setSelectedKeys((previous) => {
     const next = new Set(previous);
     if (next.has(id)) next.delete(id); else next.add(id);
@@ -679,7 +697,6 @@ export default function PurchaseOrdersPage() {
     return (
       <PurchaseOrderObject
         row={selected}
-        messageTemplate={posQ.data?.messageTemplate ?? null}
         owner={poDutyActor}
         destinations={destinations}
         activeDestinations={activeDestinations}
@@ -704,7 +721,7 @@ export default function PurchaseOrdersPage() {
             return next;
           });
         }}
-        onChanged={() => void posQ.refetch()}
+        onChanged={() => { refreshPurchasingReads(); void posQ.refetch(); }}
       />
     );
   }
@@ -742,7 +759,9 @@ export default function PurchaseOrdersPage() {
       if (view) next.set("view", view);
       else next.delete("view");
       return next;
-    });
+    }, { state: { ...location.state, poListingReturn: {
+      params: params.toString(), selectedKeys: [...selectedKeys], filter,
+    } satisfies PoListingReturn } });
   };
   /** The actual receipt, in Receiving, which owns it. */
   const openReceipt = (receiptId: string) =>
@@ -795,7 +814,8 @@ export default function PurchaseOrdersPage() {
       key: "po",
       chooserGroup: "Document",
       label: "PO No",
-      width: 170,
+      width: 180,
+      minWidth: 180,
       sortable: true,
       filterType: "numbering",
       /* ⭐ THE NUMBER OPENS THE PO, AND NOTHING ELSE SHARES IT (§6.8). The
@@ -1601,12 +1621,21 @@ function OrderedGoods({ row, destinations }: { row: RegisterRow; destinations: A
   );
 }
 
+/** A live response must still be the version named by the open PO. Never
+ * paint a newer document beneath an older version's header or send form. */
+function checkDocumentVersion(data: PoTemplateData, poId: string, version: number): void {
+  if (data.po_id !== poId || data.version !== version || data.draft) {
+    throw Object.assign(new Error("stale_po_version"), { body: { code: "stale_po_version" } });
+  }
+}
+
 /** 0430 — reprint the KEPT document of an already-sent version, exactly as it
  *  was recorded at that version's first confirmed send. */
 async function downloadKeptPdf(poId: string, version: number): Promise<void> {
   const data = await apiFetch<PoTemplateData>(
     `/api/operation/pos/${encodeURIComponent(poId)}/print-data?version=${version}`,
   );
+  checkDocumentVersion(data, poId, version);
   const blob = await renderPoPdf(data);
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -1618,13 +1647,14 @@ async function downloadKeptPdf(poId: string, version: number): Promise<void> {
   URL.revokeObjectURL(url);
 }
 
-async function downloadOfficialPdf(poId: string): Promise<void> {
+async function downloadOfficialPdf(poId: string, version: number): Promise<void> {
   const data = await apiFetch<PoTemplateData>(`/api/operation/pos/${encodeURIComponent(poId)}/print-data`);
+  checkDocumentVersion(data, poId, version);
   const blob = await renderPoPdf(data);
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `${poId}.pdf`;
+  anchor.download = `${documentDisplayNumber(`${poId}-V${version}`)}.pdf`;
   anchor.rel = "noopener";
   document.body.appendChild(anchor);
   anchor.click();
@@ -1638,7 +1668,6 @@ type DocumentMode = "read" | "issue" | "revise" | "deliverTo" | "cancel";
 
 function PurchaseOrderObject({
   row,
-  messageTemplate,
   owner,
   destinations,
   activeDestinations,
@@ -1646,7 +1675,6 @@ function PurchaseOrderObject({
   onChanged,
 }: {
   row: RegisterRow;
-  messageTemplate: string | null;
   owner: { userId: string; name: string | null } | null;
   destinations: Array<{ id: string; name: string }>;
   activeDestinations: Array<{ id: string; name: string }>;
@@ -1679,13 +1707,14 @@ function PurchaseOrderObject({
     }, { replace: true });
   };
   const [mode, setMode] = useState<DocumentMode>("read");
+  const [revisionDirty, setRevisionDirty] = useState(false);
   const [cancellationDirty, setCancellationDirty] = useState(false);
-  const [discardCancellation, setDiscardCancellation] = useState(false);
+  const [discardDocument, setDiscardDocument] = useState(false);
   const afterDiscard = useRef<(() => void) | null>(null);
   const leaveDocument = (action: () => void) => {
-    if (mode === "cancel" && cancellationDirty) {
+    if ((mode === "cancel" && cancellationDirty) || (mode === "revise" && revisionDirty)) {
       afterDiscard.current = action;
-      setDiscardCancellation(true);
+      setDiscardDocument(true);
     } else action();
   };
   const [pdfProblem, setPdfProblem] = useState<string | null>(null);
@@ -1696,7 +1725,6 @@ function PurchaseOrderObject({
   const receivingQ = usePoReceiving(row.id);
   const claimsQ = useOperationSupplierClaims("all", row.id);
   const auditQ = useOperationPoAudit(row.id);
-  const recordOpen = useRecordSend(row.id);
   const po = row.po;
   const issueNeeded = row.facts.currentSend == null && (po.status !== "cancelled" || po.cancellation_version===row.facts.version);
 
@@ -1733,7 +1761,7 @@ function PurchaseOrderObject({
               <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-control border border-kit-slate-5 px-3 text-body font-medium" onClick={() => {
                 setPdfProblem(null);
                 setPdfAction(null);
-                void downloadOfficialPdf(po.id).catch((e: unknown) => {
+                void downloadOfficialPdf(po.id, row.facts.version).catch((e: unknown) => {
                   /* The server's OWN two lines, the way PoIssueEvidence already
                      does it; a refusal carrying only a code becomes governed
                      words rather than a code on screen. */
@@ -1818,15 +1846,19 @@ function PurchaseOrderObject({
             <section className="min-w-0 border border-kit-slate-5 bg-white p-4">
               <div className="mb-3 flex items-center justify-between border-b border-kit-slate-5 pb-3">
                 <div>
-                  <h2 className="text-strong">{mode === "issue" ? "Issue purchase order" : mode === "deliverTo" ? "Change Deliver To" : mode === "cancel" ? "Cancel goods not received" : "Revise purchase order"}</h2>
+                  <h2 className="text-strong">{mode === "issue" ? "Confirm PO sent to supplier" : mode === "deliverTo" ? "Change Deliver To" : mode === "cancel" ? "Cancel goods not received" : "Revise purchase order"}</h2>
                   <p className="text-meta text-kit-slate-11">Check the official document beside these fields before you finish.</p>
                 </div>
                 <button type="button" aria-label="Close document work" onClick={() => leaveDocument(() => setMode("read"))}><X size={16} /></button>
               </div>
               {mode === "issue" ? (
-                <PoIssueEvidence
-                  po={{
+                <PoSupplierResultContent
+                  showOpenObject={false}
+                  open
+                  onClose={() => setMode("read")}
+                  pos={[{
                     id: po.id,
+                    version: row.facts.version,
                     supplierId: po.supplier_id,
                     supplierName: row.supplierName,
                     destinationId: po.destination_id ?? "not-recorded",
@@ -1835,22 +1867,8 @@ function PurchaseOrderObject({
                     contactEmail: row.supplier?.contact_email ?? null,
                     poSendChannel: row.supplier?.po_send_channel ?? null,
                     contact: row.supplier?.contact ?? null,
-                  }}
-                  version={po.version ?? 1}
-                  evidence={po.sends ?? []}
-                  doors={doorsForIssuedPo({
-                    id: po.id,
-                    supplierId: po.supplier_id,
-                    supplierName: row.supplierName,
-                    destinationId: po.destination_id ?? "not-recorded",
-                    destination: row.deliverTo,
-                    whatsappGroupUrl: row.supplier?.whatsapp_group_url ?? null,
-                    contactEmail: row.supplier?.contact_email ?? null,
-                    poSendChannel: row.supplier?.po_send_channel ?? null,
-                    contact: row.supplier?.contact ?? null,
-                  }, messageTemplate)}
-                  onOpened={(channel) => recordOpen.mutate({ channel })}
-                  onConfirmed={() => { onChanged(); setMode("read"); }}
+                  }]}
+                  onChanged={onChanged}
                 />
               ) : mode === "cancel" ? (
                 <PoCancellationFields poId={po.id} onDirtyChange={setCancellationDirty} onSaved={()=>{setCancellationDirty(false);onChanged();setMode("read");}} onCancel={()=>leaveDocument(()=>setMode("read"))} renderProblem={(problem,action,onRetry)=><ReadProblem problem={problem} action={action} onRetry={onRetry}/>}/>
@@ -1869,8 +1887,9 @@ function PurchaseOrderObject({
                   po={po}
                   destinations={destinations}
                   activeDestinations={activeDestinations}
-                  onSaved={() => { onChanged(); setMode("read"); }}
-                  onCancel={() => setMode("read")}
+                  onDirtyChange={setRevisionDirty}
+                  onSaved={() => { setRevisionDirty(false); onChanged(); setMode("read"); }}
+                  onCancel={() => leaveDocument(() => setMode("read"))}
                 />
               )}
             </section>
@@ -1953,11 +1972,21 @@ function PurchaseOrderObject({
             problem={auditQ.isError ? "The PO history could not be loaded" : null}
             action="Try again. If it still fails, ask the system owner to check the PO history."
             onRetry={() => void auditQ.refetch()}
-            rows={(auditQ.data?.history ?? []).map((event) => ({
+            rows={[...(po.sends ?? []).flatMap((send) => {
+              const proof = readPoSendEvidence(send.note);
+              if (!proof || send.kind !== "confirmed_sent" || send.channel !== "whatsapp") return [];
+              const context = `${documentDisplayNumber(`${po.id}-V${send.po_version}`)} · ${send.recipient ?? "Not recorded"}`;
+              return [{
+                id: `send-proof-${proof.path}`,
+                title: context,
+                meta: `${send.sent_by_name ?? "Staff identity not recorded"} · ${fmtDate(send.sent_at, { time: true })}`,
+                action: <PoSendEvidenceButton poId={po.id} note={send.note} context={context} />,
+              }];
+            }), ...(auditQ.data?.history ?? []).map((event) => ({
               id: event.id,
               title: event.text,
               meta: `${event.actor_name ?? "Staff identity not recorded"} · ${event.by_role ?? "Role not recorded"} · ${fmtDate(event.occurred_at, { time: true })}`,
-            }))}
+            }))]}
           />
         ) : (
           <OrderRoute
@@ -1973,10 +2002,10 @@ function PurchaseOrderObject({
           />
         )}
       </main>
-      <KitModal open={discardCancellation} onOpenChange={setDiscardCancellation} title="Discard" footer={<>
-        <KitButton onClick={() => setDiscardCancellation(false)}>Cancel</KitButton>
+      <KitModal open={discardDocument} onOpenChange={setDiscardDocument} title="Discard" footer={<>
+        <KitButton onClick={() => setDiscardDocument(false)}>Cancel</KitButton>
         <KitButton variant="primary" onClick={() => {
-          setDiscardCancellation(false); setCancellationDirty(false);
+          setDiscardDocument(false); setCancellationDirty(false); setRevisionDirty(false);
           const action = afterDiscard.current; afterDiscard.current = null; action?.();
         }}>Discard</KitButton>
       </>}>Not saved</KitModal>
@@ -2006,7 +2035,7 @@ function CurrentAction({ row, owner, onIssue }: { row: RegisterRow; owner: { use
       {fact && action ? (
         <div className="flex flex-wrap items-center gap-3" data-testid="po-object-work">
           <OwnerBadge userId={owner?.userId ?? null} name={owner?.name ?? null} />
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 basis-48 grow">
             <div className="text-strong text-kit-slate-12">{fact}</div>
             <div className="text-meta text-kit-slate-11">{action}</div>
           </div>
@@ -2179,12 +2208,12 @@ function DocumentView({ row, owner, onIssue, units, receiving, claims, destinati
           IDs card is gone: units live on their Goods line above. */}
       <div className="flex flex-col gap-3">
         <ConnectionBlock title="Receiving" empty="No receiving session is connected to this PO." hasContent={receiving.length > 0} loading={receivingLoading} problem={receivingError ? "The Receiving connection could not be loaded" : null} action="Try again. If it still fails, ask the system owner to check the receiving connection." onRetry={onRetryReceiving}>
-          {receiving.map((receipt) => <ConnectionRow key={receipt.id} primary={receipt.do_number ?? "Supplier DO not recorded"} secondary={`${receipt.status} · ${fmtDate(receipt.goods_received_at)}`} />)}
+          {receiving.map((receipt) => <ConnectionRow key={receipt.id} primary={receipt.do_number ?? "Supplier DO not recorded"} href={`/operation?tab=receiving&session=${encodeURIComponent(receipt.id)}`} secondary={`${receipt.status} · ${fmtDate(receipt.goods_received_at)}`} />)}
           {receiving.length > 0 ? <Link className="mt-2 text-meta font-medium text-kit-blue-11 hover:underline" to={`/operation?tab=receiving&po=${encodeURIComponent(po.id)}`}>Open Receiving</Link> : null}
         </ConnectionBlock>
         <ConnectionBlock title="Claims and returns" empty="No claim or return is connected to this PO." hasContent={claims.length + returnRows.length > 0} loading={claimsLoading || receivingLoading} problem={claimsError || receivingError ? "The claims and returns connection could not be loaded" : null} action="Try again. If it still fails, ask the system owner to check the claim and receiving return connections." onRetry={() => { onRetryClaims(); onRetryReceiving(); }}>
-          {claims.map((claim) => <ConnectionRow key={claim.id} primary={claim.claim_no} secondary={`${claim.status}${claim.requested_action === "return_for_inspection" ? ` · ${supplierClaimRequestLabel("return_for_inspection")}` : ""}`} />)}
-          {returnRows.map((receipt) => <ConnectionRow key={`return-${receipt.id}`} primary="Receiving return" secondary={receipt.return_reason!} />)}
+          {claims.map((claim) => <ConnectionRow key={claim.id} primary={documentDisplayNumber(claim.claim_no)} href={`/operation?tab=claims&claim=${encodeURIComponent(claim.id)}`} secondary={`${claim.status}${claim.requested_action === "return_for_inspection" ? ` · ${supplierClaimRequestLabel("return_for_inspection")}` : ""}`} />)}
+          {returnRows.map((receipt) => <ConnectionRow key={`return-${receipt.id}`} primary="Receiving return" href={`/operation?tab=receiving&session=${encodeURIComponent(receipt.id)}`} secondary={receipt.return_reason!} />)}
           {claims.length > 0 ? <Link className="mt-2 text-meta font-medium text-kit-blue-11 hover:underline" to={`/operation?tab=claims&po=${encodeURIComponent(po.id)}`}>Open Claims and Returns</Link> : null}
         </ConnectionBlock>
       </div>
@@ -2235,8 +2264,8 @@ function ConnectionBlock({ title, empty, children, hasContent, loading, problem,
   return <Block title={title}><div className="flex flex-col gap-2">{problem ? <ReadProblem problem={problem} action={action ?? "Try again."} onRetry={onRetry} /> : loading ? <Absence>Loading…</Absence> : hasContent ? children : <p className="text-meta text-kit-slate-11">{empty}</p>}</div></Block>;
 }
 
-function ConnectionRow({ primary, secondary }: { primary: string; secondary: string }) {
-  return <div><div className="text-body font-medium text-kit-slate-12">{primary}</div><div className="text-meta text-kit-slate-11">{secondary}</div></div>;
+function ConnectionRow({ primary, secondary, href }: { primary: string; secondary: string; href?: string }) {
+  return <div><div className="text-body font-medium text-kit-slate-12">{href ? <Link to={href} className="text-kit-blue-11 hover:underline">{primary}</Link> : primary}</div><div className="text-meta text-kit-slate-11">{secondary}</div></div>;
 }
 
 function RecordList({ title, empty, rows, problem, action, onRetry }: { title: string; empty: string; rows: Array<{ id: string; title: string; meta: string; detail?: string; action?: React.ReactNode }>; problem?: string | null; action?: string; onRetry?: () => void }) {
@@ -2284,6 +2313,7 @@ function OfficialPreview({ poId, version }: { poId: string; version: number }) {
     setRefusal(null);
     try {
       const data = await apiFetch<PoTemplateData>(`/api/operation/pos/${encodeURIComponent(poId)}/print-data`);
+      checkDocumentVersion(data, poId, version);
       return await renderPoPdf(data);
     } catch (error) {
       const body = (error as { body?: { message?: string; action?: string; code?: string } } | null)?.body;
@@ -2293,7 +2323,7 @@ function OfficialPreview({ poId, version }: { poId: string; version: number }) {
       }
       throw error;
     }
-  }, [poId]);
+  }, [poId, version]);
   const { pdfLoading, pdfError, setPane, retry } = usePdfCanvases(`${poId}:${version}`, render);
   return (
     <div className="mx-auto w-full max-w-[700px]">
@@ -2312,12 +2342,14 @@ function RevisionForm({
   po,
   destinations,
   activeDestinations,
+  onDirtyChange,
   onSaved,
   onCancel,
 }: {
   po: operationPoListRow;
   destinations: Array<{ id: string; name: string }>;
   activeDestinations: Array<{ id: string; name: string }>;
+  onDirtyChange: (dirty: boolean) => void;
   onSaved: () => void;
   onCancel: () => void;
 }) {
@@ -2341,6 +2373,9 @@ function RevisionForm({
       destinationId: nextDestinationId === (po.destination_id ?? "") ? null : nextDestinationId || null,
     }];
   });
+  const dirty = changes.length > 0 || reason.trim().length > 0;
+  useEffect(() => { onDirtyChange(dirty); }, [dirty, onDirtyChange]);
+  useEffect(() => () => onDirtyChange(false), [onDirtyChange]);
   const invalidNumber = po.purchase_order_lines.some((line) => !Number.isInteger(Number(draft[line.id])));
   const belowMinimum = po.purchase_order_lines.some((line) => Number(draft[line.id]) < 1);
   const belowReceived = po.purchase_order_lines.some((line) => Number(draft[line.id]) < line.received_qty);

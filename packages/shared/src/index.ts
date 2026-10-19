@@ -3453,3 +3453,5 @@ export type { DatePreset, RegisterColumnQuery, RegisterColumnFact } from "./regi
 export * from "./courier-dispatch";
 
 export { purchaseRequestReleaseSchema, type PurchaseRequestRelease } from "./purchase-request-context";
+
+export * from "./po-send-evidence";

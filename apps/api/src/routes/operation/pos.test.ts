@@ -2814,6 +2814,21 @@ describe("POST /api/operation/pos/:id/confirm-sent", () => {
     });
   });
 
+  it("passes a saved screenshot to the same versioned writer without changing its signature", async () => {
+    const rpc = mockRpc();
+    const evidencePath = "po-send/PO-2041/V2/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222.png";
+    const res = await post({ channel: "whatsapp", recipient: "TEST supplier", poVersion: 2, evidencePath });
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_confirm_po_sent", expect.objectContaining({ p_expected_version: 2, p_note: JSON.stringify({ type: "po_send_evidence", path: evidencePath }) }));
+  });
+  it("returns the missing screenshot's recoverable refusal without a second writer", async () => {
+    const rpc = mockRpc(null, { code: "22023", message: "WhatsApp screenshot is missing", details: "po_send_screenshot_required" });
+    const res = await post({ channel: "whatsapp", recipient: "TEST supplier", poVersion: 2 });
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({ code: "po_send_screenshot_required", action: "Upload WhatsApp screenshot" });
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
   /**
    * ⭐ 0378 — the caller DECLARES the version it rendered.
    *
@@ -3449,4 +3464,26 @@ describe("scoped cancellation Finance handoff",()=>{
   const response=await app.fetch(new Request("https://api.test/api/operation/pos/TEST/cancellations/effective-1/evidence?path=TEST%2Fproof.pdf",{headers:{Authorization:`Bearer ${await makeJwt(role)}`}}),env);
   expect(response.status).toBe(403);expect(rpc).not.toHaveBeenCalled();expect(adminClient).not.toHaveBeenCalled();
  });
+});
+
+describe("PO saved sending screenshot reader", () => {
+  it("signs only an exact saved WhatsApp PO/version/actor evidence path", async () => {
+    const path = "po-send/PO-TEST/V2/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222.png";
+    const sign = vi.fn(async () => ({ data: { signedUrl: "https://test.invalid/signed" }, error: null }));
+    const read: any = { select: () => read, eq: () => read, then: (resolve: any) => Promise.resolve({ data: [{ note: JSON.stringify({ type: "po_send_evidence", path }), po_version: 2, sent_by: "11111111-1111-4111-8111-111111111111" }], error: null }).then(resolve) };
+    vi.mocked(userClient).mockReturnValue({ from: () => read, storage: { from: () => ({ createSignedUrl: sign }) } } as any);
+    const jwt = await makeJwt("operation");
+    const get = (wanted: string) => app.fetch(new Request(`http://t/api/operation/pos/PO-TEST/send-evidence?path=${encodeURIComponent(wanted)}`, { headers: { Authorization: `Bearer ${jwt}` } }), env);
+    expect((await get(path.replace("PO-TEST", "PO-OTHER"))).status).toBe(404);
+    expect(sign).not.toHaveBeenCalled();
+    expect((await get(path)).status).toBe(200);
+    expect(sign).toHaveBeenCalledWith(path, 300);
+  });
+  it("never treats an absent enforcement function as an Inactive proof setting", async () => {
+    vi.mocked(userClient).mockReturnValue({ rpc: async () => ({ data: null, error: { code: "PGRST202" } }) } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request("http://t/api/operation/pos/send-evidence-policy", { headers: { Authorization: `Bearer ${jwt}` } }), env);
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ code: "po_send_evidence_unavailable" });
+  });
 });

@@ -21,6 +21,8 @@ import {
   recordSupplierAnswersInput,
   recordArrivalConfirmationInput,
   confirmPoSentInput,
+  poSendEvidenceNote,
+  readPoSendEvidence,
   supplierPoEmailInput,
   recordSendInput,
   revisePoInput,
@@ -2593,6 +2595,28 @@ operationPosRouter.post("/:id/ready-date", requireOperation, async (c) => {
 // Every row carries what makes it evidence: the kind (an OPEN completes
 // nothing), the exact version, the recipient, the channel, the time, and WHO —
 // the actual actor, the month's duty holder and the dated cover in force.
+// PUR-16 reads the actual stored setting and exact installed writer capability.
+operationPosRouter.get("/send-evidence-policy", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const result = await sb.rpc("purchasing_po_send_evidence_policy");
+  if (result.error || typeof result.data?.required !== "boolean" || result.data?.available !== true) {
+    return c.json({ code: "po_send_evidence_unavailable", message: "Evidence could not be loaded", action: "Try again" }, 503);
+  }
+  return c.json(result.data);
+});
+
+operationPosRouter.get("/:id/send-evidence", requireOperation, async (c) => {
+  const poId = c.req.param("id"), path = c.req.query("path");
+  if (!path) return c.json({ code: "invalid_param" }, 422);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const rows = await sb.from("po_sends").select("note, po_version, sent_by").eq("po_id", poId).eq("kind", "confirmed_sent").eq("channel", "whatsapp");
+  if (rows.error) return c.json({ code: "po_send_evidence_unavailable" }, 503);
+  if (!(rows.data ?? []).some(row => readPoSendEvidence(row.note)?.path === path && path.startsWith(`po-send/${poId}/V${row.po_version}/${row.sent_by}/`))) return c.json({ code: "not_found" }, 404);
+  const signed = await sb.storage.from("delivery-orders").createSignedUrl(path, 300);
+  if (signed.error || !signed.data?.signedUrl) return c.json({ code: "po_send_evidence_unavailable" }, 503);
+  return c.json({ url: signed.data.signedUrl });
+});
+
 operationPosRouter.get("/:id/sends", requireOperation, async (c) => {
   const poId = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -2686,13 +2710,16 @@ operationPosRouter.post("/:id/confirm-sent", requireOperation, poSentWorkComplet
     p_expected_version: parsed.data.poVersion,
     p_channel: parsed.data.channel,
     p_recipient: parsed.data.recipient,
-    p_note: parsed.data.note ?? null,
+    p_note: parsed.data.evidencePath ? poSendEvidenceNote(parsed.data.evidencePath, parsed.data.note) : parsed.data.note ?? null,
   });
   if (error) {
     /* THE ONE ERROR THE OPERATOR CAN ACT ON, in the approved two-line form
        (`docs/purchasing/MASTER.md` §8.3): the FACT, then the FIX. Everything
        else falls through to the shared supplier-call mapping. */
     const details = String((error as { details?: string }).details ?? "");
+    if (details === "po_send_screenshot_required" || details === "po_send_screenshot_invalid") {
+      return c.json({ code: details, message: "WhatsApp screenshot is missing", action: "Upload WhatsApp screenshot" }, 422);
+    }
     if (details === "stale_po_version" || /stale_po_version/.test(error.message ?? "")) {
       return c.json(
         {

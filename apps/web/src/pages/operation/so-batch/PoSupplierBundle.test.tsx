@@ -6,7 +6,7 @@ import PoSupplierBundle, { readPoSupplierPreparation, type PoSupplierPreparation
 const api = vi.hoisted(() => vi.fn());
 const renderPdf = vi.hoisted(() => vi.fn());
 const zip = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/api", async () => ({ ...await vi.importActual<typeof import("@/lib/api")>("@/lib/api"), apiFetch: api }));
+vi.mock("@/lib/api", async () => ({ ...await vi.importActual<typeof import("@/lib/api")>("@/lib/api"), apiFetch: (path: string, ...args: unknown[]) => path.endsWith("/send-evidence-policy") ? Promise.resolve({ required: false, available: true }) : api(path, ...args) }));
 vi.mock("@/lib/pdf/render", () => ({ renderPoPdf: renderPdf }));
 vi.mock("@/lib/purchasing/po-bundle", async () => {
   const actual = await vi.importActual<typeof import("@/lib/purchasing/po-bundle")>("@/lib/purchasing/po-bundle");
@@ -512,6 +512,8 @@ describe("human-triggered supplier email", () => {
     render(<PoSupplierBundle pos={pos} onPreview={() => {}} />);
     await waitFor(() => expect(screen.getByRole("button", { name: "Send Email" })).toBeEnabled());
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.getByTestId("po-bundle-attempt-failed-attempt")).toHaveTextContent("Failed");
+    expect(screen.getByTestId("po-bundle-attempt-failed-attempt")).toHaveTextContent("PO-001-V1");
     expect(api.mock.calls.filter(call => call[0].endsWith("supplier-email"))).toHaveLength(0);
   });
   it("a definite permission refusal leaves no uncertain dispatch record", async () => {

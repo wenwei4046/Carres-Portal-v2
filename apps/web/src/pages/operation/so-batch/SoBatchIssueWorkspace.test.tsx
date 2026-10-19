@@ -26,7 +26,7 @@ async function clickIssue() {
 const apiFetch = vi.fn();
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
-  return { ...actual, apiFetch: (...a: unknown[]) => apiFetch(...a) };
+  return { ...actual, apiFetch: (...a: unknown[]) => String(a[0]).endsWith("/send-evidence-policy") ? Promise.resolve({ required: false, available: true }) : apiFetch(...a) };
 });
 
 import SoBatchIssueWorkspace from "./SoBatchIssueWorkspace";
@@ -481,6 +481,7 @@ describe("Issue PO stays open until the PDF actually reaches the supplier", () =
     renderWorkspace();
     await clickIssue();
     await screen.findByTestId("so-batch-evidence-PO-2041");
+    await waitFor(() => expect(screen.getByTestId("so-batch-evidence-confirm")).toBeEnabled());
     apiFetch.mockReset();
     stubReads();
   }
@@ -817,6 +818,7 @@ describe("closure §8 · outbound evidence is read back, never remembered", () =
 
   it("re-reads the evidence after the operator records a send", async () => {
     await reach();
+    await waitFor(() => expect(screen.getByTestId("so-batch-evidence-confirm")).toBeEnabled());
     apiFetch.mockClear();
     fireEvent.change(screen.getByTestId("so-batch-evidence-recipient"), {
       target: { value: "Hooka Purchasing Group" },

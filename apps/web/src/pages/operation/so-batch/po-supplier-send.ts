@@ -173,8 +173,8 @@ export async function recordEmailEvidence(attempt: EmailAttempt): Promise<EmailA
 }
 
 /** `PO sent to supplier` for one PO at the version staff looked at. */
-export async function confirmPoSent(poId: string, version: number, channel: "whatsapp" | "email", recipient: string): Promise<void> {
+export async function confirmPoSent(poId: string, version: number, channel: "whatsapp" | "email", recipient: string, evidencePath?: string): Promise<void> {
   await apiFetch(`/api/operation/pos/${encodeURIComponent(poId)}/confirm-sent`, {
-    method: "POST", body: JSON.stringify({ channel, recipient, poVersion: version }),
+    method: "POST", body: JSON.stringify({ channel, recipient, poVersion: version, ...(channel === "whatsapp" && evidencePath ? { evidencePath } : {}) }),
   });
 }
