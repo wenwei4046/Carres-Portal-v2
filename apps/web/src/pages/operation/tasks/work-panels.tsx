@@ -72,6 +72,12 @@ export function panelFor(item: WorkRow, host: WorkPanelHost): ReactNode {
   if (item.module === "purchasing" && SUPPLIER_ANSWER_RULES.has(item.ruleKey)) {
     return <SupplierAnswerTaskPanel key={item.id} item={item} host={host} />;
   }
+  // A send obligation is not a supplier-date answer. Until an embedded
+  // single-PO send panel exists, use its governed owning-module door.
+  if (item.module === "purchasing" && item.source.object.kind === "purchase_order"
+    && item.source.interaction.mode === "embedded" && item.source.interaction.actionKey === "purchasing.confirm_po_sent") {
+    return <GenericTaskPanel key={item.id} item={item} host={host} />;
+  }
   if (item.module === "purchasing" && item.source.object.kind === "purchase_order") {
     return <PoDutyTaskPanel key={item.id} item={item} host={host} />;
   }

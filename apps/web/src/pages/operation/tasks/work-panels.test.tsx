@@ -56,6 +56,17 @@ describe("the act panel, in the one task view", () => {
     expect(screen.getByTestId("where")).toHaveTextContent("/operation/orders/so/o-9105");
   });
 
+  it("a PO send task opens its owning PO instead of the supplier-answer form", () => {
+    const destination = "/operation/procurement?po=PO-260910-3301";
+    mount(task({ module: "purchasing", ruleKey: "purchasing.cancellation_send", destination, line: "Send PO-260910-3301-V2 to TEST supplier" }, {
+      object: { kind: "purchase_order", id: "PO-260910-3301", label: "PO-260910-3301-V2" },
+      requiredResult: "Current PO version marked as sent",
+      interaction: { mode: "embedded", actionKey: "purchasing.confirm_po_sent", fallbackDestination: destination },
+    }));
+    expect(screen.getByTestId("task-generic-open")).toBeInTheDocument();
+    expect(screen.queryByTestId("task-record-supplier-answer")).not.toBeInTheDocument();
+  });
+
   it("prints the finish line when it adds to the step, and what happens next when the rule says", () => {
     mount(task({}, { requiredResult: "Scheduled delivery recorded", completionStatement: "The delivery has a confirmed date", nextConsequence: "Logistics is told the date" }));
     expect(screen.getByTestId("task-generic-finish")).toHaveTextContent("Finish when: The delivery has a confirmed date");

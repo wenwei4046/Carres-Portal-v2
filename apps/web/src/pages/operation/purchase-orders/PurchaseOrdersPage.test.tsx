@@ -1231,6 +1231,22 @@ describe("Purchase Order object", () => {
     expect(screen.getByTestId("po-document-split")).toHaveAttribute("data-layout", "50-50");
   });
 
+  it("keeps a changed revision when closing is cancelled and discards only explicitly", () => {
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    openRevise();
+    fireEvent.change(screen.getByLabelText("Qty for MAT-K-001"), { target: { value: "4" } });
+    fireEvent.change(screen.getByLabelText("Why"), { target: { value: "Changed quantity" } });
+    fireEvent.click(screen.getByRole("button", { name: "Close document work" }));
+    const dialog = screen.getByRole("dialog", { name: "Discard" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel", exact: true }));
+    expect(screen.getByLabelText("Qty for MAT-K-001")).toHaveValue(4);
+    expect(screen.getByLabelText("Why")).toHaveValue("Changed quantity");
+    fireEvent.click(screen.getByRole("button", { name: "Close document work" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Discard" })).getByRole("button", { name: "Discard", exact: true }));
+    expect(screen.queryByLabelText("Why")).not.toBeInTheDocument();
+    expect(reviseMutate).not.toHaveBeenCalled();
+  });
+
   it("shows a closed historical Deliver To but does not offer it for new work", () => {
     queryData.destinations.splice(1, 1);
     queryData.pos[0]!.purchase_order_lines[0]!.destination_id = "destination-2";

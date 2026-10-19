@@ -1686,13 +1686,14 @@ function PurchaseOrderObject({
     }, { replace: true });
   };
   const [mode, setMode] = useState<DocumentMode>("read");
+  const [revisionDirty, setRevisionDirty] = useState(false);
   const [cancellationDirty, setCancellationDirty] = useState(false);
-  const [discardCancellation, setDiscardCancellation] = useState(false);
+  const [discardDocument, setDiscardDocument] = useState(false);
   const afterDiscard = useRef<(() => void) | null>(null);
   const leaveDocument = (action: () => void) => {
-    if (mode === "cancel" && cancellationDirty) {
+    if ((mode === "cancel" && cancellationDirty) || (mode === "revise" && revisionDirty)) {
       afterDiscard.current = action;
-      setDiscardCancellation(true);
+      setDiscardDocument(true);
     } else action();
   };
   const [pdfProblem, setPdfProblem] = useState<string | null>(null);
@@ -1865,8 +1866,9 @@ function PurchaseOrderObject({
                   po={po}
                   destinations={destinations}
                   activeDestinations={activeDestinations}
-                  onSaved={() => { onChanged(); setMode("read"); }}
-                  onCancel={() => setMode("read")}
+                  onDirtyChange={setRevisionDirty}
+                  onSaved={() => { setRevisionDirty(false); onChanged(); setMode("read"); }}
+                  onCancel={() => leaveDocument(() => setMode("read"))}
                 />
               )}
             </section>
@@ -1969,10 +1971,10 @@ function PurchaseOrderObject({
           />
         )}
       </main>
-      <KitModal open={discardCancellation} onOpenChange={setDiscardCancellation} title="Discard" footer={<>
-        <KitButton onClick={() => setDiscardCancellation(false)}>Cancel</KitButton>
+      <KitModal open={discardDocument} onOpenChange={setDiscardDocument} title="Discard" footer={<>
+        <KitButton onClick={() => setDiscardDocument(false)}>Cancel</KitButton>
         <KitButton variant="primary" onClick={() => {
-          setDiscardCancellation(false); setCancellationDirty(false);
+          setDiscardDocument(false); setCancellationDirty(false); setRevisionDirty(false);
           const action = afterDiscard.current; afterDiscard.current = null; action?.();
         }}>Discard</KitButton>
       </>}>Not saved</KitModal>
@@ -2309,12 +2311,14 @@ function RevisionForm({
   po,
   destinations,
   activeDestinations,
+  onDirtyChange,
   onSaved,
   onCancel,
 }: {
   po: operationPoListRow;
   destinations: Array<{ id: string; name: string }>;
   activeDestinations: Array<{ id: string; name: string }>;
+  onDirtyChange: (dirty: boolean) => void;
   onSaved: () => void;
   onCancel: () => void;
 }) {
@@ -2338,6 +2342,9 @@ function RevisionForm({
       destinationId: nextDestinationId === (po.destination_id ?? "") ? null : nextDestinationId || null,
     }];
   });
+  const dirty = changes.length > 0 || reason.trim().length > 0;
+  useEffect(() => { onDirtyChange(dirty); }, [dirty, onDirtyChange]);
+  useEffect(() => () => onDirtyChange(false), [onDirtyChange]);
   const invalidNumber = po.purchase_order_lines.some((line) => !Number.isInteger(Number(draft[line.id])));
   const belowMinimum = po.purchase_order_lines.some((line) => Number(draft[line.id]) < 1);
   const belowReceived = po.purchase_order_lines.some((line) => Number(draft[line.id]) < line.received_qty);
