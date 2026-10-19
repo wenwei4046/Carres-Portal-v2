@@ -1,5 +1,5 @@
 import { poLineReportable, GOODS_ABSENCE_WORDS } from "@carres/shared";
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   documentDisplayNumber,
@@ -33,6 +33,8 @@ import {
   RailItem,
   FilterRailGroup,
   FilterRailRow,
+  ShowFiltersButton,
+  useFilterRailOpen,
 } from "./components/workspace-rail";
 import GoodsMiniTable, {
   type GoodsMiniLine,
@@ -91,6 +93,8 @@ function weekLabel(from: string, to: string): string {
 }
 
 export default function OperationReceiving() {
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [railOpen, setRailVisible] = useFilterRailOpen("carres.receiving.rail", canvasRef);
   const [params, setParams] = useSearchParams();
   // Keep historical Records/Differences URLs; only an unscoped entrance defaults to Not received.
   const rawView = params.get("view");
@@ -828,6 +832,7 @@ export default function OperationReceiving() {
   return (
     <div
       className="flex min-h-0 flex-1 flex-col bg-kit-canvas text-kit-slate-12"
+      ref={canvasRef}
       data-testid="receiving-page"
     >
       <PurchasingTabs />
@@ -884,11 +889,11 @@ export default function OperationReceiving() {
         data-testid="receiving-register"
         aria-hidden={Boolean(openObject) || undefined}
       >
-        <FilterRail testId="receiving-rail">
+        {railOpen && <FilterRail testId="receiving-rail" onHide={() => setRailVisible(false)}>
           {([['not_received', 'Not received'], ['records', 'Received'], ['differences', 'Differences']] as const).map(([key, label]) =>
             <RailItem key={key} label={label} active={view === key} testId={`receiving-view-${key}`}
               onClick={() => { const next = new URLSearchParams(params); next.set("view", key); if (key === "differences") next.delete("cancelled"); setOffset(0); setQuickReceipt(null); setParams(next); }} />)}
-        </FilterRail>
+        </FilterRail>}
 
         {/* ⭐ `min-w-0` IS LOAD-BEARING — measured on the 2026-09-19 walk.
             This column is a flex child beside the rail, and a flex item
@@ -907,6 +912,7 @@ export default function OperationReceiving() {
             loading={posQ.isLoading || suppliersQ.isLoading} error={posQ.isError || suppliersQ.isError}
             canReceive={!dutyQ.isLoading && Boolean(dutyQ.data?.allowed)}
             retry={() => { void posQ.refetch(); void suppliersQ.refetch(); }} sessionKey={`${registerSessionKey}-not-received`}
+            toolbarStart={!railOpen ? <ShowFiltersButton onShow={() => setRailVisible(true)} testId="receiving-show-filters" /> : null}
             onReport={openSession}
             onReceive={id => { const next = new URLSearchParams(params); next.set("po", id); setParams(next); }} /> : registerQ.isError ? (
             /* A failure sentence is never the empty sentence (COPY-STANDARD
@@ -981,6 +987,7 @@ export default function OperationReceiving() {
               onRowClick={setQuickReceipt}
               contextMenu={rowMenu}
               toolbarStart={<>
+                {!railOpen ? <ShowFiltersButton onShow={() => setRailVisible(true)} testId="receiving-show-filters" /> : null}
                 <button
                   type="button"
                   data-testid="start-receiving-door"

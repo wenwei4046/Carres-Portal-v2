@@ -1,5 +1,5 @@
 // design-standard: not-a-list-page — child view inside OperationReceiving’s existing ListPageShell; no nested page shell.
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { appTodayIso } from "@/lib/fmt-date";
 import { daysBetween, documentDisplayNumber, poExpectedArrivalsOf, purchaseOrderRegisterFacts } from "@carres/shared";
@@ -42,9 +42,9 @@ export function notReceivedRows(pos: operationPoListRow[], suppliers: Map<string
   return { rows, unknown };
 }
 
-export default function NotReceivedRegister({ pos, suppliers, loading, error, retry, onReceive, onReport, sessionKey, canReceive }: {
+export default function NotReceivedRegister({ pos, suppliers, loading, error, retry, onReceive, onReport, sessionKey, canReceive, toolbarStart }: {
   pos: operationPoListRow[]; suppliers: Map<string, SupplierRow>; loading: boolean; error: boolean;
-  retry: () => void; onReceive: (id: string) => void; onReport: (id: string) => void; sessionKey: string; canReceive: boolean;
+  retry: () => void; onReceive: (id: string) => void; onReport: (id: string) => void; sessionKey: string; canReceive: boolean; toolbarStart?: ReactNode;
 }) {
   const today = appTodayIso();
   const [opening, setOpening] = useState<string | null>(null);
@@ -81,7 +81,7 @@ export default function NotReceivedRegister({ pos, suppliers, loading, error, re
   return <>
     {openError && <p role="alert">Receiving could not be opened</p>}
     {unknown > 0 && <div role="alert"><p>Some information could not be loaded.</p><Button onClick={retry}>Try again</Button></div>}
-    <DataGrid appearance="reference" rows={rows} columns={columns} rowKey={row => row.id}
+    <DataGrid toolbarStart={toolbarStart} appearance="reference" rows={rows} columns={columns} rowKey={row => row.id}
       sessionKey={sessionKey} storageKey="carres.receiving.not-received.v1" searchPlaceholder="Search"
       sortDefault={{ key: "due", dir: "asc" }} emptyMessage={unknown ? "Some information could not be loaded." : "No supplier delivery is ready to receive."} />
   </>;

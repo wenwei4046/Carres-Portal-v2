@@ -646,9 +646,17 @@ describe("OperationReceiving — the formal GRN Register", () => {
   it("uses the three owner-approved views without duplicate column filters in the rail", () => {
     renderPage();
     const rail = within(screen.getByTestId("receiving-rail"));
-    expect(rail.getAllByRole("button").map(button => button.textContent)).toEqual(["Not received", "Received", "Differences"]);
+    expect(rail.getAllByRole("button").filter(button => button.hasAttribute("aria-pressed")).map(button => button.textContent)).toEqual(["Not received", "Received", "Differences"]);
     expect(rail.queryAllByRole("checkbox")).toHaveLength(0);
     for (const label of ["Filter GRN Doc Date", "Filter Supplier", "Filter Goods arrived at"]) expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
+  });
+
+  it("uses the shared hide/restore rail controls without changing the current view", () => {
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Hide filters" }));
+    expect(screen.queryByTestId("receiving-rail")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Show filters" }));
+    expect(screen.getByTestId("receiving-view-records")).toHaveAttribute("aria-pressed", "true");
   });
 
   it("opens on every permitted GRN — no date has to be chosen to see records", () => {
