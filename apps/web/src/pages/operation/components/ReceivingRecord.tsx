@@ -471,15 +471,15 @@ export default function ReceivingRecord({
               </p>
               {hasIssue && (detail.related_records?.claims.length ? detail.related_records.claims.map(claim => (
                 <Link key={claim.id}
-                  to={`/operation?tab=claims&po=${encodeURIComponent(r.po_id)}&claim=${encodeURIComponent(claim.id)}`}
+                  to={`/operation?tab=claims${r.po_id ? `&po=${encodeURIComponent(r.po_id)}` : ""}&claim=${encodeURIComponent(claim.id)}`}
                   className="mt-1.5 block text-body text-kit-blue-11 hover:underline"
                   data-testid="record-open-claims"
                 >Open in Claims{claim.claim_no ? ` · ${claim.claim_no}` : ""}</Link>
-              )) : (
+              )) : r.po_id ? (
                 <Link to={`/operation?tab=claims&po=${encodeURIComponent(r.po_id)}`}
                   className="mt-1.5 inline-block text-body text-kit-blue-11 hover:underline"
                   data-testid="record-open-claims">Open in Claims</Link>
-              ))}
+              ) : null)}
               {detail.related_records?.returns.map(record => (
                 <Link key={record.id} to={`/operation?tab=purchase-returns&pr=${encodeURIComponent(record.id)}`}
                   className="mt-1.5 block text-body text-kit-blue-11 hover:underline">{record.pr_no}</Link>
