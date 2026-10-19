@@ -2492,6 +2492,32 @@ custody and direct unknown/count-only Extra return remain unbuilt/unverified. No
 issue or link creates a Work Done fact. These candidates do not establish whole Receiving completion,
 production SQL approval, exact-main upgrade or release readiness.
 
+**Extra decision record — MINIMAL PROPOSAL / NOT APPROVED / NOT BUILT, 2026-10-20.**
+The existing §9.5 Extra/source-gap rules require Purchasing's decision and verified provenance;
+they do not name the final Extra acceptance actor. PO Duty's existing Claim execution writer admits
+only return/repair/replacement, while GRN posting authority admits physical receipt, not this new
+decision. Do not infer a fourth Claim outcome or grant GRN Duty acceptance rights.
+
+Proposed minimum: keep the original custody observation immutable. Operation records source-search
+evidence; a separate, versioned Purchasing resolution binds that custody occurrence/revision,
+actual holder/Site, verified supplier/sender, goods identity (real Unit/label or governed counted
+specification), exact existing source/line and quantity, evidence and actual decision actor. A
+candidate source is distinct from a verified source. No SKU equality or the original receipt's PO
+establishes the link. Record one explicit outcome: continue source search, accept identified scope,
+or return identified scope. Approval does not move goods, create a GRN, satisfy Work or post money.
+Acceptance executes through the existing Receiving writer only against admitted purchase scope;
+new/unordered purchase scope still requires normal purchase approval. Exact-Unit return uses its
+existing approved Claim/Purchase Return and actual handover. Unknown/count-only direct Extra return
+needs its own admitted counted-custody handover; it cannot manufacture a Unit or reuse an unrelated PR.
+
+**One unresolved owner choice:** who may decide acceptance/return of the verified Extra scope?
+Proposed default is the existing Purchasing Approver; PO Duty prepares the source resolution and
+follows up, and Warehouse records physical execution. Alternative: PO Duty may decide only within
+an existing approved source/quantity, with commercial/new-scope exceptions staying with Purchasing
+Approver. Neither choice changes ordinary Receiving authority or requires a second approval of a
+normal receipt. Until this choice and its exact governed record are admitted, Extra acceptance stays
+blocked. Read-only original-report linkage and investigation notes may continue independently.
+
 
 **Register list PDF — BUILT ON RELEASE BRANCH / NOT YET DEPLOYED, 2026-10-05.**
 The authenticated Receiving list PDF action opened no preview or error. The shared grid previously
