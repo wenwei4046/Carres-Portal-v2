@@ -491,7 +491,7 @@ describe("Purchase Orders Register", () => {
     renderPage({ pathname: "/operation/procurement", search: "?po=PO-20260828-4827",
       state: { poListingReturn: { params: "view=table", selectedKeys: ["PO-20260828-4827"], filter: { facet: null, supplier: null, deliverTo: null } } } });
     fireEvent.click(screen.getByRole("button", { name: "Back to Purchase Orders" }));
-    expect(screen.getByRole("tab", { name: "Table", exact: true })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: /^Table$/ })).toHaveAttribute("aria-selected", "true");
     const row = screen.getByTestId("grid-row-PO-20260828-4827");
     expect(within(row).getByRole("checkbox", { name: "Select row" })).toBeChecked();
   });
