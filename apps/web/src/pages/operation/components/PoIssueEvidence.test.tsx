@@ -326,14 +326,9 @@ describe("both surfaces use THIS component — one law, not two", () => {
   // an unrendered legacy copy below it — so they guarded code nobody saw.
   const PO_PAGE = ["..", "purchase-orders", "PurchaseOrdersPage.tsx"];
 
-  it("Purchase Order detail mounts it too", () => {
-    const src = readFileSync(join(HERE, ...PO_PAGE), "utf8");
-    expect(src).toMatch(/import PoIssueEvidence\b[^;]*from "\.\.\/components\/PoIssueEvidence"/);
-    expect(src).toContain("<PoIssueEvidence");
-    // It reads the PERSISTED rows and the PO's current version.
-    expect(src).toContain("evidence={po.sends ?? []}");
-    expect(src).toContain("version={po.version ?? 1}");
-  });
+  // The PO page now uses the shared supplier-send presentation (same
+  // confirm-sent writer plus unknown Email recovery). Its runtime mount and
+  // exact PO/version scope are covered by PurchaseOrdersPage.test.tsx.
 
   it("Purchase Order detail no longer claims there is no `I've sent` action", () => {
     const src = readFileSync(join(HERE, ...PO_PAGE), "utf8");
