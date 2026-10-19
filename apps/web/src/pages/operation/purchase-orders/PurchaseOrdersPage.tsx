@@ -1,4 +1,5 @@
 import PoCancellationFields from "./PoCancellationFields";
+import { PoSendEvidenceButton } from "../components/PoSendEvidence";
 import Loading from "@/components/kit/Loading";
 import KitModal from "@/components/kit/Modal";
 import KitButton from "@/components/kit/Button";
@@ -36,6 +37,7 @@ import {
   GOODS_CATEGORY_WORDS,
   documentDisplayNumber,
   poDocumentNumberOf,
+  readPoSendEvidence,
 } from "@carres/shared";
 import { Link, useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import {
@@ -1970,11 +1972,21 @@ function PurchaseOrderObject({
             problem={auditQ.isError ? "The PO history could not be loaded" : null}
             action="Try again. If it still fails, ask the system owner to check the PO history."
             onRetry={() => void auditQ.refetch()}
-            rows={(auditQ.data?.history ?? []).map((event) => ({
+            rows={[...(po.sends ?? []).flatMap((send) => {
+              const proof = readPoSendEvidence(send.note);
+              if (!proof || send.kind !== "confirmed_sent" || send.channel !== "whatsapp") return [];
+              const context = `${documentDisplayNumber(`${po.id}-V${send.po_version}`)} · ${send.recipient ?? "Not recorded"}`;
+              return [{
+                id: `send-proof-${proof.path}`,
+                title: context,
+                meta: `${send.sent_by_name ?? "Staff identity not recorded"} · ${fmtDate(send.sent_at, { time: true })}`,
+                action: <PoSendEvidenceButton poId={po.id} note={send.note} context={context} />,
+              }];
+            }), ...(auditQ.data?.history ?? []).map((event) => ({
               id: event.id,
               title: event.text,
               meta: `${event.actor_name ?? "Staff identity not recorded"} · ${event.by_role ?? "Role not recorded"} · ${fmtDate(event.occurred_at, { time: true })}`,
-            }))}
+            }))]}
           />
         ) : (
           <OrderRoute

@@ -1013,6 +1013,15 @@ describe("the supplier answer per goods line (0587, Purchasing §5.7)", () => {
 });
 
 describe("Purchase Order object", () => {
+  it("reopens saved version screenshot evidence from the owning PO history", () => {
+    const send = queryData.pos[0]!.sends[0]!;
+    Object.assign(send, { note: JSON.stringify({ type: "po_send_evidence", path: "po-send/PO-20260828-4827/V1/00000000-0000-0000-0000-00000000f004/00000000-0000-0000-0000-000000000001.png" }) });
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    fireEvent.click(screen.getByRole("button", { name: "History", exact: true }));
+    expect(screen.getByRole("button", { name: "WhatsApp screenshot", exact: true })).toBeInTheDocument();
+    expect(screen.getByText("PO-260828-4827-V1 · Hooka Purchasing Group")).toBeInTheDocument();
+  });
+
   it("opens the governed object views and preserves document connections", () => {
     renderPage("/operation/procurement?po=PO-20260828-4827");
     expect(screen.getByRole("heading", { name: /PO-260828-4827-V2/ })).toBeInTheDocument();
