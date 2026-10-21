@@ -2544,6 +2544,21 @@ Stock/Work/Extra hashes were unchanged. Same-Site-other-person/cross-Site/HR/dis
 passed in a rolled-back fixture transaction. This is transport/access proof, not real-goods evidence
 or approval to apply SQL. Real video/PDF operator acceptance and complete-page acceptance remain owed.
 
+**Independent Office source-Stock candidate — 21 Oct 2026, SQL REVIEW / ROLLED-BACK MODEL ONLY.**
+The existing Office receipt writer can be evaluated with the canonical Stock source-conversion
+core independently of individual Warehouse admission. External review candidate
+`office-source-stock-independent.NOT-APPROVED.sql` retains existing Office authority, exact Unit
+validation, cancellation quantity, original receive engine, GP binding and source-first lock order;
+it requires neither the four foundation DROP statements nor Warehouse accounts/raw-report schema.
+It is an alternative to the bundled Stock/Office candidates, not another set to stack over them.
+The receipt's canonical source results must suppress the API's older SKU-based follow-on reserve,
+including unresolved/empty results; older databases without that result retain their current path.
+Eight incremental old-schema transaction probes passed, with original schema/functions restored
+by ROLLBACK. This is no production application or partial-release approval and does not shrink
+whole Receiving. A pre-existing Warehouse report still refuses duplicate Office receiving;
+independent Office receipt creates no fabricated completion for that report's Tasks. Extra
+acceptance/return and counted/multiple-source allocation remain outside this candidate's proof.
+
 **Unposted goods held / investigation — 21 Oct 2026, BUILT ON BRANCH / ADDITIVE SQL REVIEW / MODEL ONLY.**
 Original-report observation evidence is now independently recordable before a GRN, through the same
 Receiving module and current individual Warehouse/Site/company admission. Each immutable measurement

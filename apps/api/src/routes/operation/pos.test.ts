@@ -1080,6 +1080,16 @@ describe("the Office has exactly ONE receiving door", () => {
   });
 });
 
+describe("Office canonical receipt source results", () => {
+  it.each([[], [{unit_code:"TEST-1",result:"source_reservation_needs_handling"}], null])("does not run legacy SKU binding after an authoritative result %j", async source_reservations => {
+    const data={receipt_id:"r1",status:"posted",source_reservations};
+    const rpc=vi.fn().mockResolvedValue({data,error:null});const from=vi.fn();
+    vi.mocked(userClient).mockReturnValue({rpc,from} as never);
+    const res=await app.fetch(new Request("http://t/api/operation/pos/PO-2050/office-receive",{method:"POST",headers:{Authorization:`Bearer ${await makeJwt("operation")}`,"Content-Type":"application/json"},body:JSON.stringify({doNumber:"DO-TEST",doFilePath:"test/do.jpg",lines:[{id:"11111111-1111-4111-8111-111111111111",receivedNow:1}]})}),env);
+    expect(res.status).toBe(200);expect(await res.json()).toEqual(data);expect(from).not.toHaveBeenCalled();expect(rpc).toHaveBeenCalledTimes(1);expect(rpc.mock.calls[0][0]).toBe("office_receive_post");
+  });
+});
+
 describe("POST /api/operation/pos/:id/office-receive — the arrival time (0601)", () => {
   const OFFICE_LINE = "33333333-3333-4333-8333-333333333333";
   function mocks(rpc: ReturnType<typeof vi.fn>) {
