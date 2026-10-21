@@ -1,3 +1,4 @@
+import ReceivingExtraObservations from "@/components/receiving/ReceivingExtraObservations";
 import ReceivingReportEvidence from "@/components/receiving/ReceivingReportEvidence";
 import { Link } from "react-router-dom";
 import { warehouseConfirmationReportFromWire } from "@carres/shared/adapters";
@@ -35,7 +36,7 @@ export default function BlockedReceivingReport({detail,onBack}:{detail:Receiving
         {report.note && <Prop label="Note">{report.note}</Prop>}
       </>}
     </DocSection>
-    <ReceivingReportEvidence receiptId={receipt.id} office/>
+    <ReceivingExtraObservations receiptId={receipt.id} office/><ReceivingReportEvidence receiptId={receipt.id} office/>
     <DocSection title="History"><ul className="space-y-3">{detail.events.map(event=><li key={event.id}><p className="text-body">{event.payload?.reason==="Arrival evidence added"?"Arrival evidence added":receivingEventLabel(event.event)}</p><p className="text-meta text-kit-slate-11">{event.actor_name || "Staff identity not recorded"} · {fmtDate(event.event_at,{time:true})}</p></li>)}</ul></DocSection>
   </div>;
 }

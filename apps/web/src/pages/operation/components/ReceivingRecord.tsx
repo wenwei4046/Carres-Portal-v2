@@ -1,3 +1,4 @@
+import ReceivingExtraObservations from "@/components/receiving/ReceivingExtraObservations";
 import ReceivingReportEvidence from "@/components/receiving/ReceivingReportEvidence";
 import {ReceivingSourceReservations} from "@/components/receiving/ReceivingSourceReservations";
 import BlockedReceivingReport from "./BlockedReceivingReport";
@@ -464,6 +465,7 @@ export default function ReceivingRecord({
             ))}
           </Section>
 
+          {Boolean(r.raw_report) && <ReceivingExtraObservations receiptId={r.id} office/>}
           {isGrn && <ReceivingExtraCustody key={r.id} receiptId={r.id} hasExtra={extraQty > 0} />}
 
           {/* ── Consequences ──────────────────────────────────────────── */}

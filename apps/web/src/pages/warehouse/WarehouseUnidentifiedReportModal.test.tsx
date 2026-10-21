@@ -1,3 +1,4 @@
+vi.mock("@/components/receiving/ReceivingExtraObservations",()=>({default:()=>null}));
 import {afterEach,describe,it,expect,vi} from "vitest";
 import {cleanup,render,screen,fireEvent} from "@testing-library/react";
 import {QueryClient,QueryClientProvider} from "@tanstack/react-query";

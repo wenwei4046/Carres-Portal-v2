@@ -1,3 +1,4 @@
+import {receivingExtraObservationsRouter} from "../receiving-extra-observations";
 import { receivingReportEvidenceRouter } from "../receiving-report-evidence";
 import { warehouseRepairReturnTargets } from "../../lib/warehouse-repair-return-work";
 import { Hono } from "hono";
@@ -12,6 +13,7 @@ import { withWorkCompletion, workCompletionDeps, type WorkCompletionTarget } fro
 import type { AppEnv } from "../../types";
 
 const router = new Hono<AppEnv>();
+router.route("/confirmation/receipts",receivingExtraObservationsRouter("warehouse"));
 router.route("/confirmation/receipts",receivingReportEvidenceRouter("warehouse"));
 const readiness = z.object({ contract_version: z.literal(1), individual: z.boolean(), site_active: z.boolean() });
 const missingFunction = (error: { code?: string; message?: string }, name: string) =>

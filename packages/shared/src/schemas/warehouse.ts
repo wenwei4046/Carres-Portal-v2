@@ -204,3 +204,17 @@ export const receivingReportEvidenceFiles = z.object({
   })).max(20),
 });
 export type ReceivingReportEvidenceFiles=z.infer<typeof receivingReportEvidenceFiles>;
+
+/** Independent observation snapshots, never summed as available stock/custody balance. */
+export const receivingExtraObservation = z.object({
+ id:z.string().uuid(),receipt_id:z.string().uuid(),report_revision:z.number().int().nonnegative(),report_snapshot:z.record(z.unknown()),
+ label:z.string().nullable(),qty:z.number().int().positive().nullable(),note:z.string(),goods_received_at:z.string().nullable(),
+ actual_site_id:z.string().uuid(),site_name:z.string(),holder_party_id:z.string().uuid(),holder_name:z.string(),
+ recorded_by:z.string().uuid(),actor_name:z.string(),recorded_at:z.string().datetime({offset:true}),request_key:z.string().uuid(),
+});
+export const receivingExtraObservationNote=z.object({id:z.string().uuid(),observation_id:z.string().uuid(),note:z.string(),actor_id:z.string().uuid(),actor_name:z.string(),recorded_at:z.string().datetime({offset:true}),request_key:z.string().uuid()});
+export const receivingExtraObservations=z.object({receipt_id:z.string().uuid(),revision:z.number().int().nonnegative(),can_record:z.boolean(),can_investigate:z.boolean(),observer:z.object({site_name:z.string(),holder_name:z.string(),actor_name:z.string()}).nullable(),observations:z.array(receivingExtraObservation),notes:z.array(receivingExtraObservationNote)});
+export const recordExtraObservationInput=z.object({revision:z.number().int().nonnegative(),key:z.string().uuid(),label:z.string().trim().max(120).nullable(),qty:z.number().int().positive().max(2147483647).nullable(),note:z.string().trim().max(300),day:z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable()}).strict().refine(v=>Boolean(v.label)||v.qty!==null||Boolean(v.note),{message:"Record what you observed"});
+export type ReceivingExtraObservation=z.infer<typeof receivingExtraObservation>;
+export type ReceivingExtraObservations=z.infer<typeof receivingExtraObservations>;
+export type RecordExtraObservationInput=z.infer<typeof recordExtraObservationInput>;

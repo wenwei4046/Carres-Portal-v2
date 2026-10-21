@@ -3467,3 +3467,4 @@ export { purchaseRequestReleaseSchema, type PurchaseRequestRelease } from "./pur
 export * from "./po-send-evidence";
 
 export {receivingReportEvidenceFiles,type ReceivingReportEvidenceFiles} from "./schemas/warehouse";
+export {receivingExtraObservation,receivingExtraObservationNote,receivingExtraObservations,recordExtraObservationInput,type ReceivingExtraObservation,type ReceivingExtraObservations,type RecordExtraObservationInput} from "./schemas/warehouse";

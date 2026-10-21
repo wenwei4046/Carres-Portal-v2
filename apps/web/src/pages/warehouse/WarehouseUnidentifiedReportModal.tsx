@@ -1,3 +1,4 @@
+import ReceivingExtraObservations from "@/components/receiving/ReceivingExtraObservations";
 import ReceivingReportEvidence from "@/components/receiving/ReceivingReportEvidence";
 import { useEffect, useRef, useState } from "react";
 import type { WarehouseConfirmReceiptInput, WarehouseConfirmationResult } from "@carres/shared";
@@ -63,7 +64,7 @@ export default function WarehouseUnidentifiedReportModal({site,onClose}:{site:{i
       <Prop label="Goods arrived at">{site.name}</Prop>
       <p className="text-body mb-3">Record only what you observed. Operation checks the source. This report does not create a GRN or add Stock.</p>
       {error&&<p role="alert" className="text-body">{error}</p>}
-      {result?<div role="status"><p>Receiving report saved. No GRN created.</p>{result.blockers.map(blocker=><p key={blocker.code}>{blocker.message}</p>)}<p className="text-body">Find this report in My receiving.</p><ReceivingReportEvidence receiptId={result.id}/></div>:<fieldset disabled={locked} className="min-w-0 border-0 p-0 m-0 grid gap-3">
+      {result?<div role="status"><p>Receiving report saved. No GRN created.</p>{result.blockers.map(blocker=><p key={blocker.code}>{blocker.message}</p>)}<p className="text-body">Find this report in My receiving.</p><ReceivingExtraObservations receiptId={result.id}/><ReceivingReportEvidence receiptId={result.id}/></div>:<fieldset disabled={locked} className="min-w-0 border-0 p-0 m-0 grid gap-3">
         <DatePicker id="unidentified-date" label="Goods Received Date" value={day} onChange={setDay}/>
         <Input id="unidentified-time" label="Time" hint="Optional" type="time" value={clock} onChange={event=>setClock(event.target.value)} error={clock&&!day?"Record Goods Received Date before Time.":undefined}/>
         <Input id="unidentified-handover" label="Handover person" value={handover} maxLength={200} onChange={event=>setHandover(event.target.value)}/>

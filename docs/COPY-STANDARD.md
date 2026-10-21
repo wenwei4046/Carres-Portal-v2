@@ -5876,3 +5876,21 @@ Receipt-bound attachment ledger only; uploading a file does not accept goods or 
 | Genuinely empty | `No evidence recorded yet.` | Only after a successful authorised read |
 | History | `Arrival evidence added` | Append-only attachment event; original physical report/revision unchanged |
 | Read | `View proof` | Real saved object through the owning authorised reader |
+
+### Unposted goods held: original observations and investigation — 21 Oct 2026
+
+Existing Receiving report only. Immutable physical observation evidence; no available balance or disposition.
+
+| Use | Exact words | Boundary |
+|---|---|---|
+| Section / object | `Original observations` · `Original observation` · `Observation` · `Open observation {n}` | Separate measurements tied to exact original report/revision; never added together |
+| Physical recording | `Record goods held` · `Save observation` · `Label on goods` · `Observed Qty` · `Report revision` | Current qualified individual Warehouse/Site; no SKU/Unit identity inferred |
+| Quantity hint / validation | `Leave blank when not known.` · `Enter a whole quantity greater than zero.` | Unknown is null, never zero; known observations positive whole pieces |
+| Recorder / holder | `Recorded by` · `Received by` · `Goods arrived at` | Actual person and database Site/operating company retained separately; no Duty appointment |
+| Meaning | `Each row is a separate observation. Do not add these quantities together. A note does not accept or return goods.` | No Stock/Work/acceptance/return arithmetic |
+| Actual result | `Observation recorded. No GRN or Stock created.` | Only after owning writer confirms exact request |
+| Investigation | `Add investigation note` · `Investigation note` · `Investigation history` · `Save note` | Existing active Operation/Principal; append to exact observation; Warehouse cannot read Office notes |
+| Note result | `Investigation note recorded. No goods accepted or returned.` | No supplier decision, verified source or disposition implied |
+| Empty | `No observations recorded yet.` | Successful authorised read only |
+| Missing deployment | `Original observations are not available yet.` | No fallback writer |
+| Denied | `Original observations are not available for this account and Site.` | No pointless retry or fake empty |

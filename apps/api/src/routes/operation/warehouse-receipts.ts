@@ -1,3 +1,4 @@
+import {receivingExtraObservationsRouter} from "../receiving-extra-observations";
 import { receivingReportEvidenceRouter } from "../receiving-report-evidence";
 import { receivingActorNames } from "../../lib/receiving-actor-names";
 import receivingExtraRouter from "./receiving-extra";
@@ -57,6 +58,7 @@ import { repairOrderReturnWorkCompletion } from "../../lib/repair-order-work";
  * the only lock.
  */
 const warehouseReceiptsRouter = new Hono<AppEnv>();
+warehouseReceiptsRouter.route("/",receivingExtraObservationsRouter("office"));
 warehouseReceiptsRouter.route("/",receivingReportEvidenceRouter("office"));
 warehouseReceiptsRouter.route("/", receivingExtraRouter);
 

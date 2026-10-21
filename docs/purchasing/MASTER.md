@@ -2544,6 +2544,34 @@ Stock/Work/Extra hashes were unchanged. Same-Site-other-person/cross-Site/HR/dis
 passed in a rolled-back fixture transaction. This is transport/access proof, not real-goods evidence
 or approval to apply SQL. Real video/PDF operator acceptance and complete-page acceptance remain owed.
 
+**Unposted goods held / investigation — 21 Oct 2026, BUILT ON BRANCH / ADDITIVE SQL REVIEW / MODEL ONLY.**
+Original-report observation evidence is now independently recordable before a GRN, through the same
+Receiving module and current individual Warehouse/Site/company admission. Each immutable measurement
+retains the exact receipt/revision/raw report snapshot, optional observed label/quantity/physical date,
+actual observer and database operating company/Site with recorded names/time. Unknown remains null.
+The person is the actual recorder, not a new Duty/custodian appointment. Same-Site qualified colleagues
+may record their own observations under the existing Site scope; original report authorship is retained.
+It does not change the original receipt, its fields/revision, canonical posted Extra custody, Stock,
+Work or Receiving events. Observations are never summed as distinct/current available custody.
+
+Existing active Operation/Principal may append source-investigation Notes to the exact observation,
+with separate actual actor/time and idempotent key; these Office Notes are not exposed to Warehouse.
+Raw reported PO context is observation provenance, never verified Extra source, ownership, accepted
+purchase or disposition. No acceptance/return/purchase/Stock/Work Done door or actor default was added.
+The same original observations remain readable when the receipt later posts; no automatic identity
+matching to posted Extra, a source PO, SKU or Unit is inferred.
+
+External `unposted-extra-observations.NOT-APPROVED.sql` adds two report-evidence child tables and four
+guarded helpers only. It does not relax the existing custody NOT NULL constraints, create another
+Stock/current-custody balance or change the frozen6ffa/a16 candidates. No DROP is in this candidate;
+missing deployment is explicit/fail-closed. It depends on6ffa's individual helper/current Office
+context, not Stock conversion, a16 file storage or the unanswered Extra acceptance actor. Model proof
+recorded one actual TEST observation under2b5669a6 (2 pieces, unknown label/date, NETS Warehouse,
+Carres Klang, actual Warehouse person), then one Office investigation Note. Exact-body retries
+retained both IDs; original receipt/posted custody/old Notes/Stock/Work/events stayed unchanged.
+Unknown-quantity, stale-revision, cross-Site, unqualified role, direct-table and cross-report note
+probes are scoped local evidence, not production admission or full Extra lifecycle completion.
+
 **Extra decision record — MINIMAL PROPOSAL / NOT APPROVED / NOT BUILT, 2026-10-20.**
 The existing §9.5 Extra/source-gap rules require Purchasing's decision and verified provenance;
 they do not name the final Extra acceptance actor. PO Duty's existing Claim execution writer admits

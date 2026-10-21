@@ -1,3 +1,4 @@
+import ReceivingExtraObservations from "@/components/receiving/ReceivingExtraObservations";
 import ReceivingReportEvidence from "@/components/receiving/ReceivingReportEvidence";
 import {ReceivingSourceReservations} from "@/components/receiving/ReceivingSourceReservations";
 // design-standard: list-page — existing ListPageShell and DataGrid; no separate rail for own report history.
@@ -73,7 +74,7 @@ export default function WarehouseConfirmationReports() {
         <Prop label="Document">{documentDisplayNumber(selected.po_id ?? selected.source_no ?? parsed?.poId ?? "Not recorded")}</Prop>
         {(selected.blockers ?? []).map(blocker=><p key={blocker.code} role="status" className="text-body text-kit-red-11">{blocker.message}</p>)}
         {selected.status==="draft" && (sources.isPending||arrivals.isPending) ? <p role="status">Loading…</p> : selected.status==="draft" && (sources.isError||arrivals.isError) ? <div role="alert"><p>Could not be loaded</p><Button onClick={()=>void Promise.all([sources.refetch(),arrivals.refetch()])}>Try again</Button></div> : selected.status==="draft" && ((!source&&!arrival)&&(!editable||parsed?.arrivalSourceId)||!sameSite) ? <p role="alert">Not available. Go back and reload.</p> : null}
-        <ReceivingReportEvidence receiptId={selected.id}/><WarehouseReportHistory receiptId={selected.id}/>
+        <ReceivingExtraObservations receiptId={selected.id}/><ReceivingReportEvidence receiptId={selected.id}/><WarehouseReportHistory receiptId={selected.id}/>
       </Modal>}
   </ListPageShell>;
 }
