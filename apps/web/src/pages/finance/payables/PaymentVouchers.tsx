@@ -57,6 +57,7 @@ import { paysOut } from "@carres/shared/money-accounts";
 import { useMoneyAccounts } from "../settings/api";
 import { useSaveKey } from "../save-key";
 import { amountCell, FINANCE_WIDTH } from "../finance-widths";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 /**
  * Finance → Payment Vouchers (migration 0477). The ONE door money leaves
@@ -126,6 +127,7 @@ function paidFromName(v: { pay_from_account_code: string | null; pay_from_name: 
 }
 
 function VoucherRegister() {
+  const personalLayouts = useFinancePersonalLayouts("finance_payment_vouchers");
   const navigate = useNavigate();
   const [dept, setDept] = useDepartmentParam();
   const query = usePaymentVouchers(dept);
@@ -177,7 +179,7 @@ function VoucherRegister() {
             rowKey={(r) => r.id}
             storageKey="carres.finance.payment-vouchers.v3"
             appearance="reference"
-            look="finance" fillColumn="payee"
+            look="finance" personalLayouts={personalLayouts} fillColumn="payee"
             exportName="Payment Vouchers"
             groupBanner={false}
             stickyIdentity

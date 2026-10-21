@@ -5698,9 +5698,11 @@ export function useRecordSupplierAnswers(poId: string | null) {
  */
 /**
  * Personal saved column layouts (0528; ui MASTER §6.7 rule 4). Purchase Orders
- * is the only pilot listing. Reads and writes run as the signed-in person.
+ * is the pilot listing; since 0704 (Chew 2026-10-21, a Finance exception)
+ * every Finance table joins it as `finance_<name>` (lower-case letters, digits
+ * and `_`). Reads and writes run as the signed-in person.
  */
-export type RegisterLayoutListing = "purchase_orders";
+export type RegisterLayoutListing = "purchase_orders" | `finance_${string}`;
 export interface RegisterLayoutRow {
   id: string;
   name: string;

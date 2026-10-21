@@ -52,6 +52,7 @@ import { LoadFailed } from "../other-money-in/parts";
 import { money } from "../payables/payables-words";
 import { usePlaceProduct, useItemGroups, useSaveItemGroup } from "./api";
 import { postingAccountOptions } from "./PostingAccounts";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 /** The four accounts, in the order the page prints them, and the kind each takes. */
 export const ITEM_GROUP_ACCOUNTS = [
@@ -85,6 +86,7 @@ function accountCell(code: string | null, name: string | null) {
 }
 
 export default function ItemGroups() {
+  const personalLayouts = useFinancePersonalLayouts("finance_item_groups");
   const query = useItemGroups();
   const chart = useLedgerChart();
   /* `null` = closed; "new" = a new group; a group = that group. */
@@ -126,7 +128,7 @@ export default function ItemGroups() {
           rowKey={(g) => g.id}
           storageKey="carres.finance.item-groups.v3"
           appearance="reference"
-          look="finance" fillColumn="name"
+          look="finance" personalLayouts={personalLayouts} fillColumn="name"
           groupBanner={false}
           allowColumnGrouping={false}
           stickyIdentity

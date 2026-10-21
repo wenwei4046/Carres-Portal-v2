@@ -46,6 +46,7 @@ import { ReadFailed } from "../payables/PayablesParts";
 import { AGING_COLUMN_WORDS } from "./ApAging";
 import { readDay } from "./period";
 import { amountCell, FINANCE_WIDTH } from "../finance-widths";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 const AMOUNT = FINANCE_WIDTH.amount;
 const link = "text-kit-blue-11 underline underline-offset-2";
@@ -90,6 +91,7 @@ function Invoices({ row, columns }: { row: ArAgingRow; columns: AgingColumns }) 
 }
 
 export default function ArAging() {
+  const personalLayouts = useFinancePersonalLayouts("finance_ar_aging");
   const [params, setParams] = useSearchParams();
   const today = appTodayIso();
   const asAt = readDay(params.get("asAt")) ?? today;
@@ -167,7 +169,7 @@ export default function ArAging() {
       <ListPageShell register>
         <DataGrid rows={ready?.rows ?? []} columns={gridColumns} rowKey={(r) => r.key}
           rowTestId={(r) => `ar-aging-row-${r.key}`}
-          storageKey="carres.finance.ar-aging.v2" appearance="reference" look="finance" fillColumn="debtor" exportName={`AR Aging ${asAt}`}
+          storageKey="carres.finance.ar-aging.v2" appearance="reference" look="finance" personalLayouts={personalLayouts} fillColumn="debtor" exportName={`AR Aging ${asAt}`}
           groupBanner={false} stickyIdentity isLoading={!query.isSuccess} wrapToolbar
           searchPlaceholder="Search debtors…" expandTitle="Show invoices"
           expandable={{ renderExpansion: (r) => <Invoices row={r} columns={columns} /> }}

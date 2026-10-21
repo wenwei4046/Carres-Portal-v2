@@ -62,6 +62,7 @@ import { useAddAccountInSection, useEditAccount, useMoneyAccounts, useSetAccount
 import { useSaveKey } from "../save-key";
 import ChartImport from "./ChartImport";
 import MoneyAccountModal from "./MoneyAccountModal";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 /** The group of a top account that has no section yet. */
 export const NO_SECTION = "__no_section__";
@@ -150,6 +151,7 @@ const keepInCell = {
 };
 
 export default function ChartOfAccounts() {
+  const personalLayouts = useFinancePersonalLayouts("finance_chart_of_accounts");
   const query = useLedgerChart();
   const [showRetired, setShowRetired] = useState(false);
   const [folded, setFolded] = useState<Set<string>>(() => new Set());
@@ -354,7 +356,7 @@ export default function ChartOfAccounts() {
         rowKey={(r) => r.account.code}
         storageKey="carres.finance.chart-of-accounts.v4"
         appearance="reference"
-        look="finance" fillColumn="name"
+        look="finance" personalLayouts={personalLayouts} fillColumn="name"
         rowTone={(r) => (r.account.is_header ? "subtotal" : null)}
         groupBanner={false}
         allowColumnGrouping={false}

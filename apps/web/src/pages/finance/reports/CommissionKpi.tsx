@@ -30,6 +30,7 @@ import { rm } from "@/lib/format-currency";
 import { LoadFailed } from "../other-money-in/parts";
 import { kpiPeriodWord, kpiTiersWord } from "./commission-words";
 import { amountCell, FINANCE_WIDTH } from "../finance-widths";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 const BASE = "/api/finance/dealer-commission";
 
@@ -45,6 +46,7 @@ const addedWord = (r: Pick<DcKpiRuleRow, "createdAt" | "createdBy">) =>
 const guaranteeWord = (r: Pick<DcKpiRuleRow, "modelName">) => r.modelName ?? "Product not available";
 
 export default function CommissionKpi({ toolbarStart }: { toolbarStart: React.ReactNode }) {
+  const personalLayouts = useFinancePersonalLayouts("finance_commission_kpi");
   const query = useQuery({
     queryKey: ["finance", "dealer-commission", "kpi-rules"],
     queryFn: () => apiFetch<DcKpiRulesRead>(`${BASE}/kpi-rules`),
@@ -77,7 +79,7 @@ export default function CommissionKpi({ toolbarStart }: { toolbarStart: React.Re
           rowKey={(r) => r.id}
           storageKey="carres.finance.commission-kpi.v3"
           appearance="reference"
-          look="finance" fillColumn="tiers"
+          look="finance" personalLayouts={personalLayouts} fillColumn="tiers"
           groupBanner={false}
           allowColumnGrouping={false}
           exportName="KPI allowance"

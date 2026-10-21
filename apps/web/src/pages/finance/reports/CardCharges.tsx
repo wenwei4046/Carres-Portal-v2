@@ -27,6 +27,7 @@ import { cents } from "../payables/payables-words";
 import { decodeDepartment, DepartmentFilter, useDepartmentParam } from "../department";
 import { LoadFailed } from "../other-money-in/parts";
 import { amountCell, FINANCE_WIDTH } from "../finance-widths";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 /** One approved payout's share for one department, as the database sends it. */
 export interface CardChargeSlice {
@@ -93,6 +94,7 @@ function monthEnd(ym: string): string {
 const sum = (rows: CardChargeRow[], k: "gross" | "fee" | "net") => cents(rows.reduce((t, r) => t + r[k], 0));
 
 export default function CardCharges() {
+  const personalLayouts = useFinancePersonalLayouts("finance_card_charges");
   const months = useMemo(lastMonths, []);
   const [from, setFrom] = useState(months[11]!);
   const [to, setTo] = useState(months[0]!);
@@ -117,7 +119,7 @@ export default function CardCharges() {
     <ModuleHeader destinationHeader testId="card-charges-header" word="Card charges" docTitle="Card charges · Carres" />
     <ListPageShell register>
       <DataGrid rows={rows} columns={columns} rowKey={(r) => `${r.month}|${r.acquirer}`} storageKey="carres.finance.card-charges.v2"
-        appearance="reference" look="finance" fillColumn="acquirer" exportName={`Card charges ${from} to ${to}`} groupBanner={false} stickyIdentity
+        appearance="reference" look="finance" personalLayouts={personalLayouts} fillColumn="acquirer" exportName={`Card charges ${from} to ${to}`} groupBanner={false} stickyIdentity
         isLoading={q.isPending} wrapToolbar
         errorState={q.isError ? <LoadFailed what="Card charges" onRetry={() => void q.refetch()} /> : undefined}
         emptyMessage="No approved card payout in these months. Only card settlement days whose payout is approved are counted."

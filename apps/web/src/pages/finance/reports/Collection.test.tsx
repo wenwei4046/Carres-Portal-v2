@@ -13,6 +13,8 @@ import Collection, { readBelow } from "./Collection";
 const api = vi.hoisted(() => ({ answer: null as unknown, calls: [] as string[] }));
 vi.mock("@/lib/api", () => ({
   apiFetch: vi.fn(async (url: string) => {
+    // The personal layouts read (0704) is not this page's read.
+    if (url.startsWith("/api/operation/register-layouts")) return { layouts: [], limit: 10 };
     api.calls.push(url);
     if (!url.startsWith("/api/finance/ledger/collection?")) throw new Error(`unexpected read ${url}`);
     return api.answer;

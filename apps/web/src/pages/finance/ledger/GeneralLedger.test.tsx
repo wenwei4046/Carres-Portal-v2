@@ -15,9 +15,24 @@ const api = vi.hoisted(() => ({
   answer: null as unknown,
   calls: [] as string[],
   fail: null as null | { status: number },
+  /* The person's layouts on the server (0704). Null: the read fails. */
+  layouts: null as null | unknown[],
+  layoutWrites: [] as { url: string; body: unknown }[],
+  layoutReads: 0,
 }));
 vi.mock("@/lib/api", () => ({
-  apiFetch: vi.fn(async (url: string) => {
+  apiFetch: vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.startsWith("/api/operation/register-layouts")) {
+      if (init?.method === "POST") {
+        const body = init.body ? JSON.parse(String(init.body)) : null;
+        api.layoutWrites.push({ url, body });
+        if (url.endsWith("/default")) return { layout: { id: "w1", is_default: true } };
+        return { layout: { id: "w1", name: body.name, layout: body.layout, is_default: false } };
+      }
+      api.layoutReads += 1;
+      if (!api.layouts) throw Object.assign(new Error("boom"), { status: 500, body: {} });
+      return { layouts: api.layouts, limit: 10 };
+    }
     api.calls.push(url);
     if (url.startsWith("/api/finance/ledger/departments")) return [];
     if (api.fail) throw Object.assign(new Error("boom"), { status: api.fail.status, body: {} });
@@ -63,6 +78,9 @@ beforeEach(() => {
   api.answer = ANSWER;
   api.calls = [];
   api.fail = null;
+  api.layouts = null;
+  api.layoutWrites = [];
+  api.layoutReads = 0;
 });
 
 function show(at = "/finance/ledger/general-ledger") {
@@ -142,6 +160,49 @@ describe("General Ledger (0639)", () => {
     fireEvent.mouseUp(window);
     expect(widths()[7]).toBe("180px");
     expect(JSON.parse(window.localStorage.getItem(GENERAL_LEDGER_WIDTHS_KEY)!)).toEqual({ description: 300, debit: 140, balance: 180 });
+  });
+
+  /* Server widths (0704, Chew 2026-10-21): the person's `Column widths`
+     layout on finance_general_ledger. */
+  it("reads the widths from the person's Column widths layout on the server", async () => {
+    window.localStorage.setItem(GENERAL_LEDGER_WIDTHS_KEY, JSON.stringify({ description: 300 }));
+    api.layouts = [{ id: "w1", name: "Column widths", is_default: true,
+      layout: { order: [], hidden: [], widths: { description: 320, balance: 200 }, sort: null } }];
+    show();
+    const table = await screen.findByTestId("general-ledger");
+    const widths = () => Array.from(table.querySelectorAll("col")).map((c) => c.style.width);
+    await waitFor(() => expect(widths()).toEqual(["110px", "150px", "140px", "170px", "320px", "128px", "128px", "200px"]));
+    // The browser's copy follows the server.
+    expect(JSON.parse(window.localStorage.getItem(GENERAL_LEDGER_WIDTHS_KEY)!)).toEqual({ description: 320, balance: 200 });
+  });
+
+  it("a drag saves Column widths once it stops, and makes it the person's Default once", async () => {
+    api.layouts = [];
+    show();
+    const table = await screen.findByTestId("general-ledger");
+    fireEvent.mouseDown(within(table).getByTestId("table-resize-balance"), { clientX: 900, button: 0 });
+    fireEvent.mouseMove(window, { clientX: 910 });
+    fireEvent.mouseMove(window, { clientX: 920 });
+    fireEvent.mouseMove(window, { clientX: 930 });
+    fireEvent.mouseUp(window);
+    // Nothing is sent per move.
+    expect(api.layoutWrites).toEqual([]);
+    await waitFor(() => expect(api.layoutWrites).toHaveLength(2), { timeout: 2000 });
+    expect(api.layoutWrites[0]).toEqual({
+      url: "/api/operation/register-layouts",
+      body: { listing: "finance_general_ledger", name: "Column widths", layout: { order: [], hidden: [], widths: { balance: 180 }, sort: null } },
+    });
+    expect(api.layoutWrites[1]!.url).toBe("/api/operation/register-layouts/w1/default");
+  });
+
+  it("draws the browser's widths when the server read fails", async () => {
+    window.localStorage.setItem(GENERAL_LEDGER_WIDTHS_KEY, JSON.stringify({ description: 300, debit: 140 }));
+    api.layouts = null;
+    show();
+    const table = await screen.findByTestId("general-ledger");
+    await waitFor(() => expect(api.layoutReads).toBe(1));
+    const widths = Array.from(table.querySelectorAll("col")).map((c) => c.style.width);
+    expect(widths).toEqual(["110px", "150px", "140px", "170px", "300px", "140px", "128px", "150px"]);
   });
 
   it("draws its own widths when storage refuses", async () => {

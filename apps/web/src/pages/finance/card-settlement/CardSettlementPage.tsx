@@ -50,6 +50,7 @@ import { MoneyMoveForm } from "../money-moves/MoneyMovesPage";
 import { LoadFailed } from "../other-money-in/parts";
 import { useCardSettlement, useImportCardFile, useMatchCardRow, usePrepareCardPayout } from "./api";
 import { amountCell, FINANCE_WIDTH } from "../finance-widths";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 const MATCHED_WORD: Record<CardMatchHow, string> = {
   approval_code: "Matched by approval code",
@@ -101,6 +102,7 @@ const paymentWords = (p: CardSettlementPayment | undefined) =>
     : "Payment not available";
 
 export default function CardSettlementPage() {
+  const personalLayouts = useFinancePersonalLayouts("finance_card_settlement");
   const query = useCardSettlement();
   const importFile = useImportCardFile();
   const matchRow = useMatchCardRow();
@@ -208,7 +210,7 @@ export default function CardSettlementPage() {
             rowKey={dayKey}
             storageKey="carres.finance.card-settlement.v3"
             appearance="reference"
-            look="finance" fillColumn="machine"
+            look="finance" personalLayouts={personalLayouts} fillColumn="machine"
             exportName="Card settlement"
             groupBanner={false}
             stickyIdentity

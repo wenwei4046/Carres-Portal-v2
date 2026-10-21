@@ -32,6 +32,7 @@ import { useTrialBalance } from "./ledger-queries";
 import { DepartmentFilter, useDepartmentParam } from "../department";
 import { headingWalk, indent } from "../reports/StatementTable";
 import { FINANCE_WIDTH, amountCell } from "../finance-widths";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -94,6 +95,7 @@ const money = (n: number) => (n > 0 ? rm(n) : "");
 export const trialBalanceLabel = (r: TrialBalanceLine) => "  ".repeat(r.depth - 1) + (r.heading ? r.name : `${r.code} ${r.name}`);
 
 export default function LedgerTrialBalance() {
+  const personalLayouts = useFinancePersonalLayouts("finance_trial_balance");
   const [params, setParams] = useSearchParams();
   const asked = params.get("asOf");
   const asOf = asked && ISO_DAY.test(asked) ? asked : appTodayIso();
@@ -166,7 +168,7 @@ export default function LedgerTrialBalance() {
       <ListPageShell register>
         <DataGrid rows={rows} columns={columns} rowKey={(r) => `${r.heading ? "heading" : "account"}:${r.code}`}
           storageKey="carres.finance.trial-balance.v2" appearance="reference" exportName="Trial Balance"
-          look="finance" fillColumn="account" rowTone={(r) => (r.heading ? "subtotal" : null)}
+          look="finance" personalLayouts={personalLayouts} fillColumn="account" rowTone={(r) => (r.heading ? "subtotal" : null)}
           initialGroupBy={["kind"]} groupBanner={false} stickyIdentity isLoading={!query.isSuccess}
           onSortChange={onSortChange} onSearchChange={onSearchChange} countsInGroup={isAccount}
           searchPlaceholder="Search accounts…"

@@ -36,6 +36,7 @@ import { FactRow, Facts, FilesCard, HistoryCard, ReadFailed, ReasonModal } from 
 import { DebitNoteSettlesCard } from "./NoteFollowUpParts";
 import { BILL_STATUS_WORD, VOUCHER_STATUS_WORD, cents, creditorKindWord, money, num, refusal, word } from "./payables-words";
 import { amountCell, FINANCE_WIDTH } from "../finance-widths";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 /**
  * Finance → Payables → Debit Notes (migration 0681; Chew 2026-10-03,
@@ -92,6 +93,7 @@ export function SupplierDebitsOf({ supplierId }: { supplierId: string }) {
 // ── register ────────────────────────────────────────────────────────────────
 
 function DebitNoteRegister() {
+  const personalLayouts = useFinancePersonalLayouts("finance_debit_notes");
   const navigate = useNavigate();
   const query = useSupplierDebitNotes();
   const rows = query.data ?? [];
@@ -133,7 +135,7 @@ function DebitNoteRegister() {
             rowTestId={(r) => `debit-note-row-${r.id}`}
             storageKey="carres.finance.debit-notes.v3"
             appearance="reference"
-            look="finance" fillColumn="supplier"
+            look="finance" personalLayouts={personalLayouts} fillColumn="supplier"
             exportName="Debit Notes"
             groupBanner={false}
             stickyIdentity

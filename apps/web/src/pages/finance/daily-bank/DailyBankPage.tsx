@@ -45,6 +45,7 @@ import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { useDailyBank } from "../ledger/ledger-queries";
 import { FINANCE_WIDTH, amountCell } from "../finance-widths";
 import { VOUCHER_PURPOSE_WORD } from "../payables/payables-words";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 const AMOUNT = FINANCE_WIDTH.amount;
@@ -148,6 +149,7 @@ function boardRows(data: DailyBankDay | undefined): DailyBankRow[] | null {
 }
 
 export default function DailyBankPage() {
+  const personalLayouts = useFinancePersonalLayouts("finance_daily_bank");
   const [params, setParams] = useSearchParams();
   const today = appTodayIso();
   const asked = params.get("day");
@@ -229,7 +231,7 @@ export default function DailyBankPage() {
             rowTestId={(r) => `daily-bank-row-${r.account.account_code}`}
             storageKey="carres.finance.daily-bank.v2"
             appearance="reference"
-            look="finance" fillColumn="account"
+            look="finance" personalLayouts={personalLayouts} fillColumn="account"
             exportName={`Daily Bank ${day}`}
             groupBanner={false}
             stickyIdentity

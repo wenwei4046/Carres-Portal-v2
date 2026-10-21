@@ -37,6 +37,7 @@ import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { ReadFailed } from "../payables/PayablesParts";
 import { amountCell, FINANCE_WIDTH } from "../finance-widths";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 const link = "text-kit-blue-11 underline underline-offset-2";
 
@@ -53,6 +54,7 @@ export function whereItIs(r: CardWaitingRow): string {
 const docOf = (r: CardWaitingRow) => r.wire.receipt_no ?? ledgerDocWord(r.wire.doc_no);
 
 export default function CardMoneyWaiting() {
+  const personalLayouts = useFinancePersonalLayouts("finance_card_money_waiting");
   const query = useQuery({
     queryKey: ["finance", "card-settlement", "waiting"],
     queryFn: () => apiFetch<CardWaitingAnswer>("/api/finance/card-settlement/waiting"),
@@ -110,7 +112,7 @@ export default function CardMoneyWaiting() {
       <ListPageShell register>
         <DataGrid rows={ready?.rows ?? []} columns={columns} rowKey={(r) => r.key}
           rowTestId={(r) => `card-money-waiting-row-${r.wire.entry_no}`}
-          storageKey="carres.finance.card-money-waiting.v2" appearance="reference" look="finance" fillColumn="customer" exportName="Card money waiting"
+          storageKey="carres.finance.card-money-waiting.v2" appearance="reference" look="finance" personalLayouts={personalLayouts} fillColumn="customer" exportName="Card money waiting"
           groupBanner={false} stickyIdentity isLoading={!query.isSuccess} wrapToolbar
           searchPlaceholder="Search payments…"
           emptyMessage="No card or online money is waiting. Every payment has reached the bank."

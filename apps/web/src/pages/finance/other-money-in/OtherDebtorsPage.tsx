@@ -42,6 +42,7 @@ import InvoicePage from "./InvoicePage";
 import PartyModal from "./PartyModal";
 import { LoadFailed } from "./parts";
 import { amountCell, FINANCE_WIDTH } from "../finance-widths";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -121,6 +122,7 @@ function Siblings({ current }: { current: "invoices" | "parties" }) {
 /* ── the invoice Register ──────────────────────────────────────────────────── */
 
 function InvoiceRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNew: () => void }) {
+  const personalLayouts = useFinancePersonalLayouts("finance_other_debtor_invoices");
   const [dept, setDept] = useDepartmentParam();
   const query = useOtherDebtorInvoices(dept);
   const columns = useMemo<DataGridColumn<OtherDebtorInvoiceRow>[]>(
@@ -221,7 +223,7 @@ function InvoiceRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
         rowKey={(r) => r.invoice_id}
         storageKey="carres.finance.other-debtor-invoices.v3"
         appearance="reference"
-        look="finance" fillColumn="party"
+        look="finance" personalLayouts={personalLayouts} fillColumn="party"
         exportName="Other debtor invoices"
         groupBanner={false}
         stickyIdentity
@@ -273,6 +275,7 @@ function InvoiceRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
 /* ── the party Register ────────────────────────────────────────────────────── */
 
 function PartyRegister({ onNewInvoice }: { onNewInvoice: (partyId: string | null) => void }) {
+  const personalLayouts = useFinancePersonalLayouts("finance_other_debtor_parties");
   const query = useOtherDebtorParties();
   /* `undefined` = closed; `null` = a new party; a row = edit that party. */
   const [editing, setEditing] = useState<OtherDebtorPartyRow | null | undefined>(undefined);
@@ -365,7 +368,7 @@ function PartyRegister({ onNewInvoice }: { onNewInvoice: (partyId: string | null
         rowKey={(r) => r.party_id}
         storageKey="carres.finance.other-debtor-parties.v3"
         appearance="reference"
-        look="finance" fillColumn="name"
+        look="finance" personalLayouts={personalLayouts} fillColumn="name"
         exportName="Other debtor parties"
         groupBanner={false}
         stickyIdentity

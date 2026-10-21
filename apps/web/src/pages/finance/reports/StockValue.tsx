@@ -42,6 +42,7 @@ import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { ReadFailed } from "../payables/PayablesParts";
 import { recentMonths } from "./period";
 import { FINANCE_WIDTH, amountCell } from "../finance-widths";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 /** The month before today's, as YYYY-MM: the last month that has ended. */
 export function lastEndedMonth(today: string): string {
@@ -65,6 +66,7 @@ const SUMMARY: readonly Column<StockBucketTotal>[] = [
 ];
 
 export default function StockValue() {
+  const personalLayouts = useFinancePersonalLayouts("finance_stock_value");
   const [params, setParams] = useSearchParams();
   const today = appTodayIso();
   const asked = params.get("month");
@@ -139,7 +141,7 @@ export default function StockValue() {
       <ListPageShell register>
         <DataGrid rows={query.data?.units ?? []} columns={columns} rowKey={(u) => u.id}
           rowTestId={(u) => `stock-value-row-${u.unit_code}`}
-          storageKey="carres.finance.stock-value.v3" appearance="reference" look="finance" fillColumn="sku" exportName={`Stock value ${monthEnd}`}
+          storageKey="carres.finance.stock-value.v3" appearance="reference" look="finance" personalLayouts={personalLayouts} fillColumn="sku" exportName={`Stock value ${monthEnd}`}
           groupBanner={false} stickyIdentity isLoading={!query.isSuccess} wrapToolbar
           searchPlaceholder="Search Units…"
           emptyMessage={`Carres held no Unit at the end of ${fmtDate(monthEnd, { year: "always" })}.`}

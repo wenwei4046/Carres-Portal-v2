@@ -49,10 +49,35 @@ describe("personal saved column layouts", () => {
     expect(vi.mocked(userClient).mock.calls[0]?.[1]).toBeTruthy();
   });
 
-  it("admits only the Purchase Orders pilot", async () => {
-    const res = await call("?listing=sales_orders");
-    expect(res.status).toBe(422);
+  it("admits only the Purchase Orders pilot and Finance tables (0704)", async () => {
+    for (const listing of ["sales_orders", "finance_", "finance_Bills", "finance-bills", `finance_${"a".repeat(61)}`, ""]) {
+      const res = await call(`?listing=${encodeURIComponent(listing)}`);
+      expect(res.status).toBe(422);
+    }
     expect(userClient).not.toHaveBeenCalled();
+  });
+
+  it("reads a Finance table's layouts (0704, Chew 2026-10-21)", async () => {
+    const order = vi.fn(() => Promise.resolve({ data: [], error: null }));
+    const eq = vi.fn(() => ({ order }));
+    const select = vi.fn(() => ({ eq }));
+    const from = vi.fn(() => ({ select }));
+    vi.mocked(userClient).mockReturnValue({ from } as unknown as ReturnType<typeof userClient>);
+    const res = await call("?listing=finance_general_ledger");
+    expect(res.status).toBe(200);
+    expect(eq).toHaveBeenCalledWith("listing", "finance_general_ledger");
+  });
+
+  it("saves a Finance table's layout through the same door; an unknown listing is refused before SQL", async () => {
+    const rpc = vi.fn(() => Promise.resolve({ data: { id: "l3", name: "Column widths" }, error: null }));
+    vi.mocked(userClient).mockReturnValue({ rpc } as unknown as ReturnType<typeof userClient>);
+    const ok = await call("", { method: "POST", body: JSON.stringify({ listing: "finance_bills", name: "Column widths", layout: LAYOUT }) });
+    expect(ok.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("register_layout_save", { p_listing: "finance_bills", p_name: "Column widths", p_layout: LAYOUT });
+    rpc.mockClear();
+    const refused = await call("", { method: "POST", body: JSON.stringify({ listing: "sales_orders", name: "X", layout: LAYOUT }) });
+    expect(refused.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it("saves order, widths, visibility and sort through the owner-only door", async () => {

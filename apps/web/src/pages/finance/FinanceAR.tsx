@@ -18,6 +18,7 @@ import {
   type CustomerOwingRow,
 } from "./money-owed";
 import { FINANCE_WIDTH } from "./finance-widths";
+import { useFinancePersonalLayouts } from "./finance-layouts";
 
 const soWord = (r: CustomerOwingRow) => (r.so !== null ? `SO-${r.so}` : "SO not available");
 const ageWord = (days: number | null) =>
@@ -48,6 +49,7 @@ export function ageScopeWord(scope: AgeScope): string {
  * is never zero here (only orders owing money are listed).
  */
 export default function FinanceAR() {
+  const personalLayouts = useFinancePersonalLayouts("finance_ar");
   const [dept, setDept] = useDepartmentParam();
   const query = useInvoiceRegister(dept);
   const invoiceRows = query.data;
@@ -135,7 +137,7 @@ export default function FinanceAR() {
             rowKey={(r) => r.orderId}
             storageKey="carres.finance.ar.v3"
             appearance="reference"
-            look="finance" fillColumn="customer"
+            look="finance" personalLayouts={personalLayouts} fillColumn="customer"
             exportName="AR · Receivables"
             groupBanner={false}
             stickyIdentity

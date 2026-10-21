@@ -882,6 +882,7 @@ const SETTINGS_CHART = [
 }));
 
 const realFetch = window.fetch.bind(window);
+
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
   if (!url.includes("/api/") && !url.includes("127.0.0.1:88") && !url.includes("localhost:88")) return realFetch(input, init);
@@ -978,6 +979,11 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     return json({ bank_accounts: [], manual_methods: [], storage_rules: [], collection_timing: [], setting_changes: [],
       online_provider: { name: "Stripe", configured: false } });
   if (url.includes("/api/finance/payment-storage")) return json({ cases: [], requests: [] });
+  // 0704: a person's saved layouts, one invented for Bills.
+  if (url.includes("/api/operation/register-layouts"))
+    return json(url.includes("finance_bills")
+      ? { layouts: [{ id: "l-1", name: "Month end", layout: { order: [], hidden: [], widths: {}, sort: null }, is_default: false, updated_at: TODAY }], limit: 10 }
+      : { layouts: [], limit: 10 });
   if (url.includes("/rest/")) return json([]);
   return json({}, 404);
 };

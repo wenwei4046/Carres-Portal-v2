@@ -57,6 +57,7 @@ import { useLedgerChart } from "../ledger/ledger-queries";
 import { LoadFailed } from "../other-money-in/parts";
 import { usePostingAccounts, useSetPostingAccount } from "./api";
 import { FINANCE_WIDTH } from "../finance-widths";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0657).
 // Chew 2026-10-13: each title says when its postings are made.
@@ -198,6 +199,7 @@ const changedWord = (r: { changedAt: string | null; changedBy: string | null }) 
   r.changedAt ? `${fmtDate(r.changedAt)}${r.changedBy ? ` · ${r.changedBy}` : ""}` : "";
 
 export default function PostingAccounts() {
+  const personalLayouts = useFinancePersonalLayouts("finance_posting_accounts");
   const query = usePostingAccounts();
   const chart = useLedgerChart();
   const registry = usePaymentMethodRegistry();
@@ -269,7 +271,7 @@ export default function PostingAccounts() {
           rowKey={(r) => r.id}
           storageKey="carres.finance.posting-accounts.v3"
           appearance="reference"
-          look="finance" fillColumn="posting"
+          look="finance" personalLayouts={personalLayouts} fillColumn="posting"
           groupBanner={false}
           allowColumnGrouping={false}
           fixedGroups={{ groups: POSTING_GROUPS.map((g) => ({ key: g.key, label: g.label })), groupOf: (r) => r.group, revealMatches: true }}

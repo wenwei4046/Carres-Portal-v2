@@ -14,6 +14,7 @@ import SupplierAdvancesOf from "./SupplierAdvancesOf";
 import SupplierCreditsOf from "./SupplierCreditsOf";
 import { SupplierDebitsOf } from "./SupplierDebitNotes";
 import { FINANCE_WIDTH } from "../finance-widths";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 /**
  * Finance → Unpaid by Supplier (migration 0477, `ap_outstanding`). What
@@ -41,6 +42,7 @@ const amount = (v: number | string | null | undefined) => (num(v ?? null) === 0 
 const nothingOpen = (r: ApOutstandingRow) =>
   r.open_bills === 0 && !num(supplierUnpaid(r)) && !num(r.advance_open) && !num(r.credit_open ?? 0) && !num(r.net_owing);
 export default function ApOutstanding() {
+  const personalLayouts = useFinancePersonalLayouts("finance_ap_outstanding");
   const navigate = useNavigate();
   const query = useApOutstanding();
   const [showAll, setShowAll] = useState(false);
@@ -95,7 +97,7 @@ export default function ApOutstanding() {
             rowKey={(r) => r.supplier_id}
             storageKey="carres.finance.ap-outstanding.v2"
             appearance="reference"
-            look="finance" fillColumn="supplier"
+            look="finance" personalLayouts={personalLayouts} fillColumn="supplier"
             toolbarEnd={
               // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 2026-10-13).
               <Checkbox id="ap-outstanding-show-all" label="Show all suppliers" checked={showAll}

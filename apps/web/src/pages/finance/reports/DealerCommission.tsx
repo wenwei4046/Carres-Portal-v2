@@ -57,6 +57,7 @@ import CommissionRates from "./CommissionRates";
 import CommissionKpi from "./CommissionKpi";
 import CommissionStatement from "./CommissionStatement";
 import { amountCell, FINANCE_WIDTH } from "../finance-widths";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 const BASE = "/api/finance/dealer-commission";
 const ALL = "all";
@@ -80,6 +81,7 @@ function lastMonths(): string[] {
 }
 
 export default function DealerCommission() {
+  const personalLayouts = useFinancePersonalLayouts("finance_dealer_commission");
   const months = useMemo(lastMonths, []);
   const [params, setParams] = useSearchParams();
   const v = params.get("view");
@@ -164,7 +166,7 @@ export default function DealerCommission() {
       onOpenMonth={(m) => { setMonth(m); setOutletId(ALL); setParams({ view: "orders" }); }} /> :
     <ListPageShell register>
       <DataGrid rows={rows} columns={columns} rowKey={(r) => r.dealerId} storageKey="carres.finance.dealer-commission.v2"
-        appearance="reference" look="finance" fillColumn="dealer" exportName={`Dealer commission ${month}`} groupBanner={false} stickyIdentity
+        appearance="reference" look="finance" personalLayouts={personalLayouts} fillColumn="dealer" exportName={`Dealer commission ${month}`} groupBanner={false} stickyIdentity
         isLoading={!q.isSuccess} wrapToolbar
         // A dealer's row opens its orders for the same month.
         onRowDoubleClick={(r) => { setDealerId(r.dealerId); setOutletId(ALL); setParams({ view: "orders" }); }}

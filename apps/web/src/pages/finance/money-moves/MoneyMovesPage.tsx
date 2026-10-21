@@ -53,12 +53,14 @@ import { accountLabel, CancelWithReason, LoadFailed } from "../other-money-in/pa
 import { useApproveMoneyMove, useCancelMoneyMove, useMoneyMoves, useMoneyMovesMe, usePrepareMoneyMove } from "./api";
 import { useSaveKey } from "../save-key";
 import { amountCell, FINANCE_WIDTH } from "../finance-widths";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 const TONE = { prepared: "warning", approved: "success", reversed: "neutral", cancelled: "neutral" } as const;
 const from = (r: MoneyMoveRow) => accountLabel({ code: r.from_account_code, name: r.from_account_name });
 const to = (r: MoneyMoveRow) => accountLabel({ code: r.to_account_code, name: r.to_account_name });
 
 export default function MoneyMovesPage() {
+  const personalLayouts = useFinancePersonalLayouts("finance_money_moves");
   const query = useMoneyMoves();
   const me = useMoneyMovesMe();
   const approve = useApproveMoneyMove();
@@ -144,7 +146,7 @@ export default function MoneyMovesPage() {
             rowKey={(r) => r.move_id}
             storageKey="carres.finance.money-moves.v3"
             appearance="reference"
-            look="finance" fillColumn="from"
+            look="finance" personalLayouts={personalLayouts} fillColumn="from"
             exportName="Money moves"
             groupBanner={false}
             stickyIdentity
