@@ -33,6 +33,7 @@ import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
 import { LoadFailed } from "../other-money-in/parts";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 const BASE = "/api/finance/dealer-commission";
 export const RULES_QUERY_KEY = ["finance", "dealer-commission", "rules"] as const;
@@ -81,6 +82,7 @@ const fromWord = (r: Pick<DcRule, "startsOn">) => (r.startsOn ? fmtDate(r.starts
 const addedWord = (r: Pick<DcRule, "createdAt" | "createdBy">) => `${fmtDate(r.createdAt)}${r.createdBy ? ` · ${r.createdBy}` : ""}`;
 
 export default function CommissionRates({ toolbarStart }: { toolbarStart: React.ReactNode }) {
+  const personalLayouts = useFinancePersonalLayouts("finance_commission_rates");
   const query = useQuery({
     queryKey: RULES_QUERY_KEY,
     queryFn: () => apiFetch<DcRulesRead>(`${BASE}/rules`),
@@ -110,7 +112,7 @@ export default function CommissionRates({ toolbarStart }: { toolbarStart: React.
           rowKey={(r) => r.id}
           storageKey="carres.finance.commission-rates.v3"
           appearance="reference"
-          look="finance" fillColumn="applies"
+          look="finance" personalLayouts={personalLayouts} fillColumn="applies"
           groupBanner={false}
           allowColumnGrouping={false}
           exportName="Commission rates"

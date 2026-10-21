@@ -42,6 +42,7 @@ import { creditorKindWord } from "../payables/payables-words";
 import { ReadFailed } from "../payables/PayablesParts";
 import { readDay } from "./period";
 import { amountCell, FINANCE_WIDTH } from "../finance-widths";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 export const AGING_COLUMN_WORDS: Record<AgingColumns, readonly string[]> = {
   month: ["This month", "1 month", "2 months", "3 months", "4 months and over"],
@@ -71,6 +72,7 @@ function Bills({ row, columns }: { row: ApAgingRow; columns: AgingColumns }) {
 }
 
 export default function ApAging() {
+  const personalLayouts = useFinancePersonalLayouts("finance_ap_aging");
   const [params, setParams] = useSearchParams();
   const today = appTodayIso();
   const asAt = readDay(params.get("asAt")) ?? today;
@@ -139,7 +141,7 @@ export default function ApAging() {
       <ListPageShell register>
         <DataGrid rows={ready?.rows ?? []} columns={gridColumns} rowKey={(r) => r.supplierId}
           rowTestId={(r) => `ap-aging-row-${r.supplierId}`}
-          storageKey="carres.finance.ap-aging.v2" appearance="reference" look="finance" fillColumn="supplier" exportName={`AP Aging ${asAt}`}
+          storageKey="carres.finance.ap-aging.v2" appearance="reference" look="finance" personalLayouts={personalLayouts} fillColumn="supplier" exportName={`AP Aging ${asAt}`}
           groupBanner={false} stickyIdentity isLoading={!query.isSuccess} wrapToolbar
           searchPlaceholder="Search suppliers…" expandTitle="Show bills"
           expandable={{ renderExpansion: (r) => <Bills row={r} columns={columns} /> }}

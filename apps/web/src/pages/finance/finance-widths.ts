@@ -6,8 +6,10 @@
  * belongs to the field, so every Finance page prints the same fact the same
  * width; a value that clips is fixed here, once.
  */
-import { useCallback, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { rm } from "@/lib/format-currency";
+import { useRegisterLayouts, useSaveRegisterLayout, useSetDefaultRegisterLayout } from "@/lib/queries";
+import type { FinanceLayoutListing } from "./finance-layouts";
 
 export const FINANCE_WIDTH = {
   /** An amount, right aligned: `RM 1,234,567.89` in 13px tabular figures. */
@@ -37,39 +39,109 @@ export function amountCell(v: number | string | null | undefined): string {
   return !Number.isFinite(n) || Math.round(n * 100) === 0 ? "" : rm(n);
 }
 
+/** The name of the one layout a Finance kit table keeps its widths in (0704). */
+export const COLUMN_WIDTHS_LAYOUT = "Column widths";
+/** A drag sends the widths once it has stopped this long, never per move. */
+export const COLUMN_WIDTHS_SAVE_DELAY_MS = 600;
+
 /**
  * The widths a person dragged a Finance kit table's columns to (Chew
- * 2026-10-14), remembered in this browser under one key per table. Storage
- * may be missing or refuse (a private window, blocked site data): the table
- * then draws its own widths and a drag still works until the page reloads.
+ * 2026-10-14). Since 0704 (Chew 2026-10-21) they are kept on the server, as
+ * the person's own layout named `Column widths` on the table's listing
+ * (`finance_general_ledger` …), saved once a drag has stopped for 600ms and
+ * made the person's Default once. On load the server's widths win.
+ *
+ * This browser keeps a copy under `storageKey`: while the server read is
+ * pending or failed, or a save fails, the table draws that copy. Storage may
+ * be missing or refuse (a private window, blocked site data): the table then
+ * draws its own widths and a drag still works until the page reloads.
  */
-export function useSavedWidths(storageKey: string): {
+export function useSavedWidths(storageKey: string, listing: FinanceLayoutListing): {
   widths: Readonly<Record<string, number>>;
   onResize: (key: string, width: number) => void;
 } {
   const [widths, setWidths] = useState<Record<string, number>>(() => readSavedWidths(storageKey));
+  const latest = useRef(widths);
+  const layoutsQ = useRegisterLayouts(listing);
+  const save = useSaveRegisterLayout(listing);
+  const setDefault = useSetDefaultRegisterLayout(listing);
+
+  /* The server's widths arrive: draw them once, unless the person has already
+     dragged (their drag is newer). */
+  const dragged = useRef(false);
+  const applied = useRef(false);
+  useEffect(() => {
+    if (applied.current || dragged.current) return;
+    const rows = layoutsQ.data?.layouts;
+    if (!Array.isArray(rows)) return;
+    applied.current = true;
+    const mine = rows.find((r) => r.name === COLUMN_WIDTHS_LAYOUT);
+    if (!mine) return;
+    const server = cleanWidths(mine.layout?.widths);
+    latest.current = server;
+    setWidths(server);
+    writeSavedWidths(storageKey, server);
+  }, [layoutsQ.data, storageKey]);
+
+  /* One save per finished drag. A failed save keeps the browser's copy. */
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const defaultAsked = useRef(false);
+  const flush = useRef<() => void>(() => {});
+  flush.current = () => {
+    timer.current = null;
+    const layout = {
+      order: [], hidden: [], sort: null,
+      widths: Object.fromEntries(Object.entries(latest.current)
+        .map(([key, w]) => [key, Math.min(2000, Math.max(24, Math.round(w)))])),
+    };
+    save.mutateAsync({ name: COLUMN_WIDTHS_LAYOUT, layout })
+      .then(({ layout: row }) => {
+        if (!row || row.is_default || defaultAsked.current) return;
+        defaultAsked.current = true;
+        return setDefault.mutateAsync(row.id).then(() => undefined);
+      })
+      .catch(() => { /* The browser's copy holds the widths. */ });
+  };
+  useEffect(() => () => {
+    /* Leaving the page mid-wait still sends the last drag. */
+    if (timer.current) {
+      clearTimeout(timer.current);
+      flush.current();
+    }
+  }, []);
+
   const onResize = useCallback((key: string, width: number) => {
-    setWidths((before) => {
-      const next = { ...before, [key]: Math.round(width) };
-      try {
-        window.localStorage.setItem(storageKey, JSON.stringify(next));
-      } catch {
-        /* No storage: the width holds until the page reloads. */
-      }
-      return next;
-    });
+    dragged.current = true;
+    const next = { ...latest.current, [key]: Math.round(width) };
+    latest.current = next;
+    setWidths(next);
+    writeSavedWidths(storageKey, next);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => flush.current(), COLUMN_WIDTHS_SAVE_DELAY_MS);
   }, [storageKey]);
   return { widths, onResize };
+}
+
+function writeSavedWidths(storageKey: string, widths: Record<string, number>): void {
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(widths));
+  } catch {
+    /* No storage: the width holds until the page reloads. */
+  }
+}
+
+/** Only finite, positive widths. */
+function cleanWidths(raw: unknown): Record<string, number> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  return Object.fromEntries(Object.entries(raw as Record<string, unknown>)
+    .filter((e): e is [string, number] => typeof e[1] === "number" && Number.isFinite(e[1]) && e[1] > 0));
 }
 
 /** What `useSavedWidths` stored under a key: only finite, positive widths. */
 export function readSavedWidths(storageKey: string): Record<string, number> {
   try {
     const raw = window.localStorage.getItem(storageKey);
-    const parsed: unknown = raw ? JSON.parse(raw) : null;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
-    return Object.fromEntries(Object.entries(parsed as Record<string, unknown>)
-      .filter((e): e is [string, number] => typeof e[1] === "number" && Number.isFinite(e[1]) && e[1] > 0));
+    return cleanWidths(raw ? JSON.parse(raw) : null);
   } catch {
     return {};
   }

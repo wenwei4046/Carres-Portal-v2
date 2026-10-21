@@ -16,6 +16,8 @@ const api = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/api", () => ({
   apiFetch: vi.fn(async (url: string) => {
+    // The personal layouts read (0704) is not this page's read.
+    if (url.startsWith("/api/operation/register-layouts")) return { layouts: [], limit: 10 };
     api.calls.push(url);
     if (api.fail) throw Object.assign(new Error("boom"), { status: api.fail.status, body: {} });
     const day = new URL(url, "http://t").searchParams.get("day") ?? "";

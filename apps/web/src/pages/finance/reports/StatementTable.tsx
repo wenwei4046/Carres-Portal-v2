@@ -227,7 +227,7 @@ export default function StatementTable({
 }) {
   const bySection = new Map(sections.map((s) => [s.kind, s]));
   const rows = statementRows(sections);
-  const saved = useSavedWidths(`carres.finance.widths.${testId}.v1`);
+  const saved = useSavedWidths(`carres.finance.widths.${testId}.v1`, `finance_${testId.replace(/-/g, "_")}`);
   const size = fillSizing(STATEMENT_WIDTHS, saved.widths, "account");
 
   // Every column is the width of what it holds (the Finance look): the code,

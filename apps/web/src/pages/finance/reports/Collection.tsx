@@ -40,6 +40,7 @@ import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { ReadFailed } from "../payables/PayablesParts";
 import { monthEnd, readPeriod, recentMonths, wholeMonth } from "./period";
 import { amountCell, FINANCE_WIDTH } from "../finance-widths";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 type View = "deposit" | "balance";
 const amount = (sen: number) => rm(sen / 100);
@@ -77,6 +78,7 @@ export default function Collection() {
   const { from, to } = readPeriod(params, today);
   const month = wholeMonth(from, to);
   const view: View = params.get("view") === "balance" ? "balance" : "deposit";
+  const personalLayouts = useFinancePersonalLayouts(`finance_collection_${view}`);
   const below = readBelow(params.get("below"));
   const edit = (change: (next: URLSearchParams) => void) => setParams((before) => {
     const next = new URLSearchParams(before);
@@ -159,7 +161,7 @@ export default function Collection() {
       <ListPageShell register>
         <DataGrid key={view} rows={ready?.rows ?? []} columns={columns} rowKey={(r) => r.key}
           rowTestId={(r) => `collection-row-${r.key}`}
-          storageKey={`carres.finance.collection.${view}.v2`} appearance="reference" look="finance" fillColumn="who" exportName={`Collection ${view} ${from} to ${to}`}
+          storageKey={`carres.finance.collection.${view}.v2`} appearance="reference" look="finance" personalLayouts={personalLayouts} fillColumn="who" exportName={`Collection ${view} ${from} to ${to}`}
           groupBanner={false} stickyIdentity isLoading={!query.isSuccess} wrapToolbar
           searchPlaceholder="Search salespeople…" expandTitle="Show orders"
           expandable={{ renderExpansion: (r) => <Orders row={r} view={view} /> }}

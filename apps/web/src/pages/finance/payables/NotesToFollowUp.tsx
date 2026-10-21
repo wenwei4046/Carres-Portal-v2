@@ -36,6 +36,7 @@ import {
   word,
 } from "./payables-words";
 import { amountCell, FINANCE_WIDTH } from "../finance-widths";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 /**
  * Finance → Payables → Notes to follow up (migration 0676; Chew 2026-10-06,
@@ -90,6 +91,7 @@ export function noteFromWord(
 // ── the list ────────────────────────────────────────────────────────────────
 
 function NotesRegister() {
+  const personalLayouts = useFinancePersonalLayouts("finance_notes_to_follow_up");
   const navigate = useNavigate();
   const query = useNotesToFollowUp();
   const [adding, setAdding] = useState(false);
@@ -130,7 +132,7 @@ function NotesRegister() {
             rowTestId={(r) => `note-row-${r.id}`}
             storageKey="carres.finance.notes-to-follow-up.v3"
             appearance="reference"
-            look="finance" fillColumn="supplier"
+            look="finance" personalLayouts={personalLayouts} fillColumn="supplier"
             exportName="Notes to follow up"
             groupBanner={false}
             allowColumnGrouping={false}

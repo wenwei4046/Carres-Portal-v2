@@ -221,7 +221,7 @@ api.route("/account", accountRouter);
 // Guarantee packages (0261-0263) — terms config + the claim/track-back desk.
 api.route("/guarantees", guaranteesRouter);
 api.route("/operation/badges", operationBadgesRouter);
-// 0528 — personal saved column layouts (Purchase Orders pilot), own rows only.
+// 0528 — personal saved column layouts (Purchase Orders pilot; Finance tables since 0704), own rows only.
 api.route("/operation/register-layouts", registerLayoutsRouter);
 api.route("/operation/dashboard", operationDashboardRouter);
 api.route("/operation/jump", jumpRouter);

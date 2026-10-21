@@ -41,6 +41,7 @@ import { CreditNoteSettlesCard } from "./NoteFollowUpParts";
 import type { BillReadAnswer } from "@carres/shared/bill-reading";
 import { ADVANCE_APPLICATION_STATUS_WORD, BILL_STATUS_WORD, cents, creditorKindWord, money, num, refusal, word } from "./payables-words";
 import { amountCell, FINANCE_WIDTH } from "../finance-widths";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 /**
  * Finance → Payables → Credit notes (migration 0642; Chew 2026-10-03,
@@ -76,6 +77,7 @@ const noteNo = (n: { note_no: string | null }) => n.note_no ?? "Draft, no number
 // ── register ────────────────────────────────────────────────────────────────
 
 function CreditNoteRegister() {
+  const personalLayouts = useFinancePersonalLayouts("finance_credit_notes");
   const navigate = useNavigate();
   const query = useSupplierCreditNotes();
   const rows = query.data ?? [];
@@ -115,7 +117,7 @@ function CreditNoteRegister() {
             rowTestId={(r) => `credit-note-row-${r.id}`}
             storageKey="carres.finance.credit-notes.v3"
             appearance="reference"
-            look="finance" fillColumn="supplier"
+            look="finance" personalLayouts={personalLayouts} fillColumn="supplier"
             exportName="Credit Notes"
             groupBanner={false}
             stickyIdentity

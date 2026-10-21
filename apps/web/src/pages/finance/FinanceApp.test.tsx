@@ -9,6 +9,10 @@ vi.mock("@/pages/operation/components/GlobalTopBar", () => ({ TopBarIcons: () =>
 vi.mock("@/lib/queries", () => {
   const answered = { data: [], isLoading: false, isError: false, isSuccess: true, refetch: vi.fn(), error: null };
   return {
+    // Finance tables keep personal layouts (0704); none saved here.
+    useRegisterLayouts: () => ({ data: undefined }),
+    useSaveRegisterLayout: () => ({ mutateAsync: vi.fn() }),
+    useSetDefaultRegisterLayout: () => ({ mutateAsync: vi.fn() }),
     usePaymentRegister: () => answered,
     useInvoiceRegister: () => answered,
     // The Monitor's other source reads (2026-09-12).

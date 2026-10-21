@@ -73,6 +73,7 @@ import { DepartmentFilter, DepartmentName, useDepartmentParam } from "../departm
 import { useSaveKey } from "../save-key";
 import { amountCell, FINANCE_WIDTH } from "../finance-widths";
 import { FieldError } from "@/components/kit/FieldFrame";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const NO_PARTY = "none";
@@ -134,6 +135,7 @@ export default function OtherReceiptsPage() {
 /* ── the Register ──────────────────────────────────────────────────────────── */
 
 function ReceiptRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNew: () => void }) {
+  const personalLayouts = useFinancePersonalLayouts("finance_other_receipts");
   const [dept, setDept] = useDepartmentParam();
   const query = useOtherReceipts(dept);
   const columns = useMemo<DataGridColumn<OtherReceiptRow>[]>(
@@ -237,7 +239,7 @@ function ReceiptRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
         rowKey={(r) => r.receipt_id}
         storageKey="carres.finance.other-receipts.v3"
         appearance="reference"
-        look="finance" fillColumn="from"
+        look="finance" personalLayouts={personalLayouts} fillColumn="from"
         exportName="Other receipts"
         groupBanner={false}
         stickyIdentity

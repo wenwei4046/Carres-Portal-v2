@@ -49,6 +49,7 @@ import {
 } from "./ledger-queries";
 import ManualJournalForm from "./ManualJournalForm";
 import { amountCell, FINANCE_WIDTH } from "../finance-widths";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 const ALL_ACCOUNTS = "all";
 const NEW_ENTRY = "new";
@@ -115,6 +116,7 @@ function JournalRegister({ scope, search, onOpen, onPickDept, onPickAccount, onS
   /** Present only for the principal. */
   onNew?: () => void;
 }) {
+  const personalLayouts = useFinancePersonalLayouts("finance_journal");
   const query = useLedgerEntries(scope);
   const chart = useLedgerChart();
   const accounts = useMemo(
@@ -188,7 +190,7 @@ function JournalRegister({ scope, search, onOpen, onPickDept, onPickAccount, onS
       </div>}
       <ListPageShell register>
         <DataGrid rows={rows} columns={columns} rowKey={(r) => r.id} onSortChange={setSort} onGroupByChange={onGroupByChange}
-          storageKey="carres.finance.journal.v3" appearance="reference" look="finance" fillColumn="narration" exportName="Journal"
+          storageKey="carres.finance.journal.v3" appearance="reference" look="finance" personalLayouts={personalLayouts} fillColumn="narration" exportName="Journal"
           groupBanner={false} stickyIdentity isLoading={!query.isSuccess}
           searchPlaceholder="Search entries…"
           toolbarStart={<span className="flex items-center gap-3 text-body">

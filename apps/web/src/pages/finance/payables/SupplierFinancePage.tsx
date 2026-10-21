@@ -10,6 +10,7 @@ import { creditorKindWord } from "./payables-words";
 import { ReadFailed } from "./PayablesParts";
 import SupplierFinanceModal from "./SupplierFinanceModal";
 import { FINANCE_WIDTH } from "../finance-widths";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 /**
  * Finance → Payables → Suppliers, at `/finance/suppliers` (migration 0636;
@@ -25,6 +26,7 @@ import { FINANCE_WIDTH } from "../finance-widths";
  * rather than being cut. No amount is listed here.
  */
 export default function SupplierFinancePage() {
+  const personalLayouts = useFinancePersonalLayouts("finance_supplier_finance");
   const query = useSupplierFinance();
   const [editing, setEditing] = useState<SupplierFinanceRow | null>(null);
   const rows = query.data ?? [];
@@ -65,7 +67,7 @@ export default function SupplierFinancePage() {
             rowTestId={(r) => `supplier-finance-row-${r.supplier_id}`}
             storageKey="carres.finance.supplier-finance.v3"
             appearance="reference"
-            look="finance" fillColumn="supplier"
+            look="finance" personalLayouts={personalLayouts} fillColumn="supplier"
             exportName="Suppliers"
             groupBanner={false}
             stickyIdentity

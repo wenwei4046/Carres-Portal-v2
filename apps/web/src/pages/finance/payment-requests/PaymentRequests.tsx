@@ -35,6 +35,7 @@ import SalesOrderTabs from "@/pages/operation/SalesOrderTabs";
 import { FactRow, Facts, ReadFailed, ReasonModal } from "../payables/PayablesParts";
 import { money, num, refusal } from "../payables/payables-words";
 import { amountCell, FINANCE_WIDTH } from "../finance-widths";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 /**
  * Finance → Payment Requests (migration 0645; Chew 2026-10-03,
@@ -73,6 +74,7 @@ const answerOf = (r: PaymentRequestRow) =>
 // ── register ────────────────────────────────────────────────────────────────
 
 function RequestRegister() {
+  const personalLayouts = useFinancePersonalLayouts("finance_payment_requests");
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const me = useRequestMe();
@@ -127,7 +129,7 @@ function RequestRegister() {
             rowTestId={(r) => `payment-request-row-${r.request_no}`}
             storageKey={`carres.finance.payment-requests.${finance ? view : "mine"}.v3`}
             appearance="reference"
-            look="finance" fillColumn="payee"
+            look="finance" personalLayouts={personalLayouts} fillColumn="payee"
             exportName="Payment requests"
             groupBanner={false}
             stickyIdentity

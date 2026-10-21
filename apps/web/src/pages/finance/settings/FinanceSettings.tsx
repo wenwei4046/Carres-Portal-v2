@@ -37,6 +37,7 @@ import ChartOfAccounts from "./ChartOfAccounts";
 import ItemGroups from "./ItemGroups";
 import PostingAccounts from "./PostingAccounts";
 import RequestAccess from "./RequestAccess";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 // Chew 2026-10-12 (「B 可以」): the chart first, as every other setting is
 // built on it.
@@ -85,6 +86,7 @@ const CHANNEL_OPTIONS = CARD_CHANNELS.map((v) => ({ value: v, label: CARD_CHANNE
  * reader to guess a fallback from the seeded rows.
  */
 function CardRoutes() {
+  const personalLayouts = useFinancePersonalLayouts("finance_card_payout_banks");
   const accountQuery = useMoneyAccounts();
   const routes = useCardRoutes();
   /* `undefined` = closed; `null` = a new route; a row = that route. */
@@ -118,7 +120,7 @@ function CardRoutes() {
           rowTestId={(r) => `card-route-${r.holding_code}-${r.channel}`}
           storageKey="carres.finance.card-payout-banks.v1"
           appearance="reference"
-          look="finance" fillColumn="bank"
+          look="finance" personalLayouts={personalLayouts} fillColumn="bank"
           groupBanner={false}
           allowColumnGrouping={false}
           stickyIdentity

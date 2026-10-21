@@ -64,6 +64,7 @@ import { AdvanceModal, AmountField } from "./VoucherAdvance";
 import { LineFollowUp } from "./NoteFollowUpParts";
 import { useSaveKey } from "../save-key";
 import { amountCell, FINANCE_WIDTH } from "../finance-widths";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 /**
  * Finance → Bills (migration 0477). A supplier's invoice, entered once:
@@ -94,6 +95,7 @@ export default function SupplierBills() {
 // ── register ────────────────────────────────────────────────────────────────
 
 function BillRegister() {
+  const personalLayouts = useFinancePersonalLayouts("finance_bills");
   const navigate = useNavigate();
   const [dept, setDept] = useDepartmentParam();
   const query = useSupplierBills(dept);
@@ -139,7 +141,7 @@ function BillRegister() {
             rowKey={(r) => r.id}
             storageKey="carres.finance.bills.v3"
             appearance="reference"
-            look="finance" fillColumn="supplier"
+            look="finance" personalLayouts={personalLayouts} fillColumn="supplier"
             exportName="Bills"
             groupBanner={false}
             stickyIdentity

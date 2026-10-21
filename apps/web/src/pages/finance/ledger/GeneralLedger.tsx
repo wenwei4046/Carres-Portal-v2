@@ -118,7 +118,7 @@ export default function GeneralLedger() {
   const deptWord = departmentWord(dept, departments);
   const query = useGeneralLedger(from, to, dept);
   const [search, setSearch] = useState("");
-  const saved = useSavedWidths(GENERAL_LEDGER_WIDTHS_KEY);
+  const saved = useSavedWidths(GENERAL_LEDGER_WIDTHS_KEY, "finance_general_ledger");
   const size = useMemo(() => fillSizing(WIDTH, saved.widths, "description"), [saved.widths]);
   const columns = useMemo(() => columnsAt(size.width), [size]);
 

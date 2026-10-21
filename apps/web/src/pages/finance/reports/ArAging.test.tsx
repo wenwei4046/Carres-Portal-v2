@@ -21,6 +21,8 @@ vi.mock("@/lib/api", () => ({
     if (url === "/api/finance/ledger/departments") {
       return { rows: [{ department_type: "SHOWROOM", department_id: OUTLET, name: "Test Showroom" }] };
     }
+    // The personal layouts read (0704) is not this page's read.
+    if (url.startsWith("/api/operation/register-layouts")) return { layouts: [], limit: 10 };
     api.calls.push(url);
     if (api.fail) throw Object.assign(new Error("boom"), { status: api.fail.status, body: {} });
     if (!url.startsWith("/api/finance/ledger/ar-aging?")) throw new Error(`unexpected read ${url}`);

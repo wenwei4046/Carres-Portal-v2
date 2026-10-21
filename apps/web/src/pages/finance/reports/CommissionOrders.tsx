@@ -35,6 +35,7 @@ import { fmtDate, fmtMonth } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import { customerWord, noteWord, soWord } from "./commission-words";
 import { amountCell, FINANCE_WIDTH } from "../finance-widths";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 const BASE = "/api/finance/dealer-commission";
 
@@ -67,6 +68,7 @@ export default function CommissionOrders({
   filter: { dealerId?: string; outletId?: string };
   toolbarStart: React.ReactNode;
 }) {
+  const personalLayouts = useFinancePersonalLayouts("finance_dealer_commission_orders");
   const rows = useMemo<OrderRow[]>(() => (src ? dealerCommissionOrders(src, month, filter) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [src, month, filter.dealerId, filter.outletId]);
@@ -99,7 +101,7 @@ export default function CommissionOrders({
         rowKey={(r) => r.order.orderId}
         storageKey="carres.finance.dealer-commission-orders.v3"
         appearance="reference"
-        look="finance" fillColumn="customer"
+        look="finance" personalLayouts={personalLayouts} fillColumn="customer"
         exportName={`Dealer commission by order ${month}`}
         groupBanner={false}
         allowColumnGrouping={false}

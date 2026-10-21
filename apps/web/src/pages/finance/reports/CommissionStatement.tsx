@@ -38,6 +38,7 @@ import { rm } from "@/lib/format-currency";
 import { LoadFailed } from "../other-money-in/parts";
 import { statementLineKey, statementLineWord } from "./commission-words";
 import { amountCell, FINANCE_WIDTH } from "../finance-widths";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 const BASE = "/api/finance/dealer-commission";
 
@@ -51,6 +52,7 @@ export default function CommissionStatement({
   /** A month's row opens that month's orders for this dealer. */
   onOpenMonth: (month: string) => void;
 }) {
+  const personalLayouts = useFinancePersonalLayouts("finance_dealer_commission_statement");
   const query = useQuery({
     queryKey: ["finance", "dealer-commission", "statement", dealerId],
     queryFn: () => apiFetch<DcStatementSource>(`${BASE}/statement/${dealerId}`),
@@ -92,7 +94,7 @@ export default function CommissionStatement({
         rowKey={statementLineKey}
         storageKey="carres.finance.dealer-commission-statement.v2"
         appearance="reference"
-        look="finance" fillColumn="what"
+        look="finance" personalLayouts={personalLayouts} fillColumn="what"
         exportName={`Commission statement ${statement?.dealer.name ?? ""}`.trim()}
         groupBanner={false}
         allowColumnGrouping={false}

@@ -95,7 +95,7 @@ const CASH_FLOW_WIDTHS = { amount: 140 } as const;
 const BY_ACCOUNT_WIDTHS = { bf: 150, in: 150, out: 150, cf: 150 } as const;
 
 function Statement({ report, from, to }: { report: CashFlowReport; from: string; to: string }) {
-  const saved = useSavedWidths("carres.finance.widths.cash-flow.v1");
+  const saved = useSavedWidths("carres.finance.widths.cash-flow.v1", "finance_cash_flow");
   const width = (key: keyof typeof CASH_FLOW_WIDTHS | "account") =>
     saved.widths[key] != null ? `${saved.widths[key]}px` : key === "account" ? "auto" : `${CASH_FLOW_WIDTHS[key]}px`;
   const columns: Column<Row>[] = [
@@ -140,7 +140,7 @@ function Statement({ report, from, to }: { report: CashFlowReport; from: string;
 type AccountRow = CashFlowReport["accounts"][number];
 
 function ByAccount({ report }: { report: CashFlowReport }) {
-  const saved = useSavedWidths("carres.finance.widths.cash-flow-accounts.v1");
+  const saved = useSavedWidths("carres.finance.widths.cash-flow-accounts.v1", "finance_cash_flow_accounts");
   const width = (key: keyof typeof BY_ACCOUNT_WIDTHS | "account") =>
     saved.widths[key] != null ? `${saved.widths[key]}px` : key === "account" ? "auto" : `${BY_ACCOUNT_WIDTHS[key]}px`;
   const all: Column<AccountRow>[] = [
