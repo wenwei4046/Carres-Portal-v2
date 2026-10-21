@@ -2,19 +2,19 @@
 
 ## Latest Purchasing design intake · 21 Oct 2026
 
-Jess supplied `Sales Order (28).zip` for frontend specification handoff to IT. The package supersedes the19Oct PO/Receiving exports as design evidence. The one dimensions/states/screen inventory is [UI MASTER · Purchasing design handoff](../ui/MASTER.md#purchasing-design-handoff--21-oct-2026--it-entry). No backend changes, SQL approval, production rollout or blanket business-rule replacement is inferred. IT builds full SO/PO/Receiving/Stock/DO flow first in TEST; detailed Settings and approval configuration follows before production use. This does not permit disabling production guards or changing accounting/Stock truth.
+Jess supplied `Sales Order (28).zip` for frontend specification handoff to IT. The package supersedes the19Oct PO/Receiving exports as design evidence. The one dimensions/states/screen inventory is [UI MASTER · Purchasing design handoff](../ui/MASTER.md#purchasing-design-handoff--21-oct-2026--it-entry). No backend changes, SQL approval, production rollout or blanket business-rule replacement is inferred. The resolved21Oct UI table supersedes earlier presentation instructions in this document for SO/Purchasing record split, table rows, button/dialog sizes and pager. Earlier full-width/no-preview design instructions are retired for document-bearing records; historical implementation evidence remains historical. Internal previews are not new official documents. IT builds full SO/PO/Receiving/Stock/DO flow first in TEST; detailed Settings and approval configuration follows before production use. This does not permit disabling production guards or changing accounting/Stock truth.
 
 | Export PLANNER item | Reconciliation / implementation boundary |
 |---|---|
 |1 Claim tabs/grouping | Latest presentation target To do/Waiting/Closed/All plus grouping; existing persisted states determine each set, no new backend status from a tab |
-|2 Always50/50 record | Cross-kit visual decision still UNRESOLVED in UI MASTER; do not silently overturn PDF/object composition |
+|2 Always50/50 record | Resolved latest design: document-bearing record50:50 at content820+, stacked below; internal requests use labelled internal previews; PDF generation/content authority unchanged |
 |3 Claim Reported first | Latest presentation target date-first; status retained in selectable columns, exact reported-event meaning remains module-owned |
 |4 Carres template papers | Use existing PDF/document authority and supplied Carres references; prototype papers are sketches, not a new generator |
 |5 GRN Received by person | Proposed visible person/company tooltip is presentation. Preserve actual confirmer vs count submitter/saver vs duty/company as separate stored facts; do not relabel a saver as physical receiver |
 |6 No repeated Supplier Deliver To | Deduplicate repeated identical visible location; preserve planned vs actual differing locations and their meaning |
 |7 Receiving grouping | Presentation target: retain Group by alongside approved Not received/Received/Differences; grouping does not change receipt identity |
 |8 GRN Items/merged cards | Latest card/heading target Items, reduce duplicated cards; retain evidence/related-record capabilities, Unit outcomes and Amend/Void |
-|9 Footer Rows20·1/1 | Pending shared pager reconciliation; do not publish source sample text “TEST data” as production UI |
+|9 Footer Rows20·1/1 | Resolved list controls Rows {size} · {page}/{pages}, with filtered count/totals retained; no record-card footer; never publish TEST data or hard-code sample counts |
 |10 Column views | Overview/Purchasing/Warehouse are list column presets, not role grants or separate sources |
 |11 Tabs vs Summary | Tabs describe whose move/state; Summary period/results/on-time/supplier metrics drill through into an explicit clearable filter. Only measured persisted facts count; period scope must be visible |
 |12 Expanded rows | First-column Item spanning2, Qty then≤3 contextual facts ending in current state; existing ItemRows/component, no new table engine |
@@ -2722,8 +2722,7 @@ production deployment or authorization to send a real supplier order during rese
 It does not approve legacy PR #1859 or completion of the Workspace Working Panel.
 
 
-- Internal request View is full width and usually one scroll: WORK, authoritative facts, lines/Units, source,
-  connections, evidence, corrections and History.
+- Internal request facts stay one scroll: WORK, authoritative facts, lines/Units, source, connections, evidence, corrections and History. The latest design uses an equal right pane for its labelled internal preview at content820+; stack below, with no invented official document.
 - Tabs exist only for parallel/reference surfaces: Document, Revisions where applicable, History and
   `Order Route`.
 - Use `Order Route`, never `RelationMap`, `RelationshipMap` or `Relation Map`.
@@ -2952,7 +2951,7 @@ application change is required by this reaffirmation.
   a tick is disabled only when the line cannot be bought, and then says why on hover. A reason that
   has a door (`Open Settings`, `Fix in Catalog`, `Use this PO`) keeps its door in the line's last cell.
   (10) `Split` is a grey text button the height of the select beside it.
-  (11) Group rows 54, item rows 44, drawn by the shared `ItemRows` under the list's own measured
+  (11) Group rows44, item rows44, drawn by the shared `ItemRows` under the list's own measured
   columns, so an item sits exactly under its row's columns at 1025, 1164 and 1440.
   `carres-check.js` on the fixture preview: PASS at 1025 and 1164; at 1440 its one line is the Tasks
   title row, which this round does not touch.
