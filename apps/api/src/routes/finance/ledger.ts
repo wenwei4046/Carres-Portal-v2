@@ -52,7 +52,7 @@ import { CUSTOMERS, SUPPLIERS } from "@carres/shared/tables";
 import { dailyBankQuery, dailyBankRow, sen, type DailyBankDay } from "@carres/shared/daily-bank";
 import { arAgingQuery, arAgingReport, type ArAgingAnswer } from "@carres/shared/ar-aging";
 import { cashFlowQuery, cashFlowReport, type CashFlowAnswer } from "@carres/shared/cash-flow";
-import { generalLedgerBlocks, generalLedgerQuery, type GeneralLedgerAnswer } from "@carres/shared/general-ledger";
+import { generalLedgerBlocks, generalLedgerQuery, type GeneralLedgerAnswer, type ReportDrillAnswer } from "@carres/shared/general-ledger";
 import { stockValueQuery, stockValueReport, type StockValueAnswer } from "@carres/shared/stock-value";
 import { collectionQuery, collectionReport, type CollectionAnswer } from "@carres/shared/collection";
 import { forecastQuery, forecastReport, forecastSaveInput, type ForecastAnswer, type ForecastSaved } from "@carres/shared/forecast";
@@ -111,6 +111,8 @@ import financeMoneyAccountsRouter from "./money-accounts";
  *   GET /trial-balance      every account as it stood at the end of a day, and every
  *                           heading's own subtotal at every depth, in the chart's order
  *   GET /account-ledger     one account, line by line
+ *   GET /report-drill       the entries behind one account line of a statement: the General
+ *                           Ledger read for that account, with each party named (Chew 2026-10-21)
  *   GET /health             gl_ledger_health, always eleven rows
  *   GET /self-check         books · control accounts · receivables · payables · rental months · health
  *   GET /profit-and-loss    gl_profit_and_loss, passed through
@@ -1326,6 +1328,69 @@ financeLedgerRouter.get("/general-ledger", requireFinance, async (c) => {
     return failed(c, "The General Ledger");
   }
   return c.json(answer);
+});
+
+// ── Report drill-down (Chew 2026-10-21) ─────────────────────────────────────
+
+/** The entries behind one account line of the Profit and Loss, the Balance
+ *  Sheet or the Trial Balance: the General Ledger's own read
+ *  (fin_general_ledger) for that one account, period and department, checked
+ *  by the same reader, with each line's party named. The page works out
+ *  nothing but which side of each line it prints. */
+financeLedgerRouter.get("/report-drill", requireFinance, async (c) => {
+  const parsed = ledgerAccountLedgerQuery.safeParse(queryOf(c));
+  if (!parsed.success) return invalid(c, parsed.error);
+  const { account, from, to } = parsed.data;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("fin_general_ledger", {
+    p_from: from, p_to: to, p_accounts: [account], ...departmentRpcArgs(parsed.data),
+  });
+  if (error) return ledgerError(c, error, "The General Ledger");
+  const answer = data as GeneralLedgerAnswer | null;
+  if (!answer || (answer.status !== "OK" && answer.status !== "BEFORE_GO_LIVE") || !Array.isArray(answer.accounts)
+    || answer.accounts.some((a) => a.account_code !== account)) {
+    return failed(c, "The General Ledger");
+  }
+  let blocks: ReturnType<typeof generalLedgerBlocks>;
+  try {
+    blocks = generalLedgerBlocks(answer);
+  } catch {
+    return failed(c, "The General Ledger");
+  }
+  const block = blocks[0] ?? null;
+  // The block's lines are the account's LINE rows, in the same order.
+  const lineRows = (answer.accounts[0]?.rows ?? []).filter((r) => r.row_kind === "LINE");
+  if (block && lineRows.length !== block.lines.length) return failed(c, "The General Ledger");
+
+  const idsOf = (kind: string) => [...new Set(lineRows
+    .filter((r) => r.party_type === kind && typeof r.party_id === "string")
+    .map((r) => r.party_id as string))];
+  const nameRead = (table: string, ids: string[]) => (ids.length
+    ? sb.from(table).select("id,name").in("id", ids)
+    : Promise.resolve({ data: [], error: null }));
+  const reads = await Promise.all([
+    nameRead(CUSTOMERS, idsOf("CUSTOMER")),
+    nameRead(SUPPLIERS, idsOf("SUPPLIER")),
+    nameRead("finance_parties", idsOf("OTHER")),
+  ]);
+  // A name that cannot be read stays null and the page says so; it is never guessed.
+  const names = new Map<string, string>();
+  for (const r of reads.flatMap((x) => (x.error ? [] : ((x.data ?? []) as Json[])))) {
+    if (typeof r.id === "string" && typeof r.name === "string") names.set(r.id, r.name);
+  }
+
+  const drill: ReportDrillAnswer = {
+    status: answer.status, go_live_on: answer.go_live_on, from: answer.from, to: answer.to, account,
+    block: block ? {
+      ...block,
+      lines: block.lines.map((l, i) => {
+        const r = lineRows[i]!;
+        const partyType = typeof r.party_type === "string" ? r.party_type : null;
+        return { ...l, partyType, partyName: partyType && typeof r.party_id === "string" ? (names.get(r.party_id) ?? null) : null };
+      }),
+    } : null,
+  };
+  return c.json(drill);
 });
 
 // ── Stock value, provisional (0643, Chew 2026-10-03) ────────────────────────

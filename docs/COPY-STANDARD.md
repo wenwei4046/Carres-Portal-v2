@@ -5370,6 +5370,18 @@ These words are on screen in the branch and are not approved yet. The period con
 | States | `Loading the General Ledger…` · `The General Ledger could not be loaded. Try again.` · `Try again` · `The ledger has no start date yet. Nothing can be totalled.` · `The ledger started on {date}. Pick a day from then on.` |
 | Sheet | `General Ledger` · `Account` · `Date` · `Entry No` · `Source` · `Document` · `Description` · `Debit` · `Credit` · `Balance` · `Department` · `Brought forward` · `Total` |
 
+### PROPOSAL - PENDING APPROVAL · Report drill-down (Chew 2026-10-21)
+
+The feature is Chew's (Finance MASTER §3.6); these words are on screen in the branch and are not approved yet. Only the four marked new are new; the rest are the General Ledger's, the Journal's and the statements' own.
+
+| Where | Words |
+|---|---|
+| Disclosure on an account line (Profit and Loss, Balance Sheet, Trial Balance) | **new** `Show entries` (accessible name; the Trial Balance's chevron reads **new** `Hide entries` while open) |
+| Entries under the line | Columns `Date` · `Entry No` · `Description` · `Document` · `Party` · `Amount`. `Brought forward` · `No memo` · `Name not available` (a party whose name could not be read) |
+| Empty | **new** `No entries in this period.` (Profit and Loss) · `No entries up to this day.` (Balance Sheet, Trial Balance, the Trial Balance's own) |
+| When the entries do not add up to the line (red) | **new** `Entries add up to {RM x}; the line shows {RM y}.` |
+| States | `Loading the General Ledger…` · `The General Ledger could not be loaded. Try again.` · `Try again` |
+
 ### PROPOSAL — PENDING CHEW · AP Aging (0640)
 
 These words are on screen in the branch and are not approved yet.

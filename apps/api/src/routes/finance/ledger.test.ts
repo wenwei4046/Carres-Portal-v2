@@ -1828,6 +1828,74 @@ describe("GET /general-ledger (0639)", () => {
   });
 });
 
+describe("GET /report-drill (Chew 2026-10-21)", () => {
+  const row = (over: AnyJson) => ({
+    row_kind: "LINE", account_code: "4100", account_name: "Sales", kind: "INCOME",
+    entry_date: "2026-09-02", entry_no: "JE-202609-0001", source_type: "SALES_INVOICE", source_doc_no: "INV-1",
+    narration: "Invoice", memo: null, party_type: null, party_id: null, debit: 0, credit: 0, running_balance: 0, ...over,
+  });
+  const CUST = "22222222-2222-4222-8222-222222222222";
+  const OTHER = "33333333-3333-4333-8333-333333333333";
+  const ANSWER = {
+    status: "OK", go_live_on: "2026-09-01", from: "2026-09-01", to: "2026-09-30",
+    accounts: [{
+      account_code: "4100",
+      rows: [
+        row({ row_kind: "OPENING", entry_date: null, entry_no: null, source_type: null, source_doc_no: null, debit: null, credit: null, running_balance: 0 }),
+        row({ credit: 500, running_balance: 500, party_type: "CUSTOMER", party_id: CUST }),
+        row({ entry_no: "JE-202609-0002", debit: 20, running_balance: 480, party_type: "OTHER", party_id: OTHER }),
+        row({ entry_no: "JE-202609-0003", credit: 10, running_balance: 490 }),
+        row({ row_kind: "CLOSING", entry_date: null, entry_no: null, source_type: null, source_doc_no: null, debit: null, credit: null, running_balance: 490 }),
+      ],
+    }],
+  };
+
+  it("reads the General Ledger for the one account, period and department, and names each line's party", async () => {
+    const { sb, calls } = fakeClient((call) => (call.kind === "rpc" ? ok(ANSWER)
+      : call.name === "customers" ? ok([{ id: CUST, name: "Test Customer" }])
+      : ok([])));
+    const id = "11111111-1111-4111-8111-111111111111";
+    const res = await get(`/report-drill?account=4100&from=2026-09-01&to=2026-09-30&departmentType=DEALER&departmentId=${id}`);
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_general_ledger", {
+      p_from: "2026-09-01", p_to: "2026-09-30", p_accounts: ["4100"], p_department_type: "DEALER", p_department_id: id,
+    });
+    expect(calls.filter((c) => c.kind === "from").map((c) => c.name).sort()).toEqual(["customers", "finance_parties"]);
+    const body = await json(res);
+    expect(body.block).toMatchObject({ code: "4100", kind: "INCOME", opening: 0, closing: 490 });
+    expect(body.block.lines.map((l: AnyJson) => [l.entryNo, l.debit, l.credit, l.partyType, l.partyName])).toEqual([
+      ["JE-202609-0001", 0, 500, "CUSTOMER", "Test Customer"],
+      // A name that could not be read stays null; it is never guessed.
+      ["JE-202609-0002", 20, 0, "OTHER", null],
+      ["JE-202609-0003", 0, 10, null, null],
+    ]);
+  });
+
+  it("an account with nothing answers no block", async () => {
+    fakeClient(() => ok({ ...ANSWER, accounts: [] }));
+    const body = await json(await get("/report-drill?account=4100&from=2026-09-01&to=2026-09-30"));
+    expect(body).toMatchObject({ status: "OK", account: "4100", block: null });
+  });
+
+  it("refuses a lines read that does not hold together, or another account's block", async () => {
+    const broken = structuredClone(ANSWER);
+    broken.accounts[0]!.rows[1]!.running_balance = 499;
+    fakeClient(() => ok(broken));
+    expect((await get("/report-drill?account=4100&from=2026-09-01&to=2026-09-30")).status).toBe(500);
+    fakeClient(() => ok({ ...ANSWER, accounts: [{ ...ANSWER.accounts[0]!, account_code: "4200" }] }));
+    const res = await get("/report-drill?account=4100&from=2026-09-01&to=2026-09-30");
+    expect(res.status).toBe(500);
+    expect((await json(res)).message).toBe("The General Ledger could not be loaded. Try again.");
+  });
+
+  it("refuses a missing account or a backwards period before any database call, and is Finance's only", async () => {
+    expect((await get("/report-drill?from=2026-09-01&to=2026-09-30")).status).toBe(422);
+    expect((await get("/report-drill?account=4100&from=2026-09-30&to=2026-09-01")).status).toBe(422);
+    expect((await get("/report-drill?account=4100&from=2026-09-01&to=2026-09-30", "operation")).status).toBe(403);
+    expect(userClient).not.toHaveBeenCalled();
+  });
+});
+
 describe("GET /stock-value (0643)", () => {
   const VALUE = {
     month_end: "2026-09-30", cut_at: "2026-09-30T16:00:00Z", today: "2026-10-03", provisional: true,

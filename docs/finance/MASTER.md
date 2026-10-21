@@ -701,6 +701,13 @@ The reports are:
 
 All reports only read. Reports → Payment stays Payment's.
 
+**Report drill-down — Chew 2026-10-21 (approved). BUILT 2026-10-21 on branch `finance-report-drill`, not deployed; no migration.**
+- On Profit and Loss, Balance Sheet and Trial Balance, an account line's chevron opens, right under the line, the ledger entries behind it: `Date` · `Entry No` (the Journal entry, as the General Ledger links it) · `Description` · `Document` · `Party` · `Amount`, on the line's own side so they add up to the line. A second click folds it. A heading, a subtotal, a section band and the bottom line do not drill. It is the kit's own disclosure: a button, one click, as every Finance button.
+- One arithmetic: the entries are the General Ledger's own read (`fin_general_ledger` for that one account, `GET /finance/ledger/report-drill`), checked by the same reader, for the report's own period (Balance Sheet and Trial Balance: the ledger's first day to the as-of day) and department. The statements and the Trial Balance count the same rows: posted entries, the department's lines (`gl_department_lines`), those days. The page only adds the entries up to check; when they do not equal the line, the difference shows in red under them (`Entries add up to RM x; the line shows RM y.`).
+- Not ledger figures, so they do not drill: under All, the stock accounts carrying live stock from Stock's Units (0688: SOS and SCS on the Profit and Loss, SBS on the Balance Sheet), and `Net result not yet closed`. Under a department they are the books' own and drill. Nothing drills until the chart is read. On the Balance Sheet, a line that moved money paid before its document (0506, 0507) shows that amount as the red difference; its note already says why.
+- Exports and the month-end pack are unchanged. Words: COPY-STANDARD, Finance, "Report drill-down", PROPOSAL - PENDING APPROVAL.
+- Falsifier: in Chew's test, a drilled line whose entries differ from the General Ledger for the same account, days and department, or a red difference on a line that is the books' own.
+
 **Cash Flow approach — PROPOSAL / NOT LAW, built for Chew's test (0638).**
 - A receipts and payments statement of the cash and bank accounts, as Houzs's Cash Flow is; not an indirect cash-flow statement. Reached from a door on the Reports page, like Card charges.
 - Each line names the account on the other side of the money. A line that pays several things is shared across them in proportion, to the sen, so the lines always add up to the accounts' money in and out.

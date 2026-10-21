@@ -38,7 +38,9 @@ import Tabs from "@/components/kit/Tabs";
 import { appTodayIso, fmtDate, fmtMonth } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
-import StatementTable, { indent, nothingInPeriod, nothingOnDay, paidBeforeInvoiceNote, stockNote } from "./reports/StatementTable";
+import StatementTable, { indent, nothingInPeriod, nothingOnDay, paidBeforeInvoiceNote, stockNote, type StatementAccountLine } from "./reports/StatementTable";
+import ReportDrill from "./reports/ReportDrill";
+import { useLedgerChart } from "./ledger/ledger-queries";
 import { packMonths, statementExport } from "./month-end-pack";
 import ExportStatement from "./reports/ExportStatement";
 import { monthChoices, monthEnd, readDay, readPeriod, wholeMonth } from "./reports/period";
@@ -221,6 +223,31 @@ function StockLine({ statement, dept }: { statement: Statement; dept: string }) 
   </p>;
 }
 
+/**
+ * REPORT DRILL-DOWN (Chew 2026-10-21): an account line opens the ledger
+ * entries behind it, for the statement's own period (the Balance Sheet: the
+ * ledger's first day to the as-of day) and department. Under All, the stock
+ * accounts carry live stock from Stock's Units (0688), not entries, so they do
+ * not drill: SOS and SCS on the Profit and Loss, SBS on the Balance Sheet, and
+ * any line the database marks as stock. Until the chart is read nothing
+ * drills, so a stock line can never open by accident.
+ */
+function useStatementDrill(statement: Statement, scope: { from: string | null; to: string; dept: string }, testId: string) {
+  const chart = useLedgerChart();
+  const special = new Map((chart.data?.accounts ?? []).map((a) => [a.code, a.special]));
+  const liveStock = statement === "pl" ? ["SOS", "SCS"] : ["SBS"];
+  const from = scope.from;
+  return {
+    drillable: (line: StatementAccountLine) => Boolean(chart.data) && from !== null && line.reclassifiedFor !== "STOCK"
+      && !(scope.dept === "" && liveStock.includes(special.get(line.code) ?? "")),
+    render: (line: StatementAccountLine) => <ReportDrill testId={`${testId}-drill-${line.code}`}
+      scope={{ account: line.code, from: from!, to: scope.to, dept: scope.dept }}
+      label={`${line.code} ${line.name ?? ""}`.trim()} side="natural" expected={line.amount}
+      carried={statement === "bs"}
+      empty={statement === "pl" ? "No entries in this period." : "No entries up to this day."} />,
+  };
+}
+
 const GoLiveLine = ({ goLive }: { goLive: string }) =>
   <p className="text-body text-kit-slate-11" data-testid="reports-go-live">Since {fmtDate(goLive)} · No opening balances</p>;
 
@@ -247,6 +274,7 @@ function ProfitAndLossPage() {
   const { from, to } = readPeriod(params, today);
   const pl = useProfitAndLoss(from, to, dept);
   const plReport = pl.data;
+  const plDrill = useStatementDrill("pl", { from, to, dept }, "profit-and-loss");
   if (notStartedError(pl.error)) return <NotStarted />;
   const goLive = plReport?.goLiveOn ?? null;
 
@@ -311,6 +339,7 @@ function ProfitAndLossPage() {
           empty={plReport?.status === "before_go_live" ? beforeGoLive(plReport.goLiveOn) : nothingInPeriod("INCOME")}
           nothing={nothingInPeriod}
           accountHref={(code) => ledgerAccountHref(code, from, to)}
+          drill={plDrill}
           bottomLine={plReport?.status === "ok" ? { label: "Net result", amount: plReport.net } : null} />}
         </>}
         <StockLine statement="pl" dept={dept} />
@@ -328,6 +357,7 @@ function BalanceSheetPage() {
   const asOf = readDay(params.get("asOf")) ?? today;
   const bs = useBalanceSheet(asOf, dept);
   const bsReport = bs.data;
+  const bsDrill = useStatementDrill("bs", { from: bsReport?.goLiveOn ?? null, to: asOf, dept }, "balance-sheet");
   if (notStartedError(bs.error)) return <NotStarted />;
   const goLive = bsReport?.goLiveOn ?? null;
 
@@ -367,6 +397,7 @@ function BalanceSheetPage() {
           nothing={nothingOnDay}
           accountHref={(code) => ledgerAccountHref(code, bsReport?.goLiveOn ?? null, asOf)}
           lineNote={paidBeforeInvoiceNote}
+          drill={bsDrill}
           bottomLine={null} />}
         </>}
         <StockLine statement="bs" dept={dept} />
