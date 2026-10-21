@@ -1,3 +1,4 @@
+import ReceivingReportEvidence from "@/components/receiving/ReceivingReportEvidence";
 import { Link } from "react-router-dom";
 import { warehouseConfirmationReportFromWire } from "@carres/shared/adapters";
 import { RECEIVING_UNIT_OUTCOME_LABEL, documentDisplayNumber } from "@carres/shared";
@@ -18,7 +19,7 @@ export default function BlockedReceivingReport({detail,onBack}:{detail:Receiving
     <DocSection title="Receiving"><p role="status" className="text-body">Receiving report saved. No GRN created.</p>
       {(receipt.validation_blockers ?? []).map(blocker=><p key={blocker.code} className="text-body text-kit-red-11">{blocker.message}</p>)}
       <Prop label="Count submitted">{fmtDate(receipt.submitted_at,{time:true})} · {receipt.submitted_by_name || "Staff identity not recorded"}</Prop>
-      <Prop label="Goods arrived at">{receipt.actual_site_name || "Not recorded"}</Prop>
+      <Prop label="Goods arrived at">{receipt.actual_site_name || (report?.actualSiteId===receipt.warehouse_id?receipt.warehouse_name:null) || "Not recorded"}</Prop>
       <Prop label="Goods Received Date">{report?.goodsReceivedAt ? fmtDate(report.goodsReceivedAt) : report?.goodsReceivedTime ? fmtDate(report.goodsReceivedTime,{time:true}) : "Not recorded"}</Prop>
       <Prop label="Supplier DO No">{report?.doNumber || "Not recorded"}</Prop>
       {detail.reported_source && <Prop label="PO No"><Link className="text-kit-blue-11 hover:underline" to={`/operation/procurement?po=${encodeURIComponent(detail.reported_source.id)}`}>{documentDisplayNumber(detail.reported_source.id)}</Link></Prop>}
@@ -34,6 +35,7 @@ export default function BlockedReceivingReport({detail,onBack}:{detail:Receiving
         {report.note && <Prop label="Note">{report.note}</Prop>}
       </>}
     </DocSection>
-    <DocSection title="History"><ul className="space-y-3">{detail.events.map(event=><li key={event.id}><p className="text-body">{receivingEventLabel(event.event)}</p><p className="text-meta text-kit-slate-11">{event.actor_name || "Staff identity not recorded"} · {fmtDate(event.event_at,{time:true})}</p></li>)}</ul></DocSection>
+    <ReceivingReportEvidence receiptId={receipt.id} office/>
+    <DocSection title="History"><ul className="space-y-3">{detail.events.map(event=><li key={event.id}><p className="text-body">{event.payload?.reason==="Arrival evidence added"?"Arrival evidence added":receivingEventLabel(event.event)}</p><p className="text-meta text-kit-slate-11">{event.actor_name || "Staff identity not recorded"} · {fmtDate(event.event_at,{time:true})}</p></li>)}</ul></DocSection>
   </div>;
 }

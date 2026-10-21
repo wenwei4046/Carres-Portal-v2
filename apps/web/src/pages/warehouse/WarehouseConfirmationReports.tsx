@@ -1,3 +1,4 @@
+import ReceivingReportEvidence from "@/components/receiving/ReceivingReportEvidence";
 import {ReceivingSourceReservations} from "@/components/receiving/ReceivingSourceReservations";
 // design-standard: list-page — existing ListPageShell and DataGrid; no separate rail for own report history.
 import { useSearchParams } from "react-router-dom";
@@ -72,7 +73,7 @@ export default function WarehouseConfirmationReports() {
         <Prop label="Document">{documentDisplayNumber(selected.po_id ?? selected.source_no ?? parsed?.poId ?? "Not recorded")}</Prop>
         {(selected.blockers ?? []).map(blocker=><p key={blocker.code} role="status" className="text-body text-kit-red-11">{blocker.message}</p>)}
         {selected.status==="draft" && (sources.isPending||arrivals.isPending) ? <p role="status">Loading…</p> : selected.status==="draft" && (sources.isError||arrivals.isError) ? <div role="alert"><p>Could not be loaded</p><Button onClick={()=>void Promise.all([sources.refetch(),arrivals.refetch()])}>Try again</Button></div> : selected.status==="draft" && ((!source&&!arrival)&&(!editable||parsed?.arrivalSourceId)||!sameSite) ? <p role="alert">Not available. Go back and reload.</p> : null}
-        <WarehouseReportHistory receiptId={selected.id}/>
+        <ReceivingReportEvidence receiptId={selected.id}/><WarehouseReportHistory receiptId={selected.id}/>
       </Modal>}
   </ListPageShell>;
 }
@@ -104,7 +105,7 @@ function WarehouseReportHistory({receiptId}:{receiptId:string}) {
   return <DocSection title="History">
     <ul className="space-y-3">{query.data.events.map(event=><li key={event.id}>
       <p className="text-meta text-kit-slate-11">{fmtDate(event.event_at,{time:true})} · {event.actor_name || "Staff identity not recorded"}</p>
-      <p className="text-body">{event.event==="submitted"&&warehouseConfirmationReportFromWire(event.payload.report)&&!warehouseConfirmationReportFromWire(event.payload.report)?.poId&&!warehouseConfirmationReportFromWire(event.payload.report)?.arrivalSourceId?"Receiving report saved. No GRN created.":event.event==="posted"?"Receiving saved":event.event==="resubmitted"?"Count submitted again":event.event==="submitted"?"Count submitted":"Activity"}</p>
+      <p className="text-body">{event.payload.reason==="Arrival evidence added"?"Arrival evidence added":event.event==="submitted"&&warehouseConfirmationReportFromWire(event.payload.report)&&!warehouseConfirmationReportFromWire(event.payload.report)?.poId&&!warehouseConfirmationReportFromWire(event.payload.report)?.arrivalSourceId?"Receiving report saved. No GRN created.":event.event==="posted"?"Receiving saved":event.event==="resubmitted"?"Count submitted again":event.event==="submitted"?"Count submitted":"Activity"}</p>
       <WarehouseReportSnapshot event={event}/>
       <ReceivingSourceReservations value={event.payload.source_reservations}/>
       {filesOf(event).map((file,index)=><Button key={file.path} size="sm" onClick={()=>void sign({...file,eventId:event.id,context:fmtDate(event.event_at,{time:true})})}>View proof {index+1}</Button>)}

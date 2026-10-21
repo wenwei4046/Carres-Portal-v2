@@ -1,3 +1,4 @@
+import ReceivingReportEvidence from "@/components/receiving/ReceivingReportEvidence";
 import {ReceivingSourceReservations} from "@/components/receiving/ReceivingSourceReservations";
 import BlockedReceivingReport from "./BlockedReceivingReport";
 import ReceivingExtraCustody from "@/components/receiving/ReceivingExtraCustody";
@@ -321,6 +322,7 @@ export default function ReceivingRecord({
                 </a>
               ) : null}
             </Prop>
+            {detail.events.some(event=>event.payload?.reason==="Arrival evidence added") && <ReceivingReportEvidence receiptId={r.id} office/>}
             {(r.arrival_evidence ?? []).length > 0 && (
               <Prop label="Arrival evidence">
                 <span className="text-body text-kit-slate-12">

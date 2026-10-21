@@ -4,6 +4,7 @@ import {QueryClient,QueryClientProvider} from "@tanstack/react-query";
 import WarehouseUnidentifiedReportModal from "./WarehouseUnidentifiedReportModal";
 import {apiFetch,ApiError} from "@/lib/api";
 vi.mock("@/lib/api",async()=>({...await vi.importActual("@/lib/api"),apiFetch:vi.fn()}));
+vi.mock("@/components/receiving/ReceivingReportEvidence",()=>({default:()=>null}));
 const id="00000000-0000-4000-8000-000000000801";
 const site={id:"00000000-0000-4000-8000-000000000802",name:"TEST receiving Site"};
 const saved={id,receipt_id:id,status:"draft",grn_no:null,revision:0,already_saved:false,blockers:[{code:"receipt_source_not_available",message:"The source is not available to this receiving Site"}]};

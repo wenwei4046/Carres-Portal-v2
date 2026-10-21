@@ -2516,10 +2516,33 @@ physical date/time, handover person/document number and observed goods/labels/co
 No PO, line, Unit, SKU identity or Extra classification is inferred; no accepted quantity, GRN, Stock
 or Work Done is manufactured. Lost-response retry retains the exact body/key. The saved report is
 read through the same own-Site list and append-only History; later source correction retains its
-identity and rechecks physical results. Unknown-source evidence upload remains a gap: existing
-upload doors require a governed source, so this form does not create orphan evidence or pretend it
-was saved. Existing external SQL candidate/admission and production upgrade remain separate gates;
+identity and rechecks physical results. Unknown-source evidence has a separate receipt-bound application continuation below; existing
+source-bound upload paths are not borrowed. Existing external SQL candidate/admission and production upgrade remain separate gates;
 this UI introduces no SQL or permission changes. Full production and operator acceptance unverified.
+
+**Original report evidence — 21 Oct 2026, BUILT ON BRANCH / SQL REVIEW ONLY / NOT PRODUCTION.**
+The existing shared multi-file picker can attach actual photo/video/PDF evidence only AFTER the
+original no-source draft exists. A separate private `receiving-report-proofs` bucket and evidence
+ledger bind server-generated paths to that receipt, its original actual person and database Site.
+The canonical current individual/Site/company admission is rechecked; other Warehouse persons,
+cross-Site actors, disabled identities and unqualified internal roles are refused. Existing authorised
+Office readers may read attached files, never upload for Warehouse through this door. All signing
+uses the user JWT, not admin elevation. The external `unidentified-report-evidence.NOT-APPROVED.sql`
+candidate adds only new objects/policies; it does not replace constraints or the existing receipt
+writer. Its application absence is explicit/fail-closed. Production approval and exact-main upgrade
+remain unperformed.
+
+A file slot is not attached evidence. The finaliser verifies the real Storage object's original
+owner, MIME and size, then appends one causal Receiving event with `Arrival evidence added` and
+idempotent file identity. It does not overwrite physical observations, receipt revision, source,
+Stock, Work completion or Extra custody. Same-file retry preserves its original slot and tolerates
+an already-uploaded object only after the finaliser's checks; attached files cannot be removed from
+the picker. Native isolated proof uploaded a TEST screenshot to the original2b5669a6 report after a
+failed request/retry. Both actual Warehouse and Office opened the image; downloaded6209-byte files
+matched the original SHA256. Repeated completion retained the same event; original receipt full row,
+Stock/Work/Extra hashes were unchanged. Same-Site-other-person/cross-Site/HR/disabled-owner RLS probes
+passed in a rolled-back fixture transaction. This is transport/access proof, not real-goods evidence
+or approval to apply SQL. Real video/PDF operator acceptance and complete-page acceptance remain owed.
 
 **Extra decision record — MINIMAL PROPOSAL / NOT APPROVED / NOT BUILT, 2026-10-20.**
 The existing §9.5 Extra/source-gap rules require Purchasing's decision and verified provenance;

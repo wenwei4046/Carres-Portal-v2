@@ -5862,3 +5862,17 @@ Existing individual Warehouse draft writer and My receiving history; observation
 | Observation hint | `Describe the goods, visible labels, quantity and condition you observed. Do not guess a PO or Unit ID.` | Original Note preserves observed facts; no SKU/Unit minting |
 | Time validation | `Record Goods Received Date before Time.` | No invented date/time |
 | Result continuation | `Find this report in My receiving.` | Existing original report and History; source correction remains separate |
+
+### Original report evidence — 21 Oct 2026
+
+Receipt-bound attachment ledger only; uploading a file does not accept goods or complete Work.
+
+| Use | Exact words | Boundary |
+|---|---|---|
+| Evidence context | `Original report evidence` · `These files belong to the original report. They do not verify a PO or Unit.` | Original observation provenance, never accepted-source linkage |
+| Missing deployment | `Report evidence is not available yet.` | Fail closed; no arbitrary PO path fallback |
+| Denied | `Report evidence is not available to this person and Site.` | Original active individual/Site or existing Office read authority |
+| Pending transfer | `Evidence upload is not complete.` | A slot/object without finalised history is not attached evidence |
+| Genuinely empty | `No evidence recorded yet.` | Only after a successful authorised read |
+| History | `Arrival evidence added` | Append-only attachment event; original physical report/revision unchanged |
+| Read | `View proof` | Real saved object through the owning authorised reader |

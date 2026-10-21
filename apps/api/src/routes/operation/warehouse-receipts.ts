@@ -1,3 +1,4 @@
+import { receivingReportEvidenceRouter } from "../receiving-report-evidence";
 import { receivingActorNames } from "../../lib/receiving-actor-names";
 import receivingExtraRouter from "./receiving-extra";
 import { Hono } from "hono";
@@ -56,6 +57,7 @@ import { repairOrderReturnWorkCompletion } from "../../lib/repair-order-work";
  * the only lock.
  */
 const warehouseReceiptsRouter = new Hono<AppEnv>();
+warehouseReceiptsRouter.route("/",receivingReportEvidenceRouter("office"));
 warehouseReceiptsRouter.route("/", receivingExtraRouter);
 
 /** Unresolved module reports only; ordinary drafts never become Work. */

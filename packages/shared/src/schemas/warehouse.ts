@@ -194,3 +194,13 @@ export const warehouseConfirmationReadiness = z.object({
 
 /** Canonical receipt-event projection; absence is not reservation success. */
 export const receivingSourceReservationResults=z.array(z.object({unit_code:z.string().min(1),result:z.enum(['source_reserved','existing_binding_preserved','source_reservation_needs_handling'])}));
+
+/** Receipt-bound evidence metadata. Pending upload is distinct from attached history. */
+export const receivingReportEvidenceFiles = z.object({
+  can_upload:z.boolean(),files:z.array(z.object({
+    id:z.string().uuid(),path:z.string().min(1).max(500),name:z.string().min(1).max(180),
+    event_id:z.string().uuid().nullable(),created_at:z.string().datetime({offset:true}),
+    kind:z.enum(["photo","video","pdf"]),
+  })).max(20),
+});
+export type ReceivingReportEvidenceFiles=z.infer<typeof receivingReportEvidenceFiles>;

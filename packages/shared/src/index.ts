@@ -3465,3 +3465,5 @@ export * from "./courier-dispatch";
 export { purchaseRequestReleaseSchema, type PurchaseRequestRelease } from "./purchase-request-context";
 
 export * from "./po-send-evidence";
+
+export {receivingReportEvidenceFiles,type ReceivingReportEvidenceFiles} from "./schemas/warehouse";
