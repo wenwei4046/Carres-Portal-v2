@@ -53,6 +53,10 @@ import { FactRow, Facts, FilesCard, HistoryCard, ReadFailed, ReasonModal } from 
 import { VoucherAdvanceCard } from "./VoucherAdvance";
 import { NotesOwedHint } from "./NoteFollowUpParts";
 import { paymentVoucherPrint } from "./voucher-print";
+import { printVoucher, printVoucherById } from "../preview/row-print";
+import { documentRowMenu } from "@/components/register/row-menu";
+import { VoucherPreview } from "../preview/previews";
+import { useQueryClient } from "@tanstack/react-query";
 import { paysOut } from "@carres/shared/money-accounts";
 import { useMoneyAccounts } from "../settings/api";
 import { useSaveKey } from "../save-key";
@@ -126,9 +130,16 @@ function paidFromName(v: { pay_from_account_code: string | null; pay_from_name: 
   return v.pay_from_account_code ? v.pay_from_name ?? "" : "Not chosen yet";
 }
 
+/** Duplicate (Chew 2026-10-21): a NEW draft started from this voucher, on the
+ *  new-voucher form that already takes a prefill. Nothing is saved until Save. */
+export const duplicateVoucherPath = (id: string) => `/finance/payment-vouchers/new?copy=${id}`;
+
 function VoucherRegister() {
   const personalLayouts = useFinancePersonalLayouts("finance_payment_vouchers");
   const navigate = useNavigate();
+  const qc = useQueryClient();
+  // Double-click previews the voucher (Chew 2026-10-21); View opens its page.
+  const [peek, setPeek] = useState<string | null>(null);
   const [dept, setDept] = useDepartmentParam();
   const query = usePaymentVouchers(dept);
   const rows = query.data ?? [];
@@ -199,7 +210,13 @@ function VoucherRegister() {
               </span>
             }
             emptyMessage="No payment vouchers yet. Every payment to a supplier or creditor starts here."
-            onRowDoubleClick={(r) => navigate(`/finance/payment-vouchers/${r.id}`)}
+            onRowDoubleClick={(r) => setPeek(r.id)}
+            contextMenu={(r) => documentRowMenu({
+              view: () => navigate(`/finance/payment-vouchers/${r.id}`),
+              // A draft has no number, so no paper (voucher-print.ts).
+              print: r.voucher_no ? () => void printVoucherById(qc, r.id) : undefined,
+              more: [{ label: "Duplicate", onClick: () => navigate(duplicateVoucherPath(r.id)) }],
+            })}
             statusSummary={(visible) => {
               const paid = visible
                 .filter((r) => r.status === "approved")
@@ -215,6 +232,7 @@ function VoucherRegister() {
           />
         </ListPageShell>
       )}
+      <VoucherPreview id={peek} onClose={() => setPeek(null)} onView={(id) => navigate(`/finance/payment-vouchers/${id}`)} />
     </div>
   );
 }
@@ -291,10 +309,7 @@ function VoucherDetail() {
     if (!printable) return;
     setPrinting(true);
     try {
-      const { renderPaymentVoucherPdf } = await import("@/lib/pdf/render");
-      window.open(URL.createObjectURL(await renderPaymentVoucherPdf(printable)), "_blank", "noopener");
-    } catch (e) {
-      toast.error(`The voucher could not be opened: ${(e as Error).message}`);
+      await printVoucher(doc);
     } finally {
       setPrinting(false);
     }
@@ -614,6 +629,34 @@ function VoucherForm() {
     setRequestApplied(true);
   }, [fromRequest.data, requestApplied]);
 
+  // Duplicate (Chew 2026-10-21): a new draft starts from another voucher —
+  // the same purpose, supplier, payee, account paid from, method, note, lines,
+  // advance and amounts — dated today, with no reference (that is the new
+  // payment's own) and no number until it is approved. A bill or debit note it
+  // paid stays ticked only while something is left to pay on it, at most that.
+  const copyId = id ? null : params.get("copy");
+  const copySource = usePaymentVoucher(copyId ?? undefined);
+  const [copyState, setCopyState] = useState<"none" | "waiting" | "picks" | "done">(copyId ? "waiting" : "none");
+  useEffect(() => {
+    const d = copySource.data;
+    if (copyState !== "waiting" || !d) return;
+    setPurpose(d.voucher.purpose);
+    setSupplierId(d.voucher.supplier_id ?? "");
+    setPayee(d.voucher.payee_name);
+    setPayFrom(d.voucher.pay_from_account_code ?? "");
+    setMethod((PAYMENT_VOUCHER_METHODS as readonly string[]).includes(d.voucher.pay_method)
+      ? d.voucher.pay_method as Method : "OTHER");
+    setNarration(d.voucher.narration ?? "");
+    setPicks(Object.fromEntries([
+      ...d.allocations.map((a) => [a.bill_id, { on: true, amount: String(a.amount_applied) }] as const),
+      ...(d.debit_notes ?? []).map((n) => [`${DN}${n.debit_note_id}`, { on: true, amount: String(n.amount_applied) }] as const),
+    ]));
+    setLines(d.lines.map((l) => ({ ...newLine(), accountCode: l.account_code, description: l.description ?? "", amount: String(l.amount),
+      departmentType: (l.department_type ?? null) as DepartmentType | null, departmentId: l.department_id ?? null })));
+    setAdvance((num(d.voucher.advance_amount) ?? 0) > 0 ? String(d.voucher.advance_amount) : "");
+    setCopyState("picks");
+  }, [copySource.data, copyState]);
+
   // Editing a draft: the form starts from the voucher as saved.
   useEffect(() => {
     const d = existing.data;
@@ -708,6 +751,29 @@ function VoucherForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debitNotes.data, mineDn]);
 
+  // Duplicate, second step: once the supplier's open bills and debit notes are
+  // read, keep only what still has something left to pay, at most that.
+  useEffect(() => {
+    if (copyState !== "picks") return;
+    const forBills = purpose === "SUPPLIER_BILLS" && supplierId !== "";
+    if (forBills && (!bills.data || !debitNotes.data)) return;
+    setPicks((before) => {
+      const next: Record<string, BillPick> = {};
+      if (!forBills) return next;
+      for (const [key, p] of Object.entries(before)) {
+        const dn = key.startsWith(DN) ? debitNotes.data?.find((n) => `${DN}${n.id}` === key) : undefined;
+        const bill = key.startsWith(DN) ? undefined : bills.data?.find((b) => b.bill_id === key);
+        const left = dn ? (dn.supplier_id === supplierId && dn.status === "confirmed" ? dnAvailable(dn) : 0)
+          : bill ? cents(num(bill.unallocated) ?? 0) : 0;
+        if (left > 0) next[key] = { on: true, amount: String(Math.min(left, num(p.amount) ?? 0) || left) };
+      }
+      return next;
+    });
+    setCopyState("done");
+    // dnAvailable reads only mineDn, empty on a new voucher.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [copyState, purpose, supplierId, bills.data, debitNotes.data]);
+
   const supplier = (suppliers.data ?? []).find((s) => s.id === supplierId) ?? null;
   // 0512: Paid from reads the one money-account list — cash and banks only.
   const payFromChoices = (moneyAccounts.data ?? []).filter(paysOut);
@@ -765,6 +831,8 @@ function VoucherForm() {
 
   if (id && existing.isError) return <ReadFailed what="This payment voucher" onRetry={() => void existing.refetch()} />;
   if (id && !loaded) return <div className="p-6 text-body">Loading payment voucher…</div>;
+  if (copyId && copySource.isError) return <ReadFailed what="This payment voucher" onRetry={() => void copySource.refetch()} />;
+  if (copyState === "waiting") return <div className="p-6 text-body">Loading payment voucher…</div>;
   if (id && existing.data && !existing.data.can.edit) {
     return (
       <div className="p-6 text-body">

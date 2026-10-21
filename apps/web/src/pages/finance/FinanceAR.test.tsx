@@ -167,3 +167,33 @@ describe("the empty list says WHY it is empty", () => {
     expect(screen.queryByText("No customer owes money.")).not.toBeInTheDocument();
   });
 });
+
+/* Row menu (Chew 2026-10-21, Finance MASTER §4.2): an order owing money is not
+   a Finance document, so a double-click still opens its drawer; the right-click
+   menu is that same View, then the row's own Record receipt. */
+describe("AR · Receivables row menu", () => {
+  const menuWords = () => Array.from(screen.getByRole("menu", { name: "Row actions" }).children)
+    .map((el) => (el.getAttribute("role") === "separator" ? "─" : el.textContent ?? ""));
+
+  it("is View, then Record receipt after one divider", async () => {
+    show();
+    fireEvent.contextMenu(await screen.findByText("Dahlia Suria"));
+    expect(menuWords()).toEqual(["View", "─", "Record receipt"]);
+  });
+
+  it("View opens the order's drawer without the receipt form", async () => {
+    show();
+    fireEvent.contextMenu(await screen.findByText("Dahlia Suria"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "View" }));
+    const drawer = await screen.findByTestId("ar-drawer");
+    expect(within(drawer).queryByRole("button", { name: "Confirm" })).not.toBeInTheDocument();
+  });
+
+  it("Record receipt opens the drawer with the receipt form, as the row's button does", async () => {
+    show();
+    fireEvent.contextMenu(await screen.findByText("Dahlia Suria"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Record receipt" }));
+    const drawer = await screen.findByTestId("ar-drawer");
+    expect(within(drawer).getByLabelText("Amount")).toHaveValue("4970");
+  });
+});

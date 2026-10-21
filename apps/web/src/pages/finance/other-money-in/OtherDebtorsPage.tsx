@@ -19,7 +19,11 @@
  * answer, not a zero.
  */
 import { useMemo, useState, type ReactNode } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { documentRowMenu } from "@/components/register/row-menu";
+import { OtherDebtorInvoicePreview } from "../preview/previews";
+import { printOtherDebtorInvoiceById } from "../preview/row-print";
 import {
   financePartyKindWord,
   otherDebtorInvoiceNumberWord,
@@ -40,7 +44,7 @@ import { useOtherDebtorInvoices, useOtherDebtorParties } from "./api";
 import { DepartmentFilter, useDepartmentParam } from "../department";
 import InvoicePage from "./InvoicePage";
 import PartyModal from "./PartyModal";
-import { LoadFailed } from "./parts";
+import { invoiceReceiptDoor, LoadFailed } from "./parts";
 import { amountCell, FINANCE_WIDTH } from "../finance-widths";
 import { useFinancePersonalLayouts } from "../finance-layouts";
 
@@ -123,6 +127,10 @@ function Siblings({ current }: { current: "invoices" | "parties" }) {
 
 function InvoiceRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNew: () => void }) {
   const personalLayouts = useFinancePersonalLayouts("finance_other_debtor_invoices");
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  // Double-click previews the invoice (Chew 2026-10-21); View opens its page.
+  const [peek, setPeek] = useState<string | null>(null);
   const [dept, setDept] = useDepartmentParam();
   const query = useOtherDebtorInvoices(dept);
   const columns = useMemo<DataGridColumn<OtherDebtorInvoiceRow>[]>(
@@ -240,7 +248,16 @@ function InvoiceRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
         }
         emptyMessage="No other debtor invoice yet. Press New invoice to bill a party that is not a customer."
         expandTitle="Inspect invoice"
-        onRowDoubleClick={(r) => onOpen(r.invoice_id)}
+        onRowDoubleClick={(r) => setPeek(r.invoice_id)}
+        contextMenu={(r) => {
+          const receipt = invoiceReceiptDoor(r);
+          return documentRowMenu({
+            view: () => onOpen(r.invoice_id),
+            // A draft is still a form: it has no paper until it is issued.
+            print: r.status === "draft" ? undefined : () => void printOtherDebtorInvoiceById(qc, r.invoice_id),
+            more: receipt ? [{ label: "Record receipt", onClick: () => navigate(receipt) }] : [],
+          });
+        }}
         expandable={{
           renderExpansion: (r) => (
             <div className="p-4 text-body flex flex-col items-start gap-1">
@@ -268,6 +285,7 @@ function InvoiceRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
           );
         }}
       />
+      <OtherDebtorInvoicePreview id={peek} onClose={() => setPeek(null)} onView={(id) => { setPeek(null); onOpen(id); }} />
     </ListPageShell>
   );
 }

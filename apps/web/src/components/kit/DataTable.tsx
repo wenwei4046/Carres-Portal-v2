@@ -76,6 +76,8 @@ import SearchInput from "./SearchInput";
 import { controlClass } from "./field-recipe";
 import { applyColumnOrder, moveColumnOrder, resizeColumnPair } from "./grid-layout";
 import { Z_TABLE_FOOTER, Z_TABLE_HEADER } from "./overlay-layer";
+import type { DataGridContextMenuItem } from "@/components/register/DataGrid";
+import RowContextMenu, { type RowMenuAt } from "@/components/register/RowContextMenu";
 
 /** A column may not be dragged under this, as a percentage of the table. */
 const MIN_COLUMN_PCT = 4;
@@ -236,6 +238,13 @@ export interface DataTableProps<Row> {
    *  (Finance, Chew 2026-10-14: 「点的时候都算双击点开，除了是按钮」). Absent =
    *  a single click opens, as every other table. */
   openOnDoubleClick?: boolean;
+  /** Opt-in: the ONE ROW MENU (UI MASTER §6.7 rule 5) on a right-click, or on
+   *  Shift+F10 or the Menu key from inside the row — the same menu, markup and
+   *  classes DataGrid opens (`RowContextMenu`). Build the items with
+   *  `documentRowMenu`; a row that returns none keeps the browser's own menu.
+   *  Absent = no handler at all and the markup this table always drew
+   *  (Finance, Chew 2026-10-21). */
+  contextMenu?: (row: Row) => DataGridContextMenuItem[];
   /** Present = the table is selectable. Absent = no checkbox column at all. */
   selection?: {
     selected: ReadonlySet<string>;
@@ -660,6 +669,7 @@ export default function DataTable<Row>({
   rowTestId,
   onRowOpen,
   openOnDoubleClick,
+  contextMenu,
   selection,
   empty,
   loading = false,
@@ -697,6 +707,12 @@ export default function DataTable<Row>({
    * survives a reload (§0.4).
    */
   const [order, setOrder] = useState<string[] | null>(null);
+  /* The open row menu, only ever set when the caller passed `contextMenu`. */
+  const [rowMenu, setRowMenu] = useState<RowMenuAt | null>(null);
+  const closeRowMenu = useCallback(() => setRowMenu(null), []);
+  /* The Menu key fires keydown, then the browser's own contextmenu: the
+     second must not reopen the menu at the mouse. DataGrid's same guard. */
+  const keyboardMenuAt = useRef(0);
   const [widthPct, setWidthPct] = useState<Record<string, number> | null>(null);
   const [dragKey, setDragKey] = useState<string | null>(null);
   const headRef = useRef<HTMLTableRowElement | null>(null);
@@ -1138,6 +1154,27 @@ export default function DataTable<Row>({
                   data-selected={isSelected || undefined}
                   onClick={onRowOpen && !openOnDoubleClick ? () => onRowOpen(row) : undefined}
                   onDoubleClick={onRowOpen && openOnDoubleClick ? () => onRowOpen(row) : undefined}
+                  onContextMenu={contextMenu ? (e) => {
+                    if (performance.now() - keyboardMenuAt.current < 500) {
+                      e.preventDefault();
+                      return;
+                    }
+                    const items = contextMenu(row);
+                    if (items.length === 0) return;
+                    e.preventDefault();
+                    setRowMenu({ x: e.clientX, y: e.clientY, items });
+                  } : undefined}
+                  onKeyDown={contextMenu ? (e) => {
+                    if (e.key !== "ContextMenu" && !(e.shiftKey && e.key === "F10")) return;
+                    const items = contextMenu(row);
+                    if (items.length === 0) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    keyboardMenuAt.current = performance.now();
+                    const origin = (e.target as HTMLElement).getBoundingClientRect();
+                    setRowMenu({ x: Math.round(origin.left + 8), y: Math.round(origin.bottom), items,
+                      returnFocus: e.target as HTMLElement });
+                  } : undefined}
                   /* HOVER IS GREY, SELECTION IS BLUE (Loo, 2026-08-03).
                    * Hover says "the mouse is here" — one second long, no
                    * meaning — so it may not spend the accent. Selection is a
@@ -1283,6 +1320,7 @@ export default function DataTable<Row>({
           </tfoot>
         ) : null}
       </table>
+      {rowMenu && <RowContextMenu menu={rowMenu} onClose={closeRowMenu} />}
     </div>
   );
 }

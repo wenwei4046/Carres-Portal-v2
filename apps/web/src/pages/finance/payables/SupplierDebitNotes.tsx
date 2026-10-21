@@ -37,6 +37,8 @@ import { DebitNoteSettlesCard } from "./NoteFollowUpParts";
 import { BILL_STATUS_WORD, VOUCHER_STATUS_WORD, cents, creditorKindWord, money, num, refusal, word } from "./payables-words";
 import { amountCell, FINANCE_WIDTH } from "../finance-widths";
 import { useFinancePersonalLayouts } from "../finance-layouts";
+import { documentRowMenu } from "@/components/register/row-menu";
+import { DebitNotePreview } from "../preview/previews";
 
 /**
  * Finance → Payables → Debit Notes (migration 0681; Chew 2026-10-03,
@@ -95,6 +97,8 @@ export function SupplierDebitsOf({ supplierId }: { supplierId: string }) {
 function DebitNoteRegister() {
   const personalLayouts = useFinancePersonalLayouts("finance_debit_notes");
   const navigate = useNavigate();
+  // Double-click previews the note (Chew 2026-10-21); View opens its page.
+  const [peek, setPeek] = useState<string | null>(null);
   const query = useSupplierDebitNotes();
   const rows = query.data ?? [];
   const columns = useMemo<DataGridColumn<SupplierDebitNoteRegisterRow>[]>(() => [
@@ -148,7 +152,8 @@ function DebitNoteRegister() {
               </Button>
             }
             emptyMessage="No debit note yet. A supplier's debit note appears here once it is entered."
-            onRowDoubleClick={(r) => navigate(`/finance/debit-notes/${r.id}`)}
+            onRowDoubleClick={(r) => setPeek(r.id)}
+            contextMenu={(r) => documentRowMenu({ view: () => navigate(`/finance/debit-notes/${r.id}`) })}
             statusSummary={(visible) => {
               const open = visible.filter((r) => r.status === "confirmed").reduce((s, r) => s + (num(r.debit_open) ?? 0), 0);
               return (
@@ -160,6 +165,7 @@ function DebitNoteRegister() {
           />
         </ListPageShell>
       )}
+      <DebitNotePreview id={peek} onClose={() => setPeek(null)} onView={(id) => navigate(`/finance/debit-notes/${id}`)} />
     </div>
   );
 }

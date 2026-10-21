@@ -58,11 +58,16 @@ export function useMoneyInAccounts() {
   });
 }
 
-export function useOtherDebtorParties() {
-  return useQuery({
+/** The parties' read — also fetched by the invoice row menu's Print. */
+export function partiesQuery() {
+  return {
     queryKey: moneyInKeys.parties(),
     queryFn: () => apiFetch<OtherDebtorPartyRow[]>(`${BASE}/parties`),
-  });
+  };
+}
+
+export function useOtherDebtorParties() {
+  return useQuery(partiesQuery());
 }
 
 export function useOtherDebtorInvoices(dept = "") {
@@ -73,12 +78,16 @@ export function useOtherDebtorInvoices(dept = "") {
   });
 }
 
-export function useOtherDebtorInvoice(id: string | null) {
-  return useQuery({
-    queryKey: moneyInKeys.invoice(id ?? ""),
+/** One invoice's read — also fetched by its row menu's Print. */
+export function invoiceQuery(id: string) {
+  return {
+    queryKey: moneyInKeys.invoice(id),
     queryFn: () => apiFetch<OtherDebtorInvoiceDetail>(`${BASE}/invoices/${id}`),
-    enabled: !!id,
-  });
+  };
+}
+
+export function useOtherDebtorInvoice(id: string | null) {
+  return useQuery({ ...invoiceQuery(id ?? ""), enabled: !!id });
 }
 
 export function useOtherReceipts(dept = "") {
@@ -89,12 +98,16 @@ export function useOtherReceipts(dept = "") {
   });
 }
 
-export function useOtherReceipt(id: string | null) {
-  return useQuery({
-    queryKey: moneyInKeys.receipt(id ?? ""),
+/** One receipt's read — also fetched by its row menu's Print. */
+export function receiptQuery(id: string) {
+  return {
+    queryKey: moneyInKeys.receipt(id),
     queryFn: () => apiFetch<OtherReceiptDetail>(`${BASE}/receipts/${id}`),
-    enabled: !!id,
-  });
+  };
+}
+
+export function useOtherReceipt(id: string | null) {
+  return useQuery({ ...receiptQuery(id ?? ""), enabled: !!id });
 }
 
 function useInvalidatingMutation<TVars, TResult>(fn: (vars: TVars) => Promise<TResult>) {

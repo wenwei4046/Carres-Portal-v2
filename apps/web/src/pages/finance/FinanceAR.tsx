@@ -19,6 +19,7 @@ import {
 } from "./money-owed";
 import { FINANCE_WIDTH } from "./finance-widths";
 import { useFinancePersonalLayouts } from "./finance-layouts";
+import { documentRowMenu } from "@/components/register/row-menu";
 
 const soWord = (r: CustomerOwingRow) => (r.so !== null ? `SO-${r.so}` : "SO not available");
 const ageWord = (days: number | null) =>
@@ -151,6 +152,13 @@ export default function FinanceAR() {
               : undefined}
             onClearConditions={ageScope ? clearAge : undefined}
             onRowDoubleClick={(r) => { setRecording(false); setOpenId(r.orderId); }}
+            /* An order owing money is not a Finance document: a double-click
+               still opens its drawer. The row menu (Chew 2026-10-21) is that
+               same View, then the row's own Record receipt door. */
+            contextMenu={(r) => documentRowMenu({
+              view: () => { setRecording(false); setOpenId(r.orderId); },
+              more: [{ label: "Record receipt", onClick: () => { setRecording(true); setOpenId(r.orderId); } }],
+            })}
             statusSummary={(visible) => {
               const t = outstandingTotal(visible);
               return (

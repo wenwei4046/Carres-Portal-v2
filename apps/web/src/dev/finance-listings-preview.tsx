@@ -17,6 +17,11 @@
  * card-payout-banks (a table since 2026-10-13) · money-accounts (0692: Chart of accounts with its money accounts; those out of use hidden until asked for) ·
  * dealer-commission · dealer-statement (one made-up dealer, 0664; pick it on
  * the Statement view) · notes-to-follow-up · note-to-follow-up (0676).
+ * Row menu and preview (Chew 2026-10-21): right-click a row for its menu;
+ * double-click BILL-2609-0012 (bills), PV-2609-0031 (payment-vouchers),
+ * ODI-2609-0007 (other-debtors), ORC-2609-0014 (other-receipts), a credit or
+ * debit note, or any Journal or General Ledger line for its preview. Every
+ * ledger entry answers with the same two invented lines.
  * `?role=principal` draws the area titles, to see an area fold.
  * Every listing carries at least one 60+ character party name so wrapping and
  * truncation are visible. Fixture evidence is not production evidence.
@@ -896,6 +901,60 @@ const SETTINGS_CHART = [
   sort_order: 0, section, special,
 }));
 
+// ── Row menu and preview (Chew 2026-10-21): the documents a double-click reads ──
+const BILL_DOC = {
+  bill: { ...BILLS[0]!, ap_account_name: "Trade Payables — Suppliers", narration: null, cancel_reason: null,
+    created_by_name: "Shasha", confirmed_at: at(-9), confirmed_by_name: "Chew", cancelled_at: null, cancelled_by_name: null,
+    entry_no: ENTRIES[2]!.entry_no, reversal_entry_no: null },
+  lines: [
+    { line_no: 1, account_code: "5100", account_name: "Cost of goods sold", description: "Ohana 3 seater sofa, grey fabric", sku: "SOFA-3S",
+      qty: "4", unit_price: "2995.00", amount: "11980.00", warehouse_receipt_id: null, grn_no: "GRN-20260903-1184", grn_po_id: null,
+      po_line_id: null, po_unit_cost: null, price_diff: null },
+    { line_no: 2, account_code: "6500", account_name: "Transport", description: "Lorry from Muar", sku: null,
+      qty: null, unit_price: null, amount: "500.00", warehouse_receipt_id: null, grn_no: null, grn_po_id: null,
+      po_line_id: null, po_unit_cost: null, price_diff: null },
+  ],
+  payments: [], files: [], events: [], paid_total: "5000.00", allocated_total: "5000.00", unpaid: "7480.00",
+  left_to_pay: "7480.00", advance_open: "0.00", go_live_on: GO_LIVE,
+  can: { edit: false, confirm: false, cancel: false, add_file: false, apply_advance: false },
+};
+const VOUCHER_DOC = {
+  voucher: { ...VOUCHERS[0]!, supplier_kind: "supplier", ap_account_code: "2100", ap_account_name: "Trade Payables — Suppliers",
+    narration: "First payment on the September sofas", created_by_name: "Shasha", prepared_at: at(-4), checked_at: at(-4),
+    approved_at: at(-3), rejected_at: null, rejected_by_name: null, reject_reason: null, cancelled_at: null,
+    cancelled_by_name: null, cancel_reason: null, entry_no: ENTRIES[3]!.entry_no, reversal_entry_no: null },
+  lines: [],
+  allocations: [{ bill_id: "b-1", bill_no: "BILL-2609-0012", supplier_invoice_no: "OH-INV-88231", bill_date: soon(-9),
+    due_date: soon(21), bill_total: "12480.00", ap_account_code: "2100", amount_applied: "5000.00" }],
+  files: [], events: [], advance: null, go_live_on: GO_LIVE, you_prepared: false,
+  can: { edit: false, prepare: false, check: false, approve: false, reject: false, cancel: false, add_file: false,
+    apply_advance: false, take_advance_off: false, money_back: false, cancel_money_back: false },
+};
+const DEBTOR_INVOICE_DETAIL = {
+  invoice: { ...DEBTOR_INVOICES[0]!, debtor_account_code: "1240", entry_no: ENTRIES[4]!.entry_no, reversal_entry_no: null,
+    created_by_name: "Shasha", issued_by_name: "Chew", cancelled_by_name: null },
+  lines: [
+    { line_no: 1, account_code: "4900", account_name: "Other income", description: "Event space sublet", amount: 2000, department_type: "OFFICE", department_id: null },
+    { line_no: 2, account_code: "4900", account_name: "Other income", description: "Cleaning after the event", amount: 400, department_type: "OFFICE", department_id: null },
+  ],
+  receipts: [{ receipt_id: RECEIPTS[0]!.receipt_id, receipt_no: RECEIPTS[0]!.receipt_no, receipt_date: RECEIPTS[0]!.receipt_date, amount: 1200, status: "posted" }],
+};
+const RECEIPT_DETAIL = {
+  receipt: { ...RECEIPTS[0]!, entry_no: ENTRIES[4]!.entry_no, reversal_entry_no: null, voided_by_name: null },
+  lines: [],
+  allocations: [{ invoice_id: DEBTOR_INVOICES[0]!.invoice_id, invoice_no: DEBTOR_INVOICES[0]!.invoice_no, invoice_date: DEBTOR_INVOICES[0]!.invoice_date,
+    invoice_total: 2400, amount: 1200 }],
+};
+/** Any entry number: the Journal's row, with two invented lines that balance. */
+function entryDetail(no: string) {
+  const e = ENTRIES.find((x) => x.entry_no === no) ?? { ...ENTRIES[0]!, entry_no: no };
+  const amount = Number(e.total_debit);
+  return { entry: e, related: [], lines: [
+    { line_no: 1, account_code: "5100", account_name: "Cost of goods sold", debit: amount, credit: 0, party_type: null, party_id: null, party_name: null, memo: e.narration },
+    { line_no: 2, account_code: "2100", account_name: "Trade Payables — Suppliers", debit: 0, credit: amount, party_type: "SUPPLIER", party_id: "s-1", party_name: LONG_SUPPLIER, memo: null },
+  ] };
+}
+
 const realFetch = window.fetch.bind(window);
 
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -925,6 +984,17 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (url.includes("/api/finance/payment-requests/grants")) return json({ rows: REQUEST_GRANTS });
   if (url.includes("/api/finance/payment-requests/prq-")) return json(PAYMENT_REQUEST_DOC);
   if (url.includes("/api/finance/payment-requests")) return json({ rows: PAYMENT_REQUESTS });
+  {
+    // Row menu and preview (Chew 2026-10-21): one document of each kind.
+    const path = new URL(url, window.location.origin).pathname;
+    const bill = BILLS.find((b) => path === `/api/finance/payables/bills/${b.id}`);
+    if (bill) return json({ ...BILL_DOC, bill: { ...BILL_DOC.bill, ...bill, entry_no: bill.status === "draft" ? null : BILL_DOC.bill.entry_no } });
+    const voucher = VOUCHERS.find((v) => path === `/api/finance/payables/vouchers/${v.id}`);
+    if (voucher) return json({ ...VOUCHER_DOC, voucher: { ...VOUCHER_DOC.voucher, ...voucher } });
+    if (path === `/api/finance/other-money-in/invoices/${DEBTOR_INVOICES[0]!.invoice_id}`) return json(DEBTOR_INVOICE_DETAIL);
+    if (path === `/api/finance/other-money-in/receipts/${RECEIPTS[0]!.receipt_id}`) return json(RECEIPT_DETAIL);
+    if (path.startsWith("/api/finance/ledger/entries/")) return json(entryDetail(decodeURIComponent(path.split("/").pop() ?? "")));
+  }
   if (url.includes("/api/finance/payables/bills/delivery-orders")) return json(DELIVERY_PARTNERS);
   if (url.includes("/api/finance/payables/bills")) return json({ rows: BILLS });
   if (url.includes("/api/finance/payables/vouchers")) return json({ rows: VOUCHERS });
@@ -968,7 +1038,6 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (url.includes("/api/finance/other-money-in/receipts")) return json(RECEIPTS);
   if (url.includes("/api/finance/other-money-in/me")) return json({ mayCancel: true });
   if (url.includes("/api/finance/other-money-in/accounts")) return json([]);
-  if (url.includes("/api/finance/ledger/entries/")) return json({ entry: ENTRIES[0], lines: [], related: [] });
   if (url.includes("/api/finance/ledger/entries")) return json({ rows: ENTRIES, total: ENTRIES.length });
   if (url.includes("/api/finance/ledger/item-groups")) return json(ITEM_GROUPS);
   if (url.includes("/api/finance/ledger/posting-accounts")) return json(POSTINGS);

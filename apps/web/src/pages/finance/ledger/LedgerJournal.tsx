@@ -50,6 +50,8 @@ import {
 import ManualJournalForm from "./ManualJournalForm";
 import { amountCell, FINANCE_WIDTH } from "../finance-widths";
 import { useFinancePersonalLayouts } from "../finance-layouts";
+import { documentRowMenu } from "@/components/register/row-menu";
+import { EntryPreview } from "../preview/previews";
 
 const ALL_ACCOUNTS = "all";
 const NEW_ENTRY = "new";
@@ -117,6 +119,8 @@ function JournalRegister({ scope, search, onOpen, onPickDept, onPickAccount, onS
   onNew?: () => void;
 }) {
   const personalLayouts = useFinancePersonalLayouts("finance_journal");
+  // Double-click previews the entry (Chew 2026-10-21); View opens its page.
+  const [peek, setPeek] = useState<string | null>(null);
   const query = useLedgerEntries(scope);
   const chart = useLedgerChart();
   const accounts = useMemo(
@@ -208,13 +212,15 @@ function JournalRegister({ scope, search, onOpen, onPickDept, onPickAccount, onS
             </span>}
           </span>}
           emptyMessage={emptyWords(scope)}
-          expandTitle="Show lines" onRowDoubleClick={(r) => onOpen(r.entry_no)}
+          expandTitle="Show lines" onRowDoubleClick={(r) => setPeek(r.entry_no)}
+          contextMenu={(r) => documentRowMenu({ view: () => onOpen(r.entry_no) })}
           expandable={{ renderExpansion: (r) => <EntryExpansion row={r} onOpen={onOpen} /> }}
           statusSummary={(visible) => <span data-testid="journal-summary">
             {visible.length} {visible.length === 1 ? "entry" : "entries"}
           </span>}
         />
       </ListPageShell>
+      <EntryPreview entryNo={peek} onClose={() => setPeek(null)} onView={(no) => { setPeek(null); onOpen(no); }} />
     </>}
   </div>;
 }

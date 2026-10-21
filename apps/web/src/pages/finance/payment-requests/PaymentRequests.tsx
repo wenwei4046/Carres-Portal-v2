@@ -36,6 +36,7 @@ import { FactRow, Facts, ReadFailed, ReasonModal } from "../payables/PayablesPar
 import { money, num, refusal } from "../payables/payables-words";
 import { amountCell, FINANCE_WIDTH } from "../finance-widths";
 import { useFinancePersonalLayouts } from "../finance-layouts";
+import { documentRowMenu } from "@/components/register/row-menu";
 
 /**
  * Finance → Payment Requests (migration 0645; Chew 2026-10-03,
@@ -144,6 +145,9 @@ function RequestRegister() {
               ? "No payment request is waiting for Finance."
               : "No payment request yet. Ask Finance to pay a bill with New Payment Request."}
             onRowDoubleClick={(r) => navigate(`/finance/payment-requests/${r.id}`)}
+            /* A request posts nothing to the ledger, so a double-click still
+               opens its page; the row menu is View only (Chew 2026-10-21). */
+            contextMenu={(r) => documentRowMenu({ view: () => navigate(`/finance/payment-requests/${r.id}`) })}
             statusSummary={(visible) => (
               <span data-testid="payment-requests-summary">
                 {visible.length} {visible.length === 1 ? "request" : "requests"} · {money(visible.reduce((s, r) => s + Math.round((num(r.amount) ?? 0) * 100), 0) / 100)}

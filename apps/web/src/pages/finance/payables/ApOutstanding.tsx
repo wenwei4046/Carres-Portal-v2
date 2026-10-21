@@ -15,6 +15,7 @@ import SupplierCreditsOf from "./SupplierCreditsOf";
 import { SupplierDebitsOf } from "./SupplierDebitNotes";
 import { FINANCE_WIDTH } from "../finance-widths";
 import { useFinancePersonalLayouts } from "../finance-layouts";
+import { documentRowMenu } from "@/components/register/row-menu";
 
 /**
  * Finance → Unpaid by Supplier (migration 0477, `ap_outstanding`). What
@@ -112,6 +113,12 @@ export default function ApOutstanding() {
             expandTitle="Show unpaid bills"
             expandable={{ renderExpansion: (r) => <UnpaidBillsOf row={r} /> }}
             onRowDoubleClick={(r) => navigate(`/finance/payment-vouchers/new?supplier=${r.supplier_id}`)}
+            /* A supplier is a party, not a document, and has no page of its
+               own: no View, and a double-click keeps its door. The row menu
+               (Chew 2026-10-21) is the expansion's New Payment Voucher. */
+            contextMenu={(r) => documentRowMenu({
+              more: [{ label: "New Payment Voucher", onClick: () => navigate(`/finance/payment-vouchers/new?supplier=${r.supplier_id}`) }],
+            })}
             statusSummary={(visible) => {
               const t = unpaidTotal(visible); // same arithmetic as the Dashboard (Law D)
               return (

@@ -42,6 +42,8 @@ import type { BillReadAnswer } from "@carres/shared/bill-reading";
 import { ADVANCE_APPLICATION_STATUS_WORD, BILL_STATUS_WORD, cents, creditorKindWord, money, num, refusal, word } from "./payables-words";
 import { amountCell, FINANCE_WIDTH } from "../finance-widths";
 import { useFinancePersonalLayouts } from "../finance-layouts";
+import { documentRowMenu } from "@/components/register/row-menu";
+import { CreditNotePreview } from "../preview/previews";
 
 /**
  * Finance → Payables → Credit notes (migration 0642; Chew 2026-10-03,
@@ -79,6 +81,8 @@ const noteNo = (n: { note_no: string | null }) => n.note_no ?? "Draft, no number
 function CreditNoteRegister() {
   const personalLayouts = useFinancePersonalLayouts("finance_credit_notes");
   const navigate = useNavigate();
+  // Double-click previews the note (Chew 2026-10-21); View opens its page.
+  const [peek, setPeek] = useState<string | null>(null);
   const query = useSupplierCreditNotes();
   const rows = query.data ?? [];
   const columns = useMemo<DataGridColumn<SupplierCreditNoteRegisterRow>[]>(() => [
@@ -130,7 +134,8 @@ function CreditNoteRegister() {
               </Button>
             }
             emptyMessage="No credit note yet. A supplier's credit note appears here once it is entered."
-            onRowDoubleClick={(r) => navigate(`/finance/credit-notes/${r.id}`)}
+            onRowDoubleClick={(r) => setPeek(r.id)}
+            contextMenu={(r) => documentRowMenu({ view: () => navigate(`/finance/credit-notes/${r.id}`) })}
             statusSummary={(visible) => {
               const open = visible.filter((r) => r.status === "confirmed").reduce((s, r) => s + (num(r.credit_open) ?? 0), 0);
               return (
@@ -142,6 +147,7 @@ function CreditNoteRegister() {
           />
         </ListPageShell>
       )}
+      <CreditNotePreview id={peek} onClose={() => setPeek(null)} onView={(id) => navigate(`/finance/credit-notes/${id}`)} />
     </div>
   );
 }

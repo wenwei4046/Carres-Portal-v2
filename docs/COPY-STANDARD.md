@@ -5383,6 +5383,33 @@ The feature is Chew's (Finance MASTER §3.6); Chew approved these words on 2026-
 | When the entries do not add up to the line (red) | **new** `Entries add up to {RM x}; the line shows {RM y}.` |
 | States | `Loading the General Ledger…` · `The General Ledger could not be loaded. Try again.` · `Try again` |
 
+### Row menu and preview (Chew 2026-10-21, approved)
+
+The feature is Chew's (Finance MASTER §4.2). The menu is the kit's ONE ROW MENU (UI MASTER §6.7 rule 5): `View` · `Print`, ONE divider, then the page's own items. Its words, and the preview's, are existing words; the one new word is **new** `Duplicate`, approved by Chew 2026-10-21 for Finance's Payment Vouchers only (the Sales Order bans on `Duplicate` stay). `Open`, `Pay` and `Receive` are not used. The same menu opens on Shift+F10 or the Menu key.
+
+| Page | Row menu |
+|---|---|
+| Bills | `View` · then `New Payment Voucher` when the bill is confirmed with something unpaid (the bill page's own condition and door) |
+| Payment Vouchers | `View` · `Print` (a voucher with a number; a draft has no paper) · then **new** `Duplicate`: the new-voucher form, filled from this voucher, dated today, no reference and no number; a bill or debit note stays ticked only while something is left to pay on it, at most that; nothing is saved until `Save` |
+| Unpaid by Supplier | `New Payment Voucher` for that supplier (a supplier has no page of its own, so no `View`) |
+| Credit Notes · Debit Notes · Payment Requests · Notes to follow up | `View` |
+| Other debtors (invoices) | `View` · `Print` (issued or cancelled; a draft has no paper) · then `Record receipt` when issued with something outstanding (the invoice page's own door) |
+| Other receipts | `View` · `Print` |
+| AR · Receivables | `View` (the order's drawer, as a double-click) · then `Record receipt` (the row's own door) |
+| Journal | `View` |
+| General Ledger | `View` on a line, to its entry on the Journal; `Brought forward` and `Total` have no menu |
+
+**The preview** (a double-click on a document row: Bills, Payment Vouchers, Credit Notes, Debit Notes, Other debtors invoices, Other receipts, Journal, General Ledger lines). Every word is the document page's own.
+
+| Where | Words |
+|---|---|
+| Title | `{Doc No} · {party}`; a draft `Draft bill` · `Draft voucher` · `Draft credit note` · `Draft debit note` · `Draft, no number yet`; a journal entry its `{JE No}` |
+| Facts | the page's own labels, e.g. `Status` · `Supplier` · `Supplier invoice` · `Bill date` · `Due date` · `Total` · `Unpaid` (`Not confirmed`); a voucher `Purpose` · `Payee` · `Voucher date` · `Paid from` · `Method` · `Amount`; a receipt `Received from` · `Receipt date` · `Received into` · `Reference`; a journal entry `Date` · `Source` · `Document` · `Narration` (`No narration`) |
+| Lines | heading `Lines`; columns `Description` · `Account` · `Amount`; row `Total`; a voucher's bill `{Bill No} · Supplier invoice {no}` and `Advance`, as it prints; a receipt's invoice `{Invoice No} · Invoice of {date}`; empty `No line yet.` (the voucher form's) or the page's own (`This credit note has no lines.` · `This debit note has no lines.` · `No direct line.`) |
+| General Ledger | heading `General Ledger`; each entry `Ledger entry {JE No}`, then its reversal's; columns `Account` · `Description` · `Debit` · `Credit`; row `Total`; `Account name not available` · `No memo`; nothing posted yet: the page's own `None yet. Confirming the bill makes it` (credit note, debit note alike) · `None yet. Approving the payment makes it` · `Nothing was entered in the ledger yet.` (Other debtors, Other receipts) |
+| Button | `View`, the one button: opens the document's page |
+| States | `Loading bill…` (and each document's own) · `{This bill} could not be loaded. Try again.` · `Loading entry…` · `This entry could not be loaded. Try again.` · `Try again` · `This entry has no lines.` |
+
 ### PROPOSAL — PENDING CHEW · AP Aging (0640)
 
 These words are on screen in the branch and are not approved yet.
