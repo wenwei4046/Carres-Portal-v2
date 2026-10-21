@@ -1,3 +1,4 @@
+import {warehouseAdmissionMessage} from "@/lib/warehouse-admission-message";
 import WarehouseConfirmationIncoming from "./WarehouseConfirmationIncoming";
 import { useState } from "react";
 import { poReceivingProgress, type WarehouseIncomingPo } from "@carres/shared";
@@ -34,6 +35,7 @@ export default function WarehouseIncoming() {
   const isLoading = readiness.isPending || current.isLoading;
   const isError = readiness.isError || readiness.data?.mode === "unavailable" || current.isError;
   const error = readiness.error ?? current.error;
+  const denied=error instanceof ApiError&&[401,403].includes(error.status);
   const refetch = () => readiness.isError ? readiness.refetch() : current.refetch();
 
   const pos = data?.pos ?? [];
@@ -61,18 +63,18 @@ export default function WarehouseIncoming() {
       <div className="px-9 py-8">
         <div role="alert" className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-body">
           <div className="text-destructive font-semibold mb-2">
-            Could not be loaded
+            {denied?"Receiving is not available":"Could not be loaded"}
           </div>
           <div className="text-meta text-base-700 mb-3">
-            {(error as Error | undefined)?.message ?? "Unknown error"}
+            {denied ? warehouseAdmissionMessage(null) : readiness.data?.mode === "unavailable" ? warehouseAdmissionMessage(readiness.data.reason) : (error as Error | undefined)?.message ?? "Unknown error"}
           </div>
-          <button
+          {!denied&&<button
             type="button"
             onClick={() => void refetch()}
             className="btn-secondary text-label py-1.5 px-3"
           >
             Try again
-          </button>
+          </button>}
         </div>
       </div>
     );
@@ -81,6 +83,7 @@ export default function WarehouseIncoming() {
   return (
     <div className="px-9 py-8 pb-14" data-testid="warehouse-incoming">
       {/* The shared header bar (UI-KIT §A9) — nothing drawn by hand here. */}
+      {readiness.data?.mode==="legacy_count"&&<p role="status">{warehouseAdmissionMessage(readiness.data.reason)}</p>}
       <PageHeader
         kicker={data?.warehouse?.name ?? "Warehouse"}
         title="Incoming"

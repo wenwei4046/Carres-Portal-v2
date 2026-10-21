@@ -1,3 +1,4 @@
+import {ReceivingSourceReservations} from "@/components/receiving/ReceivingSourceReservations";
 import BlockedReceivingReport from "./BlockedReceivingReport";
 import ReceivingExtraCustody from "@/components/receiving/ReceivingExtraCustody";
 import { useEffect, useMemo, useState } from "react";
@@ -576,6 +577,7 @@ export default function ReceivingRecord({
                           : ""}
                       </div>
                     ) : null}
+                    <ReceivingSourceReservations value={e.payload?.source_reservations}/>
                     {e.event === "amended" && e.payload?.before ? (
                       /* Only the AFFECTED facts compare side by side. */
                       <div className="mt-1 grid max-w-md grid-cols-2 gap-2 rounded-card border border-kit-slate-5 p-2 text-meta">

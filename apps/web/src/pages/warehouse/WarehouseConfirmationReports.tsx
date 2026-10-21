@@ -1,3 +1,4 @@
+import {ReceivingSourceReservations} from "@/components/receiving/ReceivingSourceReservations";
 // design-standard: list-page — existing ListPageShell and DataGrid; no separate rail for own report history.
 import { lazy, Suspense, useMemo, useRef, useState } from "react";
 import { documentDisplayNumber, warehouseReceiptStatusLabel, RECEIVING_UNIT_OUTCOME_LABEL, type WarehouseConfirmationResult, type WarehouseIncomingPo, type WarehouseReceiptStatus } from "@carres/shared";
@@ -98,6 +99,7 @@ function WarehouseReportHistory({receiptId}:{receiptId:string}) {
       <p className="text-meta text-kit-slate-11">{fmtDate(event.event_at,{time:true})} · {event.actor_name || "Staff identity not recorded"}</p>
       <p className="text-body">{event.event==="posted"?"Receiving saved":event.event==="resubmitted"?"Count submitted again":event.event==="submitted"?"Count submitted":"Activity"}</p>
       <WarehouseReportSnapshot event={event}/>
+      <ReceivingSourceReservations value={event.payload.source_reservations}/>
       {filesOf(event).map((file,index)=><Button key={file.path} size="sm" onClick={()=>void sign({...file,eventId:event.id,context:fmtDate(event.event_at,{time:true})})}>View proof {index+1}</Button>)}
     </li>)}</ul>
     {active?.kind==="pdf" ? <Modal open title="Evidence" width="viewer" onOpenChange={open=>{if(!open)closeEvidence();}}>

@@ -235,3 +235,11 @@ This completes the operating coverage of §§5–6 alongside the Commission jour
 | **Bonus tiers** | Skipped on purpose: zero commission rates exist, and the model-tier table already has the semantics. Wire attainment-pays through the adjustment slot, **never a parallel engine.** |
 
 **Saturday on-call boundary — owner confirmed 9 October 2026:** rotating contact coverage, default 9:00 AM–6:00 PM and editable. Answer customer, driver and warehouse calls/WhatsApp and record any required follow-up. It is not normal Saturday office attendance, PO Duty or GRN Duty, and does not automatically transfer all routine Tasks to the on-call person. Any follow-up retains its source-owned permission, normal owner and qualified cover rules. Rotation frequency remains unspecified; implementation unverified.
+
+
+**Named external Warehouse identity compatibility — 21 Oct 2026, CODE ON BRANCH / NO REAL ACCOUNT ACTIVATION.**
+The existing authorised Team account API can explicitly receive `warehouseIndividual: true` only for
+Warehouse with an existing Site and a named person. Omission preserves the shared-login marker.
+This external Warehouse person receives no internal staff code, position or Duty grant. SQL current
+person/Site/company admission still governs receiving; API input is not operational activation or a
+new HR UI door. Mocked API tests cover the explicit individual and unchanged shared paths.

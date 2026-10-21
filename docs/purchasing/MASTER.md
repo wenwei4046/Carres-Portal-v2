@@ -2492,6 +2492,23 @@ custody and direct unknown/count-only Extra return remain unbuilt/unverified. No
 issue or link creates a Work Done fact. These candidates do not establish whole Receiving completion,
 production SQL approval, exact-main upgrade or release readiness.
 
+**Receiving integration — 2026-10-21, BUILT ON CONTINUATION BRANCH / LOCAL TARGET MODEL ONLY.**
+The existing source-correction save now refreshes both Workspace and the separate legacy Tasks cache.
+Warehouse's actual saved result, its History and Office's original Receiving record display the posted
+Stock event's exact Unit reservation result, including source exceptions without guessed allocation.
+An independent TEST SO/PO fixture (canonical PO/expected-Unit birth; upstream approval journey not
+claimed) posted the same corrected report as GRN-261021-8139: U1-000-015 Reserved for SO-990001,
+U1-000-016 Incoming, causal receiving Work completed by the actual Warehouse person. The first
+mixed MPR/SO fixture exposed invalid TEST lineage and is excluded from acceptance; the replacement
+clean model leaves original MPR source/issue history unchanged and its full Work reader returns 200.
+Personal Warehouse account creation has explicit API compatibility only: an authorised People/HR
+request must opt into a named Warehouse person, with an existing Site; defaults remain shared,
+without internal staff code, position or duties. No real account was created or granted permissions.
+Admission failures name inactive Site/company and shared-login count mode. Stock SQL and its scoped
+history projection are installed only in the new disposable model, not production/main. Extra
+acceptance/return remain closed; the following owner-choice proposal is still unanswered. Full
+Receiving release, full-page/breakpoint acceptance and exact-main SQL upgrade remain unverified.
+
 **Extra decision record — MINIMAL PROPOSAL / NOT APPROVED / NOT BUILT, 2026-10-20.**
 The existing §9.5 Extra/source-gap rules require Purchasing's decision and verified provenance;
 they do not name the final Extra acceptance actor. PO Duty's existing Claim execution writer admits

@@ -191,3 +191,6 @@ export const receivingExtraCustodyEvidence = z.object({
 export const warehouseConfirmationReadiness = z.object({
   mode: z.enum(["legacy_count", "confirmation", "unavailable"]), reason: z.string().nullable(),
 });
+
+/** Canonical receipt-event projection; absence is not reservation success. */
+export const receivingSourceReservationResults=z.array(z.object({unit_code:z.string().min(1),result:z.enum(['source_reserved','existing_binding_preserved','source_reservation_needs_handling'])}));

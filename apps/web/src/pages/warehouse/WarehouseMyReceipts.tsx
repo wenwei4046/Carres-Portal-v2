@@ -1,3 +1,5 @@
+import {ApiError} from "@/lib/api";
+import {warehouseAdmissionMessage} from "@/lib/warehouse-admission-message";
 import { useWarehouseConfirmationReadiness } from "@/lib/warehouse-confirmation";
 import WarehouseConfirmationReports from "./WarehouseConfirmationReports";
 import Button from "@/components/kit/Button";
@@ -182,7 +184,8 @@ function Th({ children }: { children: React.ReactNode }) {
 export default function WarehouseMyReceipts() {
   const readiness=useWarehouseConfirmationReadiness();
   if(readiness.isPending)return <p role="status">Loading…</p>;
-  if(readiness.data?.mode==="legacy_count")return <LegacyWarehouseMyReceipts/>;
+  if(readiness.data?.mode==="legacy_count")return <><p role="status">{warehouseAdmissionMessage(readiness.data.reason)}</p><LegacyWarehouseMyReceipts/></>;
   if(readiness.data?.mode==="confirmation")return <WarehouseConfirmationReports/>;
-  return <div role="alert"><p>{readiness.isError?"Could not be loaded":"Not available yet"}</p><Button onClick={()=>void readiness.refetch()}>Try again</Button></div>;
+  const denied=readiness.error instanceof ApiError&&[401,403].includes(readiness.error.status);
+  return <div role="alert"><p>{denied?warehouseAdmissionMessage(null):readiness.isError?"Could not be loaded":warehouseAdmissionMessage(readiness.data?.reason)}</p>{!denied&&<Button onClick={()=>void readiness.refetch()}>Try again</Button>}</div>;
 }

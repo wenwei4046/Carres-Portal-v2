@@ -8880,6 +8880,7 @@ export interface ReceivingEvent {
     units_counted?: number;
     entry_source?: "office" | "warehouse";
     claims_linked?: number;
+    source_reservations?: unknown;
     reason?: string;
     /** 0426 — the formal number, and Amend's before/after record. */
     grn_no?: string | null;

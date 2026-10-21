@@ -273,6 +273,14 @@ is required for the same SO-before-PO lock order. No production/main upgrade, co
 quantity-mode/multiple-SO allocation or application exception presentation is claimed. The approved
 target above remains incomplete; frozen Receiving PR2100 and its review preview were not changed.
 
+**21 Oct continuation — application read integration BUILT ON BRANCH / NOT DEPLOYED.** The posted
+canonical source-reservation results now reach Warehouse's save result/History and Office's Receiving
+History. An independent exact-Unit SO fixture produced GRN-261021-8139 and original SO reservation;
+absent peer stayed Incoming. Source exceptions are displayed as `Source needs checking`, never Done.
+Shared Tasks/Workspace invalidation is connected. The underlying SQL remains a reviewed candidate
+installed only in the disposable clean target model; quantity/multiple-SO allocation and production
+upgrade/release acceptance remain incomplete.
+
 Ready stock contains only exact Units satisfying every eligibility rule; every total drills to IDs.
 A customer shortage separates available Units from remaining demand: Warehouse receives dated
 preparation work for available Units, Purchasing receives dated arrival work for the missing demand,

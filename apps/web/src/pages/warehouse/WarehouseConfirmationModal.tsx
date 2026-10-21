@@ -1,3 +1,4 @@
+import WarehouseReceiptReservationHistory from "@/components/receiving/ReceivingSourceReservations";
 import { ApiError } from "@/lib/api";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { documentDisplayNumber, RECEIVING_UNIT_OUTCOME_LABEL, wrongItemClaimTypesFor, type WarehouseIncomingPo, type WarehouseConfirmationResult, type WarehouseConfirmationReportInput, type WarehouseConfirmReceiptInput, type ReceivingUnitOutcome, type ReceivingArrivalEvidence } from "@carres/shared";
@@ -97,7 +98,7 @@ export default function WarehouseConfirmationModal({ po, site, saved, onClose }:
         <Button disabled={submit.isPending} onClick={close}>Cancel</Button>
         <Button variant="primary" loading={submit.isPending} disabled={submit.isPending || (!uncertain && (!confirmed || sourceUnavailable))} onClick={() => void save()}>{uncertain ? "Try again" : confirmed ? "Save Receiving" : "Save — confirm receiving results"}</Button>
       </>}>
-      {posted ? <div role="status" className="text-body"><p>{documentDisplayNumber(result.grn_no!)}</p><p>Receiving saved</p></div> : <>
+      {posted ? <div role="status" className="text-body"><p>{documentDisplayNumber(result.grn_no!)}</p><p>Receiving saved</p><WarehouseReceiptReservationHistory receiptId={result.receipt_id}/></div> : <>
         {rejected && <p role="alert">{rejected}</p>}
         {uncertain && <p role="alert" className="text-body text-kit-red-11 mb-3">Not confirmed · Try again</p>}
         {sourceUnavailable && <p role="alert" className="text-body text-kit-red-11 mb-3">Not available. Go back and reload.</p>}
@@ -135,7 +136,7 @@ export default function WarehouseConfirmationModal({ po, site, saved, onClose }:
           </DocSection>
           <DocSection title="Receiving Summary"><Checkbox id="confirm-physical" label="I checked the goods and confirm these receiving results." checked={confirmed} onCheckedChange={setConfirmed} disabled={locked}/></DocSection>
         </fieldset>
-        {result?.status === "draft" && <div role="status" className="text-body text-kit-red-11 mt-3"><p>Receiving report saved. No GRN created.</p>{result.blockers.map(blocker=><p key={blocker.code}>{blocker.message}</p>)}</div>}
+        {result?.status === "draft" && <div role="status" className="text-body text-kit-red-11 mt-3"><p>Last saved report</p><p>Receiving report saved. No GRN created.</p>{result.blockers.map(blocker=><p key={blocker.code}>{blocker.message}</p>)}</div>}
       </>}
     </Modal>
     <Modal open={leave} title="Leave without saving?" description="What you typed is not saved yet." onOpenChange={setLeave} footer={<><Button onClick={onClose}>Leave</Button><Button variant="primary" onClick={()=>setLeave(false)}>Stay</Button></>}>{null}</Modal>

@@ -1285,6 +1285,7 @@ export {
   warehouseConfirmationResult,
   warehouseConfirmationReadiness,
   receivingExtraCustodyEvidence,
+  receivingSourceReservationResults,
   receivingExtraCustodyNote,
   type WarehouseConfirmationReportInput,
   type WarehouseConfirmReceiptInput,
