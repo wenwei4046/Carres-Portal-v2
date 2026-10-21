@@ -834,13 +834,13 @@ describe("Reports — an account line opens the entries behind it", () => {
   });
 
   /** The statements as `serve` answers them, the chart, and one drill answer per account. */
-  function serveDrill(drills: Record<string, unknown>, specials: Record<string, string> = {}) {
+  function serveDrill(drills: Record<string, unknown>, specials: Record<string, string> = {}, bsRows: Row[] = bsBody(0)) {
     api.fetch.mockImplementation(async (url: string) => {
       const u = new URL(url, "http://portal.test");
       if (u.pathname === "/api/finance/ledger/profit-and-loss") return pl(u.searchParams.get("from")!, u.searchParams.get("to")!, PL_BODY);
-      if (u.pathname === "/api/finance/ledger/balance-sheet") return bs(u.searchParams.get("asOf")!, bsBody(0));
+      if (u.pathname === "/api/finance/ledger/balance-sheet") return bs(u.searchParams.get("asOf")!, bsRows);
       if (u.pathname === "/api/finance/ledger/accounts") {
-        return { go_live_on: GO_LIVE, accounts: ["4100", "4300", "5100", "6200", "1120", "1210", "2110"].map((c) => chartAccount(c, specials[c] ?? null)) };
+        return { go_live_on: GO_LIVE, accounts: ["4100", "4300", "5100", "6200", "1120", "1210", "2110", "2210"].map((c) => chartAccount(c, specials[c] ?? null)) };
       }
       if (u.pathname === "/api/finance/ledger/report-drill") {
         const a = drills[u.searchParams.get("account")!];
@@ -920,6 +920,61 @@ describe("Reports — an account line opens the entries behind it", () => {
     // 2,000 - 350 = 1,650, the line's figure.
     expect(within(drill).getAllByTestId("balance-sheet-drill-1210-row")).toHaveLength(2);
     expect(screen.queryByTestId("balance-sheet-drill-1210-differs")).not.toBeInTheDocument();
+  });
+
+  // 0506: customers paid RM 2,815.00 before their invoices. The database prints
+  // 1210 as its booked RM -815.00 less the moved RM -2,815.00, and 2210 as its
+  // booked RM 0.00 plus RM 2,815.00 (Chew 2026-10-21: shown as rows, not red).
+  const movedBody = (): Row[] => [
+    account("ASSET", "1100", "Cash and bank", "1120", "Bank — current account", 5200),
+    subtotal("ASSET", "1100", "Cash and bank", 5200),
+    { ...account("ASSET", "1200", "Receivables", "1210", "Trade receivables — customers", 2000), reclassified: -2815, reclassified_for: "CUSTOMER" },
+    subtotal("ASSET", "1200", "Receivables", 2000),
+    total("ASSET", 7200),
+    { ...account("LIABILITY", "2200", "Customer money held", "2210", "Customer deposits held", 2815), reclassified: 2815, reclassified_for: "CUSTOMER" },
+    subtotal("LIABILITY", "2200", "Customer money held", 2815),
+    total("LIABILITY", 2815),
+    account("EQUITY", "3000", "Equity", "3100", "Share capital", 0),
+    subtotal("EQUITY", "3000", "Equity", 0),
+    { section: "EQUITY", row_kind: "DERIVED", header_name: "Result not yet closed to equity", amount: 4385 },
+    total("EQUITY", 4385),
+    { section: "CHECK", row_kind: "EQUATION", amount: 0 },
+  ];
+  const description = (drill: HTMLElement, testId: string) => within(drill).getAllByTestId(testId)
+    .map((r) => Array.from(r.children).map((td) => (td.textContent ?? "").trim()))
+    .map((c) => [c[2], c[5]]);
+
+  it("the debtor line money was moved off drills to its entries and a Moved to row, adding up to the line with no red", async () => {
+    serveDrill({ "1210": drillAnswer("1210", "ASSET", [line("JE-4", 3000, 0), line("JE-5", 0, 3815)]) }, {}, movedBody());
+    show(`${BS_AT}?asOf=${TODAY}`);
+    fireEvent.click(await screen.findByTestId("table-expand-ASSET:line:1210"));
+    const drill = await screen.findByTestId("balance-sheet-drill-1210");
+    // 3,000 - 3,815 + 2,815 = 2,000, the line's figure.
+    expect(description(drill, "balance-sheet-drill-1210-row")).toEqual([
+      ["Sale", "RM 3,000.00"],
+      ["Sale", rm(-3815)],
+      ["Moved to Customer deposits held", "RM 2,815.00"],
+    ]);
+    expect(screen.queryByTestId("balance-sheet-drill-1210-differs")).not.toBeInTheDocument();
+  });
+
+  it("the line the money was moved onto shows Moved from, adding up to the line", async () => {
+    serveDrill({ "2210": { status: "OK", go_live_on: GO_LIVE, from: GO_LIVE, to: TODAY, account: "2210", block: null } }, {}, movedBody());
+    show(`${BS_AT}?asOf=${TODAY}`);
+    fireEvent.click(await screen.findByTestId("table-expand-LIABILITY:line:2210"));
+    const drill = await screen.findByTestId("balance-sheet-drill-2210");
+    expect(description(drill, "balance-sheet-drill-2210-row")).toEqual([
+      ["Moved from Trade receivables — customers", "RM 2,815.00"],
+    ]);
+    expect(screen.queryByTestId("balance-sheet-drill-2210-differs")).not.toBeInTheDocument();
+  });
+
+  it("a gap the moves do not explain still shows red", async () => {
+    serveDrill({ "1210": drillAnswer("1210", "ASSET", [line("JE-4", 3000, 0), line("JE-5", 0, 3900)]) }, {}, movedBody());
+    show(`${BS_AT}?asOf=${TODAY}`);
+    fireEvent.click(await screen.findByTestId("table-expand-ASSET:line:1210"));
+    expect(await screen.findByTestId("balance-sheet-drill-1210-differs"))
+      .toHaveTextContent("Entries add up to RM 1,915.00; the line shows RM 2,000.00.");
   });
 
   it("nothing drills until the chart is read", async () => {

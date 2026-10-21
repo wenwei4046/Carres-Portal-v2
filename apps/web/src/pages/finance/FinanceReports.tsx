@@ -39,12 +39,12 @@ import { appTodayIso, fmtDate, fmtMonth } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import StatementTable, { indent, nothingInPeriod, nothingOnDay, paidBeforeInvoiceNote, stockNote, type StatementAccountLine } from "./reports/StatementTable";
-import ReportDrill from "./reports/ReportDrill";
+import ReportDrill, { balanceSheetMoves } from "./reports/ReportDrill";
 import { useLedgerChart } from "./ledger/ledger-queries";
 import { packMonths, statementExport } from "./month-end-pack";
 import ExportStatement from "./reports/ExportStatement";
 import { monthChoices, monthEnd, readDay, readPeriod, wholeMonth } from "./reports/period";
-import { balanceSheetQuery, profitAndLossQuery, useBalanceSheet, useProfitAndLoss, type ProfitAndLoss } from "./reports/report-queries";
+import { balanceSheetQuery, profitAndLossQuery, useBalanceSheet, useProfitAndLoss, type ProfitAndLoss, type StatementSection } from "./reports/report-queries";
 import { byMonthExport, byMonthLines, lastMonths, MONTH_CHOICES, readMonthCount } from "./reports/by-month";
 import { DepartmentFilter, departmentWord, useDepartmentParam, useDepartments } from "./department";
 
@@ -232,7 +232,11 @@ function StockLine({ statement, dept }: { statement: Statement; dept: string }) 
  * any line the database marks as stock. Until the chart is read nothing
  * drills, so a stock line can never open by accident.
  */
-function useStatementDrill(statement: Statement, scope: { from: string | null; to: string; dept: string }, testId: string) {
+function useStatementDrill(statement: Statement, scope: { from: string | null; to: string; dept: string }, testId: string,
+  sections: readonly StatementSection[] = []) {
+  // Balance Sheet: the money it moved between lines (0506, 0507) shows as rows
+  // under the entries, read from the statement on screen (Chew 2026-10-21).
+  const allLines = sections.flatMap((s) => s.groups.flatMap((g) => g.lines));
   const chart = useLedgerChart();
   const special = new Map((chart.data?.accounts ?? []).map((a) => [a.code, a.special]));
   const liveStock = statement === "pl" ? ["SOS", "SCS"] : ["SBS"];
@@ -244,6 +248,7 @@ function useStatementDrill(statement: Statement, scope: { from: string | null; t
       scope={{ account: line.code, from: from!, to: scope.to, dept: scope.dept }}
       label={`${line.code} ${line.name ?? ""}`.trim()} side="natural" expected={line.amount}
       carried={statement === "bs"}
+      moves={statement === "bs" ? balanceSheetMoves(line, allLines) : undefined}
       empty={statement === "pl" ? "No entries in this period." : "No entries up to this day."} />,
   };
 }
@@ -357,7 +362,8 @@ function BalanceSheetPage() {
   const asOf = readDay(params.get("asOf")) ?? today;
   const bs = useBalanceSheet(asOf, dept);
   const bsReport = bs.data;
-  const bsDrill = useStatementDrill("bs", { from: bsReport?.goLiveOn ?? null, to: asOf, dept }, "balance-sheet");
+  const bsDrill = useStatementDrill("bs", { from: bsReport?.goLiveOn ?? null, to: asOf, dept }, "balance-sheet",
+    bsReport?.status === "ok" ? bsReport.sections : []);
   if (notStartedError(bs.error)) return <NotStarted />;
   const goLive = bsReport?.goLiveOn ?? null;
 

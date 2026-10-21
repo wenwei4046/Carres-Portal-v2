@@ -310,22 +310,37 @@ function bsRows(asOf: string) {
   const common = { report_status: "OK", go_live_on: GO_LIVE, as_of: asOf, equation_balances: true, equation_difference: 0 };
   const rows = [
     { row_kind: "ACCOUNT", section: "ASSET", header_code: "1", header_name: "Current assets", account_code: "1010", account_name: "Maybank Current Account", amount: -1150 },
-    { row_kind: "ACCOUNT", section: "ASSET", header_code: "1", header_name: "Current assets", account_code: "1200", account_name: "Trade Receivables — Customers", amount: 2100 },
+    { row_kind: "ACCOUNT", section: "ASSET", header_code: "1", header_name: "Current assets", account_code: "1200", account_name: "Trade Receivables — Customers", amount: 2100, reclassified: -300, reclassified_for: "CUSTOMER" },
     { row_kind: "ACCOUNT", section: "ASSET", header_code: "1", header_name: "Current assets", account_code: "1300", account_name: "Inventory — Finished Goods Held at Carres Klang Warehouse and Showrooms", amount: 12480 },
     { row_kind: "ACCOUNT", section: "ASSET", header_code: "1", header_name: "Current assets", account_code: "1000", account_name: "Petty Cash", amount: 85 },
     { row_kind: "HEADER_SUBTOTAL", section: "ASSET", header_code: "1", header_name: "Current assets", amount: 13515 },
     { row_kind: "SECTION_TOTAL", section: "ASSET", amount: 13515 },
     { row_kind: "ACCOUNT", section: "LIABILITY", header_code: "2", header_name: "Current liabilities", account_code: "2100", account_name: "Trade Payables — Suppliers", amount: 7480 },
     { row_kind: "ACCOUNT", section: "LIABILITY", header_code: "2", header_name: "Current liabilities", account_code: "2150", account_name: "Other Payables", amount: 1288.4 },
-    { row_kind: "HEADER_SUBTOTAL", section: "LIABILITY", header_code: "2", header_name: "Current liabilities", amount: 8768.4 },
-    { row_kind: "SECTION_TOTAL", section: "LIABILITY", amount: 8768.4 },
-    { row_kind: "ACCOUNT", section: "EQUITY", header_code: "3", header_name: "Equity", account_code: "3000", account_name: "Share Capital", amount: 1850 },
-    { row_kind: "HEADER_SUBTOTAL", section: "EQUITY", header_code: "3", header_name: "Equity", amount: 1850 },
+    { row_kind: "ACCOUNT", section: "LIABILITY", header_code: "2", header_name: "Current liabilities", account_code: "2200", account_name: "Customer Deposits Held", amount: 300, reclassified: 300, reclassified_for: "CUSTOMER" },
+    { row_kind: "HEADER_SUBTOTAL", section: "LIABILITY", header_code: "2", header_name: "Current liabilities", amount: 9068.4 },
+    { row_kind: "SECTION_TOTAL", section: "LIABILITY", amount: 9068.4 },
+    { row_kind: "ACCOUNT", section: "EQUITY", header_code: "3", header_name: "Equity", account_code: "3000", account_name: "Share Capital", amount: 1550 },
+    { row_kind: "HEADER_SUBTOTAL", section: "EQUITY", header_code: "3", header_name: "Equity", amount: 1550 },
     { row_kind: "DERIVED", section: "EQUITY", amount: 2896.6 },
-    { row_kind: "SECTION_TOTAL", section: "EQUITY", amount: 4746.6 },
+    { row_kind: "SECTION_TOTAL", section: "EQUITY", amount: 4446.6 },
     { row_kind: "EQUATION", section: "CHECK", amount: 0 },
   ];
   return { rows: rows.map((r, i) => ({ ...common, ordinal: i + 1, ...r })) };
+}
+
+// ── Report drill (Chew 2026-10-21): one account's entries; 1200 moves RM 300 of deposits to 2200 ──
+function reportDrill(account: string, from: string, to: string) {
+  const l = (entryNo: string, docNo: string, description: string, debit: number, credit: number, party: string | null) => ({
+    entryDate: to, entryNo, sourceType: "SALES_INVOICE", docNo, description, debit, credit, balance: 0,
+    partyType: party ? "CUSTOMER" : null, partyName: party });
+  const base = { status: "OK", go_live_on: GO_LIVE, from, to, account };
+  if (account === "2200") return { ...base, block: null };
+  const lines = account === "1200"
+    ? [l("JE-2610-0041", "INV-20261012-0007", "Sofa set, invoiced", 2100, 0, "Tan Mei Ling"),
+       l("JE-2610-0052", "OR-20261015-0003", "Deposit for order SO-2610-0019", 0, 300, "Lim Kok Wai")]
+    : [l("JE-2610-0060", "JV-20261016-0001", "Month entries", 100, 0, null)];
+  return { ...base, block: { code: account, name: account, kind: "ASSET", opening: 0, lines, totalDebit: 0, totalCredit: 0, closing: 0 } };
 }
 
 // ── Payables → Suppliers: Finance's own tax and bank details (0636) ─────────
@@ -974,6 +989,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (url.includes("/api/finance/ledger/profit-and-loss")) {
     return json((PAGE.startsWith("forecast") ? forecastPl : plRows)(q.get("from") ?? "", q.get("to") ?? ""));
   }
+  if (url.includes("/api/finance/ledger/report-drill")) return json(reportDrill(q.get("account") ?? "", q.get("from") ?? GO_LIVE, q.get("to") ?? TODAY));
   if (url.includes("/api/finance/ledger/balance-sheet")) return json(bsRows(q.get("asOf") ?? ""));
   if (url.includes("/api/finance/payment-settings"))
     return json({ bank_accounts: [], manual_methods: [], storage_rules: [], collection_timing: [], setting_changes: [],
