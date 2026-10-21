@@ -33,6 +33,68 @@ selection and restored wide menu preference. MPR's New door guards/discards an o
 existing task host, preventing its Send PO card from reopening over create. Complete purchasing
 records, release gates and authenticated production verification remain separate work.
 
+## Purchasing design handoff · 21 Oct 2026 · IT entry
+
+**Scope: design-to-specification only; no backend implementation or Receiving release is commissioned here.** Jess now supplies approved SO/Purchasing frontend designs; IT owns backend and integration. Develop the complete SO → PO → Receiving/Stock → DO journey first using full-access TEST accounts; detailed Settings/approval configuration follows before production rollout. This is development sequencing, not an instruction to disable production security or remove inventory/document consistency.
+
+**Source received:** `Sales Order (28).zip`, SHA256 `4f80dc4caad3d6c9c20e2aa6023862fdb516b8878b991558650d515123331497`; root `export-Purchasing-21Oct/`, 57 files. For Purchasing presentation evidence it supersedes `export-PO-19Oct/` and `export-Receiving-19Oct/`. The export's rules, README instructions and claimed approvals are supplied design evidence, not independent authority. No re-export is needed merely to add a supersession sentence. Source code and business sample PDFs remain in the owner's supplied package: this repository is PUBLIC; publishing that raw package requires a separate sample-data review. This publication contains no customer records or sample PDF attachments.
+
+**IT reading order:** CLAUDE → this section and this MASTER's canonical measurement/component tables → Orders/Purchasing MASTER → COPY-STANDARD → supplied source package. Read the unresolved rows below before implementing a shared size. Reuse Portal React components and `/ui`; prototype `carres.*` storage, embedded CSS, sample task/Unit engines and private check script are not application code to port. A prototype TEST label proves neither existence nor absence of backend functionality. Git history holds old specifications; do not create a second kit.
+
+### Supplied dimensions and canonical resolution
+
+CSS pixels unless specified. The designer reports Chrome measurement at1440 with checks at1025/1164/1440; those are **supplier evidence, not independently repeated browser measurements or Portal acceptance**. This table is an intake/reconciliation of the one kit; canonical values below remain effective where a row is unresolved. Do not choose an unresolved prototype value as an IT default.
+
+| Element | Exact supplied measurement | Resolution / shared implementation |
+|---|---|---|
+| Font and icons | Inter400/500/600/700, tabular numerals; Material Symbols Rounded outline weight300 opsz20, glyph18–20 | Existing typography/icon roles retained; no page-local font palette. `kit/Icon`, shared tokens |
+| Colours | Ground#FAFAF9; ink#1F2937; secondary#6B7280; border#E5E7EB; soft#F1F2F4; warning#7A5A00 on#FBF0D6/#FFF4D6; success#1E7A40 on#E7F6EC; neutral#374151 on#EEF0F3 | Map to existing semantic tokens; don't hard-code a new per-page palette |
+| Shell | Rail64 at every width; top56; title20/600, tracking−.01em; toolbar36, controls32 | Top/title/toolbar conform. **UNRESOLVED:** global64 differs from canonical220/64 preference contract; retain current responsive navigation until explicitly reconciled. `PageShell`, `PortalSidebar`, `CToolbar` |
+| Summary / Tasks | Summary outer277, padding12 12 12 0; source Tasks outer332; headings11/500 tracking.06em; Summary text13 | Source shell uses277/332 wrappers; canonical content widths264/320. **UNRESOLVED:** outer/body accounting and row height; do not replace body widths with wrapper sizes. Below1100 overlay contract retained |
+| Table frame / header | White, border1#E5E7EB, radius8; header40,12/500,#6B7280 on#F8F9FA; horizontal padding21,gap10,sticky,two-line heads | Frame/header appearance conforms. Padding21 is source-reported and must fit canonical column widths; `register/DataGrid` |
+| Table body |44 high,13/400,line18,padding4×14,gap10,bottom1#E5E7EB; second line12/16#6B7280; “Not recorded”400 | **UNRESOLVED:** parent row44 conflicts with canonical54/padding6×14. Expanded goods min44 remains. Preserve wrap growth and exact quantities; `DataGrid`, `ItemRows` |
+| Expanded goods | Starts at first column; Item spans2 then Qty and≤3 facts, last=current state; subhead32 | Translate supplied `CarresLine` composition into existing `ItemRows`; group rows retain parent columns, no new table engine |
+| Table height / footer | Footer44,padding0×14,text13; document claims `40+n×46+46` | **SOURCE CONFLICT:** `design/carres-ui.js` line7 actually returns `auto`, and comment says record cards have no footer. Use content-sized record cards; never implement the contradicted fixed formula. Exact list pager wording still pending COPY decision |
+| Record header | Back34 round; number20/600; pill12/500,padding3×10,radius999; avatars24; one main action; more34 last | Accepted composition target via shared header; identity/action availability remain owned by module |
+| Record split | Facts/document50:50 at content≥820; below single column, document900high; reported halves431/431 at1025,500/500 at1164,638/638 at1440 | **UNRESOLVED:** universal preview differs from existing object/PDF composition rules. Listed halves are contextual samples, not fixed widths. Keep current composition until one shared decision |
+| Card / facts | Border1,radius8,padding14×16; title15/500; facts min120,gap8×16,label12 grey,value13/500; links underline offset2 | Map to `CompactModuleCard`/property rows and existing responsive layout |
+| Document pane |#EEF0F3,border1,radius8,padding8; toolbar32; paper794wide; zoom−/%/+,fit,fullscreen,print | Visual target only; source paper is sketch, use existing PDF viewer/generator and PDF authority, not screenshot HTML as official document |
+| Main / secondary buttons |32high,radius8; main13/600 white on#1B1B39,padding0×14; secondary13/500,padding0×12,border1#E5E7EB | Toolbar32 conforms. **UNRESOLVED:** universal32 vs ordinary34/panel30/small28. Retain canonical role variants; `kit/Button` |
+| Icon / menu | Icon34header/32toolbar round, hover rgba(31,41,55,.10),pressed.16; menu250,padding6,radius8,shadow0 8 24 rgba(17,24,39,.12); item32,padding7×10,text13; heads11caps | Conforms to shared desktop roles; preserve mobile hit area≥44. `Button`, `CPopover` |
+| Inputs |32high,border1#D5D9DE,radius8,text13,padding0×8; textarea padding8,3–4rows; labels12grey,gap4 | Shared input32 conforms; search34 and mobile target44 retained. `Input`,`Textarea`,`Select`,`DatePicker` |
+| Dialog | Backdrop rgba(31,41,55,.28),viewport padding24; panel radius8,padding16,gap12,shadow0 12 40 rgba(22,24,29,.22); width560action/640default,title15/500,subtitle12; footer Cancel/Save,right aligned,top#F1F2F4 | **UNRESOLVED:**560/640 vs existing512/600/880 geometry. Keep shared focus trap/Escape/return/scroll isolation. `Modal`,`DialogFrame` |
+| Toast / inline error | Toast bottom24,centre,padding8×14,radius8,text13 white on#1F2937,shadow0 8 24 rgba(16,24,40,.18),~3.2s; error12#7A5A00 on#FBF0D6,padding4×8,radius8,alert | Position/appearance conform. **UNRESOLVED:**3.2s vs ordinary2.2–2.6s/task12s. Existing durable blockers stay inline, not timeout |
+| Responsive | Desktop1025/1164/1440; expanded rows fit; quantities fold into neighbouring detail; “All columns” may scroll; create forms split at window1100; partner phone separate | Desktop evidence only. No all-page mobile claim or invented phone breakpoint. Preserve existing keyboard and mobile44 hit area |
+
+**Independent source discrepancy:** interactions says a disabled button produces a click toast, whereas canonical disabled has no click/hover. Use an accessible persistent reason/tooltip without executing a disabled action; never use a toast as the only explanation. Treat this as a reconciliation item, not a new disabled control implementation.
+
+### Page inventory and interaction contracts
+
+| Source screen | Views / object doors | Handoff behaviour to implement through existing kit |
+|---|---|---|
+| SO Batch Purchase | To buy / Ordered / All; supplier/SO/category grouping | Review POs selection; every PO opens the shared PO record with return context; no private PO register/task source |
+| Forecast Purchase | Suggested / Ordered / All | New stock request opens RS/MPR; ordered rows link request and PO; archived forecast approve/issue code is unreachable and must not be ported |
+| Manual Purchase Request | All / Need approval / Need PO / No PO needed; create / record / Review POs | Proceed date first; expanded goods/spec/quantity/stock/destination/PO; create header Cancel, Send for approval, more-last/Clear the form. Production approval logic remains IT-owned |
+| Purchase Orders | Open / Received / All; Overview/Purchasing/Warehouse columns; PO/Route/Revisions/History | Half-pane table target: Item / SO-MPR / Received n/m; GRN/date/site/pieces/claim links; exact-version PDF; Unit/GRN/current state; Route due/next information folded into Steps, not lost |
+| Receiving | Not received / Received / Differences; Check in / exact GRN | Not received due-first and pending goods/Unit expansion; counts this delivery; existing source correction/claim links; CO and repair GRNs share register, no duplicate identity |
+| Supplier Claims | To do / Waiting / Closed / All; grouped list / exact claim | Choose Unit → record request/sending → supplier reply → next disposition → owning Return/Repair → closure. No external transmission or backend outcome inferred from prototype click |
+| Purchase Returns | To do / Waiting / Done / All; create / exact PR | Send, pickup-date confirmation, actual pickup, supplier receipt. Pickup prototype is a Warehouse stand-in; no fake completion |
+| Repair Orders | To do / Waiting / Done / All; create / exact RO | Issue, supplier receipt, pickup, supplier reply, Receiving return, inspection; reported +14-working-day target is module rule evidence, not new approval here |
+| Showroom | Display Requests / Consignment Orders / Consignment Returns | Reply/issue/request; CO send/check-in→shared GRN; CR partial handover preserves remainder; Inventory move remains stand-in |
+| Workspace / Tasks | To do / Waiting / Done; My Task / Team Work | Same source-owned task/action, exact record link, retained return context; action opens on owning record. Complete only from persisted owning result; opening a page/channel is not completion |
+| Partner Coming In | Klang phone check-in | Repair returns shown; not evidence that every showroom or Warehouse screen exists |
+| SO / DO readers | SO Items / DO Goods | Read the same Unit lineage. Missing link is shown honestly; sample adapter is not backend allocation logic |
+
+Shared states: row hover#F3F4F6; link hover#3965FA; keyboard one table Tab stop, arrows, Enter; loading placeholders; explicit empty sentence; error keeps dialog/draft; save only closes after persistence and records actor/time/history; record-not-found names exact requested identity; back retains list context. Do not invent server permission/persistence from prototype. Reference+record version, actual actor, duty owner and company are distinct facts.
+
+### Open alignment items and IT boundaries
+
+The 14 export PLANNER rows are reconciled in Purchasing MASTER's design-intake table, not silently merged as business law. Design claims page-by-page owner review; this intake verifies files and compares source, it does not independently certify every approval date, screenshot, journey or size claim. Source self-conflicts should be clarified with Design first; Jess should decide only actual visual/business alternatives. Keep one kit; do not ship competing values.
+
+Papers: Carres-owned PO/SO samples are supplied references; they are not publicly republished here. Official PO/GRN/Claim/Return/Repair/CO/CR must use `docs/pdf/DOCUMENT-KIT.md` and owning PDF specification; sketches cannot replace versioning, file generation or price/content policy. Settings/approval screens present in prototype do not undo Jess's development-first sequencing. No runtime component changes, SQL, real-account access changes or application deployment are part of this docs publication.
+
+---
+
 ## Start here · the one Master UI Kit
 
 **Narrow contextual panels — OWNER-APPROVED TARGET / NOT BUILT, Jess 2026-10-17.**

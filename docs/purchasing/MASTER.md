@@ -1,5 +1,33 @@
 # PURCHASING — MASTER
 
+## Latest Purchasing design intake · 21 Oct 2026
+
+Jess supplied `Sales Order (28).zip` for frontend specification handoff to IT. The package supersedes the19Oct PO/Receiving exports as design evidence. The one dimensions/states/screen inventory is [UI MASTER · Purchasing design handoff](../ui/MASTER.md#purchasing-design-handoff--21-oct-2026--it-entry). No backend changes, SQL approval, production rollout or blanket business-rule replacement is inferred. IT builds full SO/PO/Receiving/Stock/DO flow first in TEST; detailed Settings and approval configuration follows before production use. This does not permit disabling production guards or changing accounting/Stock truth.
+
+| Export PLANNER item | Reconciliation / implementation boundary |
+|---|---|
+|1 Claim tabs/grouping | Latest presentation target To do/Waiting/Closed/All plus grouping; existing persisted states determine each set, no new backend status from a tab |
+|2 Always50/50 record | Cross-kit visual decision still UNRESOLVED in UI MASTER; do not silently overturn PDF/object composition |
+|3 Claim Reported first | Latest presentation target date-first; status retained in selectable columns, exact reported-event meaning remains module-owned |
+|4 Carres template papers | Use existing PDF/document authority and supplied Carres references; prototype papers are sketches, not a new generator |
+|5 GRN Received by person | Proposed visible person/company tooltip is presentation. Preserve actual confirmer vs count submitter/saver vs duty/company as separate stored facts; do not relabel a saver as physical receiver |
+|6 No repeated Supplier Deliver To | Deduplicate repeated identical visible location; preserve planned vs actual differing locations and their meaning |
+|7 Receiving grouping | Presentation target: retain Group by alongside approved Not received/Received/Differences; grouping does not change receipt identity |
+|8 GRN Items/merged cards | Latest card/heading target Items, reduce duplicated cards; retain evidence/related-record capabilities, Unit outcomes and Amend/Void |
+|9 Footer Rows20·1/1 | Pending shared pager reconciliation; do not publish source sample text “TEST data” as production UI |
+|10 Column views | Overview/Purchasing/Warehouse are list column presets, not role grants or separate sources |
+|11 Tabs vs Summary | Tabs describe whose move/state; Summary period/results/on-time/supplier metrics drill through into an explicit clearable filter. Only measured persisted facts count; period scope must be visible |
+|12 Expanded rows | First-column Item spanning2, Qty then≤3 contextual facts ending in current state; existing ItemRows/component, no new table engine |
+|13 Half-pane PO tables | Use Received n/m plus linked source/GRN/claim/revision content; preserve cancelled and pending quantity semantics and link exact records |
+|14 MPR more-last | Create header Cancel/main Send for approval/more-last; Clear the form uses existing dirty/discard guard, no silent loss |
+
+Other conflicts not covered by the14 rows: STATUS says prototype mints Claim number on opening versus current first-issue authority. Preserve current numbering until owner explicitly rules otherwise. Source claims a button closes its Task after save: only a persisted source-owned completion event closes Work; a note, contact launch or source-free draft cannot do so.
+
+Prototype stand-ins remain explicitly incomplete design: Warehouse pickup/handover, Inventory inspection/move, showroom-site check-in, replacement Receiving, Finance credit/refund and Service Case linkage. These labels are not a backend gap audit. The supplied file includes SO and DO readers, but is branded a Purchasing export: do not claim a separate complete latest Sales Order design audit from this package alone.
+
+---
+
+
 **SO blueprint direct dependency — APPROVED TARGET / NOT BUILT, Jess 2026-10-01.**
 Orders MASTER §0.0 requires PO revision and `po_line_sources` coverage to remain consistent,
 including shared lines and receipts. Purchasing owns the fix and supplier commitment; SO reads
