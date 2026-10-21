@@ -1,3 +1,4 @@
+// design-standard: not-a-list-page — a hook that hands Finance grids their saved layouts; it renders nothing.
 /**
  * Finance tables keep the person's own saved column layouts on the server
  * (migration 0704; Chew 2026-10-21, 「可以」; docs/finance/MASTER.md §4.2).
