@@ -5849,3 +5849,16 @@ Existing Team account form only; explicit individual opt-in through the existing
 | Shared hint | `Shared logins cannot confirm receiving as a person.` | Count/report access retains existing permission |
 | Site hint | `Choose the existing receiving Site. Its company is set in Warehouse settings.` | Existing Warehouse only; no new Site/company writer |
 | Unavailable choices | `Warehouse choices are not available. Close this form and reload Team.` | Missing/failed list is not a confirmed zero; creation blocked |
+
+### Unidentified Warehouse delivery report — 21 Oct 2026
+
+Existing individual Warehouse draft writer and My receiving history; observation intake only.
+
+| Use | Exact words | Boundary |
+|---|---|---|
+| Entry / title | `Report unidentified delivery` | Incoming links to My receiving's same form; no source guessed |
+| Submit | `Save report` | Existing draft writer; no GRN/Stock/Work Done |
+| Guidance | `Record only what you observed. Operation checks the source. This report does not create a GRN or add Stock.` | Physical observation is not Purchasing acceptance |
+| Observation hint | `Describe the goods, visible labels, quantity and condition you observed. Do not guess a PO or Unit ID.` | Original Note preserves observed facts; no SKU/Unit minting |
+| Time validation | `Record Goods Received Date before Time.` | No invented date/time |
+| Result continuation | `Find this report in My receiving.` | Existing original report and History; source correction remains separate |

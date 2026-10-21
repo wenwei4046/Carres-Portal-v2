@@ -32,7 +32,7 @@ export default function WarehouseConfirmationIncoming(){
  const loading=pos.isPending||arrivals.isPending||reports.isPending,error=pos.isError||arrivals.isError||reports.isError;
  const raw=selected?.draft?warehouseConfirmationReportFromWire(selected.draft.raw_report):null;
  const saved=selected?.draft&&raw&&selected.draft.save_key?{saveKey:selected.draft.save_key,report:raw,result:{id:selected.draft.id,receipt_id:selected.draft.id,status:'draft',grn_no:null,revision:selected.draft.revision,already_saved:true,blockers:selected.draft.blockers} as WarehouseConfirmationResult}:undefined;
- return <ListPageShell register title="Incoming" titleRight={pos.data?.warehouse?.name}>
+ return <ListPageShell register title="Incoming" titleRight={<><span>{pos.data?.warehouse?.name}</span><Button onClick={()=>navigate("/warehouse/receipts?report=new")}>Report unidentified delivery</Button></>}>
   {error?<div role="alert"><p>Could not be loaded</p><Button onClick={()=>void Promise.all([pos.refetch(),arrivals.refetch(),reports.refetch()])}>Try again</Button></div>:loading?<p role="status">Loading…</p>:<DataGrid appearance="reference" rows={rows} columns={columns} rowKey={row=>row.id} sessionKey="warehouse-confirmation-incoming" storageKey="carres.warehouse.confirmation-incoming" searchPlaceholder="Search" sortDefault={{key:'date',dir:'asc'}}/>}
   {selected?.po&&<WarehouseConfirmationModal po={selected.po} site={pos.data?.warehouse??undefined} saved={saved} onClose={()=>setSelected(null)}/>}
   {selected?.arrival&&<WarehouseArrivalConfirmationModal source={selected.arrival} site={pos.data?.warehouse??undefined} saved={saved} onClose={()=>setSelected(null)}/>}

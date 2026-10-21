@@ -436,6 +436,16 @@ describe("Warehouse final confirmation contract", () => {
     expect(r.status).toBe(200);
     expect(await r.json()).toMatchObject({ status: "draft", grn_no: null, blockers: [{ code: "receipt_quantity_unknown" }] });
   });
+  it("passes an unidentified observation to the same draft engine without inventing source or goods", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { ...saved, status: "draft", grn_no: null, blockers: [{code:"source_not_available",message:"Source not available"}] }, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const report = {poId:null,arrivalSourceId:null,note:"TEST 2 sealed cartons; source unknown",handoverPerson:"TEST Driver",lines:[],arrivalUnits:[],extraLines:[],arrivalEvidence:[]};
+    const response = await req("/api/warehouse/receipts/confirm", "POST", await warehouseJwt(), {saveKey:input.saveKey,report});
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({status:"draft",grn_no:null});
+    expect(rpc).toHaveBeenCalledWith("warehouse_confirm_receipt", expect.objectContaining({p_save_key:input.saveKey,p_receipt_id:null,p_revision:null,p_report:expect.objectContaining({po_id:null,arrival_source_id:null,note:report.note,lines:[],arrival_units:[],extra_lines:[]})}));
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
   it("refuses a posted answer without a real GRN", async () => {
     vi.mocked(userClient).mockReturnValue(makeSb({ data: { ...saved, grn_no: null } }) as never);
     const r = await req("/api/warehouse/receipts/confirm", "POST", await warehouseJwt(), input);

@@ -1,5 +1,7 @@
 import {ReceivingSourceReservations} from "@/components/receiving/ReceivingSourceReservations";
 // design-standard: list-page — existing ListPageShell and DataGrid; no separate rail for own report history.
+import { useSearchParams } from "react-router-dom";
+import WarehouseUnidentifiedReportModal from "./WarehouseUnidentifiedReportModal";
 import { lazy, Suspense, useMemo, useRef, useState } from "react";
 import { documentDisplayNumber, warehouseReceiptStatusLabel, RECEIVING_UNIT_OUTCOME_LABEL, type WarehouseConfirmationResult, type WarehouseIncomingPo, type WarehouseReceiptStatus } from "@carres/shared";
 import { warehouseConfirmationReportFromWire } from "@carres/shared/adapters";
@@ -24,6 +26,9 @@ type ReportEditor = {site:{id:string;name:string};saved:WarehouseReportDraft} & 
 );
 
 export default function WarehouseConfirmationReports() {
+  const [params,setParams]=useSearchParams();
+  const reporting=params.get("report")==="new";
+  const setReporting=(open:boolean)=>setParams(previous=>{const next=new URLSearchParams(previous);if(open)next.set("report","new");else next.delete("report");return next;},{replace:true});
   const query=useWarehouseConfirmationReports(true);
   const sources=useWarehouseConfirmationSources(true);
   const arrivals=useWarehouseConfirmationArrivals(true);
@@ -34,7 +39,7 @@ export default function WarehouseConfirmationReports() {
     {key:"source",label:"Document",width:180,minWidth:180,accessor:row=>documentDisplayNumber(row.po_id ?? row.source_no ?? warehouseConfirmationReportFromWire(row.raw_report)?.poId ?? "Not recorded"),searchValue:row=>String(row.po_id ?? warehouseConfirmationReportFromWire(row.raw_report)?.poId ?? "")},
     {key:"supplier",label:"Supplier",width:200,minWidth:160,accessor:row=>row.supplier_name ?? "Not recorded"},
     {key:"do",label:"Handover document number",width:180,minWidth:160,accessor:row=>row.do_number ?? warehouseConfirmationReportFromWire(row.raw_report)?.doNumber ?? "Not recorded"},
-    {key:"status",label:"Status",width:160,minWidth:140,accessor:row=>warehouseReceiptStatusLabel(row.status as WarehouseReceiptStatus)},
+    {key:"status",label:"Status",width:160,minWidth:140,accessor:row=>row.status==="draft"&&row.raw_report?"Draft":warehouseReceiptStatusLabel(row.status as WarehouseReceiptStatus)},
     {key:"grn",label:"GRN No",width:180,minWidth:180,accessor:row=>row.grn_no ? documentDisplayNumber(row.grn_no) : "Draft, no number yet"},
     {key:"date",label:"Date",width:180,minWidth:160,accessor:row=>fmtDate(row.submitted_at,{time:true})},
   ],[]);
@@ -53,7 +58,9 @@ export default function WarehouseConfirmationReports() {
     else if(arrival)setEditor({kind:"arrival",arrival,site:{...site},saved});
   };
   const sourceError=sources.isError?sources.error ?? new Error("source read unavailable"):query.isError?query.error ?? new Error("reports read unavailable"):null;
-  return <ListPageShell register title="My receiving">
+  return <ListPageShell register title="My receiving" titleRight={<Button disabled={!site || sources.isError || sources.isPending} onClick={()=>setReporting(true)}>Report unidentified delivery</Button>}>
+    {reporting && site && !sources.isError && <WarehouseUnidentifiedReportModal site={site} onClose={()=>{setReporting(false);void query.refetch();}}/>}
+    {reporting && (sources.isPending ? <p role="status">Loading…</p> : sources.isError || !site ? <div role="alert"><p>Could not be loaded</p><Button onClick={()=>void sources.refetch()}>Try again</Button></div> : null)}
     {query.isPending ? <p role="status">Loading…</p> : query.isError ? <div role="alert"><p>Could not be loaded</p><Button onClick={()=>void query.refetch()}>Try again</Button></div> :
       <DataGrid appearance="reference" rows={query.data.receipts} columns={columns} rowKey={row=>row.id} sessionKey="warehouse-confirmation-reports" storageKey="carres.warehouse.confirmation-reports" searchPlaceholder="Search" emptyMessage="No receiving activity yet." onRowClick={row=>{setSelected(row);setEditor(null);setFindingSource(false);}}/>}
     {selected && editor?.kind==="po" ? <WarehouseConfirmationModal key={selected.id} po={editor.po} site={editor.site} saved={editor.saved} onClose={closeReport}/>
@@ -97,7 +104,7 @@ function WarehouseReportHistory({receiptId}:{receiptId:string}) {
   return <DocSection title="History">
     <ul className="space-y-3">{query.data.events.map(event=><li key={event.id}>
       <p className="text-meta text-kit-slate-11">{fmtDate(event.event_at,{time:true})} · {event.actor_name || "Staff identity not recorded"}</p>
-      <p className="text-body">{event.event==="posted"?"Receiving saved":event.event==="resubmitted"?"Count submitted again":event.event==="submitted"?"Count submitted":"Activity"}</p>
+      <p className="text-body">{event.event==="submitted"&&warehouseConfirmationReportFromWire(event.payload.report)&&!warehouseConfirmationReportFromWire(event.payload.report)?.poId&&!warehouseConfirmationReportFromWire(event.payload.report)?.arrivalSourceId?"Receiving report saved. No GRN created.":event.event==="posted"?"Receiving saved":event.event==="resubmitted"?"Count submitted again":event.event==="submitted"?"Count submitted":"Activity"}</p>
       <WarehouseReportSnapshot event={event}/>
       <ReceivingSourceReservations value={event.payload.source_reservations}/>
       {filesOf(event).map((file,index)=><Button key={file.path} size="sm" onClick={()=>void sign({...file,eventId:event.id,context:fmtDate(event.event_at,{time:true})})}>View proof {index+1}</Button>)}

@@ -2501,13 +2501,25 @@ claimed) posted the same corrected report as GRN-261021-8139: U1-000-015 Reserve
 U1-000-016 Incoming, causal receiving Work completed by the actual Warehouse person. The first
 mixed MPR/SO fixture exposed invalid TEST lineage and is excluded from acceptance; the replacement
 clean model leaves original MPR source/issue history unchanged and its full Work reader returns 200.
-Personal Warehouse account creation has explicit API compatibility only: an authorised People/HR
+Personal Warehouse account creation has explicit API and existing Team form compatibility: an authorised People/HR
 request must opt into a named Warehouse person, with an existing Site; defaults remain shared,
 without internal staff code, position or duties. No real account was created or granted permissions.
 Admission failures name inactive Site/company and shared-login count mode. Stock SQL and its scoped
 history projection are installed only in the new disposable model, not production/main. Extra
 acceptance/return remain closed; the following owner-choice proposal is still unanswered. Full
 Receiving release, full-page/breakpoint acceptance and exact-main SQL upgrade remain unverified.
+
+**Unidentified delivery intake — 21 Oct 2026, CODE ON CONTINUATION BRANCH / NO PRODUCTION CLAIM.**
+Incoming links to the existing My receiving page's `Report unidentified delivery` form. The existing
+individual Warehouse confirmation writer retains a no-source draft with the signed-in Site, optional
+physical date/time, handover person/document number and observed goods/labels/count/condition in Note.
+No PO, line, Unit, SKU identity or Extra classification is inferred; no accepted quantity, GRN, Stock
+or Work Done is manufactured. Lost-response retry retains the exact body/key. The saved report is
+read through the same own-Site list and append-only History; later source correction retains its
+identity and rechecks physical results. Unknown-source evidence upload remains a gap: existing
+upload doors require a governed source, so this form does not create orphan evidence or pretend it
+was saved. Existing external SQL candidate/admission and production upgrade remain separate gates;
+this UI introduces no SQL or permission changes. Full production and operator acceptance unverified.
 
 **Extra decision record — MINIMAL PROPOSAL / NOT APPROVED / NOT BUILT, 2026-10-20.**
 The existing §9.5 Extra/source-gap rules require Purchasing's decision and verified provenance;
