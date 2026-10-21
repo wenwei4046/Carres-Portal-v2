@@ -23,7 +23,9 @@
  * 2026-10-14).
  */
 import { useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { documentRowMenu } from "@/components/register/row-menu";
+import { EntryPreview } from "../preview/previews";
 import { generalLedgerBlocks, type GeneralLedgerBlock } from "@carres/shared/general-ledger";
 import { ledgerDocWord, ledgerKindWord, ledgerSourceWord } from "@carres/shared/finance-ledger";
 import DataTable, { type Column } from "@/components/kit/DataTable";
@@ -118,6 +120,12 @@ export default function GeneralLedger() {
   const deptWord = departmentWord(dept, departments);
   const query = useGeneralLedger(from, to, dept);
   const [search, setSearch] = useState("");
+  const navigate = useNavigate();
+  /* A line belongs to a journal entry (Chew 2026-10-21): a double-click
+     previews that entry, and the row menu's View opens it on the Journal, as
+     its Entry No link does. Brought forward and Total rows have no entry. */
+  const [peek, setPeek] = useState<string | null>(null);
+  const openEntry = (entryNo: string) => navigate(`/finance/ledger?${new URLSearchParams({ entry: entryNo }).toString()}`);
   const saved = useSavedWidths(GENERAL_LEDGER_WIDTHS_KEY, "finance_general_ledger");
   const size = useMemo(() => fillSizing(WIDTH, saved.widths, "description"), [saved.widths]);
   const columns = useMemo(() => columnsAt(size.width), [size]);
@@ -186,6 +194,8 @@ export default function GeneralLedger() {
           : !ready ? <p className="text-body" role="status">Loading the General Ledger…</p>
           : <div className={look.statement} style={size.style} {...size.data}><DataTable label="General Ledger" testId="general-ledger" rowTestId="general-ledger-row" rows={rowsOf(shown)}
               columns={columns} rowId={(r) => r.id} resizable={saved}
+              openOnDoubleClick onRowOpen={(r) => { if (r.kind === "line") setPeek(r.line.entryNo); }}
+              contextMenu={(r) => (r.kind === "line" ? documentRowMenu({ view: () => openEntry(r.line.entryNo) }) : [])}
               empty={search.trim() ? "No account matches this search." : "No account moved or carried a balance in this period."}
               group={{
                 keyOf: (r) => r.code,
@@ -198,5 +208,6 @@ export default function GeneralLedger() {
         </>}
       </div>
     </div>
+    <EntryPreview entryNo={peek} onClose={() => setPeek(null)} onView={(no) => { setPeek(null); openEntry(no); }} />
   </div>;
 }

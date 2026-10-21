@@ -163,12 +163,16 @@ export function usePaymentVouchers(dept = "") {
   });
 }
 
-export function usePaymentVoucher(id: string | undefined) {
-  return useQuery({
-    queryKey: payablesKeys.voucher(id ?? ""),
+/** One voucher's read — also fetched by the Payment Vouchers row menu's Print. */
+export function voucherQuery(id: string) {
+  return {
+    queryKey: payablesKeys.voucher(id),
     queryFn: () => apiFetch<PaymentVoucherDocument>(`${BASE}/vouchers/${id}`),
-    enabled: !!id,
-  });
+  };
+}
+
+export function usePaymentVoucher(id: string | undefined) {
+  return useQuery({ ...voucherQuery(id ?? ""), enabled: !!id });
 }
 
 /** 0689: each logistics partner and its delivery orders a bill can still

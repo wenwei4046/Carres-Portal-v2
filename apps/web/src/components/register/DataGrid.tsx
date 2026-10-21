@@ -72,6 +72,7 @@ import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { SkeletonRows } from "./Skeleton";
 import { DateField } from "./DateField";
 import styles from "./DataGrid.module.css";
+import RowContextMenu, { type RowMenuAt } from "./RowContextMenu";
 
 /* The row-highlight stripe (see `rowHighlight`), drawn by the v4 sheet in the
    problem ink / neutral info ink (DataGrid.module.css). */
@@ -1012,13 +1013,7 @@ function DataGridInner<T>({
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set(fixedGroups?.groups.filter((g) => g.initiallyCollapsed).map((g) => g.key)));
   const [ctx, setCtx] = useState<{ x: number; y: number; colKey: string } | null>(null);
   /** Right-click row menu — anchor point + the menu items resolved at open time. */
-  const [rowCtx, setRowCtx] = useState<{
-    x: number;
-    y: number;
-    items: DataGridContextMenuItem[];
-    /** Opened from the keyboard: focus returns here when it closes. */
-    returnFocus?: HTMLElement | null;
-  } | null>(null);
+  const [rowCtx, setRowCtx] = useState<RowMenuAt | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [groupZoneActive, setGroupZoneActive] = useState(false);
   /* HOUZS-parity Columns popover — commander 2026-05-27: "为什么不是跟houzs的一样".
@@ -1108,27 +1103,9 @@ function DataGridInner<T>({
     };
   }, [ctx]);
 
-  /* Close the row context menu on outside click, scroll, or Escape — same
-     UX as the header context menu but rendered at a higher z-index so it
-     clears the sticky <thead>. */
-  useEffect(() => {
-    if (!rowCtx) return;
-    const close = () => setRowCtx(null);
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        close();
-        rowCtx.returnFocus?.focus({ preventScroll: true });
-      }
-    };
-    window.addEventListener("click", close);
-    window.addEventListener("scroll", close, true);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("click", close);
-      window.removeEventListener("scroll", close, true);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [rowCtx]);
+  /* Closing on an outside click, a scroll or Escape lives with the menu
+     itself (RowContextMenu), shared with the kit DataTable. */
+  const closeRowCtx = useCallback(() => setRowCtx(null), []);
 
   /* Close the Columns popover on outside click — mirrors the `ctx` pattern.
      The popover itself stops propagation on its container so clicks inside
@@ -4193,57 +4170,7 @@ function DataGridInner<T>({
       {/* Row context menu — opened on right-click via the row's onContextMenu.
           Rendered after the header ctx menu so its z-index naturally wins
           if both ever opened simultaneously. */}
-      {rowCtx && (
-        <div
-          className={styles.contextMenu}
-          role="menu"
-          aria-label="Row actions"
-          style={{ top: rowCtx.y, left: rowCtx.x }}
-          onClick={(e) => e.stopPropagation()}
-          onContextMenu={(e) => e.preventDefault()}
-          ref={(el) => {
-            /* The menu takes focus when it opens, so the keyboard lands on
-               its first act — never somewhere down the page. */
-            if (el && !el.contains(document.activeElement)) {
-              el.querySelector<HTMLButtonElement>("[role=menuitem]")?.focus({ preventScroll: true });
-            }
-          }}
-          onKeyDown={(e) => {
-            const items = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>("[role=menuitem]"));
-            const at = items.indexOf(document.activeElement as HTMLButtonElement);
-            const go = (i: number) => items[(i + items.length) % items.length]?.focus({ preventScroll: true });
-            if (e.key === "ArrowDown") { e.preventDefault(); go(at + 1); }
-            else if (e.key === "ArrowUp") { e.preventDefault(); go(at - 1); }
-            else if (e.key === "Home") { e.preventDefault(); go(0); }
-            else if (e.key === "End") { e.preventDefault(); go(items.length - 1); }
-            else if (e.key === "Tab") {
-              e.preventDefault();
-              setRowCtx(null);
-              rowCtx.returnFocus?.focus({ preventScroll: true });
-            }
-          }}
-        >
-          {rowCtx.items.map((it, i) => {
-            if (it.divider) return <div key={`d-${i}`} role="separator" className={styles.contextMenuDivider} />;
-            return (
-              <button
-                key={`i-${i}-${it.label}`}
-                type="button"
-                role="menuitem"
-                className={`${styles.contextMenuItem} ${it.danger ? styles.contextMenuDanger : ""}`}
-                onClick={() => {
-                  // Close before firing — handlers may navigate or open
-                  // dialogs, and we don't want a stale menu lingering.
-                  setRowCtx(null);
-                  it.onClick?.();
-                }}
-              >
-                {it.label}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {rowCtx && <RowContextMenu menu={rowCtx} onClose={closeRowCtx} />}
     </div>
     {pdfPreview && <Modal open width="viewer" title={`${pdfPreview.title} · PDF`}
       onOpenChange={open => { if (!open) setPdfPreview(null); }}

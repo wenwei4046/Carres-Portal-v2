@@ -44,7 +44,10 @@ import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { toast } from "sonner";
-import { otherReceiptDoc } from "@/lib/pdf/other-money-in-docs";
+import { printOtherReceipt, printOtherReceiptById } from "../preview/row-print";
+import { useQueryClient } from "@tanstack/react-query";
+import { documentRowMenu } from "@/components/register/row-menu";
+import { OtherReceiptPreview } from "../preview/previews";
 import {
   useCancelReceipt,
   useMoneyInAccounts,
@@ -136,6 +139,9 @@ export default function OtherReceiptsPage() {
 
 function ReceiptRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNew: () => void }) {
   const personalLayouts = useFinancePersonalLayouts("finance_other_receipts");
+  const qc = useQueryClient();
+  // Double-click previews the receipt (Chew 2026-10-21); View opens its page.
+  const [peek, setPeek] = useState<string | null>(null);
   const [dept, setDept] = useDepartmentParam();
   const query = useOtherReceipts(dept);
   const columns = useMemo<DataGridColumn<OtherReceiptRow>[]>(
@@ -255,7 +261,11 @@ function ReceiptRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
         }
         emptyMessage="No other receipt yet. Press New receipt to record a loan in, other income, or money against an invoice."
         expandTitle="Inspect receipt"
-        onRowDoubleClick={(r) => onOpen(r.receipt_id)}
+        onRowDoubleClick={(r) => setPeek(r.receipt_id)}
+        contextMenu={(r) => documentRowMenu({
+          view: () => onOpen(r.receipt_id),
+          print: () => void printOtherReceiptById(qc, r.receipt_id),
+        })}
         expandable={{
           renderExpansion: (r) => (
             <div className="p-4 text-body flex flex-col items-start gap-1">
@@ -280,6 +290,7 @@ function ReceiptRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
           </span>
         )}
       />
+      <OtherReceiptPreview id={peek} onClose={() => setPeek(null)} onView={(id) => { setPeek(null); onOpen(id); }} />
     </ListPageShell>
   );
 }
@@ -622,10 +633,7 @@ function ReceiptFacts({ detail, onBack }: { detail: OtherReceiptDetail; onBack: 
   const downloadPdf = async () => {
     setPrinting(true);
     try {
-      const { renderReceiptPdf } = await import("@/lib/pdf/render");
-      window.open(URL.createObjectURL(await renderReceiptPdf(otherReceiptDoc(detail))), "_blank", "noopener");
-    } catch (e) {
-      toast.error(`The receipt could not be opened: ${(e as Error).message}`);
+      await printOtherReceipt(detail);
     } finally {
       setPrinting(false);
     }

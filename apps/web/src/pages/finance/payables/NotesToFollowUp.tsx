@@ -37,6 +37,7 @@ import {
 } from "./payables-words";
 import { amountCell, FINANCE_WIDTH } from "../finance-widths";
 import { useFinancePersonalLayouts } from "../finance-layouts";
+import { documentRowMenu } from "@/components/register/row-menu";
 
 /**
  * Finance → Payables → Notes to follow up (migration 0676; Chew 2026-10-06,
@@ -147,6 +148,9 @@ function NotesRegister() {
             }
             emptyMessage="No supplier owes a note. Mark a bill's line from the bill, or add one here."
             onRowDoubleClick={(r) => navigate(`/finance/notes-to-follow-up/${r.id}`)}
+            /* A note to follow up posts nothing to the ledger, so a double-click
+               still opens its page; the row menu is View only (Chew 2026-10-21). */
+            contextMenu={(r) => documentRowMenu({ view: () => navigate(`/finance/notes-to-follow-up/${r.id}`) })}
             statusSummary={(visible) => {
               const credit = visible.filter((r) => r.kind === "CREDIT" && isOpen(r)).reduce((s, r) => s + (num(r.left) ?? 0), 0);
               return (

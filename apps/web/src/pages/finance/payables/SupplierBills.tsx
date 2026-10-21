@@ -65,6 +65,8 @@ import { LineFollowUp } from "./NoteFollowUpParts";
 import { useSaveKey } from "../save-key";
 import { amountCell, FINANCE_WIDTH } from "../finance-widths";
 import { useFinancePersonalLayouts } from "../finance-layouts";
+import { documentRowMenu } from "@/components/register/row-menu";
+import { BillPreview } from "../preview/previews";
 
 /**
  * Finance → Bills (migration 0477). A supplier's invoice, entered once:
@@ -94,9 +96,18 @@ export default function SupplierBills() {
 
 // ── register ────────────────────────────────────────────────────────────────
 
+/** A confirmed bill with something left to pay: the bill page's own
+ *  `New Payment Voucher` condition and destination (Chew 2026-10-21). */
+export function billPayDoor(b: { id: string; status: string; supplier_id: string; unpaid: string | number | null }): string | null {
+  return b.status === "confirmed" && (num(b.unpaid) ?? 0) > 0
+    ? `/finance/payment-vouchers/new?supplier=${b.supplier_id}&bill=${b.id}` : null;
+}
+
 function BillRegister() {
   const personalLayouts = useFinancePersonalLayouts("finance_bills");
   const navigate = useNavigate();
+  // Double-click previews the bill (Chew 2026-10-21); View opens its page.
+  const [peek, setPeek] = useState<string | null>(null);
   const [dept, setDept] = useDepartmentParam();
   const query = useSupplierBills(dept);
   const rows = query.data ?? [];
@@ -161,7 +172,14 @@ function BillRegister() {
               </span>
             }
             emptyMessage="No bills yet. A supplier's invoice appears here once it is entered."
-            onRowDoubleClick={(r) => navigate(`/finance/bills/${r.id}`)}
+            onRowDoubleClick={(r) => setPeek(r.id)}
+            contextMenu={(r) => {
+              const pay = billPayDoor(r);
+              return documentRowMenu({
+                view: () => navigate(`/finance/bills/${r.id}`),
+                more: pay ? [{ label: "New Payment Voucher", onClick: () => navigate(pay) }] : [],
+              });
+            }}
             statusSummary={(visible) => {
               const unpaid = visible
                 .filter((r) => r.status === "confirmed")
@@ -175,6 +193,7 @@ function BillRegister() {
           />
         </ListPageShell>
       )}
+      <BillPreview id={peek} onClose={() => setPeek(null)} onView={(id) => navigate(`/finance/bills/${id}`)} />
     </div>
   );
 }
@@ -229,12 +248,14 @@ function BillDetail() {
             {doc.can.cancel && <Button onClick={() => setCancelling(true)}>Cancel bill</Button>}
             {doc.can.confirm && <Button variant="primary" onClick={() => setConfirming(true)}>Confirm bill</Button>}
             {/* Paying is a confirmed bill's next step: the kit's primary button, as on a debit note. */}
-            {b.status === "confirmed" && num(doc.unpaid) !== null && (num(doc.unpaid) ?? 0) > 0 && (
-              <Button variant="primary" data-testid="pay-bill"
-                onClick={() => navigate(`/finance/payment-vouchers/new?supplier=${b.supplier_id}&bill=${b.id}`)}>
-                New Payment Voucher
-              </Button>
-            )}
+            {(() => {
+              const pay = billPayDoor({ ...b, unpaid: doc.unpaid });
+              return pay && (
+                <Button variant="primary" data-testid="pay-bill" onClick={() => navigate(pay)}>
+                  New Payment Voucher
+                </Button>
+              );
+            })()}
           </span>
         }
       />
