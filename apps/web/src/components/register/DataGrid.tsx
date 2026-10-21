@@ -628,6 +628,11 @@ export type DataGridProps<T> = {
     rowExpansionKey?: (row: T) => string;
     /** Per-row test id for the disclosure chevron. */
     testId?: (row: T) => string;
+    /** A row with nothing to open gets an empty gutter cell, not a dead
+     *  chevron, and `Expand all` leaves it shut (Finance's Trial Balance:
+     *  a heading line does not drill, 2026-10-21). Omitted = every row opens,
+     *  as before. */
+    canExpand?: (row: T) => boolean;
     /** The chevron's words when the page's dictionary names them (`Show items`
      *  / `Hide items`); omitted, `Expand row` / `Collapse row`. */
     label?: (row: T, open: boolean) => string;
@@ -2223,7 +2228,10 @@ function DataGridInner<T>({
     });
   };
   const expandAll = () => {
-    if (expandable) setExpandedRows(new Set(sortedRows.map(expansionId)));
+    if (expandable) {
+      const opens = expandable.canExpand;
+      setExpandedRows(new Set((opens ? sortedRows.filter(opens) : sortedRows).map(expansionId)));
+    }
     setCollapsedGroups(new Set());
   };
   /** Collapse all never closes a group that must stay open. */
@@ -2662,7 +2670,8 @@ function DataGridInner<T>({
     }
     const row = item.row;
     const key = rowKey(row);
-    const expandKey = expandable ? expansionId(row) : null;
+    // A row `canExpand` refuses has no key: its gutter cell draws empty.
+    const expandKey = expandable && (expandable.canExpand?.(row) ?? true) ? expansionId(row) : null;
     const isExpanded = expandKey != null && expandedRows.has(expandKey);
     const highlight = rowHighlight?.(row) ?? null;
     return (

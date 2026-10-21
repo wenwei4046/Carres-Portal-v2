@@ -17,6 +17,11 @@
  *
  * FINANCE LOOK (Chew 2026-10-13): the code and the name are two columns, only
  * the code is the account's link, and every heading line reads as a subtotal.
+ *
+ * REPORT DRILL-DOWN (Chew 2026-10-21): an account line's chevron opens the
+ * ledger entries behind it, from the ledger's first day to the as-of day, for
+ * the department chosen, on the side the line shows its balance. A heading
+ * line does not drill. The entries are the General Ledger's (ReportDrill.tsx).
  */
 import { useCallback, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -33,6 +38,7 @@ import { DepartmentFilter, useDepartmentParam } from "../department";
 import { headingWalk, indent } from "../reports/StatementTable";
 import { FINANCE_WIDTH, amountCell } from "../finance-widths";
 import { useFinancePersonalLayouts } from "../finance-layouts";
+import ReportDrill from "../reports/ReportDrill";
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -171,6 +177,17 @@ export default function LedgerTrialBalance() {
           look="finance" personalLayouts={personalLayouts} fillColumn="account" rowTone={(r) => (r.heading ? "subtotal" : null)}
           initialGroupBy={["kind"]} groupBanner={false} stickyIdentity isLoading={!query.isSuccess}
           onSortChange={onSortChange} onSearchChange={onSearchChange} countsInGroup={isAccount}
+          expandTitle="Show entries"
+          expandable={{
+            canExpand: (r) => !r.heading && goLive !== null,
+            testId: (r) => `trial-balance-expand-${r.code}`,
+            label: (_r, open) => (open ? "Hide entries" : "Show entries"),
+            renderExpansion: (r) => (r.heading || goLive === null ? null
+              : <ReportDrill testId={`trial-balance-drill-${r.code}`}
+                scope={{ account: r.code, from: goLive, to: asOf, dept }} label={`${r.code} ${r.name}`}
+                side={r.credit > 0 ? "credit" : "debit"} expected={r.credit > 0 ? r.credit : r.debit}
+                carried empty="No entries up to this day." />),
+          }}
           searchPlaceholder="Search accounts…"
           wrapToolbar
           toolbarStart={<span className="flex items-center gap-3 text-body">

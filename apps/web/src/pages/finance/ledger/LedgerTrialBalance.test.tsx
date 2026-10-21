@@ -8,6 +8,7 @@ import { itSaysNoBannedWord } from "@/test/banned-words";
 import styles from "@/components/register/DataGrid.module.css";
 import LedgerTrialBalance, { trialBalanceLines } from "./LedgerTrialBalance";
 import { trialBalanceSheet } from "../month-end-pack";
+import { rm } from "@/lib/format-currency";
 
 const api = vi.hoisted(() => ({ fetch: vi.fn(), sheet: vi.fn(() => ({})) }));
 vi.mock("@/lib/api", () => ({ apiFetch: api.fetch }));
@@ -289,6 +290,66 @@ describe("Trial Balance headings", () => {
     const sum = (col: number) => rows.reduce((s, r) => s + Number(r[col] || 0), 0);
     expect([sum(2), sum(3)]).toEqual([total[2], total[3]]);
     expect(total[2]).toBe(total[3]);
+  });
+});
+
+// ── Report drill-down (Chew 2026-10-21) ─────────────────────────────────────
+
+describe("Trial Balance drill-down", () => {
+  const drillLine = (entryNo: string, debit: number, credit: number) => ({
+    entryDate: "2026-09-10", entryNo, sourceType: "SUPPLIER_BILL", docNo: `BILL-${entryNo}`, description: null,
+    debit, credit, balance: 0, partyType: "SUPPLIER", partyName: null,
+  });
+  function serve(report: unknown, lines: ReturnType<typeof drillLine>[]) {
+    api.fetch.mockImplementation(async (url: string) => {
+      const u = new URL(url, "http://portal.test");
+      if (u.pathname === "/api/finance/ledger/report-drill") {
+        return { status: "OK", go_live_on: "2026-09-10", from: "2026-09-10", to: "2026-09-11", account: u.searchParams.get("account"),
+          block: { code: "2110", name: "Trade payables", kind: "LIABILITY", opening: 0, lines, totalDebit: 0, totalCredit: 0, closing: 0 } };
+      }
+      return report;
+    });
+  }
+  const drillReads = () => api.fetch.mock.calls.map(([u]) => new URL(u as string, "http://portal.test"))
+    .filter((u) => u.pathname === "/api/finance/ledger/report-drill");
+
+  it("an account line opens its entries from the ledger's first day to the as-of day, on the side the line shows", async () => {
+    serve(REPORT, [drillLine("JE-1", 0, 100), drillLine("JE-2", 70, 0)]);
+    show("/finance/ledger/trial-balance?asOf=2026-09-11&dept=SHOWROOM");
+    const toggle = await screen.findByTestId("trial-balance-expand-2110");
+    expect(toggle).toHaveAccessibleName("Show entries");
+    fireEvent.click(toggle);
+    const drill = await screen.findByTestId("trial-balance-drill-2110");
+    expect(Object.fromEntries(drillReads()[0]!.searchParams))
+      .toEqual({ account: "2110", from: "2026-09-10", to: "2026-09-11", departmentType: "SHOWROOM" });
+    const rows = within(drill).getAllByTestId("trial-balance-drill-2110-row")
+      .map((r) => Array.from(r.children).map((td) => (td.textContent ?? "").trim()));
+    // On the credit side, where the line shows RM 30.00: 100 - 70.
+    expect(rows.map((r) => [r[1], r[2], r[4], r[5]])).toEqual([
+      ["JE-1", "No memo", "Name not available", "RM 100.00"],
+      ["JE-2", "No memo", "Name not available", rm(-70)],
+    ]);
+    expect(screen.queryByTestId("trial-balance-drill-2110-differs")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("trial-balance-expand-2110"));
+    expect(screen.queryByTestId("trial-balance-drill-2110")).not.toBeInTheDocument();
+  });
+
+  it("entries that do not add up to the line say the difference", async () => {
+    serve(REPORT, [drillLine("JE-1", 0, 100)]);
+    show();
+    fireEvent.click(await screen.findByTestId("trial-balance-expand-2110"));
+    expect(await screen.findByTestId("trial-balance-drill-2110-differs"))
+      .toHaveTextContent("Entries add up to RM 100.00; the line shows RM 30.00.");
+  });
+
+  it("a heading line has no chevron", async () => {
+    serve(NESTED, []);
+    show();
+    await screen.findByTestId("trial-balance-expand-CA-B1");
+    expect(screen.queryByTestId("trial-balance-expand-CA")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("trial-balance-expand-CA-B")).not.toBeInTheDocument();
+    const bank = screen.getAllByText("Bank").map((e) => e.closest("tr")!).find((tr) => tr.className.includes(styles.trSubtotal))!;
+    expect(within(bank).queryByRole("button", { name: "Show entries" })).not.toBeInTheDocument();
   });
 });
 

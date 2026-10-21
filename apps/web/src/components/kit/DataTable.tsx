@@ -415,6 +415,10 @@ export interface DataTableProps<Row> {
     label: (row: Row) => string;
     /** A row with nothing to open gets no control, not a dead one. */
     expandable?: (row: Row) => boolean;
+    /** The control column's width, e.g. `"42px"`, for a table whose other
+     *  columns are pixels (Finance's statements, 2026-10-21). Absent = the
+     *  kit's own (3%, or 42px in `content` sizing), as before. */
+    width?: string;
   };
   /**
    * **D0.5d power 1 — the operator drags the grid.** Drag a header's right
@@ -831,7 +835,7 @@ export default function DataTable<Row>({
            *  padding and 2px late bar (42), the 16px checkbox in its own (32)
            *  — because 3%/4% of a table that no longer stretches is a control
            *  narrower than itself. */}
-          {expansion && <col style={{ width: fills ? "42px" : "3%" }} />}
+          {expansion && <col style={{ width: expansion.width ?? (fills ? "42px" : "3%") }} />}
           {selection && <col style={{ width: fills ? "32px" : "4%" }} />}
           {ordered.map((c) => (
             <col
@@ -1077,7 +1081,7 @@ export default function DataTable<Row>({
                      * free-text band; a band whose content IS columnar is the
                      * opposite case, so it is one cell per column. */
                     <tr data-kit="data-group" className={groupRowClass}>
-                      {expansion && <td className={`px-2 h-9 align-middle ${groupCellWash}`} />}
+                      {expansion && <td data-kit="data-expand" className={`px-2 h-9 align-middle ${groupCellWash}`} />}
                       {selection && (
                         <td
                           className={`px-2 h-9 align-middle ${groupCellWash}`}
@@ -1154,6 +1158,7 @@ export default function DataTable<Row>({
                      * the same reason: two different things happen on one
                      * click and only one of them was asked for. */
                     <td
+                      data-kit="data-expand"
                       className={`px-2 border-l-2 ${lateBar}`}
                       onClick={(e) => e.stopPropagation()}
                     >
@@ -1235,7 +1240,7 @@ export default function DataTable<Row>({
           <tfoot className={`sticky bottom-0 ${Z_TABLE_FOOTER}`}>
             <tr className="h-11" aria-label={totals.label} data-kit="data-totals">
               {expansion && (
-                <td className={FOOT_CELL} />
+                <td data-kit="data-expand" className={FOOT_CELL} />
               )}
               {selection && (
                 <td className={FOOT_CELL} />

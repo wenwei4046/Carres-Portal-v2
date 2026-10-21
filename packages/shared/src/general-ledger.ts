@@ -46,6 +46,9 @@ export interface GeneralLedgerWireRow {
   source_doc_no: string | null;
   narration: string | null;
   memo: string | null;
+  /** gl_account_ledger's own party columns; older answers may lack them. */
+  party_type?: string | null;
+  party_id?: string | null;
   debit: Wire;
   credit: Wire;
   running_balance: Wire;
@@ -126,4 +129,29 @@ export function generalLedgerBlocks(answer: GeneralLedgerAnswer): GeneralLedgerB
       lines, totalDebit: dr / 100, totalCredit: cr / 100, closing: balance / 100,
     };
   });
+}
+
+/**
+ * REPORT DRILL-DOWN (Chew 2026-10-21, docs/finance/MASTER.md §3.6): the
+ * entries behind one account line of the Profit and Loss, the Balance Sheet
+ * or the Trial Balance. `GET /finance/ledger/report-drill?account=&from=&to=`,
+ * with the report's own department, reads `fin_general_ledger` for that one
+ * account: the lines are the General Ledger's, checked by
+ * `generalLedgerBlocks`, each with its party named.
+ */
+export interface ReportDrillLine extends GeneralLedgerLine {
+  /** CUSTOMER · SUPPLIER · OTHER, or null when the line names no party. */
+  partyType: string | null;
+  /** The party's name; null when there is none or it could not be read. */
+  partyName: string | null;
+}
+
+export interface ReportDrillAnswer {
+  status: "OK" | "BEFORE_GO_LIVE";
+  go_live_on: string;
+  from: string;
+  to: string;
+  account: string;
+  /** Null when the account brought nothing forward and moved nothing. */
+  block: (Omit<GeneralLedgerBlock, "lines"> & { lines: ReportDrillLine[] }) | null;
 }

@@ -19,7 +19,14 @@
  * column takes the width the code and the amount leave, so the table fills its
  * box, and a header edge drags to resize, remembered per person per statement
  * (Chew 2026-10-14).
+ *
+ * REPORT DRILL-DOWN (Chew 2026-10-21): with `drill`, an account line the page
+ * allows gets the kit's disclosure; opening it shows, right under the line,
+ * what `drill.render` draws (the ledger entries behind it, ReportDrill.tsx).
+ * A second click folds it. A band, a heading, `Net result not yet closed`
+ * and the `No …` line never drill. Without `drill` the table is as before.
  */
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { isZeroMoney, ledgerKindWord } from "@carres/shared/finance-ledger";
 import Button from "@/components/kit/Button";
@@ -49,6 +56,8 @@ export const CODE_LINK = "underline decoration-dotted underline-offset-[3px]";
 
 /** The statement's columns, in pixels: Code, the name (its least), Amount. */
 const NAME_WIDTH = 320;
+/** The disclosure column a drill adds: the kit's 24px button in its padding. */
+const DRILL_WIDTH = 42;
 const STATEMENT_WIDTHS = { code: FINANCE_WIDTH.code, account: NAME_WIDTH, amount: FINANCE_WIDTH.amount } as const;
 
 export const nothingInPeriod = (section: string): string => NOTHING_IN_PERIOD[section] ?? NOTHING_IN_PERIOD.INCOME!;
@@ -194,6 +203,9 @@ export function statementRows(sections: readonly StatementSection[]): StatementR
   return out;
 }
 
+/** An account line, as a drill reads it. */
+export type StatementAccountLine = Extract<StatementRow, { kind: "line" }>;
+
 /** Left padding by depth: a header at depth 1 sits flush, each level in one step. */
 const INDENT = ["", "", "pl-4", "pl-8", "pl-12"] as const;
 export const indent = (depth: number): string => INDENT[Math.min(depth, INDENT.length - 1)]!;
@@ -208,6 +220,7 @@ export default function StatementTable({
   accountHref,
   lineNote,
   bottomLine,
+  drill,
 }: {
   /** What the table is, for a screen reader. */
   label: string;
@@ -224,11 +237,18 @@ export default function StatementTable({
   lineNote?: (line: Pick<StatementLine, "code" | "reclassified" | "reclassifiedFor">) => string | null;
   /** The strip under the last row. Null: no strip. */
   bottomLine: { label: string; amount: number } | null;
+  /** Report drill-down: which account lines open, and what opens under them. */
+  drill?: {
+    drillable: (line: StatementAccountLine) => boolean;
+    render: (line: StatementAccountLine) => ReactNode;
+  };
 }) {
   const bySection = new Map(sections.map((s) => [s.kind, s]));
   const rows = statementRows(sections);
   const saved = useSavedWidths(`carres.finance.widths.${testId}.v1`, `finance_${testId.replace(/-/g, "_")}`);
-  const size = fillSizing(STATEMENT_WIDTHS, saved.widths, "account");
+  const size = fillSizing(drill ? { ...STATEMENT_WIDTHS, drill: DRILL_WIDTH } : STATEMENT_WIDTHS, saved.widths, "account");
+  const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set());
+  const canDrill = (r: StatementRow): r is StatementAccountLine => r.kind === "line" && (drill?.drillable(r) ?? false);
 
   // Every column is the width of what it holds (the Finance look): the code,
   // and the amount, which fits RM 1,234,567.89. The name wraps rather than
@@ -301,6 +321,19 @@ export default function StatementTable({
     empty={empty}
     group={{ keyOf: (r) => r.section, cells: band }}
     resizable={saved}
+    expansion={drill ? {
+      // Only a line that can drill shows open, even if it was open before the page changed.
+      expanded: new Set(rows.filter((r) => canDrill(r) && open.has(r.id)).map((r) => r.id)),
+      onToggle: (id) => setOpen((before) => {
+        const next = new Set(before);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        return next;
+      }),
+      expandable: canDrill,
+      label: () => "Show entries",
+      render: (r) => (canDrill(r) ? drill.render(r) : null),
+      width: `${DRILL_WIDTH}px`,
+    } : undefined}
     totals={bottomLine ? {
       label: bottomLine.label,
       cells: () => [

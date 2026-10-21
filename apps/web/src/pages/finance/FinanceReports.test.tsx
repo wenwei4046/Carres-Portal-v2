@@ -153,9 +153,11 @@ function Address() {
  *  A line's Code and Account cells (Chew 2026-10-14) read as one, `4100 Furniture sales`,
  *  as the export writes them; a band and the bottom strip already span the two. */
 function lines(table: HTMLElement): string[] {
-  return Array.from(table.querySelectorAll('tr[data-kit="data-group"], tr[data-kit="data-row"], tr[data-kit="data-totals"]'))
+  return Array.from(table.querySelectorAll(':scope > table > * > tr[data-kit="data-group"], :scope > table > * > tr[data-kit="data-row"], :scope > table > * > tr[data-kit="data-totals"]'))
     .map((tr) => {
-      const cells = Array.from(tr.children).map((td) => (td.textContent ?? "").trim());
+      // The drill's disclosure cell (Chew 2026-10-21) holds no word.
+      const cells = Array.from(tr.children).filter((td) => td.getAttribute("data-kit") !== "data-expand")
+        .map((td) => (td.textContent ?? "").trim());
       const read = tr.getAttribute("data-kit") === "data-row" ? [cells.slice(0, 2).filter(Boolean).join(" "), ...cells.slice(2)] : cells;
       return read.join(" | ").trim();
     });
@@ -214,16 +216,18 @@ describe("Reports — the statements read the ledger", () => {
     expect(account.querySelector("[data-fin-tone]")).toBeNull();
     // The code and the name are two columns; the code alone is the link, and
     // the table is at least as wide as its three columns (Chew 2026-10-14).
-    expect(within(table).getAllByRole("columnheader").map((h) => h.textContent?.trim())).toEqual(["Code", "Account", "Amount"]);
-    const [code, name] = Array.from(account.children) as HTMLElement[];
+    // The first header is the drill's disclosure column (Chew 2026-10-21), which holds no word.
+    expect(within(table).getAllByRole("columnheader").map((h) => h.textContent?.trim())).toEqual(["", "Code", "Account", "Amount"]);
+    const [code, name] = Array.from(account.children).filter((td) => td.getAttribute("data-kit") !== "data-expand") as HTMLElement[];
     expect(code).toHaveTextContent(/^5100$/);
     expect(within(code!).getByRole("link")).toHaveClass("decoration-dotted");
     expect(name).toHaveTextContent(/^Cost of goods sold$/);
     expect(within(name!).queryByRole("link")).not.toBeInTheDocument();
-    expect(table.parentElement!.style.getPropertyValue("--fin-table-width")).toBe("544px");
+    // 96 + 320 + 128, and the drill's 42.
+    expect(table.parentElement!.style.getPropertyValue("--fin-table-width")).toBe("586px");
     // The Account column takes the rest of the width (Chew 2026-10-14).
     expect(table.parentElement).toHaveAttribute("data-fin-fill");
-    expect(Array.from(table.querySelectorAll("col")).map((c) => c.style.width)).toEqual(["96px", "auto", "128px"]);
+    expect(Array.from(table.querySelectorAll("col")).map((c) => c.style.width)).toEqual(["42px", "96px", "auto", "128px"]);
     expect(within(table).getByRole("separator", { name: "Resize Account" })).toBeInTheDocument();
   });
 
@@ -813,9 +817,178 @@ describe("Reports — stock on hand", () => {
   });
 });
 
+// ── Report drill-down (Chew 2026-10-21) ─────────────────────────────────────
+
+describe("Reports — an account line opens the entries behind it", () => {
+  const chartAccount = (code: string, special: string | null = null) => ({
+    code, name: code, kind: "ASSET", parent_code: null, is_control: false, control_for: null,
+    is_active: true, is_header: false, sort_order: 0, section: null, special,
+  });
+  const line = (entryNo: string, debit: number, credit: number, over: Row = {}) => ({
+    entryDate: FROM, entryNo, sourceType: "SALES_INVOICE", docNo: `INV-${entryNo}`, description: "Sale",
+    debit, credit, balance: 0, partyType: null, partyName: null, ...over,
+  });
+  const drillAnswer = (account: string, kind: string, lines: ReturnType<typeof line>[], opening = 0) => ({
+    status: "OK", go_live_on: GO_LIVE, from: FROM, to: TO, account,
+    block: { code: account, name: account, kind, opening, lines, totalDebit: 0, totalCredit: 0, closing: 0 },
+  });
+
+  /** The statements as `serve` answers them, the chart, and one drill answer per account. */
+  function serveDrill(drills: Record<string, unknown>, specials: Record<string, string> = {}, bsRows: Row[] = bsBody(0)) {
+    api.fetch.mockImplementation(async (url: string) => {
+      const u = new URL(url, "http://portal.test");
+      if (u.pathname === "/api/finance/ledger/profit-and-loss") return pl(u.searchParams.get("from")!, u.searchParams.get("to")!, PL_BODY);
+      if (u.pathname === "/api/finance/ledger/balance-sheet") return bs(u.searchParams.get("asOf")!, bsRows);
+      if (u.pathname === "/api/finance/ledger/accounts") {
+        return { go_live_on: GO_LIVE, accounts: ["4100", "4300", "5100", "6200", "1120", "1210", "2110", "2210"].map((c) => chartAccount(c, specials[c] ?? null)) };
+      }
+      if (u.pathname === "/api/finance/ledger/report-drill") {
+        const a = drills[u.searchParams.get("account")!];
+        if (!a) throw new Error(`unexpected drill ${url}`);
+        return a;
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    });
+  }
+  const drillReads = () => api.fetch.mock.calls.map(([u]) => new URL(u as string, "http://portal.test"))
+    .filter((u) => u.pathname === "/api/finance/ledger/report-drill");
+
+  it("a Profit and Loss account line opens its entries for the same period and department; they add up to the line; a second click folds it", async () => {
+    const CUST = { partyType: "CUSTOMER", partyName: "Test Customer" };
+    serveDrill({ "4100": drillAnswer("4100", "INCOME", [line("JE-1", 0, 12000, CUST), line("JE-2", 0, 600), line("JE-3", 100, 0)]) });
+    show(`${PL_AT}?dept=SHOWROOM&from=${FROM}&to=${TO}`);
+    const toggle = await screen.findByTestId("table-expand-INCOME:line:4100");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(toggle);
+    const drill = await screen.findByTestId("profit-and-loss-drill-4100");
+    const read = drillReads()[0]!;
+    expect(Object.fromEntries(read.searchParams)).toEqual({ account: "4100", from: FROM, to: TO, departmentType: "SHOWROOM" });
+    const rows = within(drill).getAllByTestId("profit-and-loss-drill-4100-row");
+    expect(rows.map((r) => Array.from(r.children).map((td) => (td.textContent ?? "").trim()))).toEqual([
+      [fmtDate(FROM), "JE-1", "Sale", "INV-JE-1", "Test Customer", "RM 12,000.00"],
+      [fmtDate(FROM), "JE-2", "Sale", "INV-JE-2", "", "RM 600.00"],
+      // A debit on an income account takes off the line.
+      [fmtDate(FROM), "JE-3", "Sale", "INV-JE-3", "", rm(-100)],
+    ]);
+    expect(within(drill).getByRole("link", { name: "JE-1" })).toHaveAttribute("href", "/finance/ledger?entry=JE-1");
+    // 12,000 + 600 - 100 = 12,500, the line's figure: no difference is said.
+    expect(screen.queryByTestId("profit-and-loss-drill-4100-differs")).not.toBeInTheDocument();
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(toggle);
+    expect(screen.queryByTestId("profit-and-loss-drill-4100")).not.toBeInTheDocument();
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("entries that do not add up to the line say the difference in red, never a silent total", async () => {
+    serveDrill({ "4100": drillAnswer("4100", "INCOME", [line("JE-1", 0, 12000)]) });
+    show(`${PL_AT}?from=${FROM}&to=${TO}`);
+    fireEvent.click(await screen.findByTestId("table-expand-INCOME:line:4100"));
+    const differs = await screen.findByTestId("profit-and-loss-drill-4100-differs");
+    expect(differs).toHaveTextContent("Entries add up to RM 12,000.00; the line shows RM 12,500.00.");
+    expect(differs).toHaveClass("text-kit-red-11");
+  });
+
+  it("a heading, a band and the bottom line do not drill; under All the stock accounts do not either", async () => {
+    serveDrill({}, { "5100": "SCS" });
+    show(`${PL_AT}?from=${FROM}&to=${TO}`);
+    const table = screen.getByTestId("profit-and-loss");
+    await within(table).findByTestId("table-expand-INCOME:line:4100");
+    expect(within(table).getByTestId("table-expand-EXPENSE:line:6200")).toBeInTheDocument();
+    // Headings print with no disclosure; the closing stock account carries live stock, not entries.
+    expect(within(table).queryByTestId("table-expand-EXPENSE:group:5000")).not.toBeInTheDocument();
+    expect(within(table).queryByTestId("table-expand-EXPENSE:group:6000")).not.toBeInTheDocument();
+    expect(within(table).queryByTestId("table-expand-EXPENSE:line:5100")).not.toBeInTheDocument();
+    expect(drillReads()).toEqual([]);
+  });
+
+  it("under a department, a stock account's line is the books' own and drills", async () => {
+    serveDrill({ "5100": drillAnswer("5100", "EXPENSE", [line("JE-9", 7000, 0)]) }, { "5100": "SCS" });
+    show(`${PL_AT}?dept=SHOWROOM&from=${FROM}&to=${TO}`);
+    fireEvent.click(await screen.findByTestId("table-expand-EXPENSE:line:5100"));
+    expect(await screen.findByTestId("profit-and-loss-drill-5100")).toHaveTextContent("RM 7,000.00");
+  });
+
+  it("the Balance Sheet drills from the ledger's first day to the as-of day; its stock line does not drill", async () => {
+    serveDrill({ "1210": drillAnswer("1210", "ASSET", [line("JE-4", 2000, 0), line("JE-5", 0, 350)]) }, { "1120": "SBS" });
+    show(`${BS_AT}?asOf=${TODAY}`);
+    const table = screen.getByTestId("balance-sheet");
+    fireEvent.click(await within(table).findByTestId("table-expand-ASSET:line:1210"));
+    expect(within(table).queryByTestId("table-expand-ASSET:line:1120")).not.toBeInTheDocument();
+    expect(within(table).queryByTestId("table-expand-EQUITY:unclosed")).not.toBeInTheDocument();
+    const drill = await screen.findByTestId("balance-sheet-drill-1210");
+    expect(Object.fromEntries(drillReads()[0]!.searchParams)).toEqual({ account: "1210", from: GO_LIVE, to: TODAY });
+    // 2,000 - 350 = 1,650, the line's figure.
+    expect(within(drill).getAllByTestId("balance-sheet-drill-1210-row")).toHaveLength(2);
+    expect(screen.queryByTestId("balance-sheet-drill-1210-differs")).not.toBeInTheDocument();
+  });
+
+  // 0506: customers paid RM 2,815.00 before their invoices. The database prints
+  // 1210 as its booked RM -815.00 less the moved RM -2,815.00, and 2210 as its
+  // booked RM 0.00 plus RM 2,815.00 (Chew 2026-10-21: shown as rows, not red).
+  const movedBody = (): Row[] => [
+    account("ASSET", "1100", "Cash and bank", "1120", "Bank — current account", 5200),
+    subtotal("ASSET", "1100", "Cash and bank", 5200),
+    { ...account("ASSET", "1200", "Receivables", "1210", "Trade receivables — customers", 2000), reclassified: -2815, reclassified_for: "CUSTOMER" },
+    subtotal("ASSET", "1200", "Receivables", 2000),
+    total("ASSET", 7200),
+    { ...account("LIABILITY", "2200", "Customer money held", "2210", "Customer deposits held", 2815), reclassified: 2815, reclassified_for: "CUSTOMER" },
+    subtotal("LIABILITY", "2200", "Customer money held", 2815),
+    total("LIABILITY", 2815),
+    account("EQUITY", "3000", "Equity", "3100", "Share capital", 0),
+    subtotal("EQUITY", "3000", "Equity", 0),
+    { section: "EQUITY", row_kind: "DERIVED", header_name: "Result not yet closed to equity", amount: 4385 },
+    total("EQUITY", 4385),
+    { section: "CHECK", row_kind: "EQUATION", amount: 0 },
+  ];
+  const description = (drill: HTMLElement, testId: string) => within(drill).getAllByTestId(testId)
+    .map((r) => Array.from(r.children).map((td) => (td.textContent ?? "").trim()))
+    .map((c) => [c[2], c[5]]);
+
+  it("the debtor line money was moved off drills to its entries and a Moved to row, adding up to the line with no red", async () => {
+    serveDrill({ "1210": drillAnswer("1210", "ASSET", [line("JE-4", 3000, 0), line("JE-5", 0, 3815)]) }, {}, movedBody());
+    show(`${BS_AT}?asOf=${TODAY}`);
+    fireEvent.click(await screen.findByTestId("table-expand-ASSET:line:1210"));
+    const drill = await screen.findByTestId("balance-sheet-drill-1210");
+    // 3,000 - 3,815 + 2,815 = 2,000, the line's figure.
+    expect(description(drill, "balance-sheet-drill-1210-row")).toEqual([
+      ["Sale", "RM 3,000.00"],
+      ["Sale", rm(-3815)],
+      ["Moved to Customer deposits held", "RM 2,815.00"],
+    ]);
+    expect(screen.queryByTestId("balance-sheet-drill-1210-differs")).not.toBeInTheDocument();
+  });
+
+  it("the line the money was moved onto shows Moved from, adding up to the line", async () => {
+    serveDrill({ "2210": { status: "OK", go_live_on: GO_LIVE, from: GO_LIVE, to: TODAY, account: "2210", block: null } }, {}, movedBody());
+    show(`${BS_AT}?asOf=${TODAY}`);
+    fireEvent.click(await screen.findByTestId("table-expand-LIABILITY:line:2210"));
+    const drill = await screen.findByTestId("balance-sheet-drill-2210");
+    expect(description(drill, "balance-sheet-drill-2210-row")).toEqual([
+      ["Moved from Trade receivables — customers", "RM 2,815.00"],
+    ]);
+    expect(screen.queryByTestId("balance-sheet-drill-2210-differs")).not.toBeInTheDocument();
+  });
+
+  it("a gap the moves do not explain still shows red", async () => {
+    serveDrill({ "1210": drillAnswer("1210", "ASSET", [line("JE-4", 3000, 0), line("JE-5", 0, 3900)]) }, {}, movedBody());
+    show(`${BS_AT}?asOf=${TODAY}`);
+    fireEvent.click(await screen.findByTestId("table-expand-ASSET:line:1210"));
+    expect(await screen.findByTestId("balance-sheet-drill-1210-differs"))
+      .toHaveTextContent("Entries add up to RM 1,915.00; the line shows RM 2,000.00.");
+  });
+
+  it("nothing drills until the chart is read", async () => {
+    serve();
+    show(`${PL_AT}?from=${FROM}&to=${TO}`);
+    await within(screen.getByTestId("profit-and-loss")).findByRole("link", { name: "4100" });
+    expect(screen.queryByTestId("table-expand-INCOME:line:4100")).not.toBeInTheDocument();
+  });
+});
+
 describe("Reports words", () => {
   const here = dirname(fileURLToPath(import.meta.url));
   itSaysNoBannedWord(join(here, "FinanceReports.tsx"), { minStrings: 12, expectString: "No opening balances" });
   itSaysNoBannedWord(join(here, "reports", "by-month.ts"), { minStrings: 3, expectString: "Net result not yet closed" });
   itSaysNoBannedWord(join(here, "reports", "StatementTable.tsx"), { minStrings: 3, expectString: "Net result not yet closed" });
+  itSaysNoBannedWord(join(here, "reports", "ReportDrill.tsx"), { minStrings: 3, expectString: "Name not available" });
 });
