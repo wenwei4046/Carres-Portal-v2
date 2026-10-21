@@ -5837,3 +5837,15 @@ DEL-04 · DEL-05 · OFF-01/05, owner confirmed 9 Oct 2026). No dash is used as a
 | Work action, `Assign logistics` | line two `Choose the company that carries this delivery · due {date}` | the hard-coded `3 working days before · {date}` is retired |
 | Logistics card, first check | `{n} working days before · {date}` with `n` = the stored Contact lead (`Contact lead days`, DEL-05); at the default it reads the ruled `3 working days before`. `2 working days before` and `1 working day before` stay fixed (Workspace §5.9) | the contact day follows its one setting |
 
+
+### Team Warehouse account identity — 21 Oct 2026
+
+Existing Team account form only; explicit individual opt-in through the existing authorised writer.
+
+| Use | Exact words | Boundary |
+|---|---|---|
+| Account selector | `Warehouse account` · `Shared login` · `Individual login` | Shared default; no internal staff/Duty rights |
+| Individual hint | `Use the person's name. Receiving records who confirmed the goods.` | Named identity; not proof of operational admission |
+| Shared hint | `Shared logins cannot confirm receiving as a person.` | Count/report access retains existing permission |
+| Site hint | `Choose the existing receiving Site. Its company is set in Warehouse settings.` | Existing Warehouse only; no new Site/company writer |
+| Unavailable choices | `Warehouse choices are not available. Close this form and reload Team.` | Missing/failed list is not a confirmed zero; creation blocked |

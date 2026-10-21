@@ -242,4 +242,7 @@ The existing authorised Team account API can explicitly receive `warehouseIndivi
 Warehouse with an existing Site and a named person. Omission preserves the shared-login marker.
 This external Warehouse person receives no internal staff code, position or Duty grant. SQL current
 person/Site/company admission still governs receiving; API input is not operational activation or a
-new HR UI door. Mocked API tests cover the explicit individual and unchanged shared paths.
+new HR UI door. The existing Team Add user form exposes Shared login (default) / Individual login
+only for Warehouse and requires an existing receiving Site. Individual sends the explicit flag;
+shared omits it; changing roles clears it. Site/company setup and Receiving admission remain
+separate existing authorities. CODE ON BRANCH; no real account activation or production claim.
