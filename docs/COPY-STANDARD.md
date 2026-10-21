@@ -1,5 +1,27 @@
 # Carres Portal — Copy Standard
 
+## Purchasing21Oct design vocabulary intake
+
+Presentation source: export28; [UI MASTER](ui/MASTER.md#purchasing-design-handoff--21-oct-2026--it-entry) and [Purchasing reconciliation](purchasing/MASTER.md#latest-purchasing-design-intake--21-oct-2026). This intake does not override existing governed action meanings, identifiers or approval permissions. Latest source vocabulary to map to existing components:
+
+| Context | Design wording / status |
+|---|---|
+| Receiving tabs | Not received · Received · Differences; default Not received (already directly approved) |
+| Column presets | Overview · Purchasing · Warehouse; column visibility only |
+| Claims list | To do · Waiting · Closed · All; first date Claim Reported; retain backend state meaning |
+| Return/Repair/Showroom task views | To do · Waiting · Done · All; use source-specific Closed/Done semantics rather than one blanket substitution |
+| Missing Unit information | Unit ID not chosen · Unit ID not linked · Choose Unit ID; distinguish absent selection from absent lineage; do not hide behind generic “not recorded” |
+| Claim follow-up | Claim not sent · Reply {date} · Reply late · Evidence missing; use real source timestamp/status |
+| Performance summary | Supplier replied on time · Picked up on time · Back on time · Arrived on time · Collected on time · Replied on time; only with defined denominator and persisted evidence |
+| Create form | Clear the form; more menu last; dirty guard required |
+| Draft paper label | WHAT WE ASK; document contents remain under PDF/module authority |
+| Stand-in actions | Record pickup / Record inspection / Record move are prototype labels, not evidence of built actions |
+| Pending admission | “passed”, short task titles, new RO reply-reason taxonomy and Rows20·1/1 require exact contextual reconciliation; do not globally replace the current dictionary or backend enum |
+
+Source task-title examples: Share claim · {n} pc; Ask to confirm the claim result; Issue repair order; Confirm tomorrow's pickup; Pickup missed; Ask when the goods will arrive. They describe owning actions, not a second task engine. Source RO reply reasons: Material unavailable / Production delay / Transport delay / Partial quantity ready / Supplier holiday / Other. These are received design options; module/backend taxonomy is not changed by this publication.
+
+---
+
 > The single source of truth for how UI text is written across every page of
 > `apps/web`. **Read this BEFORE writing any button label, section title, row
 > line, empty state, error, or tooltip.** Locked with Jess (COO) 2026-07-22.

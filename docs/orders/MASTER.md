@@ -1,5 +1,7 @@
 # ORDERS — MASTER
 
+**Design handoff21Oct2026:** Purchasing export28 includes the SO Outright v12 and DO Unit-reader examples. Shared measurements, states and unresolved conflicts are maintained only in [UI MASTER](../ui/MASTER.md#purchasing-design-handoff--21-oct-2026--it-entry); this is not an independent claim that the whole Sales Order design was newly reviewed. IT owns backend implementation.
+
 **All listing appearance — the shared listing template (UI MASTER §6.0):** follow
 [UI MASTER §6.7 Portal-wide listing readability](../ui/MASTER.md#portal-wide-listing-readability--built-2026-09-17-slice-1--authenticated-walk-owed).
 This is the shared default, not a PO visual pilot. Preserve this module's filter content,
