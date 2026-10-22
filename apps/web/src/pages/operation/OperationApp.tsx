@@ -619,14 +619,14 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
             {tab === "stock-onhand" && <WarehouseStockRegister />}
             {tab === "showroom" && <WarehouseStockRegister showroom />}
             {/* Three Warehouse pages; the two directional schedules are nested views. */}
-            {tab === "warehouse-arrival-schedule" && (
-              <WarehouseDirectionPage direction="inbound"><WarehouseWorkspace direction="arrival" /></WarehouseDirectionPage>
+            {(tab === "warehouse-inbound" || tab === "warehouse-arrival-schedule") && (
+              <WarehouseDirectionPage direction="inbound" workSurface={<WarehouseInbound />}
+                scheduleSurface={<WarehouseWorkspace direction="arrival" />} />
             )}
-            {tab === "warehouse-pickup-schedule" && (
-              <WarehouseDirectionPage direction="outbound"><WarehouseWorkspace direction="pickup" /></WarehouseDirectionPage>
+            {(tab === "warehouse-outbound" || tab === "warehouse-pickup-schedule") && (
+              <WarehouseDirectionPage direction="outbound" workSurface={<WarehouseOutboundWork />}
+                scheduleSurface={<WarehouseWorkspace direction="pickup" />} />
             )}
-            {tab === "warehouse-inbound" && <WarehouseDirectionPage direction="inbound"><WarehouseInbound /></WarehouseDirectionPage>}
-            {tab === "warehouse-outbound" && <WarehouseDirectionPage direction="outbound"><WarehouseOutboundWork /></WarehouseDirectionPage>}
             {/* Non-PO inbound source object. Inbound owns the register; this
                 hidden destination owns creating and reviewing one source. */}
             {tab === "arrival-source" && <ArrivalSourceWorkspace />}
