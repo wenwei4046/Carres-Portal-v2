@@ -550,7 +550,7 @@ createRoot(document.getElementById("root")!).render(
               ) : PAGE === "warehouse" ? (
                 <WarehouseIncoming />
               ) : (
-                <OperationReceiving />
+                <PreviewFrame label="Receiving · illustrative data"><div className="flex h-full min-h-0 flex-col"><OperationReceiving /></div></PreviewFrame>
               )
             }
           />
