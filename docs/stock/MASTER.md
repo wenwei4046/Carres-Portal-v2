@@ -15,12 +15,14 @@ Receiving/issue evidence alone establishes physical stock movement; allocation i
 Unknown, failed and missing evidence must stay explicit. Current receiving/loading write doors and
 formal completion rules survive presentation changes.
 
-The dedicated **UI Template — BUILD Test Deploy** controller
-(`01a0f7c6-6fed-7282-9f2a-94e8bc94b065`) owns shared-template integration, tests and authorised
-deployment. This Warehouse chat remains PLAN; it does not duplicate that rollout or alter the
-controller's worktree. Accepted UI composition is not production proof or completion of the whole
-Warehouse audit/Blueprint. Warehouse-specific adoption requires its own operator/permission/data
-verification under the controller and the module's authorised scope.
+**Design / IT ownership — owner 22 Oct 2026:** follow UI MASTER **How design and IT work**.
+Warehouse design owns the approved journey, shared-kit adaptation and integrated UI review;
+the commissioned IT lane owns suitable Houzs source reuse, backend/integration tests and release
+verification. Reuse existing research and evidence rather than running a second backend campaign.
+This Warehouse PLAN lane remains design/read-only unless separately commissioned to build.
+Warehouse-specific source, Site, Unit, permission and stock consequences require IT evidence;
+UI approval is neither backend verification nor production completion. Use the existing module
+MASTER/handoff for status, not a second UI guide or a new chat for this responsibility change.
 
 **Shared field-operation UI:** follow [the canonical UI MASTER ruling](../ui/MASTER.md#shared-field-operation-ui--owner-ruling-2026-09-29) (approved direction; implementation and operator validation pending).
 
