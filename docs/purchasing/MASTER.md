@@ -7127,6 +7127,12 @@ destination is a showroom. A company having several locations changes destinatio
 scope, not the commercial nature of the transaction. No Dealer credit or new payment/ownership
 transition rule is inferred from this clarification.
 
+**22 Oct Inventory design alignment:** Stock MASTER §2 and §7 own the complete Inventory review
+brief and Site coverage (including PJ Showroom). The showroom reads the same Unit/quantity records
+filtered to its authorised Site; Display Requests and supplier documents remain Purchasing-owned.
+No second showroom ledger, duplicate request or broader location access is approved by this design
+alignment. Diglant factory-held Subscription supply follows Rental §5.8, not showroom consignment.
+
 The same-request handoff and these channel/location boundaries are approved. The independent
 module, proposed broader request name, final menu, six-reference-document naming/placement and
 external Dealer permissions remain pending whole-Blueprint review. This is PLAN truth, not
@@ -7677,7 +7683,7 @@ The Oracle distinction is a research lesson, not financial advice or adopted pos
 | Quotation, cost change, transport charge | Price/recording resolved; liability unresolved | Preserve evidence and accepted version; no automatic Catalog overwrite. Missing price does not stop agreed consignments. Who pays exceptional transport/damage and approval for any resulting expense must follow Finance/commercial authority, not guessed defaults |
 | Sales absence / departure | Successor rule approved §9.13; assignment action admission remains | Preserve original negotiator; authorised management designates active Sales successor on permanent departure. Temporary absence uses cover. No inactive recipient, automatic Operation takeover or self-appointed replacement |
 | Sending, revision, missing contact | Shared communication authority | Record exact version/channel/recipient/actor; mark is sending declaration, not supplier acceptance. Check external conversation before resending a missing mark; no duplicate send block |
-| Customer sale / partial failure / retry | Resolved §§7.7,9.11; Delivery MASTER §6 | Auto-notice only successful exact supplier-owned Units per supplier/delivery visit; retry deduplicates; pending/failed Units excluded |
+| Customer sale / partial failure / retry | Resolved §7.7 (2 Oct ruling); Delivery MASTER §6 | Supplier-owned display goods are not sold; no supplier sale-notice flow. Eligible Carres-owned goods follow ordinary Sales/Delivery, preserving exact successful/failed Units and retry protection |
 | Customer returns purchased goods | §9.11 and owning Service/Stock/Finance rules | Customer remedy, physical return and separately agreed supplier recovery remain independent; no automatic ownership or invoice reversal |
 | Damage/loss in display and supplier dispute | Stock/Claim owners resolved; liability decision may remain | Evidence and protective Stock state first; Purchasing Supplier Claim for supplier issue, Service only for customer remedy. No automatic write-off, charge or supplier ownership conversion |
 | Completion, archives, reopening | Partly resolved | Physical, sending, commercial and Finance obligations finish separately; no single manual Done. Later correction/reply reopens only affected work. Completed records remain searchable with historical documents |

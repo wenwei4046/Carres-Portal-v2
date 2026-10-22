@@ -17,7 +17,7 @@
 | Service Case status dropdown `Pending / In Progress / Follow-up / Resolved` | "pending, in progress, follow up all confused and never follow rules"; status is a derived who + action + object sentence | 2026-10-06 | docs/service/MASTER.md:23-31 |
 | Edit Delivery full-screen page | Retired; every arrangement write lives inside the Monitor row's expanded panels | 2026-09-13 | docs/COPY-STANDARD.md:3487-3488 · docs/delivery/MASTER.md:717-719 |
 | Payments `Payments · Invoices` tabs, standalone Invoices or Receipts pages | Payments has only `Monitor` and `Payment Records` | 2026-09-12 | docs/payment/MASTER.md:135-137 |
-| One combined Warehouse `Monitor` board for both directions | Retired; two pages `Arrival Schedule` and `Pickup Schedule` | 2026-09-14 | docs/COPY-STANDARD.md:2530 |
+| One combined Warehouse `Monitor` board for both directions | Retired; retain distinct `Arrival Schedule` inside Inbound and `Pickup Schedule` inside Outbound; no peer Schedule entries | 2026-10-22 amendment; placement APPROVED TARGET / NOT BUILT | docs/stock/MASTER.md §2 · docs/COPY-STANDARD.md Warehouse vocabulary |
 | `Old Orders (temporary)` row on the rail | Left the rail; its routes stay for legacy links | 2026-09-23 | docs/orders/MASTER.md:576-579 |
 | `Send` as an action verb | Retired and banned from reuse; the act is `Issue` | 2026-07-29 | docs/COPY-STANDARD.md:1873-1876 |
 | `warehouse-ui-preview.html` (hand-written shell, blue summary box, concatenated goods expansion) | Rejected by the owner; do not revive | UNKNOWN — ask Jess | docs/ui/MASTER.md:1545-1548 |

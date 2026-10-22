@@ -1038,6 +1038,18 @@ Read 01 §§4–5 and 03 §2. Current visual reference: `docs/ui-reference/sales
 6. Content defines column widths. Re-measure the registry against current font/padding; never clip a date, amount, status or identity to preserve an old measurement.
 7. Check the complete page under §2.2 before claiming adoption. Previous deployment evidence proves the previous implementation, not this new visual target.
 
+**Warehouse placement — owner-approved 2026-10-22 / NOT BUILT:** the three primary entries are
+Inbound, Inventory and Outbound. Use the existing shared module-view controls to expose Arrival
+Schedule inside Inbound and Pickup Schedule inside Outbound. Keep full-width directional schedule
+content as an alternate view, not a calendar strip beside the register and not another shared kit.
+Stock MASTER §2 owns scope, source-link continuity and retained context; COPY owns the exact words.
+This approval changes no shared dimensions, Summary/Tasks behaviour, business engine or permissions.
+Stock MASTER §2's **Inventory design coverage** and §7's location coverage are the approved design
+brief, including product-to-Unit detail, source links, PJ's shared stock and supplier/transit custody.
+Use this MASTER's current measurements and components for the complete sample; do not copy an old
+Houzs skin, add per-location pages, or treat a written brief as a working component. The exact visuals
+remain subject to review; this is not page acceptance or an implementation/deployment commission.
+
 ## §6.1 · Contextual summary/filter rail
 
 Use the shared FilterRail adapter when the module's purpose needs it. Approved source-owned filters and their count semantics remain. Current selected appearance and widths come from 01. Do not impose SO filters, mission labels or rail groups on every module. Hide/show retains filters and leaves the record table usable.
