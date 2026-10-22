@@ -607,6 +607,16 @@ afterEach(() => {
 /* ═══ THE REGISTER ═════════════════════════════════════════════════════════ */
 
 describe("OperationReceiving — the formal GRN Register", () => {
+  it("shows expected pending goods rather than unrecorded receipt results on a fresh visit", () => {
+    renderPage("/operation?tab=receiving");
+    expect(screen.getByRole("tab", { name: "Not received" })).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(screen.getAllByRole("button", { name: "Expand row" })[0]);
+    const items = within(screen.getByRole("table", { name: "Items" }));
+    expect(items.getByRole("columnheader", { name: "Pending Delivery Qty" })).toBeInTheDocument();
+    expect(items.queryByText("Not counted")).not.toBeInTheDocument();
+    expect(items.queryByRole("columnheader", { name: "Received Qty" })).not.toBeInTheDocument();
+  });
+
   it("uses the current three receiving stages without duplicate column filters", () => {
     renderPage();
     const rail = within(screen.getByTestId("receiving-stages"));

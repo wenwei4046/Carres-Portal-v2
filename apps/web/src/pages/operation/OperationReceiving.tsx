@@ -24,6 +24,7 @@ import {
   type WarehouseReceiptQueueRow,
 } from "@/lib/queries";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import ItemRows from "@/components/register/ItemRows";
 import { DataGrid, type DataGridColumn, type DataGridContextMenuItem } from "@/components/register/DataGrid";
 import { documentRowMenu } from "@/components/register/row-menu";
 import { toast } from "sonner";
@@ -1200,17 +1201,23 @@ function PendingReceivingView({ pos, suppliers, loading, failed, onRetry, onPick
 
 function PendingReceivingItems({ po }: { po: operationPoListRow }) {
   const query = usePoReceiving(po.id);
-  return <GoodsMiniTable label="Items" receivingLayout itemHeading="Items" lines={
-    (po.purchase_order_lines ?? []).filter(l => poLineReportable(l) > 0).map(l => ({
-      key: l.id, category: l.category ?? "", selectable: false,
-      sourceNo: (l.governed_sources ?? []).map(source => source.reference).join(" · "),
-      unitIds: (query.data?.expected_units ?? [])
-        .filter(unit => unit.po_line_id === l.id && unit.status === "incoming")
-        .map(unit => unit.unit_code),
-      unitAbsence: l.identity_mode === "quantity" ? GOODS_ABSENCE_WORDS.countedByQuantity
-        : query.isLoading ? "Loading…" : query.isError ? "Could not be loaded" : "Not recorded",
-      deliverTo: [], deliverToAbsence: "Not recorded", sku: l.sku,
-      item: l.model_name ?? l.sku, qty: poLineReportable(l),
-    }))
-  } />;
+  const cells = "grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1.5fr)_90px] items-center gap-2 px-3";
+  return <div className="min-w-0 overflow-x-auto">
+    <div className="min-w-[580px]">
+      <ItemRows label="Items" stepBack={0}>
+        <div role="row" className={`${cells} min-h-8 border-b border-c-row-line bg-c-band text-meta font-medium text-c-secondary`}>
+          {["SO No / MPR No", "Items", "Unit ID", "Pending Delivery Qty"].map(label => <div role="columnheader" key={label}>{label}</div>)}
+        </div>
+        {(po.purchase_order_lines ?? []).filter(line => poLineReportable(line) > 0).map(line => {
+          const units = (query.data?.expected_units ?? []).filter(unit => unit.po_line_id === line.id && unit.status === "incoming");
+          return <div role="row" key={line.id} className={`${cells} min-h-11 border-b border-c-row-line py-1 text-body`}>
+            <div role="cell" className="break-words font-mono">{(line.governed_sources ?? []).map(source => source.reference).join(" · ") || "Not recorded"}</div>
+            <div role="cell" className="break-words">{line.model_name ?? line.sku}{line.size ? <div className="text-meta text-c-secondary">{line.size}</div> : null}</div>
+            <div role="cell" className="break-words font-mono">{units.length ? units.map(unit => <div key={unit.id}>{unit.unit_code}</div>) : line.identity_mode === "quantity" ? GOODS_ABSENCE_WORDS.countedByQuantity : query.isLoading ? "Loading…" : query.isError ? "Could not be loaded" : "Not recorded"}</div>
+            <div role="cell" className="text-right tabular-nums">{poLineReportable(line)}</div>
+          </div>;
+        })}
+      </ItemRows>
+    </div>
+  </div>;
 }
