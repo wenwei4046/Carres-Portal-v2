@@ -1060,7 +1060,6 @@ describe("PortalSidebar — the Purchasing map", () => {
          slice A (migration 0602). */
       "display-requests",
       "consignment-orders",
-      "consignment-returns",
     ]) {
       const row = child(key);
       expect(row.tagName, key).toBe("SPAN");
@@ -1084,6 +1083,16 @@ describe("PortalSidebar — the Purchasing map", () => {
     expect(row.getAttribute("href")).toBe("/operation?tab=purchase-returns");
     expect(row.getAttribute("aria-disabled")).not.toBe("true");
     expect(row.textContent).not.toContain("Coming soon");
+  });
+
+  it("Consignment Returns is a real door now; Consignment Orders still says Coming soon", () => {
+    renderAt("/operation?tab=purchase");
+    fireEvent.click(group_("purchasing-showroom"));
+    const row = child("consignment-returns");
+    expect(row.tagName).toBe("A");
+    expect(row.getAttribute("href")).toBe("/operation?tab=consignment-returns");
+    expect(row.textContent).not.toContain("Coming soon");
+    expect(child("consignment-orders").textContent).toContain("Coming soon");
   });
 
   it("Repair Orders is a real door now — §9.7 slice A", () => {

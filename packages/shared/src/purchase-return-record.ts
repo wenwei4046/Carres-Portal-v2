@@ -207,6 +207,8 @@ export function purchaseReturnIssueMissing(source: PurchaseReturnIssueSource, pi
 export interface PurchaseReturnPrintData {
   /** null while issuing: the preview is the document it WILL be. */
   pr_no: string | null;
+  /** 0706: prints CONSIGNMENT RETURN over GOING BACK goods. */
+  is_consignment?: boolean;
   pr_doc_date: string;
   supplier: { name: string; contact: string | null };
   return_to: string | null;

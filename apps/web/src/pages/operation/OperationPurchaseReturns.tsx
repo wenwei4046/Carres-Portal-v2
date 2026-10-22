@@ -134,16 +134,21 @@ export interface PurchaseReturnsRegisterProps {
   errorTitle?: string;
   errorDetail?: string;
   onRetry?: () => void;
+  /** 0706: the Consignment Returns register: same grid, its own tab and words. */
+  consignment?: boolean;
 }
 
 export function PurchaseReturnsRegister({
   returns,
   isLoading = false,
   isError = false,
+  consignment = false,
   errorTitle = "Purchase Returns could not be loaded.",
   errorDetail,
   onRetry,
 }: PurchaseReturnsRegisterProps) {
+  const tab = consignment ? "consignment-returns" : "purchase-returns";
+  const noun = consignment ? "consignment returns" : "purchase returns";
   const [supplier, setSupplier] = useState<string | null>(null);
   const [condition, setCondition] = useState<PurchaseReturnCondition | null>(null);
   const [railOpen, setRailVisible] = useState(true);
@@ -235,7 +240,7 @@ export function PurchaseReturnsRegister({
         accessor: (row) => (
           <Link
             className="font-semibold text-kit-blue-11 hover:underline"
-            to={`/operation?tab=purchase-returns&pr=${encodeURIComponent(row.id)}`}
+            to={`/operation?tab=${tab}&pr=${encodeURIComponent(row.id)}`}
             data-testid={`purchase-return-open-${row.id}`}
           >
             {purchaseReturnNo(row.pr_no)}
@@ -418,7 +423,7 @@ export function PurchaseReturnsRegister({
         },
       },
     ],
-    [],
+    [tab],
   );
 
   if (isError) {
@@ -528,10 +533,10 @@ export function PurchaseReturnsRegister({
             leadingColumns={{ date: "pr_doc_date", identity: "pr_no" }}
             isLoading={isLoading}
             emptyMessage={
-              anyFilter ? "No matching purchase returns." : "No purchase returns."
+              anyFilter ? `No matching ${noun}.` : `No ${noun}.`
             }
-            searchPlaceholder="Search purchase returns…"
-            exportName="Purchase Returns"
+            searchPlaceholder={`Search ${noun}…`}
+            exportName={consignment ? "Consignment Returns" : "Purchase Returns"}
             toolbarStart={
               !railOpen ? (
                 <ShowFiltersButton
@@ -577,11 +582,12 @@ export function PurchaseReturnsRegister({
  * claim can link straight into the returns it authorised without the operator
  * searching for them.
  */
-export default function OperationPurchaseReturns() {
+export default function OperationPurchaseReturns({ consignment = false }: { consignment?: boolean } = {}) {
   const [params, setParams] = useSearchParams();
   const claim = params.get("claim");
   const pr = params.get("pr");
-  const query = useOperationPurchaseReturns(claim);
+  const query = useOperationPurchaseReturns(claim, undefined, consignment);
+  const label = consignment ? "Consignment Returns" : "Purchase Returns";
   const status = (query.error as { status?: number } | null)?.status;
 
   /* `?pr=` opens the full-width record (§9.6: full width after issue); the
@@ -603,10 +609,11 @@ export default function OperationPurchaseReturns() {
       returns={query.data?.returns ?? []}
       isLoading={query.isLoading}
       isError={query.isError}
+      consignment={consignment}
       errorTitle={
         status === 403
-          ? "You do not have access to Purchase Returns."
-          : "Purchase Returns could not be loaded."
+          ? `You do not have access to ${label}.`
+          : `${label} could not be loaded.`
       }
       errorDetail={query.error?.message}
       onRetry={() => void query.refetch()}
