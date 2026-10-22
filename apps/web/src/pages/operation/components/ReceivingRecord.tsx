@@ -238,7 +238,7 @@ export default function ReceivingRecord({
         </span>}
       </div>
 
-          {r.po_id && r.status === "posted" && mayAmend && !voiding && (
+          {r.po_id && r.status === "posted" && mayAmend && !amending && !voiding && (
             <div className="receiving-actions flex shrink-0 items-center gap-2">
               <Button
                 variant="primary"
