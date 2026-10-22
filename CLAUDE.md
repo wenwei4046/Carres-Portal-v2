@@ -28,6 +28,11 @@ access or the current supplied files; chat memory alone is not repository access
 Document publication does not turn proposals into approved law, authorise application builds,
 or prove production implementation. Keep FACT, PROPOSAL, APPROVED, BUILT and VERIFIED separate.
 
+**Design / IT ownership — owner 22 Oct 2026:** read UI MASTER **How design and IT work**.
+Design/specification and IT Houzs reuse/integration proceed in parallel; IT owns backend testing.
+Design reviews the integrated UI without duplicating backend tests. Keep existing release and
+SQL approval gates; record each verification state separately in the existing module authority.
+
 
 ## 1 · Mission
 

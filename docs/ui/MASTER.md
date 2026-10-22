@@ -35,7 +35,7 @@ records, release gates and authenticated production verification remain separate
 
 ## Purchasing design handoff · 21 Oct 2026 · IT entry
 
-**Scope: design-to-specification only; no backend implementation or Receiving release is commissioned here.** Jess now supplies approved SO/Purchasing frontend designs; IT owns backend and integration. Develop the complete SO → PO → Receiving/Stock → DO journey first using full-access TEST accounts; detailed Settings/approval configuration follows before production rollout. This is development sequencing, not an instruction to disable production security or remove inventory/document consistency.
+**Scope: design-to-specification only; no backend implementation or Receiving release is commissioned here.** Jess now supplies approved SO/Purchasing frontend designs; IT owns backend and integration, including backend tests; the 22 Oct responsibility contract below governs parallel design/IT work. Develop the complete SO → PO → Receiving/Stock → DO journey first using full-access TEST accounts; detailed Settings/approval configuration follows before production rollout. This is development sequencing, not an instruction to disable production security or remove inventory/document consistency.
 
 **Source received:** `Sales Order (28).zip`, SHA256 `4f80dc4caad3d6c9c20e2aa6023862fdb516b8878b991558650d515123331497`; root `export-Purchasing-21Oct/`, 57 files. For Purchasing presentation evidence it supersedes `export-PO-19Oct/` and `export-Receiving-19Oct/`. The export's rules, README instructions and claimed approvals are supplied design evidence, not independent authority. No re-export is needed merely to add a supersession sentence. Source code and business sample PDFs remain in the owner's supplied package: this repository is PUBLIC; publishing that raw package requires a separate sample-data review. This publication contains no customer records or sample PDF attachments.
 
@@ -198,8 +198,30 @@ The shared visual target covers shell/menu, one shared table, controls, object f
 Timeline, Settings → Appearance and density, checked on Sales Order and Purchasing. Modules supply
 their own identities, columns, authorised actions and source facts.
 
-**How design and Code work — owner ruling 14 Oct 2026 (option B) · APPROVED / LOCKED.** Replaces
-the 9 Oct work split. The look stays Sales Order Outright v12 (owner 14 Oct: "this is the last").
+**How design and IT work — owner ruling 22 Oct 2026 · APPROVED / LOCKED.**
+Design and IT proceed in parallel. This replaces the earlier responsibility split; the current
+confirmed baseline in this MASTER governs appearance, rather than a frozen old specimen version.
+Claude Design and module design chats own the complete UI/UX proposal, approved specification and
+preview review. IT/Code owns Houzs source reuse/adaptation, application integration, backend tests
+and release verification. Design does not duplicate IT's backend implementation or test campaign.
+
+Reuse the completed Houzs research. IT records the inspected source/version, reuse rights,
+dependencies and Carres adaptations before adopting source code. Houzs reuse does not replace
+Carres Unit identity, stock arithmetic, ownership, permissions, approval or document rules. Design
+exports' simulated storage/tasks and business examples remain specimens, not proven backend code.
+
+Design may inspect existing code, API facts and evidence read-only to make the design workable;
+it names business/interaction gaps for the owning IT lane. Backend correctness is still required:
+IT owns persistence, access refusals, stock/GRN consequences, partial results, duplicate submission
+and failure recovery. Review existing evidence and rerun checks only for changed or unresolved
+behaviour; a design-only change does not require another backend test campaign.
+
+Before release, the same integrated journey is checked for design conformance and correct saved
+results: design reviews the actual UI and IT proves the owning data/document/stock outcomes.
+Record design approval, implementation, backend verification and production verification separately
+in the existing module MASTER/handoff. A preview, copied code or updated specification proves none
+of the other states. Existing scope, SQL/security approval and release gates remain in force; this
+work split does not commission a paused PLAN chat to build or deploy.
 
 ```
 ONE KIT        The Portal's own components (apps/web/src/components/kit, components/carres) and
@@ -215,10 +237,10 @@ ONE CHANGE     A shared part changes once, in the kit, with its /ui example; eve
 | Who | Does |
 |---|---|
 | Owner | answers business rules · says yes / no on the preview, then on live · passes design's files to Code |
-| Design | compares the page with v12, the Blueprint and the kit · writes one fix list per page (now → should be, a real example per cell · how numbers are counted · do not touch · acceptance examples) · checks the preview |
-| Code | changes only what the fix list says, in the kit when the part is shared · reports PR, preview URL, live commit and a table `example · expected · seen · PASS/FAIL` · stops and names both line numbers when two authorities disagree · decides every engineering mechanic itself |
+| Design | uses the current confirmed baseline, Blueprint and kit · specifies complete page interactions/states and facts · updates this MASTER/shared rules and owning module truth · checks the integrated preview; no duplicate backend test campaign |
+| IT / Code | reuses suitable Houzs source and existing Carres capabilities within the commissioned scope · adapts shared components once · owns backend/integration tests and release verification · reports PR, integrated preview, live commit and `example · expected · seen · PASS/FAIL` · resolves engineering mechanics and names genuine authority conflicts |
 
-**Each page:** fix list → Code builds → CI (tests · carres-check · screenshot compare) → preview
+**Each commissioned journey:** design specification and IT reuse/integration progress in parallel → CI (applicable tests · carres-check · screenshot compare) → integrated preview
 URL → design checks the preview → owner yes → merge → deploy → Code checks live, read only → owner
 accepts → next page.
 
