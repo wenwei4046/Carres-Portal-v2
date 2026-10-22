@@ -9,6 +9,16 @@ Paste everything below the line into a fresh session. It is self-contained.
 
 ---
 
+**CURRENT RESPONSIBILITY · OWNER-APPROVED 22 Oct 2026.**
+Read UI MASTER **How design and IT work** and the current module MASTER before continuing.
+Design/Claude Design updates the one UI/UX specification while IT reuses/adapts Houzs and integrates
+Carres. IT owns backend tests and release verification; design checks the complete integrated UI
+and reports gaps without duplicating backend testing. Reuse existing Houzs research and valid
+verification evidence. Record design approval, implementation, backend verification and production
+verification separately. This is a work-ownership update, not a new build/deploy/SQL approval and
+not a claim that old previews are current. Existing paused or pending-approval scopes stay scoped.
+Keep current engineering/production evidence below; remeasure its status before executing it.
+
 **LATEST REPAIR APPLIED AND LIVE VERIFIED ·18Oct2026.**
 Jess explicitly approved exact18c256c328ff8cedb2ec56ff62e6553bd8c37dd49167dfc0186ba33a2688ecc5 in controller chat.0700 committed/pushed a82948daf before governed probe/apply.
 Probe: original42501 negative control; authenticated Operation reads38 lines after repair; same stock arithmetic, unchanged invoker/ACL/private-helper protection. Post-rollback baseline unchanged.
