@@ -627,12 +627,20 @@ Carres already has a simpler Card settlement. It takes Public Bank, GHL and Mayb
 | Closed months lock | Keep, but **do not switch it on**. |
 | Month-end stock value: groups | Four groups: warehouse, showroom, in transit (road, transit points and partner legs) and sent for repair. Supplier consignment and dealer stock are excluded; Stock MASTER §12.9 says dealer display stock is the dealer's own. |
 | Month-end stock value: source | The P&L and Balance Sheet show the stock value live each time they are opened, worked out from Stock's Units (reading only) and marked **provisional**. Once Stock's Month-end Stock Confirmation (Stock MASTER §12.10, not built) confirms a month, Finance stores that month's value and it never changes again (Chew 2026-10-12, 「存货价值就不能定成我开P&L 时每次都是live 的，然后当jess 那边月底存货确认就 我这里储存起来不会再改」). **APPROVED. The live part is BUILT and APPLIED 2026-10-12 (0688); storing a confirmed month waits for Stock's confirmation.** See "Stock in the statements" below. |
-| Opening balances | Finance's own account figures at go-live. No old transactions are brought in, because CLAUDE.md §6 stands. **Parked (Chew 2026-10-03)** until every feature is tested: it is data entered at go-live, though each customer's and supplier's opening balance will need a place to be entered. |
+| Opening balances | Finance's own figures at go-live. No old transactions are brought in, because CLAUDE.md §6 stands; the opening is a set of balances, not history. **APPROVED (Chew 2026-10-21/22) / NOT BUILT: the place to enter them is built first; Chew gives the amounts later.** See "Opening balances" below. |
 | SST | Carres is not SST-registered, so there is no tax on invoices. |
 | Year-end close | Later, before year end. |
 | More than one company | Not needed. |
 | Event or project costs | Not needed. |
 | AutoCount | Stop using it once the ERP is stable. |
+
+**Opening balances — APPROVED (Chew 2026-10-21/22) / NOT BUILT.** The place to enter them is built first; Chew gives the amounts later (「opening balance 要有地方输入先，数额我过后才提供」).
+- **Page.** Ledger → `Opening balances`, after Journal. Tabs: Accounts · Customers and other debtors · Suppliers · Stock · Customer deposits. Finance enters it as a draft, saved and changed freely; the draft is not in the ledger.
+- **Accounts.** Every account that is not a control account, bank and cash included. Income and expense accounts take their year-to-date balance before go-live, account by account, so Carres prints the whole year's P&L (Chew 2026-10-22, 「b」).
+- **Customers, other debtors and suppliers.** For each party, its total owed first, then each invoice or bill still open (document no, date, due date, amount), so AR / AP Aging age it and a receipt or payment can settle that document. The open items should tally to the total; a party whose items do not tally may still post, with a remark showing the difference (Chew 2026-10-22, 「先输入总数，再输入每张欠的钱，两边应该tally」 and 「opening balance 可以 post 先，只是要 remark 有 different」). The part not covered by items shows as not tied to an invoice / bill.
+- **Stock.** Each Unit held at go-live with its cost, pasted from Excel (Unit, cost); an unknown Unit is shown, never guessed. Finance keeps these costs as its own record and Stock value reads them for a Unit with no PO cost; Stock's records are not written (Chew 2026-10-22, 「A，可以从 Excel 贴进来」).
+- **Customer deposits.** Each customer's deposit per order not yet delivered (customer, order, amount), pasted from Excel or keyed; when that order is invoiced the deposit is set against it automatically (Chew 2026-10-22, 「a」).
+- **Post.** Posting writes one ledger entry dated the day before go-live, every line balanced against `160-0000`, which must be zero after it. Each party's total posts on its control account with its party. Posted once; a mistake is corrected by reversing and posting again before the first month is closed. Every report then shows it as `Brought forward` instead of `No opening balances`.
 
 **Stock value approach — PROPOSAL / NOT LAW, built for Chew's test (0643).**
 - Reports → Stock value, for a month end. Every Carres-owned Unit held at the end of that day (Kuala Lumpur): free, reserved, on hold or on a movement. Incoming, sold and ended Units are not counted; consignment Units are counted apart and never valued.
