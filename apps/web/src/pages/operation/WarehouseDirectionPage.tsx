@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import Tabs from "@/components/kit/Tabs";
 
@@ -11,6 +11,12 @@ export default function WarehouseDirectionPage({ direction, workSurface, schedul
   const work = direction === "inbound" ? "warehouse-inbound" : "warehouse-outbound";
   const schedule = direction === "inbound" ? "warehouse-arrival-schedule" : "warehouse-pickup-schedule";
   const showingSchedule = params.get("tab") === schedule;
+  const [visited, setVisited] = useState({ work: !showingSchedule, schedule: showingSchedule });
+  useEffect(() => {
+    setVisited(previous => showingSchedule
+      ? previous.schedule ? previous : { ...previous, schedule: true }
+      : previous.work ? previous : { ...previous, work: true });
+  }, [showingSchedule]);
   return <div className="flex min-h-0 min-w-0 flex-1 flex-col">
     <div className="shrink-0 overflow-x-auto border-b border-c-card-border bg-c-card px-3 py-2">
       <Tabs label={direction === "inbound" ? "Inbound view" : "Outbound view"}
@@ -24,7 +30,7 @@ export default function WarehouseDirectionPage({ direction, workSurface, schedul
           { value: schedule, label: direction === "inbound" ? "Arrival Schedule" : "Pickup Schedule" },
         ]} />
     </div>
-    <div className={showingSchedule ? "hidden" : "flex min-h-0 min-w-0 flex-1 flex-col"}>{workSurface}</div>
-    <div className={showingSchedule ? "flex min-h-0 min-w-0 flex-1 flex-col" : "hidden"}>{scheduleSurface}</div>
+    <div className={showingSchedule ? "hidden" : "flex min-h-0 min-w-0 flex-1 flex-col"}>{(visited.work || !showingSchedule) && workSurface}</div>
+    <div className={showingSchedule ? "flex min-h-0 min-w-0 flex-1 flex-col" : "hidden"}>{(visited.schedule || showingSchedule) && scheduleSurface}</div>
   </div>;
 }
