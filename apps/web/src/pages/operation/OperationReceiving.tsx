@@ -1202,7 +1202,7 @@ function PendingReceivingItems({ po }: { po: operationPoListRow }) {
   const query = usePoReceiving(po.id);
   return <GoodsMiniTable label="Items" receivingLayout itemHeading="Items" lines={
     (po.purchase_order_lines ?? []).filter(l => poLineReportable(l) > 0).map(l => ({
-      key: l.id, category: l.category ?? "",
+      key: l.id, category: l.category ?? "", selectable: false,
       sourceNo: (l.governed_sources ?? []).map(source => source.reference).join(" · "),
       unitIds: (query.data?.expected_units ?? [])
         .filter(unit => unit.po_line_id === l.id && unit.status === "incoming")

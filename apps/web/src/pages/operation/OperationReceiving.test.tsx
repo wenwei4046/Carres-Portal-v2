@@ -751,10 +751,10 @@ describe("OperationReceiving — the formal GRN Register", () => {
 
   it("switches the source view without creating another page or leaving cancelled-only active", async () => {
     renderPage("/operation?tab=receiving&cancelled=1");
-    fireEvent.mouseDown(screen.getByRole("tab", { name: "Differences", exact: true }), { button: 0, ctrlKey: false });
+    fireEvent.mouseDown(screen.getByRole("tab", { name: /^Differences$/ }), { button: 0, ctrlKey: false });
     await waitFor(() => expect(h.registerAsks.at(-1)).toMatchObject({ view: "differences", cancelled: false, offset: 0 }));
-    expect(screen.getByRole("tab", { name: "Differences", exact: true })).toHaveAttribute("aria-selected", "true");
-    fireEvent.mouseDown(screen.getByRole("tab", { name: "Received", exact: true }), { button: 0, ctrlKey: false });
+    expect(screen.getByRole("tab", { name: /^Differences$/ })).toHaveAttribute("aria-selected", "true");
+    fireEvent.mouseDown(screen.getByRole("tab", { name: /^Received$/ }), { button: 0, ctrlKey: false });
     await waitFor(() => expect(h.registerAsks.at(-1)).toMatchObject({ view: "records" }));
   });
 
@@ -1022,8 +1022,8 @@ describe("OperationReceiving — the formal GRN Register", () => {
 
   it("keeps source view controls keyboard-focusable with explicit selected state", () => {
     renderPage();
-    const records = screen.getByRole("tab", { name: "Received", exact: true });
-    const differences = screen.getByRole("tab", { name: "Differences", exact: true });
+    const records = screen.getByRole("tab", { name: /^Received$/ });
+    const differences = screen.getByRole("tab", { name: /^Differences$/ });
     records.focus(); expect(records).toHaveFocus();
     differences.focus(); expect(differences).toHaveFocus();
     expect(records).toHaveAttribute("aria-selected", "true");
