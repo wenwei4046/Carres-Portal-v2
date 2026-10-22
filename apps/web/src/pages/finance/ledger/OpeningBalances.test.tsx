@@ -106,18 +106,19 @@ describe("Opening balances (0705)", () => {
     expect(await screen.findByTestId("opening-state")).toHaveTextContent("Draft · Not in the ledger yet · Posts dated Wed, 9 Sep 26");
     expect(screen.getByTestId("opening-totals")).toHaveTextContent("Debit RM 1,500.00 · Credit RM 350.00");
     expect(screen.getByTestId("opening-difference")).toHaveTextContent("160-0000 Opening balance RM 1,150.00");
-    // A Unit and an order not found come first: Post names the first gap.
-    expect(screen.getByRole("button", { name: "Post: correct the Units not found" })).toBeDisabled();
+    // A Unit and an order not found come first: Post stays a verb and the reason is the line beside it.
+    expect(screen.getByRole("button", { name: "Post" })).toBeDisabled();
+    expect(screen.getByTestId("opening-post-gap")).toHaveTextContent("Correct the Units not found before posting.");
   });
 
   it("names the gaps before Post in order, and none when the draft balances", () => {
     const a = draft();
-    expect(postGap(a)).toBe("correct the Units not found");
-    expect(postGap({ ...a, stock: a.stock.filter((s) => s.found) })).toBe("correct the orders not found");
+    expect(postGap(a)).toBe("Correct the Units not found before posting.");
+    expect(postGap({ ...a, stock: a.stock.filter((s) => s.found) })).toBe("Correct the orders not found before posting.");
     const clean = { ...a, stock: a.stock.filter((s) => s.found), deposits: a.deposits.filter((d) => d.found) };
-    expect(postGap(clean)).toBe("make debits equal credits");
+    expect(postGap(clean)).toBe("Make debits equal credits before posting.");
     expect(postGap({ ...clean, totals: { debit: "850.00", credit: "850.00", lines: 4 } })).toBeNull();
-    expect(postGap({ ...clean, totals: { debit: "0", credit: "0", lines: 0 } })).toBe("enter the balances first");
+    expect(postGap({ ...clean, totals: { debit: "0", credit: "0", lines: 0 } })).toBe("Enter the balances before posting.");
   });
 
   it("saves the Accounts tab whole, with the draft it was read from", async () => {
@@ -143,8 +144,9 @@ describe("Opening balances (0705)", () => {
   it("shows a party whose open items do not tally with its difference, and posting is not blocked by it", async () => {
     show("/finance/ledger/opening-balances?tab=suppliers");
     expect(await screen.findByText("Lumen Sofa Works")).toBeInTheDocument();
-    expect(screen.getByText("Open items differ from the total by RM -20.00")).toBeInTheDocument();
+    expect(screen.getByText("Open items are RM 20.00 more than the total")).toBeInTheDocument();
     expect(partyRemark({ difference: "0.00" })).toBe("");
+    expect(partyRemark({ difference: "800.00" })).toBe("Open items are RM 800.00 less than the total");
     expect(postGap({ ...draft(), stock: [], deposits: [], totals: { debit: "50.00", credit: "50.00", lines: 2 } })).toBeNull();
   });
 
@@ -255,5 +257,5 @@ describe("the paste readers and the report caption", () => {
 const here = dirname(fileURLToPath(import.meta.url));
 describe("Opening balances words", () => {
   itSaysNoBannedWord(join(here, "OpeningBalances.tsx"), { minStrings: 30, expectString: "Not in the ledger yet" });
-  itSaysNoBannedWord(join(here, "OpeningParties.tsx"), { minStrings: 20, expectString: "Open items differ from the total by" });
+  itSaysNoBannedWord(join(here, "OpeningParties.tsx"), { minStrings: 20, expectString: "than the total" });
 });

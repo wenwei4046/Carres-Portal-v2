@@ -46,7 +46,7 @@ import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { ReadFailed } from "../payables/PayablesParts";
 import { refusal } from "../payables/payables-words";
-import { amountCell, FINANCE_WIDTH } from "../finance-widths";
+import { amountCell, fillSizing, FINANCE_WIDTH } from "../finance-widths";
 import { useFinancePersonalLayouts } from "../finance-layouts";
 import look from "../finance-look.module.css";
 import {
@@ -78,12 +78,12 @@ function onSaveError(e: unknown, reread: () => void) {
   if ((e as { status?: number }).status === 409) reread();
 }
 
-/** The first thing between this draft and Post, said after `Post: `, or null. */
+/** The first thing between this draft and Post, said as a line beside the button, or null. */
 export function postGap(a: OpeningAnswer): string | null {
-  if (a.stock.some((s) => !s.found)) return "correct the Units not found";
-  if (a.deposits.some((d) => !d.found)) return "correct the orders not found";
-  if (Number(a.totals.lines) === 0) return "enter the balances first";
-  if (openingDifference(a.totals) !== 0) return "make debits equal credits";
+  if (a.stock.some((s) => !s.found)) return "Correct the Units not found before posting.";
+  if (a.deposits.some((d) => !d.found)) return "Correct the orders not found before posting.";
+  if (Number(a.totals.lines) === 0) return "Enter the balances before posting.";
+  if (openingDifference(a.totals) !== 0) return "Make debits equal credits before posting.";
   return null;
 }
 
@@ -149,9 +149,8 @@ function PostBar({ answer: a }: { answer: OpeningAnswer }) {
         </span>
       </span>
       <span className="ml-auto flex items-center gap-2">
-        {a.may_post && !posted && <Button variant="primary" disabled={gap !== null || closed} onClick={() => setAsking("post")}>
-          {gap ? `Post: ${gap}` : "Post"}
-        </Button>}
+        {a.may_post && !posted && gap && !closed && <span className="text-body text-kit-slate-11" data-testid="opening-post-gap">{gap}</span>}
+        {a.may_post && !posted && <Button variant="primary" disabled={gap !== null || closed} onClick={() => setAsking("post")}>Post</Button>}
         {a.may_post && posted && <Button variant="neutral" disabled={closed} onClick={() => setAsking("reverse")}>Reverse</Button>}
       </span>
     </div>
@@ -242,13 +241,15 @@ function AccountsTab({ answer: a, reread }: { answer: OpeningAnswer; reread: () 
       inputMode="decimal" value={typed[r.row.code]?.[side] ?? ""} aria-invalid={r.error ? true : undefined}
       onChange={(e) => set(r.row.code, side, e.target.value)} />);
 
+  // The Finance look: Account takes the width the others leave, never below its own (220).
+  const size = fillSizing({ code: FINANCE_WIDTH.code, account: FINANCE_WIDTH.account, kind: 110, debit: AMOUNT + 24, credit: AMOUNT + 24 }, {}, "account");
   const columns: Column<(typeof read)[number]>[] = [
-    { key: "code", label: "Code", width: `${FINANCE_WIDTH.code}px`, cell: (r) => r.row.code },
-    { key: "account", label: "Account", width: "auto", cell: (r) => <span className={r.row.eligible ? undefined : "text-kit-slate-11"}>
+    { key: "code", label: "Code", width: size.width("code"), cell: (r) => r.row.code },
+    { key: "account", label: "Account", width: size.width("account"), cell: (r) => <span className={r.row.eligible ? undefined : "text-kit-slate-11"}>
       {r.row.name}{r.row.eligible ? "" : " · Can no longer take an opening balance"}</span> },
-    { key: "kind", label: "Type", width: "110px", cell: (r) => ledgerKindWord(r.row.kind) },
-    { key: "debit", label: "Debit", width: `${AMOUNT + 24}px`, align: "right", numeric: true, cell: (r) => box(r, "debit") },
-    { key: "credit", label: "Credit", width: `${AMOUNT + 24}px`, align: "right", numeric: true, cell: (r) => box(r, "credit") },
+    { key: "kind", label: "Type", width: size.width("kind"), cell: (r) => ledgerKindWord(r.row.kind) },
+    { key: "debit", label: "Debit", width: size.width("debit"), align: "right", numeric: true, cell: (r) => box(r, "debit") },
+    { key: "credit", label: "Credit", width: size.width("credit"), align: "right", numeric: true, cell: (r) => box(r, "credit") },
   ];
 
   const totalOf = (side: "debit" | "credit") => read.reduce((t, r) => t + Math.round((r[side] ?? 0) * 100), 0) / 100;
@@ -265,9 +266,9 @@ function AccountsTab({ answer: a, reread }: { answer: OpeningAnswer; reread: () 
       </span>}
     </div>
     {firstBad && <FieldError testId="opening-accounts-error">{`${firstBad.row.code} ${firstBad.row.name}: ${firstBad.error}`}</FieldError>}
-    <div className={look.statement}>
+    <div className={look.statement} style={size.style} {...size.data}>
       <DataTable label="Opening balances, accounts" testId="opening-accounts" rowTestId="opening-account-row"
-        rows={read} columns={columns} rowId={(r) => r.row.code} sizing="content"
+        rows={read} columns={columns} rowId={(r) => r.row.code}
         empty="No account can take an opening balance."
         totals={{ label: "Total", cell: (c) => (c.key === "debit" ? <span className="font-semibold tabular-nums">{rm(totalOf("debit"))}</span>
           : c.key === "credit" ? <span className="font-semibold tabular-nums">{rm(totalOf("credit"))}</span>

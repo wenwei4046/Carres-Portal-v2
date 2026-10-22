@@ -46,7 +46,9 @@ const sumSen = (vals: Array<number | string>) => vals.reduce<number>((t, v) => t
 
 /** The Remark a party row carries when its open items do not add up to its total. */
 export function partyRemark(p: Pick<OpeningPartyWire, "difference">): string {
-  return partyDiffers(p) ? `Open items differ from the total by ${rm(openingSen(p.difference) / 100)}` : "";
+  const sen = openingSen(p.difference);   // total less open items
+  if (sen === 0) return "";
+  return `Open items are ${rm(Math.abs(sen) / 100)} ${sen < 0 ? "more" : "less"} than the total`;
 }
 
 export default function OpeningParties({ answer: a, side, reread }: { answer: OpeningAnswer; side: Side; reread: () => void }) {
@@ -222,10 +224,10 @@ function PartyWindow({ answer: a, side, party, onClose, reread }: {
       </div>
       <p className="text-strong" data-testid="opening-party-tally">
         Open {docWord} {rm(itemsSen / 100)} · Total {rm(totalRead.value ?? 0)} ·{" "}
-        <span className={differenceSen === 0 ? undefined : "text-kit-red-11"}>Difference {rm(differenceSen / 100)}</span>
+        <span className={differenceSen === 0 ? undefined : "text-kit-red-11"}>Difference {rm(Math.abs(differenceSen) / 100)}</span>
       </p>
       {differenceSen !== 0 && <FieldError testId="opening-party-differs">
-        {`The open ${docWord} differ from the total. It may still post; the row shows the difference.`}
+        {`The open ${docWord} are ${rm(Math.abs(differenceSen) / 100)} ${differenceSen < 0 ? "more" : "less"} than the total. It may still post; the row shows the difference.`}
       </FieldError>}
     </div>
   </Modal>;
