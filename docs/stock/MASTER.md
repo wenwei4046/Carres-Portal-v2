@@ -7,7 +7,7 @@ canonical UI MASTER; its accepted composition is resolved owner truth. The one c
 contract; this module does not duplicate its dimensions or create another kit.
 
 The accepted composition may improve existing confusing Warehouse presentation as well as fill
-missing capabilities. Preserve useful behaviour, Unit/source facts, five destinations, permission
+missing capabilities. Preserve useful behaviour, Unit/source facts, the three-entry navigation target in §2, permission
 and write ownership. Warehouse rail summaries/date shortcuts use its own authoritative stock and
 physical-work facts; do not copy Sales monetary summaries, Item commercial columns or customer
 section order into Warehouse. Register Table/Cards must describe the same filtered population.
@@ -60,8 +60,36 @@ never transfers write ownership.
 
 ## 2 · Navigation and words
 
-Warehouse has five operator destinations: **Arrival Schedule · Pickup Schedule · Inbound · Inventory · Outbound**.
-The two schedules are separate read-only projections. They use large working-day dates, white cards,
+**OWNER-APPROVED TARGET / NOT BUILT — 2026-10-22.** Jess approved three primary Warehouse
+entries: **Inbound · Inventory · Outbound**. `Arrival Schedule` becomes a view inside Inbound;
+`Pickup Schedule` becomes a view inside Outbound. This supersedes the 2026-09-14 requirement for
+five peer sidebar destinations, not the separation between arrival and pickup facts.
+
+| Primary entry | Existing work / views retained | Schedule placement |
+|---|---|---|
+| Inbound | Arrival register and the one existing Receiving Workspace | `Arrival Schedule` inside Inbound |
+| Inventory | One inventory authority, Unit detail and existing governed control/saved views | No new schedule or second stock ledger |
+| Outbound | Outbound register/presentations and existing Loading work | `Pickup Schedule` inside Outbound |
+
+The registers remain the normal entry; each schedule is an alternate read-only view of the same
+source-owned work. Use existing shared module-view controls, not a new page shell or tab engine.
+Preserve current Site/source/date scope where applicable when switching views, and retain each
+view's position. A schedule card opens the exact existing receiving/loading work; returning restores
+the originating view, filters, selected week/day and scroll position. Opening or switching a view
+never creates a task, receipt, handover or stock movement. Existing schedule bookmarks and
+Calendar/Work/source-record links must continue to reach the matching nested schedule and exact
+source context; do not silently redirect pickup work to arrivals. Legacy combined Monitor/Dashboard
+aliases continue to resolve to the arrival view, now inside Inbound. No new route syntax is approved
+by this documentation amendment; IT adapts the existing routes when separately commissioned.
+
+**Approval boundary:** only the navigation regrouping above is approved here. It does not approve
+Houzs's five Inventory tabs, new calculations, a different Receiving destination, detailed Inventory
+visuals, backend copying, implementation Cards, application changes or deployment. Inventory's
+complete visual sample remains subject to review. Existing backend, permission, duty and ownership
+contracts stay intact. The old five-entry runtime and earlier verification records are historical
+implementation evidence, not proof this three-entry target is built.
+
+The two schedules remain separate full-width, six-working-day read-only projections. They use large working-day dates, white cards,
 quiet Expected/Scheduled badges and warning colour only for actual overdue work. They keep distinct
 orders identifiable, retain delayed and undated work, and never reschedule goods automatically.
 
@@ -528,8 +556,9 @@ GRN posting remains a separate unbuilt target.
 
 All surfaces reuse the governed Shell, Register, Workspace and Object Detail grammar.
 
-Arrival Schedule and Pickup Schedule are separate full-width six-working-day projections. Registers
-have date filters instead of calendar strips.
+Arrival Schedule (inside Inbound) and Pickup Schedule (inside Outbound) remain separate full-width
+six-working-day projections under the approved/not-built §2 navigation change. Register views have
+date filters instead of calendar strips; the schedules are not squeezed into a strip above a register.
 
 **EVERY CONFIGURED WORKING DAY SURVIVES EVERY VIEWPORT WIDTH — owner ruling 2026-09-16, APPROVED /
 LOCKED.** The board previously swapped to a single-date agenda below 1280px; at 703px the operator
@@ -1129,7 +1158,7 @@ door clear instead of continuing to emphasise scanning as the next act. Warehous
 on the driver's behalf. Return from a Unit or work surface must reach the correct source register
 and preserve its applicable filters and position; a button labelled Inventory must not land on
 Dashboard. Reuse Delivery's shared register and object-detail grammar, not its customer-arrangement
-Monitor workspace. Keep the five Warehouse destinations, the shipped six-working-day schedules,
+Monitor workspace. Follow the three-entry target in §2 and retain the shipped six-working-day schedules,
 the shared Receiving engine and full-width Loading. This approval introduces no new design system.
 
 The NETS operator journey is:
@@ -1605,8 +1634,8 @@ with the physical Units. No page or integration may directly set an `Available` 
 `Who has it` and ownership through the left rail; expand every total to exact Units; open Unit
 Detail for source, reservation, handover, problem and append-only history.
 
-**UI / PAGE / OBJECT PLACEMENT →** Inventory is the one Register under `Arrival Schedule · Pickup Schedule · Inbound ·
-Inventory · Outbound`. Defaults are `Unit ID · Product · Stock use · Who has it · Site · Condition
+**UI / PAGE / OBJECT PLACEMENT →** Inventory is the one Register under `Inbound · Inventory · Outbound`;
+Arrival Schedule belongs inside Inbound and Pickup Schedule inside Outbound (§2, approved/not built). Defaults are `Unit ID · Product · Stock use · Who has it · Site · Condition
 · SO No · SO date · PO No · PO date · Expected arrival · Last verified · Work`. Ready Stock is a
 saved view of the same authority; Sales and Operations read the same eligible Units with different
 permissions. History belongs in Unit Detail and the Inventory rail, not a second accounting Stock
@@ -2330,7 +2359,7 @@ are separate milestones. No Warehouse surface is frozen into the UI Kit by this 
 | Schedule date heading | `WarehouseWorkspace.tsx` `DateHeading` | 2026-10-06: the weekday always prints (COPY: never `Today` as a date word); today keeps its blue ink, 2px underline and `data-today`, and a screen reader still hears `Today` |
 | Physical Site visits | Posted receiving_unit_results + warehouse_receipts.actual_site_id / goods_received_at; arrival_source_events.collected with source.from_site_id | Only unambiguous same-Unit, same-Site evidence pairs. Every later receipt opens another visit. Missing or overlapping evidence remains visibly unpaired |
 | Historical DO departures | delivery_handover_event_units warehouse side + handed_over event | These old events have no historical Site field. Preserve the departure independently; do not infer Site from the Unit's current warehouse, rewrite history or fabricate a backfill |
-| Arrival Schedule / Pickup Schedule | WarehouseWorkspace, warehouse-schedule projection and Site operating dates | Separate pages; normal white cards and quiet date provenance badges, overdue work highlighted, undated/delayed work reachable, including older overdue and dated non-working-day entries without changing their dates. Pickup opens exact Loading scope |
+| Arrival Schedule / Pickup Schedule | WarehouseWorkspace, warehouse-schedule projection and Site operating dates; previous separate-page implementation | §2 nesting inside Inbound/Outbound is APPROVED TARGET / NOT BUILT. Retain normal white cards and quiet date provenance badges, overdue work highlighted, undated/delayed work reachable, including older overdue and dated non-working-day entries without changing their dates. Pickup opens exact Loading scope |
 | Transfer and return arrival sources | Migration 0490 is committed, replacing the former unnumbered draft; existing arrival source writer and Receiving engine | Do not rebuild a parallel Transfer/Return engine. Planned, collected, carrier-received and received are distinct facts |
 | Stock Count / Difference / approved Adjustment | Approved business design in §6 and §12.5 | Not built as a complete stocktake engine. WarehouseCountModal records truck/loading counts and is not a stocktake |
 | Month-end / Finance handoff | Approved business design in §9 and §12.10 | Complete versioned confirmation and Finance acknowledgement are not claimed shipped |
@@ -2379,7 +2408,7 @@ The UI Kit remains unfrozen pending the owner's rendered-design review.
 | G9 | Delivery selection without physical Warehouse handover lets digital state outrun reality; Outbound requires exact two-sided handover. | built exact-Unit handover; UI completion and driver distinction verified separately |
 | G10 | return state without return receipt/inspection leaves false holder and availability; Return/Repair uses new out-and-back events and check required. | 0490 arrival-source and receiving path exists; completeness is movement-specific |
 | G11 | unknown import cannot become new/sellable/reserved truth; reject to review and never allocate through migration. | data-governance/engineering gap |
-| G12 | giant mixed UI and drifting copy are not business decisions; governed Shell/Register/Object Detail and five destinations consolidate presentation. | UI/engineering consolidation gap |
+| G12 | giant mixed UI and drifting copy are not business decisions; governed Shell/Register/Object Detail and the three-entry target in §2 consolidate presentation. | UI/engineering consolidation gap |
 | G13 | legacy Stock/Receiving/partner/PO write paths cannot coexist as authorities; each physical act has one owning door and forbidden external overwrite. | engineering/authority consolidation gap |
 | G14 | appointment/customer-date ownership was once contradictory. It is now resolved: Sales Order owns the customer promise; Delivery derives DO/Journey dates; Warehouse consumes dated Inbound/Outbound work and never owns the promise. | resolved cross-module authority; no Warehouse owner decision |
 
@@ -2414,16 +2443,17 @@ measured need, and assumed external cutover.
 **RESOLVED FROM AUTHORITY:** Unit authority, ownership seams, shared Work and UI grammar and
 upstream/downstream owners.
 
-**BUILT / VERIFIED:** the Unit-authority foundation (PR #878), the five destinations in §2,
+**BUILT / VERIFIED (historical scope; not the 22 Oct navigation target):** the Unit-authority foundation (PR #878), the previous five-destination presentation,
 existing Receiving and exact-Unit two-sided handover, 0490 arrival sources, and the layout and
 physical-history corrections recorded in §13. Verification is scoped to those capabilities;
 missing historical Site evidence remains explicitly unpaired.
 
-**APPROVED TARGET / NOT BUILT:** complete blind Stock Count / Count again / Difference /
+**APPROVED TARGET / NOT BUILT:** the 22 Oct three-entry navigation regrouping in §2; complete blind Stock Count / Count again / Difference /
 approved Adjustment, versioned month-end reconciliation and Finance acknowledgement.
 Movement-specific supplier-return and repair coverage and reporting controls must be assessed
 against their owning workflows; arrival-source support alone does not prove end-to-end completion.
-There are no additional Ready stock, Transfers or Counts destinations in the approved five-page map.
+There are no additional Ready stock, Transfers, Counts or peer Schedule destinations in the approved
+three-entry map. Both schedule capabilities remain inside their respective Inbound/Outbound entries.
 
 **REAL GAP / CONTRADICTION:** none requiring an owner decision. The formerly open accessory
 question — does an accessory piece carry a Unit identity? — is closed by §14.1 G3: every sofa

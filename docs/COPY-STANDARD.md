@@ -2630,8 +2630,9 @@ a second word for `Waiting {the exact thing}`. Falsifier: if operators read the 
 review with that observation.
 
 **`Inventory` is no longer banned globally — owner ruling 2026-09-01.** It is the approved
-Warehouse master Register destination under `Arrival Schedule · Pickup Schedule · Inbound · Inventory · Outbound`
-(five destinations since the 2026-09-14 split: `Arrival Schedule · Pickup Schedule · Inbound · Inventory · Outbound`). It does
+Warehouse master Register destination under `Inbound · Inventory · Outbound` (owner-approved
+2026-10-22 / NOT BUILT: `Arrival Schedule` is a view inside Inbound; `Pickup Schedule` is a view
+inside Outbound, superseding the five peer destinations). It does
 not become a synonym for Finance valuation, Purchasing planning or another module's goods pool.
 
 **`Recovery` is banned by MEANING, not by spelling.** Account recovery on the login page is a
@@ -2695,7 +2696,7 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | The physical-goods domain in explanatory copy | **Stock** | Warehouse as a quantity noun |
 | The module's rail heading (CARD-2026-08-19-warehouse-rail) | **Warehouse** | Stock (as a heading) · Supply Chain |
 | The Warehouse master Register destination | **Inventory** | On hand · Stock Units |
-| The two Warehouse dated pages (owner ruling 2026-09-14) | **`Arrival Schedule` · `Pickup Schedule`** — two independent sidebar destinations. **The single combined `Monitor` is RETIRED as a Warehouse page word**: one board carrying both directions made every operator read past half of it. `Monitor` remains Delivery's and Payments' word; the ERP still keeps ONE global `Dashboard`. The retired `?tab=warehouse-monitor` / `?tab=warehouse-dashboard` addresses resolve to `Arrival Schedule` | Monitor (as a Warehouse page) · Dashboard (as a Warehouse page) · Board · Overview · a direction TAB inside one page |
+| The two Warehouse schedule views (owner amendment 2026-10-22, APPROVED TARGET / NOT BUILT) | **`Arrival Schedule`** inside **`Inbound`**; **`Pickup Schedule`** inside **`Outbound`**. Retain these exact directional view names. Three primary entries: Inbound, Inventory, Outbound. The two schedules remain separate; the single combined `Monitor` stays retired. Existing schedule links keep their source/date/Site context; retired `?tab=warehouse-monitor` / `?tab=warehouse-dashboard` aliases resolve to Arrival Schedule inside Inbound. | Monitor (as a Warehouse page) · Dashboard (as a Warehouse page) · Board · Overview · separate peer Schedule sidebar destinations · a combined arrival/pickup board |
 | ARRIVAL event names — printed only when the movement is SPECIAL | **`Transfer arrival` · `Customer/failed-delivery return` · `Return from repair` · `Supplier replacement`** (`Supplier replacement` ADDED 2026-09-14: the claim-replacement inbound, which had no word). **An ordinary supplier arrival prints NO event-type heading at all** — the page is already called Arrival Schedule, and the same heading repeated down a whole column is noise | `Supplier arrival` as a per-card heading (retired 2026-09-14) · Inbound delivery · Receipt · GRN (as an event name) |
 | PICKUP event names — printed only when the movement is SPECIAL | **`Transfer pickup` · `Supplier-return pickup` · `Repair pickup`**. **An ordinary customer pickup prints NO event-type heading.** `Supplier-return pickup` and `Repair pickup` have NO owning record today and render zero cards; the words are governed so they are right the day the record exists | `Customer-delivery pickup` as a per-card heading (retired 2026-09-14) · Dispatch · Shipment · Collection (bare) |
 | Whether a Schedule date is AGREED — the card's one tinted pill | **`Expected`** (amber) · **`Scheduled`** (blue). `Scheduled` requires recorded evidence of an agreement; **a date alone is never `Scheduled`**, and an unknown agreement prints NO pill and no tint. The tint means date agreement and NOTHING else — never progress, damage or lateness | `Confirmed` (that is Delivery's customer word) · `TBC` · a tint that also encodes progress |

@@ -9,6 +9,14 @@ Paste everything below the line into a fresh session. It is self-contained.
 
 ---
 
+**WAREHOUSE NAVIGATION — OWNER-APPROVED TARGET / NOT BUILT ·22Oct2026.**
+Jess approved Inbound, Inventory and Outbound as the three primary entries; Arrival Schedule moves
+inside Inbound and Pickup Schedule inside Outbound. Read Stock MASTER §2 and the updated architecture,
+UI MASTER and COPY. Preserve both directional working-week schedules, source links and return context.
+This is a documentation/design amendment only, not implementation Cards, backend changes or deployment
+permission. Earlier five-entry runtime evidence below/elsewhere does not verify this target. Detailed
+Inventory visual approval and the module's wider incomplete work remain separate.
+
 **LATEST REPAIR APPLIED AND LIVE VERIFIED ·18Oct2026.**
 Jess explicitly approved exact18c256c328ff8cedb2ec56ff62e6553bd8c37dd49167dfc0186ba33a2688ecc5 in controller chat.0700 committed/pushed a82948daf before governed probe/apply.
 Probe: original42501 negative control; authenticated Operation reads38 lines after repair; same stock arithmetic, unchanged invoker/ACL/private-helper protection. Post-rollback baseline unchanged.

@@ -40,8 +40,8 @@
 | Showroom | Carres | Goods in Carres-operated showrooms | BUILT | OperationApp:685 · portal-nav:452 · docs/COPY-STANDARD.md:1131-1135 |
 | Showroom | Dealer | Dealer-operated showrooms; stays Coming soon | APPROVED | portal-nav:453 · docs/COPY-STANDARD.md:1135-1136 |
 | Showroom | Ready Stock | Showroom staff find eligible Warehouse stock for urgent SOs | APPROVED | docs/ERP-ARCHITECTURE.md:368-370 |
-| Warehouse | Arrival Schedule | Dated board of goods arriving | BUILT | OperationApp:689 · portal-nav:507-508 · docs/COPY-STANDARD.md:2530 |
-| Warehouse | Pickup Schedule | Dated board of goods being picked up | BUILT | OperationApp:692 · portal-nav:524-525 · docs/COPY-STANDARD.md:2530 |
+| Warehouse → Inbound | Arrival Schedule (view) | Dated board of goods arriving, inside Inbound | APPROVED TARGET / NOT BUILT placement; existing board previously built | docs/stock/MASTER.md §2 (22 Oct 2026); existing OperationApp:689 |
+| Warehouse → Outbound | Pickup Schedule (view) | Dated board of goods being picked up, inside Outbound | APPROVED TARGET / NOT BUILT placement; existing board previously built | docs/stock/MASTER.md §2 (22 Oct 2026); existing OperationApp:692 |
 | Warehouse | Inbound | Register of goods owed in and their receipt | BUILT | OperationApp:695 · portal-nav:531-532 · docs/COPY-STANDARD.md:2573 |
 | Warehouse | Inventory | The one current Unit Register | BUILT | OperationApp:684 · portal-nav:537 · docs/ERP-ARCHITECTURE.md:441 |
 | Warehouse | Outbound | Register of goods leaving, loading and driver confirmation | BUILT | OperationApp:696 · portal-nav:539-540 · docs/COPY-STANDARD.md:2574 |
