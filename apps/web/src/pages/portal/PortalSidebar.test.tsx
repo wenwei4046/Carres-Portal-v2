@@ -473,7 +473,7 @@ describe("the accordion", () => {
     fireEvent.click(module_("warehouse"));
     // Arrival Schedule is Warehouse's landing (owner ruling 2026-09-14) —
     // the rail navigated there.
-    expect(child("wh-arrival-schedule").className).toContain("bg-c-select-pill");
+    expect(child("wh-inbound").className).toContain("bg-c-select-pill");
   });
 
   it("clicking the open module closes it again", () => {
@@ -500,7 +500,7 @@ describe("the accordion", () => {
     fireEvent.click(module_("warehouse"));
     expect(screen.getByTestId("nav-children-warehouse")).toBeInTheDocument();
     expect(screen.queryByTestId("nav-children-purchasing")).not.toBeInTheDocument();
-    expect(child("wh-arrival-schedule").className).toContain("bg-c-select-pill");
+    expect(child("wh-inbound").className).toContain("bg-c-select-pill");
   });
 
   it("a module shut by hand stays shut while you stand on its page", () => {
@@ -1516,13 +1516,13 @@ describe("PortalSidebar — the Delivery module's two destinations", () => {
   });
 });
 
-describe("PortalSidebar — the Warehouse module's four destinations", () => {
+describe("PortalSidebar — the Warehouse module's three destinations", () => {
   /* THE MAP IS FOUR DESTINATIONS (owner replacement Card 2026-09-06 —
    * Stock MASTER §2, ERP-ARCHITECTURE §2.1): `Monitor · Inbound ·
    * Inventory · Outbound`. The ERP keeps ONE global Dashboard; no
    * Warehouse-local Dashboard label remains, and no Calendar, Transfer,
    * Ready Stock or Dashboard row joins the rail. */
-  it("the map is Monitor · Inbound · Inventory · Outbound, in that order", () => {
+  it("the map is Inbound · Inventory · Outbound, in that order", () => {
     renderAt("/operation?tab=stock-onhand");
     const rows = Array.from(
       screen
@@ -1530,8 +1530,6 @@ describe("PortalSidebar — the Warehouse module's four destinations", () => {
         .querySelectorAll("[data-testid^='nav-child-']"),
     ).map((el) => el.textContent?.replace("Coming soon", "").trim());
     expect(rows).toEqual([
-      "Arrival Schedule",
-      "Pickup Schedule",
       "Inbound",
       "Inventory",
       "Outbound",
@@ -1544,14 +1542,10 @@ describe("PortalSidebar — the Warehouse module's four destinations", () => {
     expect(screen.getByTestId("nav-child-stock")).toHaveTextContent("Inventory");
   });
 
-  it("all five destinations are live links — both Schedules, Inbound, Outbound included", () => {
+  it("the three destinations are live links and schedules are nested", () => {
     renderAt("/operation?tab=stock-onhand");
-    const arrival = child("wh-arrival-schedule") as HTMLAnchorElement;
-    expect(arrival.tagName).toBe("A");
-    expect(arrival).toHaveAttribute("href", "/operation?tab=warehouse-arrival-schedule");
-    const pickup = child("wh-pickup-schedule") as HTMLAnchorElement;
-    expect(pickup.tagName).toBe("A");
-    expect(pickup).toHaveAttribute("href", "/operation?tab=warehouse-pickup-schedule");
+    expect(screen.queryByTestId("nav-child-wh-arrival-schedule")).toBeNull();
+    expect(screen.queryByTestId("nav-child-wh-pickup-schedule")).toBeNull();
     const inbound = child("wh-inbound") as HTMLAnchorElement;
     expect(inbound.tagName).toBe("A");
     expect(inbound).toHaveAttribute("href", "/operation?tab=warehouse-inbound");
@@ -1586,12 +1580,12 @@ describe("PortalSidebar — the Warehouse module's four destinations", () => {
   /* ⭐ THE 64px ICON GOES WHERE IT IS TOLD (the Purchasing law, applied):
    * Warehouse names `Arrival Schedule` as its landing (owner ruling
    * 2026-09-14) — by name, never derived from row order. */
-  it("the collapsed Warehouse icon links to Arrival Schedule, and lights on a Warehouse page", () => {
+  it("the collapsed Warehouse icon links to Inbound, and lights on a Warehouse page", () => {
     localStorage.setItem("carres-menu-collapsed", "1");
     try {
       renderAt("/operation?tab=stock-onhand");
       const icon = screen.getByTitle("Warehouse") as HTMLAnchorElement;
-      expect(icon).toHaveAttribute("href", "/operation?tab=warehouse-arrival-schedule");
+      expect(icon).toHaveAttribute("href", "/operation?tab=warehouse-inbound");
       expect(icon.className).toContain("bg-c-select-pill");
     } finally {
       localStorage.removeItem("carres-menu-collapsed");

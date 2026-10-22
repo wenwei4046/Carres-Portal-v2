@@ -62,7 +62,7 @@ never transfers write ownership.
 
 ## 2 · Navigation and words
 
-Warehouse has five operator destinations: **Arrival Schedule · Pickup Schedule · Inbound · Inventory · Outbound**.
+**Owner22Oct2026 · current navigation:** Warehouse has exactly three primary operator pages: **Inbound · Inventory · Outbound**. Arrival Schedule is an internal Inbound view; Pickup Schedule is an internal Outbound view. This replaces earlier five-destination navigation statements in this document. The directional schedules retain their complete week, date/Site/source scope and existing Receiving/Loading ownership; grouping the navigation neither deletes their capabilities nor changes business writes. Existing schedule/bookmark URLs remain valid and highlight the corresponding parent. Frontend adoption is on branch for review, not deployed or visually verified.
 The two schedules are separate read-only projections. They use large working-day dates, white cards,
 quiet Expected/Scheduled badges and warning colour only for actual overdue work. They keep distinct
 orders identifiable, retain delayed and undated work, and never reschedule goods automatically.

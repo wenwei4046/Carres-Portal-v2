@@ -1,3 +1,7 @@
+## Warehouse navigation ·22Oct2026
+
+Jess explicitly confirmed the frontend must show only Inbound / Inventory / Outbound. `portal-nav` now draws three primary entries; `WarehouseDirectionPage` reuses kit Tabs to nest the unchanged Arrival/Pickup schedules in their respective directions. Existing date/Site query parameters and deep links remain; schedule links highlight the corresponding parent. No Receiving, Loading, inventory or backend writer changed. Sidebar regression checks passed128/128; actual browser acceptance remains pending; this is branch implementation, not deployed proof.
+
 ## Receiving frontend adoption ·22Oct2026
 
 Owner explicitly commissioned applying the latest Receiving UI to the ERP frontend in Planner. Backend remains IT-owned; the paused PR2100/SQL delivery and five-minute automation remain paused.
