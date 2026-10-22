@@ -486,11 +486,11 @@ SUPPLY CHAIN
 │       ├── Consignment Orders
 │       └── Consignment Returns
 ├── Warehouse
-│   ├── Arrival Schedule
-│   ├── Pickup Schedule
 │   ├── Inbound
+│   │   └── Arrival Schedule (view)
 │   ├── Inventory
 │   └── Outbound
+│       └── Pickup Schedule (view)
 └── Delivery
 
 FINANCE
@@ -515,6 +515,13 @@ This is the **ERP Shell V1 destination grammar**, owner-approved 2026-08-13. A m
 a second settings home. `Old Orders` is a temporary cutover door and is not part of permanent IA.
 The right Quick Rail is governed by `ui/MASTER.md`; it never adds duplicate module destinations or
 business truth.
+
+**Warehouse navigation amendment — owner-approved 2026-10-22 / NOT BUILT.** Three primary
+entries only: Inbound, Inventory and Outbound. Arrival Schedule is an Inbound view; Pickup Schedule
+is an Outbound view. The two directional schedules and their full working-week content remain;
+existing bookmarks and Calendar/Work/source links retain exact source/date/Site context. This
+supersedes five peer destinations, not the business/work ownership or global Calendar. Stock MASTER
+§2 owns the complete placement and acceptance boundary. This is design approval, not build or release.
 
 **Warehouse placement — owner ruling 2026-09-01.** Inventory is the one current Unit Register.
 Ready Stock is a saved eligible-Unit view shared with Sales, not a destination or second pool;

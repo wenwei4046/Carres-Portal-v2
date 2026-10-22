@@ -60,7 +60,8 @@
 | `Sales Orders` · `Outright Sales` · `Subscription` | Sales navigation parent and its two pages | COPY:4816-4818 | APPROVED |
 | `Delivery` · `Monitor` · `Delivery Orders` | Delivery module and its two pages | COPY:3494-3496 | APPROVED |
 | `Payments` · `Monitor` · `Payment Records` | Payments module and its two pages | COPY:2699 | APPROVED |
-| `Inventory` · `Arrival Schedule` · `Pickup Schedule` | Warehouse pages | COPY:2529-2530 | APPROVED |
+| `Inbound` · `Inventory` · `Outbound` | Three primary Warehouse entries | Stock MASTER §2; COPY Warehouse vocabulary | APPROVED TARGET / NOT BUILT regrouping, 22 Oct 2026 |
+| `Arrival Schedule` · `Pickup Schedule` | Views inside Inbound and Outbound respectively | Stock MASTER §2; COPY Warehouse vocabulary | APPROVED TARGET / NOT BUILT placement, 22 Oct 2026 |
 
 ## Banned or retired words
 

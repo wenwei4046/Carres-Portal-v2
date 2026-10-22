@@ -592,6 +592,11 @@ Customer receipt date / forecast fulfilment window
 
 ## 5.8 · Unit、提货与已确定的初期存放方式
 
+**设计交接 ·2026-10-22：** Stock MASTER §2/§7 已纳入 Diglant Klang 留厂成品与预期供应的
+Inventory 设计范围，并区分实际提货、在途、实际到仓或直送；本节的拥有权及交接规则不变。
+把地点列入设计不等于启用地点、委任 HOUZS Balakong/Penang 承运本项目或完成后台接通。
+建议的 `Supplier storage location` Site Kind 仍未批准，不能先改成 Carres warehouse。
+
 Carres 在正式 PO 发出时产生永久 Unit ID，Diglant 按对应型号/尺寸贴标。打印/贴标
 不证明生产完、收货、拥有权或可交付。标签缺失、重号、型号不符或破损走核查，不能
 临时造一个新身份；重印同 ID，实体替换才新 ID，保留旧新关系。
