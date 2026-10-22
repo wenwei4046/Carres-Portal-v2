@@ -27,6 +27,13 @@ This is a documentation/design amendment only, not implementation Cards, backend
 permission. Earlier five-entry runtime evidence below/elsewhere does not verify this target. Detailed
 Inventory visual approval and the module's wider incomplete work remain separate.
 
+**INVENTORY DESIGN COVERAGE ·22Oct2026.** Read Stock MASTER §2/§7 before drawing: complete
+list/expansion/Unit/source/action-result journey, current kit, shared PJ inventory and configurable
+Carres Klang / PJ / Diglant Klang / HOUZS Balakong / HOUZS Penang coverage. Detailed visuals await
+review. Diglant's proposed supplier-storage Site Kind is NOT approved; Rental's factory-hold rules
+remain authoritative. No location activation, account access, logistics appointment, duplicate stock
+ledger or BUILD commission is implied. Purchasing/Rental pointers agree with this same brief.
+
 **LATEST REPAIR APPLIED AND LIVE VERIFIED ·18Oct2026.**
 Jess explicitly approved exact18c256c328ff8cedb2ec56ff62e6553bd8c37dd49167dfc0186ba33a2688ecc5 in controller chat.0700 committed/pushed a82948daf before governed probe/apply.
 Probe: original42501 negative control; authenticated Operation reads38 lines after repair; same stock arithmetic, unchanged invoker/ACL/private-helper protection. Post-rollback baseline unchanged.

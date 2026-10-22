@@ -84,12 +84,45 @@ source context; do not silently redirect pickup work to arrivals. Legacy combine
 aliases continue to resolve to the arrival view, now inside Inbound. No new route syntax is approved
 by this documentation amendment; IT adapts the existing routes when separately commissioned.
 
-**Approval boundary:** only the navigation regrouping above is approved here. It does not approve
+**Navigation approval boundary:** the regrouping above approves placement only. It does not approve
 Houzs's five Inventory tabs, new calculations, a different Receiving destination, detailed Inventory
 visuals, backend copying, implementation Cards, application changes or deployment. Inventory's
 complete visual sample remains subject to review. Existing backend, permission, duty and ownership
 contracts stay intact. The old five-entry runtime and earlier verification records are historical
 implementation evidence, not proof this three-entry target is built.
+
+### Inventory design coverage · owner direction 22 Oct 2026
+
+**APPROVED DESIGN SCOPE / COMPLETE VISUAL REVIEW STILL OWED.** Jess asked Design to use the
+studied Houzs Inventory interactions as the starting reference, adapt them through the ONE current
+Carres kit, and cover the complete journey before returning for review. This is the brief for the
+existing Inventory page, not five newly approved pages, a second UI kit or a claim of implementation.
+UI MASTER owns appearance and shared behaviour; this section owns stock facts and required coverage.
+
+| Design segment | Required content and behaviour | Boundary / evidence status |
+|---|---|---|
+| Find stock | Authorised Site scope, product search and supported Unit/source-number search; category, ownership, availability and condition remain distinct; summaries follow the same filter scope as the results | Existing Stock arithmetic and access rules; failed/unknown reads never become zero. Do not imply every source search is already implemented |
+| Product overview | Product/SKU grouping with quantity and Site breakdown; expand to the actual Units, or SKU/quantity for quantity goods; make unavailable/reserved/controlled goods understandable | Adapt Houzs product → warehouse/source breakdown; retain permanent Carres identities and the existing approved grouped Ready Stock/Showroom target |
+| Open details | Define separate row, expansion-arrow, Unit and document-link outcomes using the admitted kit. Unit details include product/specification, actual Site, ownership, condition, availability, source and reservation links, receipt/handover evidence and actor history | Expansion exposes goods/source facts; it does not become another work queue or edit form. Returning restores filters, sort, page and scroll |
+| Explain supply and allocation | Show existing SO allocation and PO/CO/receipt links with their actual quantities/dates. Distinguish expected, factory-held, in transit and physically received goods | Source owners supply facts; no copied Houzs Available formula and no second calculation/stock ledger |
+| Guide work | Show why action is needed, the exact goods, responsible duty/actor, permitted existing action door, required input/evidence, missing requirements, saved result and next handoff | Receiving, Loading, Transfer, Report issue and approval keep their existing owning engines; no duplicate current-action form or personnel list |
+| Complete review sample | List, multiple-Unit expansion, Unit detail, PJ-filtered stock, source/allocation links and action result; include long content/narrow layout and loading, empty, read-error, no-access, disabled, validation and stale-save behaviour | Use the current Carres shared components. Authorised read-only data where available; clearly label samples and unverified interactions. No real transaction is needed for design review |
+
+**Reference limits:** the 22 Oct screen study of `https://erp.houzscentury.com/scm/inventory`
+(runtime source commit not exposed in that observation) observed Balances, Batches, Reservations,
+Warehouses and Analytics as views of its Inventory surface, including product/warehouse breakdown,
+source links, filters and common table controls. These are interaction evidence, not Carres-approved
+stock semantics or backend verification. Its Batches screen states that search covers batches
+assembled from up to 1,000 loaded lot rows; do not present that as an unrestricted whole-register
+search. Reuse candidates need IT's source/version, rights and compatibility review under UI MASTER
+**How design and IT work**. Do not import all five tabs, valuation visibility, batch semantics or
+analytics merely because the reference contains them. No current-2990 equivalence is asserted.
+
+**Review and handoff:** Design supplies one complete, coherent Inventory sample and names each
+existing component reused, reference interaction adapted and genuine gap. Jess reviews the visual
+result; IT separately owns integration/backend verification. Publication of this brief is not visual
+acceptance, build commissioning or production completion. Keep normal/partial/failed outcomes and
+source ownership visible; preserve conforming parts of the current application.
 
 The two schedules remain separate full-width, six-working-day read-only projections. They use large working-day dates, white cards,
 quiet Expected/Scheduled badges and warning colour only for actual overdue work. They keep distinct
@@ -339,10 +372,11 @@ Showroom Count is blind and Unit-level. An equal total does not cancel mismatche
 the Portal says eight and the scan also finds eight but one governed Unit is missing and one
 unregistered Unit is present, both differences remain and must be investigated.
 
-A consignment Unit always retains `Supplier Consignment`, source Consignment Order and Supplier
-while Stock records its Site/holder and condition. A sale produces the Sales Order reservation and
-Purchasing's `Sold to Settle` consequence; Finance handles Supplier Invoice/settlement. Warehouse
-cannot change ownership or settlement price. Purchasing may authorise change, return or supplier
+A consignment Unit retains `Supplier Consignment`, source Consignment Order and Supplier while
+Stock records its Site/holder and condition. Under the 2 Oct ruling in §4 and Purchasing §7.7,
+supplier-owned display goods are not sold and create no sales-based supplier notice/settlement.
+Carres-owned purchased display goods follow ordinary Sales Order reservation and Finance purchase
+matching. Warehouse cannot change ownership or settlement price. Purchasing may authorise change, return or supplier
 collection, but that decision cannot remove the Unit from the showroom: Outbound handover and the
 actual recipient evidence must move it. Repair follows the same out-and-back physical truth.
 
@@ -845,6 +879,29 @@ operated by HOUZS — owner instruction 2026-09-25: add it now, not later) are a
 count` and `Confirm collection from Warehouse` return when Counts and NETS logins are built — no
 switch for a capability that does not exist.
 
+**LOCATION COVERAGE FOR INVENTORY DESIGN — owner direction 22 Oct 2026; design scope approved,
+not live Site creation/activation or a completed UI.** Include the following cases in the same
+configurable Site scope. This is a review coverage list, not a hard-coded/exhaustive location menu.
+Site identity is maintained here once; Showroom, Purchasing, Delivery and Subscription read it.
+
+| Location | Representation in the design | What must not be inferred |
+|---|---|---|
+| Carres Klang | Existing Carres warehouse scope; operated by NETS under current authority | Physical operator is not automatically the legal owner of its goods |
+| PJ Showroom | Carres-operated showroom; the same Stock records filtered by Site, with existing Unit identities and movements | No second showroom inventory, duplicate opening stock or automatic sale eligibility for supplier-owned display |
+| Diglant Klang | Supplier-held completed Subscription goods at the factory, alongside separately identifiable production/expected supply; Rental §5.8 governs actual pickup and custody | Not a Carres warehouse receipt or automatically Ready Stock; no assumption of ownership transfer, free/unlimited storage or a new logistics appointment |
+| HOUZS Balakong | Logistics transit point; distinguish planned routing from actual received/handover evidence | Selecting a destination does not move goods or make them available |
+| HOUZS Penang | Include in design and governed Site configuration target already approved 25 Sep; identify future/planned use until actual operation/evidence is established | Mention in a design does not prove the Site is active, stocked, commissioned or appointed for the Diglant programme |
+
+Actual Site activation, address, access and operator facts come from authorised settings; do not
+invent them in a specimen. Keep legal ownership, physical Site/operator and availability as separate
+facts. A schedule or planned transfer changes none of them without its governing actual event.
+
+**UNRESOLVED PROPOSAL, NOT APPROVED:** adding a Site Kind named `Supplier storage location` for
+Diglant. The current approved Kind list remains the three kinds above. Design must expose this
+classification gap to IT rather than silently adding an enum or classifying the factory as a Carres
+warehouse/transit point. Rental's approved factory-hold business model remains valid while that
+representation is resolved; supplier-held coverage does not require inventing a second ledger.
+
 **SHOWROOM SPACE PLANNING — OWNER RULING, Jess 2026-09-28; APPROVED TARGET / NOT
 BUILT.** Do not add fixed Sofa, Mattress or Bedframe display-capacity settings at this stage.
 Showrooms can change their product mix and layout; independent category limits would not reliably
@@ -1342,7 +1399,7 @@ never a generic `Mark done`.
 ## 10 · Permissions
 
 - Sales searches and chooses through Sales Order, and reports issues; no physical edits.
-- Purchasing owns PO, Consignment, supplier, claim and Sold to Settle; no physical handover/payment.
+- Purchasing owns PO, Consignment, supplier and claim; no physical handover/payment or supplier-owned display sale-notice flow (§4).
 - NETS Warehouse owns only assigned receipt, warehouse handover, evidence and Count execution.
 - NETS Delivery owns only assigned collection, transport, arrival, return and evidence.
 - Showroom owns only its Site arrival, count and observation.
@@ -2032,15 +2089,16 @@ Position/Zone/slot. Stock cannot change legal ownership or supplier settlement p
 Consignment, reserved/sold awaiting Delivery, waiting repair/change and waiting supplier collection.
 An actual arrival requires the showroom person to scan/check the Unit and submit evidence before
 the Site/holder changes; departure requires an actual recipient handover. Sales Order reservation
-binds the exact display Unit while holder remains the showroom until collection. Consignment sale
-creates Purchasing `Sold to Settle`; Finance verifies invoice/payment. Purchasing authority to
+binds an eligible Carres-owned display Unit while holder remains the showroom until collection.
+Supplier-owned display goods are not sold (§4; Purchasing §7.7); the former consignment-sale
+settlement wording is superseded. Purchasing authority to
 change/return/collect never moves the Unit without Outbound and recipient proof.
 
 **OPERATOR JOURNEY →** a personally signed-in showroom operator sees the Site's actual dated
 arrival, departure, Count and condition-check Work; scans arrival/departure, Counts, reports a
 problem and reads processing state; cannot change ownership/cost/SO reservation/Claim. Sales chooses
 an authorised exact display Unit without moving it. Purchasing manages Consignment Order, exchange,
-Claim, collection and Sold to Settle without editing holder.
+Claim and collection without editing holder; no supplier-owned display sale-notice flow.
 
 **UI / PAGE / OBJECT PLACEMENT →** the showroom uses Inventory's own columns and words (§7, owner
 rulings 2026-09-25): the rail row `STOCK → Showroom Display` filters the same eleven-column

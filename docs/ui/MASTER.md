@@ -1044,8 +1044,11 @@ Schedule inside Inbound and Pickup Schedule inside Outbound. Keep full-width dir
 content as an alternate view, not a calendar strip beside the register and not another shared kit.
 Stock MASTER §2 owns scope, source-link continuity and retained context; COPY owns the exact words.
 This approval changes no shared dimensions, Summary/Tasks behaviour, business engine or permissions.
-Detailed Inventory/Houzs adaptation remains a separate visual review; this is not page acceptance
-or an implementation/deployment commission.
+Stock MASTER §2's **Inventory design coverage** and §7's location coverage are the approved design
+brief, including product-to-Unit detail, source links, PJ's shared stock and supplier/transit custody.
+Use this MASTER's current measurements and components for the complete sample; do not copy an old
+Houzs skin, add per-location pages, or treat a written brief as a working component. The exact visuals
+remain subject to review; this is not page acceptance or an implementation/deployment commission.
 
 ## §6.1 · Contextual summary/filter rail
 
