@@ -435,12 +435,34 @@ describe("the page binds the register to its own read", () => {
 
   it("narrows to one Supplier Claim when the address names it", () => {
     page({}, "/operation?tab=purchase-returns&claim=SC-1038");
-    expect(returnsQuery).toHaveBeenCalledWith("SC-1038");
+    expect(returnsQuery).toHaveBeenCalledWith("SC-1038", undefined, false);
   });
 
   it("asks for every return when no claim is named", () => {
     page();
-    expect(returnsQuery).toHaveBeenCalledWith(null);
+    expect(returnsQuery).toHaveBeenCalledWith(null, undefined, false);
+  });
+
+  it("the Consignment Returns register asks for consignment returns and says so when there are none", () => {
+    returnsQuery.mockReturnValue({ ...idle, data: { returns: [] } });
+    render(
+      <MemoryRouter initialEntries={["/operation?tab=consignment-returns"]}>
+        <OperationPurchaseReturns consignment />
+      </MemoryRouter>,
+    );
+    expect(returnsQuery).toHaveBeenCalledWith(null, undefined, true);
+    expect(screen.getByText("No consignment returns.")).toBeTruthy();
+    expect(screen.queryByText("No purchase returns.")).toBeNull();
+  });
+
+  it("the Consignment Returns register names its own failure", () => {
+    returnsQuery.mockReturnValue({ ...idle, data: undefined, isError: true, error: { message: "boom" } });
+    render(
+      <MemoryRouter initialEntries={["/operation?tab=consignment-returns"]}>
+        <OperationPurchaseReturns consignment />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("Consignment Returns could not be loaded.")).toBeTruthy();
   });
 
   it("says a read FAILED rather than showing an empty register", () => {

@@ -287,6 +287,26 @@ describe("GET /api/operation/purchase-returns", () => {
     expect(new Set(unitCalls.flat()).size).toBe(250);
   });
 
+  it("the register lists Purchase Returns by default and Consignment Returns on ?consignment=1", async () => {
+    // The mock's `eq` filters nothing, so the proof is the filter the read asks for.
+    const asked = async (query: string) => {
+      const sb = client();
+      await get(sb, "operation", query);
+      const from = vi.mocked(sb.from);
+      return from.mock.results
+        .filter((_r, i) => from.mock.calls[i]![0] === "purchase_returns")
+        .flatMap((r) => (r.value.eq as ReturnType<typeof vi.fn>).mock.calls);
+    };
+    expect(await asked("")).toContainEqual(["is_consignment", false]);
+    expect(await asked("?consignment=1")).toContainEqual(["is_consignment", true]);
+  });
+
+  it("carries is_consignment on each return", async () => {
+    const res = await get(client({ returns: [{ ...RETURN, is_consignment: true }] }), "operation", "?consignment=1");
+    const body = (await res.json()) as { returns: Array<{ is_consignment: boolean }> };
+    expect(body.returns[0]!.is_consignment).toBe(true);
+  });
+
   it("offers no door that edits or deletes a return", async () => {
     // Creation is `POST /` onto the ONE SQL door (0548/0609); nothing edits or
     // deletes a return (ERP-ARCHITECTURE law C: a door, never a duplicate).

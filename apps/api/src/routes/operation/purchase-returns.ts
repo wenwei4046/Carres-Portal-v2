@@ -97,7 +97,7 @@ async function readAllIn(
 function failDoor(c: Context, error: { code?: string; message?: string; details?: string; detail?: string }) {
   const detail = error.details ?? error.detail;
   if (error.code === "23514" || error.code === "22023") {
-    const byName = detail === "unit_not_eligible" || detail === "unit_changed" || detail === "unit_twice" || detail === "unit_not_tracked";
+    const byName = detail === "unit_not_eligible" || detail === "unit_changed" || detail === "unit_twice" || detail === "unit_not_tracked" || detail === "not_suppliers_goods" || detail === "mixed_ownership";
     const message = byName ? `${error.message ?? "refused"}. ${NO_RETURN_WAS_ISSUED}` : (error.message ?? "refused");
     return c.json({ error: "refused", code: detail ?? "invalid_param", message }, error.code === "23514" ? 409 : 422);
   }
@@ -105,7 +105,7 @@ function failDoor(c: Context, error: { code?: string; message?: string; details?
   return c.json(m.body, m.status);
 }
 
-const DOCUMENT_COLUMNS = "id, pr_no, pr_doc_date, supplier_id, supplier_claim_id, warehouse_receipt_id, confirmed_pickup_date, created_by";
+const DOCUMENT_COLUMNS = "id, pr_no, pr_doc_date, supplier_id, supplier_claim_id, warehouse_receipt_id, confirmed_pickup_date, created_by, is_consignment";
 
 /** Everything the register, the record and Work print, for these returns. */
 async function assemble(c: Context<AppEnv>, documents: Row[]): Promise<{ rows: PurchaseReturnDetail[]; error: unknown }> {
@@ -182,6 +182,7 @@ async function assemble(c: Context<AppEnv>, documents: Row[]): Promise<{ rows: P
     return {
       id,
       pr_no: str(row.pr_no),
+      is_consignment: row.is_consignment === true,
       pr_doc_date: str(row.pr_doc_date),
       supplier_id: str(row.supplier_id),
       supplier_name: supplierName.get(row.supplier_id as string) || null,
@@ -233,12 +234,13 @@ async function assemble(c: Context<AppEnv>, documents: Row[]): Promise<{ rows: P
   return { rows, error: null };
 }
 
-async function readReturns(c: Context<AppEnv>, filter?: { id?: string; claimId?: string }) {
+async function readReturns(c: Context<AppEnv>, filter?: { id?: string; claimId?: string; consignment?: boolean }) {
   const sb = userClient(c.env, c.var.auth.jwt);
   const documents = await readAll((from, to) => {
     let q = sb.from("purchase_returns").select(DOCUMENT_COLUMNS);
     if (filter?.id) q = q.eq("id", filter.id);
     if (filter?.claimId) q = q.eq("supplier_claim_id", filter.claimId);
+    if (filter?.consignment !== undefined) q = q.eq("is_consignment", filter.consignment);
     return q.order("pr_doc_date", { ascending: false }).order("id", { ascending: false }).range(from, to);
   });
   if (documents.error) return { rows: [] as PurchaseReturnDetail[], error: documents.error };
@@ -248,11 +250,14 @@ async function readReturns(c: Context<AppEnv>, filter?: { id?: string; claimId?:
 // ----- GET / -----
 //
 // `?claim=<claim_no>` narrows to one Supplier Claim's returns, so the claim
-// record links straight into its own paperwork.
+// record links straight into its own paperwork. `?consignment=1` lists the
+// Consignment Returns (0706) and nothing else; the default lists none of them.
 purchaseReturnsRouter.get("/", async (c) => {
   gate(c);
   const claimParam = c.req.query("claim")?.trim() || null;
-  const { rows, error } = await readReturns(c);
+  // A claim's own view (`?claim=`) shows whatever it issued, either kind.
+  const consignment = c.req.query("consignment") === "1" ? true : claimParam ? undefined : false;
+  const { rows, error } = await readReturns(c, { consignment });
   if (error) {
     const mapped = mapPgError(error as never);
     return c.json(mapped.body, mapped.status);
@@ -433,6 +438,7 @@ purchaseReturnsRouter.get("/:id/print-data", async (c) => {
   // Money-free (DOCUMENT-KIT §4): the payload carries no figure at all.
   const print: PurchaseReturnPrintData = {
     pr_no: row.pr_no,
+    is_consignment: row.is_consignment,
     pr_doc_date: row.pr_doc_date ?? new Date().toISOString(),
     supplier: { name: s?.name ?? row.supplier_name ?? "", contact: s?.contact ?? null },
     return_to: row.units[0]?.return_to ?? null,
