@@ -83,7 +83,9 @@ export default function FinanceAR() {
     return next;
   });
   const [openId, setOpenId] = useState<string | null>(null);
-  // The row's Record receipt button opens the form; a double-click only opens the order.
+  /* A list row carries no button (Chew 2026-10-21): the row menu's Record
+     receipt opens the drawer with the form showing; a double-click or View
+     only opens the order, whose drawer has the same Record receipt door. */
   const [recording, setRecording] = useState(false);
   const open = openId ? rows.find((r) => r.orderId === openId) ?? null : null;
   const payments: readonly OrderPaymentRow[] = useMemo(() => {
@@ -110,15 +112,6 @@ export default function FinanceAR() {
         </span>
       ),
       numberValue: (r) => r.outstanding, filterType: "number", exportValue: (r) => r.outstanding },
-    { key: "act", label: "Record receipt", width: 150, filterable: false,
-      accessor: (r) => (
-        <button type="button" className="btn-secondary" data-testid={`ar-record-${r.orderId}`}
-          onClick={(e) => { e.stopPropagation(); setRecording(true); setOpenId(r.orderId); }}>
-          Record receipt
-        </button>
-      ),
-      /* A door is not a fact: it never joins the search or the export. */
-      searchValue: () => "", exportValue: () => "" },
   ], [today]);
 
   return (
@@ -154,10 +147,13 @@ export default function FinanceAR() {
             onRowDoubleClick={(r) => { setRecording(false); setOpenId(r.orderId); }}
             /* An order owing money is not a Finance document: a double-click
                still opens its drawer. The row menu (Chew 2026-10-21) is that
-               same View, then the row's own Record receipt door. */
+               same View, then Record receipt on the drawer's own condition:
+               only while something is owed. */
             contextMenu={(r) => documentRowMenu({
               view: () => { setRecording(false); setOpenId(r.orderId); },
-              more: [{ label: "Record receipt", onClick: () => { setRecording(true); setOpenId(r.orderId); } }],
+              more: r.outstanding > 0
+                ? [{ label: "Record receipt", onClick: () => { setRecording(true); setOpenId(r.orderId); } }]
+                : [],
             })}
             statusSummary={(visible) => {
               const t = outstandingTotal(visible);
