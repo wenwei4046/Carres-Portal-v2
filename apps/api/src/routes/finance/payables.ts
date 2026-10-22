@@ -46,6 +46,7 @@ import type { AppEnv } from "../../types";
  *     GET  /accounts                    ap_account_choices — which account fits which box
  *     GET  /outstanding                 ap_outstanding — owed per supplier, zero included
  *     GET  /bill-outstanding            ap_bill_outstanding — owed per confirmed bill
+ *     GET  /opening-bill-outstanding    ap_opening_bill_outstanding — each posted opening bill (0705)
  *     GET  /aging?asAt=                 fin_ap_aging — owed on a day, bill by bill, tied
  *                                       to the payables control accounts (0640)
  *     GET  /supplier-finance            finance_supplier_list — every supplier with Finance's
@@ -206,8 +207,10 @@ function voucherArgs(voucherId: string | null, d: PaymentVoucherDraftInput) {
       department_id: l.departmentId ?? null,
     })),
     // 0681: an allocation pays a bill or a supplier debit note.
+    // 0705: or an opening bill (Opening balances).
     p_allocations: d.allocations.map((a) =>
-      a.debitNoteId ? { debit_note_id: a.debitNoteId, amount: a.amount } : { bill_id: a.billId, amount: a.amount }),
+      a.openingItemId ? { opening_item_id: a.openingItemId, amount: a.amount }
+        : a.debitNoteId ? { debit_note_id: a.debitNoteId, amount: a.amount } : { bill_id: a.billId, amount: a.amount }),
     p_pay_method: d.payMethod,
     p_pay_reference: d.payReference ?? null,
     p_narration: d.narration ?? null,
@@ -367,6 +370,15 @@ payablesRouter.get("/bill-outstanding", requireFinance, async (c) => {
   const f = supplierFilter(c);
   if (!f.ok) return badId(c, "supplier");
   const { data, error } = await sb(c).rpc("ap_bill_outstanding", { p_supplier_id: f.value });
+  if (error) return pgFail(c, error);
+  return c.json({ rows: data ?? [] });
+});
+
+// 0705: each posted opening bill, what is paid and held on it (Opening balances).
+payablesRouter.get("/opening-bill-outstanding", requireFinance, async (c) => {
+  const f = supplierFilter(c);
+  if (!f.ok) return badId(c, "supplier");
+  const { data, error } = await sb(c).rpc("ap_opening_bill_outstanding", { p_supplier_id: f.value });
   if (error) return pgFail(c, error);
   return c.json({ rows: data ?? [] });
 });

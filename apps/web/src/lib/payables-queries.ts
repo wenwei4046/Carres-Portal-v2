@@ -6,6 +6,7 @@ import {
   type ApAccountChoice,
   type BillForeignAmountInput,
   type ApBillOutstandingRow,
+  type ApOpeningBillRow,
   type ApCreditor,
   type ApOutstandingRow,
   type BillDeliveryPartner,
@@ -61,6 +62,9 @@ export const payablesKeys = {
   outstanding: () => ["finance", "payables", "outstanding"] as const,
   billOutstanding: (supplierId: string | null) =>
     ["finance", "payables", "bill-outstanding", supplierId ?? "all"] as const,
+  /** 0705: a supplier's posted opening bills. */
+  openingBills: (supplierId: string | null) =>
+    ["finance", "payables", "opening-bills", supplierId ?? "all"] as const,
   bills: () => ["finance", "payables", "bills"] as const,
   bill: (id: string) => ["finance", "payables", "bill", id] as const,
   grnCandidates: (supplierId: string | null) =>
@@ -120,6 +124,19 @@ export function useApBillOutstanding(supplierId: string | null, enabled = true) 
     queryFn: async () =>
       (await apiFetch<Rows<ApBillOutstandingRow>>(
         `${BASE}/bill-outstanding${supplierId ? `?supplierId=${encodeURIComponent(supplierId)}` : ""}`,
+      )).rows,
+    enabled,
+    staleTime: 15_000,
+  });
+}
+
+/** 0705: a supplier's posted opening bills (Opening balances), paid by voucher like a bill. */
+export function useApOpeningBills(supplierId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: payablesKeys.openingBills(supplierId),
+    queryFn: async () =>
+      (await apiFetch<Rows<ApOpeningBillRow>>(
+        `${BASE}/opening-bill-outstanding${supplierId ? `?supplierId=${encodeURIComponent(supplierId)}` : ""}`,
       )).rows,
     enabled,
     staleTime: 15_000,

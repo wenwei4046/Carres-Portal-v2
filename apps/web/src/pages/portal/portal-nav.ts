@@ -750,6 +750,8 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // (entries · account balances · checks), and UI MASTER §6.5 keeps tabs
       // for views of ONE object.
       { key: "ledger", label: "Journal", icon: BookOpen, financePath: "/finance/ledger", section: "Ledger" },
+      // 0705 — Finance's figures at go-live, after the Journal (Chew 2026-10-21/22).
+      { key: "opening-balances", label: "Opening balances", icon: BookOpen, financePath: "/finance/ledger/opening-balances", section: "Ledger" },
       // 0639 — every account's period, one block each; after the Journal, as
       // in Chew's menu draft (2026-10-03).
       { key: "general-ledger", label: "General Ledger", icon: BookOpenText, financePath: "/finance/ledger/general-ledger", section: "Ledger" },

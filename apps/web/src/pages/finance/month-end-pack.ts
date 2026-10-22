@@ -17,6 +17,7 @@ import { ledgerKindWord } from "@carres/shared/finance-ledger";
 import { fmtDate, fmtMonth } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import { trialBalanceQuery } from "./ledger/ledger-queries";
+import { openingWords, readOpeningPosted } from "./ledger/opening-balances-queries";
 import { trialBalanceLabel, trialBalanceLines } from "./ledger/LedgerTrialBalance";
 import { nothingInPeriod, nothingOnDay, paidBeforeInvoiceNote, statementRows } from "./reports/StatementTable";
 import {
@@ -88,10 +89,11 @@ export function packPeriod(ym: string, today: string): { from: string; to: strin
 // A workbook is filed and re-read in a later year, so its dates always carry the year (fmt-date's document option).
 const day = (iso: string) => fmtDate(iso, { year: "always" });
 const beforeGoLive =(goLive: string) => `The ledger started on ${day(goLive)}. Pick a day from then on.`;
-export const noOpening = (goLive: string) => `Since ${day(goLive)} · No opening balances`;
+/** Row 2 of every sheet: `Since {go-live} · No opening balances`, or `· Brought forward` once Finance has posted them (0705). */
+export const noOpening = (goLive: string, broughtForward = false) => `Since ${day(goLive)} · ${openingWords(broughtForward)}`;
 
-export function trialBalanceSheet(tb: TrialBalanceReport): PackSheet {
-  const head: Cell[][] = [["Trial Balance", `As of ${day(tb.as_of)}`], [noOpening(tb.go_live_on)], []];
+export function trialBalanceSheet(tb: TrialBalanceReport, broughtForward = false): PackSheet {
+  const head: Cell[][] = [["Trial Balance", `As of ${day(tb.as_of)}`], [noOpening(tb.go_live_on, broughtForward)], []];
   if (tb.status === "before_go_live") return { name: "Trial Balance", rows: [...head, [beforeGoLive(tb.go_live_on)]] };
   // The rows the page's Export Excel writes: headings by name with their Debit
   // and Credit left empty, and the accounts anything was posted to, so adding
@@ -140,8 +142,8 @@ function statementBody(
   return out;
 }
 
-export function profitAndLossSheet(pl: ProfitAndLoss): PackSheet {
-  const head: Cell[][] = [["Profit and Loss", `${day(pl.from)} to ${day(pl.to)}`], [noOpening(pl.goLiveOn)], []];
+export function profitAndLossSheet(pl: ProfitAndLoss, broughtForward = false): PackSheet {
+  const head: Cell[][] = [["Profit and Loss", `${day(pl.from)} to ${day(pl.to)}`], [noOpening(pl.goLiveOn, broughtForward)], []];
   if (pl.status === "before_go_live") return { name: "Profit and Loss", rows: [...head, [beforeGoLive(pl.goLiveOn)]] };
   return {
     name: "Profit and Loss",
@@ -149,8 +151,8 @@ export function profitAndLossSheet(pl: ProfitAndLoss): PackSheet {
   };
 }
 
-export function balanceSheetSheet(bs: BalanceSheet): PackSheet {
-  const head: Cell[][] = [["Balance Sheet", `As of ${day(bs.asOf)}`], [noOpening(bs.goLiveOn)], []];
+export function balanceSheetSheet(bs: BalanceSheet, broughtForward = false): PackSheet {
+  const head: Cell[][] = [["Balance Sheet", `As of ${day(bs.asOf)}`], [noOpening(bs.goLiveOn, broughtForward)], []];
   if (bs.status === "before_go_live") return { name: "Balance Sheet", rows: [...head, [beforeGoLive(bs.goLiveOn)]] };
   const rows = [...head, ...statementBody(bs.sections, nothingOnDay, paidBeforeInvoiceNote)];
   if (!bs.balances) rows.push([`Assets differ from liabilities plus equity by`, Math.abs(bs.difference)]);
@@ -167,12 +169,13 @@ export const packFileName = (ym: string) => `Month-end pack ${fmtMonth(ym)}.xlsx
  */
 export async function exportMonthEndPack(qc: QueryClient, ym: string, today: string): Promise<PackSheet[]> {
   const { from, to } = packPeriod(ym, today);
-  const [tb, pl, bs] = await Promise.all([
+  const [tb, pl, bs, posted] = await Promise.all([
     qc.fetchQuery(trialBalanceQuery(to)),
     qc.fetchQuery(profitAndLossQuery(from, to)),
     qc.fetchQuery(balanceSheetQuery(to)),
+    readOpeningPosted(qc),
   ]);
-  const sheets = [trialBalanceSheet(tb), profitAndLossSheet(pl), balanceSheetSheet(bs)];
+  const sheets = [trialBalanceSheet(tb, posted), profitAndLossSheet(pl, posted), balanceSheetSheet(bs, posted)];
   const XLSX = await import("xlsx");
   const wb = XLSX.utils.book_new();
   for (const s of sheets) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s.rows), s.name);
@@ -186,8 +189,8 @@ export async function exportMonthEndPack(qc: QueryClient, ym: string, today: str
  * `stem` is the file name without its extension:
  * `Profit and Loss Sep 2026 Showroom` · `Balance Sheet as of 30 Sep 2026`.
  */
-export function statementExport(report: ProfitAndLoss | BalanceSheet, department: string | null): { sheet: PackSheet; stem: string } {
-  const sheet = "asOf" in report ? balanceSheetSheet(report) : profitAndLossSheet(report);
+export function statementExport(report: ProfitAndLoss | BalanceSheet, department: string | null, broughtForward = false): { sheet: PackSheet; stem: string } {
+  const sheet = "asOf" in report ? balanceSheetSheet(report, broughtForward) : profitAndLossSheet(report, broughtForward);
   if (department) sheet.rows.splice(1, 0, ["Department", department]);
   const ym = "asOf" in report ? null : report.from.slice(0, 7);
   const when = "asOf" in report ? `as of ${day(report.asOf)}`

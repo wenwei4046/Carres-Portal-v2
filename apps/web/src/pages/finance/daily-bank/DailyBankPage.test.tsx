@@ -91,7 +91,8 @@ describe("Daily Bank (0637)", () => {
   it("reads today in Malaysia when no day is asked", async () => {
     show();
     await screen.findByTestId("daily-bank-row-1122");
-    expect(api.calls[0]).toBe("/api/finance/ledger/daily-bank?day=2026-10-03");
+    // 0705: the caption's opening state is read beside it; the day's read is the first of its own.
+    expect(api.calls.find((u) => u.includes("/daily-bank"))).toBe("/api/finance/ledger/daily-bank?day=2026-10-03");
   });
 
   it("prints each account's day: brought forward, money in and out, balance, waiting and what is left to pay", async () => {

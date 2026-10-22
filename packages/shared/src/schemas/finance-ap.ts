@@ -270,9 +270,16 @@ export const paymentVoucherLineInput = z
 
 /** What a voucher pays: a confirmed bill, or (0681) a confirmed supplier debit note. */
 export const paymentVoucherAllocationInput = z
-  .object({ billId: z.string().uuid().optional(), debitNoteId: z.string().uuid().optional(), amount: money })
+  .object({
+    billId: z.string().uuid().optional(),
+    debitNoteId: z.string().uuid().optional(),
+    /** 0705: an opening bill (Opening balances, a supplier's open item). */
+    openingItemId: z.string().uuid().optional(),
+    amount: money,
+  })
   .strict()
-  .refine((a) => (a.billId ? 1 : 0) + (a.debitNoteId ? 1 : 0) === 1, "Choose a bill or a debit note");
+  .refine((a) => (a.billId ? 1 : 0) + (a.debitNoteId ? 1 : 0) + (a.openingItemId ? 1 : 0) === 1,
+    "Choose a bill, a debit note or an opening bill");
 
 export const paymentVoucherDraftInput = z
   .object({
@@ -763,6 +770,22 @@ export interface SupplierAdvanceRow {
   advance_open: ApMoney;
 }
 
+/** 0705: a supplier's posted opening bill, as the voucher and Unpaid by Supplier list it. */
+export interface ApOpeningBillRow {
+  item_id: string;
+  doc_no: string;
+  supplier_id: string;
+  supplier_name: string;
+  doc_date: string;
+  due_date: string | null;
+  total_amount: ApMoney;
+  paid_total: ApMoney;
+  balance_owing: ApMoney;
+  ap_account_code: string;
+  allocated_total: ApMoney;
+  unallocated: ApMoney;
+}
+
 export interface ApBillOutstandingRow {
   bill_id: string;
   bill_no: string;
@@ -917,6 +940,16 @@ export interface PaymentVoucherDocument {
     note_date: string;
     due_date: string | null;
     note_total: ApMoney;
+    ap_account_code: string;
+    amount_applied: ApMoney;
+  }>;
+  /** 0705: the opening bills it pays. Absent before 0705 is applied. */
+  opening_bills?: Array<{
+    opening_item_id: string;
+    doc_no: string;
+    doc_date: string;
+    due_date: string | null;
+    bill_total: ApMoney;
     ap_account_code: string;
     amount_applied: ApMoney;
   }>;

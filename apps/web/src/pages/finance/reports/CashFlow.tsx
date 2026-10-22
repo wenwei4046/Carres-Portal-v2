@@ -33,6 +33,7 @@ import { appTodayIso, fmtDate, fmtMonth } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { useCashFlow } from "../ledger/ledger-queries";
+import { openingWords, useOpeningPosted } from "../ledger/opening-balances-queries";
 import { FINANCE_WIDTH, fillSizing, useSavedWidths } from "../finance-widths";
 import look from "../finance-look.module.css";
 import { DepartmentFilter, departmentWord, useDepartmentParam, useDepartments } from "../department";
@@ -75,12 +76,13 @@ export const NO_CHANNEL_NOTE =
 
 /** The statement as sheet rows: the shape the Profit and Loss exports.
  *  0684: with a channel, its name heads the sheet and no balance is printed. */
-export function cashFlowSheet(r: CashFlowReport, from: string, to: string, goLive: string, channel: string | null = null): { sheet: PackSheet; stem: string } {
+export function cashFlowSheet(r: CashFlowReport, from: string, to: string, goLive: string, channel: string | null = null,
+  broughtForward = false): { sheet: PackSheet; stem: string } {
   const day = (iso: string) => fmtDate(iso, { year: "always" });
   const ym = from.slice(0, 7);
   const when = from === `${ym}-01` && to === monthEnd(ym) ? fmtMonth(ym) : `${day(from)} to ${day(to)}`;
   const title = channel ? `Cash Flow · ${channel}` : "Cash Flow";
-  const rows: Array<Array<string | number>> = [[title, `${day(from)} to ${day(to)}`], [noOpening(goLive)]];
+  const rows: Array<Array<string | number>> = [[title, `${day(from)} to ${day(to)}`], [noOpening(goLive, broughtForward)]];
   if (channel) rows.push([NO_CHANNEL_NOTE]);
   // The screen's columns: Code, Account, Amount. A band or a total reads
   // across the code and the name, as on screen; a line that names no account
@@ -183,6 +185,7 @@ function ByAccount({ report, from, to }: { report: CashFlowReport; from: string;
 
 export default function CashFlow() {
   const [params, setParams] = useSearchParams();
+  const posted = useOpeningPosted();
   const today = appTodayIso();
   const { from, to } = readPeriod(params, today);
   // 0684 (Chew ruling 1): one channel's money, kept in `?dept=` like the other reports.
@@ -225,7 +228,7 @@ export default function CashFlow() {
     <ModuleHeader destinationHeader testId="cash-flow-destination-header" word="Cash Flow" docTitle="Cash Flow · Carres" />
     <div className="min-h-0 flex-1 overflow-auto p-6">
       <div className="flex flex-col gap-6">
-        {goLive && <p className="text-body text-kit-slate-11" data-testid="cash-flow-go-live">Since {fmtDate(goLive)} · No opening balances</p>}
+        {goLive && <p className="text-body text-kit-slate-11" data-testid="cash-flow-go-live">Since {fmtDate(goLive)} · {openingWords(posted)}</p>}
         <div className="flex flex-wrap items-end gap-3">
           <div className="w-40">
             <Select id="cash-flow-month" label="Month" value={month ?? ""} onValueChange={pickMonth} placeholder="Custom Date Range"
@@ -235,7 +238,7 @@ export default function CashFlow() {
           <div className="w-40"><DatePicker id="cash-flow-to" label="Up to" value={to} minDate={from} onChange={pickTo} /></div>
           <DepartmentFilter value={dept} onChange={setDept} />
           <ExportStatement testId="cash-flow-export" word="cash flow"
-            build={ready && goLive ? () => cashFlowSheet(ready, from, to, goLive, channel) : null} />
+            build={ready && goLive ? () => cashFlowSheet(ready, from, to, goLive, channel, posted) : null} />
         </div>
         {channel && <p className="text-body text-kit-slate-11" data-testid="cash-flow-channel-note">
           Only money tied to {channel}. {NO_CHANNEL_NOTE}</p>}

@@ -43,6 +43,7 @@ import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { useDailyBank } from "../ledger/ledger-queries";
+import { openingWords, useOpeningPosted } from "../ledger/opening-balances-queries";
 import { FINANCE_WIDTH, amountCell } from "../finance-widths";
 import { VOUCHER_PURPOSE_WORD } from "../payables/payables-words";
 import { useFinancePersonalLayouts } from "../finance-layouts";
@@ -150,6 +151,7 @@ function boardRows(data: DailyBankDay | undefined): DailyBankRow[] | null {
 
 export default function DailyBankPage() {
   const personalLayouts = useFinancePersonalLayouts("finance_daily_bank");
+  const posted = useOpeningPosted();
   const [params, setParams] = useSearchParams();
   const today = appTodayIso();
   const asked = params.get("day");
@@ -257,7 +259,7 @@ export default function DailyBankPage() {
             statusSummary={(visible) => (
               <span data-testid="daily-bank-summary">
                 {visible.length} {visible.length === 1 ? "account" : "accounts"} · {fmtDate(day)}
-                {goLive && <span data-testid="daily-bank-go-live"> · Since {fmtDate(goLive)} · No opening balances</span>}
+                {goLive && <span data-testid="daily-bank-go-live"> · Since {fmtDate(goLive)} · {openingWords(posted)}</span>}
                 {day < today && <span data-testid="daily-bank-waiting-now"> · Waiting for approval shows the vouchers still waiting now.</span>}
               </span>
             )}

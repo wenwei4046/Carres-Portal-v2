@@ -346,6 +346,8 @@ export const LEDGER_SOURCE_WORDS: Readonly<Record<string, string>> = {
   MANUAL: "Manual journal",
   // The month close's accrual (migration 0666).
   DEALER_COMMISSION: "Dealer commission",
+  // Finance's figures at go-live, posted once (migration 0705).
+  OPENING: "Opening balances",
 };
 
 export function isReversalSource(sourceType: string): boolean {

@@ -987,7 +987,7 @@ describe("Reports — an account line opens the entries behind it", () => {
 
 describe("Reports words", () => {
   const here = dirname(fileURLToPath(import.meta.url));
-  itSaysNoBannedWord(join(here, "FinanceReports.tsx"), { minStrings: 12, expectString: "No opening balances" });
+  itSaysNoBannedWord(join(here, "FinanceReports.tsx"), { minStrings: 12, expectString: "Months before then have no figures." });
   itSaysNoBannedWord(join(here, "reports", "by-month.ts"), { minStrings: 3, expectString: "Net result not yet closed" });
   itSaysNoBannedWord(join(here, "reports", "StatementTable.tsx"), { minStrings: 3, expectString: "Net result not yet closed" });
   itSaysNoBannedWord(join(here, "reports", "ReportDrill.tsx"), { minStrings: 3, expectString: "Name not available" });

@@ -6,7 +6,7 @@ import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { fmtDate } from "@/lib/fmt-date";
-import { useApBillOutstanding, useApOutstanding } from "@/lib/payables-queries";
+import { useApBillOutstanding, useApOpeningBills, useApOutstanding } from "@/lib/payables-queries";
 import { cents, creditorKindWord, money, num } from "./payables-words";
 import { ReadFailed } from "./PayablesParts";
 import { supplierUnpaid, unpaidTotal } from "../money-owed";
@@ -141,6 +141,23 @@ function onVoucher(r: ApOutstandingRow): number | null {
   return a === null || p === null ? null : cents(a - p);
 }
 
+/** 0705: the supplier's opening bills still unpaid (Opening balances). Paid by voucher like a bill. */
+function OpeningBillsOf({ supplierId }: { supplierId: string }) {
+  const bills = useApOpeningBills(supplierId);
+  const open = (bills.data ?? []).filter((b) => (num(b.balance_owing) ?? 0) > 0);
+  if (bills.isError) return <p role="alert">The opening bills could not be loaded. Try again.</p>;
+  if (open.length === 0) return null;
+  return <div className="mt-2" data-testid={`ap-outstanding-opening-${supplierId}`}>
+    {open.map((b) => (
+      <p key={b.item_id}>
+        Opening bill {b.doc_no} · {fmtDate(b.doc_date)}
+        {" · "}{b.due_date ? `due ${fmtDate(b.due_date)}` : "no due date"}
+        {" · "}{money(b.balance_owing)} unpaid
+      </p>
+    ))}
+  </div>;
+}
+
 function UnpaidBillsOf({ row }: { row: ApOutstandingRow }) {
   const bills = useApBillOutstanding(row.supplier_id);
   const open = (bills.data ?? []).filter((b) => (num(b.balance_owing) ?? 0) > 0);
@@ -160,6 +177,7 @@ function UnpaidBillsOf({ row }: { row: ApOutstandingRow }) {
                 {" · "}{money(b.balance_owing)} unpaid
               </p>
             ))}
+      <OpeningBillsOf supplierId={row.supplier_id} />
       {(num(row.debit_open ?? 0) ?? 0) > 0 && <SupplierDebitsOf supplierId={row.supplier_id} />}
       <SupplierAdvancesOf supplierId={row.supplier_id} />
       {(num(row.credit_open ?? 0) ?? 0) > 0 && <SupplierCreditsOf supplierId={row.supplier_id} />}

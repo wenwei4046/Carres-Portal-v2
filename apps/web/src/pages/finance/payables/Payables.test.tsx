@@ -188,6 +188,7 @@ beforeEach(() => {
     [`${B}/vouchers`]: { rows: [] },
     // 0681: no supplier debit note unless a test adds one.
     [`${B}/debit-notes`]: { rows: [] },
+    [`${B}/opening-bill-outstanding`]: { rows: [] },
   };
   localStorage.clear();
 });
@@ -813,6 +814,24 @@ describe("Payment voucher form", () => {
     expect(writes()[0]!.body).toMatchObject({
       allocations: [{ billId: BILL2, amount: 200 }, { debitNoteId: DN, amount: 80 }],
     });
+  });
+
+  it("0705: pays an opening bill beside a bill, at most what no voucher holds yet", async () => {
+    const OB = "99999999-9999-4999-8999-999999999991";
+    api.routes[`${B}/opening-bill-outstanding`] = { rows: [{
+      item_id: OB, doc_no: "LSW-OLD-77", supplier_id: SUP, supplier_name: "Lumen Sofa Works", doc_date: "2026-07-01",
+      due_date: "2026-08-01", total_amount: "500.00", paid_total: "0.00", balance_owing: "500.00", ap_account_code: "2100",
+      allocated_total: "150.00", unallocated: "350.00" }] };
+    show(`/finance/payment-vouchers/new?supplier=${SUP}`);
+    const picks = await screen.findByTestId("voucher-opening-bill-picks");
+    expect(picks).toHaveTextContent("LSW-OLD-77");
+    fireEvent.click(within(picks).getByLabelText("Pay opening bill LSW-OLD-77"));
+    expect(within(picks).getByLabelText("Amount for opening bill LSW-OLD-77")).toHaveValue("350");
+    expect(screen.getByTestId("voucher-form-total")).toHaveTextContent("RM 350.00");
+    fireEvent.change(screen.getByLabelText("Paid from"), { target: { value: "1120" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0]!.body).toMatchObject({ allocations: [{ openingItemId: OB, amount: 350 }] });
   });
 
   it("0681: a debit note sent from its page arrives ticked", async () => {
