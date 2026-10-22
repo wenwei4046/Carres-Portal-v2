@@ -16,7 +16,8 @@ Presentation source: export28; [UI MASTER](ui/MASTER.md#purchasing-design-handof
 | Create form | Clear the form; more menu last; dirty guard required |
 | Draft paper label | WHAT WE ASK; document contents remain under PDF/module authority |
 | Stand-in actions | Record pickup / Record inspection / Record move are prototype labels, not evidence of built actions |
-| Pending admission | “passed”, short task titles, new RO reply-reason taxonomy and Rows20·1/1 require exact contextual reconciliation; do not globally replace the current dictionary or backend enum |
+| List pager | Rows {size} · {page}/{pages}; filtered count/totals remain; no record-card footer.20and1/1are sample values only |
+| Context-dependent source terms | “passed” and RO reply reasons remain source-specific; never globally replace a backend enum through a copy change |
 
 Source task-title examples: Share claim · {n} pc; Ask to confirm the claim result; Issue repair order; Confirm tomorrow's pickup; Pickup missed; Ask when the goods will arrive. They describe owning actions, not a second task engine. Source RO reply reasons: Material unavailable / Production delay / Transport delay / Partial quantity ready / Supplier holiday / Other. These are received design options; module/backend taxonomy is not changed by this publication.
 

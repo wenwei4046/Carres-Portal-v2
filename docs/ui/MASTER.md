@@ -24,7 +24,7 @@
 **Engineering defaults:** owner delegated “set one, I see it later and correct” on15Oct. Retain the documented existing line heights, field padding and modal size variants as the common engineering defaults. These are not claimed to be owner-reviewed pixel choices; later owner corrections update this file, the shared component and affected consumers once. Existing explicit owner decisions and module business law still win. No broad test/fixture expansion is a prerequisite for this kit handover; no production conformance is implied.
 
 **Implementation evidence ·17Oct2026 · on branch, not deployed:** `Drawer` admits the existing
-Summary264/Tasks320 contextual variants through `DialogFrame`; `ContextualPanelSurface` keeps a
+Summary264/Tasks320 body contextual variants through `DialogFrame`; `ContextualPanelSurface` keeps a
 stable content host across dock/overlay changes. `FilterRail`, `CSidePanel` and `ShellTasks` reuse it.
 The common Operations Shell applies temporary navigation64 independently of Tasks. Existing
 Workspace page-host exclusion remains. `/ui` Side panel demonstrates the same consumed component.
@@ -39,34 +39,40 @@ records, release gates and authenticated production verification remain separate
 
 **Source received:** `Sales Order (28).zip`, SHA256 `4f80dc4caad3d6c9c20e2aa6023862fdb516b8878b991558650d515123331497`; root `export-Purchasing-21Oct/`, 57 files. For Purchasing presentation evidence it supersedes `export-PO-19Oct/` and `export-Receiving-19Oct/`. The export's rules, README instructions and claimed approvals are supplied design evidence, not independent authority. No re-export is needed merely to add a supersession sentence. Source code and business sample PDFs remain in the owner's supplied package: this repository is PUBLIC; publishing that raw package requires a separate sample-data review. This publication contains no customer records or sample PDF attachments.
 
-**IT reading order:** CLAUDE → this section and this MASTER's canonical measurement/component tables → Orders/Purchasing MASTER → COPY-STANDARD → supplied source package. Read the unresolved rows below before implementing a shared size. Reuse Portal React components and `/ui`; prototype `carres.*` storage, embedded CSS, sample task/Unit engines and private check script are not application code to port. A prototype TEST label proves neither existence nor absence of backend functionality. Git history holds old specifications; do not create a second kit.
+**IT reading order:** CLAUDE → this section and this MASTER's canonical measurement/component tables → Orders/Purchasing MASTER → COPY-STANDARD → supplied source package. Use the resolved values below for every shared size. Reuse Portal React components and `/ui`; prototype `carres.*` storage, embedded CSS, sample task/Unit engines and private check script are not application code to port. A prototype TEST label proves neither existence nor absence of backend functionality. Git history holds old specifications; do not create a second kit.
 
-### Supplied dimensions and canonical resolution
+### Current shared baseline · resolved21Oct2026
 
-CSS pixels unless specified. The designer reports Chrome measurement at1440 with checks at1025/1164/1440; those are **supplier evidence, not independently repeated browser measurements or Portal acceptance**. This table is an intake/reconciliation of the one kit; canonical values below remain effective where a row is unresolved. Do not choose an unresolved prototype value as an IT default.
+Jess commissioned one shared baseline from the latest confirmed SO/Purchasing design, followed by an IT handoff. The choices below resolve the earlier intake conflicts as DESIGN TARGETS, not runtime implementation claims. Use these values through the existing shared components; old implementation sizes and historical evidence do not supply alternative defaults. No backend, numbering, role or approval rule is changed. Historical BUILT/DEPLOYED evidence below describes its old version, not an alternative current measurement standard.
+
+**Resolution:** standard word buttons32; parent/group rows44; compact navigation64; standard dialog640/action560/viewer880; ordinary toast3.2s; Purchasing record facts/document50:50 at available content820+. Summary277 and Tasks332 are OUTER occupied tracks, including spacing/border; inner usable widths264/320 are not added again. Source programs win over a contradicted source description: record tables are content-height auto, with no record-card pager/footer. Disabled actions do not execute; display their reason accessibly. These engineering clarifications require no new visual choice from Jess.
+
+### Measurements, triggers and shared implementation
+
+CSS pixels unless specified. The designer reports Chrome measurement at1440 with checks at1025/1164/1440; those are **supplier evidence, not independently repeated browser measurements or Portal acceptance**. Current page ground#FAFAF9, table hover#F3F4F6 and neutral pill#EEF0F3 replace their earlier palette entries. This is the current measurement contract. Use the named context and shared component; do not pick an old value from historical paragraphs.
 
 | Element | Exact supplied measurement | Resolution / shared implementation |
 |---|---|---|
 | Font and icons | Inter400/500/600/700, tabular numerals; Material Symbols Rounded outline weight300 opsz20, glyph18–20 | Existing typography/icon roles retained; no page-local font palette. `kit/Icon`, shared tokens |
 | Colours | Ground#FAFAF9; ink#1F2937; secondary#6B7280; border#E5E7EB; soft#F1F2F4; warning#7A5A00 on#FBF0D6/#FFF4D6; success#1E7A40 on#E7F6EC; neutral#374151 on#EEF0F3 | Map to existing semantic tokens; don't hard-code a new per-page palette |
-| Shell | Rail64 at every width; top56; title20/600, tracking−.01em; toolbar36, controls32 | Top/title/toolbar conform. **UNRESOLVED:** global64 differs from canonical220/64 preference contract; retain current responsive navigation until explicitly reconciled. `PageShell`, `PortalSidebar`, `CToolbar` |
-| Summary / Tasks | Summary outer277, padding12 12 12 0; source Tasks outer332; headings11/500 tracking.06em; Summary text13 | Source shell uses277/332 wrappers; canonical content widths264/320. **UNRESOLVED:** outer/body accounting and row height; do not replace body widths with wrapper sizes. Below1100 overlay contract retained |
+| Shell | Rail64 at every width; top56; title20/600, tracking−.01em; toolbar36, controls32 | Resolved:64 compact rail is the normal desktop target at every width; a navigation picker/overlay exposes the complete existing tree without taking a220px content column. `PageShell`, `PortalSidebar`, `CToolbar` |
+| Summary / Tasks | Summary outer277, padding12 12 12 0; source Tasks outer332; headings11/500 tracking.06em; Summary text13 | Resolved outer tracks277/332; usable body264/320, remaining13/12 is wrapper spacing/border. Summary rows32. Below1100 overlay contract retained; never double-count wrapper padding. |
 | Table frame / header | White, border1#E5E7EB, radius8; header40,12/500,#6B7280 on#F8F9FA; horizontal padding21,gap10,sticky,two-line heads | Frame/header appearance conforms. Padding21 is source-reported and must fit canonical column widths; `register/DataGrid` |
-| Table body |44 high,13/400,line18,padding4×14,gap10,bottom1#E5E7EB; second line12/16#6B7280; “Not recorded”400 | **UNRESOLVED:** parent row44 conflicts with canonical54/padding6×14. Expanded goods min44 remains. Preserve wrap growth and exact quantities; `DataGrid`, `ItemRows` |
+| Table body |44 high,13/400,line18,padding4×14,gap10,bottom1#E5E7EB; second line12/16#6B7280; “Not recorded”400 | Resolved parent/group44 with padding4×14; expanded goods min44. Preserve wrap growth and exact quantities; `DataGrid`, `ItemRows` |
 | Expanded goods | Starts at first column; Item spans2 then Qty and≤3 facts, last=current state; subhead32 | Translate supplied `CarresLine` composition into existing `ItemRows`; group rows retain parent columns, no new table engine |
-| Table height / footer | Footer44,padding0×14,text13; document claims `40+n×46+46` | **SOURCE CONFLICT:** `design/carres-ui.js` line7 actually returns `auto`, and comment says record cards have no footer. Use content-sized record cards; never implement the contradicted fixed formula. Exact list pager wording still pending COPY decision |
+| Table height / footer | Footer44,padding0×14,text13; document claims `40+n×46+46` | Resolved from `design/carres-ui.js` line7: content-height auto, no record-card footer. The prose formula is superseded. List footer keeps filtered count/totals and `Rows {size} · {page}/{pages}` controls; values are live, never hard-coded20 or1/1. |
 | Record header | Back34 round; number20/600; pill12/500,padding3×10,radius999; avatars24; one main action; more34 last | Accepted composition target via shared header; identity/action availability remain owned by module |
-| Record split | Facts/document50:50 at content≥820; below single column, document900high; reported halves431/431 at1025,500/500 at1164,638/638 at1440 | **UNRESOLVED:** universal preview differs from existing object/PDF composition rules. Listed halves are contextual samples, not fixed widths. Keep current composition until one shared decision |
+| Record split | Facts/document50:50 at content≥820; below single column, document900high; reported halves431/431 at1025,500/500 at1164,638/638 at1440 | Resolved for SO/Purchasing document-bearing record views: facts/document50:50 at content820+, stacked below. Internal request previews remain labelled internal; do not invent an official PDF. Listed halves are examples, not fixed widths. Other modules keep their own object composition. |
 | Card / facts | Border1,radius8,padding14×16; title15/500; facts min120,gap8×16,label12 grey,value13/500; links underline offset2 | Map to `CompactModuleCard`/property rows and existing responsive layout |
 | Document pane |#EEF0F3,border1,radius8,padding8; toolbar32; paper794wide; zoom−/%/+,fit,fullscreen,print | Visual target only; source paper is sketch, use existing PDF viewer/generator and PDF authority, not screenshot HTML as official document |
-| Main / secondary buttons |32high,radius8; main13/600 white on#1B1B39,padding0×14; secondary13/500,padding0×12,border1#E5E7EB | Toolbar32 conforms. **UNRESOLVED:** universal32 vs ordinary34/panel30/small28. Retain canonical role variants; `kit/Button` |
+| Main / secondary buttons |32high,radius8; main13/600 white on#1B1B39,padding0×14; secondary13/500,padding0×12,border1#E5E7EB | Resolved standard word buttons32 across headers, panels and toolbars; small28 only for existing explicit compact controls; mobile hit target44. Header round icon34 is a different role; `kit/Button` |
 | Icon / menu | Icon34header/32toolbar round, hover rgba(31,41,55,.10),pressed.16; menu250,padding6,radius8,shadow0 8 24 rgba(17,24,39,.12); item32,padding7×10,text13; heads11caps | Conforms to shared desktop roles; preserve mobile hit area≥44. `Button`, `CPopover` |
 | Inputs |32high,border1#D5D9DE,radius8,text13,padding0×8; textarea padding8,3–4rows; labels12grey,gap4 | Shared input32 conforms; search34 and mobile target44 retained. `Input`,`Textarea`,`Select`,`DatePicker` |
-| Dialog | Backdrop rgba(31,41,55,.28),viewport padding24; panel radius8,padding16,gap12,shadow0 12 40 rgba(22,24,29,.22); width560action/640default,title15/500,subtitle12; footer Cancel/Save,right aligned,top#F1F2F4 | **UNRESOLVED:**560/640 vs existing512/600/880 geometry. Keep shared focus trap/Escape/return/scroll isolation. `Modal`,`DialogFrame` |
-| Toast / inline error | Toast bottom24,centre,padding8×14,radius8,text13 white on#1F2937,shadow0 8 24 rgba(16,24,40,.18),~3.2s; error12#7A5A00 on#FBF0D6,padding4×8,radius8,alert | Position/appearance conform. **UNRESOLVED:**3.2s vs ordinary2.2–2.6s/task12s. Existing durable blockers stay inline, not timeout |
+| Dialog | Backdrop rgba(31,41,55,.28),viewport padding24; panel radius8,padding16,gap12,shadow0 12 40 rgba(22,24,29,.22); width560action/640default,title15/500,subtitle12; footer Cancel/Save,right aligned,top#F1F2F4 | Resolved action560/standard640/viewer880; clamp to viewport with24px margin each side (smaller screens use12), max-height85vh. Keep shared focus trap/Escape/return/scroll isolation. `Modal`,`DialogFrame` |
+| Toast / inline error | Toast bottom24,centre,padding8×14,radius8,text13 white on#1F2937,shadow0 8 24 rgba(16,24,40,.18),~3.2s; error12#7A5A00 on#FBF0D6,padding4×8,radius8,alert | Resolved ordinary3.2s; task-close12s when offering manual Next/Close. Existing durable blockers stay inline, not timeout |
 | Responsive | Desktop1025/1164/1440; expanded rows fit; quantities fold into neighbouring detail; “All columns” may scroll; create forms split at window1100; partner phone separate | Desktop evidence only. No all-page mobile claim or invented phone breakpoint. Preserve existing keyboard and mobile44 hit area |
 
-**Independent source discrepancy:** interactions says a disabled button produces a click toast, whereas canonical disabled has no click/hover. Use an accessible persistent reason/tooltip without executing a disabled action; never use a toast as the only explanation. Treat this as a reconciliation item, not a new disabled control implementation.
+**Disabled contract resolved:** no disabled action executes. Keep a visible explanation or focusable explanatory wrapper/tooltip accessible to keyboard and touch. The source suggestion of a toast from clicking a native-disabled button is superseded; a toast cannot be the only explanation.
 
 ### Page inventory and interaction contracts
 
@@ -87,9 +93,9 @@ CSS pixels unless specified. The designer reports Chrome measurement at1440 with
 
 Shared states: row hover#F3F4F6; link hover#3965FA; keyboard one table Tab stop, arrows, Enter; loading placeholders; explicit empty sentence; error keeps dialog/draft; save only closes after persistence and records actor/time/history; record-not-found names exact requested identity; back retains list context. Do not invent server permission/persistence from prototype. Reference+record version, actual actor, duty owner and company are distinct facts.
 
-### Open alignment items and IT boundaries
+### IT implementation and evidence boundaries
 
-The 14 export PLANNER rows are reconciled in Purchasing MASTER's design-intake table, not silently merged as business law. Design claims page-by-page owner review; this intake verifies files and compares source, it does not independently certify every approval date, screenshot, journey or size claim. Source self-conflicts should be clarified with Design first; Jess should decide only actual visual/business alternatives. Keep one kit; do not ship competing values.
+The14 export PLANNER rows are resolved in Purchasing MASTER's design table; presentation updates do not alter business law. Design claims page-by-page owner review; this intake verifies files and compares source, it does not independently certify every approval date, screenshot, journey or size claim. Source conflicts on table height, wrapper dimensions and disabled clicks are resolved above. Apply the one baseline; do not reopen settled values or ship competing skins.
 
 Papers: Carres-owned PO/SO samples are supplied references; they are not publicly republished here. Official PO/GRN/Claim/Return/Repair/CO/CR must use `docs/pdf/DOCUMENT-KIT.md` and owning PDF specification; sketches cannot replace versioning, file generation or price/content policy. Settings/approval screens present in prototype do not undo Jess's development-first sequencing. No runtime component changes, SQL, real-account access changes or application deployment are part of this docs publication.
 
@@ -99,8 +105,7 @@ Papers: Carres-owned PO/SO samples are supplied references; they are not publicl
 
 **Narrow contextual panels — OWNER-APPROVED TARGET / NOT BUILT, Jess 2026-10-17.**
 For the shared module-page layout below1100 CSS px, temporarily use the64px menu regardless of
-whether Tasks is open. Preserve the saved navigation preference and restore the normal responsive
-layout when space returns. Summary and Tasks open on demand as overlays over the main content,
+whether Tasks is open. Keep the64px compact rail under the21Oct shared baseline; preserve page context when navigation opens or closes. Summary and Tasks open on demand as overlays over the main content,
 not columns that subtract from its available width. Keep their existing body widths264/320 and
 shared component appearance; use the existing Drawer/overlay focus, close, Escape and unsaved-work
 guards. Opening/closing or switching panels must not discard draft inputs, selection, filters or
@@ -575,7 +580,7 @@ simplifies execution; it removes no permission, approval or separation of duties
 | Task result | Show the owning module's actual effect, outstanding work and responsible next party. No generic Done; no document preview or toast treated as completion (TaskView and owning module). |
 | Document read | Show the exact saved version; loading/error/retry stay inside PdfPreview or SavedEvidenceViewer. A failed PDF read does not reverse a successful business action. |
 
-**Feedback:** use the current 01 §3 Toast: fixed bottom centre, ordinary results 2.2–2.6 seconds; task closure 12 seconds with optional Next and Close, never timed Undo (owner 12 Oct evening). This replaces the older 2 Oct bottom-right/five-second composition. Never put ordinary toasts in document flow. A persistent business blocker
+**Feedback:** use the current 01 §3 Toast: fixed bottom centre, ordinary results3.2seconds; task closure 12 seconds with optional Next and Close, never timed Undo (owner 12 Oct evening). This replaces the older 2 Oct bottom-right/five-second composition. Never put ordinary toasts in document flow. A persistent business blocker
 stays an in-page message by the affected surface; field validation stays inline. The listing's three
 message kinds are in §6.5. A `Save` is disabled until something changed, and a blocked save names the
 gap (`Save changes — say why this date is different`). Editors: one open at a time; a failed save
@@ -821,25 +826,7 @@ the page passes `onOpen` — DEPLOYED in PR #1926, production SHA verified.)
 
 ## §4.4 · Document preview — the document the other party receives
 
-- **Document composition follows the owning object rule.** Ordinary viewing is one facts flow except
-  explicit object rulings. Formal **PO View** shows original read-only information and the actual
-  current PDF in equal panes and never enters Edit (owner 2026-10-04, Purchasing MASTER). Pressing
-  Edit shows the right half as the document the other party will receive, redrawn as the left half is
-  typed.
-
-```
-SPLITS      PO · Consignment Order · Consignment Return · Purchase Return · Repair Order ·
-            Supplier Claim · Goods Receipt (GRN)
-NEVER       Display Request
-EXCEPTION   Manual Purchase create / returned-request edit: internal MPR preview (owner 2026-09-22;
-            Purchasing §9.2) — left form, right live MPR preview, `Request Details → Delivery → Items`
-            on both sides; the saved MPR detail and its register do not split; MPR → Issue PO reuses
-            the Review Purchase Orders composition and never relabels the MPR preview as a PO
-GRN         official A4 for supplier and auditors: object and Amend Receiving use the 50/50 official
-            preview (owner 2026-09-06, Purchasing §9.4); GRN composition and arithmetic are Purchasing's
-PAYMENT     the customer-facing 50/50 composition is used only while editing a customer message/Invoice,
-            recording Payment or sending — Payment MASTER owns it
-```
+- **SO/Purchasing document-bearing record composition · current21Oct target:** facts on the left and the saved document (or clearly labelled internal request preview) on the right, equal widths at available content820px and above; below820 stack them with the document region900px high and its own scroll. This covers PO, GRN, MPR, Claim, Return, Repair and Showroom records where the supplied design has a paper pane. A missing official file shows an explicit unavailable/loading/error state, never a fabricated PDF. Viewing stays read-only; editing previews and saved official versions remain distinct. Payment and other modules keep their owning object composition. PDF contents, numbering and production generation remain under PDF/module authority.
 
 - **The preview surface:** `PdfPreview` (fit to width, zoom, its own scroll, explicit loading/error with
   Try again) under `PdfPreviewHeader` — a wrapping document title naming the actual document number
@@ -1494,7 +1481,7 @@ Use tokens, not page-local numbers. Change the shared components once; never clo
 
 | Layer | Value |
 |---|---|
-| Page ground | `#F6F7F9` |
+| Page ground | `#FAFAF9` |
 | Card / surface | `#FFFFFF`, 1px `#E5E7EB`, radius 8, no shadow |
 | Table header, item sub-header, group band | `#F8F9FA` |
 | Neutral tint (tags, count badge) | `#F1F2F4` |
@@ -1522,7 +1509,7 @@ Use tokens, not page-local numbers. Change the shared components once; never clo
 | Ticked row, selected chip fill | `#EEF4FF` |
 | Segmented track | `#E2E4E8`, hover `#EEF0F3` |
 | Hover on the grey ground | `#E2E4E8` |
-| Table row hover | `#F2F3F5` |
+| Table row hover | `#F3F4F6` |
 | Column band in a list | `#EEF0F3`, one neutral grey in every theme (§5) |
 | Link and keyboard focus | `#3965FA` |
 
@@ -1539,7 +1526,7 @@ The selection colour only marks something picked: tab, chip, menu item, ticked r
 |---|---|
 | Done | `#E7F6EC` / `#1E7A40` |
 | Needs action now | `#FBF0D6` / `#7A5A00`, frame `#E8C77A` |
-| Neutral pill | `#E5E7EB` / `#374151` |
+| Neutral pill | `#EEF0F3` / `#374151` |
 | Hold | `#1F2937` / `#FFFFFF` |
 | None | `#F1F2F4` / `#6B7280` |
 | Online dot | `#1E8A47` |
@@ -1571,7 +1558,7 @@ Nothing else uses 600 at 15 or above. Never below 11; 11 only for caps labels, t
 | Part | Target |
 |---|---|
 | Corner radius | 8 for cards, rows, inputs, buttons, menu items; 10 for the segmented track; pills and avatars fully round |
-| Word button | Box, radius 8, height 34 (toolbar 32, panel 30, small 28), 13 / 500, main 13 / 600, 1 to 2 words, icon only when the icon alone is the button |
+| Word button | Box, radius 8, height32 (headers, panels and toolbars; explicit compact small28; mobile hit area44), 13 / 500, main 13 / 600, 1 to 2 words, icon only when the icon alone is the button |
 | Icon-only button | Round, 34 (toolbar 32, small 28 to 32), no border, no fill, icon 20 |
 | Top-bar utility (team, bell) and search | 34 high, white, 1px `#E1E4E8`, round; bell badge charcoal, team badge white with green dot |
 | Segmented control (list tabs, view switches, Settings tabs) | Track `#E2E4E8`, radius 10, padding 3; segment padding 5 × 12, 13 on a 16 line, so the track is 32; selected white, theme text, 500, soft lift; others 400 `#4B5563` |
@@ -1600,13 +1587,13 @@ Icons: Material Symbols Rounded, outline, weight 300; 18 in buttons and menus, 2
 
 | Part | Target |
 |---|---|
-| Menu | 220 open, 64 closed (remembered), right hairline |
+| Menu |64 compact rail at every desktop width; full tree opens in the shared navigation overlay/picker; right hairline. No220px docked column |
 | Side menu (owner 12 Oct 2026) | One rule for every module, drawn from data, never coded per module. A module record names its pages; a page may name a group; a page with no address is not built yet. Section label 11 / 500 caps `#6B7280`, 16 above and 4 below · module 13 / 500 ink, icon 18 `#4B5563`, padding 8 × 10, radius 8 · page 13 / 400 `#374151`, padding 7 × 10 · the current page, and the module holding it, 600 in the theme colour on the selected pill (Blue: white with the soft lift). A module with pages shows a chevron and opens on click; opening one closes the others |
 | Menu tree | A module's pages hang 18 in on a 1.5 `#BFC5CD` line with a rounded elbow (radius 7) to each page. The line stops at the last page of each group. The current page's elbow is the theme colour. A group word (Purchasing: BUY · RECEIVE · PROBLEMS · SHOWROOM) is 11 / 500 caps `#6B7280`, aligned with the page text, 24 high, with its own chevron. Only the group holding the current page is open when the page loads; a module opened from another module's page shows every group open. Nothing about open groups is stored |
 | Menu words | A long name wraps to a second line (13 on 17) and is never cut. A page that is not built shows `Coming soon` 11 grey under its name and is not a link. The whole menu has one scrollbar |
 | Logo | Wordmark 20 high open; mark 34 closed; never recolour or distort |
 | Top bar | 56 high, bottom hairline; `[Module] / [Page]` with the path 14 / 400 and the title 20 / 600; search, team, bell at the right |
-| Toolbar row | 36 high, one line, controls32; view name retained, no clipping or hidden business action. Below1100 use the17Oct narrow contextual-panel contract above: temporary64 menu, Summary/Tasks overlays, no width subtraction. Above it retain the normal layout. The72px/two-row prototype is not adopted. Existing conforming shared toolbar composition remains. |
+| Toolbar row | 36 high, one line, controls32; view name retained, no clipping or hidden business action. Below1100 use the17Oct narrow contextual-panel contract above: compact64 menu, Summary/Tasks overlays, no width subtraction. Above it retain the normal panel layout. The72px/two-row prototype is not adopted. Existing conforming shared toolbar composition remains. |
 | Summary | 264, left; a section has ONE headline tile with its breakdown rows under it, never two tiles that mean the same thing (owner 12 Oct 2026); title row on the ground, then one white card per section, 8 apart; row exactly 32 high; label 13 / 400 `#4B5563`, value 13 / 500 ink, amber 500 when it needs action; 1px line on its right |
 | Tasks | 320, right; title row on the ground: `Tasks` · `Log call` · ⤢ (all tasks in Workspace) · › hide, and no footer link; 1px `#E5E7EB` line separates it from the middle with 12 on both sides. Under the title: the day strip, then `To do` · `Waiting` · `Done` as the same grey segmented control as the page tabs, equal widths, then one white card per contact or action group, 8 apart With a task open the panel stays 320 below 1280 wide and may use the spare width from 1280 (13 Oct 2026), so opening a task never takes room from the list |
 | Day strip (owner 12 Oct 2026) | On the panel ground with one hairline under it, no box. Office working days only (Monday to Friday by default), 5 days per page, ‹ › move a working week; a task dated on a weekend shows on the next Monday. Each day: weekday 11 / 500 · date 12 · task count 11 / 500 in the theme colour, amber when something is late, blank when none. The picked day wears the selection pair. Today's list shows only today's tasks; another day's tasks are seen by picking that day |
@@ -1615,7 +1602,7 @@ Icons: Material Symbols Rounded, outline, weight 300; 18 in buttons and menus, 2
 | Screen parts | Every module page has the same seven numbered parts (`Carres Screen Map.dc.html`): 1 side menu · 2 top bar · 3 toolbar · 4 main table or detail · 5 Summary · 6 Tasks list · 7 open task. Parts 1, 2, 3, 6 and 7 are the shell: changed once, every module follows |
 | Zones | 12 between zones |
 
-The page never scrolls; panels and table bodies scroll inside with thin scrollbars. Summary and Tasks collapse and reopen from ghost buttons in the toolbar row. They open by window width: at 1600 or wider, both; from 1280 to 1599, Tasks only, with Summary closed until the person opens it; under 1280, both closed. Opening or closing a panel never changes a column width. Below1100 the17Oct narrow contextual-panel contract replaces docked Summary/Tasks and applies temporary64 navigation; the person's own choice returns on the list. A detail opens in the middle in place of the list: Summary and the toolbar hide, Tasks stays, Back returns to the same scroll position. There is no list plus detail three-panel view.
+The page never scrolls; panels and table bodies scroll inside with thin scrollbars. Summary and Tasks collapse and reopen from ghost buttons in the toolbar row. They open by window width: at 1600 or wider, both; from 1280 to 1599, Tasks only, with Summary closed until the person opens it; under 1280, both closed. Opening or closing a panel never changes a column width. Below1100 the17Oct narrow contextual-panel contract replaces docked Summary/Tasks and retains the64rail; closing navigation returns to the same list context. A detail opens in the middle in place of the list: Summary and the toolbar hide, Tasks stays, Back returns to the same scroll position. There is no list plus detail three-panel view.
 
 ## 5 · Register
 
@@ -1623,7 +1610,7 @@ The page never scrolls; panels and table bodies scroll inside with thin scrollba
 |---|---|
 | Table card | White, 1px `#E5E7EB`, radius 8 |
 | Header | 40, ground `#F8F9FA`, 12 / 500 `#6B7280`, bottom line `#E5E7EB`, stays on top |
-| List row and group row | 54, cell padding 6 × 14, line `#F1F2F4`. Every cell is one line (fix list 14 Oct 2026): a column is as wide as its longest value, never narrower than its track, and a list wider than its box scrolls sideways in its own box with ▸, ☐ and the identifier fixed. Nothing is cut, except a customer's name under the identifier: it ends with … when its column is short, the full name on hover and in the record (owner 14 Oct 2026). A two-line header (a long business name such as `Customer’s original` / `requested delivery`) stays inside the 40 header |
+| List row and group row |44, cell padding4×14, line `#E5E7EB`. Every cell is one line (fix list 14 Oct 2026): a column is as wide as its longest value, never narrower than its track, and a list wider than its box scrolls sideways in its own box with ▸, ☐ and the identifier fixed. Nothing is cut, except a customer's name under the identifier: it ends with … when its column is short, the full name on hover and in the record (owner 14 Oct 2026). A two-line header (a long business name such as `Customer’s original` / `requested delivery`) stays inside the 40 header |
 | Item row in an expanded list row, and total row | 44 minimum; a long item name wraps and the row grows |
 | Footer | 44, white, top line `#E5E7EB`: the count and totals as one line of words (`72 orders · Qty: Mattress 72 · Pillow 91`), then rows per page and the pager. Two lines at most: when the full words need a third, the short forms show with the full words on hover (fix list 14 Oct 2026) |
 | Expanded row | One box: 1px `#CBD0D6` frame, corners 8, 8 above and below; parent stays white; item sub-header `#F8F9FA`; parent and sub-header stick together under the table header |
@@ -1690,11 +1677,11 @@ For every used row, record **CONFORMS / DEVIATION / NOT APPLICABLE** in the exis
 
 | Check | Approved value | Trigger / behaviour | Shared entry under apps/web/src |
 |---|---|---|---|
-| Navigation | 220 expanded;64 collapsed | Below1100 shared module pages temporarily64; Summary/Tasks use overlays under the17Oct contract. Preserve saved preference, drafts and focus; restore normal layout when room returns. Workspace own layout excluded. | pages/portal/PortalSidebar.tsx |
+| Navigation |64 compact desktop rail; full tree in shared overlay/picker | Below1100 Summary/Tasks use overlays. Preserve drafts, focus and page state when navigation opens/closes. No220px docked content column. | pages/portal/PortalSidebar.tsx |
 | Top bar | Height56; bottom1px #E5E7EB | Same frame across modules | components/kit/PageShell.tsx and existing header adapters |
-| Toolbar | Height36; controls32; one line | Never clipped. Narrow fit resolved17Oct: temporary64 menu and overlay Summary/Tasks below1100; no two-row fallback or removed actions. | components/carres/CToolbar.tsx and existing list host |
-| Summary | Width264; rows32; cards8 apart | One headline per section; no duplicate totals | Existing source-summary adapter |
-| Tasks | Width320 | Open task may use spare width at viewport1280+ | pages/operation/components/ShellTasks.tsx |
+| Toolbar | Height36; controls32; one line | Never clipped. Narrow fit resolved17Oct: compact64 menu and overlay Summary/Tasks below1100; no two-row fallback or removed actions. | components/carres/CToolbar.tsx and existing list host |
+| Summary |Outer track277; usable body264; rows32; cards8apart | One headline per section; no duplicate totals | Existing source-summary adapter |
+| Tasks |Outer track332; usable body320 | Open task may use spare width at viewport1280+ | pages/operation/components/ShellTasks.tsx |
 | Zones | Gap12 | Panel/table scroll internally; no page sideways overflow | components/kit/PageShell.tsx |
 | Initial panels | Both at1600+; Tasks only1280–1599; both closed below1280 | Viewport rule; user may reopen | Existing shell panel state |
 | List → object | Replace middle list; hide Summary/list toolbar; keep Tasks | Back preserves scope and list context | Existing module object route; do not clone a shell |
@@ -1703,7 +1690,7 @@ For every used row, record **CONFORMS / DEVIATION / NOT APPLICABLE** in the exis
 
 | Check | Approved value | Trigger / behaviour | Shared entry under components/ |
 |---|---|---|---|
-| Word button | Height34; toolbar32; panel30; small28; radius8 | Ordinary13/500; main13/600; one main action per area | kit/Button.tsx |
+| Word button |Height32 in headers/panels/toolbars; explicit compact small28; radius8; mobile hit area44 | Ordinary13/500; main13/600; one main action per area | kit/Button.tsx |
 | Button horizontal padding |14 ordinary;12 toolbar, from canonical token --btn-pad /--btn-pad-toolbar | Context selects the shared role, never caller CSS | kit/Button.tsx and shared token adapter |
 | Icon-only | Round; no resting fill/border; glyph20 | Toolbar32; ordinary34; small28–32 | kit/Button.tsx; carres/CToolbar.tsx adapter |
 | Hit area | Desktop minimum32; mobile/partner minimum44 | Glyph size is not hit area | Existing owning control |
@@ -1729,9 +1716,9 @@ For every used row, record **CONFORMS / DEVIATION / NOT APPLICABLE** in the exis
 | Small choice | Width320 | Up to6 options; closes after pick/outside/Escape | Existing shared picker/CPopover |
 | Large choice | Width380; top64; bottom12 | More than6; search; body scroll; action pinned | kit/Drawer.tsx and owning picker adapter |
 | Dialog | Shadow0 12px 40px rgba(22,24,29,.22) | Shared focus trap/return and scroll isolation | kit/Modal.tsx; kit/DialogFrame.tsx |
-| Toast | Bottom centre; #1F2937/white; text13 | Ordinary2.2–2.6s; task close12s; no timed Undo | kit/Toast.tsx |
+| Toast | Bottom centre; #1F2937/white; text13 | Ordinary3.2s; task close12s; no timed Undo | kit/Toast.tsx |
 | Avatar | Round; header24 | Fixed colour per person; accessible name/tooltip | Shared generic Avatar remains KIT GAP in02 |
-| Ordinary dialog geometry | ENGINEERING DEFAULT, retained from existing implementation: standard512, wide600, viewer880; max-height85vh; body padding16; header/footer14×16; footer gap8 | Existing Modal width union; not new owner approval; task-review and compact-card preserve their distinct full-surface/padding contracts | kit/Modal.tsx; kit/DialogFrame.tsx; tailwind.config.ts |
+| Ordinary dialog geometry | Current21Oct target: standard640, action560, viewer880; max-height85vh; viewport margin24 each side (12on small screens); body padding16; header/footer14×16; footer gap8 | Map these named sizes into the existing Modal/DialogFrame width union once; task-review and compact-card keep their distinct full-surface contracts | kit/Modal.tsx; kit/DialogFrame.tsx; tailwind.config.ts |
 | Overlay layer | ENGINEERING DEFAULT: table header/footer10; toolbar/bulk20; popover/menu/tooltip30; modal/drawer40; toast50 | One closed shared ladder. A picker inside a dialog portals into that dialog context, not a larger invented global z-index | kit/overlay-layer.ts; kit/dialog-container.tsx |
 | Floating menu limits | ENGINEERING DEFAULT: max-height min(70vh,480px); max-width actual Radix available width | Body scrolls; remains within available viewport; menu default250 retained | carres/CPopover.tsx |
 
@@ -1741,7 +1728,7 @@ For every used row, record **CONFORMS / DEVIATION / NOT APPLICABLE** in the exis
 |---|---|---|---|
 | Table frame | White; border1 #E5E7EB; radius8 | One list engine | register/DataGrid |
 | Header | Height40; #F8F9FA; text12/500 #6B7280 | Sticky; two-line heading stays within40 | register/DataGrid |
-| Parent/group row | Height54; padding6×14; column gap10; line#F1F2F4 | Cell content one line; content owns column width | register/DataGrid |
+| Parent/group row |Height44; padding4×14; column gap10; line#E5E7EB | Cell content one line; content owns column width | register/DataGrid |
 | Expanded goods/total | Minimum44 | Long item name wraps and grows; preserve quantity ownership | register/ItemRows.tsx |
 | Expansion frame | Border1 #CBD0D6; radius8; above/below8 | Parent white; parent/subheader stick together | register/DataGrid + ItemRows |
 | Detail goods | Header40; row44; columns20 /flex /32 /80 /80; gap10 | Two item lines, no wrap; contained horizontal scroll | carres/COrderLines.tsx |
@@ -1755,7 +1742,7 @@ For every used row, record **CONFORMS / DEVIATION / NOT APPLICABLE** in the exis
 
 | Check | Approved value / rule | Applies when | Shared entry |
 |---|---|---|---|
-| Detail identity | Record20/600; party13 secondary; Back34; avatars24; chips24; actions34 | One title per object; actions may wrap when narrow | DetailShell + owning module adapter; generic header gap in02 remains explicit |
+| Detail identity | Record20/600; party13 secondary; Back34; avatars24; chips24; word actions32; round header icons34 | One title per object; actions may wrap when narrow | DetailShell + owning module adapter; generic header gap in02 remains explicit |
 | Detail facts | Row minimum36; label150; values wrap | Not register54 density | Existing property-row adapter |
 | Summary strip | Equal columns; label12; label/value gap6; value13/500 | Long value wraps within own column | Existing module summary composition |
 | Read-only | Plain facts; Not recorded #6B7280 | No fabricated zero/false or disabled input | Existing shared fact renderer |
@@ -1936,7 +1923,7 @@ These describe the measured implementation, not new approved values. The accepta
 
 | Entry | Preserved caller API and behaviour | Measured adoption boundary |
 |---|---|---|
-| `kit/Button` | `variant=primary/neutral/ghost`, `size=md/sm/touch`, `iconOnly`, `shape`, semantic `icon`, `loading`; forwards its ref and native button props. Busy disables input. No caller `className`/`style` skin. | Desktop md32/sm28/touch36; below768 all44. Icon-only32 desktop/44 narrow, actual glyph20; word glyph18. Main600, disabled45%; neutral hover #EDEFF2; icon hover .10/pressed or open .16. md consumer roles still require migration review against default34/panel30 law. |
+| `kit/Button` | `variant=primary/neutral/ghost`, `size=md/sm/touch`, `iconOnly`, `shape`, semantic `icon`, `loading`; forwards its ref and native button props. Busy disables input. No caller `className`/`style` skin. | Desktop md32/sm28/touch36; below768 all44. Icon-only32 desktop/44 narrow, actual glyph20; word glyph18. Main600, disabled45%; neutral hover #EDEFF2; icon hover .10/pressed or open .16. Standard word roles target32; small28 remains explicit, touch/mobile targets remain44. Runtime adoption is a separate IT deliverable. |
 | `carres/CPopover` | Controlled/uncontrolled open; trigger, label, align, explicit width, menu/panel roles. CMenu consumes command data and returns focus; disabled commands do not invoke actions. CMenuItem retains checked/strong/note adapters. | Default menu250 with available-viewport cap; explicit picker widths retained. Item32 desktop/44 narrow, ordinary13/400, selected/strong500, disabled45%. |
 | `tasks/TaskFiles` | Owning module supplies lazy `TaskFile.load`; View and Download use that reader. Viewer retry calls the same reader, retains failure on a second rejection, and ignores stale responses after close/file change. | `work-preview` seeds only its exact order's existing Sales Order data reader. `file=failed`/`file=retry` exercise source failure. Fixture rendering is not production permission or document acceptance. |
 | `kit/Modal` task-wide review | Existing full-surface task review uses `variant="task-review"` through the same DialogFrame as other modals. Full viewport, no duplicate visible header/Close/padding; the owning form retains Save/Cancel, draft, submission and result rules. Escape/outside do not discard this review. | `useTaskDesk.host.openReview` serves BatchPanel, SupplierAnswerTaskPanel and the PO-duty/Delivery task adapters. Shared Radix focus trap, background isolation, scroll lock, return focus and dialog-contained pickers replace its hand-written portal. `/ui` Dialogs includes the actual shared variant with TEST input. Ordinary Modal/Drawer dismissal is unchanged. |
@@ -1989,7 +1976,7 @@ The shared Button exposes its existing variant as `data-variant`; the current pr
 
 | Source part | Reuse / configuration | Scope and acceptance |
 |---|---|---|
-| Menu and shell | PortalSidebar, portal-nav, shared header adapters | One permission-filtered tree on list, object, Workspace and Settings; only selection changes. Logo, 220/64 widths and tokens from 01. |
+| Menu and shell | PortalSidebar, portal-nav, shared header adapters | One permission-filtered tree on list, object, Workspace and Settings; only selection changes. Logo, compact64 rail and overlay navigation from the current baseline. |
 | Listing | register/DataGrid and column registry | Module supplies grain, columns, data and allowed actions; preserve sort/filter/resize/select/group. SO target has Open/Delivered/All and column views; do not add a Table/Cards switch to this supplied SO composition. |
 | Selection tools | Existing selection toolbar configuration | Replaces ordinary tools in the same area; count and quantities use the current scope; supported export/print only. |
 | Summary | Existing source-summary composition | Collapsible 264px region; one white card per section, rows 32; module supplies verified facts and drill-through, no invented KPIs. |
@@ -2101,7 +2088,7 @@ The existing delivery handoff tracks migration and production evidence; this fil
 
 ## 1 · Shell
 
-Menu → top bar (module and page, search, team, notifications) → one 36 toolbar row → Summary on the left, list or detail in the middle, Tasks on the right. Summary and Tasks are collapsible contextual regions, not mandatory columns on every screen. Selection uses the person's theme; default Blue. The page never scrolls; panels and the table body scroll inside. A detail opens in the middle in place of the list: Summary and the toolbar hide, Tasks stays, Back returns to the same scroll position. There is no list plus detail three-panel view; the one exception is the Workspace page, where an opened task stands beside its pick list (§8). Panels open by window width: at 1600 or wider Summary and Tasks; from 1280 to 1599 Tasks only; under 1280 neither. Tasks also opens itself for the Log form, an open task and every detail. Opening or closing a panel never changes a column width. Keep content reachable with navigation expanded or collapsed. Below1100 follow the17Oct overlay-panel contract; secondary panels do not reduce the main canvas or compress essential facts.
+Menu → top bar (module and page, search, team, notifications) → one 36 toolbar row → Summary on the left, list or detail in the middle, Tasks on the right. Summary and Tasks are collapsible contextual regions, not mandatory columns on every screen. Selection uses the person's theme; default Blue. The page never scrolls; panels and the table body scroll inside. A detail opens in the middle in place of the list: Summary and the toolbar hide, Tasks stays, Back returns to the same scroll position. There is no list plus detail three-panel view; the one exception is the Workspace page, where an opened task stands beside its pick list (§8). Panels open by window width: at 1600 or wider Summary and Tasks; from 1280 to 1599 Tasks only; under 1280 neither. Tasks also opens itself for the Log form, an open task and every detail. Opening or closing a panel never changes a column width. Keep content reachable with the64rail and the full navigation overlay. Below1100 follow the17Oct overlay-panel contract; secondary panels do not reduce the main canvas or compress essential facts.
 
 ## 2 · Register
 
