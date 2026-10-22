@@ -295,6 +295,7 @@ export default function ReceivingRecord({
         <>
           {/* ── The facts ─────────────────────────────────────────────── */}
           <Block title="Receiving Details">
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-x-4 gap-y-2 [&>div]:flex-col [&>div]:items-start [&>div]:gap-1 [&>div>span:first-child]:w-auto [&>div>span:last-child]:font-medium">
             <Prop label={isGrn ? "Linked PO" : "Linked PO"}>
               <span className="font-mono">{documentDisplayNumber(r.po_id ?? "")}</span>
             </Prop>
@@ -393,40 +394,12 @@ export default function ReceivingRecord({
                 </span>
               </Prop>
             ) : null}
+            </div>
           </Block>
 
-          {/* ── Unit results — Expected = Received + Not received ──────── */}
-          {(r.unit_results ?? []).length > 0 && (
-            <Block title="Unit results">
-              {(r.unit_results ?? []).map((u) => (
-                <div
-                  key={u.stock_item_id}
-                  className="flex items-center gap-2 py-0.5 text-body"
-                  data-testid={`unit-result-${u.unit_code}`}
-                >
-                  <span className="w-36 shrink-0 font-mono text-meta text-kit-slate-11">
-                    {u.unit_code}
-                  </span>
-                  <span
-                    className={
-                      u.outcome === "received"
-                        ? "text-kit-green-11"
-                        : u.outcome === "received_with_issue"
-                          ? "text-kit-red-11"
-                          : "text-kit-slate-9"
-                    }
-                  >
-                    {RECEIVING_UNIT_OUTCOME_LABEL[u.outcome]}
-                    {u.issue_kind === "wrong_item" ? " · wrong item" : ""}
-                    {u.issue_kind === "damaged" ? " · damaged" : ""}
-                  </span>
-                </div>
-              ))}
-            </Block>
-          )}
-
-          {/* ── Receiving Summary — this session, then the source's cumulative ── */}
-          <Block title="Receiving Summary">
+          {/* ── Lines ─────────────────────────────────────────────────── */}
+          <Block title="Items">
+          <div role="group" aria-label="Receiving Summary">
             <Prop label="Received Qty">
               <span className="tabular-nums">{totals.received}</span>
             </Prop>
@@ -457,10 +430,9 @@ export default function ReceivingRecord({
                 </Prop>
               </>
             )}
-          </Block>
+          </div>
 
-          {/* ── Lines ─────────────────────────────────────────────────── */}
-          <Block title="Items">
+
             {lines.map((l) => (
               <div key={l.id} className="receiving-item-row flex flex-wrap gap-2 py-1 text-body border-b border-kit-slate-4">
                 <span className="flex-1 min-w-0 font-mono text-kit-slate-12 break-words">
@@ -491,6 +463,35 @@ export default function ReceivingRecord({
                 </span>
               </div>
             ))}
+          {(r.unit_results ?? []).length > 0 && (
+            <div role="group" aria-label="Unit results">
+              {(r.unit_results ?? []).map((u) => (
+                <div
+                  key={u.stock_item_id}
+                  className="flex items-center gap-2 py-0.5 text-body"
+                  data-testid={`unit-result-${u.unit_code}`}
+                >
+                  <span className="w-36 shrink-0 font-mono text-meta text-kit-slate-11">
+                    {u.unit_code}
+                  </span>
+                  <span
+                    className={
+                      u.outcome === "received"
+                        ? "text-kit-green-11"
+                        : u.outcome === "received_with_issue"
+                          ? "text-kit-red-11"
+                          : "text-kit-slate-9"
+                    }
+                  >
+                    {RECEIVING_UNIT_OUTCOME_LABEL[u.outcome]}
+                    {u.issue_kind === "wrong_item" ? " · wrong item" : ""}
+                    {u.issue_kind === "damaged" ? " · damaged" : ""}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
           </Block>
 
           {/* ── Consequences ──────────────────────────────────────────── */}
