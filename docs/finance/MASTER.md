@@ -634,7 +634,7 @@ Carres already has a simpler Card settlement. It takes Public Bank, GHL and Mayb
 | Event or project costs | Not needed. |
 | AutoCount | Stop using it once the ERP is stable. |
 
-**Opening balances — APPROVED (Chew 2026-10-21/22); BUILT ON BRANCH 2026-10-22 (0705), NOT APPLIED, NOT DEPLOYED.** The place to enter them is built first; Chew gives the amounts later (「opening balance 要有地方输入先，数额我过后才提供」).
+**Opening balances — APPROVED (Chew 2026-10-21/22); BUILT and APPLIED 2026-10-22 (0705, tracker 20261022035556, md5 equal to the file), DEPLOYED.** The place to enter them is built first; Chew gives the amounts later (「opening balance 要有地方输入先，数额我过后才提供」).
 - **Page.** Ledger → `Opening balances`, after Journal. Tabs: Accounts · Customers and other debtors · Suppliers · Stock · Customer deposits. Finance enters it as a draft, saved and changed freely; the draft is not in the ledger.
 - **Accounts.** Every account that is not a control account, bank and cash included. Income and expense accounts take their year-to-date balance before go-live, account by account, so Carres prints the whole year's P&L (Chew 2026-10-22, 「b」).
 - **Customers, other debtors and suppliers.** For each party, its total owed first, then each invoice or bill still open (document no, date, due date, amount), so AR / AP Aging age it and a receipt or payment can settle that document. The open items should tally to the total; a party whose items do not tally may still post, with a remark showing the difference (Chew 2026-10-22, 「先输入总数，再输入每张欠的钱，两边应该tally」 and 「opening balance 可以 post 先，只是要 remark 有 different」). The part not covered by items shows as not tied to an invoice / bill.
