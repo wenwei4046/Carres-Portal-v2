@@ -14,7 +14,7 @@ import { PORTAL_MODULES, PORTAL_NAV, navBlocks, navItemHref, visibleItems } from
  *                         Debit Notes (0681) · Notes to follow up (0676) · Suppliers
  *     Receivables         AR · Receivables · Other debtors · Other receipts
  *     Bank & Cards        Daily Bank · Card settlement · Card money waiting · Money moves
- *     Ledger              Journal · General Ledger · Trial Balance · Self-check
+ *     Ledger              Journal · Opening balances (0705) · General Ledger · Trial Balance · Self-check
  *     Reports             one row per report, Payment's own report last
  *     Forecast
  *     Rental Approver · Subscriptions · Dealers               (unchanged)
@@ -41,7 +41,7 @@ describe("the Finance modules (Chew, 2026-10-03)", () => {
       "Payables: AP · Payables · Payment Vouchers · Bills · Payment Requests · Credit Notes · Debit Notes · Notes to follow up · Suppliers",
       "Receivables: AR · Receivables · Other debtors · Other receipts",
       "Bank & Cards: Daily Bank · Card settlement · Card money waiting · Money moves",
-      "Ledger: Journal · General Ledger · Trial Balance · Self-check",
+      "Ledger: Journal · Opening balances · General Ledger · Trial Balance · Self-check",
       "Reports: Profit and Loss · Balance Sheet · Cash Flow · AP Aging · AR Aging · Collection · Card charges · Dealer commission · Stock value · Payment",
       "Forecast",
       "Rental Approver",
@@ -95,6 +95,7 @@ describe("the Finance modules (Chew, 2026-10-03)", () => {
       "money-moves": "/finance/money-moves",
       dealers: "/finance/dealers",
       ledger: "/finance/ledger",
+      "opening-balances": "/finance/ledger/opening-balances",
       "general-ledger": "/finance/ledger/general-ledger",
       "trial-balance": "/finance/ledger/trial-balance",
       "self-check": "/finance/ledger/self-check",

@@ -87,7 +87,8 @@ describe("Cash Flow (0638)", () => {
   it("reads this month when no period is asked", async () => {
     show();
     await screen.findByTestId("cash-flow");
-    expect(api.calls[0]).toBe("/api/finance/ledger/cash-flow?from=2026-10-01&to=2026-10-31");
+    // 0705: the caption's opening state is read beside it; the period's read is the first of its own.
+    expect(api.calls.find((u) => u.includes("/cash-flow"))).toBe("/api/finance/ledger/cash-flow?from=2026-10-01&to=2026-10-31");
   });
 
   it("files the money under what it was for, with transfers and card payouts named", async () => {

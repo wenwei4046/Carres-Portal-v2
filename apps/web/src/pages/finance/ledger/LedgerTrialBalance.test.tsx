@@ -355,5 +355,5 @@ describe("Trial Balance drill-down", () => {
 
 describe("Trial Balance words", () => {
   itSaysNoBannedWord(join(dirname(fileURLToPath(import.meta.url)), "LedgerTrialBalance.tsx"),
-    { minStrings: 8, expectString: "No opening balances" });
+    { minStrings: 8, expectString: "Show entries" });
 });

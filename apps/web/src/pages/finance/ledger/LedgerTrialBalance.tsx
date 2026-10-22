@@ -34,6 +34,7 @@ import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { useTrialBalance } from "./ledger-queries";
+import { openingWords, useOpeningPosted } from "./opening-balances-queries";
 import { DepartmentFilter, useDepartmentParam } from "../department";
 import { headingWalk, indent } from "../reports/StatementTable";
 import { FINANCE_WIDTH, amountCell } from "../finance-widths";
@@ -102,6 +103,7 @@ export const trialBalanceLabel = (r: TrialBalanceLine) => "  ".repeat(r.depth - 
 
 export default function LedgerTrialBalance() {
   const personalLayouts = useFinancePersonalLayouts("finance_trial_balance");
+  const posted = useOpeningPosted();
   const [params, setParams] = useSearchParams();
   const asked = params.get("asOf");
   const asOf = asked && ISO_DAY.test(asked) ? asked : appTodayIso();
@@ -195,7 +197,7 @@ export default function LedgerTrialBalance() {
             <span className="w-40"><DateField value={asOf} onChange={setAsOf} aria-label="As of" /></span>
             <DepartmentFilter value={dept} onChange={setDept} />
             {goLive && <span data-testid="trial-balance-go-live">
-              Since {fmtDate(goLive)} · No opening balances
+              Since {fmtDate(goLive)} · {openingWords(posted)}
             </span>}
           </span>}
           emptyMessage={report?.status === "before_go_live"

@@ -15,6 +15,8 @@
  * voucher-pays-debit-note (0681) · forecast (last month, so the actual is a whole month) ·
  * posting-accounts · item-groups (long lists under their tables, 0657–0659) ·
  * card-payout-banks (a table since 2026-10-13) · money-accounts (0692: Chart of accounts with its money accounts; those out of use hidden until asked for) ·
+ * opening-balances (0705: a draft whose supplier's open bills do not tally,
+ * a Unit and an order not found; `&role=principal` shows Post) ·
  * dealer-commission · dealer-statement (one made-up dealer, 0664; pick it on
  * the Statement view) · notes-to-follow-up · note-to-follow-up (0676).
  * Row menu and preview (Chew 2026-10-21): right-click a row for its menu;
@@ -955,6 +957,61 @@ function entryDetail(no: string) {
   ] };
 }
 
+// 0705: Opening balances, a draft. One supplier's open bills do not tally
+// with its total (the remark shows the difference); one Unit and one order
+// are not found, so Post names that first.
+const OPENING = {
+  status: "draft", go_live_on: GO_LIVE, entry_date: soon(-61), books_closed_through: null, entry: null,
+  posted_at: null, posted_by_name: null, updated_at: at(-1), updated_by_name: "Chew", last_reversed: null,
+  may_post: ROLE === "principal",
+  accounts: [
+    { code: "310-2000", name: "HONG LEONG BANK", kind: "ASSET", special: "SBK", debit: "48210.55", credit: "0.00", eligible: true },
+    { code: "320-0000", name: "CASH IN HAND", kind: "ASSET", special: "SCH", debit: "1200.00", credit: "0.00", eligible: true },
+    { code: "100-0000", name: "CAPITAL", kind: "EQUITY", special: null, debit: "0.00", credit: "100000.00", eligible: true },
+    { code: "150-0000", name: "RETAINED EARNING", kind: "EQUITY", special: "SRE", debit: "0.00", credit: "0.00", eligible: true },
+    { code: "500-0000", name: "SALES", kind: "INCOME", special: null, debit: "0.00", credit: "312400.00", eligible: true },
+    { code: "610-0001", name: "PURCHASES MATTRESS", kind: "EXPENSE", special: null, debit: "201330.00", credit: "0.00", eligible: true },
+    { code: "900-R001", name: "RENTAL OF PREMISES", kind: "EXPENSE", special: null, debit: "36000.00", credit: "0.00", eligible: true },
+  ],
+  parties: [
+    { id: "op-1", party_type: "SUPPLIER", party_id: "s-1", name: LONG_SUPPLIER, account_code: "400-0000", account_name: "TRADE CREDITORS",
+      total: "12480.00", items_total: "12600.00", difference: "-120.00",
+      items: [{ id: "oi-1", doc_no: "OH-INV-88010", doc_date: soon(-120), due_date: soon(-90), amount: "4600.00" },
+        { id: "oi-2", doc_no: "OH-INV-88102", doc_date: soon(-80), due_date: soon(-50), amount: "8000.00" }] },
+    { id: "op-2", party_type: "SUPPLIER", party_id: "s-2", name: "Hooka", account_code: "400-0000", account_name: "TRADE CREDITORS",
+      total: "3890.50", items_total: "3890.50", difference: "0.00",
+      items: [{ id: "oi-3", doc_no: "HK-2077", doc_date: soon(-70), due_date: soon(-40), amount: "3890.50" }] },
+    { id: "op-3", party_type: "CUSTOMER", party_id: "c-1", name: LONG_CUSTOMER, account_code: "300-1000", account_name: "SHOWROOM DEBTORS",
+      total: "2400.00", items_total: "2400.00", difference: "0.00",
+      items: [{ id: "oi-4", doc_no: "IV-2608-0091", doc_date: soon(-95), due_date: soon(-65), amount: "2400.00" }] },
+    { id: "op-4", party_type: "OTHER", party_id: "fp-1", name: LONG_PARTY, account_code: "305-0000", account_name: "OTHER DEBTOR",
+      total: "800.00", items_total: "0.00", difference: "800.00", items: [] },
+  ],
+  stock: [
+    { unit_code: "U-OLD-0999", unit_id: null, found: false, sku: null, qty: null, unit_cost: "120.00", value: null },
+    { unit_code: "U-2609-0001", unit_id: "u-1", found: true, sku: "mattress:M1401F-K", qty: 1, unit_cost: "1850.00", value: "1850.00" },
+    { unit_code: "U-2609-0002", unit_id: "u-2", found: true, sku: "sofa:S220-3S-GREY", qty: 1, unit_cost: "2390.00", value: "2390.00" },
+  ],
+  deposits: [
+    { id: "od-1", order_ref: "SO-1401", customer_ref: LONG_CUSTOMER, order_id: "o-1401", found: true, so: 1401, customer_name: LONG_CUSTOMER,
+      delivered_at: null, account_code: "300-1000", amount: "1500.00" },
+    { id: "od-2", order_ref: "SO-1402", customer_ref: "Nurul", order_id: "o-1402", found: true, so: 1402, customer_name: "NURUL AIN BINTI ISMAIL",
+      delivered_at: null, account_code: "300-1000", amount: "800.00" },
+    { id: "od-3", order_ref: "SO-9999", customer_ref: null, order_id: null, found: false, so: null, customer_name: null,
+      delivered_at: null, account_code: null, amount: "250.00" },
+  ],
+  totals: { debit: "293380.55", credit: "430970.50", lines: 15 },
+  choices: {
+    customers: [{ id: "c-1", name: LONG_CUSTOMER, phone: "0123456789" }, { id: "c-2", name: "LIM KUAN YANG", phone: "0198765432" }],
+    other_debtors: [{ id: "fp-1", name: LONG_PARTY }],
+    suppliers: [{ id: "s-1", name: LONG_SUPPLIER }, { id: "s-2", name: "Hooka" }, { id: "s-3", name: "Nice Future" }],
+    debtor_accounts: [{ code: "300-1000", name: "SHOWROOM DEBTORS", control_for: "CUSTOMER" },
+      { code: "300-3000", name: "SUBSCRIPTION DEBTORS", control_for: "CUSTOMER" }, { code: "305-0000", name: "OTHER DEBTOR", control_for: "OTHER" }],
+    supplier_accounts: [{ code: "400-0000", name: "TRADE CREDITORS", control_for: "SUPPLIER" }, { code: "405-0000", name: "OTHERS CREDITORS", control_for: "SUPPLIER" }],
+    default_accounts: { CUSTOMER: "300-1000", OTHER: "305-0000", SUPPLIER: "400-0000" },
+  },
+};
+
 const realFetch = window.fetch.bind(window);
 
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -964,6 +1021,8 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
   if (init?.method && init.method !== "GET") return json({ message: "Local preview does not save records." }, 405);
   const q = new URL(url, window.location.origin).searchParams;
+  if (url.includes("/api/finance/opening-balances/state")) return json({ status: "draft", entry_date: null, entry_no: null });
+  if (url.includes("/api/finance/opening-balances")) return json(OPENING);
   if (new URL(url, window.location.origin).pathname === "/api/finance/ledger/money-accounts") return json(MONEY_ACCOUNT_ROWS);
   // 0541: the card payout banks, as production has them. Invented.
   if (new URL(url, window.location.origin).pathname === "/api/finance/ledger/money-accounts/card-routes")
@@ -1085,6 +1144,7 @@ const ROUTES: Record<string, string> = {
   "other-debtor-parties": "/finance/other-debtors?view=parties",
   "other-receipts": "/finance/other-receipts",
   journal: "/finance/ledger",
+  "opening-balances": "/finance/ledger/opening-balances",
   "trial-balance": "/finance/ledger/trial-balance",
   // The old address, to see it open the Profit and Loss.
   reports: "/finance/reports",

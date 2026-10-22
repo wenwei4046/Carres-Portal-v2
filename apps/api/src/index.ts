@@ -106,6 +106,8 @@ import financeLedgerRouter from "./routes/finance/ledger";
 import financeDealerCommissionRouter, { dealerStatementRouter } from "./routes/finance/dealer-commission";
 // The manual journal door — the principal's one write to the ledger (0462).
 import financeManualJournalsRouter from "./routes/finance/manual-journals";
+// 0705 — Finance's opening balances at go-live: a draft, posted once (principal).
+import financeOpeningBalancesRouter from "./routes/finance/opening-balances";
 import financeMoneyMovesRouter from "./routes/finance/money-moves";
 import financeCardSettlementRouter from "./routes/finance/card-settlement";
 import supplierActivityRouter from "./routes/supplier/activity";
@@ -324,6 +326,8 @@ api.route("/finance/dealer-commission", financeDealerCommissionRouter);
 api.route("/dealer-commission", dealerStatementRouter);
 // The manual journal (principal only). Before the catch-all as well.
 api.route("/finance/manual-journals", financeManualJournalsRouter);
+// The opening balances (0705). Before the catch-all as well.
+api.route("/finance/opening-balances", financeOpeningBalancesRouter);
 // Bank transfers and card payouts (0529). Before the catch-all as well.
 api.route("/finance/money-moves", financeMoneyMovesRouter);
 // Card settlement files and their matching (0572). Before the catch-all as well.

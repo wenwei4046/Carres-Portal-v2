@@ -35,6 +35,7 @@ import Select from "@/components/kit/Select";
 import { appTodayIso, fmtDate, fmtMonth } from "@/lib/fmt-date";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { useGeneralLedger } from "./ledger-queries";
+import { openingWords, useOpeningPosted } from "./opening-balances-queries";
 import { balanceWords } from "./LedgerJournal";
 import { DepartmentFilter, departmentWord, useDepartmentParam, useDepartments } from "../department";
 import { noOpening, type PackSheet } from "../month-end-pack";
@@ -91,11 +92,11 @@ const columnsAt = (width: (key: string) => string): readonly Column<Row>[] => [
 
 /** The blocks as sheet rows, the screen's own words, for Export Excel. */
 export function generalLedgerSheet(blocks: GeneralLedgerBlock[], from: string, to: string, goLive: string,
-  department: string | null): { sheet: PackSheet; stem: string } {
+  department: string | null, broughtForward = false): { sheet: PackSheet; stem: string } {
   const day = (iso: string) => fmtDate(iso, { year: "always" });
   const ym = from.slice(0, 7);
   const when = from === `${ym}-01` && to === monthEnd(ym) ? fmtMonth(ym) : `${day(from)} to ${day(to)}`;
-  const rows: Array<Array<string | number>> = [["General Ledger", `${day(from)} to ${day(to)}`], [noOpening(goLive)]];
+  const rows: Array<Array<string | number>> = [["General Ledger", `${day(from)} to ${day(to)}`], [noOpening(goLive, broughtForward)]];
   if (department) rows.push(["Department", department]);
   rows.push([], ["Account", "Date", "Entry No", "Source", "Document", "Description", "Debit", "Credit", "Balance"]);
   for (const b of blocks) {
@@ -113,6 +114,7 @@ export function generalLedgerSheet(blocks: GeneralLedgerBlock[], from: string, t
 
 export default function GeneralLedger() {
   const [params, setParams] = useSearchParams();
+  const posted = useOpeningPosted();
   const today = appTodayIso();
   const { from, to } = readPeriod(params, today);
   const [dept, setDept] = useDepartmentParam();
@@ -172,7 +174,7 @@ export default function GeneralLedger() {
       <div className="flex flex-col gap-6">
         {notStarted ? <div role="alert" className="text-body"><p>The ledger has no start date yet. Nothing can be totalled.</p></div> : <>
           {goLive && <p className="text-body text-kit-slate-11" data-testid="general-ledger-go-live">
-            Since {fmtDate(goLive)} · No opening balances</p>}
+            Since {fmtDate(goLive)} · {openingWords(posted)}</p>}
           <div className="flex flex-wrap items-end gap-3">
             <div className="w-40">
               <Select id="general-ledger-month" label="Month" value={month ?? ""} onValueChange={pickMonth} placeholder="Custom Date Range"
@@ -186,7 +188,7 @@ export default function GeneralLedger() {
                 value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
             <ExportStatement testId="general-ledger-export" word="general ledger" pdf={false}
-              build={ready && goLive ? () => generalLedgerSheet(shown, from, to, goLive, dept ? deptWord : null) : null} />
+              build={ready && goLive ? () => generalLedgerSheet(shown, from, to, goLive, dept ? deptWord : null, posted) : null} />
           </div>
           {query.isError || blocks === "unreadable" ? <ReadFailed what="The General Ledger" onRetry={() => void query.refetch()} />
           : beforeStart && goLive ? <p className="text-body" data-testid="general-ledger-before-start">

@@ -5,6 +5,7 @@ import {
   PAYMENT_VOUCHER_METHODS,
   type ApAccountChoice,
   type ApBillOutstandingRow,
+  type ApOpeningBillRow,
   type PaymentVoucherDocument,
   type PaymentVoucherDraftInput,
   type PaymentVoucherRegisterRow,
@@ -30,6 +31,7 @@ import {
   usePaymentVoucher,
   useSupplierBills,
   useSupplierDebitNotes,
+  useApOpeningBills,
   usePaymentVouchers,
   useSaveVoucher,
   useSupplierFinance,
@@ -384,6 +386,7 @@ function VoucherDetail() {
           </Facts>
           <VoucherBillsCard doc={doc} />
           {(doc.debit_notes ?? []).length > 0 && <VoucherDebitNotesCard doc={doc} />}
+          {(doc.opening_bills ?? []).length > 0 && <VoucherOpeningBillsCard doc={doc} />}
           <VoucherAdvanceCard doc={doc} />
           <VoucherLinesCard doc={doc} />
           <FilesCard kind="vouchers" id={id} files={doc.files} canAdd={doc.can.add_file} />
@@ -504,6 +507,38 @@ function VoucherDebitNotesCard({ doc }: { doc: PaymentVoucherDocument }) {
   );
 }
 
+/** 0705: the opening bills this voucher pays (Opening balances). */
+function VoucherOpeningBillsCard({ doc }: { doc: PaymentVoucherDocument }) {
+  return (
+    <Facts title="Opening bills paid">
+      <div className="overflow-x-auto">
+        <table className="w-full text-body" data-testid="voucher-opening-bills">
+          <thead>
+            <tr className="text-left text-base-500">
+              <th className="py-1 pr-3">Supplier invoice</th>
+              <th className="py-1 pr-3">Bill date</th>
+              <th className="py-1 pr-3">Due date</th>
+              <th className="py-1 pr-3 text-right">Bill total</th>
+              <th className="py-1 text-right">Paid by this voucher</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(doc.opening_bills ?? []).map((o) => (
+              <tr key={o.opening_item_id} className="border-t border-base-100">
+                <td className="py-1 pr-3">{o.doc_no}</td>
+                <td className="py-1 pr-3">{fmtDate(o.doc_date)}</td>
+                <td className="py-1 pr-3">{o.due_date ? fmtDate(o.due_date) : "No due date"}</td>
+                <td className="py-1 pr-3 text-right">{money(o.bill_total)}</td>
+                <td className="py-1 text-right">{money(o.amount_applied)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Facts>
+  );
+}
+
 function VoucherLinesCard({ doc }: { doc: PaymentVoucherDocument }) {
   return (
     <Facts title="Direct lines">
@@ -527,6 +562,8 @@ type BillPick = { on: boolean; amount: string };
 /** 0681: a debit note's pick sits beside the bills' under this prefix, so the
  *  total and the Save checks count it as they count a bill. */
 const DN = "dn:";
+/** 0705: an opening bill's pick (Opening balances), counted the same way. */
+const OB = "ob:";
 type DirectLine = { key: string; accountCode: string; description: string; amount: string; departmentType: DepartmentType | null; departmentId: string | null };
 
 let seq = 0;
@@ -650,6 +687,7 @@ function VoucherForm() {
     setPicks(Object.fromEntries([
       ...d.allocations.map((a) => [a.bill_id, { on: true, amount: String(a.amount_applied) }] as const),
       ...(d.debit_notes ?? []).map((n) => [`${DN}${n.debit_note_id}`, { on: true, amount: String(n.amount_applied) }] as const),
+      ...(d.opening_bills ?? []).map((o) => [`${OB}${o.opening_item_id}`, { on: true, amount: String(o.amount_applied) }] as const),
     ]));
     setLines(d.lines.map((l) => ({ ...newLine(), accountCode: l.account_code, description: l.description ?? "", amount: String(l.amount),
       departmentType: (l.department_type ?? null) as DepartmentType | null, departmentId: l.department_id ?? null })));
@@ -674,6 +712,7 @@ function VoucherForm() {
     setPicks(Object.fromEntries([
       ...d.allocations.map((a) => [a.bill_id, { on: true, amount: String(a.amount_applied) }] as const),
       ...(d.debit_notes ?? []).map((n) => [`${DN}${n.debit_note_id}`, { on: true, amount: String(n.amount_applied) }] as const),
+      ...(d.opening_bills ?? []).map((o) => [`${OB}${o.opening_item_id}`, { on: true, amount: String(o.amount_applied) }] as const),
     ]));
     setLines(d.lines.map((l) => ({ ...newLine(), accountCode: l.account_code, description: l.description ?? "", amount: String(l.amount),
       departmentType: (l.department_type ?? null) as DepartmentType | null, departmentId: l.department_id ?? null })));
@@ -751,20 +790,37 @@ function VoucherForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debitNotes.data, mineDn]);
 
+  // 0705: the supplier's posted opening bills, paid like bills. What one can
+  // still take is its amount less what vouchers hold on it, plus this draft's own.
+  const openingBills = useApOpeningBills(supplierId || null, purpose === "SUPPLIER_BILLS" && supplierId !== "");
+  const mineOb = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const o of existing.data?.opening_bills ?? []) out[o.opening_item_id] = num(o.amount_applied) ?? 0;
+    return out;
+  }, [existing.data]);
+  const obAvailable = (o: ApOpeningBillRow) => cents((num(o.unallocated) ?? 0) + (mineOb[o.item_id] ?? 0));
+  const openingRows = purpose === "SUPPLIER_BILLS" && supplierId !== ""
+    ? (openingBills.data ?? [])
+      .map((o) => ({ ...o, available: obAvailable(o) }))
+      .filter((o) => o.available > 0 || picks[`${OB}${o.item_id}`]?.on)
+    : [];
+
   // Duplicate, second step: once the supplier's open bills and debit notes are
   // read, keep only what still has something left to pay, at most that.
   useEffect(() => {
     if (copyState !== "picks") return;
     const forBills = purpose === "SUPPLIER_BILLS" && supplierId !== "";
-    if (forBills && (!bills.data || !debitNotes.data)) return;
+    if (forBills && (!bills.data || !debitNotes.data || (!openingBills.data && !openingBills.isError))) return;
     setPicks((before) => {
       const next: Record<string, BillPick> = {};
       if (!forBills) return next;
       for (const [key, p] of Object.entries(before)) {
         const dn = key.startsWith(DN) ? debitNotes.data?.find((n) => `${DN}${n.id}` === key) : undefined;
-        const bill = key.startsWith(DN) ? undefined : bills.data?.find((b) => b.bill_id === key);
+        const ob = key.startsWith(OB) ? openingBills.data?.find((o) => `${OB}${o.item_id}` === key) : undefined;
+        const bill = key.startsWith(DN) || key.startsWith(OB) ? undefined : bills.data?.find((b) => b.bill_id === key);
         const left = dn ? (dn.supplier_id === supplierId && dn.status === "confirmed" ? dnAvailable(dn) : 0)
-          : bill ? cents(num(bill.unallocated) ?? 0) : 0;
+          : ob ? cents(num(ob.unallocated) ?? 0)
+            : bill ? cents(num(bill.unallocated) ?? 0) : 0;
         if (left > 0) next[key] = { on: true, amount: String(Math.min(left, num(p.amount) ?? 0) || left) };
       }
       return next;
@@ -772,7 +828,7 @@ function VoucherForm() {
     setCopyState("done");
     // dnAvailable reads only mineDn, empty on a new voucher.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [copyState, purpose, supplierId, bills.data, debitNotes.data]);
+  }, [copyState, purpose, supplierId, bills.data, debitNotes.data, openingBills.data]);
 
   const supplier = (suppliers.data ?? []).find((s) => s.id === supplierId) ?? null;
   // 0512: Paid from reads the one money-account list — cash and banks only.
@@ -804,7 +860,8 @@ function VoucherForm() {
       allocations: purpose === "SUPPLIER_BILLS"
         ? Object.entries(picks).filter(([, p]) => p.on).map(([key, p]) => (key.startsWith(DN)
           ? { debitNoteId: key.slice(DN.length), amount: Number(p.amount) }
-          : { billId: key, amount: Number(p.amount) }))
+          : key.startsWith(OB) ? { openingItemId: key.slice(OB.length), amount: Number(p.amount) }
+            : { billId: key, amount: Number(p.amount) }))
         : [],
       advanceAmount: advanceN,
     };
@@ -951,6 +1008,11 @@ function VoucherForm() {
               <DebitNotePicks rows={debitRows} picks={picks} onChange={setPicks} />
             </Facts>
           )}
+          {openingRows.length > 0 && (
+            <Facts title="Opening bills to pay">
+              <OpeningBillPicks rows={openingRows} picks={picks} onChange={setPicks} />
+            </Facts>
+          )}
           {purpose === "SUPPLIER_BILLS" && supplierId !== "" && (
             <Facts title="Advance">
               <label className="block">
@@ -1083,6 +1145,60 @@ function DebitNotePicks({ rows, picks, onChange }: {
                 <td className="py-1 pr-2 text-right">{money(n.available)}</td>
                 <td className="py-1">
                   <input aria-label={`Amount for ${n.note_no}`} className={`${fieldCls} w-28`} inputMode="decimal"
+                    disabled={!p.on} value={p.amount}
+                    onChange={(e) => onChange({ ...picks, [key]: { on: true, amount: e.target.value } })} />
+                  {over && <span className="block text-meta text-kit-red-11">More than is left to pay</span>}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** 0705: the supplier's posted opening bills, ticked and paid like bills. */
+function OpeningBillPicks({ rows, picks, onChange }: {
+  rows: Array<ApOpeningBillRow & { available: number }>;
+  picks: Record<string, BillPick>;
+  onChange: (next: Record<string, BillPick>) => void;
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-body" data-testid="voucher-opening-bill-picks">
+        <thead>
+          <tr className="text-left text-base-500">
+            <th className="py-1 pr-2" />
+            <th className="py-1 pr-2">Supplier invoice</th>
+            <th className="py-1 pr-2">Bill date</th>
+            <th className="py-1 pr-2">Due date</th>
+            <th className="py-1 pr-2 text-right">Total</th>
+            <th className="py-1 pr-2 text-right">Left to pay</th>
+            <th className="py-1">Pay now</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((o) => {
+            const key = `${OB}${o.item_id}`;
+            const p = picks[key] ?? { on: false, amount: "" };
+            const over = p.on && (num(p.amount) ?? 0) > o.available;
+            return (
+              <tr key={o.item_id} className="border-t border-base-100">
+                <td className="py-1 pr-2">
+                  <input type="checkbox" aria-label={`Pay opening bill ${o.doc_no}`} checked={p.on}
+                    onChange={(e) => onChange({
+                      ...picks,
+                      [key]: { on: e.target.checked, amount: e.target.checked ? String(o.available) : "" },
+                    })} />
+                </td>
+                <td className="py-1 pr-2">{o.doc_no}</td>
+                <td className="py-1 pr-2">{fmtDate(o.doc_date)}</td>
+                <td className="py-1 pr-2">{o.due_date ? fmtDate(o.due_date) : "No due date"}</td>
+                <td className="py-1 pr-2 text-right">{money(o.total_amount)}</td>
+                <td className="py-1 pr-2 text-right">{money(o.available)}</td>
+                <td className="py-1">
+                  <input aria-label={`Amount for opening bill ${o.doc_no}`} className={`${fieldCls} w-28`} inputMode="decimal"
                     disabled={!p.on} value={p.amount}
                     onChange={(e) => onChange({ ...picks, [key]: { on: true, amount: e.target.value } })} />
                   {over && <span className="block text-meta text-kit-red-11">More than is left to pay</span>}

@@ -553,6 +553,27 @@ describe("supplier debit notes (0681, Chew 2026-10-03)", () => {
     });
   });
 
+  it("a voucher pays an opening bill beside a bill (0705)", async () => {
+    const sb = mockRpc({ data: VOUCHER_ID, error: null });
+    const res = await call("/vouchers", {
+      method: "POST",
+      body: { ...goodVoucher, lines: [], allocations: [{ billId: BILL_ID, amount: 50 }, { openingItemId: NOTE_ID, amount: 100 }] },
+    });
+    expect(res.status).toBe(201);
+    expect(sb.rpc.mock.calls[0]?.[1]).toMatchObject({
+      p_allocations: [{ bill_id: BILL_ID, amount: 50 }, { opening_item_id: NOTE_ID, amount: 100 }],
+    });
+    expect((await call("/vouchers", { method: "POST", body: { ...goodVoucher, allocations: [{ billId: BILL_ID, openingItemId: NOTE_ID, amount: 5 }] } })).status).toBe(422);
+  });
+
+  it("lists a supplier's opening bills (0705)", async () => {
+    const sb = mockRpc({ data: [{ item_id: NOTE_ID, doc_no: "OH-1" }], error: null });
+    const res = await call(`/opening-bill-outstanding?supplierId=${VOUCHER_ID}`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ rows: [{ item_id: NOTE_ID, doc_no: "OH-1" }] });
+    expect(sb.rpc).toHaveBeenCalledWith("ap_opening_bill_outstanding", { p_supplier_id: VOUCHER_ID });
+  });
+
   it("a voucher line that names both a bill and a debit note, or neither, is refused before the database", async () => {
     const sb = mockRpc({ data: VOUCHER_ID, error: null });
     expect((await call("/vouchers", { method: "POST", body: { ...goodVoucher, allocations: [{ billId: BILL_ID, debitNoteId: NOTE_ID, amount: 5 }] } })).status).toBe(422);

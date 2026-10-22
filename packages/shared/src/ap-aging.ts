@@ -39,7 +39,7 @@ export interface ApAgingBill {
   total: Wire;
   open: Wire;
   /** 0681: a supplier debit note is aged beside the bills. Absent before 0681. */
-  kind?: "bill" | "debit_note";
+  kind?: "bill" | "debit_note" | "opening";   // 0705: a bill brought forward at go-live
 }
 
 export interface ApAgingAnswer {
@@ -87,8 +87,8 @@ export interface ApAgingBillLine {
   total: number;
   open: number;
   column: number;
-  /** A bill, or (0681) a supplier debit note. */
-  kind: "bill" | "debit_note";
+  /** A bill, (0681) a supplier debit note, or (0705) a bill brought forward at go-live. */
+  kind: "bill" | "debit_note" | "opening";
 }
 
 export interface ApAgingRow {
@@ -129,7 +129,7 @@ export function apAgingReport(a: ApAgingAnswer, basis: AgingBasis, columns: Agin
       return {
         billId: b.bill_id, billNo: b.bill_no, supplierInvoiceNo: b.supplier_invoice_no, billDate: b.bill_date,
         dueDate: b.due_date, total: sen(b.total) / 100, open: open / 100, column,
-        kind: b.kind === "debit_note" ? "debit_note" : "bill",
+        kind: b.kind === "debit_note" || b.kind === "opening" ? b.kind : "bill",
       };
     });
     const balance = sen(s.balance);

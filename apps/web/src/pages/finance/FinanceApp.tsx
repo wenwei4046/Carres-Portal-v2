@@ -25,6 +25,7 @@ import LedgerJournal from "./ledger/LedgerJournal";
 import LedgerTrialBalance from "./ledger/LedgerTrialBalance";
 import GeneralLedger from "./ledger/GeneralLedger";
 import LedgerSelfCheck from "./ledger/LedgerSelfCheck";
+import OpeningBalances from "./ledger/OpeningBalances";
 import SupplierBills from "./payables/SupplierBills";
 import PaymentVouchers from "./payables/PaymentVouchers";
 import FinanceSettings from "./settings/FinanceSettings";
@@ -183,6 +184,8 @@ export default function FinanceApp() {
           <Route path="dealers" element={financeOnly(<PrincipalDealers channel="dealer" financeView={role !== "principal"} />)} />
           {/* The Finance Ledger (read-only). `?entry=JE-…` opens one entry. */}
           <Route path="ledger" element={financeOnly(<LedgerJournal />)} />
+          {/* 0705 — Finance's figures at go-live: a draft, posted once (Chew 2026-10-21/22). */}
+          <Route path="ledger/opening-balances" element={financeOnly(<OpeningBalances />)} />
           {/* 0639 — every account's period, one block each (Chew 2026-10-03). */}
           <Route path="ledger/general-ledger" element={financeOnly(<GeneralLedger />)} />
           <Route path="ledger/trial-balance" element={financeOnly(<LedgerTrialBalance />)} />

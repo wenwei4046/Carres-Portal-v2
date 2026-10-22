@@ -57,7 +57,9 @@ function Bills({ row, columns }: { row: ApAgingRow; columns: AgingColumns }) {
   const cols: readonly Column<ApAgingRow["bills"][number]>[] = [
     // 0681: a supplier debit note is aged beside the bills, and opens its own page.
     { key: "bill", label: "Bill No", width: `${FINANCE_WIDTH.documentNo}px`,
-      cell: (b) => <Link className={link} to={b.kind === "debit_note" ? `/finance/debit-notes/${b.billId}` : `/finance/bills/${b.billId}`}>{b.billNo}</Link> },
+      // 0705: a bill brought forward at go-live has no page; its number is the supplier's.
+      cell: (b) => (b.kind === "opening" ? "Opening balance"
+        : <Link className={link} to={b.kind === "debit_note" ? `/finance/debit-notes/${b.billId}` : `/finance/bills/${b.billId}`}>{b.billNo}</Link>) },
     { key: "invoice", label: "Supplier invoice", width: "150px", cell: (b) => b.supplierInvoiceNo ?? "" },
     { key: "date", label: "Bill date", width: "120px", cell: (b) => fmtDate(b.billDate) },
     { key: "due", label: "Due date", width: "120px", cell: (b) => (b.dueDate ? fmtDate(b.dueDate) : "") },

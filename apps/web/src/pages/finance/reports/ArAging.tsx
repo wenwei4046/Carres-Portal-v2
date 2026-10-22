@@ -59,6 +59,8 @@ const KIND_WORD: Record<ArInvoiceKind, string> = {
   storage: "Storage Invoice",
   additional_storage: "Additional Storage Invoice",
   other: "Other debtor invoice",
+  // 0705: an invoice brought forward at go-live on Opening balances.
+  opening: "Opening balance",
 };
 export const debtorTypeWord = (r: Pick<ArAgingRow, "partyType">) => (r.partyType === "CUSTOMER" ? "Customer" : "Other debtor");
 

@@ -124,11 +124,12 @@ export function byMonthExport(
   lines: readonly ByMonthLine[],
   goLive: string,
   department: string | null,
+  broughtForward = false,
 ): { sheet: PackSheet; stem: string } {
   const rows: PackSheet["rows"] = [
     [`${name} by month`],
     ...(department ? [["Department", department]] : []),
-    [noOpening(goLive)],
+    [noOpening(goLive, broughtForward)],
     [],
     ["Account", ...heads],
     // Two spaces per level under the top, as the month-end pack indents.

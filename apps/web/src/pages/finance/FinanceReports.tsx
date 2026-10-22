@@ -41,6 +41,7 @@ import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import StatementTable, { indent, nothingInPeriod, nothingOnDay, paidBeforeInvoiceNote, stockNote, type StatementAccountLine } from "./reports/StatementTable";
 import ReportDrill, { balanceSheetMoves } from "./reports/ReportDrill";
 import { useLedgerChart } from "./ledger/ledger-queries";
+import { openingWords, useOpeningPosted } from "./ledger/opening-balances-queries";
 import { packMonths, statementExport } from "./month-end-pack";
 import ExportStatement from "./reports/ExportStatement";
 import { monthChoices, monthEnd, readDay, readPeriod, wholeMonth } from "./reports/period";
@@ -137,6 +138,7 @@ function StatementByMonth({ statement, count, onCount, today, dept, deptWord }: 
   const reads = useQueries({
     queries: months.map((ym) => (isPl ? profitAndLossQuery(`${ym}-01`, monthEnd(ym), dept) : balanceSheetQuery(asOf(ym), dept))),
   });
+  const posted = useOpeningPosted();
   const name = isPl ? "Profit and Loss" : "Balance Sheet";
   const word = isPl ? "profit and loss" : "balance sheet";
   const testId = isPl ? "profit-and-loss-by-month" : "balance-sheet-by-month";
@@ -163,7 +165,7 @@ function StatementByMonth({ statement, count, onCount, today, dept, deptWord }: 
           options={MONTH_CHOICES.map((n) => ({ value: String(n), label: `${n} months` }))} />
       </div>
       <ExportStatement testId={`${testId}-export`} word={word} pdf={false}
-        build={lines && goLive && started ? () => byMonthExport(name, months, heads("always"), lines, goLive, deptWord) : null} />
+        build={lines && goLive && started ? () => byMonthExport(name, months, heads("always"), lines, goLive, deptWord, posted) : null} />
     </div>
     {reads.some((r) => r.isError) ? <ReadFailed testId={`${testId}-failed`}
       sentence={`The ${word} could not be loaded. Try again.`}
@@ -253,8 +255,11 @@ function useStatementDrill(statement: Statement, scope: { from: string | null; t
   };
 }
 
-const GoLiveLine = ({ goLive }: { goLive: string }) =>
-  <p className="text-body text-kit-slate-11" data-testid="reports-go-live">Since {fmtDate(goLive)} · No opening balances</p>;
+/** 0705: `Brought forward` once Finance has posted the opening balances. */
+function GoLiveLine({ goLive }: { goLive: string }) {
+  const posted = useOpeningPosted();
+  return <p className="text-body text-kit-slate-11" data-testid="reports-go-live">Since {fmtDate(goLive)} · {openingWords(posted)}</p>;
+}
 
 /** What both statements keep in the address: the department, the view and its months. */
 function useReportAddress() {
@@ -280,6 +285,7 @@ function ProfitAndLossPage() {
   const pl = useProfitAndLoss(from, to, dept);
   const plReport = pl.data;
   const plDrill = useStatementDrill("pl", { from, to, dept }, "profit-and-loss");
+  const posted = useOpeningPosted();
   if (notStartedError(pl.error)) return <NotStarted />;
   const goLive = plReport?.goLiveOn ?? null;
 
@@ -333,7 +339,7 @@ function ProfitAndLossPage() {
             <DatePicker id="reports-pl-to" label="Up to" value={to} minDate={from} onChange={pickTo} />
           </div>
           <ExportStatement testId="profit-and-loss-export" word="profit and loss"
-            build={plReport?.status === "ok" ? () => statementExport(plReport, deptWord) : null} />
+            build={plReport?.status === "ok" ? () => statementExport(plReport, deptWord, posted) : null} />
         </div>
         {pl.isError ? <ReadFailed testId="profit-and-loss-failed"
           sentence="The profit and loss could not be loaded. Try again."
@@ -364,6 +370,7 @@ function BalanceSheetPage() {
   const bsReport = bs.data;
   const bsDrill = useStatementDrill("bs", { from: bsReport?.goLiveOn ?? null, to: asOf, dept }, "balance-sheet",
     bsReport?.status === "ok" ? bsReport.sections : []);
+  const posted = useOpeningPosted();
   if (notStartedError(bs.error)) return <NotStarted />;
   const goLive = bsReport?.goLiveOn ?? null;
 
@@ -386,7 +393,7 @@ function BalanceSheetPage() {
             <DatePicker id="reports-bs-as-of" label="As of" value={asOf} onChange={pickAsOf} />
           </div>
           <ExportStatement testId="balance-sheet-export" word="balance sheet"
-            build={bsReport?.status === "ok" ? () => statementExport(bsReport, deptWord) : null} />
+            build={bsReport?.status === "ok" ? () => statementExport(bsReport, deptWord, posted) : null} />
         </div>
         {bsReport?.status === "ok" && !bsReport.balances && <div role="status" data-testid="balance-sheet-differs"
           className="flex flex-wrap items-center gap-2 rounded-control bg-kit-amber-3 px-4 py-2 text-body text-kit-amber-11">

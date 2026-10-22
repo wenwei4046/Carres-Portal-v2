@@ -39,7 +39,8 @@ export type ArAgingQuery = z.infer<typeof arAgingQuery>;
 type Wire = number | string;
 
 /** A customer's sales or storage invoice (Payment's), or an other debtor's (Finance's). */
-export type ArInvoiceKind = "sales" | "storage" | "additional_storage" | "other";
+/** 0705: `opening`, an invoice brought forward at go-live on Opening balances, aged by its own dates. */
+export type ArInvoiceKind = "sales" | "storage" | "additional_storage" | "other" | "opening";
 
 export interface ArAgingInvoice {
   invoice_id: string;
