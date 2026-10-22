@@ -5374,8 +5374,8 @@ These words are on screen in the branch and are not approved yet. The period con
 |---|---|
 | Menu | `Cash Flow`, a row under `Reports` |
 | Page | Title `Cash Flow`. `Since {date} · No opening balances` · `Month` · `From` · `Up to` · `Custom Date Range` · `Export Excel` · `Export PDF` · `The cash flow could not be exported. Try again.` |
-| Statement | Panel `Cash Flow`. Columns `Account` · `Amount`. Sections `Inflow` · `Outflow`, each with its total. A line is `{code} {name}`, or `Transfer from {code} {name}` · `Transfer to {code} {name}` between two of Carres's own cash and bank accounts, or `Card payout from {code} {name}` when card or online money reaches a bank. Empty sections: `No money came into the cash and bank accounts in this period.` · `No money went out of the cash and bank accounts in this period.` Bottom line `Net cash flow`. Under it: `Brought forward` · `Carried forward` · `Card and online payments in this period` · `Waiting for card payout at the end` |
-| By account | Panel `By account`. Columns `Account` · `Brought forward` · `Inflow` · `Outflow` · `Carried forward`, and a `Total` row |
+| Statement | Panel `Cash Flow`. Columns `Code` · `Account` · `Amount` (Chew 2026-10-21, approved: the code is its own column, the code alone the link, as on the Trial Balance and the other statements; the line's words no longer carry it). Sections `Inflow` · `Outflow`, each with its total. A line's Account is `{name}`, or `Transfer from {name}` · `Transfer to {name}` between two of Carres's own cash and bank accounts, or `Card payout from {name}` when card or online money reaches a bank, with that account's code under `Code`. A row that names no account (the empty-section words) leaves `Code` empty. Empty sections: `No money came into the cash and bank accounts in this period.` · `No money went out of the cash and bank accounts in this period.` Bottom line `Net cash flow`. Under it: `Brought forward` · `Carried forward` · `Card and online payments in this period` · `Waiting for card payout at the end` |
+| By account | Panel `By account`. Columns `Code` · `Account` · `Brought forward` · `Inflow` · `Outflow` · `Carried forward`, and a `Total` row |
 | Meaning | `Inflow` and `Outflow` are money into and out of the cash and bank accounts. A line names the account on the other side of the money. `Carried forward` is brought forward plus inflow less outflow. Card and online money is not cash until its card payout reaches a bank. |
 | States | `Loading Cash Flow…` · `Cash Flow could not be loaded. Try again.` · `Try again` · `The ledger has no start date yet. Nothing can be totalled.` · `The ledger started on {date}. Pick a day from then on.` |
 
@@ -5418,7 +5418,7 @@ The feature is Chew's (Finance MASTER §4.2). The menu is the kit's ONE ROW MENU
 | Credit Notes · Debit Notes · Payment Requests · Notes to follow up | `View` |
 | Other debtors (invoices) | `View` · `Print` (issued or cancelled; a draft has no paper) · then `Record receipt` when issued with something outstanding (the invoice page's own door) |
 | Other receipts | `View` · `Print` |
-| AR · Receivables | `View` (the order's drawer, as a double-click) · then `Record receipt` (the row's own door) |
+| AR · Receivables | `View` (the order's drawer, as a double-click) · then `Record receipt` while something is owed (the drawer's own door). The row itself carries no `Record receipt` button (Chew 2026-10-21, approved) |
 | Journal | `View` |
 | General Ledger | `View` on a line, to its entry on the Journal; `Brought forward` and `Total` have no menu |
 

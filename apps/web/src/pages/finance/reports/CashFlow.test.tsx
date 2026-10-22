@@ -93,10 +93,12 @@ describe("Cash Flow (0638)", () => {
   it("files the money under what it was for, with transfers and card payouts named", async () => {
     show();
     const table = await screen.findByTestId("cash-flow");
-    expect(table).toHaveTextContent("1210 Trade receivables");
-    expect(table).toHaveTextContent("Card payout from 1131 GHL");
-    expect(table).toHaveTextContent("Transfer from 1110 Cash in hand");
-    expect(table).toHaveTextContent("Transfer to 1121 Public Bank");
+    expect(table).toHaveTextContent("Trade receivables");
+    expect(table).toHaveTextContent("Card payout from GHL");
+    expect(table).toHaveTextContent("Transfer from Cash in hand");
+    expect(table).toHaveTextContent("Transfer to Public Bank");
+    // Chew 2026-10-21: the code is its own column, never inside the words.
+    expect(table).not.toHaveTextContent("Transfer to 1121");
     expect(table).toHaveTextContent("Inflow");
     expect(table).toHaveTextContent("RM 6,797.50");
     expect(table).toHaveTextContent("Outflow");
@@ -105,12 +107,24 @@ describe("Cash Flow (0638)", () => {
     expect(table).toHaveTextContent("RM 5,097.50");
   });
 
-  it("each line opens the Journal on that account for the period", async () => {
+  it("Code and Account are two columns, the code alone the link to the Journal for the period (Chew 2026-10-21)", async () => {
     show("/finance/reports/cash-flow?from=2026-10-01&to=2026-10-15");
     const table = await screen.findByTestId("cash-flow");
-    expect(within(table).getByRole("link", { name: "1210 Trade receivables" })).toHaveAttribute(
+    const heads = within(table).getAllByRole("columnheader").map((h) => h.textContent?.trim());
+    expect(heads.slice(0, 3)).toEqual(["Code", "Account", "Amount"]);
+    expect(within(table).getByRole("link", { name: "1210" })).toHaveAttribute(
       "href", "/finance/ledger?account=1210&from=2026-10-01&to=2026-10-15",
     );
+    const transfer = within(table).getByText("Transfer to Public Bank").closest("tr")!;
+    expect(within(transfer).getByRole("link", { name: "1121" })).toBeInTheDocument();
+    expect(within(table).queryByRole("link", { name: /Trade receivables/ })).not.toBeInTheDocument();
+  });
+
+  it("an empty side's words sit under Account with an empty Code", async () => {
+    api.answer = { ...ANSWER, accounts: [{ ...ANSWER.accounts[0], receipts: 0, payments: 0 }], rows: [] };
+    show();
+    const row = (await screen.findByText("No money went out of the cash and bank accounts in this period.")).closest("tr")!;
+    expect(within(row).queryByRole("link")).not.toBeInTheDocument();
   });
 
   it("carries the balances forward, and says what card money is paid and still waiting", async () => {
@@ -125,7 +139,10 @@ describe("Cash Flow (0638)", () => {
   it("lists each cash and bank account with its own figures and their total", async () => {
     show();
     const accounts = await screen.findByTestId("cash-flow-accounts");
-    expect(accounts).toHaveTextContent("1121 Public Bank");
+    expect(within(accounts).getByRole("link", { name: "1121" })).toHaveAttribute(
+      "href", "/finance/ledger?account=1121&from=2026-10-01&to=2026-10-31",
+    );
+    expect(within(accounts.closest("table") ?? accounts).getByText("Public Bank")).toBeInTheDocument();
     expect(accounts).toHaveTextContent("RM 15,197.50");
     expect(accounts).toHaveTextContent("Total");
     expect(accounts).toHaveTextContent("RM 15,597.50");
@@ -215,7 +232,7 @@ describe("one channel's money (0684, Chew ruling 1)", () => {
     expect(stem).toBe("Cash Flow Bangsar showroom Oct 2026");
     expect(sheet.rows[0]).toEqual(["Cash Flow · Bangsar showroom", "Thu, 1 Oct 26 to Sat, 31 Oct 26"]);
     expect(sheet.rows.some((r) => r[0] === "Brought forward" || r[0] === "Carried forward")).toBe(false);
-    expect(sheet.rows).toContainEqual(["Net cash flow", 4800]);
+    expect(sheet.rows).toContainEqual(["Net cash flow", "", 4800]);
   });
 });
 
@@ -225,18 +242,20 @@ describe("the Cash Flow sheet", () => {
     expect(stem).toBe("Cash Flow Oct 2026");
     expect(sheet.name).toBe("Cash Flow");
     expect(sheet.rows.slice(0, 4)).toEqual([
-      ["Cash Flow", "Thu, 1 Oct 26 to Sat, 31 Oct 26"], ["Since Tue, 1 Sep 26 · No opening balances"], [], ["Account", "Amount"],
+      ["Cash Flow", "Thu, 1 Oct 26 to Sat, 31 Oct 26"], ["Since Tue, 1 Sep 26 · No opening balances"], [], ["Code", "Account", "Amount"],
     ]);
-    expect(sheet.rows).toContainEqual(["Inflow", 6797.5]);
-    expect(sheet.rows).toContainEqual(["Card payout from 1131 GHL", 397.5]);
-    expect(sheet.rows).toContainEqual(["Carried forward", 15597.5]);
+    expect(sheet.rows).toContainEqual(["Inflow", "", 6797.5]);
+    expect(sheet.rows).toContainEqual(["1131", "Card payout from GHL", 397.5]);
+    expect(sheet.rows).toContainEqual(["1121", "Transfer to Public Bank", 400]);
+    expect(sheet.rows).toContainEqual(["Carried forward", "", 15597.5]);
   });
 
   it("names a line in words", () => {
     const base = { key: "k", code: "1121", name: "Public Bank", amount: 1, transfer: false, holding: false } as const;
-    expect(cashFlowLineWord({ ...base, side: "IN" })).toBe("1121 Public Bank");
-    expect(cashFlowLineWord({ ...base, side: "OUT", transfer: true })).toBe("Transfer to 1121 Public Bank");
-    expect(cashFlowLineWord({ ...base, side: "IN", holding: true, code: "1131", name: "GHL" })).toBe("Card payout from 1131 GHL");
+    expect(cashFlowLineWord({ ...base, side: "IN" })).toBe("Public Bank");
+    expect(cashFlowLineWord({ ...base, side: "OUT", transfer: true })).toBe("Transfer to Public Bank");
+    expect(cashFlowLineWord({ ...base, side: "IN", transfer: true })).toBe("Transfer from Public Bank");
+    expect(cashFlowLineWord({ ...base, side: "IN", holding: true, code: "1131", name: "GHL" })).toBe("Card payout from GHL");
   });
 });
 

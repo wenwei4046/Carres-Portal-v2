@@ -46,7 +46,7 @@ export default function ARDrawer({
   payments: readonly OrderPaymentRow[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Open with the Record receipt form already showing (the row's Record receipt button). */
+  /** Open with the Record receipt form already showing (the AR row menu's Record receipt). */
   startRecording?: boolean;
 }) {
   const [recPanelOpen, setRecPanelOpen] = useState(startRecording);

@@ -217,7 +217,8 @@ export async function writeStatementPdf({ sheet, stem }: ReturnType<typeof state
     title: head[0]!.join(" · "),
     summary: head.slice(1).map((r) => r.join(" ")).join(" · "),
     headers: headers!.map(String),
-    rows: body.map((r) => [text(r[0]), text(r[1])]),
+    // As many columns as the sheet heads (Cash Flow has Code · Account · Amount).
+    rows: body.map((r) => headers!.map((_, i) => text(r[i]))),
     printedAt: new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }),
   });
   const url = URL.createObjectURL(blob);

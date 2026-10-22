@@ -8,6 +8,11 @@
  * money, and opens the Journal on that account for the period. A move between
  * two of Carres's own accounts is a transfer, in on one and out on the other.
  *
+ * Like the Trial Balance and the other statements (Chew 2026-10-21), a line's
+ * account code is its own `Code` column, the code alone the link, and the
+ * line's words name the account without it; By account does the same. The
+ * export writes the same three columns.
+ *
  * Card and online money counts as cash when its payout reaches a bank (a line
  * named `Card payout from …`); until then the foot says how much customers
  * paid that way in the period and how much still waits for its payout.
@@ -28,13 +33,14 @@ import { appTodayIso, fmtDate, fmtMonth } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { useCashFlow } from "../ledger/ledger-queries";
-import { useSavedWidths } from "../finance-widths";
+import { FINANCE_WIDTH, fillSizing, useSavedWidths } from "../finance-widths";
+import look from "../finance-look.module.css";
 import { DepartmentFilter, departmentWord, useDepartmentParam, useDepartments } from "../department";
 import type { PackSheet } from "../month-end-pack";
 import { noOpening } from "../month-end-pack";
 import { ReadFailed } from "../payables/PayablesParts";
 import ExportStatement from "./ExportStatement";
-import { STATEMENT_LINK } from "./StatementTable";
+import { CODE_LINK } from "./StatementTable";
 import { monthChoices, monthEnd, readPeriod, wholeMonth } from "./period";
 
 const SECTION_WORD = { IN: "Inflow", OUT: "Outflow" } as const;
@@ -43,9 +49,10 @@ const NOTHING = {
   OUT: "No money went out of the cash and bank accounts in this period.",
 } as const;
 
-/** What one line of the statement says the money was. */
+/** What one line of the statement says the money was. The account's code is
+ *  its own column (Chew 2026-10-21), so the words carry only its name. */
 export function cashFlowLineWord(l: CashFlowLine): string {
-  const account = `${l.code} ${l.name}`;
+  const account = l.name;
   if (l.transfer) return l.side === "IN" ? `Transfer from ${account}` : `Transfer to ${account}`;
   if (l.holding && l.side === "IN") return `Card payout from ${account}`;
   return account;
@@ -75,56 +82,61 @@ export function cashFlowSheet(r: CashFlowReport, from: string, to: string, goLiv
   const title = channel ? `Cash Flow · ${channel}` : "Cash Flow";
   const rows: Array<Array<string | number>> = [[title, `${day(from)} to ${day(to)}`], [noOpening(goLive)]];
   if (channel) rows.push([NO_CHANNEL_NOTE]);
-  rows.push([], ["Account", "Amount"]);
+  // The screen's columns: Code, Account, Amount. A band or a total reads
+  // across the code and the name, as on screen; a line that names no account
+  // leaves Code empty.
+  rows.push([], ["Code", "Account", "Amount"]);
   for (const section of ["IN", "OUT"] as const) {
     const lines = section === "IN" ? r.inflow : r.outflow;
-    rows.push([SECTION_WORD[section], section === "IN" ? r.totalInflow : r.totalOutflow]);
-    if (!lines.length) rows.push([NOTHING[section]]);
-    for (const l of lines) rows.push([cashFlowLineWord(l), l.amount]);
+    rows.push([SECTION_WORD[section], "", section === "IN" ? r.totalInflow : r.totalOutflow]);
+    if (!lines.length) rows.push(["", NOTHING[section]]);
+    for (const l of lines) rows.push([l.code, cashFlowLineWord(l), l.amount]);
   }
-  rows.push(["Net cash flow", r.net]);
-  if (!r.byChannel) rows.push(["Brought forward", r.broughtForward], ["Carried forward", r.carriedForward]);
-  rows.push(["Card and online payments in this period", r.cardTaken]);
-  if (r.cardWaiting !== null) rows.push(["Waiting for card payout at the end", r.cardWaiting]);
+  rows.push(["Net cash flow", "", r.net]);
+  if (!r.byChannel) rows.push(["Brought forward", "", r.broughtForward], ["Carried forward", "", r.carriedForward]);
+  rows.push(["Card and online payments in this period", "", r.cardTaken]);
+  if (r.cardWaiting !== null) rows.push(["Waiting for card payout at the end", "", r.cardWaiting]);
   return { sheet: { name: "Cash Flow", rows }, stem: channel ? `Cash Flow ${channel} ${when}` : `Cash Flow ${when}` };
 }
 
 /** The Cash Flow tables' widths in pixels; the line or account column takes
  *  the rest of the width unless a person dragged it (Chew 2026-10-14). */
-const CASH_FLOW_WIDTHS = { amount: 140 } as const;
-const BY_ACCOUNT_WIDTHS = { bf: 150, in: 150, out: 150, cf: 150 } as const;
+const CASH_FLOW_WIDTHS = { code: FINANCE_WIDTH.code, account: 420, amount: 140 } as const;
+const BY_ACCOUNT_WIDTHS = { code: FINANCE_WIDTH.code, account: FINANCE_WIDTH.account, bf: 150, in: 150, out: 150, cf: 150 } as const;
 
 function Statement({ report, from, to }: { report: CashFlowReport; from: string; to: string }) {
   const saved = useSavedWidths("carres.finance.widths.cash-flow.v1", "finance_cash_flow");
-  const width = (key: keyof typeof CASH_FLOW_WIDTHS | "account") =>
-    saved.widths[key] != null ? `${saved.widths[key]}px` : key === "account" ? "auto" : `${CASH_FLOW_WIDTHS[key]}px`;
+  // The Finance look (Chew 2026-10-13), as the other statements wear it.
+  const size = fillSizing(CASH_FLOW_WIDTHS, saved.widths, "account");
+  const width = size.width;
   const columns: Column<Row>[] = [
+    { key: "code", label: "Code", width: width("code"),
+      cell: (row) => row.kind === "nothing" ? null
+        : <Link className={CODE_LINK} to={ledgerAccountHref(row.line.code, from, to)}>{row.line.code}</Link> },
     { key: "account", label: "Account", width: width("account"),
       cell: (row) => row.kind === "nothing"
-        ? <span className="text-kit-slate-11">{NOTHING[row.section]}</span>
-        : <Link className={STATEMENT_LINK} to={ledgerAccountHref(row.line.code, from, to)}
-            title={cashFlowLineWord(row.line)}>
-            {cashFlowLineWord(row.line)}
-          </Link> },
+        ? <span className="whitespace-normal text-kit-slate-11">{NOTHING[row.section]}</span>
+        : <span className="whitespace-normal">{cashFlowLineWord(row.line)}</span> },
     { key: "amount", label: "Amount", width: width("amount"), align: "right", numeric: true,
       cell: (row) => (row.kind === "nothing" ? null : rm(row.line.amount)) },
   ];
+  // A band and the bottom line read across the code and the name.
   const band = (row: Row): readonly GroupRowCell[] => [
-    { content: <span className="font-semibold">{SECTION_WORD[row.section]}</span> },
+    { span: 2, content: <span className="font-semibold">{SECTION_WORD[row.section]}</span> },
     { align: "right", content: <span className="font-semibold tabular-nums">
       {rm(row.section === "IN" ? report.totalInflow : report.totalOutflow)}</span> },
   ];
   return <div className="flex flex-col gap-4">
-    <DataTable label="Cash Flow" testId="cash-flow" rowTestId="cash-flow-row" rows={statementRows(report)} columns={columns}
+    <div className={look.statement} style={size.style} {...size.data}><DataTable label="Cash Flow" testId="cash-flow" rowTestId="cash-flow-row" rows={statementRows(report)} columns={columns}
       rowId={(row) => row.id} empty={NOTHING.IN} group={{ keyOf: (row) => row.section, cells: band }}
-      resizable={saved} sizing={saved.widths.account != null ? "content" : undefined}
+      resizable={saved}
       totals={{
         label: "Net cash flow",
         cells: () => [
-          { content: <span className="font-semibold">Net cash flow</span> },
+          { span: 2, content: <span className="font-semibold">Net cash flow</span> },
           { align: "right", content: <span className="font-semibold tabular-nums">{rm(report.net)}</span> },
         ],
-      }} />
+      }} /></div>
     {/* 0684: balances are not split by channel, so one channel's view prints none. */}
     <TotalsSummary label={report.byChannel ? "Card and online money" : "Cash and bank balances"} rows={report.byChannel ? [
       { key: "taken", label: "Card and online payments in this period", value: rm(report.cardTaken) },
@@ -139,12 +151,15 @@ function Statement({ report, from, to }: { report: CashFlowReport; from: string;
 
 type AccountRow = CashFlowReport["accounts"][number];
 
-function ByAccount({ report }: { report: CashFlowReport }) {
+function ByAccount({ report, from, to }: { report: CashFlowReport; from: string; to: string }) {
   const saved = useSavedWidths("carres.finance.widths.cash-flow-accounts.v1", "finance_cash_flow_accounts");
-  const width = (key: keyof typeof BY_ACCOUNT_WIDTHS | "account") =>
-    saved.widths[key] != null ? `${saved.widths[key]}px` : key === "account" ? "auto" : `${BY_ACCOUNT_WIDTHS[key]}px`;
+  const size = fillSizing(BY_ACCOUNT_WIDTHS, saved.widths, "account");
+  const width = size.width;
   const all: Column<AccountRow>[] = [
-    { key: "account", label: "Account", width: width("account"), cell: (a) => `${a.account.account_code} ${a.account.name}` },
+    { key: "code", label: "Code", width: width("code"),
+      cell: (a) => <Link className={CODE_LINK} to={ledgerAccountHref(a.account.account_code, from, to)}>{a.account.account_code}</Link> },
+    { key: "account", label: "Account", width: width("account"),
+      cell: (a) => <span className="whitespace-normal">{a.account.name}</span> },
     { key: "bf", label: "Brought forward", width: width("bf"), align: "right", numeric: true, cell: (a) => rm(a.broughtForward) },
     { key: "in", label: "Inflow", width: width("in"), align: "right", numeric: true, cell: (a) => rm(a.inflow) },
     { key: "out", label: "Outflow", width: width("out"), align: "right", numeric: true, cell: (a) => rm(a.outflow) },
@@ -152,18 +167,18 @@ function ByAccount({ report }: { report: CashFlowReport }) {
   ];
   // 0684: one channel's view has no balances to bring or carry forward.
   const columns = report.byChannel ? all.filter((c) => c.key !== "bf" && c.key !== "cf") : all;
-  return <DataTable label="Cash Flow by account" testId="cash-flow-accounts" rowTestId="cash-flow-account" rows={report.accounts}
+  return <div className={look.statement} style={size.style} {...size.data}><DataTable label="Cash Flow by account" testId="cash-flow-accounts" rowTestId="cash-flow-account" rows={report.accounts}
     columns={columns} rowId={(a) => a.account.account_code} empty="No bank or cash account yet. Finance adds them in Settings."
-    resizable={saved} sizing={saved.widths.account != null ? "content" : undefined}
+    resizable={saved}
     totals={{
       label: "Total",
-      cell: (c) => c.key === "account" ? "Total"
+      cell: (c) => c.key === "code" ? "Total"
         : c.key === "bf" ? rm(report.broughtForward)
         : c.key === "in" ? rm(report.totalInflow)
         : c.key === "out" ? rm(report.totalOutflow)
         : c.key === "cf" ? rm(report.carriedForward)
         : null,
-    }} />;
+    }} /></div>;
 }
 
 export default function CashFlow() {
@@ -231,7 +246,7 @@ export default function CashFlow() {
         : !ready ? <p className="text-body" role="status">Loading Cash Flow…</p>
         : <div className="flex flex-col gap-6">
             <Panel title="Cash Flow"><Statement report={ready} from={from} to={to} /></Panel>
-            <Panel title="By account"><ByAccount report={ready} /></Panel>
+            <Panel title="By account"><ByAccount report={ready} from={from} to={to} /></Panel>
           </div>}
       </div>
     </div>
