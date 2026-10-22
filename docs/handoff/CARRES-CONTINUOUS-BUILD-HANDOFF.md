@@ -1,3 +1,13 @@
+## Receiving frontend adoption ·22Oct2026
+
+Owner explicitly commissioned applying the latest Receiving UI to the ERP frontend in Planner. Backend remains IT-owned; the paused PR2100/SQL delivery and five-minute automation remain paused.
+
+**IMPLEMENTED ON BRANCH, NOT VERIFIED IN BROWSER / NOT DEPLOYED:** existing `OperationReceiving` now presents Not received / Received / Differences through kit Tabs; fresh visits start with expected PO goods, due-first, using the existing PO population and Receiving writer door. Existing received/date-filter deep links retain their register. Pending expansion reads existing PO Receiving Unit facts; no invented Unit IDs. Received/Differences retain server pagination, filters, export, cards and exact GRN identity; Group by uses DataGrid's shared presentation capability. `ReceivingRecord` adopts shared Block/Button, one header above both panes, header Amend/More doors, no duplicate identical delivery site, and a content-container820 breakpoint for the50:50 record/document split (stacked document900 below it). Existing mutations, PDFs, duty/actor facts and history remain.
+
+**Evidence:** existing Receiving75 tests and failed-save7 tests passed during this change; diff whitespace check passed. Typecheck is still running locally; browser connection became unavailable before a rendered walk, so visual conformance and full preview acceptance are NOT claimed. Local DEV-only real-component fixture: `http://127.0.0.1:5482/receiving-preview.html` (stubbed API; not production).
+
+**Remaining:** rendered whole-page review at1025/1164/1440 and narrow widths; reconcile remaining Items/Check-in composition against supplied design; all-source expected-arrival coverage (CO/repair versus current PO-only pending data) belongs to IT integration and must not be represented as complete. No main merge/release until required CI and actual changed-preview review. This is a frontend adoption in progress, not full Receiving delivery.
+
 # HANDOFF — Carres Portal v2 · continuous build
 
 Paste everything below the line into a fresh session. It is self-contained.

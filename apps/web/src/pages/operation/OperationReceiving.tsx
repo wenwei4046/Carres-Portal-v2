@@ -13,6 +13,7 @@ import {
 } from "@carres/shared";
 import {
   useOperationGrnRegister,
+  usePoReceiving,
   fetchGrnRegisterExport,
   useOperationPos,
   useOperationSuppliers,
@@ -29,8 +30,6 @@ import { toast } from "sonner";
 import { printGrn, receivingHasGrn } from "./record-print";
 import { REGISTER_FIELD_WIDTH } from "@/components/register/register-field-widths";
 import {
-  FilterRail,
-  RailItem,
   FilterRailGroup,
   FilterRailRow,
 } from "./components/workspace-rail";
@@ -92,6 +91,8 @@ function weekLabel(from: string, to: string): string {
 export default function OperationReceiving() {
   const [params, setParams] = useSearchParams();
   const view = params.get("view") === "differences" ? "differences" : "records";
+  // Existing received deep links retain their scope; a fresh visit starts with expected goods.
+  const stage = params.get("view") ?? (params.has("from") || params.has("to") || params.has("cancelled") || params.has("po") || params.has("session") || params.has("arrival") || params.has("find") ? "records" : "pending");
   const sessionId = params.get("session");
   const poId = params.get("po");
   const arrivalId = params.get("arrival");
@@ -873,16 +874,30 @@ export default function OperationReceiving() {
 
       <div
         className={[
-          "flex min-h-0 flex-1 gap-0 p-2",
+          "flex min-h-0 flex-1 flex-col gap-3 p-3",
           openObject ? "invisible h-0 flex-none overflow-hidden p-0" : "",
         ].join(" ")}
         data-testid="receiving-register"
       >
-        <FilterRail testId="receiving-rail">
-          {([['records', 'GRN Records'], ['differences', 'Receiving Differences']] as const).map(([key, label]) =>
-            <RailItem key={key} label={label} active={view === key} testId={`receiving-view-${key}`}
-              onClick={() => { const next = new URLSearchParams(params); next.set("view", key); if (key === "differences") next.delete("cancelled"); setOffset(0); setQuickReceipt(null); setParams(next); }} />)}
-        </FilterRail>
+
+
+        <div className="shrink-0 overflow-x-auto" data-testid="receiving-stages">
+          <Tabs label="Receiving status" value={stage} onValueChange={(value) => {
+            const next = new URLSearchParams(params);
+            next.set("view", value);
+            if (value !== "records") next.delete("cancelled");
+            setOffset(0); setQuickReceipt(null); setParams(next);
+          }} tabs={[
+            { value: "pending", label: "Not received" },
+            { value: "records", label: "Received" },
+            { value: "differences", label: "Differences" },
+          ]} />
+        </div>
+        {stage === "pending" && !openObject ? (
+          <PendingReceivingView pos={pos} suppliers={supplierById} loading={posQ.isLoading}
+            failed={posQ.isError} onRetry={() => void posQ.refetch()}
+            onPick={(id) => { const next = new URLSearchParams(params); next.set("po", id); setParams(next); }} />
+        ) : null}
 
         {/* ⭐ `min-w-0` IS LOAD-BEARING — measured on the 2026-09-19 walk.
             This column is a flex child beside the rail, and a flex item
@@ -894,7 +909,7 @@ export default function OperationReceiving() {
             rule never fired, because the grid measured 2234px on a phone.
             Every sibling rail+grid register already carries it. */}
         <div
-          className="flex min-h-0 min-w-0 flex-1 flex-col pl-2"
+          className={`min-h-0 min-w-0 flex-1 flex-col ${stage === "pending" ? "hidden" : "flex"}`}
           data-testid="receiving-register-column"
         >
           {registerQ.isError ? (
@@ -946,11 +961,8 @@ export default function OperationReceiving() {
               activeConditions={activeConditions}
               onClearConditions={clearRail}
               groupBanner={false}
-              allowColumnGrouping={false}
-              /* Receiving is UNGROUPED — one sticky header, no business
-                 groups. The group-local header pattern applies to registers
-                 that HAVE groups; inventing GRN groups to use it would be a
-                 regression. */
+              allowColumnGrouping
+              /* Group by is presentation only; it never changes GRN identity. */
               expandTitle="Show goods"
               expandable={{
                 flush: true,
@@ -970,8 +982,8 @@ export default function OperationReceiving() {
               onRowClick={setQuickReceipt}
               contextMenu={rowMenu}
               toolbarStart={<>
-                <button
-                  type="button"
+                <Button
+                  variant="primary"
                   data-testid="start-receiving-door"
                   onClick={() => {
                     // A PUSH, not a replace — Back from the Find step returns
@@ -980,10 +992,9 @@ export default function OperationReceiving() {
                     next.set("find", "1");
                     setParams(next);
                   }}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-full bg-kit-blue-9 px-3 text-body font-medium text-white hover:brightness-95"
                 >
                   Start Receiving
-                </button>
+                </Button>
                 <CPopover label="Filters" trigger={<Button>Filters</Button>}>
                   <div data-testid="receiving-list-filters">
                     <FilterRailGroup title="Received with" icon="goods">
@@ -1155,3 +1166,51 @@ function FindPoView({
   );
 }
 
+
+/** Expected PO goods, using the shared register and the existing Receiving door.
+ * No local receipt or stock engine: IT continues to own non-PO source integration. */
+function PendingReceivingView({ pos, suppliers, loading, failed, onRetry, onPick }: {
+  pos: operationPoListRow[]; suppliers: Map<string, SupplierRow>; loading: boolean;
+  failed: boolean; onRetry: () => void; onPick: (id: string) => void;
+}) {
+  const rows = useMemo(() => pos.filter(poStillOwes), [pos]);
+  const pendingQty = (p: operationPoListRow) => (p.purchase_order_lines ?? []).reduce((n, l) => n + poLineReportable(l), 0);
+  const columns: DataGridColumn<operationPoListRow>[] = [
+    { key: "due", label: "Due", width: 128, sortable: true,
+      sortFn: (a, b) => (a.eta_date ?? "9999").localeCompare(b.eta_date ?? "9999"),
+      searchValue: p => p.eta_date ?? "", accessor: p => p.eta_date ? fmtDate(p.eta_date) : "Not recorded" },
+    { key: "po", label: "PO No", width: REGISTER_FIELD_WIDTH.documentNo, sortable: true,
+      searchValue: p => p.id, accessor: p => <span className="font-mono">{documentDisplayNumber(p.id)}</span> },
+    { key: "supplier", label: "Supplier", width: 220, sortable: true,
+      searchValue: p => suppliers.get(p.supplier_id)?.name ?? p.supplier_id,
+      accessor: p => suppliers.get(p.supplier_id)?.name ?? "Not recorded" },
+    { key: "pending", label: "Pending Delivery Qty", width: 150, sortable: true,
+      sortFn: (a, b) => pendingQty(a) - pendingQty(b), accessor: p => <span className="tabular-nums">{pendingQty(p)}</span> },
+  ];
+  if (failed) return <div role="alert" className="flex flex-col items-center gap-3 p-6 text-body">
+    <p>Receiving could not be opened</p><Button onClick={onRetry}>Try again</Button>
+  </div>;
+  return <DataGrid<operationPoListRow> appearance="reference" rows={rows} columns={columns}
+    rowKey={p => p.id} storageKey="carres.receiving.pending.v1" exportName="Receiving"
+    isLoading={loading} sortDefault={{ key: "due", dir: "asc" }}
+    searchPlaceholder="PO number or supplier…" emptyMessage="No supplier delivery is ready to receive."
+    onRowClick={p => onPick(p.id)} expandTitle="Show goods"
+    expandable={{ renderExpansion: p => <PendingReceivingItems po={p} /> }} />;
+}
+
+function PendingReceivingItems({ po }: { po: operationPoListRow }) {
+  const query = usePoReceiving(po.id);
+  return <GoodsMiniTable label="Items" receivingLayout itemHeading="Items" lines={
+    (po.purchase_order_lines ?? []).filter(l => poLineReportable(l) > 0).map(l => ({
+      key: l.id, category: l.category ?? "",
+      sourceNo: (l.governed_sources ?? []).map(source => source.reference).join(" · "),
+      unitIds: (query.data?.expected_units ?? [])
+        .filter(unit => unit.po_line_id === l.id && unit.status === "incoming")
+        .map(unit => unit.unit_code),
+      unitAbsence: l.identity_mode === "quantity" ? GOODS_ABSENCE_WORDS.countedByQuantity
+        : query.isLoading ? "Loading…" : query.isError ? "Could not be loaded" : "Not recorded",
+      deliverTo: [], deliverToAbsence: "Not recorded", sku: l.sku,
+      item: l.model_name ?? l.sku, qty: poLineReportable(l),
+    }))
+  } />;
+}
