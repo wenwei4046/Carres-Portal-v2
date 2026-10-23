@@ -1,9 +1,13 @@
 import { Hono } from "hono";
 import { deliveryOrderLookup } from "../../lib/delivery-order-lookup";
+import { attemptDeliveryOrderIssue } from "../../lib/delivery-order-issue";
 import type { Context } from "hono";
 import {
   attemptEvidenceInput,
   deliveryGroupOf,
+  deliveryOrderOffer,
+  deliveryOrderScopeOf,
+  salesOrderParamOf,
   proofReviewInput,
   recordHandoverInput,
   recordOutboundPrepInput,
@@ -205,6 +209,114 @@ deliveryOrdersRouter.get("/", requireOperationOrPrincipal, async (c) => {
     proofReviews: proof.proofReviews,
     attemptEvidence: proof.attemptEvidence,
   });
+});
+
+/* ── New Delivery Order ───────────────────────────────────────────────────
+ * Weisiang's decision (Mr Lim, WhatsApp 2026-10-22, relayed by YH
+ * 2026-10-23): office staff open a Delivery Order from a Sales Order's lines,
+ * the Houzs way. Overturns Jess's "the system issues every DO" rule (Delivery
+ * MASTER §3, §15; Orders MASTER); Jess was not part of the decision.
+ *
+ *   GET  /offer/:so — the SO's lines still free to ship: a line already on a
+ *                     live DO of this order is not offered again.
+ *   POST /          — { orderId, groups } through the ONE issuing path
+ *                     (`attemptDeliveryOrderIssue`): the same goods, money and
+ *                     Finance gates, the 0575 number and the 0710 mint, which
+ *                     refuses a double again inside the database.
+ */
+async function readOffer(
+  sb: SbLike,
+  match: { column: "id" | "so"; value: string | number },
+) {
+  const orderRes = await sb
+    .from("orders")
+    .select("id, so, customer_name, order_lines(id, sku, qty, attrs)")
+    .eq(match.column, match.value)
+    .maybeSingle();
+  if (orderRes.error) return { ok: false as const, error: orderRes.error };
+  if (!orderRes.data) return { ok: true as const, order: null };
+  const docsRes = await sb
+    .from("ops_delivery_orders")
+    .select("leg, trip_groups, voided_at")
+    .eq("order_id", orderRes.data.id);
+  if (docsRes.error) return { ok: false as const, error: docsRes.error };
+  const order = orderRes.data as {
+    id: string;
+    so: number;
+    customer_name: string | null;
+    order_lines: Array<{ id: string; sku: string; qty: number; attrs: unknown }> | null;
+  };
+  const lines = order.order_lines ?? [];
+  const offer = deliveryOrderOffer(lines, docsRes.data ?? []);
+  const offered = new Set<string>(offer.groups);
+  return {
+    ok: true as const,
+    order,
+    offer,
+    lines: lines
+      .map((l) => ({ ...l, group: deliveryGroupOf(l.sku) }))
+      .filter((l) => (l.group ? offered.has(l.group) : offer.whole)),
+  };
+}
+
+deliveryOrdersRouter.get("/offer/:so", requireOperationOrPrincipal, async (c) => {
+  const ident = salesOrderParamOf(c.req.param("so"));
+  if (ident.kind === "invalid") {
+    return c.json({ error: "invalid_so_number", message: "Sales Order not found." }, 400);
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const read = await readOffer(
+    sb,
+    ident.kind === "id" ? { column: "id", value: ident.id } : { column: "so", value: ident.so },
+  );
+  if (!read.ok) {
+    const m = mapPgError(read.error);
+    return c.json(m.body, m.status);
+  }
+  if (!read.order) return c.json({ error: "order_not_found", message: "Sales Order not found." }, 404);
+  return c.json({
+    order: { id: read.order.id, so: read.order.so, customer_name: read.order.customer_name },
+    offer: read.offer,
+    lines: read.lines,
+  });
+});
+
+deliveryOrdersRouter.post("/", requireOperationOrPrincipal, async (c) => {
+  const body = (await c.req.json().catch(() => null)) as { orderId?: unknown; groups?: unknown } | null;
+  const orderId = typeof body?.orderId === "string" ? body.orderId : "";
+  const groups = Array.isArray(body?.groups) ? body!.groups.filter((g): g is string => typeof g === "string") : null;
+  const ident = salesOrderParamOf(orderId);
+  if (ident.kind !== "id" || !groups) {
+    return c.json({ error: "invalid_body", message: "Pick a Sales Order and its goods." }, 400);
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const read = await readOffer(sb, { column: "id", value: ident.id });
+  if (!read.ok) {
+    const m = mapPgError(read.error);
+    return c.json(m.body, m.status);
+  }
+  if (!read.order) return c.json({ error: "order_not_found", message: "Sales Order not found." }, 404);
+  const scope = deliveryOrderScopeOf(read.offer, groups);
+  if (!scope.ok) {
+    return c.json(
+      { error: scope.reason, message: scope.reason === "nothing_picked" ? "Pick the goods for this Delivery Order." : "These goods are already on a Delivery Order." },
+      scope.reason === "nothing_picked" ? 400 : 409,
+    );
+  }
+  const attempt = await attemptDeliveryOrderIssue(sb, ident.id, { waitBookingConfirm: false, groups: scope.scope });
+  switch (attempt.outcome) {
+    case "issued":
+      return c.json({ doNumber: attempt.doNumber }, 201);
+    case "already":
+      return c.json({ error: "already_on_a_delivery_order", message: "These goods are already on a Delivery Order." }, 409);
+    case "blocked":
+      return c.json(
+        { error: "delivery_order_gate", message: `Cannot issue the delivery order: ${attempt.reasons.join(" ")}`, reasons: attempt.reasons },
+        422,
+      );
+    case "error":
+      return c.json(attempt.body, attempt.status);
+  }
 });
 
 deliveryOrdersRouter.get("/:id", requireOperationOrPrincipal, async (c) => {
