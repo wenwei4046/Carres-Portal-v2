@@ -924,6 +924,9 @@ export function useCreateOrder(
       const [order] = args;
       qc.setQueryData(qk.order(order.id), order);
       void qc.invalidateQueries({ queryKey: ["orders"] });
+      // The office create page (2026-10-22) lands back on the Sales Orders
+      // Register, keyed under ["operation","orders"] with a 30s staleTime.
+      void qc.invalidateQueries({ queryKey: ["operation", "orders"] });
       // Forward to caller's onSuccess if provided. Spread keeps us
       // signature-agnostic across TanStack versions.
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));

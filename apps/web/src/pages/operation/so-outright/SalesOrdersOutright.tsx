@@ -31,6 +31,7 @@ import { documentRowMenu } from "@/components/register/row-menu";
 import CancelSalesOrderDialog from "../CancelSalesOrderDialog";
 import CSidePanel from "@/components/carres/CSidePanel";
 import { CChip, CIconButton, CShowPanelButton, CViewButton } from "@/components/carres/CToolbar";
+import Button from "@/components/kit/Button";
 import { useAuth } from "@/lib/auth";
 import { appTodayIso } from "@/lib/fmt-date";
 import { useSalesOrderRegisterFacts, useSalesOrderRegisterOrders } from "@/lib/queries";
@@ -665,6 +666,12 @@ export default function SalesOrdersOutright() {
               </span>
             )}
             <span className="ml-auto flex shrink-0 items-center gap-1.5">
+              {/* OVERTURNED 2026-10-22 by Weisiang (Mr Lim): office staff may
+                  create Sales Orders (Houzs way). Jess's 2026-09-27 ruling is
+                  kept for history in docs/orders/MASTER.md. */}
+              <Button variant="primary" size="md" icon="add" data-testid="new-sales-order" onClick={() => navigate("/operation/orders/so/new")}>
+                New Sales Order
+              </Button>
               <CPopover
                 label="Views"
                 role="menu"

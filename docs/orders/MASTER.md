@@ -264,7 +264,8 @@ framed box (`h-[calc(100vh-260px)]`, min 420px) with one node-sized skeleton; th
 gone from both.
 
 **The office create door — RETIRED IN CODE 2026-09-28 (owner ruling 2026-09-27), production walk
-owed.** The Register carries no `New Sales Order`; `/operation/orders/so/new` lands on the Register;
+owed. OVERTURNED 2026-10-22 by Weisiang (Mr Lim) — see "OVERTURNED 2026-10-22" under the Register;
+`/operation/orders/so/new` now opens the office create page.** ~~The Register carries no `New Sales Order`; `/operation/orders/so/new` lands on the Register;~~
 `POST /api/operation/orders` answers 410 `office_create_retired` before any database client opens,
 with the Operation permission boundary kept. **Not removed yet:** the page's own Create mode
 (`mode === "create"` in `SalesOrderWorkspace.tsx`) is now unreachable and still in the file; the
@@ -938,14 +939,30 @@ line two (`Cody` / `Super King`) instead of repeating the SKU. Its columns stay
 `Category | Unit ID | Deliver To | SKU | Qty | Item`; `Deliver To` with no PO line reads `No PO yet`.
 
 Search, filters, sorting, Columns and Export remain. Selection scopes output only. The Register
-contains no owner, avatar, next-action sentence, Priority or workflow button — **and no `New Sales
-Order` button (OWNER RULING 2026-09-27, Jess: "add new sales order should not be here").** A
-customer order is the dealer's / showroom's act in the Sales Portal and nowhere else; Operation receives
-it, never creates it, and never opens the Sales Portal — the only order Operation places is a Manual
-Purchase (owner, 2026-09-27). The office
-create door `/operation/orders/so/new` and `POST /api/operation/orders` are retired with the button
-(measured 2026-09-27: every one of the 58 `Order created` events came from principal / operation /
-bd office logins — test data — and none from a dealer or showroom). Buying without a customer order
+contains no owner, avatar, next-action sentence, Priority or workflow button.
+
+**OVERTURNED 2026-10-22 by Weisiang (Mr Lim): office staff may create Sales Orders (Houzs way).
+Jess's earlier rule kept below for history.** Ruled by Weisiang (Mr Lim, "Houzs Weisiang.00") on
+WhatsApp 2026-10-22 6:29 PM for the Houzs → Carres port — "just clear Carress rules and Implement
+Houzs inside, as long as they can open SO PO DO" — relayed by YH 2026-10-23. Jess, who wrote the
+rule below, was not part of this decision. Built: the Register shows `New Sales Order`; it opens
+`/operation/orders/so/new` (`OperationNewSalesOrder.tsx`), one page in the kit, which posts the
+Sales Portal's own body to `POST /api/orders` → `create_order_from_sales_portal` — the SAME engine
+and the same validation the Sales Portal answers to (delivery facts, both dates, payment method,
+customer signature, terms), placed under the picked outlet's dealer. Plain catalog lines only; no
+configurator, bundle, PWP or free gift. `POST /api/operation/orders` stays a 410 — the office uses
+the Sales Portal door, not a second create path.
+
+> ~~**and no `New Sales Order` button (OWNER RULING 2026-09-27, Jess: "add new sales order should
+> not be here").** A customer order is the dealer's / showroom's act in the Sales Portal and nowhere
+> else; Operation receives it, never creates it, and never opens the Sales Portal — the only order
+> Operation places is a Manual Purchase (owner, 2026-09-27). The office create door
+> `/operation/orders/so/new` and `POST /api/operation/orders` are retired with the button (measured
+> 2026-09-27: every one of the 58 `Order created` events came from principal / operation / bd
+> office logins — test data — and none from a dealer or showroom).~~ *(Jess's rule — OVERTURNED
+> 2026-10-22 by Weisiang, above.)*
+
+Buying without a customer order
 is Purchasing's `Manual Purchase`; a Subscription order is born in Rental (0275). `Scan Order` is
 NOT built — its whole purpose was to prefill this door (§11 stays as the record of that decision).
 This overwrites Loo's 2026-08-11 line that `New Sales Order` is the one permanently visible primary

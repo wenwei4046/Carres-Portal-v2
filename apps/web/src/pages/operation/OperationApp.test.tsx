@@ -158,6 +158,9 @@ vi.mock("./SettingsWorkspace", () => ({
 vi.mock("./SalesOrderWorkspace", () => ({
   default: () => <div data-testid="workspace-stub">workspace</div>,
 }));
+vi.mock("./OperationNewSalesOrder", () => ({
+  default: () => <div data-testid="new-sales-order-stub">new-sales-order</div>,
+}));
 vi.mock("./OperationImport", () => ({
   default: () => <div data-testid="import-stub">import-page</div>,
 }));
@@ -273,10 +276,12 @@ describe("OperationApp — the Sales Order cutover's two doors", () => {
     expect(screen.queryByTestId("sales-orders-work-surface")).not.toBeInTheDocument();
   });
 
-  /* ⭐ OWNER RULING 2026-09-27 (Jess): Operation never creates a Sales Order by
-     any door. A saved or pasted link to the retired create door opens no form. */
-  it("the retired office create door opens no workspace", () => {
+  /* OVERTURNED 2026-10-22 by Weisiang (Mr Lim): office staff may create Sales
+     Orders (Houzs way). The create door opens the office create page, never
+     the object workspace (`new` is not an order id). */
+  it("the office create door opens the New Sales Order page", () => {
     renderApp("/operation/orders/so/new");
+    expect(screen.getByTestId("new-sales-order-stub")).toBeInTheDocument();
     expect(screen.queryByTestId("workspace-stub")).not.toBeInTheDocument();
   });
 });
