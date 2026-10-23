@@ -132,6 +132,18 @@ describe.skipIf(!URL)("Service Cases the Houzs way (real PostgreSQL, 0711)", () 
     expect(await attempt("update service_cases set status_id = $2 where id = $1", [C.owned, closed])).toBe("ok");
   });
 
+  it("only the Sales Order PIC (or the principal) picks the owner of a case on their order", async () => {
+    const pick = (who: string) => attempt("update service_cases set owner_user_id = $2 where id = $1", [C.picOrder, who]);
+    await as(U.admin, "operation");
+    expect(await pick(U.admin)).toBe("42501");
+    await as(U.sales, "operation");
+    expect(await pick(U.admin)).toBe("ok");
+    await as(U.boss, "principal");
+    expect(await pick(U.other)).toBe("ok");
+    await as(U.admin, "operation");
+    expect(await attempt("update service_cases set owner_user_id = $2 where id = $1", [C.raised, U.admin])).toBe("ok");
+  });
+
   it("the default owner is set by the principal, never by any operation login", async () => {
     await as(U.admin, "operation");
     expect(await attempt("update service_settings set default_owner_user_id = $1", [U.admin])).toBe("no rows");

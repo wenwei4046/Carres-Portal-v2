@@ -9,7 +9,8 @@
 --   1. service_cases.owner_user_id — the Case owner. The Sales Order PIC picks
 --      an admin to own the case (Houzs). Overturns Service MASTER "the Sales
 --      Order PIC is never the Case owner" and the round-robin owner rule. Who
---      may pick is enforced by the API (PATCH /api/ops/service-cases/:id).
+--      may pick is enforced by the API (PATCH /api/ops/service-cases/:id)
+--      and by the service_cases_owner_pick_guard trigger.
 --   2. priority stops being generated from `usable`: staff edit it (Houzs).
 --      Existing values are kept; new cases still start from `usable`.
 --   3. Close Case no longer waits for the customer's confirmation (Houzs
@@ -30,6 +31,38 @@ create index if not exists service_cases_owner_user_id_idx
   on public.service_cases (owner_user_id);
 comment on column public.service_cases.owner_user_id is
   '0711: the Case owner, picked by the Sales Order PIC (Weisiang''s decision, WhatsApp 2026-10-22). Falls back to service_settings.default_owner_user_id at create.';
+
+-- Who may pick, held in the database too (the browser can reach PostgREST):
+-- the principal, the order's PIC, or any office person when there is no PIC.
+-- Mirrors shared mayPickCaseOwner. No JWT (service role, migrations) passes.
+create or replace function public.service_case_owner_pick_guard()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $fn$
+declare
+  v_pic uuid;
+begin
+  if new.owner_user_id is not distinct from old.owner_user_id or auth.uid() is null then
+    return new;
+  end if;
+  if (select public.app_role()) = 'principal' then
+    return new;
+  end if;
+  select oc.assigned_staff into v_pic
+    from public.ops_order_control oc where oc.order_id = new.order_id;
+  if (select public.app_role()) = 'operation' and (v_pic is null or v_pic = auth.uid()) then
+    return new;
+  end if;
+  raise exception 'Only the sales order PIC can pick who owns this case.'
+    using errcode = '42501', detail = 'not_order_pic';
+end;
+$fn$;
+drop trigger if exists service_cases_owner_pick_guard on public.service_cases;
+create trigger service_cases_owner_pick_guard
+  before update of owner_user_id on public.service_cases
+  for each row execute function public.service_case_owner_pick_guard();
 
 -- ── 2 · staff edit the priority ─────────────────────────────────────────────
 do $$
@@ -117,6 +150,8 @@ comment on function public.my_service_case_ids() is
 
 -- ROLLBACK (manual):
 --   drop function if exists public.my_service_case_ids();
+--   drop trigger if exists service_cases_owner_pick_guard on public.service_cases;
+--   drop function if exists public.service_case_owner_pick_guard();
 --   drop policy if exists scs_service_editor_write on public.service_case_statuses;
 --   drop policy if exists sct_service_editor_write on public.service_case_types;
 --   drop table if exists public.service_settings;

@@ -252,6 +252,13 @@ scRouter.get("/settings", requireOperationOrPrincipal, async (c) => {
 scRouter.patch("/settings", requireOperationOrPrincipal, requireSettingsEditor("service"), async (c) => {
   const parsed = await parseBody(c, serviceSettingsPatchSchema);
   const sb = userClient(c.env, c.var.auth.jwt);
+  // The default owner becomes a case's owner, so it passes the same check.
+  if (parsed.defaultOwnerUserId !== null && !(await isActiveOfficePerson(sb, parsed.defaultOwnerUserId))) {
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: "Pick an active office person to own this case." },
+      422,
+    );
+  }
   const { error } = await sb
     .from("service_settings")
     .update({ default_owner_user_id: parsed.defaultOwnerUserId, updated_by: c.var.auth.id, updated_at: new Date().toISOString() })
@@ -650,19 +657,11 @@ scRouter.patch("/:id", requireOperationOrPrincipal, async (c) => {
     if (!mayPickCaseOwner({ role: auth.role, callerId: auth.id, soPicUserId })) {
       throw new HTTPException(403, { message: "Only the sales order PIC can pick who owns this case." });
     }
-    if (parsed.ownerUserId !== null) {
-      const { data: person } = await sb
-        .from("app_users")
-        .select("status, role")
-        .eq("id", parsed.ownerUserId)
-        .maybeSingle();
-      const p = person as { status?: string | null; role?: string } | null;
-      if (!p || (p.status ?? "active") !== "active" || (p.role !== "operation" && p.role !== "principal")) {
-        return c.json(
-          { error: "invalid_input", code: "invalid_param", message: "Pick an active office person to own this case." },
-          422,
-        );
-      }
+    if (parsed.ownerUserId !== null && !(await isActiveOfficePerson(sb, parsed.ownerUserId))) {
+      return c.json(
+        { error: "invalid_input", code: "invalid_param", message: "Pick an active office person to own this case." },
+        422,
+      );
     }
   }
 
@@ -1107,6 +1106,13 @@ function shapeCase(r: RawCase) {
     // 0711 — the case owner (Weisiang's decision, WhatsApp 2026-10-22).
     ownerUserId:     r.owner_user_id ?? null,
   };
+}
+
+/** 0711 — may this person own a case: an active operation or principal account. */
+async function isActiveOfficePerson(sb: ReturnType<typeof userClient>, userId: string): Promise<boolean> {
+  const { data } = await sb.from("app_users").select("status, role").eq("id", userId).maybeSingle();
+  const p = data as { status?: string | null; role?: string } | null;
+  return !!p && (p.status ?? "active") === "active" && (p.role === "operation" || p.role === "principal");
 }
 
 /** 0711 — the Sales Order PIC of a case's order (ops_order_control), or null

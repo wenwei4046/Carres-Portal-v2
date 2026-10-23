@@ -81,7 +81,10 @@ export default function OperationServiceCases() {
 
   const allRows: ServiceCase[] = listQ.data?.items ?? [];
   const stages = stageCounts(allRows);
-  const rows = stageId ? allRows.filter((r) => (r.statusId ?? "") === stageId) : allRows;
+  // A picked stage with no cases left in this list (My cases / state switched)
+  // has no card to un-press, so it stops filtering instead of hiding every row.
+  const stageShown = stageId !== null && stages.some((st) => st.id === stageId);
+  const rows = stageShown ? allRows.filter((r) => (r.statusId ?? "") === stageId) : allRows;
 
   // 0711 — the owner's name on each row, from the same staff list every
   // Operation picker reads.
