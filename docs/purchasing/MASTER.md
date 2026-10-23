@@ -895,7 +895,9 @@ Useful proven capability:
 
 Capability deliberately rejected or improved:
 
-- blank PO/return/consignment creation without a governed source;
+- blank return/consignment creation without a governed source; the PO part is overturned:
+  **OVERTURNED 2026-10-22 by Weisiang (Mr Lim): office staff may open a PO without a source (Houzs way). Jess's earlier rule kept below for history.**
+  > Jess's earlier rule: "blank PO/return/consignment creation without a governed source;"
 - delete and right-click commands that hide authority;
 - many cloned consignment engines whose document type, ownership and accounting meaning diverge;
 - a separate consignment-receipt workflow when one Goods Receipt can preserve ownership;
@@ -4486,8 +4488,14 @@ on `auth.uid()`; a shape check refuses any key but order/hidden/widths/sort; 10 
 listing; one default. Routes `/api/operation/register-layouts` run as the caller. **Owed:** saving
 a layout and pressing `PO sent to supplier` on production.
 
-**Purpose / source:** every numbered supplier purchase commitment and version. No blank independent
-PO; source is approved demand. The listing answers to whom, what, and when goods should arrive.
+**OVERTURNED 2026-10-22 by Weisiang (Mr Lim): office staff may open a PO without a source (Houzs way). Jess's earlier rule kept below for history.** (Weisiang, WhatsApp 2026-10-22 6:29 PM, relayed by YH 2026-10-23: "just clear Carress rules and Implement Houzs inside, as long as they can open SO PO DO". Jess was not part of this decision. Built as `New Purchase Order` on the PO register → `POST /api/operation/pos/new` → the existing `purchasing_issue_pos_batch`.)
+
+> Jess's earlier rule: "**Purpose / source:** every numbered supplier purchase commitment and version. No blank independent
+> PO; source is approved demand."
+
+**Purpose / source (current):** every numbered supplier purchase commitment and version. A PO comes
+from approved demand (SO Batch Purchase, Manual Purchase) or is opened directly by office staff with
+no source (`New Purchase Order`). The listing answers to whom, what, and when goods should arrive.
 Quantity progress belongs to Warehouse Inbound / Receiving and PO detail.
 
 **OVERVIEW DISPLAY — owner's 12 Oct 2026 package · BUILT 12 Oct 2026 · the page's first display.**
@@ -8512,7 +8520,7 @@ closed the remaining Houzs capability choices for this review as follows:
 |---|---|
 | Supplier on-time / quality performance | KEEP the approved §12 delivery/claim performance reporting target; complete through the reporting surface, not a new Purchasing scoring engine. Approved does not mean built. |
 | Scheduled future supplier prices | Catalog owns price maintenance; do not create a competing Purchasing price scheduler. |
-| Copy previous PO | REJECT for this scope. New purchases continue from authorised source demand; no blank/independent PO entrance. This is a scope ruling, not a verified claim about a Houzs button's runtime behaviour. |
+| Copy previous PO | **OVERTURNED 2026-10-22 by Weisiang (Mr Lim): office staff may open a PO without a source (Houzs way). Jess's earlier rule kept below for history.** `New Purchase Order` on the PO register is the blank/independent PO entrance; Copy previous PO itself is still not built. Jess's earlier rule: "REJECT for this scope. New purchases continue from authorised source demand; no blank/independent PO entrance. This is a scope ruling, not a verified claim about a Houzs button's runtime behaviour." |
 | Multi-PO printing / multi-PO date recording | DEFER until measured operator need warrants it. Existing multi-line recording within one PO remains; it is not equivalent to cross-PO bulk operation. |
 | Excess receipt | KEEP Receiving's Extra Qty handling and existing stock-availability safeguards; do not introduce a second overreceipt engine. |
 

@@ -71,6 +71,7 @@ import { SO_HEAD_ROW, SO_ROW, SO_TABLE, SO_TD, SO_TH } from "../components/so-do
 import TableScroller from "@/components/TableScroller";
 import type { PoTemplateData } from "@/lib/pdf/types";
 import {
+  useCatalog,
   useMonthlyDemandFacts,
   useOperationPoAudit,
   useOperationPos,
@@ -93,6 +94,7 @@ import PurchasingTabs from "../PurchasingTabs";
 import { CHANNEL_WORD, refreshPurchasingReads } from "../components/PoIssueEvidence";
 import { PoSupplierResultContent } from "../so-batch/PoSupplierResultPanel";
 import ChangeDeliverToForm from "./ChangeDeliverToForm";
+import NewPurchaseOrderModal from "./NewPurchaseOrderModal";
 import GoodsMiniTable, { goodsCategoryOf, type GoodsMiniLine } from "../components/GoodsMiniTable";
 import { lineConfigBits } from "../../dealer/new-order/special-addons-picker";
 import { personInitials } from "@/lib/staff-avatar";
@@ -467,6 +469,17 @@ export default function PurchaseOrdersPage() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
+  /* New Purchase Order — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22):
+     office staff open a PO with no source, the Houzs way. Catalog is read only
+     once the form opens. */
+  const [newPoOpen, setNewPoOpen] = useState(false);
+  const catalogQ = useCatalog({ enabled: newPoOpen });
+  const newPoSkus = useMemo(() => {
+    const models = new Map((catalogQ.data?.models ?? []).map((m) => [m.id, m.name]));
+    return (catalogQ.data?.skus ?? [])
+      .filter((s) => !s.discontinuedAt)
+      .map((s) => ({ sku: s.sku, supplierId: s.supplierId, label: `${s.sku} · ${models.get(s.modelId) ?? ""} ${s.variant}`.trim() }));
+  }, [catalogQ.data]);
   const restoredListing = poListingReturnOf(location.state);
   const [filter, setFilter] = useState<RailFilter>(() => restoredListing?.filter ?? RAIL_CLEAR);
   /* The personal saved-layout pilot (ui MASTER §6.7 rule 4). A failed read
@@ -1249,6 +1262,18 @@ export default function PurchaseOrdersPage() {
   return (
     <div ref={canvasRef} className={`${registerStyles.page} flex h-full min-h-0 flex-col`} data-testid="purchase-orders-register">
       <PurchasingTabs />
+      <NewPurchaseOrderModal
+        open={newPoOpen}
+        onOpenChange={setNewPoOpen}
+        suppliers={(suppliersQ.data?.suppliers ?? []).map((s) => ({ id: s.id, name: s.name }))}
+        destinations={activeDestinations}
+        skus={newPoSkus}
+        onIssued={(poId) => {
+          setNewPoOpen(false);
+          void posQ.refetch();
+          if (poId) setParams((current) => { const next = new URLSearchParams(current); next.set("po", poId); next.delete("view"); return next; });
+        }}
+      />
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
         {railOpen && (
         <FilterRail
@@ -1397,6 +1422,7 @@ export default function PurchaseOrdersPage() {
                     testId="purchase-orders-show-filters"
                   />
                 )}
+                <Button size="sm" icon="add" onClick={() => setNewPoOpen(true)} data-testid="po-new">New Purchase Order</Button>
                 {overview && stateTabs}
               </>}
               statusSummary={(filtered, selectedRows) => {
