@@ -3624,6 +3624,8 @@ export interface WarehouseStockEntry {
   sku: string;
   qty: number;
   reserved: number;
+  /** Bindable Units (`stock_sku_availability.available`) — Weisiang's decision 2026-10-22. */
+  available?: number;
   low_stock_status: LowStockStatus;
   /** T42-pass3-C1 — current `stock_balances.low_threshold`. NULL = no alert
    *  configured. Used by `SetThresholdDialog` prefill from OperationWarehouse. */
