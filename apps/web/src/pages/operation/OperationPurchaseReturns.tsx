@@ -17,10 +17,12 @@
  *   FLAT      — "do not invent status groups". The rail carries the conditions;
  *               the grid stays one ungrouped list.
  *   READ-ONLY — "Issuing the document does not move stock", and the physical
- *               pickup is Stock's (§7.4, Stock MASTER §12.8). There is no
- *               blank `+ New` here because only an approved Claim/outcome
- *               creates a return, and no batch action because a register that
- *               selects nothing has nothing to act on (§6.7 rule 5).
+ *               pickup is Stock's (§7.4, Stock MASTER §12.8). No batch action
+ *               because a register that selects nothing has nothing to act on
+ *               (§6.7 rule 5). `New Purchase Return` (supplier + Units in
+ *               stock, no claim) is Weisiang's decision (Mr Lim, WhatsApp
+ *               2026-10-22), overturning Jess's "only an approved Claim
+ *               creates a return"; Jess was not part of it.
  *   PURCHASING'S OWN — no Finance, no Credit Consequence, no Work column.
  *
  * ── WHERE ITS ROWS COME FROM ────────────────────────────────────────────────
@@ -63,7 +65,9 @@ import {
   type PurchaseReturnCondition,
   type PurchaseReturnListRow,
 } from "@carres/shared";
-import { useOperationPurchaseReturns } from "@/lib/queries";
+import { useOperationPurchaseReturns, useOperationSuppliers } from "@/lib/queries";
+import Select from "@/components/kit/Select";
+import PurchaseReturnIssue from "./components/PurchaseReturnIssue";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import Button from "@/components/kit/Button";
 import EmptyState from "@/components/kit/EmptyState";
@@ -134,6 +138,8 @@ export interface PurchaseReturnsRegisterProps {
   errorTitle?: string;
   errorDetail?: string;
   onRetry?: () => void;
+  /** `New Purchase Return` — Weisiang's decision, Mr Lim, WhatsApp 2026-10-22. */
+  onNew?: () => void;
 }
 
 export function PurchaseReturnsRegister({
@@ -143,6 +149,7 @@ export function PurchaseReturnsRegister({
   errorTitle = "Purchase Returns could not be loaded.",
   errorDetail,
   onRetry,
+  onNew,
 }: PurchaseReturnsRegisterProps) {
   const [supplier, setSupplier] = useState<string | null>(null);
   const [condition, setCondition] = useState<PurchaseReturnCondition | null>(null);
@@ -533,12 +540,19 @@ export function PurchaseReturnsRegister({
             searchPlaceholder="Search purchase returns…"
             exportName="Purchase Returns"
             toolbarStart={
-              !railOpen ? (
-                <ShowFiltersButton
-                  onShow={() => setRailVisible(true)}
-                  testId="purchase-returns-show-filters"
-                />
-              ) : null
+              <>
+                {!railOpen ? (
+                  <ShowFiltersButton
+                    onShow={() => setRailVisible(true)}
+                    testId="purchase-returns-show-filters"
+                  />
+                ) : null}
+                {onNew ? (
+                  <Button variant="primary" onClick={onNew} data-testid="purchase-returns-new">
+                    {NEW_PURCHASE_RETURN}
+                  </Button>
+                ) : null}
+              </>
             }
             /* ⭐ ONE TRACKED UNIT PER EXPANDED ROW (§9.6). The expansion is the
                per-Unit truth and the evidence door; the parent row never
@@ -583,6 +597,7 @@ export default function OperationPurchaseReturns() {
   const pr = params.get("pr");
   const query = useOperationPurchaseReturns(claim);
   const status = (query.error as { status?: number } | null)?.status;
+  const [creating, setCreating] = useState(false);
 
   /* `?pr=` opens the full-width record (§9.6: full width after issue); the
      register's own link and every Work card land here. */
@@ -598,8 +613,20 @@ export default function OperationPurchaseReturns() {
     );
   }
 
+  if (creating) {
+    return <NewPurchaseReturn onClose={() => setCreating(false)} onIssued={(id) => {
+      setCreating(false);
+      setParams((previous) => {
+        const next = new URLSearchParams(previous);
+        next.set("pr", id);
+        return next;
+      });
+    }} />;
+  }
+
   return (
     <PurchaseReturnsRegister
+      onNew={() => setCreating(true)}
       returns={query.data?.returns ?? []}
       isLoading={query.isLoading}
       isError={query.isError}
@@ -611,5 +638,27 @@ export default function OperationPurchaseReturns() {
       errorDetail={query.error?.message}
       onRetry={() => void query.refetch()}
     />
+  );
+}
+
+export const NEW_PURCHASE_RETURN = "New Purchase Return";
+
+/**
+ * `New Purchase Return` with no claim: pick the supplier, then the same issue
+ * form lists that supplier's Units in stock. Weisiang's decision (Mr Lim,
+ * WhatsApp 2026-10-22); Jess was not part of it.
+ */
+function NewPurchaseReturn({ onClose, onIssued }: { onClose: () => void; onIssued: (id: string) => void }) {
+  const suppliers = useOperationSuppliers();
+  const [supplierId, setSupplierId] = useState("");
+  if (supplierId) return <PurchaseReturnIssue supplierId={supplierId} onClose={onClose} onIssued={onIssued} />;
+  return (
+    <div className="flex max-w-md flex-col gap-3 p-4" data-testid="purchase-return-new">
+      <h1 className="text-page text-kit-slate-12">{NEW_PURCHASE_RETURN}</h1>
+      <Select id="purchase-return-new-supplier" label="Supplier" placeholder="Choose the supplier"
+        onValueChange={setSupplierId}
+        options={(suppliers.data?.suppliers ?? []).map((s) => ({ value: s.id, label: s.name }))} />
+      <div><Button variant="neutral" onClick={onClose}>Cancel</Button></div>
+    </div>
   );
 }

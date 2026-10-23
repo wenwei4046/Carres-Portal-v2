@@ -65,8 +65,11 @@ export function purchaseReturnDraftPrint(
   };
 }
 
-export default function PurchaseReturnIssue({ claimId, onClose, onIssued }: { claimId: string; onClose: () => void; onIssued: (id: string) => void }) {
-  const read = usePurchaseReturnIssueSource(claimId);
+/** `claimId` — issued from a claim. `supplierId` with no claim — `New Purchase
+ *  Return`, Weisiang's decision (Mr Lim, WhatsApp 2026-10-22), overturning
+ *  Jess's "only after an approved claim"; Jess was not part of it. */
+export default function PurchaseReturnIssue({ claimId = null, supplierId = null, onClose, onIssued }: { claimId?: string | null; supplierId?: string | null; onClose: () => void; onIssued: (id: string) => void }) {
+  const read = usePurchaseReturnIssueSource(claimId, supplierId);
   if (read.isError) {
     return <div role="alert"><EmptyState title="Some information could not be refreshed." action={<Button variant="neutral" onClick={() => void read.refetch()}>Try again</Button>} /></div>;
   }
@@ -93,7 +96,7 @@ export function IssueForm({ source, onClose, onIssued }: { source: PurchaseRetur
     if (missing.length) return;
     const byId = new Map(source.units.map((u) => [u.stock_item_id, u]));
     door.mutate({
-      claim_id: source.claim_id,
+      ...(source.claim_id ? { claim_id: source.claim_id } : { supplier_id: source.supplier_id }),
       units: picked.map((id) => ({ stock_item_id: id, seen: byId.get(id)?.seen ?? "", pickup_location: (pickup[id] ?? byId.get(id)?.pickup_location ?? "").trim() || null })),
       confirmed_pickup_date: confirmed,
     }, { onSuccess: (out) => onIssued(out.id) });
@@ -102,12 +105,12 @@ export function IssueForm({ source, onClose, onIssued }: { source: PurchaseRetur
 
   return <div className="flex min-h-0 flex-1 flex-col gap-4 min-[1180px]:flex-row" data-testid="purchase-return-issue">
     <div className="flex min-w-0 flex-col gap-3 min-[1180px]:w-1/2" data-testid="purchase-return-issue-form">
-      <p className="text-meta text-kit-slate-11">{source.claim_no ?? "Supplier Claim"}</p>
+      <p className="text-meta text-kit-slate-11">{source.claim_id ? (source.claim_no ?? "Supplier Claim") : (source.supplier_name ?? "Supplier")}</p>
       <h1 className="text-page text-kit-slate-12">{ISSUE_PURCHASE_RETURN}</h1>
       {refusal ? <p role="alert" className="rounded-control border border-kit-red-9 bg-kit-red-3 px-3 py-2 text-body text-kit-red-11" data-testid="purchase-return-issue-refusal">{refusal}</p> : null}
       <Block title="Units to return">
         <div className="grid gap-1" data-testid="purchase-return-units">
-          {source.units.length === 0 ? <p className="text-body text-kit-slate-11">No tracked Units on this claim.</p> : null}
+          {source.units.length === 0 ? <p className="text-body text-kit-slate-11">{source.claim_id ? "No tracked Units on this claim." : "No Units of this supplier in stock."}</p> : null}
           {source.units.map((u) => <div key={u.stock_item_id} className="flex min-h-[40px] flex-col justify-center border-b border-kit-slate-4 py-1 last:border-b-0">
             <Checkbox id={`pr-unit-${u.stock_item_id}`} label={u.unit_code} disabled={Boolean(u.refusal)}
               checked={picked.includes(u.stock_item_id)}

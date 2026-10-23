@@ -159,7 +159,10 @@ export interface PurchaseReturnIssueUnit {
 }
 
 export interface PurchaseReturnIssueSource {
-  claim_id: string;
+  /** null = `New Purchase Return` with no claim — Weisiang's decision (Mr Lim,
+   *  WhatsApp 2026-10-22), overturning Jess's "only after an approved claim". */
+  claim_id: string | null;
+  supplier_id?: string;
   claim_no: string | null;
   supplier_name: string | null;
   /** Return To as the door resolves it (owner ruling 2026-09-29): the

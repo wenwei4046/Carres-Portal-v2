@@ -299,21 +299,34 @@ purchaseReturnsRouter.get("/work-source", async (c) => {
 /** The form's facts, read as the caller: the claim, Supplier Master's return
  *  address, and every tracked Unit with the door's own refusal words. The
  *  catalog snapshot (Category · Items) is read here, never taken from the
- *  browser. */
-async function readIssueSource(c: Context<AppEnv>, claimId: string): Promise<{ source: PurchaseReturnIssueSource | null; error: unknown }> {
+ *  browser.
+ *
+ *  0713 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): `{ supplierId }`
+ *  reads the same facts for a Purchase Return with no claim — the supplier's
+ *  Units in stock (`purchase_return_supplier_units`). Overturns Jess's "only
+ *  after an approved claim" (§9.6); Jess was not part of the decision. */
+async function readIssueSource(c: Context<AppEnv>, from: { claimId: string } | { supplierId: string }): Promise<{ source: PurchaseReturnIssueSource | null; error: unknown }> {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const claim = await sb.from("supplier_claims").select("id, claim_no, supplier_id, warehouse_receipt_id").eq("id", claimId).maybeSingle();
-  if (claim.error) return { source: null, error: claim.error };
-  if (!claim.data) return { source: null, error: null };
-  const row = claim.data as Row;
+  let row: Row;
+  if ("claimId" in from) {
+    const claim = await sb.from("supplier_claims").select("id, claim_no, supplier_id, warehouse_receipt_id").eq("id", from.claimId).maybeSingle();
+    if (claim.error) return { source: null, error: claim.error };
+    if (!claim.data) return { source: null, error: null };
+    row = claim.data as Row;
+  } else {
+    row = { id: null, claim_no: null, supplier_id: from.supplierId, warehouse_receipt_id: null };
+  }
   const [supplier, grn, units] = await Promise.all([
     sb.from("suppliers").select("name, return_address, address").eq("id", row.supplier_id as string).maybeSingle(),
     row.warehouse_receipt_id
       ? sb.from("warehouse_receipts").select("grn_no").eq("id", row.warehouse_receipt_id as string).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
-    sb.rpc("purchase_return_eligible_units", { p_claim: claimId }),
+    "claimId" in from
+      ? sb.rpc("purchase_return_eligible_units", { p_claim: from.claimId })
+      : sb.rpc("purchase_return_supplier_units", { p_supplier: from.supplierId }),
   ]);
   for (const r of [supplier, grn, units]) if (r.error) return { source: null, error: r.error };
+  if (!("claimId" in from) && !supplier.data) return { source: null, error: null };
   const unitRows = ((units.data ?? []) as Row[]);
   const skus = [...new Set(unitRows.map((u) => u.sku as string).filter(Boolean))];
   const catalog = await readAllIn(skus, (b, f, t) => sb.from("product_skus").select("sku, variant, product_models(name, category)").in("sku", b).range(f, t));
@@ -325,7 +338,8 @@ async function readIssueSource(c: Context<AppEnv>, claimId: string): Promise<{ s
   const s = supplier.data as { name?: string | null; return_address?: string | null; address?: string | null } | null;
   return {
     source: {
-      claim_id: claimId,
+      claim_id: str(row.id),
+      supplier_id: row.supplier_id as string,
       claim_no: str(row.claim_no),
       supplier_name: s?.name ?? null,
       // Owner ruling 2026-09-29: the door's own resolution, shown with its source.
@@ -353,32 +367,39 @@ async function readIssueSource(c: Context<AppEnv>, claimId: string): Promise<{ s
 purchaseReturnsRouter.get("/issue-source", async (c) => {
   gate(c);
   const claimId = c.req.query("claim")?.trim() ?? "";
-  if (!/^[0-9a-f-]{36}$/i.test(claimId)) return c.json({ error: "invalid_input", code: "invalid_param", message: "claim is required" }, 422);
-  const { source, error } = await readIssueSource(c, claimId);
+  const supplierId = c.req.query("supplier")?.trim() ?? "";
+  const uuid = /^[0-9a-f-]{36}$/i;
+  if (!uuid.test(claimId) && !uuid.test(supplierId)) return c.json({ error: "invalid_input", code: "invalid_param", message: "claim or supplier is required" }, 422);
+  const { source, error } = await readIssueSource(c, uuid.test(claimId) ? { claimId } : { supplierId });
   if (error) return failDoor(c, error as never);
-  if (!source) throw new HTTPException(404, { message: "claim not found" });
+  if (!source) throw new HTTPException(404, { message: uuid.test(claimId) ? "claim not found" : "supplier not found" });
   return c.json({ source });
 });
 
 // ----- POST / — `Issue Purchase Return` -----
+//
+// From a claim (`claim_id`), or — Weisiang's decision (Mr Lim, WhatsApp
+// 2026-10-22) — with no claim (`supplier_id`): `New Purchase Return`. One door.
 
 const issueSchema = z.object({
-  claim_id: z.string().uuid(),
+  claim_id: z.string().uuid().optional(),
+  supplier_id: z.string().uuid().optional(),
   units: z.array(z.object({
     stock_item_id: z.string().uuid(),
     seen: z.string().min(1).max(64),
     pickup_location: z.string().trim().max(160).nullable().optional(),
   })).min(1).max(200),
   confirmed_pickup_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
-});
+}).refine((b) => Boolean(b.claim_id) !== Boolean(b.supplier_id), { message: "name a claim or a supplier" });
 
 purchaseReturnsRouter.post("/", purchaseReturnWorkCompletion("issue"), async (c) => {
   gate(c);
   const parsed = await parseJsonBody(c, issueSchema);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
-  const { source, error } = await readIssueSource(c, parsed.data.claim_id);
+  const { claim_id: claimId, supplier_id: supplierId } = parsed.data;
+  const { source, error } = await readIssueSource(c, claimId ? { claimId } : { supplierId: supplierId! });
   if (error) return failDoor(c, error as never);
-  if (!source) throw new HTTPException(404, { message: "claim not found" });
+  if (!source) throw new HTTPException(404, { message: claimId ? "claim not found" : "supplier not found" });
   const facts = new Map(source.units.map((u) => [u.stock_item_id, u]));
   const units = parsed.data.units.map((u) => {
     const f = facts.get(u.stock_item_id);
@@ -392,9 +413,10 @@ purchaseReturnsRouter.post("/", purchaseReturnWorkCompletion("issue"), async (c)
     };
   });
   const { data, error: doorError } = await userClient(c.env, c.var.auth.jwt).rpc("purchasing_issue_purchase_return", {
-    p_claim_id: parsed.data.claim_id,
+    p_claim_id: claimId ?? null,
     p_units: units,
     p_confirmed_pickup_date: parsed.data.confirmed_pickup_date ?? null,
+    ...(claimId ? {} : { p_supplier_id: supplierId }),
   });
   if (doorError) return failDoor(c, doorError);
   return c.json({ id: data as string }, 201);

@@ -4060,13 +4060,16 @@ export function usePurchaseReturnEvidence(id: string | null) {
 
 /** The `Issue Purchase Return` form's facts, read fresh each time it opens:
  *  the `seen` token the door compares is only as good as its read. */
-export function usePurchaseReturnIssueSource(claimId: string | null) {
+export function usePurchaseReturnIssueSource(claimId: string | null, supplierId: string | null = null) {
+  // No claim → `New Purchase Return` reads the supplier's Units in stock
+  // (Weisiang's decision, Mr Lim, WhatsApp 2026-10-22).
+  const query = claimId ? `claim=${encodeURIComponent(claimId)}` : `supplier=${encodeURIComponent(supplierId ?? "")}`;
   return useQuery({
-    queryKey: ["operation", "purchase-returns", "issue-source", claimId] as const,
-    enabled: Boolean(claimId),
+    queryKey: ["operation", "purchase-returns", "issue-source", claimId, supplierId] as const,
+    enabled: Boolean(claimId || supplierId),
     staleTime: 0,
     refetchOnWindowFocus: false,
-    queryFn: () => apiFetch<{ source: PurchaseReturnIssueSource }>(`/api/operation/purchase-returns/issue-source?claim=${encodeURIComponent(claimId ?? "")}`),
+    queryFn: () => apiFetch<{ source: PurchaseReturnIssueSource }>(`/api/operation/purchase-returns/issue-source?${query}`),
   });
 }
 
