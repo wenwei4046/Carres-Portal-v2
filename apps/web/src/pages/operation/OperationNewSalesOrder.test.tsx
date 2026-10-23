@@ -64,6 +64,14 @@ describe("buildOfficeOrder", () => {
     expect(body.installmentMonths).toBeNull();
   });
 
+  it("an installment order carries its term, so the engine accepts it", () => {
+    const f = { ...filled(), paymentMethod: "installment", approvalCode: "APP123", installmentMonths: "12" };
+    const body = buildOfficeOrder(f, { dealerId: DEALER, signaturePath: `orders-attachments/${DEALER}/s/signature.png` });
+    expect(body.installmentMonths).toBe(12);
+    expect(createOrderInputSchema.safeParse(body).success).toBe(true);
+    expect(buildOfficeOrder({ ...f, paymentMethod: "cash" }, { dealerId: DEALER, signaturePath: "x" }).installmentMonths).toBeNull();
+  });
+
   it("an empty form is refused by the same engine rules", () => {
     const body = buildOfficeOrder(emptyOfficeForm(), { dealerId: DEALER, signaturePath: "" });
     expect(createOrderInputSchema.safeParse(body).success).toBe(false);

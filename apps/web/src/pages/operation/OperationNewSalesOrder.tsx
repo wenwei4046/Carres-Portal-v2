@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   BUILDING_TYPE_OPTIONS,
   createOrderInputSchema,
+  INSTALMENT_MONTHS,
   resolvePaymentMethods,
   type CreateOrderInput,
 } from "@carres/shared";
@@ -58,6 +59,7 @@ export type OfficeForm = {
   lines: Line[];
   paymentMethod: string;
   approvalCode: string;
+  installmentMonths: string;
   followUps: Record<string, string>;
   paid: string;
   signature: string | null;
@@ -71,7 +73,7 @@ export function emptyOfficeForm(): OfficeForm {
   return {
     outletId: "", salespersonId: "", name: "", phone: "", emergencyName: "", emergencyPhone: "",
     line1: "", city: "", postcode: "", state: "", buildingType: "", floor: "1", hasLift: "",
-    deliveryDate: null, proceedDate: null, lines: [newLine()], paymentMethod: "", approvalCode: "",
+    deliveryDate: null, proceedDate: null, lines: [newLine()], paymentMethod: "", approvalCode: "", installmentMonths: "",
     followUps: {}, paid: "0", signature: null, termsAccepted: false,
   };
 }
@@ -125,7 +127,9 @@ export function buildOfficeOrder(
     depositPct: total > 0 ? Math.min(100, Math.max(0, Math.round((paid / total) * 100))) : 0,
     paymentMethod: f.paymentMethod,
     approvalCode: f.approvalCode.trim() || null,
-    installmentMonths: null,
+    installmentMonths: f.paymentMethod === "installment" && f.installmentMonths
+      ? (Number(f.installmentMonths) as CreateOrderInput["installmentMonths"])
+      : null,
     pwpCartLineKeys: [],
     entryData: {
       fields: { building_type: f.buildingType },
@@ -142,6 +146,7 @@ function firstIssue(body: CreateOrderInput, f: OfficeForm): string | null {
   if (body.lines.some((l) => !Number.isInteger(l.qty) || l.qty < 1)) return "Qty must be at least 1.";
   if (body.lines.some((l) => Number.isNaN(l.unitPrice) || l.unitPrice < 0)) return "Unit price must be 0 or more.";
   if (!f.paymentMethod) return "Pick the payment method.";
+  if (f.paymentMethod === "installment" && !f.installmentMonths) return "Pick the installment term.";
   if (!f.signature) return "The customer signs before the order is created.";
   if (!f.termsAccepted) return "The customer accepts the terms before the order is created.";
   const parsed = createOrderInputSchema.safeParse(body);
@@ -154,7 +159,8 @@ function firstIssue(body: CreateOrderInput, f: OfficeForm): string | null {
 
 export default function OperationNewSalesOrder() {
   const navigate = useNavigate();
-  const [f, setF] = useState<OfficeForm>(emptyOfficeForm);
+  const [initial] = useState<OfficeForm>(emptyOfficeForm);
+  const [f, setF] = useState<OfficeForm>(initial);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [sessionId] = useState(newWizardSessionId);
@@ -176,6 +182,19 @@ export default function OperationNewSalesOrder() {
       .filter((s) => s.posActive !== false && !s.discontinuedAt)
       .map((s) => ({ value: s.sku, label: `${s.sku} · ${models.get(s.modelId) ?? ""} ${s.variant}`.trim(), price: s.price }));
   }, [catalogQ.data]);
+
+  // Dirty guard (same pattern as SalesOrderWorkspace): a half-keyed, signed
+  // order is not lost to Cancel or a tab close.
+  const dirty = f !== initial;
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
 
   const setLine = (key: string, patch: Partial<Line>) =>
     setF((p) => ({ ...p, lines: p.lines.map((l) => (l.key === key ? { ...l, ...patch } : l)) }));
@@ -202,7 +221,7 @@ export default function OperationNewSalesOrder() {
       title="New Sales Order"
       titleRight={
         <>
-          <Button variant="neutral" onClick={() => navigate("/operation/orders")} disabled={busy}>Cancel</Button>
+          <Button variant="neutral" onClick={() => { if (!dirty || window.confirm("Discard unsaved changes?")) navigate("/operation/orders"); }} disabled={busy}>Cancel</Button>
           <Button variant="primary" icon="confirm" loading={busy} onClick={() => void submit()}>Create order</Button>
         </>
       }
@@ -265,9 +284,14 @@ export default function OperationNewSalesOrder() {
         <Panel title="Payment">
           <div className="grid gap-3 min-[768px]:grid-cols-2">
             <Select id="nso-method" label="Payment method" required value={f.paymentMethod || undefined}
-              onValueChange={(v) => setF((p) => ({ ...p, paymentMethod: v, followUps: {} }))}
+              onValueChange={(v) => setF((p) => ({ ...p, paymentMethod: v, followUps: {}, installmentMonths: "" }))}
               options={methods.map((m) => ({ value: m.key, label: m.label }))} />
             <Input id="nso-paid" label="Deposit paid (RM)" type="number" min={0} value={f.paid} onChange={(e) => set("paid", e.target.value)} />
+            {f.paymentMethod === "installment" && (
+              <Select id="nso-installment" label="Installment term" required value={f.installmentMonths || undefined}
+                onValueChange={(v) => set("installmentMonths", v)}
+                options={INSTALMENT_MONTHS.map((m) => ({ value: String(m), label: `${m} months` }))} />
+            )}
             {method?.approvalCodeRequired && (
               <Input id="nso-approval" label="Reference code" required value={f.approvalCode} onChange={(e) => set("approvalCode", e.target.value)} />
             )}

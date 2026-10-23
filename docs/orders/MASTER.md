@@ -265,7 +265,7 @@ gone from both.
 
 **The office create door — RETIRED IN CODE 2026-09-28 (owner ruling 2026-09-27), production walk
 owed. OVERTURNED 2026-10-22 by Weisiang (Mr Lim) — see "OVERTURNED 2026-10-22" under the Register;
-`/operation/orders/so/new` now opens the office create page.** The Register carries no `New Sales Order`; `/operation/orders/so/new` lands on the Register;
+`/operation/orders/so/new` now opens the office create page.** ~~The Register carries no `New Sales Order`; `/operation/orders/so/new` lands on the Register;~~
 `POST /api/operation/orders` answers 410 `office_create_retired` before any database client opens,
 with the Operation permission boundary kept. **Not removed yet:** the page's own Create mode
 (`mode === "create"` in `SalesOrderWorkspace.tsx`) is now unreachable and still in the file; the
