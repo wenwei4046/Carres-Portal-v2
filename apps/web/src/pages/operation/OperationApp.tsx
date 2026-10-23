@@ -87,6 +87,7 @@ import OperationOpsReserved from "./OperationOpsReserved";
 import OperationOpsRepair from "./OperationOpsRepair";
 import OperationOpsInventory from "./OperationOpsInventory";
 import WarehouseStockRegister from "./WarehouseStockRegister";
+import { AutoSchedule, DeliveryPlanning, DpOrders, Trips } from "./DeliveryPlanning";
 import WarehouseWorkspace from "./WarehouseWorkspace";
 import { LEGACY_SCHEDULE_TABS } from "./warehouse-schedule-view";
 import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
@@ -552,6 +553,14 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
             {/* T11 — Delivery: the 3-pane module (queues · calendar · detail).
                 Read-only by design; every write stays behind the order drawer. */}
             {tab === "delivery" && <OperationDelivery />}
+            {/* 0723 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office staff plan
+                delivery dates and trips with a time slot per stop, the Houzs way.
+                Overturns Jess's Delivery MASTER §8/§14.3/§15; Jess was not part of
+                this decision. */}
+            {tab === "delivery-planning" && <DeliveryPlanning />}
+            {tab === "dp-orders" && <DpOrders />}
+            {tab === "auto-schedule" && <AutoSchedule />}
+            {tab === "trips" && <Trips />}
             {/* SO V2 CARD 10 — My Work / Team Work: two filters over the ONE
                 open work set (Card 9's engine). The page writes nothing; a
                 row opens the Sales Order Workspace. */}

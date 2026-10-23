@@ -509,6 +509,14 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         activeFor: ["path:/operation/delivery-orders"],
         section: "Delivery",
       },
+      /* 0723 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office staff plan
+       * delivery dates and trips with a time slot per stop, the Houzs way.
+       * Overturns Jess's "exactly two children" and "no Trips, Regions or
+       * Schedule destination" (Delivery MASTER §8); Jess was not part of this decision. */
+      { key: "delivery-planning", label: "Delivery Planning", icon: CalendarDays, tab: "delivery-planning", section: "Delivery" },
+      { key: "dp-orders", label: "DP Orders", icon: ClipboardList, tab: "dp-orders", section: "Delivery" },
+      { key: "auto-schedule", label: "Auto-schedule", icon: CalendarClock, tab: "auto-schedule", section: "Delivery" },
+      { key: "trips", label: "Trips", icon: Truck, tab: "trips", section: "Delivery" },
       /* THE WAREHOUSE MAP IS FIVE DESTINATIONS (owner ruling 2026-09-14):
        * `Arrival Schedule · Pickup Schedule · Inbound · Inventory · Outbound`.
        *

@@ -127,7 +127,7 @@ the Service lane, not guessed by Delivery.
 - Assigning a Klang Valley delivery pre-selects NETS. NETS is responsible immediately and does not
   click Accept. NETS remains responsible until it records `Cannot Deliver` with a reason and
   evidence.
-- NETS contacts the customer and arranges the delivery date and time. Operation may record those
+- ~~NETS contacts the customer and arranges the delivery date and time.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): office staff may plan a delivery date for a Logistics company's delivery (Delivery Planning, DP Orders, Auto-schedule); it is written as the planned date only, the company may still change it, and the date the company agrees wins. Carres also delivers with its own lorries; for an own-lorry delivery the office's date is the delivery date. BUILT on branch `feat/delivery-planning-houzs-way`, migration 0723 NOT APPLIED.** Operation may record those
   facts on NETS' behalf; every such record says `Recorded by {person} on behalf of NETS`.
 - Operation decides what follows a `Cannot Deliver`: keep NETS with a new date, correct the
   information, hold or cancel the arrangement, or `Change logistics`.
@@ -754,11 +754,11 @@ Delivery Orders    the formal Delivery Order register                    /operat
 Delivery Order     one formal DO, its evidence and history — a door on a number, never navigation
 ```
 
-The sidebar carries the Delivery module with exactly two children, in this order: **Monitor**
-and **Delivery Orders**. Monitor leads and is the collapsed icon's landing. **The Edit Delivery
+~~The sidebar carries the Delivery module with exactly two children, in this order: **Monitor**
+and **Delivery Orders**.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): the Delivery module's children are, in this order: Monitor · Delivery Orders · Delivery Planning · DP Orders · Auto-schedule · Trips (Houzs `DeliveryPlanning.tsx`, `DpOrders.tsx`, `AutoSchedule.tsx`, `Trips.tsx`). Delivery Planning holds the editable Regions list (state → region, deliveries a day) and the Residence rules (one note per building type). BUILT on branch `feat/delivery-planning-houzs-way`, migration 0723 NOT APPLIED.** Monitor leads and is the collapsed icon's landing. **The Edit Delivery
 page is retired (owner ruling 2026-09-13):** every arrangement write lives inside the Monitor
-row's expanded panels (§8.6). There is no Delivery dashboard, Fleet, Trips, Regions, Schedule,
-Exceptions, Partners, Report or Delivery Returns destination; those capabilities live inside the
+row's expanded panels (§8.6). There is no Delivery dashboard, Fleet, ~~Trips, Regions, Schedule,~~
+Exceptions, Partners, Report or Delivery Returns destination (**OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): Trips, Regions (inside Delivery Planning) and the schedule pages Delivery Planning, DP Orders and Auto-schedule are destinations; Fleet stays out of this slice.**); those capabilities live inside the
 two destinations, the DO object, central Settings and central Reports. Sales contains **Sales
 Orders** and temporary **Old Orders** only. Central Settings retains the governed Delivery
 settings door behind the page-header gear.
@@ -1942,7 +1942,7 @@ does not rewrite an existing agreement. Until a range has been configured and ac
 never convert a period name into clock times. No initial clock boundaries are approved by this
 ruling; the hardcoded source examples above are not defaults to adopt.
 
-A date-only booking remains valid. Empty means no period recorded, not explicit any-time consent.
+A date-only booking remains valid. **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): on a Trip every stop has a time slot, the Houzs way (Houzs `Trips.tsx`): the Trips page flags a stop with `No time slot`, `Fill time slots` gives each one a slot, and a stop cannot be saved without one. A booking that is not on a trip may still be date-only. BUILT on branch `feat/delivery-planning-houzs-way`, migration 0723 NOT APPLIED.** Empty means no period recorded, not explicit any-time consent.
 Explicit any-time agreement still respects site access and working hours. ETA remains a separate
 estimate; an evidenced breach of the actual agreed range follows §5.2's Operation-owned customer
 exception. Customer messages, Monitor, Work and reporting consume that delivery's recorded
@@ -2224,7 +2224,7 @@ partner and date grouping is a derived schedule.
 
 **NOT CURRENT OPERATING TRUTH:** customer self-scheduling, Carres central customer scheduling,
 automatic partner allocation, routine multi-partner Klang Valley operation, route optimisation,
-formal lorry or dispatch run, loading manifest, ordered stops or per-trip cost. The model is
+~~formal lorry or dispatch run,~~ loading manifest, ~~ordered stops~~ or per-trip cost. **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): a Trip (one day + one own lorry or Logistics company, ordered stops, a time slot per stop) and Auto-schedule (dates proposed by region and deliveries a day, written when staff confirm) are current. The trip rides the existing arrangement row (`planned_date`, `stop_seq`, `time_slot`); no second trip model. BUILT on branch `feat/delivery-planning-houzs-way`, migration 0723 NOT APPLIED.** The model is
 partner-neutral, so Carres can later assign any partner and enable customer confirmation, Portal
 or API without replacing the DO, history or proof model. A first-class dispatch run is admitted
 only when a real vehicle-level fact exists.
@@ -2255,9 +2255,9 @@ only when a real vehicle-level fact exists.
 | Alert · Attention · Checklist · Due · Next Action · Priority, as Monitor columns | none; the three checks live in their columns |
 
 **Intentional rejects:** a New DO, Issue, Release or Approve control; a new payment exception
-door; a Delivery dashboard, Fleet, Trips, Regions, Schedule, Exceptions, Partners, Report or
-Delivery Returns destination; a copy of an arrangement; route optimisation, dispatch runs or
-loading manifests; customer self-scheduling; a second quantity, stock, duty, calendar or owner
+door; a Delivery dashboard, Fleet, ~~Trips, Regions, Schedule,~~ Exceptions, Partners, Report or
+Delivery Returns destination; a copy of an arrangement; route optimisation, ~~dispatch runs~~ or
+loading manifests (**OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): Trips, Regions, Delivery Planning, DP Orders and Auto-schedule are built; a Trip is the dispatch run.**); customer self-scheduling; a second quantity, stock, duty, calendar or owner
 truth; `Waiting for customer reply` inferred from silence; a Loan on every order; relative dates;
 emoji, ticks, checkmarks, warning marks or progress icons inside a status fact; a generic attention
 label; a checklist column; a Delivery-local roster; an Operations Superuser fallback owner; a fake
@@ -2327,7 +2327,7 @@ built. The remaining recommendation on the structured company-cost reference is 
 
 **Fresh Houzs transportation comparison — read-only, 9 Oct 2026.** The Transportation hub exposes planning, DP Orders, date/time arrangement, Last Mile, capacity, crew leave and maintenance. Delivery Date Arrangement describes postcode-based date proposals and date-only writes before lorry/time scheduling; its loaded view separates pending/date-arranged populations and warns search covers loaded rows. Last Mile describes time-arranged trips, map, crew proposals and per-lorry/day packing sheets in reverse stop order. The map loaded day-order coverage separately while trip/packing sections showed no scheduled trips; main row loading at inspection was not a verified empty order population. No selection/apply/date change/crew proposal/dispatch/print/send/save was performed; no actual delivery-result/proof workflow or capacity algorithm was verified. Foreign regional rules, fleet facts and costs are not adopted.
 
-**Recommendation / KEEP + ADAPT + REJECT:** adapt progressive scheduling visibility, source-linked trip/packing scope and explicit map/list population explanations only where useful. Keep Carres §5's requested versus agreed scheduled date, optional agreed time/window and separate ETA; date-only booking remains valid. Reject mandatory time arrangement for every Carres order, geography-only customer agreement, own-fleet/headcount assumptions, automatic crew authority, and map/packing output as delivery evidence. External Logistics still owns routine customer scheduling; Workspace/People supplies eligibility/cover, Warehouse owns exact physical preparation/handover, and Delivery owns trip/attempt/proof. A reference planning module never gains Stock, customer-promise, money or permission writers.
+**Recommendation / KEEP + ADAPT + REJECT:** adapt progressive scheduling visibility, source-linked trip/packing scope and explicit map/list population explanations only where useful. Keep Carres §5's requested versus agreed scheduled date, optional agreed time/window and separate ETA; date-only booking remains valid. Reject ~~mandatory time arrangement for every Carres order, geography-only customer agreement, own-fleet/headcount assumptions,~~ automatic crew authority (**OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): a time slot for every stop on a Trip, dates proposed by region alone (Auto-schedule) and own lorries are adopted; YH 2026-10-23: Carres has its own lorries as well as Logistics companies. BUILT on branch `feat/delivery-planning-houzs-way`, migration 0723 NOT APPLIED.**), and map/packing output as delivery evidence. External Logistics still owns routine customer scheduling; Workspace/People supplies eligibility/cover, Warehouse owns exact physical preparation/handover, and Delivery owns trip/attempt/proof. A reference planning module never gains Stock, customer-promise, money or permission writers.
 
 **Recommended remaining scheduling contract — PROPOSAL where new:** any schedule/capacity suggestion identifies the delivery scope, calendar, site/customer access, actual confirmed agreement, applicable configuration version and input completeness. A suggestion is neither customer consent nor booking saved; the owning arrangement write must retain actual agreement and audit before other consumers treat it as scheduled. When a source changes or a save fails, preserve attempted input, re-read current facts and show the outstanding action. A map may include requested/planned orders while a trip list contains confirmed trips; state those populations rather than assert disagreement from unequal counts. No map implies live tracking without independently evidenced tracking data.
 

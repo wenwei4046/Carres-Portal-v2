@@ -53,6 +53,7 @@ import dispatchCustomerLegRouter from "./routes/operation/dispatch-customer-leg"
 import deliveryChainRouter from "./routes/operation/delivery-chain";
 import orderControlRouter from "./routes/operation/order-control";
 import deliveryOrdersRouter from "./routes/operation/delivery-orders";
+import deliveryPlanningRouter from "./routes/operation/delivery-planning";
 // 0379 — Delivery's OWN arrangement doors (owner correction 2026-08-24).
 import deliveryArrangementsRouter from "./routes/operation/delivery-arrangements";
 import paymentApprovalsRouter from "./routes/operation/payment-approvals";
@@ -237,6 +238,9 @@ api.route("/operation/orders", deliveryChainRouter);
 // 0159 P2 control overlay — GET + PUT /:id/control
 api.route("/operation/orders", orderControlRouter);
 api.route("/operation/delivery-orders", deliveryOrdersRouter);
+// 0723 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): Delivery Planning, DP Orders,
+// Auto-schedule and Trips with time slots, Houzs way. Jess was not part of this decision.
+api.route("/operation/delivery-planning", deliveryPlanningRouter);
 api.route("/operation/delivery-arrangements", deliveryArrangementsRouter);
 api.route("/operation/delivery-arrangements", deliveryLinksRouter);
 // 0362 — the Delivery Payment Approval: raise · decide · read (owner ruling 2026-08-19)
