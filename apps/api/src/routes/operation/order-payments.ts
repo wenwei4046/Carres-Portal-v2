@@ -684,6 +684,11 @@ async function recordPayment(
 ): Promise<{ data: any; error: any }> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let last: { data: any; error: any } = { data: null, error: null };
+  // 0707: a caller with no key gets one per request, never the receipt number.
+  // The receipt seeds on the order's payment count, which a waiting backdated
+  // request does not raise, so a second backdated payment on the same paid
+  // date would mint the same number and land on the first request.
+  const key = args.idempotencyKey ?? crypto.randomUUID();
   for (let attempt = 0; attempt < 3; attempt++) {
     const receiptNo = await nextReceiptNo(sb, orderId, args.paidOn, attempt);
     last = await sb.rpc("payment_record", {
@@ -697,7 +702,7 @@ async function recordPayment(
       p_receipt_url: args.receiptUrl ?? null,
       p_receipt_no: receiptNo,
       p_counts_toward_paid: true,
-      p_idempotency_key: args.idempotencyKey ?? receiptNo,
+      p_idempotency_key: key,
       p_duplicate_ack: args.duplicateAck ?? false,
     });
     // 23505 = the receipt number is taken. Anything else is the caller's answer.

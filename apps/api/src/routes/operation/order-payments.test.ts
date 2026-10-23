@@ -356,6 +356,9 @@ describe("POST /:id/payments", () => {
     // A DIFFERENT number, still on the locked scheme — never the same one twice.
     expect(second.args.p_receipt_no).not.toBe(first.args.p_receipt_no);
     expect(second.args.p_receipt_no).toMatch(/^RC-260626-\d{4}$/);
+    // 0707 — with no key sent, the key is the request's own, not the receipt.
+    expect(first.args.p_idempotency_key).not.toBe(first.args.p_receipt_no);
+    expect(second.args.p_idempotency_key).toBe(first.args.p_idempotency_key);
   });
 
   it("gives up after three attempts rather than looping on a real conflict", async () => {

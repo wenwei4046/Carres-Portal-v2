@@ -133,6 +133,17 @@ describe.skipIf(!URL)("a backdated payment waits for the Payment Approver (real 
     const own = (await record(40, daysAgo(30), "kown")) as { ok: true; value: any };
     expect(own.value.pending_approval).toBe(true);
     expect(await decide(own.value.request.id, true)).toEqual({ ok: false, detail: "own_request" });
+
+    // a principal login that is not a person (shared or system) is not the
+    // Payment Approver, as in payment_record and payment_void
+    await actAs(U.recorder);
+    const other = (await record(35, daysAgo(25), "knotperson")) as { ok: true; value: any };
+    await actAs(null);
+    await q("update app_users set is_person = false where id = $1", [U.principal]);
+    await actAs(U.principal);
+    expect(await decide(other.value.request.id, true)).toEqual({ ok: false, detail: "not_payment_approver" });
+    await actAs(null);
+    await q("update app_users set is_person = true where id = $1", [U.principal]);
   });
 
   it("approve records the payment once, on its paid date, and a retry answers the same payment", async () => {

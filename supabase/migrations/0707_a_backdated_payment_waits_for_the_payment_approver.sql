@@ -215,9 +215,10 @@ begin
   if not coalesce(public.app_role() in ('operation', 'principal'), false) then
     raise exception 'Operation or principal only' using errcode = '42501', detail = 'role_not_admitted';
   end if;
-  -- Payment Approver duty (today's holder or cover), or principal. An
-  -- unassigned duty refuses, never admits.
-  if not (coalesce(public.app_role() = 'principal', false)
+  -- Payment Approver duty (today's holder or cover), or a principal who is a
+  -- person (the test payment_record, payment_void and
+  -- payment_correct_allocation ask). An unassigned duty refuses, never admits.
+  if not (coalesce(public.app_role() = 'principal' and public.workspace_is_person(v_uid), false)
           or (v_uid is not null
               and coalesce(nullif(v_duty->>'actor_user_id', '')::uuid = v_uid, false))) then
     raise exception 'forbidden' using errcode = '42501', detail = 'not_payment_approver';
