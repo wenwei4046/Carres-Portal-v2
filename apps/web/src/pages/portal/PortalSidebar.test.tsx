@@ -1470,7 +1470,16 @@ describe("PortalSidebar — the Delivery module's two destinations", () => {
         .getByTestId("nav-children-delivery")
         .querySelectorAll("[data-testid^='nav-child-']"),
     ).map((el) => el.textContent?.replace("Coming soon", "").trim());
-    expect(rows).toEqual(["Monitor", "Delivery Orders"]);
+    // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): the customer
+    // consignment pages join Delivery after Delivery Orders. Jess was not part
+    // of this decision.
+    expect(rows).toEqual([
+      "Monitor",
+      "Delivery Orders",
+      "Customer Consignment Orders",
+      "Consignment Notes",
+      "Customer Consignment Returns",
+    ]);
   });
 
   it("Monitor opens ?tab=delivery and is the ONLY active row there", () => {

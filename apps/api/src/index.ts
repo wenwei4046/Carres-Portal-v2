@@ -132,6 +132,7 @@ import guaranteesRouter from "./routes/guarantees";
 import dosRouter from "./routes/storage/dos";
 // Phase A step 5 (migration 0137) — per-unit stock register.
 import opsStockRouter from "./routes/ops/stock";
+import customerConsignmentRouter from "./routes/ops/customer-consignment";
 import opsStockPlanRouter from "./routes/ops/stock-plan";
 import opsStockEmergencyRouter from "./routes/ops/stock-emergency";
 // Migration 0140 — Service Notes (SN / Issue Tracker).
@@ -342,6 +343,8 @@ api.route("/supplier/threads", supplierThreadsRouter);
 api.route("/warehouse", warehouseReceivingRouter);
 api.route("/storage/dos", dosRouter);
 api.route("/ops/stock", opsStockRouter);
+// 0719 — Weisiang's decision (WhatsApp 2026-10-22): Customer Consignment Order, Consignment Note, Customer Consignment Return.
+api.route("/ops/customer-consignment", customerConsignmentRouter);
 // K2 (0287) — the monthly ready stock plan. Mounted BELOW /ops/stock so the
 // K1 reorder routes on that router keep their paths unchanged.
 api.route("/ops/stock-plan", opsStockPlanRouter);

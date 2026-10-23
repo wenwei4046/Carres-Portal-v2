@@ -509,6 +509,14 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         activeFor: ["path:/operation/delivery-orders"],
         section: "Delivery",
       },
+      /* 0719 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office staff send
+       * goods to customers on consignment and take unsold goods back, Houzs way.
+       * Overturns Jess's Purchasing MASTER consignment rules and the Consignment
+       * Note ban; Jess was not part of this decision. Customer side only — the
+       * supplier-side Consignment Orders / Returns stay under Purchasing. */
+      { key: "customer-consignment-orders", label: "Customer Consignment Orders", icon: FileText, tab: "customer-consignment-orders", section: "Delivery" },
+      { key: "consignment-notes", label: "Consignment Notes", icon: FileText, tab: "consignment-notes", section: "Delivery" },
+      { key: "customer-consignment-returns", label: "Customer Consignment Returns", icon: Undo2, tab: "customer-consignment-returns", section: "Delivery" },
       /* THE WAREHOUSE MAP IS FIVE DESTINATIONS (owner ruling 2026-09-14):
        * `Arrival Schedule · Pickup Schedule · Inbound · Inventory · Outbound`.
        *
