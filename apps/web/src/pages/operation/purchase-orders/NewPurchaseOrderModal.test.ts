@@ -34,5 +34,6 @@ describe("newPurchaseOrderBody", () => {
     expect(newPurchaseOrderBody(draft({ lines: [{ key: 1, sku: "SOFA-1", qty: "0", price: "" }] }))).toBeNull();
     expect(newPurchaseOrderBody(draft({ lines: [{ key: 1, sku: "SOFA-1", qty: "1.5", price: "" }] }))).toBeNull();
     expect(newPurchaseOrderBody(draft({ lines: [{ key: 1, sku: "SOFA-1", qty: "1", price: "-3" }] }))).toBeNull();
+    expect(newPurchaseOrderBody(draft({ lines: [{ key: 1, sku: "SOFA-1", qty: "1", price: "0" }] }))).toBeNull();
   });
 });

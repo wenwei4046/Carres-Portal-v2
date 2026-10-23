@@ -58,7 +58,7 @@ function client(rows: Record<string, unknown[]>, rpcResult: { data: unknown; err
 }
 
 const ROWS = {
-  purchasing_destinations: [{ id: DEST, warehouse_id: DEST_WH, active: true }],
+  purchasing_destinations: [{ id: DEST, name: "Showroom", warehouse_id: DEST_WH, warehouses: { address: "Lot 1, Klang" }, active: true }],
   warehouses: [{ id: OWN_WH, name: "Carres Klang", kind: "own" }],
   product_skus: [{ sku: "SOFA-1", cost: 1200 }, { sku: "BED-1", cost: null }],
 };
@@ -120,9 +120,30 @@ describe("POST /api/operation/pos/new — a Purchase Order with no source (Weisi
   });
 
   it("a destination with no warehouse falls back to the own Klang warehouse", async () => {
-    const { rpc } = client({ ...ROWS, purchasing_destinations: [{ id: DEST, warehouse_id: null, active: true }] }, { data: { po_ids: ["PO2"] }, error: null });
+    const { rpc } = client({ ...ROWS, purchasing_destinations: [{ id: DEST, name: "Showroom", address: "Jalan 1", warehouse_id: null, active: true }] }, { data: { po_ids: ["PO2"] }, error: null });
     await post(BODY);
     expect((rpc.mock.calls[0] as unknown as [string, { p_pos: Array<Record<string, unknown>> }])[1].p_pos[0]!.warehouse_id).toBe(OWN_WH);
+  });
+
+  it("a Deliver To with no address is refused before a PO number is spent", async () => {
+    const { rpc } = client({ ...ROWS, purchasing_destinations: [{ id: DEST, name: "Showroom", address: " ", warehouse_id: null }] }, { data: null, error: null });
+    const res = await post(BODY);
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code: string }).code).toBe("destination_address_missing");
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("a factory-pickup supplier takes its collection partner from Settings", async () => {
+    const PARTNER = "00000000-0000-4000-8000-000000000c01";
+    const { rpc } = client({ ...ROWS, suppliers: [{ kind: "factory_pickup", name: "F" }], purchasing_supplier_settings: [{ fixed_destination_id: null, collected_by_partner_id: PARTNER }] }, { data: { po_ids: ["PO3"] }, error: null });
+    await post(BODY);
+    expect((rpc.mock.calls[0] as unknown as [string, { p_pos: Array<Record<string, unknown>> }])[1].p_pos[0]!.procurement_partner_id).toBe(PARTNER);
+  });
+
+  it("refuses a price of 0 (Free of Charge needs a reason this form does not take)", async () => {
+    const { rpc } = client(ROWS, { data: null, error: null });
+    expect((await post({ ...BODY, lines: [{ sku: "SOFA-1", qty: 1, price: 0 }] })).status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it("refuses an empty order before touching the database", async () => {
