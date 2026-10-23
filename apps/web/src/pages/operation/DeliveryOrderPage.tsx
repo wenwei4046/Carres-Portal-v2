@@ -32,6 +32,9 @@ import WarehouseHandoverBlock from "./components/WarehouseHandoverBlock";
 import DeliveryResultAction from "./components/DeliveryResultAction";
 import DeliveryEvidencePanel from "./components/DeliveryEvidencePanel";
 import { NO_PROOF_REVIEW, proofReviewOf } from "./delivery-orders-register";
+import { deliveryCost, rateCardFor, zoneForPostcode } from "@carres/shared/fleet";
+import { rm } from "@/lib/format-currency";
+import { FL, usePricing } from "./fleet";
 
 /**
  * THE DELIVERY ORDER OBJECT PAGE — read-only facts + doors
@@ -125,6 +128,8 @@ export default function DeliveryOrderPage() {
   const { doId = "" } = useParams();
   const navigate = useNavigate();
   const { data, isLoading, isError, error } = useDeliveryOrder(doId || null);
+  /* 0725 — Rate Cards (Weisiang's decision 2026-10-22, Houzs way; Jess was not part of this decision). */
+  const pricing = usePricing();
 
   const d = data?.deliveryOrder;
   const order = d?.orders;
@@ -411,6 +416,19 @@ export default function DeliveryOrderPage() {
                 {arrangementPartner?.name || d.logistics_partner || (
                   <Absence>Logistics not assigned when this document was issued</Absence>
                 )}
+              </Fact>
+              {/* 0725 — the cost the Logistics company's rate card computes for this
+                  trip's zone and goods (Weisiang's decision 2026-10-22, Houzs way). */}
+              <Fact label={FL.rateCardCost}>
+                {(() => {
+                  const partnerId = arrangement?.partner_id;
+                  if (!partnerId || !pricing.data) return <Absence>{FL.noRateCard}</Absence>;
+                  const zone = zoneForPostcode(order.customer_address, pricing.data.zones);
+                  const card = rateCardFor(pricing.data.rates, partnerId, zone?.id ?? null);
+                  if (!card) return <Absence>{FL.noRateCard}</Absence>;
+                  const items = tripLines.reduce((n, l) => n + (Number(l.qty) || 0), 0);
+                  return `${rm(deliveryCost(card, items))} · ${zone ? `${FL.zone} ${zone.name}` : FL.noZone}`;
+                })()}
               </Fact>
               <Fact label="Delivery appointment">
                 {arrangement?.confirmed_date || d.delivery_date ? (

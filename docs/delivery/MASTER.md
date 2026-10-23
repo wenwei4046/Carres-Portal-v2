@@ -765,6 +765,7 @@ row's expanded panels (§8.6). ~~There is no Delivery dashboard, Fleet, Trips, R
 Exceptions, Partners, Report or Delivery Returns destination; those capabilities live inside the
 two destinations, the DO object, central Settings and central Reports.~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): Delivery
 also carries `Fleet Day`, `Live Map`, `Lorry Capacity` and `Crew Leave` for Carres' own lorries
+(§15.3), and (0725, the same decision) `Fleet`, `Fleet Health`, `Delivery Zones` and `Rate Cards`
 (§15.3); no other Delivery destination is added. Sales contains **Sales
 Orders** and temporary **Old Orders** only. Central Settings retains the governed Delivery
 settings door behind the page-header gear.
@@ -2337,7 +2338,7 @@ built. The remaining recommendation on the structured company-cost reference is 
 | Receive and review evidence | Driver sends signed DO and goods/service photos; Operation uploads them to ERP and reviews them separately | Result, submission, upload and acceptance are different facts. Missing required proof stays open; service completion is not inferred from goods delivery |
 | Recover and finish | Resolve failed/remaining goods, agreed redelivery and actual returns; Warehouse receipt starts Check required | Same Unit chain. Service/Claims/Commercial owns remedies; Rental reads accepted customer receipt for its service-start witness. Outstanding services, proof and recovery work stay open at day end |
 
-**Fresh Houzs transportation comparison — read-only, 9 Oct 2026.** The Transportation hub exposes planning, DP Orders, date/time arrangement, Last Mile, capacity, crew leave and maintenance. Delivery Date Arrangement describes postcode-based date proposals and date-only writes before lorry/time scheduling; its loaded view separates pending/date-arranged populations and warns search covers loaded rows. Last Mile describes time-arranged trips, map, crew proposals and per-lorry/day packing sheets in reverse stop order. The map loaded day-order coverage separately while trip/packing sections showed no scheduled trips; main row loading at inspection was not a verified empty order population. No selection/apply/date change/crew proposal/dispatch/print/send/save was performed; no actual delivery-result/proof workflow or capacity algorithm was verified. Foreign regional rules, fleet facts and costs are not adopted.
+**Fresh Houzs transportation comparison — read-only, 9 Oct 2026.** The Transportation hub exposes planning, DP Orders, date/time arrangement, Last Mile, capacity, crew leave and maintenance. Delivery Date Arrangement describes postcode-based date proposals and date-only writes before lorry/time scheduling; its loaded view separates pending/date-arranged populations and warns search covers loaded rows. Last Mile describes time-arranged trips, map, crew proposals and per-lorry/day packing sheets in reverse stop order. The map loaded day-order coverage separately while trip/packing sections showed no scheduled trips; main row loading at inspection was not a verified empty order population. No selection/apply/date change/crew proposal/dispatch/print/send/save was performed; no actual delivery-result/proof workflow or capacity algorithm was verified. ~~Foreign regional rules, fleet facts and costs are not adopted.~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): Houzs' postcode Delivery Zones, per-lorry Fleet Health dates and per-company Rate Cards are adopted (§15.3, migration 0725). A zone never sets or agrees a customer's delivery date.
 
 **Recommendation / KEEP + ADAPT + REJECT:** adapt progressive scheduling visibility, source-linked trip/packing scope and explicit map/list population explanations only where useful. Keep Carres §5's requested versus agreed scheduled date, optional agreed time/window and separate ETA; date-only booking remains valid. Reject mandatory time arrangement for every Carres order, geography-only customer agreement, ~~own-fleet/headcount assumptions, automatic crew authority,~~ and map/packing output as delivery evidence. OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): Carres runs its own lorries; Fleet Day proposes the crew per lorry per day automatically (last crew, then the lorry's template driver, then the first free person; never anyone on leave or already on a lorry) and staff confirm or change it (§15.3). External Logistics still owns routine customer scheduling; Workspace/People supplies eligibility/cover, Warehouse owns exact physical preparation/handover, and Delivery owns trip/attempt/proof. A reference planning module never gains Stock, customer-promise, money or permission writers.
 
@@ -2394,9 +2395,13 @@ was not decisive evidence. Current Carres source supplied the concrete reuse/gap
 
 **COMPANY-COST AUTOMATION SCOPE — OWNER-APPROVED / LOCKED 2026-09-30.** Retain the approved
 service capability and evidenced actual-company-cost workflow under Payment §9 and Delivery §11.2.
-A new structured rate/automatic company-cost calculation model is outside this convergence mission
+~~A new structured rate/automatic company-cost calculation model is outside this convergence mission
 and belongs to separate planning. Delivery does not infer rate bases, regions, price versions or
-quote exceptions from the current free-text company-charge lines. Staff continues to record and
+quote exceptions from the current free-text company-charge lines.~~ OVERTURNED 2026-10-22 by
+Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): each Logistics company (Carres
+Lorries included) has Rate Cards per Delivery Zone — per item or per delivery order, 1st / 2nd /
+each further unit and a minimum — and the DO page shows the computed `Rate card cost` (§15.3).
+The free-text company-charge lines are still not parsed. Staff continues to record and
 check actual logistics cost and its evidence. This keeps normal delivery moving without introducing
 an unapproved pricing model; revisit the separate costing mission if measured volume or repeated
 pricing disputes justify it. Actual service evidence and authorised customer billing remain in
@@ -2451,6 +2456,29 @@ Logistics companies (§2). Built the Houzs way (Houzs `FleetDay`, `FleetRunSheet
 
 Not built: a GPS vendor feed, repair days, more than one trip per lorry per day, time slots and
 auto-scheduling (left to the trips and master-list work).
+
+**0725 · Fleet, Fleet Health, Delivery Zones, Rate Cards — same decision · BUILT ON BRANCH
+`feat/fleet-zones-rates-health`, 0725 not applied.** Houzs `Fleet`, `FleetHealth`, `DeliveryZones`,
+`DeliveryRateCards`:
+
+- **Fleet** — Carres Lorries' lorries (plate, capacity, type, Active · Inactive) and crew (name,
+  Driver · Helper, phone, Active · Inactive): add, edit, deactivate. The same rows and doors as Settings
+  → Logistics → Carres Lorries → Vehicles and Drivers; every other Logistics company keeps its own
+  lists there, and coverage still never hides a company.
+- **Fleet Health** — per lorry: PUSPAKOM, road tax, insurance and service due dates. `Overdue` once the
+  day has passed, `Due soon` within 30 days. Operation saves (`fleet_save_lorry_health`).
+- **Delivery Zones** — a named zone and its postcode ranges (`47` = 47000–47999, `46-47`,
+  `58200-58299`, `58200`); seeded with Houzs' 13-zone Malaysian map; the narrowest range wins. `Which
+  zone is this postcode?` answers the zone and the post town from the address list. A zone is a
+  postcode bucket for cost; 0723's Regions (state → region) stay the bucket for dates.
+- **Rate Cards** — per Logistics company per zone, or `Every other zone`: per item or per delivery
+  order, 1st, 2nd, each further unit and a minimum. The DO page's `Rate card cost` prices the DO's
+  goods for its zone. Staff still record and check the actual logistics cost (Payment §9).
+- Zones and Rate Cards are Delivery settings: written by the people named for Delivery settings, every
+  change in the settings history.
+
+Not built (0725): Houzs' sofa compartment brackets, cap-and-overage, service/pickup/disposal charges,
+rounding, per-trip and per-customer counting, and the billed-versus-computed reconciliation.
 
 ## 16 · Production closure
 
