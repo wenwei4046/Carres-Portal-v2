@@ -6,7 +6,9 @@ import pg from "pg";
  * 2026-10-22): office staff plan delivery dates, DP Orders and Trips with a
  * time slot per stop, the Houzs way. Jess was not part of this decision.
  *
- *   date     own lorry: the planned day is the scheduled day; a Logistics
+ *   date     own lorry (the own-fleet company Carres Lorries, YH 2026-10-23):
+ *            the planned day is the scheduled day; no company = not assigned
+ *            yet, never an own lorry; a Logistics
  *            company: only the planned day, the company's agreed day wins and
  *            is never overwritten here; a changed company stays on Monitor
  *   stop     every stop needs a time slot; joining a trip goes last
@@ -31,9 +33,12 @@ const OWN_A = uid("a1");
 const OWN_B = uid("a2");
 const CO = uid("a3");
 const DONE = uid("a4");
+const NONE = uid("a5");
 // 2030-01-07 is a Monday, 2030-01-06 a Sunday.
 const MON = "2030-01-07";
 const TUE = "2030-01-08";
+
+let OWN = ""; // Carres Lorries, seeded by 0723 (same row 0724 seeds)
 
 type Result = { ok: true; r: Record<string, unknown> } | { ok: false; why: string; detail: string };
 
@@ -79,7 +84,7 @@ describe.skipIf(!URL)("Delivery planning, DP Orders and Trips (real PostgreSQL, 
     }
     await q("insert into dealers (id, name) values ($1, $2)", [DEALER, `IT dealer ${HEX}`]);
     await q("insert into delivery_partners (id, name) values ($1, $2), ($3, $4)", [NETS, `IT NETS ${HEX}`, TT, `IT TT ${HEX}`]);
-    for (const [id, status] of [[OWN_A, "proceed_order"], [OWN_B, "proceed_order"], [CO, "proceed_order"], [DONE, "delivered"]] as const) {
+    for (const [id, status] of [[OWN_A, "proceed_order"], [OWN_B, "proceed_order"], [CO, "proceed_order"], [NONE, "proceed_order"], [DONE, "delivered"]] as const) {
       await q(
         "insert into orders (id, status, dealer_id, customer_name, customer_phone, source_system) values ($1, $2, $3, 'IT customer', '0100000000', 'autocount')",
         [id, status, DEALER],
@@ -88,6 +93,7 @@ describe.skipIf(!URL)("Delivery planning, DP Orders and Trips (real PostgreSQL, 
     // CO is with NETS and NETS has already agreed Tuesday.
     await q("insert into ops_delivery_arrangements (order_id, leg, partner_id, confirmed_date) values ($1, 0, $2, $3)", [CO, NETS, TUE]);
     await q("set local session_replication_role = origin");
+    OWN = (await q("select id from delivery_partners where own_fleet")).rows[0].id;
   });
 
   afterAll(async () => {
@@ -98,7 +104,7 @@ describe.skipIf(!URL)("Delivery planning, DP Orders and Trips (real PostgreSQL, 
 
   it("refuses anyone but office staff, and an order already delivered", async () => {
     await as(DEALER_USER);
-    expect(await attempt(plan, [OWN_A, MON, null, "Lorry 1", null])).toMatchObject({ ok: false, detail: "forbidden" });
+    expect(await attempt(plan, [OWN_A, MON, OWN, "Lorry 1", null])).toMatchObject({ ok: false, detail: "forbidden" });
     await as(OP);
     expect(await attempt(plan, [DONE, MON, null, "Lorry 1", null])).toMatchObject({ ok: false, detail: "order_not_open" });
     expect(await attempt(plan, [OWN_A, "2030-01-06", null, "Lorry 1", null])).toMatchObject({ ok: false, detail: "not_a_delivery_day" });
@@ -106,10 +112,23 @@ describe.skipIf(!URL)("Delivery planning, DP Orders and Trips (real PostgreSQL, 
 
   it("own lorry: the planned day is the scheduled day, and a second stop goes last on the trip", async () => {
     await as(OP);
-    expect(await attempt(plan, [OWN_A, MON, null, "Lorry 1", null])).toMatchObject({ ok: true, r: { ownLorry: true, stop: 1 } });
-    expect(await attempt(plan, [OWN_B, MON, null, "lorry 1", "13:00-15:00"])).toMatchObject({ ok: true, r: { stop: 2 } });
-    expect(await arr(OWN_A)).toMatchObject({ partner_id: null, planned_date: MON, confirmed_date: MON, stop_seq: 1, vehicle: "Lorry 1" });
+    expect(await attempt(plan, [OWN_A, MON, OWN, "Lorry 1", null])).toMatchObject({ ok: true, r: { ownLorry: true, stop: 1 } });
+    expect(await attempt(plan, [OWN_B, MON, OWN, "lorry 1", "13:00-15:00"])).toMatchObject({ ok: true, r: { stop: 2 } });
+    expect(await arr(OWN_A)).toMatchObject({ partner_id: OWN, planned_date: MON, confirmed_date: MON, stop_seq: 1, vehicle: "Lorry 1" });
     expect(await arr(OWN_B)).toMatchObject({ stop_seq: 2, time_slot: "13:00-15:00" });
+  });
+
+  it("own lorry lands on the own-fleet company and writes the scheduled day; no company is not an own lorry", async () => {
+    await q("reset role");
+    expect((await q("select count(*)::int as n from delivery_partners where own_fleet and name = 'Carres Lorries'")).rows[0].n).toBe(1);
+    await as(OP);
+    // Carres Lorries' own day may be moved here; it is not a company's agreed day.
+    expect(await attempt(plan, [OWN_A, TUE, null, null, null])).toMatchObject({ ok: true, r: { ownLorry: true } });
+    expect(await arr(OWN_A)).toMatchObject({ partner_id: OWN, planned_date: TUE, confirmed_date: TUE });
+    expect(await attempt(plan, [OWN_A, MON, null, null, null])).toMatchObject({ ok: true });
+    // Not assigned yet (0386's null): only the planned day, nothing scheduled.
+    expect(await attempt(plan, [NONE, MON, null, "Lorry 1", null])).toMatchObject({ ok: true, r: { ownLorry: false } });
+    expect(await arr(NONE)).toMatchObject({ partner_id: null, planned_date: MON, confirmed_date: null });
   });
 
   it("a Logistics company: its agreed day is never overwritten, and a changed company stays on Monitor", async () => {

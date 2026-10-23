@@ -7,7 +7,9 @@
  * MASTER §8, §14.3 and §15 rules; Jess was not part of this decision.
  *
  * A TRIP is one day + one carrier: a Logistics company, or Carres's own lorry
- * (no company; the lorry is the free-text `vehicle`). No trip table exists.
+ * (the own-fleet company Carres Lorries, YH 2026-10-23; the lorry is the
+ * free-text `vehicle`). No company means not assigned yet, never own lorry.
+ * No trip table exists.
  */
 import { resolveDeliveryLocality } from "@/lib/locality";
 
@@ -31,29 +33,33 @@ export type PlanFeed = {
   deliveryOrders: { order_id: string; leg: number; do_number: string }[];
   regions: PlanRegion[];
   residenceRules: { building_type: string; note: string }[];
-  companies: { id: string; name: string }[];
+  companies: { id: string; name: string; own_fleet: boolean }[];
 };
 
 export const NO_REGION = "No region";
 export const OWN_LORRY = "Own lorry";
+export const NOT_ASSIGNED = "Not assigned";
 
 export type PlanRow = {
   key: string; orderId: string; leg: number; so: string; customer: string;
   location: string; state: string | null; region: string; buildingType: string; rule: string;
   requested: string | null; doNumber: string | null;
-  partnerId: string | null; carrier: string; vehicle: string | null;
+  partnerId: string | null; ownLorry: boolean; carrier: string; vehicle: string | null;
   /** The trip day: the scheduled day when there is one, else the planned day. */
   day: string | null; scheduled: boolean; seq: number | null; timeSlot: string | null;
 };
 
-export const carrierOf = (partnerName: string | null, vehicle: string | null) =>
-  partnerName ?? (vehicle ? `${OWN_LORRY} · ${vehicle}` : OWN_LORRY);
+export const carrierOf = (partner: { name: string; own_fleet: boolean } | null, vehicle: string | null) =>
+  !partner ? NOT_ASSIGNED : !partner.own_fleet ? partner.name : vehicle ? `${OWN_LORRY} · ${vehicle}` : OWN_LORRY;
+
+/** The own-fleet company (Carres Lorries) an `Own lorry` choice is saved as. */
+export const ownFleetOf = (companies: PlanFeed["companies"]) => companies.find((c) => c.own_fleet) ?? null;
 
 /** The rows the four pages show: every open order (whole-order scope) plus its legs. */
 export function planRows(feed: PlanFeed): PlanRow[] {
   const regionOf = new Map(feed.regions.map((r) => [r.state.toLowerCase(), r.region]));
   const ruleOf = new Map(feed.residenceRules.map((r) => [r.building_type, r.note]));
-  const company = new Map(feed.companies.map((c) => [c.id, c.name]));
+  const company = new Map(feed.companies.map((c) => [c.id, c]));
   const arr = new Map(feed.arrangements.map((a) => [`${a.order_id}#${a.leg}`, a]));
   const doOf = new Map<string, string>();
   for (const d of feed.deliveryOrders) {
@@ -67,7 +73,7 @@ export function planRows(feed: PlanFeed): PlanRow[] {
     const buildingType = String(o.entry_data?.fields?.building_type ?? "").trim();
     for (const leg of [...legs].sort((a, b) => a - b)) {
       const a = arr.get(`${o.id}#${leg}`);
-      const partnerName = a?.partner_id ? company.get(a.partner_id) ?? null : null;
+      const partner = a?.partner_id ? company.get(a.partner_id) ?? null : null;
       rows.push({
         key: `${o.id}#${leg}`, orderId: o.id, leg,
         so: o.so ? `SO-${o.so}${leg > 0 ? ` · Leg ${leg}` : ""}` : "",
@@ -78,7 +84,8 @@ export function planRows(feed: PlanFeed): PlanRow[] {
         requested: o.delivery_date_tbd ? null : o.delivery_date,
         doNumber: doOf.get(`${o.id}#${leg}`) ?? null,
         partnerId: a?.partner_id ?? null,
-        carrier: carrierOf(partnerName, a?.vehicle ?? null),
+        ownLorry: Boolean(partner?.own_fleet),
+        carrier: carrierOf(partner, a?.vehicle ?? null),
         vehicle: a?.vehicle ?? null,
         day: a?.confirmed_date ?? a?.planned_date ?? null,
         scheduled: Boolean(a?.confirmed_date),
@@ -90,7 +97,7 @@ export function planRows(feed: PlanFeed): PlanRow[] {
 }
 
 export const planStatus = (r: PlanRow) =>
-  !r.day ? "Waiting for a date" : r.scheduled ? "Scheduled" : `Planned, ${r.carrier} may change it`;
+  !r.day ? "Waiting for a date" : r.scheduled ? "Scheduled" : r.partnerId ? `Planned, ${r.carrier} may change it` : "Planned";
 
 /** One trip = one day + one carrier, stops in order. */
 export type Trip = { key: string; day: string; carrier: string; stops: PlanRow[] };
@@ -98,7 +105,7 @@ export function tripsOf(rows: PlanRow[]): Trip[] {
   const trips = new Map<string, Trip>();
   for (const r of rows) {
     if (!r.day) continue;
-    const carrierKey = r.partnerId ?? `own:${(r.vehicle ?? "").toLowerCase()}`;
+    const carrierKey = r.ownLorry ? `own:${(r.vehicle ?? "").toLowerCase()}` : r.partnerId ?? "none";
     const key = `${r.day}|${carrierKey}`;
     const t = trips.get(key) ?? { key, day: r.day, carrier: r.carrier, stops: [] };
     t.stops.push(r);

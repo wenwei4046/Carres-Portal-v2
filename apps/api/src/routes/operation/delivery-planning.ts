@@ -42,7 +42,8 @@ router.get("/", requireOperationOrPrincipal, async (c) => {
       .limit(2000),
     sb.from("delivery_regions").select("state, region, per_day").order("region").order("state"),
     sb.from("delivery_residence_rules").select("building_type, note").order("building_type"),
-    sb.from("delivery_partners").select("id, name").order("name"),
+    // own_fleet marks Carres Lorries: the web saves `Own lorry` as that company (YH 2026-10-23).
+    sb.from("delivery_partners").select("id, name, own_fleet").order("name"),
     sb
       .from("ops_delivery_arrangement_events")
       .select("id, order_id, leg, note, recorded_at, from_partner_id")

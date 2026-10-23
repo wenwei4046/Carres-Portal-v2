@@ -15,7 +15,7 @@ import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
 import { useDeliveryDays } from "@/lib/deadline-queries";
 import {
-  OWN_LORRY, fillTimeSlots, planRows, planStatus, proposeDates, tripsOf,
+  OWN_LORRY, carrierOf, fillTimeSlots, ownFleetOf, planRows, planStatus, proposeDates, tripsOf,
   type PlanFeed, type PlanRegion, type PlanRow,
 } from "./delivery-planning";
 
@@ -27,7 +27,8 @@ import {
  * Houzs way. This overturns Jess's Delivery MASTER §8 (no Trips / Regions /
  * Schedule destination), §14.3 (no automatic allocation or ordered stops) and
  * §10's rejection of mandatory time slots; Jess was not part of this decision.
- * A trip is one day + one carrier (a Logistics company, or Carres's own lorry).
+ * A trip is one day + one carrier (a Logistics company, or Carres's own lorry =
+ * the own-fleet company Carres Lorries, YH 2026-10-23).
  * For a Logistics company the date written is the planned date: the company
  * may still change it, and its own scheduled date wins.
  */
@@ -87,18 +88,23 @@ function PlanForm({ feed, row, onClose, onSaved }: { feed: Feed; row: PlanRow | 
   const isNew = row === "new";
   const [doNumber, setDoNumber] = useState("");
   const [date, setDate] = useState<string | null>(isNew ? null : row.day);
-  const [carrier, setCarrier] = useState(isNew ? "" : row.partnerId ?? "own");
+  const own = ownFleetOf(feed.companies);
+  const [carrier, setCarrier] = useState(isNew ? "" : row.partnerId ?? "");
   const [vehicle, setVehicle] = useState(isNew ? "" : row.vehicle ?? "");
   const [slot, setSlot] = useState(isNew ? "" : row.timeSlot ?? "");
   const companyFixed = !isNew && row.partnerId !== null;
   const save = useMutation({
     mutationFn: () => {
-      const body = { date, partnerId: carrier && carrier !== "own" ? carrier : null, vehicle: vehicle || null, timeSlot: slot || null };
+      const body = { date, partnerId: carrier || null, vehicle: vehicle || null, timeSlot: slot || null };
       return isNew ? send("/jobs", { ...body, doNumber }) : send("/date", { ...body, orderId: row.orderId, leg: row.leg });
     },
     onSuccess: () => { onSaved(); onClose(); },
   });
-  const options = [{ value: "own", label: OWN_LORRY }, ...feed.companies.map((c) => ({ value: c.id, label: c.name }))];
+  // `Own lorry` is saved as the Carres Lorries company, looked up by own_fleet.
+  const options = [
+    ...(own ? [{ value: own.id, label: OWN_LORRY }] : []),
+    ...feed.companies.filter((c) => !c.own_fleet).map((c) => ({ value: c.id, label: c.name })),
+  ];
   return (
     <Modal open onOpenChange={(o) => !o && onClose()} title={isNew ? "New DP Order" : `Delivery date · ${row.so}`}
       footer={<>
@@ -110,7 +116,7 @@ function PlanForm({ feed, row, onClose, onSaved }: { feed: Feed; row: PlanRow | 
         <DatePicker id="plan-date" label="Delivery date" required value={date} onChange={setDate} />
         <Select id="plan-carrier" label="Lorry or Logistics" value={carrier || undefined} onValueChange={setCarrier} options={options} disabled={companyFixed} />
         {companyFixed && <p className="text-body text-c-muted">To change the Logistics company, use Change logistics on Monitor. The company may still change this date.</p>}
-        {carrier === "own" && <Input id="plan-lorry" label="Lorry" value={vehicle} onChange={(e) => setVehicle(e.target.value)} />}
+        {own && carrier === own.id && <Input id="plan-lorry" label="Lorry" value={vehicle} onChange={(e) => setVehicle(e.target.value)} />}
         <Input id="plan-slot" label="Time slot" placeholder="09:00-11:00" value={slot} onChange={(e) => setSlot(e.target.value)} />
         {save.isError && <FieldError>{errorText(save.error)}</FieldError>}
       </div>
@@ -248,13 +254,13 @@ export function DpOrders() {
       key: r.key, row: r, doNumber: r.doNumber ?? "", so: r.so, customer: r.customer, day: r.day, carrier: r.carrier,
       timeSlot: r.timeSlot ?? "No time slot", status: r.scheduled ? "Scheduled" : "Planned", note: "",
     }));
-    const company = new Map(q.data.companies.map((c) => [c.id, c.name]));
+    const company = new Map(q.data.companies.map((c) => [c.id, c]));
     const order = new Map([...q.data.orders, ...q.data.closedOrders].map((o) => [o.id, o]));
     const gone = q.data.cancelled.map((e) => {
       const o = order.get(e.order_id);
       return {
         key: e.id, row: null, doNumber: "", so: o?.so ? `SO-${o.so}${e.leg > 0 ? ` · Leg ${e.leg}` : ""}` : "", customer: o?.customer_name ?? "",
-        day: null, carrier: e.from_partner_id ? company.get(e.from_partner_id) ?? "" : OWN_LORRY, timeSlot: "", status: "Cancelled",
+        day: null, carrier: carrierOf(e.from_partner_id ? company.get(e.from_partner_id) ?? null : null, null), timeSlot: "", status: "Cancelled",
         note: `${e.note ?? ""} · cancelled ${fmtDate(e.recorded_at)}`,
       };
     });

@@ -13,8 +13,11 @@
 --   3 · The arrangement (0386, one row per order + leg) carries the plan:
 --       `planned_date`, `stop_seq` and `time_slot`. NO second trip table: a trip
 --       is every arrangement on one day with one carrier (a Logistics company,
---       or Carres's own lorry = no company, lorry named in the existing free
---       text `vehicle`). Lorry master lists belong to a later slice.
+--       or Carres's own lorry: the own-fleet company `Carres Lorries`, with the
+--       lorry named in the existing free text `vehicle`). YH 2026-10-23: an own
+--       lorry is the Carres Lorries company, the same model as 0724 (#2130),
+--       whose Fleet Day matches `vehicle` to a plate. No company on the
+--       arrangement (`partner_id` null) keeps its 0386 meaning: not assigned yet.
 --   4 · Three doors. `delivery_plan_date` writes a day (Auto-schedule, DP Orders
 --       create). Own lorry: the day is Carres's to give, so it is also the
 --       scheduled `confirmed_date`. A Logistics company: only `planned_date` is
@@ -31,6 +34,35 @@
 -- =============================================================================
 
 set search_path = public;
+
+-- ── 0 · The own-fleet company (same text as 0724, so 0724 no-ops after it) ──
+
+alter table public.delivery_partners
+  add column if not exists own_fleet boolean not null default false;
+comment on column public.delivery_partners.own_fleet is
+  '0724 (Weisiang''s decision 2026-10-22): this Logistics company is Carres'' own lorries. Its Drivers and Vehicles feed Fleet Day, Live Map, Lorry Capacity and Crew Leave.';
+
+do $seed$
+declare
+  v_id uuid;
+begin
+  if not exists (select 1 from public.delivery_partners where own_fleet) then
+    insert into public.delivery_partners (name, own_fleet, active)
+    values ('Carres Lorries', true, true)
+    returning id into v_id;
+    -- The goods-holder identity every partner has (0424's backfill rule).
+    if to_regclass('public.stock_operating_parties') is not null then
+      insert into public.stock_operating_parties (code, name, kind)
+      values ('partner_' || v_id, 'Carres Lorries', 'delivery_operator')
+      on conflict (code) do nothing;
+      update public.delivery_partners dp
+         set operating_party_id = sop.id
+        from public.stock_operating_parties sop
+       where dp.id = v_id and sop.code = 'partner_' || v_id;
+    end if;
+  end if;
+end;
+$seed$;
 
 -- ── 1 · Regions ──────────────────────────────────────────────────────────────
 
@@ -155,6 +187,7 @@ declare
   v_vehicle text := nullif(btrim(coalesce(p_vehicle, '')), '');
   v_slot    text := nullif(btrim(coalesce(p_time_slot, '')), '');
   v_seq     smallint;
+  v_own     boolean;
 begin
   perform public._delivery_plan_open_order(p_order_id);
   if p_date is null then
@@ -175,7 +208,10 @@ begin
       using errcode = 'P0001', detail = 'change_logistics_on_monitor';
   end if;
   -- A day the company has agreed is changed on Monitor, never silently here.
-  if a.partner_id is not null and a.confirmed_date is not null and a.confirmed_date <> p_date then
+  -- Carres Lorries' day is Carres's own, so the office may move it here.
+  if a.partner_id is not null
+     and not exists (select 1 from public.delivery_partners p where p.id = a.partner_id and p.own_fleet)
+     and a.confirmed_date is not null and a.confirmed_date <> p_date then
     raise exception 'The Logistics company has agreed % for this delivery. Change it on Monitor.', a.confirmed_date
       using errcode = 'P0001', detail = 'company_date_agreed';
   end if;
@@ -186,6 +222,9 @@ begin
     values (a.id, a.order_id, a.leg, 'assigned', null, p_partner_id, auth.uid(), 'operation');
     a.partner_id := p_partner_id;
   end if;
+  -- Own lorry = the arrangement's company is the own-fleet company (Carres Lorries).
+  -- No company is not an own lorry: it is not assigned yet (0386).
+  v_own := exists (select 1 from public.delivery_partners p where p.id = a.partner_id and p.own_fleet);
 
   -- Joining a trip puts the stop last on it.
   if a.stop_seq is null or public.delivery_trip_day(a) is distinct from p_date then
@@ -194,7 +233,7 @@ begin
      where public.delivery_trip_day(x) = p_date
        and x.id <> a.id
        and x.partner_id is not distinct from a.partner_id
-       and (a.partner_id is not null or lower(coalesce(x.vehicle, '')) = lower(coalesce(v_vehicle, a.vehicle, '')));
+       and (not v_own or lower(coalesce(x.vehicle, '')) = lower(coalesce(v_vehicle, a.vehicle, '')));
   else
     v_seq := a.stop_seq;
   end if;
@@ -203,7 +242,7 @@ begin
      set partner_id     = a.partner_id,
          planned_date   = p_date,
          -- Own lorry: Carres gives the day, so it is the scheduled day too.
-         confirmed_date = case when a.partner_id is null then p_date else confirmed_date end,
+         confirmed_date = case when v_own then p_date else confirmed_date end,
          vehicle        = coalesce(v_vehicle, vehicle),
          time_slot      = coalesce(v_slot, time_slot),
          stop_seq       = v_seq,
@@ -218,7 +257,7 @@ begin
           concat_ws(' · ', 'Planned ' || to_char(p_date, 'YYYY-MM-DD'), v_slot, v_vehicle), auth.uid(), 'operation');
 
   return jsonb_build_object('orderId', a.order_id, 'leg', a.leg, 'date', p_date,
-                            'ownLorry', a.partner_id is null, 'stop', v_seq);
+                            'ownLorry', v_own, 'stop', v_seq);
 end;
 $$;
 
