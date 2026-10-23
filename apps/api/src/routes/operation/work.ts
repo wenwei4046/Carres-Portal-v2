@@ -898,8 +898,16 @@ export function projectPaymentCollectionWork(input: {
   ownerCalendarFor?: (orderId: string) => OwnerCalendar;
 }): OperationWorkItem[] {
   const calendars = input.calendars ?? workFeedCalendarsOf();
+  // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): an order may carry
+  // several part Sales Invoices (0712). The balance is the ORDER's, so the
+  // customer is asked once per order, on its first issued Sales Invoice.
+  const askedOrders = new Set<string>();
   return input.invoices.flatMap((invoice) => {
     if (invoice.status !== "issued" || !invoice.orders) return [];
+    if (invoice.kind === "sales") {
+      if (askedOrders.has(invoice.order_id)) return [];
+      askedOrders.add(invoice.order_id);
+    }
     const timingRule = collectionTimingFor(input.timingRules, invoice.issued_at?.slice(0, 10) ?? input.today);
     const ownerCalendar = input.ownerCalendarFor?.(invoice.order_id) ?? calendars.owner;
     const { timing, clock } = invoicePaymentTiming(invoice, input.today, calendars.delivery, undefined, timingRule, ownerCalendar);
