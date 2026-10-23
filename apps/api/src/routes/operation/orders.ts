@@ -1176,6 +1176,58 @@ operationOrdersRouter.get("/monthly-demand", requireOperation, async (c) => {
   });
 });
 
+/* ⭐ AMENDMENTS QUEUE — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess
+   was not part of this decision): every Sales Order amendment waits for an
+   approver, the Houzs way (Houzs `Amendments.tsx` + `GET /so-amendments`). This
+   overturns Orders MASTER "Staff amendments and Sales Approver" items 1-2.
+   Submission already writes nothing on the order and the Principal's decide
+   door already applies or rejects it (0564); this read is the approver's list
+   of every amendment across orders. Waiting first, newest first within a
+   status. A draft was never submitted, so it is not in the queue. Must sit
+   above `/:id`, which would otherwise swallow the word.
+   ponytail: newest 1000 only; page it when the history outgrows that. */
+const AMENDMENT_WAITING = new Set(["submitted", "issued", "accepted"]);
+operationOrdersRouter.get("/amendments", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("sales_order_amendments")
+    .select("id, order_id, status, reason, submitted_by, submitted_at, decided_by, decided_at, decision_note, customer_agreement_kind, orders(so, customer_name)")
+    .neq("status", "draft")
+    .order("submitted_at", { ascending: false })
+    .limit(1000);
+  if (error) {
+    const m = mapPipelineV2Error(error);
+    return c.json(m.body, m.status);
+  }
+  type Row = {
+    id: string; order_id: string; status: string; reason: string | null;
+    submitted_by: string | null; submitted_at: string; decided_by: string | null; decided_at: string | null;
+    decision_note: string | null; customer_agreement_kind: string | null;
+    orders?: { so?: number | null; customer_name?: string | null } | null;
+  };
+  const rows = (data ?? []) as Row[];
+  const names = await resolveActorNames(sb, rows.flatMap((r) => [r.submitted_by, r.decided_by]));
+  const waitingFirst = [...rows].sort(
+    (a, b) => Number(AMENDMENT_WAITING.has(b.status)) - Number(AMENDMENT_WAITING.has(a.status)),
+  );
+  return c.json({
+    amendments: waitingFirst.map((r) => ({
+      id: r.id,
+      orderId: r.order_id,
+      so: r.orders?.so ?? null,
+      customerName: r.orders?.customer_name ?? null,
+      status: AMENDMENT_WAITING.has(r.status) ? "waiting" : r.status,
+      reason: r.reason,
+      submittedBy: (r.submitted_by && names.get(r.submitted_by)) || null,
+      submittedAt: r.submitted_at,
+      decidedBy: (r.decided_by && names.get(r.decided_by)) || null,
+      decidedAt: r.decided_at,
+      decisionNote: r.decision_note,
+      agreementRecorded: r.customer_agreement_kind != null,
+    })),
+  });
+});
+
 operationOrdersRouter.get("/:id", requireOperation, async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);

@@ -98,6 +98,7 @@ import OperationStockPlan from "./OperationStockPlan";
 // Migration 0140 — Service Notes / Issue Tracker.
 import OperationServiceCases from "./OperationServiceCases";
 import OperationIssueTracker from "./OperationIssueTracker";
+import SalesOrderAmendments from "./SalesOrderAmendments";
 import IssueRelatedPartyReport from "./IssueRelatedPartyReport";
 import OperationGuarantees from "./OperationGuarantees";
 // Gmail-style right rail — Calendar (deliveries/day) · Keep notes · Tasks board.
@@ -185,6 +186,9 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
      Page Header gear is the ERP's single Settings entry (ui/MASTER.md). */
   const isSettingsUrl = location.pathname.startsWith("/operation/settings");
   const isIssuesUrl = location.pathname.startsWith("/operation/issues");
+  /* Amendments queue — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22). Its
+     own prefix, not `/operation/orders/…`, so `Outright` does not light too. */
+  const isAmendmentsUrl = location.pathname.startsWith("/operation/amendments");
   /* 【WAREHOUSE】 CARD 02 — one exact Unit, addressed by its permanent Carres
      Unit ID. The Route shipped 2026-08-21 and never joined this gate, so the
      URL fell through to the `?tab=` branch and rendered the DASHBOARD over a
@@ -207,7 +211,7 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
        router. A new route joins BOTH lists in the same commit. */
     isEditDeliveryUrl ||
     isDeliveryOrdersUrl || isSettingsUrl || isIssuesUrl || isStockUnitUrl ||
-    isLegacyPurchasingUrl;
+    isLegacyPurchasingUrl || isAmendmentsUrl;
 
   const [tab, setTab] = useState<string>("dashboard");
   // Sidebar collapse moved into PortalSidebar (Unified Internal Portal,
@@ -251,6 +255,7 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
       || isDeliveryOrdersUrl
       || isSettingsUrl
       || isIssuesUrl
+      || isAmendmentsUrl
     )
       return;
     setMovementsPrefill((p) => (urlTab === "movements" ? p : undefined));
@@ -262,7 +267,7 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
        (the stock-onhand precedent). */
     setTab(LEGACY_SCHEDULE_TABS.has(urlTab) ? "warehouse-arrival-schedule" : urlTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlTab, isProcurementUrl, isToOrderUrl, isOrdersUrl, isOldOrdersUrl, isDeliveryOrdersUrl, isSettingsUrl, isIssuesUrl]);
+  }, [urlTab, isProcurementUrl, isToOrderUrl, isOrdersUrl, isOldOrdersUrl, isDeliveryOrdersUrl, isSettingsUrl, isIssuesUrl, isAmendmentsUrl]);
 
   // When the URL leaves a URL-driven section (e.g. user navigated via Back
   // to `/operation`), make sure the local tab state has a sensible value so
@@ -476,6 +481,7 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
                 saved or pasted link lands on that row, brief unfolded. */}
             <Route path="delivery/edit/:orderId" element={<EditDeliveryRedirect />} />
             <Route path="issues" element={<OperationIssueTracker />} />
+            <Route path="amendments" element={<SalesOrderAmendments />} />
             <Route path="issues/reports" element={<IssueRelatedPartyReport />} />
             {/* The office create door is RETIRED (owner ruling 2026-09-27): a
                 Sales Order is born in the Sales Portal. A saved or pasted link
