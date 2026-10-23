@@ -217,7 +217,7 @@ it("disables select-all when every visible row is ineligible", () => {
   const onToggleAll = vi.fn();
   render(<DataGrid<Row> rows={ROWS} columns={COLUMNS} storageKey="test.select.none" rowKey={row => row.id}
     selectable={{ selectedKeys: new Set(), onToggle: vi.fn(), onToggleAll, isSelectable: () => false }} />);
-  const selectAll = screen.getByRole("checkbox", { name: "Select all rows", exact: true });
+  const selectAll = screen.getByRole("checkbox", { name: /^Select all rows$/ });
   expect(selectAll).toBeDisabled();
   fireEvent.click(selectAll);
   expect(onToggleAll).not.toHaveBeenCalled();
