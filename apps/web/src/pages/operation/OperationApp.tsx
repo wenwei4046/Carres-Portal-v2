@@ -87,6 +87,7 @@ import OperationOpsReserved from "./OperationOpsReserved";
 import OperationOpsRepair from "./OperationOpsRepair";
 import OperationOpsInventory from "./OperationOpsInventory";
 import WarehouseStockRegister from "./WarehouseStockRegister";
+import { DeliveryReturns, LoadScan } from "./DeliveryReturns";
 import WarehouseWorkspace from "./WarehouseWorkspace";
 import { LEGACY_SCHEDULE_TABS } from "./warehouse-schedule-view";
 import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
@@ -552,6 +553,12 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
             {/* T11 — Delivery: the 3-pane module (queues · calendar · detail).
                 Read-only by design; every write stays behind the order drawer. */}
             {tab === "delivery" && <OperationDelivery />}
+            {/* 0716 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office staff
+                record Delivery Returns and mark DOs Delivered by load scan, the Houzs
+                way. Overturns Jess's Delivery MASTER §6.1/§7/§8; Jess was not part of
+                this decision. */}
+            {tab === "delivery-returns" && <DeliveryReturns />}
+            {tab === "load-scan" && <LoadScan />}
             {/* SO V2 CARD 10 — My Work / Team Work: two filters over the ONE
                 open work set (Card 9's engine). The page writes nothing; a
                 row opens the Sales Order Workspace. */}

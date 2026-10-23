@@ -509,6 +509,12 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         activeFor: ["path:/operation/delivery-orders"],
         section: "Delivery",
       },
+      /* 0716 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office staff
+       * record Delivery Returns and mark DOs Delivered by load scan, the Houzs
+       * way. Overturns Jess's "exactly two children" (Delivery MASTER §8); Jess
+       * was not part of this decision. */
+      { key: "delivery-returns", label: "Delivery Returns", icon: Undo2, tab: "delivery-returns", section: "Delivery" },
+      { key: "load-scan", label: "Load Scan", icon: PackageCheck, tab: "load-scan", section: "Delivery" },
       /* THE WAREHOUSE MAP IS FIVE DESTINATIONS (owner ruling 2026-09-14):
        * `Arrival Schedule · Pickup Schedule · Inbound · Inventory · Outbound`.
        *
