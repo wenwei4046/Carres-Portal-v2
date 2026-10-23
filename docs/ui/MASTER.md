@@ -1636,6 +1636,8 @@ Icons: Material Symbols Rounded, outline, weight 300; 18 in buttons and menus, 2
 | Screen parts | Every module page has the same seven numbered parts (`Carres Screen Map.dc.html`): 1 side menu · 2 top bar · 3 toolbar · 4 main table or detail · 5 Summary · 6 Tasks list · 7 open task. Parts 1, 2, 3, 6 and 7 are the shell: changed once, every module follows |
 | Zones | 12 between zones |
 
+The shared DataGrid selection bar measures its full count and controls. When that full wording cannot fit, its owning module may supply the same facts with the existing SO/PO abbreviations; all four purchase counts remain visible, controls keep32px and the view keeps its name. The shared short count uses the existing4px control gap only in that measured state; wide wording and10px gap return when they fit. Below the supported fit, the existing contained toolbar scroll keeps every action reachable.
+
 The page never scrolls; panels and table bodies scroll inside with thin scrollbars. Summary and Tasks collapse and reopen from ghost buttons in the toolbar row. They open by window width: at 1600 or wider, both; from 1280 to 1599, Tasks only, with Summary closed until the person opens it; under 1280, both closed. Opening or closing a panel never changes a column width. Below1100 the17Oct narrow contextual-panel contract replaces docked Summary/Tasks and retains the64rail; closing navigation returns to the same list context. A detail opens in the middle in place of the list: Summary and the toolbar hide, Tasks stays, Back returns to the same scroll position. There is no list plus detail three-panel view.
 
 ## 5 · Register

@@ -1765,7 +1765,7 @@ describe("PortalSidebar — owner17Oct temporary module rail", () => {
       expect(localStorage.getItem(COLLAPSE_KEY)).toBe("0");
       Object.defineProperty(window, "innerWidth", { configurable: true, value: 1164 });
       fireEvent(window, new Event("resize"));
-      expect(screen.getByTestId("portal-sidebar")).toHaveStyle({ width: "220px" });
+      expect(screen.getByTestId("portal-sidebar")).toHaveStyle({ width: "64px" });
       expect(localStorage.getItem(COLLAPSE_KEY)).toBe("0");
     } finally { Object.defineProperty(window, "innerWidth", { configurable: true, value: previousWidth }); }
   });

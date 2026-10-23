@@ -1374,6 +1374,7 @@ sidebar page. Existing implementation constants do not override these approved p
 | `PO No` on SO Batch Purchase (owner ruling 2026-10-05) | every linked PO number on one line, separated by `, ` (`PO-260903-4316-V1, PO-260903-4585-V1`), each its own link; no `{n} POs` count; none: `Not ordered yet` |
 | Open local filter-rail control | `Hide filters` |
 | Hidden local filter-rail control | `Show filters` |
+| Compact selected Issue count (same four facts, only when measured toolbar space is short) | `{n} SO · {i} item(s) · {u} unit(s) · {p} PO`; full Sales Order and Issue wording stays on the count's hover title; all four quantities stay on screen. SO and PO are the existing document abbreviations. |
 | Selected Issue action | `1 selected · 1 unit · Issue 1 PO  [Clear]  [YJ]  [Issue PO]          [Export Excel (1)]` |
 | PO Duty owner chip title | `{name} · PO Duty` |
 | Dated cover chip title | `{cover name} · PO Duty cover for {normal holder}` |

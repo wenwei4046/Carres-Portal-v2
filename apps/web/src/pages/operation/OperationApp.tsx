@@ -13,6 +13,7 @@ import {
 // Unified Internal Portal (2026-06-30) — the three private rails (Operation /
 // Principal / Finance) merged into ONE role-aware PortalSidebar.
 import PortalSidebar from "@/pages/portal/PortalSidebar";
+import Drawer from "@/components/kit/Drawer";
 import { useAuth } from "@/lib/auth";
 import OperationDashboard from "./OperationDashboard";
 // ⭐ SALES ORDER PRODUCTION CUTOVER (owner ruling, 2026-08-10 —
@@ -102,7 +103,7 @@ import IssueRelatedPartyReport from "./IssueRelatedPartyReport";
 import OperationGuarantees from "./OperationGuarantees";
 // Gmail-style right rail — Calendar (deliveries/day) · Keep notes · Tasks board.
 import ShellHeader, { ShellHeaderContext, useShellHeaderHost } from "./components/ShellHeader";
-import ShellTasks, { useShellTasks } from "./components/ShellTasks";
+import ShellTasks from "./components/ShellTasks";
 import { activeNavTitle } from "@/pages/portal/portal-nav";
 import type { MovementsFilters } from "@/lib/queries";
 
@@ -128,7 +129,6 @@ import type { MovementsFilters } from "@/lib/queries";
 export default function OperationApp({purchaseRequestContext=false}:{purchaseRequestContext?:boolean}={}) {
   const location = useLocation();
   const phone = usePhone();
-  const tasksPage = useShellTasks((s) => s.pageHosts);
   /* The system deals every order to a person (0504) — from the shell, so it
      runs whichever Operations page is opened. */
   useOrderDealSweep();
@@ -370,7 +370,12 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
           </div>
         </>
       ) : (
-        <PortalSidebar compactForCanvas={tasksPage === 0} />
+        <>
+          <PortalSidebar compactForCanvas onExpandForCanvas={() => setMenuOpen(true)} />
+          <Drawer open={menuOpen} onOpenChange={setMenuOpen} title="Menu">
+            <PortalSidebar drawer />
+          </Drawer>
+        </>
       )}
       <ShellHeaderContext.Provider value={shellHost.value}>
       <div className="flex min-h-0 min-w-0 flex-col overflow-hidden">
