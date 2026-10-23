@@ -3418,7 +3418,8 @@ Three `Reports` rows, one row per document line, read from each Register's own r
 detail-listing port, row 15): **`Sales order lines`** · **`Delivery order lines`** ·
 **`Sales invoice lines`**. Columns reuse governed words: `Proceed date` / `DO date` /
 `Invoice date` · `SO no.` / `DO No` / `Invoice No` · `SO no.` · `Customer` · `Item` · `Qty` ·
-`Unit price` · `Amount` (no money on Delivery order lines). Footer: `{shown} of {total} lines ·`
+`Unit price` · `Amount` (no money on Delivery order lines). Each add-on is its own line after the goods,
+`Item` = the add-on's catalog name. Footer: `{shown} of {total} lines ·`
 then the exclusion: `Rentals are not listed.` · `Cancelled delivery orders are not listed.` ·
 `Only issued sales invoices are listed.` Empty: `No lines yet.` + the same exclusion.
 

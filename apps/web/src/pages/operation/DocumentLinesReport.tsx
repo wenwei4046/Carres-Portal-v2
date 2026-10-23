@@ -10,7 +10,7 @@ import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
-import { useDeliveryOrdersRegister, useInvoiceRegister, useSalesOrderRegisterOrders } from "@/lib/queries";
+import { useCatalog, useDeliveryOrdersRegister, useInvoiceRegister, useSalesOrderRegisterOrders } from "@/lib/queries";
 import { LoadFailed } from "@/pages/finance/other-money-in/parts";
 import ModuleHeader from "./components/ModuleHeader";
 import { skuKey, useCatalogNames } from "./sales-order-register-readings";
@@ -79,10 +79,20 @@ function useNameOf() {
   return useMemo(() => (sku: string) => names.get(skuKey(sku))?.name, [names]);
 }
 
+/** Add-on key → its catalog name, from the same catalog read. */
+function useAddonName() {
+  const catalogQ = useCatalog();
+  return useMemo(() => {
+    const m = new Map((catalogQ.data?.addons ?? []).map((a) => [a.key, a.name] as const));
+    return (key: string) => m.get(key) || undefined;
+  }, [catalogQ.data]);
+}
+
 export function SalesOrderLinesReport() {
   const q = useSalesOrderRegisterOrders({ stage: "proceeded" });
   const nameOf = useNameOf();
-  const rows = useMemo(() => salesOrderLinesOf(q.data?.orders ?? [], nameOf), [q.data, nameOf]);
+  const addonName = useAddonName();
+  const rows = useMemo(() => salesOrderLinesOf(q.data?.orders ?? [], nameOf, addonName), [q.data, nameOf, addonName]);
   return <LinesGrid kind="so" rows={rows} loading={q.isPending} failed={q.isError} retry={() => void q.refetch()} />;
 }
 
@@ -96,6 +106,7 @@ export function DeliveryOrderLinesReport() {
 export function SalesInvoiceLinesReport() {
   const q = useInvoiceRegister();
   const nameOf = useNameOf();
-  const rows = useMemo(() => salesInvoiceLinesOf(q.data ?? [], nameOf), [q.data, nameOf]);
+  const addonName = useAddonName();
+  const rows = useMemo(() => salesInvoiceLinesOf(q.data ?? [], nameOf, addonName), [q.data, nameOf, addonName]);
   return <LinesGrid kind="inv" rows={rows} loading={q.isPending} failed={q.isError} retry={() => void q.refetch()} />;
 }

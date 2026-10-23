@@ -4,6 +4,7 @@
  * One row per document LINE, the document repeated on every line. Each listing
  * reads the SAME read its Register reads and stores nothing:
  *   Sales Order lines    → the Sales Orders Register's orders (rentals left out, as there)
+ *                          — add-ons follow the goods as their own priced lines
  *   Delivery Order lines → the Delivery Orders Register's documents, THIS trip's
  *                          lines through `tripLinesOf` (cancelled documents left out)
  *   Sales Invoice lines  → the Invoices Register; an issued Sales Invoice's lines
@@ -32,7 +33,16 @@ export interface DocumentLine {
 }
 
 type NameOf = (sku: string) => string | undefined;
-type Line = { sku: string; qty: number; unit_price?: number | string | null; label?: string | null };
+type Line = { sku: string; qty: number; unit_price?: number | string | null; label?: string | null; name?: string };
+type Addon = { addon_key?: string | null; qty: number; unit_price?: number | string | null };
+
+/** Each add-on as its own priced line after the goods, as Houzs prints every
+ *  charge as a document line — so Amount totals what the document asks for. */
+const addonLines = (addons: readonly Addon[] | null | undefined, addonName: NameOf): Line[] =>
+  (addons ?? []).map((a) => {
+    const key = a.addon_key ?? "";
+    return { sku: key, qty: a.qty, unit_price: a.unit_price, name: addonName(key) ?? key };
+  });
 
 function linesOf(
   head: Omit<DocumentLine, "key" | "item" | "qty" | "unitPrice" | "amount">,
@@ -46,7 +56,7 @@ function linesOf(
     return {
       key: `${keyOf}:${i}`,
       ...head,
-      item: nameOf(l.sku) ?? lineName(l),
+      item: l.name ?? nameOf(l.sku) ?? lineName(l),
       qty: l.qty,
       unitPrice,
       amount: unitPrice == null ? null : Math.round(unitPrice * l.qty * 100) / 100,
@@ -54,11 +64,11 @@ function linesOf(
   });
 }
 
-export function salesOrderLinesOf(orders: readonly operationOrderListRow[], nameOf: NameOf): DocumentLine[] {
+export function salesOrderLinesOf(orders: readonly operationOrderListRow[], nameOf: NameOf, addonName: NameOf): DocumentLine[] {
   return orders.filter((o) => !isRental(o)).flatMap((o) =>
     linesOf(
       { date: o.proceeded_at ?? null, docNo: `SO-${o.so}`, orderId: o.id, so: o.so, customer: displayCustomerName(o.customer_name) },
-      o.id, o.order_lines ?? [], nameOf, true,
+      o.id, [...(o.order_lines ?? []), ...addonLines(o.order_addons, addonName)], nameOf, true,
     ));
 }
 
@@ -70,13 +80,13 @@ export function deliveryOrderLinesOf(docs: readonly DeliveryOrderRow[], nameOf: 
     ));
 }
 
-export function salesInvoiceLinesOf(invoices: readonly InvoiceRegisterRow[], nameOf: NameOf): DocumentLine[] {
+export function salesInvoiceLinesOf(invoices: readonly InvoiceRegisterRow[], nameOf: NameOf, addonName: NameOf): DocumentLine[] {
   return invoices.flatMap((r) => {
     const o = r.orders;
     if (r.kind !== "sales" || r.status !== "issued" || r.voided_at || !o) return [];
     return linesOf(
       { date: r.issued_at, docNo: r.invoice_no ?? "", orderId: r.order_id, so: o.so, customer: displayCustomerName(o.customer_name) },
-      r.id, (o.order_lines ?? []).map((l) => ({ ...l, sku: l.sku ?? "" })), nameOf, true,
+      r.id, [...(o.order_lines ?? []).map((l) => ({ ...l, sku: l.sku ?? "" })), ...addonLines(o.order_addons, addonName)], nameOf, true,
     );
   });
 }
