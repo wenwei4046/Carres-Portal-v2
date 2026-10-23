@@ -332,12 +332,10 @@ describe("POST /api/ops/service-cases — the S1 guided intake", () => {
     });
   });
 
-  it("never writes `priority` — it is generated from `usable` in the database", async () => {
-    // The card's law is that staff never pick a priority. Enforcing it means the
-    // write path must not HAVE the column, not merely decline to offer a picker.
+  it("starts the priority from `usable`, never from the client (0711: staff edit it afterwards)", async () => {
     const { sb, inserts } = buildInsertSb();
     await post({ ...WIZARD_BODY, priority: "low" }, sb);
-    expect(inserts[0]).not.toHaveProperty("priority");
+    expect(inserts[0]).toMatchObject({ priority: "high" });
   });
 
   it("refuses an answer that is not one of the offered keys", async () => {
@@ -697,36 +695,14 @@ describe("S3 — the case drives the follow-ups", () => {
     expect(inserts[0]).not.toHaveProperty("progress");
   });
 
-  it("refuses to close a case whose chain is still open, and names what is left", async () => {
+  it("Close Case closes an open case even with steps still open — Weisiang's decision 2026-10-22", async () => {
+    // Overturns the S3 close gate (Service MASTER S:734): Houzs lets staff press
+    // Close Case on every open case.
     const { sb, updates } = buildCaseSb(REPAIR_CASE, true);
     const res = await patch("c1", { statusId: "33333333-3333-3333-3333-333333333333" }, sb);
 
-    expect(res.status).toBe(422);
-    const body = (await res.json()) as { code: string; message: string };
-    expect(body.code).toBe("case_steps_open");
-    expect(body.message).toContain("Call Ohana to confirm the repair date");
-    expect(body.message).toContain("Call Ryan Chong to confirm the problem is solved");
-    // Nothing reached the database.
-    expect(updates).toHaveLength(0);
-  });
-
-  it("refuses a close that has everything EXCEPT the customer's word", async () => {
-    const { sb, updates } = buildCaseSb(
-      {
-        ...REPAIR_CASE,
-        progress: ["supplier_date", "collect", "at_supplier", "back_from_supplier", "redeliver"].map(
-          stamped,
-        ),
-      },
-      true,
-    );
-    const res = await patch("c1", { statusId: "33333333-3333-3333-3333-333333333333" }, sb);
-
-    expect(res.status).toBe(422);
-    expect((await res.json()) as { message: string }).toMatchObject({
-      message: expect.stringContaining("confirm the problem is solved"),
-    });
-    expect(updates).toHaveLength(0);
+    expect(res.status).toBe(200);
+    expect(updates[0]).toMatchObject({ status_id: "33333333-3333-3333-3333-333333333333" });
   });
 
   it("closes the case once every step has an outcome on file", async () => {
@@ -1165,7 +1141,7 @@ describe("GET /api/ops/service-cases/:id", () => {
           then: (res: (v: { data: unknown; error: null }) => unknown) =>
             Promise.resolve({ data: CASE_ROW, error: null }).then(res),
         };
-        for (const m of ["select", "eq", "order", "single"]) chain[m] = () => chain;
+        for (const m of ["select", "eq", "order", "single", "maybeSingle"]) chain[m] = () => chain;
         return chain;
       },
     } as never);
@@ -1241,5 +1217,114 @@ describe("GET /api/ops/service-cases/numbers", () => {
     const { sb } = buildSb([]);
     const res = await get("/ops/service-cases/numbers", sb, "dealer");
     expect(res.status).toBe(403);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 0711 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): the Houzs way.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("0711 — the Sales Order PIC picks the case owner; staff edit priority", () => {
+  const ME = "11111111-1111-1111-1111-000000000999"; // makeJwt's subject
+  const ADMIN = "55555555-5555-5555-5555-555555555555";
+
+  /** Answers per table; records every update. */
+  function tableSb(tables: Record<string, unknown>, rpcData: unknown = null) {
+    const updates: Array<[string, Record<string, unknown>]> = [];
+    const inserts: Array<[string, Record<string, unknown>]> = [];
+    const sb = {
+      from: vi.fn((table: string) => {
+        const chain: Record<string, unknown> = {
+          update: (row: Record<string, unknown>) => { updates.push([table, row]); return chain; },
+          insert: (row: Record<string, unknown>) => { inserts.push([table, row]); return chain; },
+          then: (res: (v: { data: unknown; error: null }) => unknown) =>
+            Promise.resolve({ data: tables[table] ?? null, error: null }).then(res),
+        };
+        for (const m of ["select", "eq", "in", "single", "maybeSingle", "order", "limit", "gte", "contains"]) {
+          chain[m] = () => chain;
+        }
+        return chain;
+      }),
+      rpc: vi.fn(async (name: string) =>
+        name === "next_case_no" ? { data: "SC2610-01", error: null } : { data: rpcData, error: null },
+      ),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+    return { sb, updates, inserts };
+  }
+  async function patchCase(body: unknown, sb: unknown, role = "operation") {
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    return app.request(
+      "/api/ops/service-cases/c1",
+      {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${await makeJwt(role)}`, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      },
+      env,
+    );
+  }
+  const activeAdmin = { status: "active", role: "operation" };
+
+  it("lets the Sales Order PIC pick an admin to own the case", async () => {
+    const { sb, updates } = tableSb({
+      service_cases: { order_id: "ord-1" },
+      ops_order_control: { assigned_staff: ME },
+      app_users: activeAdmin,
+    });
+    const res = await patchCase({ ownerUserId: ADMIN }, sb);
+    expect(res.status).toBe(200);
+    expect(updates).toContainEqual(["service_cases", { owner_user_id: ADMIN }]);
+  });
+
+  it("refuses an office person who is not the order's PIC", async () => {
+    const { sb, updates } = tableSb({
+      service_cases: { order_id: "ord-1" },
+      ops_order_control: { assigned_staff: "99999999-9999-9999-9999-999999999999" },
+      app_users: activeAdmin,
+    });
+    const res = await patchCase({ ownerUserId: ADMIN }, sb);
+    expect(res.status).toBe(403);
+    expect(updates).toHaveLength(0);
+  });
+
+  it("lets the principal pick, and anyone pick when the order has no PIC", async () => {
+    const pic = { service_cases: { order_id: "ord-1" }, ops_order_control: { assigned_staff: ADMIN }, app_users: activeAdmin };
+    expect((await patchCase({ ownerUserId: ADMIN }, tableSb(pic).sb, "principal")).status).toBe(200);
+    const noPic = { service_cases: { order_id: null }, ops_order_control: null, app_users: activeAdmin };
+    expect((await patchCase({ ownerUserId: ADMIN }, tableSb(noPic).sb)).status).toBe(200);
+  });
+
+  it("refuses an owner who is not an active office person", async () => {
+    const { sb, updates } = tableSb({
+      service_cases: { order_id: null },
+      app_users: { status: "active", role: "dealer" },
+    });
+    const res = await patchCase({ ownerUserId: ADMIN }, sb);
+    expect(res.status).toBe(422);
+    expect(updates).toHaveLength(0);
+  });
+
+  it("lets staff set the priority by hand", async () => {
+    const { sb, updates } = tableSb({ service_cases: { order_id: null } });
+    const res = await patchCase({ priority: "low" }, sb);
+    expect(res.status).toBe(200);
+    expect(updates).toContainEqual(["service_cases", { priority: "low" }]);
+  });
+
+  it("gives a new case the default owner from Service settings", async () => {
+    const { sb, inserts } = tableSb({
+      service_settings: { default_owner_user_id: ADMIN },
+      service_cases: { id: "new-case", case_no: "SC2610-01" },
+    });
+    await post({ customerName: "Ryan Chong" }, sb);
+    expect(inserts.find(([t]) => t === "service_cases")?.[1]).toMatchObject({ owner_user_id: ADMIN });
+  });
+
+  it("My Cases narrows the list to the ids the database answers for me and my team", async () => {
+    const { sb } = tableSb({ service_cases: [CASE_ROW, { ...CASE_ROW, id: "c2" }] }, ["c2"]);
+    const res = await get("/ops/service-cases?mine=1", sb);
+    const body = (await res.json()) as { items: Array<{ id: string }> };
+    expect(body.items.map((r) => r.id)).toEqual(["c2"]);
+    expect(sb.rpc).toHaveBeenCalledWith("my_service_case_ids");
   });
 });
