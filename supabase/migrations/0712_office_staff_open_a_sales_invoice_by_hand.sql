@@ -42,6 +42,8 @@
 --   · no lines, a line of another order, a repeated line, a qty that is not a
 --     whole number above 0, or more than is left on the line
 --   · an invoice that comes to RM 0
+--   · a snapshot sent straight to payment_invoice_issue that claims to be an
+--     office invoice (only the door makes one)
 --
 -- UNCHANGED: Balance due, the Payment Monitor, AR and statements stay ORDER
 -- money (orderMoney / soRemaining); payments still credit AR as before.
@@ -192,7 +194,8 @@ begin
                              else coalesce(v_whole.invoice_no, 'draft') end,
     'addons_pending', not exists (select 1 from invoices i
                                    where i.order_id = p_order_id and i.kind = 'sales' and i.status = 'issued'
-                                     and i.snapshot ->> 'issued_from' = 'office'),
+                                     and i.snapshot ->> 'issued_from' = 'office'
+                                     and jsonb_array_length(coalesce(i.snapshot -> 'addons', '[]'::jsonb)) > 0),
     'addons', coalesce((select jsonb_agg(jsonb_build_object('addon_key', a.addon_key, 'qty', a.qty,
                                                             'unit_price', a.unit_price) order by a.addon_key, a.id)
                           from order_addons a where a.order_id = p_order_id), '[]'::jsonb),
@@ -275,10 +278,13 @@ begin
     v_amount := v_amount + round(v_qty * v_left.unit_price, 2);
   end loop;
 
-  -- The order's add-ons (delivery, carrying, ...) ride on its first office invoice.
+  -- The order's add-ons (delivery, carrying, ...) ride on the first office
+  -- invoice; if that one is voided, on the next (no live office invoice
+  -- carries them any more).
   if not exists (select 1 from invoices i
                   where i.order_id = p_order_id and i.kind = 'sales' and i.status = 'issued'
-                    and i.snapshot ->> 'issued_from' = 'office') then
+                    and i.snapshot ->> 'issued_from' = 'office'
+                    and jsonb_array_length(coalesce(i.snapshot -> 'addons', '[]'::jsonb)) > 0) then
     select coalesce(jsonb_agg(jsonb_build_object('addon_key', a.addon_key, 'qty', a.qty, 'unit_price', a.unit_price)
                               order by a.addon_key, a.id), '[]'::jsonb),
            v_amount + coalesce(sum(round(a.qty * a.unit_price, 2)), 0)
@@ -342,6 +348,22 @@ $new$  if v_inv.kind = 'sales' then
     return jsonb_build_object('voided', to_jsonb(v_inv), 'replacement', null);
   end if;$new$);
 
+-- ── 4b · only the door makes an office invoice ───────────────────────────────
+-- issued_from = 'office' now decides revenue and the one-live index, so a
+-- snapshot sent straight to payment_invoice_issue may not claim it: the draft
+-- must be the door's own (inserted with snapshot.issued_from = office).
+select pg_temp.mig0712_rewrite('public.payment_invoice_issue(uuid, jsonb)'::regprocedure,
+$old$      using errcode = '22023', detail = 'not_a_draft';
+  end if;$old$,
+$new$      using errcode = '22023', detail = 'not_a_draft';
+  end if;
+  -- 0712: only sales_invoice_office_open makes an office invoice.
+  if (coalesce(p_snapshot ->> 'issued_from', '') = 'office')
+     <> (coalesce(v_inv.snapshot ->> 'issued_from', '') = 'office') then
+    raise exception 'Only New Sales Invoice opens an office invoice.'
+      using errcode = '22023', detail = 'office_snapshot_mismatch';
+  end if;$new$);
+
 -- ── 5 · the Collection report adds up every live Sales Invoice ───────────────
 select pg_temp.mig0712_rewrite('public.fin_collection(date, date)'::regprocedure,
 $old$              select i.id, i.invoice_no, i.amount + coalesce(i.tax_amount, 0) as billed, i.issued_at
@@ -376,6 +398,9 @@ begin
   if position('issued_from'' = ''office''' in pg_get_functiondef('public.payment_invoice_void_replace(uuid, text)'::regprocedure)) = 0 then
     raise exception '0712: voiding an office invoice still drafts a whole-order replacement';
   end if;
+  if position('office_snapshot_mismatch' in pg_get_functiondef('public.payment_invoice_issue(uuid, jsonb)'::regprocedure)) = 0 then
+    raise exception '0712: a snapshot sent straight to payment_invoice_issue can still claim to be an office invoice';
+  end if;
   if position('string_agg(i.invoice_no' in pg_get_functiondef('public.fin_collection(date, date)'::regprocedure)) = 0 then
     raise exception '0712: the Collection report still reads one invoice';
   end if;
@@ -392,7 +417,8 @@ commit;
 -- REVERSAL (by hand, only if 0712 must be withdrawn and NO office invoice is
 -- live — otherwise the old index cannot be rebuilt):
 --   1 re-run the bodies of _sales_invoice_to_ledger, _gl_goods_split,
---     payment_invoice_void_replace and fin_collection from before 0712
+--     payment_invoice_issue, payment_invoice_void_replace and fin_collection
+--     from before 0712
 --     (pg_get_functiondef on a database without 0712);
 --   2 drop function public.sales_invoice_office_open(uuid, jsonb),
 --     public.sales_invoice_office_offer(uuid), public._sales_invoice_office_left(uuid),

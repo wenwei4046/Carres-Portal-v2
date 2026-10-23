@@ -904,7 +904,7 @@ financeInvoicesRouter.get("/:id/pdf-data", requireFinance, async (c) => {
 
   const { data: invoice, error: invErr } = await sb
     .from("invoices")
-    .select("id, invoice_no, order_id, amount, tax_amount, issued_at, voided_at")
+    .select("id, invoice_no, order_id, amount, tax_amount, issued_at, voided_at, snapshot")
     .eq("id", id)
     .maybeSingle();
   if (invErr) {
@@ -972,8 +972,10 @@ financeInvoicesRouter.get("/:id/pdf-data", requireFinance, async (c) => {
     const m = mapPgError(lineErr);
     return c.json(m.body, m.status);
   }
+  // 0712: an office (part) invoice prints only the goods it bills.
+  const officeLines = inv.snapshot?.issued_from === "office" && Array.isArray(inv.snapshot.lines) ? inv.snapshot.lines : null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const lineRows = (lines ?? []) as any[];
+  const lineRows = (officeLines ?? lines ?? []) as any[];
 
   // SKU descriptions (separate query — order_lines.sku is text, not FK'd).
   const skus: string[] = lineRows.map((l) => String(l.sku));

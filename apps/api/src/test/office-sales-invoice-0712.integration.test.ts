@@ -186,4 +186,25 @@ describe.skipIf(!URL)("office New Sales Invoice (real PostgreSQL, 0712)", () => 
     expect([leftOf(o, bed), leftOf(o, sofa)]).toEqual([1, 1]);
     expect(await posting(second)).toEqual([]);
   });
+
+  it("voiding the invoice that carried the add-ons puts them on the next one", async () => {
+    await actAs(U.op);
+    const third = await open(order, [[sofa, 1]]);
+    expect(Number((third as unknown as { row: { r: { invoice: { amount: string } } } }).row.r.invoice.amount)).toBe(500);
+    await actAs(U.principal);
+    expect((await attempt("select public.payment_invoice_void_replace(id, 'IT add-on move') as r from invoices where invoice_no = $1", [first])).ok).toBe(true);
+    await actAs(U.op);
+    expect((await offer(order)).addons_pending).toBe(true);
+    const fourth = await open(order, [[bed, 1]]);
+    expect(Number((fourth as unknown as { row: { r: { invoice: { amount: string } } } }).row.r.invoice.amount)).toBe(1100);
+  });
+
+  it("a snapshot sent straight to payment_invoice_issue cannot claim to be an office invoice", async () => {
+    await actAs(U.op);
+    const draft = (await q(`insert into invoices (order_id, amount, tax_amount, kind, status)
+                            values ($1, 500, 0, 'sales', 'draft') returning id`, [order])).rows[0].id;
+    const r = await attempt("select public.payment_invoice_issue($1, $2::jsonb) as r",
+      [draft, JSON.stringify({ kind: "sales", issued_from: "office", lines: [] })]);
+    expect(r).toEqual({ ok: false, detail: "office_snapshot_mismatch" });
+  });
 });
