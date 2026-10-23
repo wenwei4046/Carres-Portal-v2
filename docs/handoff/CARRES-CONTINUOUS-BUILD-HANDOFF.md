@@ -18,19 +18,18 @@ of33; closing Tasks left0 dialogs/overlays and body pointer-events:auto. The scr
 Pending work modal legitimately blocks background clicks. No evidence supports click-through.
 
 CONFORMS after scoped correction: existing TasksPill in all4 purchasing toolbars/selection bars;
-shared ShellTasks consumes new View tasks events without replaying old ones; existing shared
+shared ShellTasks consumes new View tasks events without replaying old ones; Operations shared
 PortalSidebar stays64 with full navigation in kit Drawer; grouped To buy and Today reuse shared
 soBatchPurchaseStatus exact order-line coverage; existing eligibility/permissions/Issue PO and
 stock writers are retained; DataGrid select-all is disabled when no eligible row exists and its
 36px selection toolbar contains narrow overflow. Disabled group ticks reuse item reasons.
 NOT APPLICABLE: new business rule, SQL, Settings changes, purchase issuance or supplier transmission.
 
-Verification: purchasing/sidebar/shell/grid focused379/379; the4 new outstanding-demand cases
+Verification: purchasing/sidebar/shell/grid unique focused404/404 (392 unchanged cases plus final grid12); web typecheck and design guard PASS; the4 new outstanding-demand cases
 FAIL on detached main and PASS with the fix (negative control). Real fixture browser6/6 at825×804,
 1025×804 and1440×804: Got it/X/Escape/View tasks dismissal; no residual lock; group/item/all selection;
 expansion independence; Tasks and full navigation close retain selection; reload does not reopen
-acknowledged reminder. Local fixture PNGs in output/purchasing-shell-selection. Full release gates,
-Linux screenshot update, exact deployed SHA and authenticated production confirmation remain pending.
+acknowledged reminder. Local fixture PNGs in output/purchasing-shell-selection. Linux screenshot workflow39932935270 PASS,45 PNGs generated and37 changed against main; screenshots reviewed for shared nav and Tasks composition. Runtime is unchanged since capture except the empty-select-all callback guard. Full exact-head CI, deployed SHA and authenticated production confirmation remain pending.
 
 **CURRENT RESPONSIBILITY · OWNER-APPROVED 22 Oct 2026.**
 Read UI MASTER **How design and IT work** and the current module MASTER before continuing.
