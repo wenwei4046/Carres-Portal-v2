@@ -87,6 +87,7 @@ import OperationOpsReserved from "./OperationOpsReserved";
 import OperationOpsRepair from "./OperationOpsRepair";
 import OperationOpsInventory from "./OperationOpsInventory";
 import WarehouseStockRegister from "./WarehouseStockRegister";
+import { CustomerConsignmentOrders, ConsignmentNotes, CustomerConsignmentReturns } from "./CustomerConsignment";
 import WarehouseWorkspace from "./WarehouseWorkspace";
 import { LEGACY_SCHEDULE_TABS } from "./warehouse-schedule-view";
 import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
@@ -616,6 +617,13 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
             {/* CARD-2026-08-20-stock-register: the Stock Register replaces the
                 On hand surface. Same `?tab=` address, new page. */}
             {tab === "stock-onhand" && <WarehouseStockRegister />}
+            {/* 0719 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): goods go out to
+                customers on consignment and unsold goods come back, Houzs way. Overturns
+                Jess's Purchasing MASTER consignment rules and the Consignment Note ban;
+                Jess was not part of this decision. */}
+            {tab === "customer-consignment-orders" && <CustomerConsignmentOrders />}
+            {tab === "consignment-notes" && <ConsignmentNotes />}
+            {tab === "customer-consignment-returns" && <CustomerConsignmentReturns />}
             {tab === "showroom" && <WarehouseStockRegister showroom />}
             {/* WAREHOUSE (owner ruling 2026-09-14) — Arrival Schedule and
                 Pickup Schedule are two independent dated boards; Inbound and

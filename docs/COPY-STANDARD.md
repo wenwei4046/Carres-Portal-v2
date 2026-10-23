@@ -923,7 +923,8 @@ so does the word anywhere near a trip. But Carres genuinely holds supplier-owned
 supplier calls it consignment, the agreement says consignment, and inventing a Carres-only word
 would leave staff translating in both directions. **`Consignment Order` · `Consignment Return`** are the ruled supplier-document names. A consignment arrival uses the
 same **`Goods Receipt`** as a purchase arrival while preserving supplier ownership. On a UNIT the fact is spelt
-**`Supplier Consignment`**, against **`Carres Owned`**. The word never describes a delivery.
+**`Supplier Consignment`**, against **`Carres Owned`**. ~~The word never describes a delivery.~~
+**OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): the word also names the customer-side goods-out documents below ("Customer consignment words"). It still never describes a split trip.**
 
 ## The dictionary — every visible word, audited (Jess 2026-07-27)
 
@@ -1189,7 +1190,7 @@ historical issued titles/versions. Consignment Order instructs the supplier to p
 goods; Consignment Return instructs/records goods handed back to the supplier. Neither title means
 physical execution is complete or a payable exists. Purchasing §§9.9–9.10 own these purposes.
 
-Do not replace both titles with Consignment Note or create a third manual document of that name.
+Do not replace both titles with Consignment Note~~ or create a third manual document of that name~~. **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): `Consignment Note` is the customer-side delivery document ("Customer consignment words" below); it never replaces the two supplier titles.**
 Staff enter one Display Request and use its source-prefilled execution documents. Showroom receipt
 and supplier collection acknowledgement remain evidence on Receiving/handover, not another create
 step. Purchased Carres-owned goods use the ordinary Sales Invoice; no supplier sale notice is required.
@@ -1202,6 +1203,23 @@ Shared issue action: `Issue consignment order`; contextual `Issue consignment or
 result `Consignment order issued to {supplier}`. Existing source/permission controls remain.
 Exact register column copy and composition remain subject to design closure; no new component is
 admitted by this naming ruling. Chinese explanations may accompany names in owner discussions.
+
+### Customer consignment words — Weisiang's decision, 2026-10-22
+
+**OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): office staff send Carres-owned goods to customers and dealers on consignment and take unsold goods back, the Houzs way.** BUILT on branch `feat/customer-consignment-houzs-way` (migration 0719, NOT APPLIED). The supplier-side `Consignment Order` / `Consignment Return` above keep their names; the customer side always says `Customer` or `Note`, so the two never share a title.
+
+| Purpose | Exact words |
+|---|---|
+| Delivery rail rows (after `Delivery Orders`) | `Customer Consignment Orders` · `Consignment Notes` · `Customer Consignment Returns` |
+| Numbers | `CCO-YYYYMMDD-RRRR` (Order No) · `CSN-YYYYMMDD-RRRR` (Consignment Note No) · `CCR-YYYYMMDD-RRRR` (Return No). Not `CN`: refunds print credit notes as `CN-`. |
+| Create buttons / dialog titles | `New Customer Consignment Order` · `New Consignment Note` · `New Customer Consignment Return` |
+| Send an order's Units | `Issue Consignment Note for {order no}` · button `Issue Consignment Note` · `The picked Units go to the customer. They stay Carres-owned.` |
+| Order dialog line | `The Units leave stock when their Consignment Note is issued.` |
+| Sold at the customer | `Record sold Units on {note no}` · field `SO No` · button `Record sold` · `Sold Units go to the Sales Order. Record the customer's payment on that Sales Order.` |
+| Return dialog line | `Unsold Units come back into stock. No refund: nothing was paid for them.` |
+| Columns | `Order No` · `Consignment Note No` · `Return No` · `Date` · `Delivery Date` · `Customer` · `Phone` · `Dealer` · `Units` · `At customer` · `Delivery Location` · `Note` |
+| Empty / refusal | `No customer consignment orders yet.` · `No consignment notes yet.` · `No customer consignment returns yet.` · `Every Unit on this order has gone out.` · `No Units are at the customer on this note.` · `No Units are at a customer.` · `{Unit ID} belongs to its supplier` · `{Unit ID} is not out on a Consignment Note` · `Choose the customer or dealer` |
+| Dealer picker | `No dealer` |
 
 ### Showroom movement controls — proposed copy for owner review, 2026-09-29
 
