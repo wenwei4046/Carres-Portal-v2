@@ -137,8 +137,57 @@ orderPaymentsRouter.post("/:id/payments", async (c) => {
     duplicateAck: parsed.data.duplicateAck,
   });
   if (error) return fail(c, error);
+  if (isWaiting(data)) return c.json({ pendingApproval: true, request: data.request }, 202);
   const out = data as { payment: unknown; orders_paid: number | null };
   return c.json({ payment: out.payment, ordersPaid: out.orders_paid }, 201);
+});
+
+/* 0707 — a paid date more than 14 days back is not recorded: payment_record
+   answers a waiting request for the Payment Approver instead. Nothing in it
+   counts until the approver decides. */
+function isWaiting(data: unknown): data is { pending_approval: true; request: unknown } {
+  return (data as { pending_approval?: unknown } | null)?.pending_approval === true;
+}
+
+const REQUEST_ID = z.string().uuid();
+const decideBackdateInput = z.object({
+  approve: z.boolean(),
+  reason: z.string().trim().max(500).optional(),
+  duplicateAck: z.boolean().optional(),
+});
+
+// GET /:id/payment-backdate — the order's backdated payment requests, newest first.
+orderPaymentsRouter.get("/:id/payment-backdate", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+  const { data, error } = await userClient(c.env, auth.jwt)
+    .from("payment_backdate_requests")
+    .select("id, order_id, amount, paid_on, method, kind, reference, receipt_url, status, requested_by, requested_at, decided_by, decided_at, decision_reason, payment_id")
+    .eq("order_id", idCheck.data)
+    .order("requested_at", { ascending: false });
+  if (error) return fail(c, error);
+  return c.json({ requests: data ?? [] });
+});
+
+// POST /:id/payment-backdate/:rid/decide — the SQL door decides who may
+// (Payment Approver duty or principal, never the requester).
+orderPaymentsRouter.post("/:id/payment-backdate/:rid/decide", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+  const ridCheck = REQUEST_ID.safeParse(c.req.param("rid"));
+  if (!ridCheck.success) throw new HTTPException(404, { message: "Request not found" });
+  const parsed = await parseJsonBody(c, decideBackdateInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const { data, error } = await userClient(c.env, auth.jwt).rpc("payment_backdate_decide", {
+    p_request_id: ridCheck.data,
+    p_approve: parsed.data.approve,
+    p_reason: parsed.data.reason ?? null,
+    p_duplicate_ack: parsed.data.duplicateAck ?? false,
+  });
+  if (error) return fail(c, error);
+  return c.json(data);
 });
 
 // DELETE /:id/payments/:pid — VOID a mis-keyed entry. 0430: the reason is
@@ -296,6 +345,7 @@ orderPaymentsRouter.post("/:id/storage/collect", async (c) => {
     duplicateAck: parsed.data.duplicateAck,
   });
   if (payErr) return fail(c, payErr);
+  if (isWaiting(data)) return c.json({ pendingApproval: true, request: data.request }, 202);
 
   const { data: control, error: ctrlErr } = await sb
     .from("ops_order_control")

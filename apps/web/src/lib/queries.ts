@@ -8363,15 +8363,78 @@ function invalidateOrderMoney(
   ]);
 }
 
+/** 0707 — a backdated payment request, waiting for the Payment Approver. */
+export interface PaymentBackdateRequest {
+  id: string;
+  order_id: string;
+  amount: number;
+  paid_on: string;
+  method: string;
+  kind: "payment" | "deposit" | "storage";
+  reference: string | null;
+  receipt_url: string | null;
+  status: "waiting" | "approved" | "refused";
+  requested_by: string;
+  requested_at: string;
+  decided_by: string | null;
+  decided_at: string | null;
+  decision_reason: string | null;
+  payment_id: string | null;
+}
+
+/** 0707 — a paid date more than 14 days back is not recorded: the server
+ *  answers a waiting request instead, and nothing counts until it is approved. */
+export type RecordPaymentResult =
+  | { payment: OrderPaymentRow; pendingApproval?: undefined }
+  | { pendingApproval: true; request: PaymentBackdateRequest; payment?: undefined };
+
+export const BACKDATE_WAITING_WORDS =
+  "Sent to the Payment Approver. This payment counts once it is approved.";
+
+/** The order's backdated payment requests (0707), newest first. */
+export function usePaymentBackdateRequests(orderId: string | null) {
+  return useQuery({
+    queryKey: ["operation", "orders", orderId ?? "null", "payment-backdate"] as const,
+    queryFn: () =>
+      apiFetch<{ requests: PaymentBackdateRequest[] }>(
+        `/api/operation/orders/${orderId}/payment-backdate`,
+      ),
+    enabled: !!orderId,
+    staleTime: 10_000,
+  });
+}
+
+/** Approve or refuse one (0707). The SQL door decides who may: the Payment
+ *  Approver duty or a principal, never the person who asked. */
+export function useDecidePaymentBackdate(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<unknown, ApiError, { requestId: string; approve: boolean; reason?: string; duplicateAck?: boolean }>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, { requestId: string; approve: boolean; reason?: string; duplicateAck?: boolean }>({
+    mutationFn: ({ requestId, ...body }) =>
+      apiFetch(`/api/operation/orders/${orderId}/payment-backdate/${requestId}/decide`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await invalidateOrderMoney(qc, orderId);
+      await qc.invalidateQueries({ queryKey: qk.finance.invoiceRegister(), exact: true });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
 /** Record one payment on the ledger. */
 export function useRecordPayment(
   orderId: string,
-  opts?: Partial<UseMutationOptions<{ payment: OrderPaymentRow }, ApiError, RecordPaymentInput>>,
+  opts?: Partial<UseMutationOptions<RecordPaymentResult, ApiError, RecordPaymentInput>>,
 ) {
   const qc = useQueryClient();
-  return useMutation<{ payment: OrderPaymentRow }, ApiError, RecordPaymentInput>({
+  return useMutation<RecordPaymentResult, ApiError, RecordPaymentInput>({
     mutationFn: (input) =>
-      apiFetch<{ payment: OrderPaymentRow }>(
+      apiFetch<RecordPaymentResult>(
         `/api/operation/orders/${orderId}/payments`,
         { method: "POST", body: JSON.stringify(input) },
       ),
@@ -8410,7 +8473,7 @@ export function useCollectStorage(
   orderId: string,
   opts?: Partial<
     UseMutationOptions<
-      { payment: OrderPaymentRow; control: OpsOrderControl },
+      RecordPaymentResult & { control?: OpsOrderControl },
       ApiError,
       CollectStorageInput
     >
@@ -8418,12 +8481,12 @@ export function useCollectStorage(
 ) {
   const qc = useQueryClient();
   return useMutation<
-    { payment: OrderPaymentRow; control: OpsOrderControl },
+    RecordPaymentResult & { control?: OpsOrderControl },
     ApiError,
     CollectStorageInput
   >({
     mutationFn: (input) =>
-      apiFetch<{ payment: OrderPaymentRow; control: OpsOrderControl }>(
+      apiFetch<RecordPaymentResult & { control?: OpsOrderControl }>(
         `/api/operation/orders/${orderId}/storage/collect`,
         { method: "POST", body: JSON.stringify(input) },
       ),

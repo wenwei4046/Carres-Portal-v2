@@ -342,6 +342,20 @@ deployed; owner walk owed.
 | Saturday on-call refusals | `Ends must be after Starts.` · `Choose a person.` · `Choose another person for Cover.` · `{name} cannot be on call. Choose an eligible active staff member.` · `These times changed. Cancel and try again.` · `Saturday on-call is set by Jess or a person she names.` · `Saturday on-call was not saved. Try again.` · failure `Saturday on-call could not be opened.` | the database's own sentence · Error |
 | Monthly PO / GRN rota in Duty history | `Assigned by system` on a monthly-rotation row (never the account that bootstrapped an older row); note `Monthly rotation`; future month under `Next` | Roster · Auto-assigned · Rota bot |
 
+## Backdated payment words (0707, Houzs port row 11) · BUILT, AWAITS JESS'S REVIEW
+
+A payment whose paid date is more than 14 days ago waits for the Payment Approver (payment
+MASTER §12). It does not count until approved.
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| The Work action | **`Approve RM {amount} paid on {weekday}, {day} {month}`** | Approve backdate · Backdate request |
+| The Work problem / the row's fact | **`Paid date is more than 14 days ago`** (row line ends with `.`) | Backdated · Late entry |
+| The recorder's result | **`Sent to the Payment Approver. This payment counts once it is approved.`** | Payment recorded · Pending approval |
+| The waiting section / done heading | **`Waiting for the Payment Approver`** · row `RM {amount} · Paid date: {date}` | In review |
+| The approver's controls | existing **`Approve`** · **`Refuse`** · **`Decision reason`** · **`Back`**; results `Approved` · `Refused` | Reject · Deny |
+| A likely duplicate at approval | existing duplicate refusal, then **`I opened the earlier payment and this is a different one.`** | — |
+
 ## Action copy / work clarity law — owner ruling 2026-08-11
 
 When a surface represents something a human must handle, follow up, confirm, call, chase or do,

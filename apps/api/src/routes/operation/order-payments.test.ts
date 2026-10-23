@@ -929,3 +929,90 @@ describe("POST /:id/payments — the §5 acknowledgement is the SERVER's to judg
     expect(res.status).toBe(403);
   });
 });
+
+// =====================================================================
+// 0707 — a paid date more than 14 days back waits for the Payment Approver
+// =====================================================================
+describe("backdated payment (0707)", () => {
+  const REQ_ID = "00000000-0000-4000-8000-0000000007a7";
+  const waiting = { id: REQ_ID, order_id: ORDER_ID, amount: 300, paid_on: "2026-09-01", status: "waiting" };
+
+  it("202 — Record payment answers a waiting request, not a payment", async () => {
+    const sb = makeSb(
+      { order_payments: { list: { data: null, error: null, count: 0 } } },
+      { data: { pending_approval: true, request: waiting, payment: null, orders_paid: 0 }, error: null },
+    );
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/payments`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("operation")}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: 300, paidOn: "2026-09-01", method: "cash", kind: "payment" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(202);
+    expect(await res.json()).toEqual({ pendingApproval: true, request: waiting });
+  });
+
+  it("202 — storage collection that waits does not read the gate", async () => {
+    const sb = makeSb(
+      { order_payments: { list: { data: null, error: null, count: 0 } } },
+      { data: { pending_approval: true, request: waiting, payment: null }, error: null },
+    );
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/storage/collect`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("operation")}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: 300, paidOn: "2026-09-01", method: "cash" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(202);
+    expect(sb.from).not.toHaveBeenCalledWith("ops_order_control");
+  });
+
+  it("GET lists the order's requests", async () => {
+    const sb = makeSb({ payment_backdate_requests: { list: { data: [waiting], error: null } } });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/payment-backdate`, {
+        headers: { Authorization: `Bearer ${await makeJwt("operation")}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ requests: [waiting] });
+  });
+
+  it("decide passes the decision to the SQL door, which owns the duty check", async () => {
+    const sb = makeSb({}, { data: { request: { ...waiting, status: "refused" }, payment: null }, error: null });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/payment-backdate/${REQ_ID}/decide`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("operation")}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ approve: false, reason: "Wrong slip" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb.calls.rpc[0]).toEqual({
+      name: "payment_backdate_decide",
+      args: { p_request_id: REQ_ID, p_approve: false, p_reason: "Wrong slip", p_duplicate_ack: false },
+    });
+  });
+
+  it("decide is refused for a dealer before anything reads", async () => {
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/payment-backdate/${REQ_ID}/decide`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("dealer")}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ approve: true }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+});
