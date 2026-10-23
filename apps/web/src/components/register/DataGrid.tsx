@@ -2478,6 +2478,7 @@ function DataGridInner<T>({
                   type="checkbox"
                   aria-label="Select all rows"
                   checked={allSel}
+                  disabled={keys.length === 0}
                   ref={(el) => {
                     if (el) el.indeterminate = someSel;
                   }}

@@ -414,6 +414,8 @@ export default function SoBatchBySupplier({
         },
         onToggleAll: (keys, allSelected) => onToggleLines(keys.flatMap((k) => buyable.get(k) ?? []), !allSelected),
         isSelectable: (g: SupplierGroup) => (buyable.get(g.key) ?? []).length > 0,
+        unselectableReason: (g: SupplierGroup) => g.ordered ? B.ordered
+          : [...new Set(g.lines.map(line => lineExtras?.(line).whyText).filter(Boolean))].join(" · ") || null,
         isIndeterminate: (g: SupplierGroup) => { const n = ticked(g); return n > 0 && n < (buyable.get(g.key) ?? []).length; },
         testId: (g: SupplierGroup) => `by-supplier-select-${g.key}`,
       }}

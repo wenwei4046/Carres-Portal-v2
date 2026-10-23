@@ -64,6 +64,7 @@ import PoNumberLinks from "@/components/register/PoNumberLinks";
 import { poNumberLinks, poNumberLinksSearch, poObjectPath } from "@/components/register/po-number-links";
 import { printSalesOrdersOrSay } from "../record-print";
 import SoBatchBySupplier from "./SoBatchBySupplier";
+import { TasksPill } from "../components/ShellTasks";
 import { BY_SUPPLIER, orderedSupplierGroups, supplierGroups, todayNumbers, type SupplierShow } from "./by-supplier";
 import SoBatchTodayCard from "./SoBatchTodayCard";
 import CPopover, { CMenuGroup, CMenuItem } from "@/components/carres/CPopover";
@@ -872,18 +873,27 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
   /* `To buy` · `Ordered` · `All` (owner's 12 Oct 2026 package): what is still to
      buy, what is already on a PO, or both, for the same shown Sales Orders. */
   const show: SupplierShow = presentationParams.get("show") === "ordered" ? "ordered" : presentationParams.get("show") === "all" ? "all" : "buy";
+  // The pooled demand read can retain goods already covered for this order.
+  // Reuse the order view's exact coverage result; never relax the buying gate.
+  const outstandingLeafs = useMemo(() => leafs.filter((leaf) => {
+    if (selectable(leaf)) return true;
+    const order = orderById.get(leaf.orderId);
+    if (!order) return true; // unknown coverage is never assumed complete
+    const lines = order.lines.filter((line) => leaf.lineIds.includes(line.orderLineId));
+    return lines.length === 0 || soBatchPurchaseStatus({ ...order, lines }, [leaf]) !== "Done";
+  }), [leafs, orderById, selectable]);
   const bySupplier = useMemo(() => {
     if (presentation === "table") return [];
-    const buy = show === "ordered" ? [] : supplierGroups(leafs.filter((leaf) => shownOrderIds.has(leaf.orderId)), nowKey, presentation, data.today);
+    const buy = show === "ordered" ? [] : supplierGroups(outstandingLeafs.filter((leaf) => shownOrderIds.has(leaf.orderId)), nowKey, presentation, data.today);
     const ordered = show === "buy" ? [] : orderedSupplierGroups(shown, presentation);
     return [...buy, ...ordered];
-  }, [presentation, show, leafs, shown, shownOrderIds, nowKey, data.today]);
+  }, [presentation, show, outstandingLeafs, shown, shownOrderIds, nowKey, data.today]);
   const showTabs = <Tabs variant="segmented" label="SO Batch Purchase shown" value={show}
     onValueChange={(value) => changePresentationParam("show", value === "ordered" || value === "all" ? value : null)}
     tabs={[{ value: "buy", label: BY_SUPPLIER.showBuy }, { value: "ordered", label: BY_SUPPLIER.showOrdered }, { value: "all", label: BY_SUPPLIER.showAll }]} />;
   /* The Today card reads every Sales Order, not the filtered list: it says
      what the day holds, whatever the rail is showing. */
-  const todayCard = useMemo(() => todayNumbers(leafs, nowKey, data.today, data.poCutoffTimes ?? []), [leafs, nowKey, data.today, data.poCutoffTimes]);
+  const todayCard = useMemo(() => todayNumbers(outstandingLeafs, nowKey, data.today, data.poCutoffTimes ?? []), [outstandingLeafs, nowKey, data.today, data.poCutoffTimes]);
   /* BY SALES ORDER (owner 13 Oct 2026, round 3): the same list, one row per
      Sales Order. What a row says is counted once here; the tabs read it. */
   const orderFacts = useMemo(() => new Map(orders.map((order) => [
@@ -1180,8 +1190,9 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
                 onToggleLine={toggleLeaf}
                 onToggleLines={setLeafsSelected}
                 selectionSummary={summary.text}
-                selectionPrimary={<>{issueActions}{viewSwitchCompact}</>}
+                selectionPrimary={<>{issueActions}{viewSwitchCompact}<TasksPill /></>}
                 warning={stockWarning}
+                toolbarAfterTools={<TasksPill />}
                 toolbarEnd={<div className="order-3 ml-auto flex shrink-0 items-center gap-2">
                   {viewSwitch}
                 </div>}
@@ -1200,7 +1211,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
                     /* Why a line cannot be bought is said by its tick (hover and
                        screen reader); a reason that has a door keeps the door,
                        in the cell the editor would take. */
-                    whyText: why?.text ?? null,
+                    whyText: why?.text ?? (status === "ordered" ? BY_SUPPLIER.ordered : null),
                     door: why?.door === "use_po" && why.usePo ? <UseThisPoButton orderId={leaf.orderId} usePo={why.usePo} />
                       : why?.door && why.door !== "use_po" ? (
                         <button type="button" className={STATUS_DOOR_CLASS} data-testid={`by-supplier-door-${leaf.id}`}
@@ -1235,7 +1246,8 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
                 isTicked={(id) => live.has(id)}
                 onToggleOrder={setOrderSelected}
                 selectionSummary={summary.text}
-                selectionPrimary={<>{issueActions}{viewSwitchCompact}</>}
+                selectionPrimary={<>{issueActions}{viewSwitchCompact}<TasksPill /></>}
+                toolbarAfterTools={<TasksPill />}
                 toolbarEnd={<div className="order-3 ml-auto flex shrink-0 items-center gap-2">
                   {viewSwitch}
                 </div>}
