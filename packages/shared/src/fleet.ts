@@ -171,3 +171,115 @@ export const fleetPositionInput = z.object({
   recordedAt: z.string().datetime({ offset: true }).optional(),
   source: z.enum(["driver_app", "tracker"]).default("driver_app"),
 });
+
+/* ── 0725 · Fleet Health, Delivery Zones, Rate Cards ─────────────────────────
+ * Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): the Houzs way (Houzs
+ * FleetHealth, DeliveryZones + zone-classify.ts, DeliveryRateCards +
+ * delivery-rate-card.ts). Jess was not part of this decision.
+ */
+
+export type DueFlag = "overdue" | "due_soon" | "ok" | "not_recorded";
+
+/** A lorry date: overdue once the day has passed, due soon within `soonDays` (Houzs: 30). */
+export function dueFlag(due: string | null | undefined, today: string, soonDays = 30): DueFlag {
+  if (!due) return "not_recorded";
+  if (due < today) return "overdue";
+  const soon = new Date(`${today}T00:00:00Z`);
+  soon.setUTCDate(soon.getUTCDate() + soonDays);
+  return due <= soon.toISOString().slice(0, 10) ? "due_soon" : "ok";
+}
+
+/** The worst of a lorry's flags, for one status per lorry. */
+export function worstFlag(flags: readonly DueFlag[]): DueFlag {
+  for (const f of ["overdue", "due_soon", "not_recorded"] as const) if (flags.includes(f)) return f;
+  return "ok";
+}
+
+export interface DeliveryZone { id: string; name: string; postcodes: string[] }
+
+const RANGE = /^(\d{2}|\d{5})(?:-(\d{2}|\d{5}))?$/;
+/** One zone entry as an inclusive 5-digit range: "47" = 47000–47999, "46-47", "58200-58299", "58200". */
+export function postcodeRange(entry: string): [number, number] | null {
+  const m = RANGE.exec(entry.trim());
+  if (!m) return null;
+  const lo = Number(m[1].padEnd(5, "0"));
+  const hi = Number((m[2] ?? m[1]).padEnd(5, "9"));
+  return lo <= hi ? [lo, hi] : null;
+}
+
+/** A 5-digit Malaysian postcode in free text (not glued to other digits). */
+export const parsePostcode = (raw: string | null | undefined) => /(?<!\d)(\d{5})(?!\d)/.exec(raw ?? "")?.[1] ?? null;
+
+/** Which zone a postcode (or an address holding one) falls in. The narrowest range wins (Houzs rule). */
+export function zoneForPostcode<Z extends DeliveryZone>(raw: string | null | undefined, zones: readonly Z[]): Z | null {
+  const pc = parsePostcode(raw);
+  if (!pc) return null;
+  const n = Number(pc);
+  let best: Z | null = null;
+  let width = Infinity;
+  for (const z of zones) {
+    for (const entry of z.postcodes) {
+      const r = postcodeRange(entry);
+      if (r && r[0] <= n && n <= r[1] && r[1] - r[0] < width) {
+        best = z;
+        width = r[1] - r[0];
+      }
+    }
+  }
+  return best;
+}
+
+export type RateBasis = "item" | "order";
+export interface RateCard {
+  id: string;
+  partnerId: string;
+  /** null = every other zone */
+  zoneId: string | null;
+  basis: RateBasis;
+  firstUnit: number;
+  secondUnit: number;
+  furtherUnit: number;
+  minCharge: number;
+}
+
+/** The company's card for a zone, else its "every other zone" card. */
+export const rateCardFor = (cards: readonly RateCard[], partnerId: string, zoneId: string | null) =>
+  cards.find((c) => c.partnerId === partnerId && zoneId != null && c.zoneId === zoneId) ??
+  cards.find((c) => c.partnerId === partnerId && c.zoneId == null) ??
+  null;
+
+/** Houzs positional tiers: 1st unit + 2nd unit + each further unit, never below the minimum. Per order = one unit. */
+export function deliveryCost(card: RateCard, items: number): number {
+  const units = card.basis === "order" ? 1 : Math.max(0, Math.floor(items));
+  if (units === 0) return 0;
+  const sum = card.firstUnit + (units >= 2 ? card.secondUnit : 0) + Math.max(0, units - 2) * card.furtherUnit;
+  return Math.round(Math.max(sum, card.minCharge) * 100) / 100;
+}
+
+const dateOrNull = isoDate.nullable();
+export const fleetHealthInput = z.object({
+  vehicleId: uuid,
+  puspakomDue: dateOrNull,
+  roadTaxDue: dateOrNull,
+  insuranceDue: dateOrNull,
+  serviceDue: dateOrNull,
+});
+export const deliveryZoneInput = z.object({
+  id: uuid.nullish(),
+  name: z.string().trim().min(1).max(60),
+  postcodes: z
+    .array(z.string().trim())
+    .max(200)
+    .refine((xs) => xs.every((x) => postcodeRange(x) !== null), { message: "Write each range as 47, 46-47, 58200-58299 or 58200." }),
+});
+const money = z.number().min(0).max(99_999_999);
+export const rateCardInput = z.object({
+  id: uuid.nullish(),
+  partnerId: uuid,
+  zoneId: uuid.nullable(),
+  basis: z.enum(["item", "order"]),
+  firstUnit: money,
+  secondUnit: money,
+  furtherUnit: money,
+  minCharge: money.default(0),
+});

@@ -519,6 +519,13 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "fleet-map", label: "Live Map", icon: MapPin, section: "Delivery" },
       { key: "fleet-capacity", label: "Lorry Capacity", icon: Gauge, section: "Delivery" },
       { key: "crew-leave", label: "Crew Leave", icon: CalendarOff, section: "Delivery" },
+      /* 0725 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): Houzs Fleet
+       * (lorries + crew), Fleet Health, Delivery Zones and Rate Cards. Jess was
+       * not part of this decision. */
+      { key: "fleet", label: "Fleet", icon: Truck, section: "Delivery" },
+      { key: "fleet-health", label: "Fleet Health", icon: ShieldCheck, section: "Delivery" },
+      { key: "delivery-zones", label: "Delivery Zones", icon: MapPin, section: "Delivery" },
+      { key: "rate-cards", label: "Rate Cards", icon: Receipt, section: "Delivery" },
       /* THE WAREHOUSE MAP IS FIVE DESTINATIONS (owner ruling 2026-09-14):
        * `Arrival Schedule · Pickup Schedule · Inbound · Inventory · Outbound`.
        *

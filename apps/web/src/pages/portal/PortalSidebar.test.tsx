@@ -1473,7 +1473,11 @@ describe("PortalSidebar — the Delivery module's two destinations", () => {
     // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): Carres' own lorries add
     // Fleet Day, Live Map, Lorry Capacity and Crew Leave after the two Delivery
     // destinations. Jess was not part of this decision.
-    expect(rows).toEqual(["Monitor", "Delivery Orders", "Fleet Day", "Live Map", "Lorry Capacity", "Crew Leave"]);
+    // 0725 (same decision) adds Fleet, Fleet Health, Delivery Zones and Rate Cards.
+    expect(rows).toEqual([
+      "Monitor", "Delivery Orders", "Fleet Day", "Live Map", "Lorry Capacity", "Crew Leave",
+      "Fleet", "Fleet Health", "Delivery Zones", "Rate Cards",
+    ]);
   });
 
   it("Monitor opens ?tab=delivery and is the ONLY active row there", () => {

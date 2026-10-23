@@ -3654,7 +3654,8 @@ button exists anywhere on this surface**: the SYSTEM issues the document
 ~~The Delivery module carries TWO navigation destinations under the module word **Delivery**:
 **Monitor** (`?tab=delivery`) and **Delivery Orders** (the formal-document register).~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): the
 Delivery module carries **Monitor**, **Delivery Orders** and the four Carres-lorry pages **Fleet Day**,
-**Live Map**, **Lorry Capacity** and **Crew Leave** (see "Carres lorries words" below). The DO
+**Live Map**, **Lorry Capacity** and **Crew Leave**, and (0725, the same decision) **Fleet**, **Fleet
+Health**, **Delivery Zones** and **Rate Cards** (see "Carres lorries words" below). The DO
 object page is a door on a number, never navigation. **The Edit Delivery page is retired (owner
 ruling 2026-09-13)**: every arrangement write lives inside the Monitor row's expanded panels.
 `Delivery Work` remains banned; a formal DO remains a Delivery Order and its number remains a
@@ -3992,6 +3993,12 @@ pages say (`apps/web/src/pages/operation/fleet.ts`, `FL`).
 | Live Map | `Lorry` · `Last seen` · `Position` · `Open map` · `No position yet` · `Over 30 minutes old` |
 | Lorry Capacity | `Month` · `Working days` (Mon–Sat) · `Trips` · `Utilisation` · `Stops` · `Stops per trip` · `Revenue` · `Revenue per trip` |
 | Crew Leave | `Crew` · `From` · `To` · `Reason` · `Add leave` · `Remove` · `No crew leave recorded.` |
+| Delivery sidebar children (0725, same decision; Jess was not part of it) | `Fleet` · `Fleet Health` · `Delivery Zones` · `Rate Cards` |
+| Fleet (0725) | `Lorries` · `Crew` · `Plate` · `Capacity` · `Type` · `Name` · `Role` · `Phone` · `Status` · `Active` · `Inactive` · `Add lorry` · `Add crew` · `Edit` · `Save` · `Cancel` · `Deactivate` · `Activate` · `Carres Lorries has no crew yet. Add a driver or helper.` |
+| Fleet Health (0725) | `Lorry` · `PUSPAKOM` · `Road tax` · `Insurance` · `Service` · `Overdue` · `Due soon` · `OK` · `Not recorded` · `Save` |
+| Delivery Zones (0725) | `Zone` · `Postcode ranges` (hint `47, 46-47, 58200-58299`) · `Add zone` · `Remove` · `No delivery zone yet.` · `Which zone is this postcode?` · `Postcode` · `Zone {name}` · `No zone` · `Not in the address list` |
+| Rate Cards (0725) | `Logistics company` · `Zone` · `Every other zone` · `Per` · `Item` · `Delivery order` · `1st` · `2nd` · `Each further` · `Minimum` · `Add rate` · `This Logistics company has no rate card yet.` — never Carrier, 3PL or Partner |
+| DO page (0725) | `Rate card cost` — `RM {amount} · Zone {name}` or `No rate card for this Logistics company and zone` |
 | Empty and failed states | `Carres Lorries is not set up. Add its Vehicles and Drivers in Settings, Logistics.` · `Carres Lorries has no lorry yet. Add one in Settings, Logistics, Carres Lorries, Vehicles.` · `This page could not be loaded. Try again.` |
 
 ## The Work Logistics card and external link words — owner rulings 2026-09-24 · model and link page BUILT · the card is NOT MOUNTED on any screen

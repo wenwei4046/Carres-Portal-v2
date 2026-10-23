@@ -60,6 +60,7 @@ import OperationReceiving from "./OperationReceiving";
 import OperationReceivingReport from "./OperationReceivingReport";
 import OperationDeliveryReport from "./OperationDeliveryReport";
 import { CrewLeavePage, FleetDayPage, FleetLiveMapPage, LorryCapacityPage } from "./OperationFleet";
+import { DeliveryZonesPage, FleetHealthPage, FleetPage, RateCardsPage } from "./OperationFleetSetup";
 // R2 (0288) — the supplier-claim queue, fourth tab of the Purchasing module.
 import OperationSupplierClaims from "./OperationSupplierClaims";
 import OperationPurchaseReturns from "./OperationPurchaseReturns";
@@ -537,6 +538,11 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
             {tab === "fleet-map" && <FleetLiveMapPage />}
             {tab === "fleet-capacity" && <LorryCapacityPage />}
             {tab === "crew-leave" && <CrewLeavePage />}
+            {/* 0725 — Fleet, Fleet Health, Delivery Zones, Rate Cards (same decision). */}
+            {tab === "fleet" && <FleetPage />}
+            {tab === "fleet-health" && <FleetHealthPage />}
+            {tab === "delivery-zones" && <DeliveryZonesPage />}
+            {tab === "rate-cards" && <RateCardsPage />}
             {/* Preserve legacy bookmarks at the one Settings destination. */}
             {tab === "staff-duties" && <Navigate replace state={location.state} to={`/operation/settings/staff-duties?${new URLSearchParams([...searchParams].filter(([key]) => key !== "tab"))}`} />}
             {/* R2 — the supplier-claim queue: what receiving found wrong, and
