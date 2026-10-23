@@ -487,7 +487,16 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
         (doc.delivery_date as string | null) === confirmedDate &&
         ((doc.time_slot as string | null) ?? null) ===
           (confirmedTimeSlot ?? null);
-      if (doc && !doc.voided_at && !sameBooking) {
+      if (doc && !doc.voided_at && doc.delivery_date === null) {
+        // An undated DO (opened by the office before the booking, 0710) gets
+        // its date filled in and KEEPS its number — the Houzs way (Weisiang
+        // 2026-10-22). Only a DO that already had a date is rebooked below.
+        await sb.rpc("delivery_document_date_fill", {
+          p_do_id: doc.id,
+          p_date: confirmedDate,
+          p_time_slot: confirmedTimeSlot ?? null,
+        });
+      } else if (doc && !doc.voided_at && !sameBooking) {
         const { data: runs } = await sb
           .from("delivery_attempts")
           .select("result")

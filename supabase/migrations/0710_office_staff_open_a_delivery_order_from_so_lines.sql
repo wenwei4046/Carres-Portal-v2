@@ -110,11 +110,39 @@ comment on function public.delivery_office_document_mint(uuid, text[], text) is
 revoke all on function public.delivery_office_document_mint(uuid, text[], text) from public, anon;
 grant execute on function public.delivery_office_document_mint(uuid, text[], text) to authenticated;
 
+-- The booking confirmed later FILLS IN an undated DO's date; the DO keeps its
+-- number. Houzs does this (a DO's delivery date is a header edit on the same
+-- document: Houzs-ERP backend/src/scm/routes/delivery-orders-mfg.ts PATCH
+-- /:id). A DO that already had a date and is rebooked is still voided and
+-- reissued by the booking door (order-control.ts), unchanged.
+create or replace function public.delivery_document_date_fill(
+  p_do_id uuid, p_date date, p_time_slot text
+) returns void
+language plpgsql security definer
+set search_path = public, pg_temp
+as $fn$
+begin
+  if not coalesce((select public.is_operation()), false) then
+    raise exception 'Only operation or principal may date a Delivery Order' using errcode = '42501', detail = 'forbidden';
+  end if;
+  if p_date is null then
+    raise exception 'a date is required' using errcode = '22023', detail = 'date_required';
+  end if;
+  update ops_delivery_orders
+     set delivery_date = p_date,
+         time_slot = nullif(btrim(coalesce(p_time_slot, '')), '')
+   where id = p_do_id and voided_at is null and delivery_date is null;
+end;
+$fn$;
+revoke all on function public.delivery_document_date_fill(uuid, date, text) from public, anon;
+grant execute on function public.delivery_document_date_fill(uuid, date, text) to authenticated;
+
 -- =============================================================================
 -- REVERSAL (run by hand only if 0710 must be withdrawn; nothing else depends
 -- on it but the New Delivery Order door, which then answers 500):
 --
 --   drop function if exists public.delivery_office_document_mint(uuid, text[], text);
+--   drop function if exists public.delivery_document_date_fill(uuid, date, text);
 --
 -- Documents it already minted stay: they are ordinary ops_delivery_orders
 -- rows and a DO is never deleted (0356).
