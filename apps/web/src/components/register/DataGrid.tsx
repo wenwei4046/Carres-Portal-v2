@@ -2482,7 +2482,7 @@ function DataGridInner<T>({
                   ref={(el) => {
                     if (el) el.indeterminate = someSel;
                   }}
-                  onChange={() => selectable.onToggleAll(keys, allSel)}
+                  onChange={() => { if (keys.length > 0) selectable.onToggleAll(keys, allSel); }}
                 />
               </span>
             </th>
