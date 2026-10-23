@@ -835,6 +835,15 @@ export const cancelPoInput = z.object({
 }).strict();
 export type CancelPoInput = z.infer<typeof cancelPoInput>;
 
+/** 0717 — a decision on a PO change request (PO Amendments / Cancellation
+ *  Requests). Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was not
+ *  part of this decision). A rejection's reason is required in SQL. */
+export const decidePoChangeInput = z.object({
+  approve: z.boolean(),
+  note: z.string().trim().max(500).optional(),
+}).strict();
+export type DecidePoChangeInput = z.infer<typeof decidePoChangeInput>;
+
 /**
  * `reservedDrilldownQuery` — GET /api/operation/warehouse/reserved-drilldown
  * (Pipeline v2, C4). Drill-down on a single (warehouse, sku) pair to surface

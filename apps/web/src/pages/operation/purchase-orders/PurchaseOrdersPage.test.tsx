@@ -1229,7 +1229,7 @@ describe("Purchase Order object", () => {
     fireEvent.change(screen.getByLabelText("Why"), {
       target: { value: "Send this line to Penang" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save PO V3" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send for approval" }));
     expect(reviseMutate).toHaveBeenCalledWith(
       {
         reason: "Send this line to Penang",
@@ -1282,7 +1282,7 @@ describe("Purchase Order object", () => {
     openRevise();
     fireEvent.change(screen.getByLabelText("Qty for MAT-K-001"), { target: { value: "4" } });
     fireEvent.change(screen.getByLabelText("Why"), { target: { value: "Customer quantity changed" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save PO V3" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send for approval" }));
     expect(reviseMutate).toHaveBeenCalledWith(
       {
         reason: "Customer quantity changed",

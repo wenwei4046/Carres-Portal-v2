@@ -454,6 +454,11 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         section: "Purchasing",
         pageGroup: "purchasing-buy",
       },
+      /* PO Amendments · Cancellation Requests (0717) — Weisiang's decision
+       * (Mr Lim, WhatsApp 2026-10-22; Jess was not part of this decision):
+       * a PO change or cancellation waits for approval, the Houzs way. */
+      { key: "po-amendments", label: "PO Amendments", icon: BadgeCheck, section: "Purchasing", pageGroup: "purchasing-buy" },
+      { key: "po-cancellation-requests", label: "Cancellation Requests", icon: ClipboardX, section: "Purchasing", pageGroup: "purchasing-buy" },
 
       /* RECEIVE — one page today, and it still earns its own drawer: the
        * receipt is its own step in the operator's day, and the drawer is where
