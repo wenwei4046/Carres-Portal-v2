@@ -25,8 +25,10 @@ export type NewPoLineDraft = { key: number; sku: string; qty: string; price: str
 export type NewPoDraft = { supplierId: string; destinationId: string; etaDate: string | null; note: string; lines: NewPoLineDraft[] };
 export type NewPoSku = { sku: string; label: string; supplierId: string | null };
 
-/** The request body, or null while the draft is not complete. */
-export function newPurchaseOrderBody(draft: NewPoDraft): NewPurchaseOrderInput | null {
+/** The request body, or null while the draft is not complete. `consignment`
+ *  opens a Consignment Order through the same form (Weisiang's decision, Mr Lim,
+ *  WhatsApp 2026-10-22, overturning Jess's "no blank order"; Jess was not part of it). */
+export function newPurchaseOrderBody(draft: NewPoDraft, consignment = false): NewPurchaseOrderInput | null {
   if (!draft.supplierId || !draft.destinationId) return null;
   const lines = draft.lines.filter((l) => l.sku);
   if (lines.length === 0) return null;
@@ -43,6 +45,7 @@ export function newPurchaseOrderBody(draft: NewPoDraft): NewPurchaseOrderInput |
     destinationId: draft.destinationId,
     etaDate: draft.etaDate,
     ...(draft.note.trim() ? { note: draft.note.trim() } : {}),
+    ...(consignment ? { consignment: true } : {}),
     lines: out,
   };
 }
@@ -57,6 +60,7 @@ export default function NewPurchaseOrderModal({
   destinations,
   skus,
   onIssued,
+  consignment = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -64,11 +68,13 @@ export default function NewPurchaseOrderModal({
   destinations: ReadonlyArray<{ id: string; name: string }>;
   skus: readonly NewPoSku[];
   onIssued: (poId: string | null) => void;
+  /** Open a Consignment Order (supplier-owned goods) instead of a Purchase Order. */
+  consignment?: boolean;
 }) {
   const [draft, setDraft] = useState<NewPoDraft>({ supplierId: "", destinationId: "", etaDate: null, note: "", lines: [blankLine()] });
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  const body = newPurchaseOrderBody(draft);
+  const body = newPurchaseOrderBody(draft, consignment);
   // The engine refuses a SKU whose Catalog supplier is not this supplier, so only offer those.
   const skuOptions = useMemo(
     () => skus.filter((s) => s.supplierId === draft.supplierId).map((s) => ({ value: s.sku, label: s.label })),
@@ -87,7 +93,7 @@ export default function NewPurchaseOrderModal({
       onIssued(res.poId);
     } catch (e) {
       const action = ((e as { body?: { action?: string } }).body)?.action;
-      setProblem([(e as Error).message || "The Purchase Order was not created.", action].filter(Boolean).join(" "));
+      setProblem([(e as Error).message || `The ${consignment ? "Consignment Order" : "Purchase Order"} was not created.`, action].filter(Boolean).join(" "));
     } finally {
       setBusy(false);
     }
@@ -97,11 +103,11 @@ export default function NewPurchaseOrderModal({
     <Modal
       open={open}
       onOpenChange={onOpenChange}
-      title="New Purchase Order"
+      title={consignment ? "New Consignment Order" : "New Purchase Order"}
       width="wide"
       footer={<>
         <Button onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-        <Button variant="primary" onClick={() => void issue()} disabled={!body || busy} loading={busy}>Issue PO</Button>
+        <Button variant="primary" onClick={() => void issue()} disabled={!body || busy} loading={busy}>{consignment ? "Issue consignment order" : "Issue PO"}</Button>
       </>}
     >
       <div className="flex flex-col gap-3" data-testid="new-po-form">

@@ -18,15 +18,16 @@
  *   `PO {n}-Day Delivery Date` (two-line label, bold date) · `Delivery Method`.
  * - Supplier and Deliver To NAMES bold; addresses regular.
  *
- * Unchanged business: MONEY-FREE, structurally (the payload is the
- * `purchasing_po_document` RPC, 0307) · the sofa plan-view drawing, one set per
+ * Unchanged business: an ordinary PO is MONEY-FREE, structurally (the payload is the
+ * `purchasing_po_document` RPC, 0307); a Consignment Order prints its line prices
+ * (Weisiang's decision, Mr Lim, WhatsApp 2026-10-22; Jess was not part of it) · the sofa plan-view drawing, one set per
  * page · `Issued by {audit_log actor}` in the footer · no signatures.
  */
 
 import type { ReactNode } from "react";
 import { Document, Image, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { NOTO_SANS_SC_FAMILY } from "./fonts/noto";
-import { CARRES_COMPANY } from "./letterhead";
+import { CARRES_COMPANY, formatMoney } from "./letterhead";
 import { poDocumentNumberOf } from "@carres/shared";
 import type { PoTemplateData } from "./types";
 
@@ -280,6 +281,18 @@ export function PoTemplate(data: PoTemplateData) {
      reprinted from `po_version_documents`, whose payload carries that same old
      number. `poDocumentNumberOf` is the one place that decides. */
   const poId = draft ? "DRAFT" : poDocumentNumberOf(po_number, version);
+  /* Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): a Consignment Order is
+     titled as one and prints its prices; an ordinary PO stays money-free. */
+  const prices = data.consignment ? (data.line_prices ?? {}) : null;
+  const priceOf = (line: PoLine) => prices?.[line.sku] ?? null;
+  const amountOf = (ls: readonly PoLine[]) => {
+    const each = ls.map((l) => priceOf(l));
+    return each.some((p) => p == null) ? null : ls.reduce((n, l, i) => n + Number(l.qty) * each[i]!, 0);
+  };
+  const totalLabel = (label: string, ls: readonly PoLine[]) => {
+    const amount = prices ? amountOf(ls) : null;
+    return amount == null ? label : `${label} · ${formatMoney(amount, "RM")}`;
+  };
 
   const soCell = (line: PoLine): string[] => {
     const src = (line.sources ?? []).filter((s) => s.so != null);
@@ -423,7 +436,7 @@ export function PoTemplate(data: PoTemplateData) {
          operator must see before sending; a quantity line's Unit ID cell draws nothing
          (no dash anywhere, owner ruling 2026-09-26). */
       const missingUnits = !draft && line.identity_mode === "exact_unit" && units.length === 0 && Number(line.cancelled_qty??0)<line.qty;
-      const stacked = Math.max(so.length, runs.length, missingUnits ? 3 : 1, 1 + (bits.length > 0 ? 1 : 0) + (Number(line.cancelled_qty??0)>0?1+cancelledRuns.length:0));
+      const stacked = Math.max(so.length, runs.length, missingUnits ? 3 : 1, 1 + (bits.length > 0 ? 1 : 0) + (prices ? 1 : 0) + (Number(line.cancelled_qty??0)>0?1+cancelledRuns.length:0));
       blocks.push({
         h: Math.max(EST_ROW, 4 + stacked * EST_LINE),
         node: (
@@ -456,6 +469,7 @@ export function PoTemplate(data: PoTemplateData) {
                 {showVariant ? ` · ${line.description}` : ""}
               </Text>
               {bits.length > 0 ? <Text style={styles.descSub}>{bits.join(" · ")}</Text> : null}
+              {prices ? <Text style={styles.descSub}>{priceOf(line) == null ? "Unit Price not recorded" : `Unit Price ${formatMoney(priceOf(line)!, "RM")} · Amount ${formatMoney(priceOf(line)! * Number(line.qty), "RM")}`}</Text> : null}
               {Number(line.cancelled_qty??0)>0 ? <>
                 <Text style={styles.descSub}>Cancelled Qty {line.cancelled_qty} · Received Qty {line.received_qty??0} · Pending Delivery Qty {line.pending_qty??Math.max(0,line.qty-(line.received_qty??0)-(line.cancelled_qty??0))}</Text>
                 {cancelledRuns.map(run=><Text key={`cancelled-${run.first}`} style={styles.descSub}>Cancelled: <UnitCode code={run.first}/>{run.last?<Text> to <UnitCode code={run.last}/></Text>:null}</Text>)}
@@ -467,13 +481,13 @@ export function PoTemplate(data: PoTemplateData) {
       });
     }
     const groupQty = group.lines.reduce((n, l) => n + Number(l.qty), 0);
-    blocks.push({ h: 12, node: <TotalRow key={`t-${gi}`} label="TOTAL" qty={groupQty} /> });
+    blocks.push({ h: 12, node: <TotalRow key={`t-${gi}`} label={totalLabel("TOTAL", group.lines)} qty={groupQty} /> });
     if (groups.length > 1 && gi === groups.length - 1) {
       blocks.push({
         h: 15,
         node: (
           <View key="po-total" style={{ marginTop: mm(3) }}>
-            <TotalRow label="PO TOTAL" qty={poTotal} />
+            <TotalRow label={totalLabel(prices ? "ORDER TOTAL" : "PO TOTAL", lines)} qty={poTotal} />
           </View>
         ),
       });
@@ -560,7 +574,7 @@ export function PoTemplate(data: PoTemplateData) {
             </View>
             <View style={styles.docBlock}>
               <Text style={styles.docNumber}>{poId}</Text>
-              <Text style={styles.docTitle}>PURCHASE ORDER</Text>
+              <Text style={styles.docTitle}>{data.consignment ? "CONSIGNMENT ORDER" : "PURCHASE ORDER"}</Text>
             </View>
           </View>
           <View style={styles.headerRule} />

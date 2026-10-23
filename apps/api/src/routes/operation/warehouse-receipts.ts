@@ -330,7 +330,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
         readByIds<Record<string, unknown>>(scanPoIds, (ids) =>
           sb
             .from("purchase_orders")
-            .select("id, version, supplier_id, suppliers(name)")
+            .select("id, version, supplier_id, is_consignment, suppliers(name)")
             .in("id", ids),
         ),
         // Only the fields the ONE reply arithmetic reads
@@ -361,6 +361,12 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
       supplierByPo.set(p.id as string, sup?.name ?? null);
       versionByPo.set(p.id as string, (p.version as number | null) ?? 1);
     }
+    /* `Consignment goods` — the Consignment Receive entry, Houzs way (Weisiang's
+       decision, Mr Lim, WhatsApp 2026-10-22; Jess was not part of it). Not a
+       second receipt page: the same GRN records, narrowed to Consignment Orders. */
+    const consignmentPo = new Set(poRows.filter((p) => p.is_consignment === true).map((p) => p.id as string));
+    const consignmentCount = scan.filter((r) => consignmentPo.has(r.po_id)).length;
+    if (c.req.query("consignment") === "1") scan.splice(0, scan.length, ...scan.filter((r) => consignmentPo.has(r.po_id)));
     const promisesByPo = new Map<string, PoDatePromise[]>();
     for (const row of promiseRows) {
       const pid = row.po_id as string;
@@ -795,7 +801,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
         };
       }),
       page: { offset: exportAll ? 0 : offset, limit: exportAll ? view.total : limit, total: view.total },
-      facets: view.facets,
+      facets: { ...view.facets, consignment: consignmentCount },
       column_values: columnValues,
       /* The expansion's item words and governed categories, resolved once for
          the page — the same two facts the official GRN document prints. */

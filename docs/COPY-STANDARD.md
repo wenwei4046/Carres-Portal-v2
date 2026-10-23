@@ -1197,7 +1197,7 @@ step. Purchased Carres-owned goods use the ordinary Sales Invoice; no supplier s
 Supplier PDF titles: `CONSIGNMENT ORDER` and `CONSIGNMENT RETURN`. Goods headings: `COMING IN`
 and `GOING BACK`. Placement uses COMING IN; standalone return uses GOING BACK; a same-supplier
 swap's combined Consignment Order uses both and links the return without duplicate notification.
-These instruction PDFs contain no prices or totals. Each leg retains separate actual evidence.
+~~These instruction PDFs contain no prices or totals.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): the Consignment Order PDF carries prices: each line `Unit Price RM {price} · Amount RM {amount}` (or `Unit Price not recorded`), group `TOTAL · RM {amount}`, and `ORDER TOTAL · RM {amount}`.** New screen words: `New Consignment Order` (PO register button and dialog title), `Consignment goods` (Receiving rail filter and active condition). Each leg retains separate actual evidence.
 Shared issue action: `Issue consignment order`; contextual `Issue consignment order to {supplier}`;
 result `Consignment order issued to {supplier}`. Existing source/permission controls remain.
 Exact register column copy and composition remain subject to design closure; no new component is
