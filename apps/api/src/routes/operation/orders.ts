@@ -1185,16 +1185,22 @@ operationOrdersRouter.get("/monthly-demand", requireOperation, async (c) => {
    of every amendment across orders. Waiting first, newest first within a
    status. A draft was never submitted, so it is not in the queue. Must sit
    above `/:id`, which would otherwise swallow the word.
-   ponytail: newest 1000 only; page it when the history outgrows that. */
-const AMENDMENT_WAITING = new Set(["submitted", "issued", "accepted"]);
+   Waiting rows are read on their own, unlimited (one live amendment per order,
+   0334 `amendments_one_live_per_order`), so an old waiting one is never cut
+   off by the history cap.
+   ponytail: decided history is the newest 1000 only; page it when it outgrows that. */
+const AMENDMENT_WAITING = ["submitted", "issued", "accepted"];
+const AMENDMENT_DECIDED = ["applied", "rejected", "withdrawn"];
 operationOrdersRouter.get("/amendments", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb
-    .from("sales_order_amendments")
-    .select("id, order_id, status, reason, submitted_by, submitted_at, decided_by, decided_at, decision_note, customer_agreement_kind, orders(so, customer_name)")
-    .neq("status", "draft")
-    .order("submitted_at", { ascending: false })
-    .limit(1000);
+  const cols = "id, order_id, status, reason, submitted_by, submitted_at, decided_by, decided_at, decision_note, customer_agreement_kind, orders(so, customer_name)";
+  const [waitingRes, decidedRes] = await Promise.all([
+    sb.from("sales_order_amendments").select(cols).in("status", AMENDMENT_WAITING)
+      .order("submitted_at", { ascending: false }),
+    sb.from("sales_order_amendments").select(cols).in("status", AMENDMENT_DECIDED)
+      .order("submitted_at", { ascending: false }).limit(1000),
+  ]);
+  const error = waitingRes.error ?? decidedRes.error;
   if (error) {
     const m = mapPipelineV2Error(error);
     return c.json(m.body, m.status);
@@ -1205,18 +1211,15 @@ operationOrdersRouter.get("/amendments", requireOperation, async (c) => {
     decision_note: string | null; customer_agreement_kind: string | null;
     orders?: { so?: number | null; customer_name?: string | null } | null;
   };
-  const rows = (data ?? []) as Row[];
-  const names = await resolveActorNames(sb, rows.flatMap((r) => [r.submitted_by, r.decided_by]));
-  const waitingFirst = [...rows].sort(
-    (a, b) => Number(AMENDMENT_WAITING.has(b.status)) - Number(AMENDMENT_WAITING.has(a.status)),
-  );
+  const waitingFirst = [...(waitingRes.data ?? []), ...(decidedRes.data ?? [])] as Row[];
+  const names = await resolveActorNames(sb, waitingFirst.flatMap((r) => [r.submitted_by, r.decided_by]));
   return c.json({
     amendments: waitingFirst.map((r) => ({
       id: r.id,
       orderId: r.order_id,
       so: r.orders?.so ?? null,
       customerName: r.orders?.customer_name ?? null,
-      status: AMENDMENT_WAITING.has(r.status) ? "waiting" : r.status,
+      status: AMENDMENT_WAITING.includes(r.status) ? "waiting" : r.status,
       reason: r.reason,
       submittedBy: (r.submitted_by && names.get(r.submitted_by)) || null,
       submittedAt: r.submitted_at,

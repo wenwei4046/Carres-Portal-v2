@@ -23,12 +23,22 @@ const ROWS = [
 
 function mockDb() {
   const calls: Array<[string, ...unknown[]]> = [];
-  const chain: Record<string, unknown> = {};
-  for (const m of ["select", "neq", "order", "limit", "in"]) chain[m] = vi.fn((...a: unknown[]) => { calls.push([m, ...a]); return chain; });
-  chain.then = (resolve: (v: unknown) => unknown) => resolve({ data: ROWS, error: null });
+  // One chain per query; it answers with the rows whose status the query asked for.
+  const from = vi.fn(() => {
+    let statuses: string[] | null = null;
+    const chain: Record<string, unknown> = {};
+    for (const m of ["select", "order", "limit", "in"]) chain[m] = vi.fn((...a: unknown[]) => {
+      calls.push([m, ...a]);
+      if (m === "in" && a[0] === "status") statuses = a[1] as string[];
+      return chain;
+    });
+    chain.then = (resolve: (v: unknown) => unknown) =>
+      resolve({ data: statuses ? ROWS.filter((r) => statuses!.includes(r.status)) : [], error: null });
+    return chain;
+  });
   const rpc = vi.fn(async () => ({ data: [{ id: SUBMITTER, name: "Aini" }, { id: PRINCIPAL, name: "Mr Lim" }], error: null }));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  vi.mocked(userClient).mockReturnValue({ from: vi.fn(() => chain), rpc } as any);
+  vi.mocked(userClient).mockReturnValue({ from, rpc } as any);
   return calls;
 }
 
@@ -49,7 +59,10 @@ describe("GET /api/operation/orders/amendments — the approver's queue", () => 
     expect(body.amendments.map((a) => [a.id, a.status])).toEqual([["a-waiting", "waiting"], ["a-applied", "applied"]]);
     expect(body.amendments[0]).toMatchObject({ so: 1188, customerName: "Lee", submittedBy: "Aini", agreementRecorded: false });
     expect(body.amendments[1]).toMatchObject({ decidedBy: "Mr Lim", agreementRecorded: true });
-    expect(calls).toContainEqual(["neq", "status", "draft"]);
+    const statusReads = calls.filter((c) => c[0] === "in" && c[1] === "status").map((c) => c[2] as string[]);
+    expect(statusReads.flat()).not.toContain("draft");
+    // The waiting read has no cap, so an old waiting amendment is never cut off.
+    expect(calls.filter((c) => c[0] === "limit")).toEqual([["limit", 1000]]);
   });
 
   it("is not open to a role outside Operation and Principal", async () => {
