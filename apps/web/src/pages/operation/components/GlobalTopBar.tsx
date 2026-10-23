@@ -79,6 +79,9 @@ const WAREHOUSE_TABS = new Set([
   "warehouse-monitor",
   "warehouse-dashboard",
   "stock-onhand",
+  "stock-adjustments",
+  "stock-transfers",
+  "stock-takes",
 ]);
 
 function moduleSettingsFor(
