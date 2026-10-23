@@ -1242,6 +1242,21 @@ Consignment Overview, Consignment Receipts, Report or Settings sidebar destinati
 lives in its authority home: Registers, central Work/Reports/Settings, in-context Catalog governance
 or the one Receiving engine. `purchase_demand` remains an authoritative record, not a page.
 
+### Houzs-way purchasing pages — Weisiang's decision 2026-10-22
+
+Weisiang's decision (Mr Lim, Houzs owner side, WhatsApp 2026-10-22, relayed by YH 2026-10-23):
+"I think just clear Carress rules and Implement Houzs inside". Jess was not part of this decision.
+Exact visible words:
+
+| Where | Exact visible words |
+|---|---|
+| Suppliers pages (Operations sidebar) | `Purchase Invoices`, under `Supplier items` |
+| Purchase Invoices columns | `Bill No` · `Bill Date` · `Supplier` · `Supplier Invoice` · `PO` · `Due Date` · `Status` · `Total` · `Paid` · `Unpaid`; status words are Finance's `Draft` · `Confirmed` · `Cancelled` |
+| Purchase Invoices search, empty, failed, door | `Search bill, supplier or PO…` · `No purchase invoice yet. Finance enters each supplier bill.` · `Purchase invoices could not be read. Refresh to try again.` · `Open in Finance` (principal only) |
+| Supplier drawer payment terms | `Terms (days)` · `Save` · `0 to 365` · `Saved` · `Not saved. Try again.` |
+| Catalog SKU Master bulk delete | `Delete {n}` · `Working…` · confirm `Delete {n} SKUs? A SKU on orders, purchase orders, stock or bills is kept.` · `Deleted {n} SKUs` · `Deleted {n}. Not deleted: {codes}. {reason}` |
+| SKU delete refusal (0721) | `{SKU} is on orders, purchase orders, stock or bills, so it was not deleted. Turn it off instead.` |
+
 **ADD SUPPLIER — APPROVED / LOCKED, owner ruling 2026-09-04; in-context Catalog door.** Exact
 visible words, top to bottom:
 
