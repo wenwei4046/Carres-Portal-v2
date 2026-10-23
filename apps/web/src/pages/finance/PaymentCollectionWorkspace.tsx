@@ -16,6 +16,7 @@ import InvoiceRecordPayment from "./InvoiceRecordPayment";
 import InvoiceAskToPay from "./InvoiceAskToPay";
 import InvoicePaymentLink from "./InvoicePaymentLink";
 import InvoiceStorage from "./InvoiceStorage";
+import InvoiceBackdateRequests from "./InvoiceBackdateRequests";
 import InvoiceCollectionResult from "./InvoiceCollectionResult";
 import InvoiceVoidReplace from "./InvoiceVoidReplace";
 import InvoiceCollectionOwner from "./InvoiceCollectionOwner";
@@ -313,6 +314,8 @@ function InvoiceObject({ invoice, facts: f, onAsk, onResult, correctionInFlight,
         {canCorrect && invoice.status === "issued" && invoice.invoice_no &&
           <InvoiceVoidReplace invoiceId={invoice.id} invoiceNo={invoice.invoice_no} />}
       </Facts>
+      {/* 0707 — a payment with an old paid date, waiting for the Payment Approver. */}
+      <InvoiceBackdateRequests orderId={invoice.order_id} />
       <Facts title="Related Payments">
         {payments.length ? payments.map((p) => <p key={p.id}>
           {p.receipt_no ?? "Receipt number missing"} · {rm(p.amount)} · {fmtDate(p.paid_on)}

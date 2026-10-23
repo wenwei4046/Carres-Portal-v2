@@ -42,6 +42,9 @@ vi.mock("@/lib/queries", () => ({
   useCollectionOutcomes: () => ({ data: { outcomes: [] }, isLoading: false, isError: false }),
   useCatalog: () => ({ data: { models: [{ id: "m1", name: "King Mattress" }], skus: [{ sku: "A", modelId: "m1" }] } }),
   useRecordPayment: () => ({ mutate: vi.fn(), isPending: false }),
+  // 0707 — the waiting backdated payments; none in these listing tests.
+  usePaymentBackdateRequests: () => ({ data: { requests: [] } }),
+  useDecidePaymentBackdate: () => ({ mutate: vi.fn(), isPending: false }),
   qk: { finance: {
     invoiceRegister: () => ["finance", "invoice-register"],
     paymentRegister: () => ["finance", "payment-register"],

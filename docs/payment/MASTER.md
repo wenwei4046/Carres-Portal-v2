@@ -777,6 +777,7 @@ object · Cover rule. Object identity is row/card header; owner is metadata/avat
 | Free request day 22–30 | Storage Waiver Approver | same | decision exists |
 | Overpaid/unallocated money | Payment Approver | `Review RM {amount}` | allocated/classified |
 | Suspected wrong/duplicate | Payment Approver | `Review payment RM {amount}` | distinct/corrected/voided |
+| Paid date more than 14 days ago (`payment.approve_backdated_payment`, 0707, awaits Jess's review) | Payment Approver | `Approve RM {amount} paid on {weekday}, {day} {month}` | approved or refused |
 | Finance Exception | Finance Control Duty | `Review payment evidence` | exception resolved |
 
 **ONE SALES ORDER, ONE COLLECTION OWNER — AND IT IS THE PERSON THE ORDER WAS DEALT TO (owner
@@ -915,7 +916,7 @@ release. A live unpaid Storage Invoice prevents Delivery Order creation.
 | Responsible Delivery Operation (the order's collection owner — the individual the Sales Order was dealt to, 0504) | ordinary balance collection, storage-invoice collection, free-storage requests through Operation authority, delivery/storage contact, evidence, normal posting/receipt |
 | Finance Control Duty | bank/payment evidence exception |
 | Storage Waiver Approver | mattress/bedframe day 22–30 decision |
-| Payment Approver | void, reallocation, overpayment review |
+| Payment Approver | void, reallocation, overpayment review, a payment whose paid date is more than 14 days ago (0707: it waits in `payment_backdate_requests` and counts only once approved; the person who recorded it cannot approve it) |
 | Finance | read/export, external bank control, Finance Exception |
 | Manager | Payment settings; Workspace still owns duty assignment |
 
