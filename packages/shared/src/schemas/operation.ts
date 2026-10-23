@@ -229,6 +229,10 @@ export const newPurchaseOrderInput = z.object({
   etaDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   procurementPartnerId: z.string().uuid().nullable().optional(),
   note: z.string().trim().max(500).optional(),
+  /** Consignment Order (supplier-owned goods) — Weisiang's decision, Mr Lim,
+   *  WhatsApp 2026-10-22: the same blank form, issued through
+   *  `purchasing_issue_consignment_order` (0720), which marks it consignment. */
+  consignment: z.boolean().optional(),
   lines: z.array(z.object({
     sku: z.string().trim().min(1),
     qty: z.number().int().min(1).max(10000),

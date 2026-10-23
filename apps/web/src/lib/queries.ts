@@ -4739,6 +4739,8 @@ export interface GrnRegisterFilters {
   to: string | null;
   /** `Cancelled GRNs` — the rail's last row. */
   cancelled: boolean;
+  /** `Consignment goods` — receipts of Consignment Orders only (Weisiang 2026-10-22). */
+  consignment?: boolean;
   q: string;
 }
 export interface GrnRegisterResponse {
@@ -4755,6 +4757,8 @@ export interface GrnRegisterResponse {
     /** OVERLAPPING by construction — never added into a total. */
     receivedWith: Record<GrnReceivedWith, number>;
     cancelled: number;
+    /** Receipts of Consignment Orders in this view (Weisiang 2026-10-22). */
+    consignment?: number;
   };
   /** The expansion's item words and governed categories, per SKU on this
    *  page — the same two facts the official GRN document prints. */
@@ -4783,6 +4787,7 @@ function grnRegisterParams(filters: GrnRegisterFilters) {
   if (filters.from) params.set("from", filters.from);
   if (filters.to) params.set("to", filters.to);
   if (filters.cancelled) params.set("cancelled", "1");
+  if (filters.consignment) params.set("consignment", "1");
   if (filters.q.trim()) params.set("q", filters.q.trim());
   return params;
 }
@@ -4805,6 +4810,7 @@ export function useOperationGrnRegister(
       columns: filters.columns ?? null,
       limit: filters.limit ?? 50,
       cancelled: filters.cancelled ? "1" : null,
+      consignment: filters.consignment ? "1" : null,
     }),
     queryFn: () =>
       apiFetch<GrnRegisterResponse>(

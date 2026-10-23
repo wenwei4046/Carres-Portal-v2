@@ -369,6 +369,16 @@ describe("Purchase Orders Register", () => {
     expect(within(dialog).getByRole("button", { name: "Issue PO" })).toBeDisabled();
   });
 
+  /* Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): a Consignment Order opens blank, with prices, the Houzs way. */
+  it("New Consignment Order opens the same form as a Consignment Order", async () => {
+    useRealRegisterGrid = true;
+    renderPage();
+    fireEvent.click(await screen.findByTestId("po-new-consignment"));
+    const dialog = await screen.findByRole("dialog", { name: "New Consignment Order" });
+    expect(within(dialog).getAllByText("Unit Price (RM)").length).toBeGreaterThan(0);
+    expect(within(dialog).getByRole("button", { name: "Issue consignment order" })).toBeDisabled();
+  });
+
   /* ONE ROW MENU — owner ruling 2026-10-05: `View · Print`. */
   it("the row menu reads View · Print; View opens the read-first PO page", async () => {
     useRealRegisterGrid = true;

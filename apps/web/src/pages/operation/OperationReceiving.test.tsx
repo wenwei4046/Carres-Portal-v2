@@ -792,6 +792,15 @@ describe("OperationReceiving — the formal GRN Register", () => {
     );
   });
 
+  /* Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): Consignment Receive, Houzs way, is the same Receiving narrowed to Consignment Orders. */
+  it("Consignment goods is a rail row and an active condition", async () => {
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    const rail = within(screen.getByTestId("receiving-list-filters"));
+    fireEvent.click(rail.getByTestId("rail-consignment"));
+    await waitFor(() => expect(screen.getAllByText("Consignment goods").length).toBe(2));
+  });
+
   it("Cancelled GRNs is the last ROW, and the default listing holds valid and cancelled alike", async () => {
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: "Filters" }));

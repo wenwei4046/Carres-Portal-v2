@@ -473,6 +473,9 @@ export default function PurchaseOrdersPage() {
      office staff open a PO with no source, the Houzs way. Catalog is read only
      once the form opens. */
   const [newPoOpen, setNewPoOpen] = useState(false);
+  /* New Consignment Order — the same form and door, marked consignment
+     (Weisiang's decision, Mr Lim, WhatsApp 2026-10-22; Jess was not part of it). */
+  const [newPoConsignment, setNewPoConsignment] = useState(false);
   const catalogQ = useCatalog({ enabled: newPoOpen });
   const newPoSkus = useMemo(() => {
     const models = new Map((catalogQ.data?.models ?? []).map((m) => [m.id, m.name]));
@@ -1268,6 +1271,7 @@ export default function PurchaseOrdersPage() {
         suppliers={(suppliersQ.data?.suppliers ?? []).map((s) => ({ id: s.id, name: s.name }))}
         destinations={activeDestinations}
         skus={newPoSkus}
+        consignment={newPoConsignment}
         onIssued={(poId) => {
           setNewPoOpen(false);
           void posQ.refetch();
@@ -1422,7 +1426,8 @@ export default function PurchaseOrdersPage() {
                     testId="purchase-orders-show-filters"
                   />
                 )}
-                <Button size="sm" icon="add" onClick={() => setNewPoOpen(true)} data-testid="po-new">New Purchase Order</Button>
+                <Button size="sm" icon="add" onClick={() => { setNewPoConsignment(false); setNewPoOpen(true); }} data-testid="po-new">New Purchase Order</Button>
+                <Button size="sm" icon="add" onClick={() => { setNewPoConsignment(true); setNewPoOpen(true); }} data-testid="po-new-consignment">New Consignment Order</Button>
                 {overview && stateTabs}
               </>}
               statusSummary={(filtered, selectedRows) => {
