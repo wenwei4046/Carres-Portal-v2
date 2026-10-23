@@ -71,7 +71,7 @@ const INVOICE_REGISTER_SELECT =
   // earlier payment instead of guessing from a figure alone.
   "order_payments(id,receipt_no,amount,paid_on,voided_at,reference,method)," +
   "payment_communications(id,kind,message_text,template_key,sent_screenshot_url,recorded_at)," +
-  "order_lines(sku,qty,unit_price),order_addons(qty,unit_price)," +
+  "order_lines(sku,qty,unit_price),order_addons(addon_key,qty,unit_price)," +
   // Payment Monitor Card 02 (2026-09-16): the confirmed delivery is
   // DELIVERY'S fact — its Delivery Orders and its arrangement per leg, then
   // the booking overlay only while its stage is `confirmed`. The shared

@@ -90,7 +90,7 @@ export interface InvoiceRegisterRow {
      *  today` reads the same ledger the Work feed does. */
     latest_promise?: { promised_date: string; recorded_at: string } | null;
     order_lines: Array<{ sku?: string; qty: number; unit_price: number | string | null }>;
-    order_addons: Array<{ qty: number; unit_price: number | string | null }>;
+    order_addons: Array<{ addon_key?: string | null; qty: number; unit_price: number | string | null }>;
     ops_order_control: Array<{
       balance: number | string | null;
       confirmed_date: string | null;
