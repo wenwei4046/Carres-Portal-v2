@@ -140,6 +140,8 @@ export const partnerDriverInput = z.object({
   name: trimmed(120).min(1, "The driver name is required."),
   phone: optionalText(40),
   active: z.boolean().default(true),
+  /* 0724 (Weisiang's decision 2026-10-22): a crew member drives or helps. */
+  role: z.enum(["driver", "helper"]).nullish(),
 });
 export type PartnerDriverInput = z.infer<typeof partnerDriverInput>;
 

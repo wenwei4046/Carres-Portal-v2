@@ -59,6 +59,7 @@ import OperationPurchaseOrders from "./purchase-orders/PurchaseOrdersPage";
 import OperationReceiving from "./OperationReceiving";
 import OperationReceivingReport from "./OperationReceivingReport";
 import OperationDeliveryReport from "./OperationDeliveryReport";
+import { CrewLeavePage, FleetDayPage, FleetLiveMapPage, LorryCapacityPage } from "./OperationFleet";
 // R2 (0288) — the supplier-claim queue, fourth tab of the Purchasing module.
 import OperationSupplierClaims from "./OperationSupplierClaims";
 import OperationPurchaseReturns from "./OperationPurchaseReturns";
@@ -530,6 +531,12 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
             {/* Central Reports → Delivery (Delivery MASTER §12, CARD 17) —
                 reachable by direct URL, like the Receiving report. */}
             {tab === "delivery-report" && <OperationDeliveryReport />}
+            {/* 0724 — Carres' own lorries, the Houzs way (Weisiang's decision
+                2026-10-22; Jess was not part of this decision). */}
+            {tab === "fleet-day" && <FleetDayPage />}
+            {tab === "fleet-map" && <FleetLiveMapPage />}
+            {tab === "fleet-capacity" && <LorryCapacityPage />}
+            {tab === "crew-leave" && <CrewLeavePage />}
             {/* Preserve legacy bookmarks at the one Settings destination. */}
             {tab === "staff-duties" && <Navigate replace state={location.state} to={`/operation/settings/staff-duties?${new URLSearchParams([...searchParams].filter(([key]) => key !== "tab"))}`} />}
             {/* R2 — the supplier-claim queue: what receiving found wrong, and

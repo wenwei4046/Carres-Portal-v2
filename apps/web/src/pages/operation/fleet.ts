@@ -1,0 +1,105 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { FleetCrew, FleetDayCrew, FleetLeave, FleetLorry, FleetStop } from "@carres/shared/fleet";
+import { apiFetch } from "@/lib/api";
+
+/**
+ * Carres' own lorries (migration 0724) — Weisiang's decision (Mr Lim,
+ * WhatsApp 2026-10-22): Fleet Day, Run sheet, Live Map, Lorry Capacity and
+ * Crew Leave, the Houzs way. Jess was not part of this decision. Words are in
+ * COPY-STANDARD "Carres lorries words".
+ */
+export const FL = {
+  fleetDay: "Fleet Day",
+  liveMap: "Live Map",
+  capacity: "Lorry Capacity",
+  crewLeave: "Crew Leave",
+  runSheet: "Run sheet",
+  printRunSheets: "Print run sheets",
+  day: "Day",
+  month: "Month",
+  lorry: "Lorry",
+  lorryCapacity: "Capacity",
+  driver: "Driver",
+  helper: "Helper",
+  noDriver: "No driver",
+  noHelper: "No helper",
+  stops: "Stops",
+  revenue: "Revenue",
+  crew: "Crew",
+  proposed: "Proposed",
+  confirmed: "Confirmed",
+  confirmCrew: "Confirm crew",
+  noLorryMatched: "No lorry matched",
+  noLorryMatchedNote: "Delivery dates for Carres Lorries whose vehicle is not one of its plates.",
+  lastSeen: "Last seen",
+  position: "Position",
+  openMap: "Open map",
+  noPosition: "No position yet",
+  oldPosition: "Over 30 minutes old",
+  workingDays: "Working days",
+  trips: "Trips",
+  utilisation: "Utilisation",
+  stopsPerTrip: "Stops per trip",
+  revenuePerTrip: "Revenue per trip",
+  from: "From",
+  to: "To",
+  reason: "Reason",
+  role: "Role",
+  addLeave: "Add leave",
+  remove: "Remove",
+  noOwnFleet: "Carres Lorries is not set up. Add its Vehicles and Drivers in Settings, Logistics.",
+  noLorries: "Carres Lorries has no lorry yet. Add one in Settings, Logistics, Carres Lorries, Vehicles.",
+  noLeave: "No crew leave recorded.",
+  failed: "This page could not be loaded. Try again.",
+  saveFailed: "Not saved. Try again.",
+  refusals: {
+    on_leave: "This person is on leave that day.",
+    already_crewed: "This person is already on another lorry that day.",
+    not_a_driver: "Choose an active driver.",
+    not_a_helper: "Choose an active helper.",
+    not_own_lorry: "This lorry is not a Carres lorry.",
+  } as Record<string, string>,
+} as const;
+
+export interface FleetPayload {
+  company: { id: string; name: string } | null;
+  lorries: Array<FleetLorry & { templateDriverName: string | null }>;
+  crew: FleetCrew[];
+  leave: FleetLeave[];
+  crewDays: FleetDayCrew[];
+  stops: FleetStop[];
+  positions: Array<{ vehicleId: string; lat: number; lng: number; recordedAt: string; source: string }>;
+}
+
+export function useFleet(from: string, to: string = from) {
+  return useQuery({
+    queryKey: ["fleet", from, to],
+    queryFn: () => apiFetch<FleetPayload>(`/api/operation/fleet?from=${from}&to=${to}`),
+  });
+}
+
+/** One write helper: post or delete, then re-read every fleet view. */
+export function useFleetWrite() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ path, method = "POST", body }: { path: string; method?: "POST" | "DELETE"; body?: unknown }) =>
+      apiFetch(`/api/operation/fleet${path}`, { method, ...(body ? { body: JSON.stringify(body) } : {}) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["fleet"] }),
+  });
+}
+
+/** The refusal's own sentence when the door named it, else the plain retry line. */
+export function refusalOf(error: unknown): string {
+  const code = (error as { code?: string; body?: { code?: string } } | null)?.body?.code
+    ?? (error as { code?: string } | null)?.code;
+  return (code && FL.refusals[code]) || FL.saveFailed;
+}
+
+/** A plain map link: no API key, opens the phone's or browser's own map. */
+export const mapHref = (lat: number, lng: number) => `https://www.google.com/maps?q=${lat},${lng}`;
+
+export const monthRange = (month: string) => {
+  const [y, m] = month.split("-").map(Number);
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return { from: `${month}-01`, to: `${month}-${String(last).padStart(2, "0")}` };
+};

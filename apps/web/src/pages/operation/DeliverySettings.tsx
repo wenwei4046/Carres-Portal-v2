@@ -115,6 +115,10 @@ const DS = {
   vehicleType: "Vehicle type",
   vehicleCapacity: "Capacity",
   addDriver: "Add a driver",
+  /* 0724 (Weisiang's decision 2026-10-22): a crew member drives or helps. */
+  crewRole: "Role",
+  roleDriver: "Driver",
+  roleHelper: "Helper",
   addVehicle: "Add a vehicle",
   /* Services */
   stairCarry: "Stair carry",
@@ -348,7 +352,7 @@ interface PartnerDraft {
   };
   handover: HandoverPoint[];
   fleet: {
-    drivers: Array<{ id: string | null; name: string; phone: string; active: boolean }>;
+    drivers: Array<{ id: string | null; name: string; phone: string; active: boolean; role: "driver" | "helper" | null }>;
     vehicles: Array<{ id: string | null; plate: string; vehicleType: string; capacity: string; driverName: string; driverPhone: string; active: boolean }>;
   };
   services: { stairCarry: boolean; dismantling: boolean; disposal: boolean; charges: string };
@@ -392,7 +396,7 @@ function draftOf(p: DeliverySettingsPartnerRow, data: DeliverySettingsResponse):
     fleet: {
       drivers: data.drivers
         .filter((d) => d.partner_id === p.id)
-        .map((d) => ({ id: d.id, name: d.name, phone: d.phone ?? "", active: d.active })),
+        .map((d) => ({ id: d.id, name: d.name, phone: d.phone ?? "", active: d.active, role: d.role ?? null })),
       vehicles: data.vehicles
         .filter((v) => v.partner_id === p.id)
         .map((v) => ({
@@ -546,7 +550,7 @@ function PartnerObject({ data, partnerId, section }: { data: DeliverySettingsRes
           if (d.id && was && same(was, d)) continue;
           await apiFetch("/api/operation/delivery-settings/partner/driver", {
             method: "POST",
-            body: JSON.stringify({ partnerId: id, driverId: d.id, name: d.name.trim(), phone: d.phone.trim() || null, active: d.active }),
+            body: JSON.stringify({ partnerId: id, driverId: d.id, name: d.name.trim(), phone: d.phone.trim() || null, active: d.active, role: d.role }),
           });
         }
         for (const v of draft.fleet.vehicles) {
@@ -817,14 +821,17 @@ function PartnerObject({ data, partnerId, section }: { data: DeliverySettingsRes
                         <Select id={`dp-driver-active-${i}`} label={DS.status} value={d.active ? "active" : "inactive"} onValueChange={(v) => {
                           const drivers = [...draft.fleet.drivers]; drivers[i] = { ...d, active: v === "active" }; set("fleet", { ...draft.fleet, drivers });
                         }} options={[{ value: "active", label: DS.active }, { value: "inactive", label: DS.inactive }]} />
+                        <Select id={`dp-driver-role-${i}`} label={DS.crewRole} value={d.role ?? "driver"} onValueChange={(v) => {
+                          const drivers = [...draft.fleet.drivers]; drivers[i] = { ...d, role: v === "helper" ? "helper" : "driver" }; set("fleet", { ...draft.fleet, drivers });
+                        }} options={[{ value: "driver", label: DS.roleDriver }, { value: "helper", label: DS.roleHelper }]} />
                       </>
                     ) : (
-                      <span>{d.name} · {orNotConfigured(d.phone)} · {d.active ? DS.active : DS.inactive}</span>
+                      <span>{d.name} · {orNotConfigured(d.phone)} · {d.role === "helper" ? DS.roleHelper : DS.roleDriver} · {d.active ? DS.active : DS.inactive}</span>
                     )}
                   </div>
                 ))}
                 {canEdit ? (
-                  <Button size="sm" data-testid="delivery-settings-add-driver" onClick={() => set("fleet", { ...draft.fleet, drivers: [...draft.fleet.drivers, { id: null, name: "", phone: "", active: true }] })}>{DS.addDriver}</Button>
+                  <Button size="sm" data-testid="delivery-settings-add-driver" onClick={() => set("fleet", { ...draft.fleet, drivers: [...draft.fleet.drivers, { id: null, name: "", phone: "", active: true, role: null }] })}>{DS.addDriver}</Button>
                 ) : draft.fleet.drivers.length === 0 ? <span className="text-kit-slate-9">{NOT_CONFIGURED}</span> : null}
               </div>
             </Row>
