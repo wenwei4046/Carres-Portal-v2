@@ -1169,6 +1169,15 @@ Purchasing MASTER §9.6. `Handover`, `Handover proof`, `Units / Qty`, `Return Do
 `Return No` are superseded as labels on this register, not globally retired custody vocabulary.
 Finance is excluded from this UI. Display approval does not rename stored records or APIs.
 
+### New Purchase Return and multi-PO receiving — Weisiang (Mr Lim, WhatsApp) 2026-10-22
+
+Weisiang's decision; Jess was not part of it. New screen words:
+`New Purchase Return` (register button and page title) · `Choose the supplier` ·
+`No Units of this supplier in stock.` · Unit refusals `Not bought from this supplier` ·
+`Reserved for an order` · `On a claim hold` · `Consignment stock` · `Not in stock`.
+Receiving Find PO: `Receive selected ({n})` (tick several POs of one supplier; POs of other
+suppliers cannot be ticked).
+
 ### Showroom navigation — owner ruling 2026-10-02
 
 Module/page title: **`Showroom`**, with destinations **`Carres`** and **`Dealer`**.
