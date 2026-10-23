@@ -1190,6 +1190,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
                 onToggleLine={toggleLeaf}
                 onToggleLines={setLeafsSelected}
                 selectionSummary={summary.text}
+                selectionSummaryCompact={summary.compactText}
                 selectionPrimary={<>{issueActions}{viewSwitchCompact}<TasksPill /></>}
                 warning={stockWarning}
                 toolbarAfterTools={<TasksPill />}
@@ -1246,6 +1247,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
                 isTicked={(id) => live.has(id)}
                 onToggleOrder={setOrderSelected}
                 selectionSummary={summary.text}
+                selectionSummaryCompact={summary.compactText}
                 selectionPrimary={<>{issueActions}{viewSwitchCompact}<TasksPill /></>}
                 toolbarAfterTools={<TasksPill />}
                 toolbarEnd={<div className="order-3 ml-auto flex shrink-0 items-center gap-2">

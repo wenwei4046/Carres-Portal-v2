@@ -456,6 +456,8 @@ export type DataGridProps<T> = {
    * its unit passes it — `1 delivery scope selected` (owner ruling 2026-08-24).
    */
   selectionSummary?: (n: number) => string;
+  /** Same selection facts in shorter governed words, only when the full text cannot fit. */
+  selectionSummaryCompact?: (n: number) => string;
   /** Page-owned primary action beside the selection summary and Clear.
    *  Use this for structured ownership beside the governed work action;
    *  outputs remain separated at the toolbar's right edge. */
@@ -897,6 +899,7 @@ function DataGridInner<T>({
   toolbarEnd,
   selectionActions,
   selectionSummary,
+  selectionSummaryCompact,
   selectionPrimary,
   expandTitle,
   hideSelectionExport,
@@ -1697,6 +1700,35 @@ function DataGridInner<T>({
       selectable.selectedKeys.has(rowKey(r)) || selectable.isIndeterminate?.(r as never) === true,
     );
   }, [selectable, sortedRows, rowKey]);
+
+  const selectionText = selectedOrIndeterminateVisibleRows.length > 0 ? (selectionSummary?.(selectedOrIndeterminateVisibleRows.length) ?? `${selectedOrIndeterminateVisibleRows.length} selected`) : "";
+  const compactSelectionText = selectedOrIndeterminateVisibleRows.length > 0 ? selectionSummaryCompact?.(selectedOrIndeterminateVisibleRows.length) : undefined;
+  const selectionBarRef = useRef<HTMLDivElement>(null);
+  const selectionCountRef = useRef<HTMLSpanElement>(null);
+  const selectionMeasureRef = useRef<HTMLSpanElement>(null);
+  const [compactSelection, setCompactSelection] = useState(false);
+  useLayoutEffect(() => {
+    const bar = selectionBarRef.current, count = selectionCountRef.current, full = selectionMeasureRef.current;
+    if (!bar || !count || !full || !compactSelectionText) return;
+    const measure = () => {
+      if (bar.clientWidth === 0) return;
+      const children = [...bar.children] as HTMLElement[];
+      const css = getComputedStyle(bar);
+      // Measure the full wording even while its short version is displayed;
+      // otherwise a fitting short bar would oscillate back to the long one.
+      const needed = full.getBoundingClientRect().width
+        + children.filter(child => child !== count && !child.classList.contains(styles.toolbarSpacer)).reduce((n, child) => n + child.getBoundingClientRect().width, 0)
+        + (parseFloat(css.getPropertyValue("--selection-gap")) || 10) * (children.length - 1)
+        + parseFloat(css.paddingLeft) + parseFloat(css.paddingRight);
+      setCompactSelection(needed > bar.clientWidth + 1);
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(bar);
+    [...bar.children].forEach(child => observer.observe(child));
+    return () => observer.disconnect();
+  }, [selectionText, compactSelectionText, selectionPrimary, selectedOrIndeterminateVisibleRows.length]);
 
   // ── Group rendering ───────────────────────────────────────────────
   // Multi-level groups produced as a flat list of render instructions.
@@ -3561,14 +3593,13 @@ function DataGridInner<T>({
         {isReference && toolbarAfterTools ? <div className={styles.afterTools} data-testid="toolbar-after-tools">{toolbarAfterTools}</div> : null}
       </div>
       ) : (
-        <div className={`${styles.toolbar} ${styles.selectionBar}`} data-testid="selection-bar" style={hideToolbar ? { display: "none" } : undefined}>
-          <span className={styles.selectionCount}>
+        <div ref={selectionBarRef} data-compact={compactSelection && compactSelectionText ? "true" : undefined} className={`${styles.toolbar} ${styles.selectionBar}`} data-testid="selection-bar" style={hideToolbar ? { display: "none" } : undefined}>
+          <span ref={selectionCountRef} className={styles.selectionCount} title={selectionText}>
             {/* The page names its own unit when it has one: `3 delivery scopes
                 selected` beats `3 selected`, which is true and says nothing
                 about what three of. */}
-            {selectionSummary
-              ? selectionSummary(selectedOrIndeterminateVisibleRows.length)
-              : `${selectedOrIndeterminateVisibleRows.length} selected`}
+            <span>{compactSelection && compactSelectionText ? compactSelectionText : selectionText}</span>
+            {compactSelectionText ? <span ref={selectionMeasureRef} aria-hidden className={styles.selectionMeasure} data-full-summary={selectionText} /> : null}
           </span>
           <button
             type="button"

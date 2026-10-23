@@ -2869,7 +2869,7 @@ replaced by one row per Sales Order on the same kit list as `By supplier`, so no
   order whose answer could not be confirmed offers no stock until its record has been read again.
 - **While lines are ticked** the selection bar stands where the toolbar was: the count, `Clear`, `Use stock`, the PO
   Duty chip, `Issue PO`, `Export Excel (n)`, and the view button as one small button, because the ticks are the same
-  in every grouping and the grouping can still be changed. One line at 1164 and 1440.
+  in every grouping and the grouping can still be changed. One line at 1164 and 1440. The shared DataGrid uses the COPY-standard SO/PO short count only when its full wording does not fit; Sales Order, item, Unit and PO quantities remain visible and every action keeps its control.
 - **Kept from the old list:** eligibility and the duplicate-PO protection, the one tick set and the one `Issue PO` door,
   the PO Duty chip, `Export Excel (n)` for the ticked rows, Export in ⋮, the rail and its counts, the quick card,
   `Purchase Orders` in the ⋮ menu (supplier preparation for the Sales Orders in view: this tab, the rail and the
