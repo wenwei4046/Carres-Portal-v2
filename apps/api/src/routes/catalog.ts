@@ -907,7 +907,11 @@ catalogRouter.patch("/skus/:id", async (c) => {
 
 // Loo 2026-07-20 — Delete = the SKU is GONE for good (was a soft
 // discontinued_at stamp; Loo: "如果选择 delete，就是这个 SKU 永远消失").
-// Order/PO lines are unaffected — they store the sku as a text snapshot, no FK.
+// Order/PO lines store the sku as a text snapshot with no FK, so since 0721
+// (Weisiang's decision, Mr Lim, WhatsApp 2026-10-22: purchasing bulk-deletes
+// products Houzs way, data protected) a BEFORE DELETE trigger refuses, by name,
+// a SKU that orders, POs, stock Units or supplier bills name (P0001 sku_in_use
+// -> 422). Turning it off (discontinued_at / pos_active) is the way to retire it.
 // Soft retirement still exists as `discontinued_at` via PATCH (and the
 // compartment un-offer path keeps soft-discontinuing by design).
 //

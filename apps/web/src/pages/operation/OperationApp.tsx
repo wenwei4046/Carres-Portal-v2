@@ -75,6 +75,7 @@ import OperationStock from "./OperationStock";
 import OperationAllOrders from "./OperationAllOrders";
 import OperationSuppliers from "./OperationSuppliers";
 import OperationSupplierItems from "./OperationSupplierItems";
+import OperationPurchaseInvoices from "./OperationPurchaseInvoices";
 // 2026-05-20 — Phase A · AutoCount integration tabs.
 import OperationImport from "./OperationImport";
 import OperationInbox from "./OperationInbox";
@@ -641,6 +642,9 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
                 about parties, this is about items, and the sidebar already
                 gives a module more than one page. */}
             {tab === "supplier-items" && <OperationSupplierItems />}
+            {/* Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): supplier
+                bills, read-only, inside Purchasing (0721). */}
+            {tab === "purchase-invoices" && <OperationPurchaseInvoices />}
             {/* 2026-05-20 — Phase A · AutoCount integration */}
             {tab === "ops-import" && <OperationImport />}
             {tab === "ops-inbox" && <OperationInbox />}
