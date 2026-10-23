@@ -1270,6 +1270,7 @@ export default function PurchaseOrdersPage() {
         skus={newPoSkus}
         onIssued={(poId) => {
           setNewPoOpen(false);
+          refreshPurchasingReads();
           void posQ.refetch();
           if (poId) setParams((current) => { const next = new URLSearchParams(current); next.set("po", poId); next.delete("view"); return next; });
         }}

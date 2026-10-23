@@ -1995,18 +1995,42 @@ operationPosRouter.post("/new", requireOperation, async (c) => {
 
   // The warehouse the goods land in: the Deliver To's own warehouse, else the
   // own Klang warehouse — the same choice Manual Purchase makes.
-  const [dest, wh, cat] = await Promise.all([
-    sb.from("purchasing_destinations").select("id, warehouse_id").eq("id", input.destinationId).maybeSingle(),
+  const [dest, wh, cat, sup, collection] = await Promise.all([
+    sb.from("purchasing_destinations").select("id, name, address, warehouse_id, warehouses(address)").eq("id", input.destinationId).maybeSingle(),
     sb.from("warehouses").select("id, name").eq("kind", "own"),
     sb.from("product_skus").select("sku, cost").in("sku", [...new Set(input.lines.map((l) => l.sku))]),
+    sb.from("suppliers").select("kind, name").eq("id", input.supplierId).maybeSingle(),
+    sb.from("purchasing_supplier_settings").select("fixed_destination_id, collected_by_partner_id").eq("supplier_id", input.supplierId).maybeSingle(),
   ]);
-  const readError = dest.error ?? wh.error ?? cat.error;
+  const readError = dest.error ?? wh.error ?? cat.error ?? sup.error ?? collection.error;
   if (readError) {
     const m = mapPgError(readError);
     return c.json(m.body, m.status);
   }
+  const refuse = (status: 422, code: string, facts?: Parameters<typeof purchasingRefusal>[1]) => {
+    const r = purchasingRefusal(code, facts);
+    return c.json({ error: code, code, message: r.wrong, action: r.todo }, status);
+  };
+  // Same pre-checks as Manual Purchase, before a PO number is spent: a Deliver To
+  // with no address (the PO paper refuses it later), and a factory-pickup
+  // supplier's collection partner and fixed Deliver To from its settings.
+  const destRow = dest.data as { name: string | null; address: string | null; warehouse_id: string | null; warehouses: { address?: string | null } | { address?: string | null }[] | null } | null;
+  if (destRow) {
+    const whAddr = Array.isArray(destRow.warehouses) ? destRow.warehouses[0]?.address : destRow.warehouses?.address;
+    const address = destRow.warehouse_id != null ? whAddr ?? null : destRow.address;
+    if (typeof address !== "string" || address.trim() === "") {
+      return refuse(422, "destination_address_missing", { destination: destRow.name ?? null });
+    }
+  }
+  const supRow = sup.data as { kind: string | null; name: string | null } | null;
+  const setting = collection.data as { fixed_destination_id: string | null; collected_by_partner_id: string | null } | null;
+  const pickup = supRow?.kind === "factory_pickup";
+  const partnerId = pickup ? (input.procurementPartnerId ?? setting?.collected_by_partner_id ?? null) : (input.procurementPartnerId ?? null);
+  if (pickup && setting?.fixed_destination_id && setting.fixed_destination_id !== input.destinationId) {
+    return refuse(422, "supplier_collection_destination_mismatch", { supplier: supRow?.name ?? null, destination: null });
+  }
   const own = (wh.data ?? []) as Array<{ id: string; name: string | null }>;
-  const warehouseId = (dest.data as { warehouse_id: string | null } | null)?.warehouse_id
+  const warehouseId = destRow?.warehouse_id
     ?? (own.find((w) => /klang|klg/i.test(w.name ?? "")) ?? own[0])?.id
     ?? null;
   const catalogCost = new Map(((cat.data ?? []) as Array<{ sku: string; cost: number | null }>).map((r) => [r.sku, r.cost == null ? null : Number(r.cost)]));
@@ -2017,7 +2041,7 @@ operationPosRouter.post("/new", requireOperation, async (c) => {
       warehouse_id: warehouseId,
       destination_id: input.destinationId,
       eta_date: input.etaDate ?? null,
-      procurement_partner_id: input.procurementPartnerId ?? null,
+      procurement_partner_id: partnerId,
       so_refs: null,
       purpose: null,
       note: input.note || null,

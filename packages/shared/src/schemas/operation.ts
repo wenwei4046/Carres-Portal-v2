@@ -232,7 +232,8 @@ export const newPurchaseOrderInput = z.object({
   lines: z.array(z.object({
     sku: z.string().trim().min(1),
     qty: z.number().int().min(1).max(10000),
-    price: z.number().nonnegative().nullable().optional(),
+    // Positive only: a price of 0 is Free of Charge, which needs a reason this form does not collect.
+    price: z.number().positive().nullable().optional(),
   }).strict()).min(1).max(100),
 }).strict();
 export type NewPurchaseOrderInput = z.infer<typeof newPurchaseOrderInput>;

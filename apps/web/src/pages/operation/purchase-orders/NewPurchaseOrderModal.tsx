@@ -35,7 +35,7 @@ export function newPurchaseOrderBody(draft: NewPoDraft): NewPurchaseOrderInput |
     const qty = Number(l.qty);
     if (!Number.isInteger(qty) || qty < 1) return null;
     const price = l.price.trim() === "" ? null : Number(l.price);
-    if (price != null && (!Number.isFinite(price) || price < 0)) return null;
+    if (price != null && (!Number.isFinite(price) || price <= 0)) return null;
     out.push({ sku: l.sku, qty, price });
   }
   return {
@@ -122,7 +122,7 @@ export default function NewPurchaseOrderModal({
               value={line.sku || undefined} onValueChange={(sku) => setLine(line.key, { sku })} options={skuOptions} />
             <Input id={`new-po-qty-${line.key}`} label={i === 0 ? "Qty" : undefined} type="number" min={1} step={1}
               value={line.qty} onChange={(e) => setLine(line.key, { qty: e.target.value })} />
-            <Input id={`new-po-price-${line.key}`} label={i === 0 ? "Unit Price (RM)" : undefined} type="number" min={0} step="0.01"
+            <Input id={`new-po-price-${line.key}`} label={i === 0 ? "Unit Price (RM)" : undefined} type="number" min={0.01} step="0.01"
               placeholder="Catalog" value={line.price} onChange={(e) => setLine(line.key, { price: e.target.value })} />
             <Button variant="ghost" disabled={draft.lines.length === 1}
               onClick={() => setDraft((d) => ({ ...d, lines: d.lines.filter((l) => l.key !== line.key) }))}>Remove</Button>
