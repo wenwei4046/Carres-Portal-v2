@@ -87,6 +87,7 @@ import OperationOpsReserved from "./OperationOpsReserved";
 import OperationOpsRepair from "./OperationOpsRepair";
 import OperationOpsInventory from "./OperationOpsInventory";
 import WarehouseStockRegister from "./WarehouseStockRegister";
+import { StockAdjustments, StockTransfers, StockTakes } from "./WarehouseStockMoves";
 import WarehouseWorkspace from "./WarehouseWorkspace";
 import { LEGACY_SCHEDULE_TABS } from "./warehouse-schedule-view";
 import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
@@ -617,6 +618,12 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
                 On hand surface. Same `?tab=` address, new page. */}
             {tab === "stock-onhand" && <WarehouseStockRegister />}
             {tab === "showroom" && <WarehouseStockRegister showroom />}
+            {/* 0714 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office staff
+                adjust, transfer and count stock the Houzs way. Overturns Jess's Stock
+                MASTER §12.4/§12.5/§12.7; Jess was not part of this decision. */}
+            {tab === "stock-adjustments" && <StockAdjustments />}
+            {tab === "stock-transfers" && <StockTransfers />}
+            {tab === "stock-takes" && <StockTakes />}
             {/* WAREHOUSE (owner ruling 2026-09-14) — Arrival Schedule and
                 Pickup Schedule are two independent dated boards; Inbound and
                 Outbound are their own rail + Register work pages. */}

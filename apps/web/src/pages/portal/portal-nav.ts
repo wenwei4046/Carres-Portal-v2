@@ -561,6 +561,12 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         section: "Warehouse",
       },
       { key: "stock", label: "Inventory", icon: Boxes, tab: "stock-onhand", section: "Warehouse" },
+      /* 0714 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office staff
+       * adjust, transfer and count stock the Houzs way. Overturns Jess's Stock
+       * MASTER §12.4/§12.5/§12.7; Jess was not part of this decision. */
+      { key: "stock-adjustments", label: "Stock Adjustment", icon: SlidersHorizontal, tab: "stock-adjustments", section: "Warehouse" },
+      { key: "stock-transfers", label: "Stock Transfer", icon: ArrowLeftRight, tab: "stock-transfers", section: "Warehouse" },
+      { key: "stock-takes", label: "Stock Take", icon: ClipboardList, tab: "stock-takes", section: "Warehouse" },
       {
         key: "wh-outbound",
         label: "Outbound",
