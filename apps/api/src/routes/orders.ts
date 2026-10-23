@@ -4386,7 +4386,7 @@ ordersRouter.get("/:id/invoice-pdf-data", async (c) => {
 
   const { data: inv, error: invErr } = await sb
     .from("invoices")
-    .select("id, invoice_no, amount, tax_amount, issued_at, voided_at")
+    .select("id, invoice_no, amount, tax_amount, issued_at, voided_at, snapshot")
     .eq("invoice_no", ord.invoice_no)
     .maybeSingle();
   if (invErr) throw new HTTPException(500, { message: invErr.message });
@@ -4403,8 +4403,11 @@ ordersRouter.get("/:id/invoice-pdf-data", async (c) => {
     .select("sku, qty, unit_price")
     .eq("order_id", id);
   if (linErr) throw new HTTPException(500, { message: linErr.message });
+  // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): an office (part)
+  // invoice (0712) prints only the goods it bills, from its own snapshot.
+  const officeLines = i.snapshot?.issued_from === "office" && Array.isArray(i.snapshot.lines) ? i.snapshot.lines : null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const lineRows = (lines ?? []) as any[];
+  const lineRows = (officeLines ?? lines ?? []) as any[];
 
   const skus: string[] = lineRows.map((l) => String(l.sku));
   const skuVariantBySku: Record<string, string> = {};
