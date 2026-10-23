@@ -19,6 +19,7 @@
  * defaults, and the page never offers Edit.
  */
 import { Hono, type Context } from "hono";
+import { z } from "zod";
 import {
   VERIFIED_COMPANY_PROFILE,
   COMPANY_PROFILE_FIELDS,
@@ -201,6 +202,40 @@ router.get("/can-edit/:section", requireOperationOrPrincipal, async (c) => {
   return c.json({ canEdit: await canEditSettings(c.env, c.var.auth.jwt, section, c.var.auth.role) });
 });
 
+// ── Address lists (0722) ──────────────────────────────────────────────────
+// Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was not part of it):
+// office staff add, rename or hide a State, City or Postcode, Houzs way. The
+// read is `addressListsReadRouter` below (every signed-in account); this is
+// the one write, on the Sales Order Settings gate.
+const addressOverrideInput = z.object({
+  state: z.string().trim().min(1).max(80),
+  city: z.string().trim().min(1).max(80).nullable(),
+  postcode: z.string().trim().regex(/^\d{5}$/, "A postcode is 5 digits.").nullable(),
+  renameTo: z.string().trim().min(1).max(80).nullable(),
+  hidden: z.boolean(),
+  remove: z.boolean().default(false),
+});
+
+router.put("/address-lists", requireSettingsEditor("sales_orders"), async (c) => {
+  const parsed = await parseJsonBody(c, addressOverrideInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const d = parsed.data;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.rpc("settings_save_address_override", {
+    p_state: d.state,
+    p_city: d.city,
+    p_postcode: d.postcode,
+    p_rename_to: d.renameTo,
+    p_hidden: d.hidden,
+    p_remove: d.remove,
+  });
+  if (error) {
+    const f = rpcFailure(error);
+    return c.json(f.body, f.status);
+  }
+  return c.json({ ok: true });
+});
+
 // ── Settings editors (TEAM-02) ────────────────────────────────────────────
 router.get("/editors", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -284,4 +319,21 @@ companyProfileReadRouter.get("/", async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const read = await sb.from("company_profile").select("*").eq("id", 1).maybeSingle();
   return c.json({ stored: !read.error && !!read.data, values: profileOf(read.error ? null : read.data) });
+});
+
+/**
+ * GET /api/address-lists — the office's State · City · Postcode changes on
+ * top of the national file (0722, Weisiang's decision, Mr Lim, WhatsApp
+ * 2026-10-22). Open to every signed-in account: the dealer POS pickers use
+ * the same lists. Before 0722 is applied it answers no rows, so the pickers
+ * show the national file alone.
+ */
+export const addressListsReadRouter = new Hono<AppEnv>();
+addressListsReadRouter.get("/", async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const read = await sb
+    .from("address_list_overrides")
+    .select("state, city, postcode, rename_to, hidden")
+    .order("id");
+  return c.json({ stored: !read.error, rows: read.error ? [] : read.data ?? [] });
 });

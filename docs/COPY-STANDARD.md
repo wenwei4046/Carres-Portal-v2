@@ -5884,6 +5884,19 @@ Each person's own lunch start; the activity check skips that lunch. Times print 
 | Not a staff member | Only a staff member can set a lunch time. | Shared logins record no lunch |
 | Staff & Duties check time bounds | `Morning check from {Office start} to {last minute before the Office lunch}. Afternoon check from {first minute after the Office lunch} to {last minute before Office end}. A person's afternoon check moves with their own lunch.` | WS-02 · WS-03 bounds follow Settings → Office (0677) |
 
+## Settings → Address lists · Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was not part of this decision) · migration 0722 · BUILT ON BRANCH, NOT APPLIED
+
+Office staff add, rename or hide a State, City or Postcode on top of the national list, the Houzs SO Maintenance way. Names print joined by ` · `; no dash.
+
+| Situation | Exact words | Source |
+|---|---|---|
+| Settings menu group / row and page title | Sales Orders · Address lists | Weisiang 2026-10-22 |
+| List section | List changes (`Every address picker offers the national list with these changes on top. Orders already saved keep the names they recorded.`) · empty `No list changes yet. The pickers offer the national list.` | 0722 |
+| One change | row name `{State} · {City} · {Postcode}` (missing parts left out) · value `Added` · `Renamed to {name}` · `Hidden` · button `Remove` | 0722 |
+| Form section | Change a name (`Leave City and Postcode empty to change a State. Leave Postcode empty to change a City. Use the names as the pickers show them.`) · State · City (optional) · Postcode (optional) · Change: `Add` · `Rename` · `Hide` · New name · Save change | 0722 |
+| Form gaps | `State is required` · `City is required for a postcode` · `A postcode is 5 digits` · `A postcode cannot be renamed. Hide it and add the new one` · `New name is required` | 0722 checks |
+| Saved toast / change record | `Address lists saved` · change record title `Address lists`, fields State · City · Postcode · Renamed to · Hidden, values `Yes` · `No` | Shared Settings words |
+
 ## Settings → Company · Office · Settings editors · owner 9 Oct 2026 (Carres Settings List COM · OFF · TEAM-02) · DEPLOYED 10 Oct 2026 (#1996); confirmed Settings design (rows with one explanation, change record as a disclosure) DEPLOYED 12 Oct 2026 (#2013); signed-in reader walk done 12 Oct 2026, editor save walk owed
 
 | Situation | Exact words | Source |
