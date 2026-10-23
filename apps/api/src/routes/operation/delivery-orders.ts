@@ -314,8 +314,17 @@ deliveryOrdersRouter.post("/", requireOperationOrPrincipal, async (c) => {
         { error: "delivery_order_gate", message: `Cannot issue the delivery order: ${attempt.reasons.join(" ")}`, reasons: attempt.reasons },
         422,
       );
-    case "error":
+    case "error": {
+      // 0710's refusals (a racing create, a Journey order) in the dialog's words, not the database's.
+      const detail = (attempt.body as { detail?: unknown }).detail;
+      if (detail === "already_on_a_delivery_order") {
+        return c.json({ error: detail, message: "These goods are already on a Delivery Order." }, 409);
+      }
+      if (detail === "journey_order") {
+        return c.json({ error: detail, message: "This order travels on a Delivery Journey. Each leg issues its own Delivery Order." }, 409);
+      }
       return c.json(attempt.body, attempt.status);
+    }
   }
 });
 

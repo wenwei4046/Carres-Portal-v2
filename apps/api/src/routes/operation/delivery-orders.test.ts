@@ -794,6 +794,18 @@ describe("New Delivery Order — office staff open a DO from SO lines", () => {
     expect(((await res.json()) as { reasons: string[] }).reasons).toEqual(["RM 100.00 unpaid"]);
   });
 
+  it("a create that lost a race to the same goods says so in the dialog's words", async () => {
+    mockSb([{ data: SO_ORDER }, { data: [] }]);
+    vi.mocked(attemptDeliveryOrderIssue).mockResolvedValueOnce({
+      outcome: "error",
+      body: { message: "these goods are already on a Delivery Order", detail: "already_on_a_delivery_order" },
+      status: 409,
+    });
+    const res = await call("", "operation", { method: "POST", body: JSON.stringify({ orderId: SO_ORDER.id, groups: ["bed"] }) });
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { message: string }).message).toBe("These goods are already on a Delivery Order.");
+  });
+
   it("refuses a role outside operation/principal", async () => {
     mockSb([]);
     const res = await call("", "supplier", { method: "POST", body: JSON.stringify({ orderId: SO_ORDER.id, groups: [] }) });
