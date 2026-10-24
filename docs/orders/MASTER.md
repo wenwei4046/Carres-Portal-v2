@@ -1,5 +1,14 @@
 # ORDERS — MASTER
 
+## Current Order Route presentation — owner24Oct2026
+
+The latest Sales Order Template Spec in `../ui/MASTER.md` replaces the old GOODS/DELIVERY/PAYMENT group-band Overview with one Journey line and party cards: Purchasing/Supplier, Warehouse, Logistics and Payment. Overview, Map and Documents read the same source-owned facts. Remove the duplicate GOODS Overview band; retain per-SO-line procurement, PO/source, received/accepted/damaged/wrong quantities, exact Units, location and evidence within the owning party card and source-linked Map/Documents. This is a presentation correction, not permission to discard the goods-chain readers or merge goods with stock ownership.
+
+One Now is the recommended current focus; parallel procurement, booking, collection and preparation remain independently actionable under their own permissions/gates. Completed labels report actual results, optional steps show not-applicable only when their source says so. Never derive delivery completion, proof acceptance, DO issuance or customer agreement from prototype arrays, ETA or the first unfinished node. The supplied9 display slots are captured in UI MASTER; the referenced Ops§4 source is unavailable in the supplied package, so exact business-step admission is not established by prototype comments.
+
+Historical group-band dimensions/status evidence below describes the old presentation, not a second current design. Detailed business truths/readers remain binding. Missing values now show nothing; failure and required-field messages remain explicit. Document separator shape follows current COPY; allocator policy and stored identities are not changed by the template. No application implementation, production verification or Receiving#2111 work is commissioned by this reconciliation.
+
+
 **Design handoff21Oct2026:** Purchasing export28 includes the SO Outright v12 and DO Unit-reader examples. Shared measurements, states and the resolved21Oct baseline are maintained only in [UI MASTER](../ui/MASTER.md#purchasing-design-handoff--21-oct-2026--it-entry); this is not an independent claim that the whole Sales Order design was newly reviewed. IT owns backend implementation.
 
 **All listing appearance — the shared listing template (UI MASTER §6.0):** follow
@@ -1931,11 +1940,7 @@ whole map, but never below **0.7×**: text scaled past that is an unreadable str
 map too wide for the floor opens **centred on the Sales Order** and the operator pans; `⛶` remains
 the explicit whole-map fit and may go smaller because the operator asked for it.
 
-**THREE ROUTES READ AS THREE GROUPS — owner ruling 2026-08-17.** One uppercase **group band** —
-`GOODS` · `DELIVERY` · `PAYMENT` · `LOAN` (conditional) — `PAYMENT` since 2026-09-26 (Jess: *"remove money, but payment"*; the page's word since 2026-09-21) — sits above each route's columns; columns
-inside a group sit 32px apart and **groups sit 72px apart**. The band is where a route says its
-name: edges carry no route captions. Colour still belongs to STATE alone (blue CURRENT · green
-done · amber exception); routes are told apart by band and spacing, never by hue.
+**CURRENT OVERVIEW — owner24Oct2026.** The Journey line and Purchasing/Supplier, Warehouse, Logistics and Payment party cards replace the old GOODS/DELIVERY/PAYMENT group bands. Use UI MASTER Template1–7. Map may retain source-qualified parallel lanes; do not repeat a generic GOODS band beside the party-card Overview or use historical32/72px band spacing as current visual law.
 
 **The Sales Order is the ONLY root**, and goods, delivery and money leave it simultaneously. The
 origin carries its number and labelled SO Date as evidence but **no circular `Open SO-{n} →`

@@ -1,5 +1,12 @@
 # Carres Portal — Copy Standard
 
+## Current template copy correction — owner24Oct2026
+
+The latest Sales Order Template Spec in UI MASTER governs label case and missing values across all modules: field labels Title Case, table headers CAPS, sentences/notes sentence case. Missing values show nothing; `Not recorded` is retired as an empty-value placeholder, including quick cards and generated document fields. Keep labels, truthful read/error/permission/setup states and required-field validation. `Not received`, `No PO yet` and other actual business states remain facts, never invented to fill an empty value. Historical quoted observations containing the retired wording are evidence only. The optional Journey-step dash marks not-applicable, not a missing value. UI MASTER owns the exact current type/colour/geometry; this file owns copy.
+
+Order Route Overview uses one Journey line and Purchasing/Supplier, Warehouse, Logistics and Payment cards. `Now` is the current visual focus word; no generic GOODS band duplicates those cards. Source-qualified per-line goods facts survive inside their owners and Map/Documents. Existing parallel work is not serialised by the one Now marker. UI MASTER records the supplied nine display slots and the missing Ops§4 source; do not invent its business rules.
+
+
 ## Purchasing21Oct design vocabulary intake
 
 Presentation source: export28; [UI MASTER](ui/MASTER.md#purchasing-design-handoff--21-oct-2026--it-entry) and [Purchasing reconciliation](purchasing/MASTER.md#latest-purchasing-design-intake--21-oct-2026). This intake does not override existing governed action meanings, identifiers or approval permissions. Latest source vocabulary to map to existing components:
@@ -43,23 +50,9 @@ business vocabulary. The menu64/overlay/one-line-toolbar geometry and triggers l
 UI MASTER's17Oct narrow-panel contract; module facts, task wording and permissions are unchanged.
 
 
-## System-wide document number display — owner-confirmed 2026-10-04
+## System-wide document number display — owner24Oct2026
 
-**APPROVED TARGET / NOT BUILT across all surfaces.** The owner clarified that the two-digit
-year applies throughout the system, not only to PO. Every Carres date-bearing document number
-uses `YY` in its displayed date segment: for example `GRN-20261004-1234` displays as
-`GRN-261004-1234`, and `SCN-20261004-1234` as `SCN-261004-1234`. Already-short dates stay short;
-non-date legacy numbers acquire no invented date. Only the recognised year segment changes:
-never remove `20` from arbitrary serials, Unit IDs or supplier-provided invoice/DO references.
-
-Apply consistently to registers, cards, Working Panels, full details, related records, Work,
-Calendar links, search results, exports and newly rendered document previews. Preserve each
-family's governed prefix, separators, date granularity, serial and revision rules; PO's `-V{n}`
-is not a system-wide suffix. This presentation rule does not rewrite stored identities, source
-links, issued historical files or allocator policy. Search resolves original and displayed
-identities to the same record; any ambiguous result must retain source context, never guess.
-Cross-module adoption needs verification; no module may treat the rule as PO-only. Formal-number
-allocation continues to follow each family's approved numbering law.
+**APPROVED TARGET; APPLICATION ADOPTION NOT VERIFIED.** For the new date-bearing format, join the governed prefix directly to the date and use one hyphen before the serial: `DO261024-0001`, `PO260928-0004`, `GRN261008-0001`; PR/RO/DR/CO/TR follow the same separator shape. The supplied CR example is format evidence, not a new universal prefix. Preserve each family's approved identity, business partition, allocation/privacy and revision rules. A supplied serial example does not change random versus sequential allocation. Historical sheet references such as `PO/2607-035`, supplier-owned references, Unit IDs, issued documents and saved record identities remain unchanged. Do not renumber or silently normalise old documents; preserve original links and search resolution. Date-bearing new shapes use the governed original document date; examples do not permit guessing a missing date. UI MASTER owns presentation, while each module's numbering law owns allocation. Resolve any new allocator/date-granularity policy explicitly before build; no production data change is authorised here.
 
 ## Why this exists
 
@@ -2756,7 +2749,7 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | Inventory's can-it-be-sold column (owner ruling 2026-09-25) | **`Inventory Status`** with exactly **`Available` · `Reserved` · `Cannot sell`**; the reason for `Cannot sell` lives in the **`Stock Condition`** column (`New` · `Display` · `Old` · `Damaged` · `Wrong item` · `In repair` · `Waiting inspection`); a `Damaged`/`Old` Unit may be `Available` again for clearance sale (owner 2026-09-25) | `Stock use` · `Not available` · `Blocked` · `Reserved / sold` · a condition word inside the status |
 | Inventory's three after-OUT columns (owner ruling 2026-09-25) | **`Ship Date`** (the day the goods left the warehouse with the Logistics company — the pair to `Goods Received Date`; owner chose the international word over SAP's `Goods Issue Date`) · **`Pickup By`** (the company whose driver took the goods — owner's short word; `Logistics` stays the transport-company noun elsewhere) · **`Delivery Location`** (where it is going); all three blank while the Unit stands in a Site | Handed over (as a column head) · Goods Out Date · Pickup Date · Dispatch Date · Picked By · Carrier · Shipped by · With NETS Delivery · In transit · On the way · a company inside `Stock Location` |
 | Inventory's place column (owner ruling 2026-09-25) | the existing heading **`Stock Location`** with the existing place words only: **`Carres Klang`** · **`PJ Showroom`** · `AL Sungai Buloh` · `HOUZS Balakong` — the Site the Unit stands in or last stood in. No holder column exists: Carres owns the goods | `Who has it` · `Site` (as a column head) · `Holder` · `Where` · `With NETS Delivery` (Delivery's Items-panel word, not Inventory's) · `In transit` · `On the way to {destination}` · `NETS` as a warehouse |
-| Inventory absence words (owner ruling 2026-09-25) | **`No SO`** (not promised to anyone) · **`Not received`** (no Receiving record — an `Incoming` Unit) · **`Not recorded`** (fact never captured — including a held Unit whose `Goods Received Date` was never captured; it WAS received, so it never reads `Not received`). `Unit ID` · `Product` · `Stock use` never print an absence word | `—` for an optional fact · a blank cell · N/A |
+| Inventory facts and missing values — reconciled24Oct2026 | `No SO` and `Not received` only for their governed factual states; missing facts show nothing. Required identity omissions remain defects | `Not recorded` as a missing-value placeholder; a fabricated identity or receipt |
 | Inventory footer's second line when goods are still owed (owner ruling 2026-09-25) | **`{n} still to arrive · see Inbound`** — the same Pending Delivery arithmetic Inbound prints, never a second count; absent when n is 0 | Incoming {n} in the footer · counting not-yet-received goods inside `{n} records` |
 | Unit and Stock event history | **History** | In & out · Movements · Movement log · Ledger |
 | Cross-Site movement object | **Transfer** | Movement · Relocation; it appears in Inbound/Outbound/Inventory rather than a fifth top page |
@@ -3011,7 +3004,7 @@ words and puts the reason after a `·`, exactly as stair carry already qualifies
 | Report a problem, now inside the `⋮` menu (icon only; its accessible name is `More actions` — owner ruling 2026-09-21) | **`Report a problem`** | Raise an issue · Log a complaint · New Service Case |
 | The delivery address the customer has not given yet | **`Address not given yet`** | Unknown · Fill in later · TBC |
 | The Sales Orders row context menu (ONE ROW MENU, owner ruling 2026-10-05) | **`View` · `Print` · `Cancel SO`** — `View · Print` are the shared row-menu words every register starts with (`documentRowMenu`); `Cancel SO` alone after the divider | `Edit` in the row menu (reached through View since 2026-10-05) · `Print PDF` (retired as a menu word 2026-09-26) · `Download official PDF` (the PO row's word until 2026-10-05) · `Preview` · `Copy to new Sales Order` · `Request Delivery Order` (Delivery's door, never a Sales Order row — Jess 2026-09-26) |
-| A cell with no value, anywhere in a register | **`Not recorded`** | `Not given` · Not provided · None · N/A · — · a blank cell. **ONE word, YH 2026-08-29.** The Sales Orders register printed TWO — `Not given` for a fact the customer never told us, `Not recorded` for one Carres never wrote down — 20 cells against 18 on the same table. The distinction is real and invisible: an operator sees two spellings of empty and must work out whether they differ. `Not recorded` survives because it is honest about EVERY column; nobody *gives* us an invoice number or a showroom. Neither word had ever been registered here, while `lib/locality.ts` claimed `Not given` was governed by this file |
+| A missing value in a register, record, card or document field — owner24Oct2026 | Leave the value empty; keep its label where needed | `Not recorded`, dash, N/A, fabricated zero/date or a fake business state. Read failures and missing required input remain explicit |
 | Sales Orders register `PO No` cell with several documents (owner ruling 2026-10-06) | every number on one line, comma-separated, each its own link — `PO-20260902-8370, PO-20260910-4031`; the column keeps its width and is dragged wider to read more | `{first No} + {n} more` (withdrawn 2026-10-06) · `2 Purchase Orders` · a popover |
 | Sales Orders register `DO No` cell with several documents | unchanged as built: `{n} Delivery Orders` opening the list of every number; changes only with the owner's approval | `{first No} + {n} more` |
 | Sales Orders register `PO No` / `DO No` cell when no PO or DO exists for the order yet — OWNER RULING 2026-09-21 (Jess) · BUILT (Sales Orders Card 12) | **`No PO yet`** · **`No DO yet`**, muted, one line (owner preference 2026-09-21; also the SO goods expansion's `Deliver To` before any PO line). 🟡 SO Batch Purchase prints `Not ordered yet` for the same fact — converging it is Purchasing's own round | `Not recorded` (says Carres failed to write a number down; the document simply does not exist yet) · `No delivery order yet` (too long for the cell, and a second grammar beside `PO No`) · a blank cell |
