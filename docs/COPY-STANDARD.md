@@ -1169,6 +1169,20 @@ Purchasing MASTER §9.6. `Handover`, `Handover proof`, `Units / Qty`, `Return Do
 `Return No` are superseded as labels on this register, not globally retired custody vocabulary.
 Finance is excluded from this UI. Display approval does not rename stored records or APIs.
 
+### PO Amendments and Cancellation Requests — Weisiang (Mr Lim, WhatsApp) 2026-10-22
+
+Weisiang's decision; Jess was not part of it (Purchasing MASTER, migration 0717). Sidebar and
+page words: `PO Amendments` · `Cancellation Requests`. The PO revise form and `Cancel goods not
+received` form submit with `Send for approval`. Status words: `Waiting for approval` (amendment) ·
+`Waiting for PO Duty` · `Waiting for Purchasing Approver` (cancellation levels) · `Approved` ·
+`Rejected`. Columns: `Status` · `PO No` · `Supplier` · `Change` · `Reason` · `Requested by` ·
+`Requested` · `First approval` (cancellations) · `Decided by` · `Decided` · `Decision reason`.
+Row dialog: `Approve` · `Reject` · `Back`; `Decision reason` with hint `Needed to reject.`
+Change text: `{SKU}: Qty {was} to {now}` (`, Deliver To changes`) · `{SKU}: cancel {qty}` ·
+`Whole PO`. Refusals: `You cannot decide your own request.` · `Only PO Duty or its cover gives the
+first approval.` · `The second approval must be another person.` · `This purchase order already
+has a request waiting for approval.` · `Say why this request is rejected.`
+
 ### Showroom navigation — owner ruling 2026-10-02
 
 Module/page title: **`Showroom`**, with destinations **`Carres`** and **`Dealer`**.

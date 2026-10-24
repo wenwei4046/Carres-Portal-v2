@@ -85,6 +85,9 @@ describe("the approved hierarchy", () => {
       "Forecast Purchase",
       "Manual Purchase Request",
       "Purchase Orders",
+      /* 0717 · Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was not part of this decision). */
+      "PO Amendments",
+      "Cancellation Requests",
     ]);
     expect(group("purchasing-receive")).toEqual(["Receiving"]);
     expect(group("purchasing-problems")).toEqual([
@@ -99,8 +102,9 @@ describe("the approved hierarchy", () => {
     ]);
   });
 
-  it("is exactly eleven pages", () => {
-    expect(purchasing).toHaveLength(11);
+  it("is exactly thirteen pages", () => {
+    /* Eleven, plus PO Amendments and Cancellation Requests (0717 · Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was not part of this decision)). */
+    expect(purchasing).toHaveLength(13);
   });
 
   it("no row carries a hairline — Reports are central, not a Purchasing row", () => {
@@ -156,6 +160,9 @@ describe("the live destinations keep their exact current addresses", () => {
       ["Forecast Purchase", "/operation?tab=forecast-purchase"],
       ["Manual Purchase Request", "/operation?tab=manual-purchase"],
       ["Purchase Orders", "/operation/procurement"],
+      /* 0717 · Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was not part of this decision). */
+      ["PO Amendments", "/operation?tab=po-amendments"],
+      ["Cancellation Requests", "/operation?tab=po-cancellation-requests"],
       ["Receiving", "/operation?tab=receiving"],
       ["Supplier Claims", "/operation?tab=claims"],
       /* §9.6 — Purchase Returns opened 2026-09-19 with its register, its read

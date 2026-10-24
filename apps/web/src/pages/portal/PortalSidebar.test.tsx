@@ -543,7 +543,9 @@ describe("the tree line", () => {
     renderAt("/operation?tab=purchase"); // BUY open: three pages
     expect(trunk("purchase").style.height).toBe("100%");
     expect(trunk("manual-purchase").style.height).toBe("100%");
-    expect(trunk("purchase-orders").style.height).toBe("calc(50% - 8px)");
+    /* 0717 · the BUY group now ends at Cancellation Requests (Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was not part of this decision)). */
+    expect(trunk("purchase-orders").style.height).toBe("100%");
+    expect(trunk("po-cancellation-requests").style.height).toBe("calc(50% - 8px)");
   });
 
   it("the current page's elbow takes the theme colour; the others stay grey", () => {
@@ -924,7 +926,7 @@ describe("PortalSidebar — the Purchasing map", () => {
     expect(tree.querySelector(".border-t")).toBeNull();
   });
 
-  it("eleven pages in the approved order, and not a twelfth", () => {
+  it("thirteen pages in the approved order, and not a fourteenth", () => {
     renderAt("/operation?tab=purchase");
     for (const key of [
       "purchasing-buy",
@@ -944,6 +946,9 @@ describe("PortalSidebar — the Purchasing map", () => {
       "Forecast Purchase",
       "Manual Purchase Request",
       "Purchase Orders",
+      /* 0717 · Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was not part of this decision). */
+      "PO Amendments",
+      "Cancellation Requests",
       "Receiving",
       "Supplier Claims",
       "Purchase Returns",
@@ -1012,7 +1017,7 @@ describe("PortalSidebar — the Purchasing map", () => {
         .getByTestId("nav-group-children-purchasing-buy")
         .querySelectorAll("[data-testid^='nav-child-']"),
     ).map((el) => el.textContent?.replace("Coming soon", "").trim());
-    expect(rows).toEqual(["SO Batch Purchase", "Forecast Purchase", "Manual Purchase Request", "Purchase Orders"]);
+    expect(rows).toEqual(["SO Batch Purchase", "Forecast Purchase", "Manual Purchase Request", "Purchase Orders", "PO Amendments", "Cancellation Requests"]);
   });
 
   it("the rail word is `Manual Purchase Request`, in BUY (owner 2026-09-23)", () => {

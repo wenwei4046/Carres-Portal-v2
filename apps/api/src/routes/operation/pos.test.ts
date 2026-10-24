@@ -1154,11 +1154,15 @@ describe("POST /api/operation/pos/:id/cancel", () => {
       env,
     );
     expect(res.status).toBe(200);
-    expect(rpc).toHaveBeenCalledWith("operation_cancel_po", {
+    // 0717 · Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): a whole-PO
+    // cancel is sent for two approvals, never run on the reason alone.
+    expect(rpc).toHaveBeenCalledWith("purchasing_request_po_change", {
+      p_kind: "cancellation",
       p_po_id: PO_ID,
       p_reason: "Wrong supplier selected",
+      p_payload: {},
     });
-    assertRpcCallShape(rpc, "operation_cancel_po", ["p_po_id", "p_reason"]);
+    assertRpcCallShape(rpc, "purchasing_request_po_change", ["p_kind", "p_po_id", "p_reason", "p_payload"]);
   });
 
   it("returns 422 when reason is empty", async () => {
@@ -3414,7 +3418,7 @@ describe("existing PO revision exact contextual source transport", () => {
     for(const contextual of [false,true]) {
       const res=await app.fetch(new Request("https://api.test/api/operation/pos/TEST/revise",{method:"POST",headers:{Authorization:`Bearer ${await makeJwt("operation")}`,"Content-Type":"application/json"},body:JSON.stringify({reason:"TEST source growth",lines:[{lineId,qty:3,destinationId:null,...(contextual?{expectedPoVersion:1,requestSources:[source]}:{})}]})}),env);
       expect(res.status).toBe(200);
-      expect(rpc).toHaveBeenLastCalledWith("purchasing_revise_po",{p_po_id:"TEST",p_reason:"TEST source growth",p_lines:[{line_id:lineId,qty:3,destination_id:null,...(contextual?{expected_po_version:1,request_sources:[{demand_id:source.demandId,qty:3,request_version:1,approval_version:1,approval_token:source.approvalToken,recipients:[]}]}:{})}]});
+      expect(rpc).toHaveBeenLastCalledWith("purchasing_request_po_change",{p_kind:"amendment",p_po_id:"TEST",p_reason:"TEST source growth",p_payload:[{line_id:lineId,qty:3,destination_id:null,...(contextual?{expected_po_version:1,request_sources:[{demand_id:source.demandId,qty:3,request_version:1,approval_version:1,approval_token:source.approvalToken,recipients:[]}]}:{})}]});
     }
   });
   it.each(["missing version","duplicate source","wrong total"])("refuses %s before SQL", async(kind)=> {
@@ -3429,8 +3433,16 @@ describe("qualified cancellation stays on the existing PO door",()=> {
  it("passes the exact facts to the qualified overload without granting the reason-only signature evidence",async()=> {
   const rpc=vi.fn(async()=>({data:{state:"effective",poVersion:3},error:null}));vi.mocked(userClient).mockReturnValue({rpc} as never);
   const response=await app.fetch(new Request("https://api.test/api/operation/pos/TEST/cancel",{method:"POST",headers:{Authorization:`Bearer ${await makeJwt("operation")}`,"Content-Type":"application/json"},body:JSON.stringify({reason:"TEST supplier agreed",cancellation})}),env);
-  expect(response.status).toBe(200);expect(rpc).toHaveBeenCalledWith("operation_cancel_po",{p_po_id:"TEST",p_reason:"TEST supplier agreed",p_cancellation:cancellation});
-  expect(await response.json()).toEqual({cancellation:{state:"effective",poVersion:3}});
+  // 0717 · Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): `complete` waits for two approvals.
+  expect(response.status).toBe(200);expect(rpc).toHaveBeenCalledWith("purchasing_request_po_change",{p_kind:"cancellation",p_po_id:"TEST",p_reason:"TEST supplier agreed",p_payload:cancellation});
+  expect(await response.json()).toEqual({request:{state:"effective",poVersion:3}});
+ });
+ it("records supplier facts directly, through the door that refuses `complete`",async()=> {
+  const rpc=vi.fn(async()=>({data:{state:"pending"},error:null}));vi.mocked(userClient).mockReturnValue({rpc} as never);
+  const record={...cancellation,action:"record"};
+  const response=await app.fetch(new Request("https://api.test/api/operation/pos/TEST/cancel",{method:"POST",headers:{Authorization:`Bearer ${await makeJwt("operation")}`,"Content-Type":"application/json"},body:JSON.stringify({reason:"TEST supplier asked",cancellation:record})}),env);
+  expect(response.status).toBe(200);expect(rpc).toHaveBeenCalledWith("purchasing_record_po_cancellation",{p_po_id:"TEST",p_reason:"TEST supplier asked",p_cancellation:record});
+  expect(await response.json()).toEqual({cancellation:{state:"pending"}});
  });
  it("lets Finance read only the owning money-free cancellation continuation, no PO write",async()=> {
   const rpc=vi.fn(async()=>({data:{lines:[],events:[],financeHandoffs:[{sourceType:"po_cancellation",ownerModule:"finance",state:"needs_finance_review"}]},error:null}));vi.mocked(userClient).mockReturnValue({rpc} as never);
@@ -3486,4 +3498,23 @@ describe("PO saved sending screenshot reader", () => {
     expect(res.status).toBe(503);
     expect(await res.json()).toMatchObject({ code: "po_send_evidence_unavailable" });
   });
+});
+
+// 0717 · Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was not part
+// of this decision): the PO Amendments register and Cancellation Requests queue.
+describe("PO change requests (0717)",()=> {
+ it("decides through the one SQL door and names who acted on the list",async()=> {
+  const rpc=vi.fn(async(name:string)=>name==="actor_display_names"?{data:[{id:"u1",name:"Ah Mei"}],error:null}:{data:{id:"r1",status:"first_approved"},error:null});
+  const order=vi.fn(()=>({limit:async()=>({data:[{id:"r1",po_id:"PO-1",requested_by:"u1",first_approved_by:null,decided_by:null,purchase_orders:{suppliers:{name:"TEST Supplier"}}}],error:null})}));
+  const from=vi.fn((table:string)=>table==="salespersons"?{select:()=>({in:async()=>({data:[],error:null})})}:{select:()=>({eq:()=>({order})})});
+  vi.mocked(userClient).mockReturnValue({rpc,from} as never);
+  const token=await makeJwt("operation");
+  const decide=await app.fetch(new Request("https://api.test/api/operation/pos/change-requests/r1/decide",{method:"POST",headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},body:JSON.stringify({approve:true})}),env);
+  expect(decide.status).toBe(200);expect(rpc).toHaveBeenCalledWith("purchasing_decide_po_change",{p_id:"r1",p_approve:true,p_note:null});
+  const bad=await app.fetch(new Request("https://api.test/api/operation/pos/change-requests?kind=price",{headers:{Authorization:`Bearer ${token}`}}),env);
+  expect(bad.status).toBe(422);
+  const list=await app.fetch(new Request("https://api.test/api/operation/pos/change-requests?kind=cancellation",{headers:{Authorization:`Bearer ${token}`}}),env);
+  expect(list.status).toBe(200);expect(from).toHaveBeenCalledWith("po_change_requests");
+  expect(((await list.json()) as {requests:unknown[]}).requests[0]).toMatchObject({id:"r1",supplier_name:"TEST Supplier",requested_by_name:"Ah Mei"});
+ });
 });
