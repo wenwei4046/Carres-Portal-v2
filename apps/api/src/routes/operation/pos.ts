@@ -35,6 +35,9 @@ import {
   type PoReportResponse,
   type WarehouseReceiptLine,
   claimPhotoWire,
+  newPurchaseOrderInput,
+  PURCHASING_REFUSAL_CODES,
+  purchasingRefusal,
 } from "@carres/shared";
 // renderPoPdf moved to apps/web/src/lib/pdf/render.ts (Workers WASM ban).
 import { requireOperation } from "../../lib/auth-guards";
@@ -1970,6 +1973,105 @@ operationPosRouter.get("/:id/source-orders", requireOperation, async (c) => {
 // The RPCs themselves are NOT dropped — they are the construction history of
 // every PO on file — but migration 0339 revokes EXECUTE from `public`, `anon`
 // and `authenticated`, so this route could not reach them even if it returned.
+
+// ----- POST /new — a Purchase Order with no source (Houzs way) -----
+//
+// Weisiang's decision (Mr Lim, WhatsApp 2026-10-22, relayed by YH 2026-10-23):
+// "just clear Carress rules and Implement Houzs inside, as long as they can
+// open SO PO DO". Office staff open a PO by naming the supplier, Deliver To,
+// goods and dates. This overturns Jess's "No blank independent PO" rule
+// (docs/purchasing/MASTER.md); Jess was not part of the decision.
+//
+// It is NOT a second creation authority. The one authority stays
+// `purchasing_issue_pos_batch`, which already accepts a line with no demand,
+// no Sales Order lineage and no request: its actor gate, supplier-truth check,
+// commercial gate, Deliver To check, number draw and Unit ID birth all apply
+// unchanged. The retired `POST /` and `POST /batch` stay retired.
+operationPosRouter.post("/new", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, newPurchaseOrderInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const input = parsed.data;
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  // The warehouse the goods land in: the Deliver To's own warehouse, else the
+  // own Klang warehouse — the same choice Manual Purchase makes.
+  const [dest, wh, cat, sup, collection] = await Promise.all([
+    sb.from("purchasing_destinations").select("id, name, address, warehouse_id, warehouses(address)").eq("id", input.destinationId).maybeSingle(),
+    sb.from("warehouses").select("id, name").eq("kind", "own"),
+    sb.from("product_skus").select("sku, cost").in("sku", [...new Set(input.lines.map((l) => l.sku))]),
+    sb.from("suppliers").select("kind, name").eq("id", input.supplierId).maybeSingle(),
+    sb.from("purchasing_supplier_settings").select("fixed_destination_id, collected_by_partner_id").eq("supplier_id", input.supplierId).maybeSingle(),
+  ]);
+  const readError = dest.error ?? wh.error ?? cat.error ?? sup.error ?? collection.error;
+  if (readError) {
+    const m = mapPgError(readError);
+    return c.json(m.body, m.status);
+  }
+  const refuse = (status: 422, code: string, facts?: Parameters<typeof purchasingRefusal>[1]) => {
+    const r = purchasingRefusal(code, facts);
+    return c.json({ error: code, code, message: r.wrong, action: r.todo }, status);
+  };
+  // Same pre-checks as Manual Purchase, before a PO number is spent: a Deliver To
+  // with no address (the PO paper refuses it later), and a factory-pickup
+  // supplier's collection partner and fixed Deliver To from its settings.
+  const destRow = dest.data as { name: string | null; address: string | null; warehouse_id: string | null; warehouses: { address?: string | null } | { address?: string | null }[] | null } | null;
+  if (destRow) {
+    const whAddr = Array.isArray(destRow.warehouses) ? destRow.warehouses[0]?.address : destRow.warehouses?.address;
+    const address = destRow.warehouse_id != null ? whAddr ?? null : destRow.address;
+    if (typeof address !== "string" || address.trim() === "") {
+      return refuse(422, "destination_address_missing", { destination: destRow.name ?? null });
+    }
+  }
+  const supRow = sup.data as { kind: string | null; name: string | null } | null;
+  const setting = collection.data as { fixed_destination_id: string | null; collected_by_partner_id: string | null } | null;
+  const pickup = supRow?.kind === "factory_pickup";
+  const partnerId = pickup ? (input.procurementPartnerId ?? setting?.collected_by_partner_id ?? null) : (input.procurementPartnerId ?? null);
+  if (pickup && setting?.fixed_destination_id && setting.fixed_destination_id !== input.destinationId) {
+    return refuse(422, "supplier_collection_destination_mismatch", { supplier: supRow?.name ?? null, destination: null });
+  }
+  const own = (wh.data ?? []) as Array<{ id: string; name: string | null }>;
+  const warehouseId = destRow?.warehouse_id
+    ?? (own.find((w) => /klang|klg/i.test(w.name ?? "")) ?? own[0])?.id
+    ?? null;
+  const catalogCost = new Map(((cat.data ?? []) as Array<{ sku: string; cost: number | null }>).map((r) => [r.sku, r.cost == null ? null : Number(r.cost)]));
+
+  const { data, error } = await sb.rpc("purchasing_issue_pos_batch", {
+    p_pos: [{
+      supplier_id: input.supplierId,
+      warehouse_id: warehouseId,
+      destination_id: input.destinationId,
+      eta_date: input.etaDate ?? null,
+      procurement_partner_id: partnerId,
+      so_refs: null,
+      purpose: null,
+      note: input.note || null,
+      lines: input.lines.map((l) => {
+        const listed = catalogCost.get(l.sku) ?? null;
+        const catalog = listed != null && Number.isFinite(listed) && listed > 0 ? listed : null;
+        // Blank price: the Catalog price, or an honest absence (0573) when there is none.
+        if (l.price == null) {
+          return { sku: l.sku, qty: l.qty, cost: catalog, cost_source: catalog == null ? null : "catalog",
+            commercial_treatment: catalog == null ? null : "normal", commercial_reason: null, expected_catalog_cost: catalog };
+        }
+        const same = catalog != null && l.price === catalog;
+        return { sku: l.sku, qty: l.qty, cost: l.price, cost_source: same ? "catalog" : "hand_entered",
+          commercial_treatment: "normal", commercial_reason: null, expected_catalog_cost: catalog };
+      }),
+    }],
+  });
+  if (error) {
+    const detail = String((error as { details?: string }).details ?? "").trim();
+    if ((PURCHASING_REFUSAL_CODES as readonly string[]).includes(detail)) {
+      const r = purchasingRefusal(detail);
+      const status = detail === "not_po_duty" ? 403 : detail === "supplier_price_changed" ? 409 : 422;
+      return c.json({ error: detail, code: detail, message: r.wrong, action: r.todo }, status);
+    }
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  const poId = ((data as { po_ids?: string[] } | null)?.po_ids ?? [])[0] ?? null;
+  return c.json({ poId }, 201);
+});
 
 // ----- POST /:id/receive — RETIRED 2026-08-03 (Card C1, Jess) -----
 //

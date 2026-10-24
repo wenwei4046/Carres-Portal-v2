@@ -3301,6 +3301,8 @@ export * from "./payment-duplicate";
 export * from "./purchase-order-register";
 
 export { recordArrivalConfirmationInput, recordSupplierAnswersInput, recordSupplierReplyInput } from "./schemas/operation";
+export { newPurchaseOrderInput } from "./schemas/operation";
+export type { NewPurchaseOrderInput } from "./schemas/operation";
 export type { RecordSupplierAnswersInput } from "./schemas/operation";
 
 export {
