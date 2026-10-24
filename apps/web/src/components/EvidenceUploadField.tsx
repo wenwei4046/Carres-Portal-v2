@@ -50,6 +50,8 @@ type Props<E extends { path: string; kind: string }> = {
   sign: (file: File) => Promise<{ token: string; path: string }>;
   /** The private storage bucket the signed slot belongs to. */
   bucket: string;
+  /** Optional receipt-owned transfer/finalisation; the shared picker still owns per-file retry. */
+  upload?: (slot: {token:string;path:string}, file:File) => Promise<void>;
   imageMimes: readonly string[];
   videoMimes: readonly string[];
   /** Absent = PDFs are not accepted (every caller before 0587). */
@@ -61,6 +63,7 @@ type Props<E extends { path: string; kind: string }> = {
   maxFiles: number;
   ariaLabel: string;
   disabled?: boolean;
+  appendOnly?: boolean;
   testId?: string;
 };
 
@@ -71,6 +74,7 @@ export default function EvidenceUploadField<E extends { path: string; kind: stri
   onChange,
   sign,
   bucket,
+  upload: transfer,
   imageMimes,
   videoMimes,
   pdfMimes = [],
@@ -80,6 +84,7 @@ export default function EvidenceUploadField<E extends { path: string; kind: stri
   maxFiles,
   ariaLabel,
   disabled,
+  appendOnly = false,
   testId,
 }: Props<E>) {
   const [files, setFiles] = useState<FileState[]>([]);
@@ -104,16 +109,17 @@ export default function EvidenceUploadField<E extends { path: string; kind: stri
     );
     try {
       const slot = await sign(state.file);
-      const { error } = await supabase.storage
-        .from(bucket)
-        .uploadToSignedUrl(slot.path, slot.token, state.file);
-      if (error) throw error;
+      if (transfer) await transfer(slot,state.file);
+      else {
+        const { error } = await supabase.storage.from(bucket).uploadToSignedUrl(slot.path, slot.token, state.file);
+        if (error) throw error;
+      }
       setFiles((prev) =>
         prev.map((f) =>
           f.id === state.id ? { ...f, status: "done", path: slot.path } : f,
         ),
       );
-      onChange([
+      if (!entriesRef.current.some(entry=>entry.path===slot.path)) onChange([
         ...entriesRef.current,
         { path: slot.path, kind: state.kind } as E,
       ]);
@@ -207,7 +213,7 @@ export default function EvidenceUploadField<E extends { path: string; kind: stri
           {files.map((f) => (
             <li
               key={f.id}
-              className="flex items-center gap-2"
+              className="flex flex-wrap items-center gap-2"
               data-testid={testId ? `${testId}-file` : undefined}
             >
               {f.kind === "photo" ? (
@@ -250,13 +256,13 @@ export default function EvidenceUploadField<E extends { path: string; kind: stri
                   </button>
                 </>
               )}
-              <button
+              {(!appendOnly || f.status !== "done") && <button
                 type="button"
                 className="btn-ghost px-1.5 py-0 text-body font-medium"
                 onClick={() => remove(f)}
               >
                 Remove
-              </button>
+              </button>}
             </li>
           ))}
         </ul>

@@ -1280,6 +1280,16 @@ export {
 } from "./receiving-register";
 export {
   warehouseSubmitReceiptInput,
+  warehouseConfirmationReportInput,
+  warehouseConfirmReceiptInput,
+  warehouseConfirmationResult,
+  warehouseConfirmationReadiness,
+  receivingExtraCustodyEvidence,
+  receivingSourceReservationResults,
+  receivingExtraCustodyNote,
+  type WarehouseConfirmationReportInput,
+  type WarehouseConfirmReceiptInput,
+  type WarehouseConfirmationResult,
   warehouseReceiptReturnInput,
   type WarehouseSubmitReceiptInput,
   type WarehouseReceiptReturnInput,
@@ -3455,3 +3465,6 @@ export * from "./courier-dispatch";
 export { purchaseRequestReleaseSchema, type PurchaseRequestRelease } from "./purchase-request-context";
 
 export * from "./po-send-evidence";
+
+export {receivingReportEvidenceFiles,type ReceivingReportEvidenceFiles} from "./schemas/warehouse";
+export {receivingExtraObservation,receivingExtraObservationNote,receivingExtraObservations,recordExtraObservationInput,type ReceivingExtraObservation,type ReceivingExtraObservations,type RecordExtraObservationInput} from "./schemas/warehouse";

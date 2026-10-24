@@ -191,6 +191,15 @@ describe("POST /api/hr/team/staff-code", () => {
 });
 
 describe("POST /api/hr/team/accounts", () => {
+  it.each([true, undefined])("keeps Warehouse identity explicit (%s), with no internal staff privileges or new Site", async(warehouseIndividual)=>{
+    const site="00000000-0000-4000-8000-000000000401";
+    const {admin,calls}=makeAdminMock({app_users:[{data:null},{data:null}],warehouses:{data:{id:site}},audit_log:{data:null}},{createUser:{data:{user:{id:USER_A}}}});
+    const result=await authed("/api/hr/team/accounts","hr",{method:"POST",body:JSON.stringify({name:"TEST Warehouse Individual",email:"individual@example.invalid",role:"warehouse",warehouseId:site,warehouseIndividual,tempPassword:"test-only-password"})});
+    expect(result.status).toBe(201);
+    expect((calls.app_users??[])[0]).toMatchObject({is_person:warehouseIndividual===true,role:"warehouse",warehouse_id:site,staff_code:null,position_id:null});
+    expect(admin.rpc).not.toHaveBeenCalledWith("next_staff_code");
+  });
+
   it("only a principal can mint a principal account", async () => {
     const res = await authed("/api/hr/team/accounts", "hr", {
       method: "POST",

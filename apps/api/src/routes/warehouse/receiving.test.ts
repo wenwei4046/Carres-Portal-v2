@@ -399,3 +399,72 @@ describe("POST /api/warehouse/receipts", () => {
     expect(JSON.stringify(await res.json())).toContain("already waiting");
   });
 });
+
+/** The final-confirmation door never changes into the legacy count promise. */
+describe("Warehouse final confirmation contract", () => {
+  const receiptId = "00000000-0000-4000-8000-000000000123";
+  const saved = { id: receiptId, receipt_id: receiptId, status: "posted", grn_no: "GRN-TEST-1", revision: 0, blockers: [], already_saved: false };
+  const input = { saveKey: "00000000-0000-4000-8000-000000000456", report: { poId: "PO-TEST", lines: [{ id: LINE, receivedNow: 1 }] } };
+
+  it("keeps the old count mode explicit only when readiness is genuinely not deployed", async () => {
+    vi.mocked(userClient).mockReturnValue(makeSb({ error: { code: "PGRST202", message: "Could not find public.warehouse_receiving_readiness in the schema cache" } }) as never);
+    const r = await req("/api/warehouse/confirmation/readiness", "GET", await warehouseJwt());
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ mode: "legacy_count", reason: "confirmation_not_available" });
+  });
+  it("a readiness read failure does not silently select legacy mode", async () => {
+    vi.mocked(userClient).mockReturnValue(makeSb({ error: { code: "PGRST000", message: "Connection unavailable" } }) as never);
+    const r = await req("/api/warehouse/confirmation/readiness", "GET", await warehouseJwt());
+    expect(r.status).toBe(503);
+    expect(await r.json()).not.toMatchObject({ mode: "legacy_count" });
+  });
+  it("a missing final engine refuses instead of submitting a count", async () => {
+    vi.mocked(userClient).mockReturnValue({ rpc: async (name: string) => name === "warehouse_confirm_receipt"
+      ? { data: null, error: { code: "PGRST202", message: "warehouse_confirm_receipt not deployed" } }
+      : { data: { id: receiptId, status: "submitted" }, error: null } } as never);
+    const r = await req("/api/warehouse/receipts/confirm", "POST", await warehouseJwt(), input);
+    expect(r.status).toBe(503);
+    expect(await r.json()).toMatchObject({ code: "receiving_confirmation_unavailable" });
+  });
+  it("preserves missing physical facts for the engine's blocked report instead of zero/Not received", async () => {
+    const blocked = { ...saved, status: "draft", grn_no: null, blockers: [{ code: "receipt_quantity_unknown", message: "Physical quantities are not recorded" }] };
+    vi.mocked(userClient).mockReturnValue({ rpc: async (_name: string, args: Record<string, unknown>) => {
+      const report = args.p_report as { lines: Array<{ received_now?: number | null; units?: Array<{ outcome?: string | null }> }> };
+      return { data: report.lines[0]?.received_now === null && report.lines[0]?.units?.[0]?.outcome === null ? blocked : saved, error: null };
+    } } as never);
+    const r = await req("/api/warehouse/receipts/confirm", "POST", await warehouseJwt(), { ...input, report: { poId: "PO-TEST", lines: [{ id: LINE, receivedNow: null, units: [{ unitCode: "U-TEST", outcome: null }] }] } });
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ status: "draft", grn_no: null, blockers: [{ code: "receipt_quantity_unknown" }] });
+  });
+  it("passes an unidentified observation to the same draft engine without inventing source or goods", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { ...saved, status: "draft", grn_no: null, blockers: [{code:"source_not_available",message:"Source not available"}] }, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const report = {poId:null,arrivalSourceId:null,note:"TEST 2 sealed cartons; source unknown",handoverPerson:"TEST Driver",lines:[],arrivalUnits:[],extraLines:[],arrivalEvidence:[]};
+    const response = await req("/api/warehouse/receipts/confirm", "POST", await warehouseJwt(), {saveKey:input.saveKey,report});
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({status:"draft",grn_no:null});
+    expect(rpc).toHaveBeenCalledWith("warehouse_confirm_receipt", expect.objectContaining({p_save_key:input.saveKey,p_receipt_id:null,p_revision:null,p_report:expect.objectContaining({po_id:null,arrival_source_id:null,note:report.note,lines:[],arrival_units:[],extra_lines:[]})}));
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+  it("refuses a posted answer without a real GRN", async () => {
+    vi.mocked(userClient).mockReturnValue(makeSb({ data: { ...saved, grn_no: null } }) as never);
+    const r = await req("/api/warehouse/receipts/confirm", "POST", await warehouseJwt(), input);
+    expect(r.status).toBe(502);
+  });
+  it("returns the engine's evidenced posted result", async () => {
+    vi.mocked(userClient).mockReturnValue(makeSb({ data: saved }) as never);
+    const r = await req("/api/warehouse/receipts/confirm", "POST", await warehouseJwt(), input);
+    expect(r.status).toBe(200);
+    expect(await r.json()).toEqual(saved);
+  });
+  it("requires both correction identity and revision", async () => {
+    vi.mocked(userClient).mockReturnValue(makeSb({ data: saved }) as never);
+    const r = await req("/api/warehouse/receipts/confirm", "POST", await warehouseJwt(), { ...input, receiptId });
+    expect(r.status).toBe(422);
+  });
+  it("does not admit Operation through the Warehouse confirmation door", async () => {
+    vi.mocked(userClient).mockReturnValue(makeSb({ data: saved }) as never);
+    const r = await req("/api/warehouse/receipts/confirm", "POST", await makeJwt("operation"), input);
+    expect(r.status).toBe(403);
+  });
+});

@@ -28,6 +28,7 @@ const MAX_SIZE = 10 * 1024 * 1024;
 type Props = {
   poId: string;
   arrivalSourceId?: string;
+  arrivalProofDoor?: "operation" | "warehouse";
   imageOnly?: boolean;
   doNumber: string;
   onUploaded: (filePath: string) => void;
@@ -38,6 +39,7 @@ export default function DOFileUploadField({
   doNumber,
   onUploaded,
   arrivalSourceId,
+  arrivalProofDoor = "operation",
   imageOnly = false,
 }: Props) {
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +48,10 @@ export default function DOFileUploadField({
 
   async function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     setError(null);
-    const file = e.target.files?.[0];
+    const input = e.currentTarget;
+    const file = input.files?.[0];
+    // Retain the File, clear the native selection so the same file can retry.
+    input.value = "";
     if (!file) return;
 
     if (
@@ -69,7 +74,7 @@ export default function DOFileUploadField({
     try {
       const sign = await apiFetch<{ token: string; path: string }>(
         arrivalSourceId
-          ? `/api/operation/arrival-sources/${arrivalSourceId}/proof`
+          ? arrivalProofDoor === "warehouse" ? `/api/warehouse/confirmation/arrivals/${arrivalSourceId}/proof` : `/api/operation/arrival-sources/${arrivalSourceId}/proof`
           : "/api/storage/dos/sign-upload",
         {
           method: "POST",

@@ -1,4 +1,9 @@
+import {receivingExtraObservationsRouter} from "../receiving-extra-observations";
+import { receivingReportEvidenceRouter } from "../receiving-report-evidence";
+import { receivingActorNames } from "../../lib/receiving-actor-names";
+import receivingExtraRouter from "./receiving-extra";
 import { Hono } from "hono";
+import { receivingPostedWorkCompletion } from "../../lib/receiving-work-completion";
 import { z } from "zod";
 import {
   arrivalReceivingInput,
@@ -53,6 +58,28 @@ import { repairOrderReturnWorkCompletion } from "../../lib/repair-order-work";
  * the only lock.
  */
 const warehouseReceiptsRouter = new Hono<AppEnv>();
+warehouseReceiptsRouter.route("/",receivingExtraObservationsRouter("office"));
+warehouseReceiptsRouter.route("/",receivingReportEvidenceRouter("office"));
+warehouseReceiptsRouter.route("/", receivingExtraRouter);
+
+/** Unresolved module reports only; ordinary drafts never become Work. */
+warehouseReceiptsRouter.get("/work-reports",requireOperation,async c=>{
+  const sb=userClient(c.env,c.var.auth.jwt);
+  const result=await readAllPages((from,to)=>sb.from("warehouse_receipts").select("*").in("status",["submitted","draft"]).order("submitted_at").order("id").range(from,to));
+  if("error" in result){const m=mapPgError(result.error);return c.json(m.body,m.status);}
+  if("tooMany" in result)return c.json({code:"too_many_rows"},422);
+  let supplierNames=new Map<string,string|null>();
+  try {
+    const pos=await readByIds<{id:string;suppliers:unknown}>(result.rows.map(row=>row.po_id).filter((id):id is string=>typeof id==="string"),(ids)=>sb.from("purchase_orders").select("id,suppliers(name)").in("id",ids));
+    supplierNames=new Map(pos.map(po=>{const supplier=z.object({name:z.string().nullable()}).nullable().parse(po.suppliers);return [po.id,supplier?.name ?? null];}));
+  } catch { return c.json({message:"Receiving source could not be loaded"},503); }
+  const receipts=result.rows.filter(row=>row.status==="submitted" || (row.status==="draft" && row.submitted_from==="warehouse" && row.raw_report && typeof row.raw_report==="object" && Array.isArray(row.validation_blockers) && row.validation_blockers.length>0)).map(row=>({
+    id:row.id,po_id:row.po_id ?? null,supplier_name:typeof row.po_id==="string" ? supplierNames.get(row.po_id) ?? null : null,status:row.status,goods_received_at:row.goods_received_at,
+    submitted_at:row.submitted_at,actual_site_id:row.actual_site_id,warehouse_id:row.warehouse_id,
+    has_raw_report:row.raw_report!=null,validation_blockers:row.validation_blockers,
+  }));
+  return c.json({receipts});
+});
 
 // Source receipts remain a Receiving operation, under the same GRN Duty gate.
 warehouseReceiptsRouter.post(
@@ -160,11 +187,11 @@ const RECEIPT_SELECT_WITHOUT_ARRIVAL = `id, ${RECEIPT_FIELDS}`;
 /** Run a receipts read with the full select; retry once without the optional
  *  column when the deployed schema does not carry it. Any other error is the
  *  caller's to handle unchanged. */
-async function readReceipts<T>(run: (select: string) => Promise<T>): Promise<T> {
+async function readReceipts<T>(run: (select: string) => Promise<T>, includeReport = false): Promise<T> {
   // 0601's columns first; a schema that does not carry them yet (the Worker
   // deploys on merge, the migration is applied through its governed path)
   // still opens every record, reading `Time not recorded` and no receiver.
-  for (const select of [RECEIPT_SELECT_0601, RECEIPT_SELECT]) {
+  for (const select of [...(includeReport ? [`${RECEIPT_SELECT_0601}, raw_report, validation_blockers, save_key`] : []), RECEIPT_SELECT_0601, RECEIPT_SELECT]) {
     try {
       return await run(select);
     } catch (error) {
@@ -1051,7 +1078,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
  * "zero ops typing" promise quietly withdrawn — a count ops disagrees with goes
  * BACK, with a reason, to the only people who can look at the goods again.
  */
-warehouseReceiptsRouter.post("/:id/check-in", requireOperation, async (c) => {
+warehouseReceiptsRouter.post("/:id/check-in", requireOperation, receivingPostedWorkCompletion(), async (c) => {
   // The optional body carries only the Actual Site — everything counted was
   // decided by the person who held the pallet. Absent body = original flow.
   // Validated as a UUID here, so a malformed value is the caller's 422 and
@@ -1173,7 +1200,7 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
       };
       if (res.error) throw res.error;
       return res.data;
-    });
+    }, true);
   } catch (e) {
     error = e;
   }
@@ -1183,6 +1210,15 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
   }
   if (!row) return c.json({ error: "receipt not found" }, 404);
   const r = row as ReceiptRow;
+
+  let arrivalSource: {id:string;source_no:string;kind:string;claim_id:string|null;units:Array<{stock_item_id:string;unit:{unit_code:string;sku:string}|null}>} | null=null;
+  const reportedArrival=(r.raw_report as {arrival_source_id?:unknown}|null)?.arrival_source_id;
+  const arrivalId=typeof r.arrival_source_id==="string"?r.arrival_source_id:typeof reportedArrival==="string"&&z.string().uuid().safeParse(reportedArrival).success?reportedArrival:null;
+  if(arrivalId){
+    const source=await sb.from("arrival_sources").select("id,source_no,kind,claim_id,units:arrival_source_units(stock_item_id,unit:ops_stock_items!arrival_source_units_stock_item_id_fkey(unit_code,sku))").eq("id",arrivalId).maybeSingle();
+    if(source.error)return c.json({message:"Receiving source could not be loaded"},503);
+    arrivalSource=z.object({id:z.string().uuid(),source_no:z.string(),kind:z.string(),claim_id:z.string().uuid().nullable(),units:z.array(z.object({stock_item_id:z.string().uuid(),unit:z.object({unit_code:z.string(),sku:z.string()}).nullable()}))}).nullable().parse(source.data);
+  }
 
   // Related documents are read through this actor's RLS scope and exact source IDs.
   // A failed relationship read is unavailable, never a false empty result.
@@ -1287,6 +1323,12 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
     for (const u of users ?? [])
       userNames.set(u.id as string, u.name as string);
   }
+  if (r.posted_authority === "warehouse_confirmation" || (r.raw_report && typeof r.raw_report === "object")) {
+    try {
+      const recorded = await receivingActorNames(sb, id, userIds);
+      for (const [actor, actorName] of Object.entries(recorded ?? {})) userNames.set(actor, actorName);
+    } catch { return c.json({ message: "Receiving actor names could not be loaded" }, 503); }
+  }
   const whIds = [r.warehouse_id, r.actual_site_id].filter(
     (v): v is string => typeof v === "string" && v.length > 0,
   );
@@ -1379,6 +1421,13 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
   }
   const name = (v: unknown) =>
     typeof v === "string" && v.length > 0 ? (userNames.get(v) ?? null) : null;
+  let reportedSource: {id:string;lines:Array<{id:string;sku:string}>} | null=null;
+  const raw=r.raw_report as {po_id?:unknown}|null;
+  if(r.status==="draft" && typeof raw?.po_id==="string" && raw.po_id.length>0 && raw.po_id.length<=100){
+    const source=await sb.from("purchase_orders").select("id,purchase_order_lines(id,sku)").eq("id",raw.po_id).maybeSingle();
+    if(source.error)return c.json({message:"Receiving source could not be loaded"},503);
+    if(source.data)reportedSource={id:source.data.id,lines:source.data.purchase_order_lines ?? []};
+  }
   const sup = (po as Record<string, unknown> | null)?.suppliers as {
     name?: string;
   } | null;
@@ -1403,6 +1452,8 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
       arrival_evidence_files: arrivalEvidence,
       unit_results: unitResults,
     },
+    arrival_source: arrivalSource,
+    reported_source: reportedSource,
     related_records: await relatedRead,
     line_info: lineInfo,
     po: po ?? null,

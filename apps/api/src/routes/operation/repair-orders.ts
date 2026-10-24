@@ -99,8 +99,7 @@ function failRo(c: Context, error: { code?: string; message?: string; details?: 
 const str = (v: unknown) => (typeof v === "string" && v ? v : null);
 
 /** Read everything the register and the object page print, for these ROs. */
-async function assemble(c: Context<AppEnv>, documents: Row[]): Promise<{ rows: RepairOrderDetail[]; error: unknown }> {
-  const sb = userClient(c.env, c.var.auth.jwt);
+async function assemble(c: Context<AppEnv>, documents: Row[], sb = userClient(c.env, c.var.auth.jwt)): Promise<{ rows: RepairOrderDetail[]; error: unknown }> {
   const ids = documents.map((d) => d.id as string);
   if (ids.length === 0) return { rows: [], error: null };
 
@@ -266,6 +265,26 @@ async function assemble(c: Context<AppEnv>, documents: Row[]): Promise<{ rows: R
 
 const DOC_SELECT =
   "id, ro_no, ro_doc_date, version, supplier_id, supplier_claim_id, cost_responsibility, price, quotation_path, pickup_site_id, return_site_id, supplier_received_at, supplier_received_source, supplier_received_evidence, return_target_date, return_target_working_days, return_target_calendar, cancelled_at, cancel_reason, created_by, created_at";
+
+/** Server-only completion facts: the actual Warehouse JWT first attests the
+ * exact receiving Site/source. No RO document, contact or permission is returned
+ * to Warehouse; the existing assembler/projector remains the one Work source. */
+export async function readRepairOrderForWarehouseReceiving(c:Context<AppEnv>,sourceId:string,roId?:string):Promise<RepairOrderDetail|null>{
+  if(c.var.auth.role!=="warehouse")throw new Error("Warehouse source attestation required");
+  const admitted=await userClient(c.env,c.var.auth.jwt).rpc("warehouse_arrival_proof_allowed",{p_source_id:sourceId,p_require_open:false});
+  if(admitted.error || admitted.data!==true)throw new Error("Repair return source not available");
+  const sb=adminClient(c.env);
+  const source=await sb.from("arrival_sources").select("repair_order_id,kind").eq("id",sourceId).maybeSingle();
+  if(source.error)throw new Error("Repair return source could not be read");
+  if(source.data?.kind!=="repair-return" || !source.data.repair_order_id)return null;
+  const id=source.data.repair_order_id as string;
+  if(roId && id!==roId)throw new Error("Repair return source changed");
+  const document=await sb.from("repair_orders").select(DOC_SELECT).eq("id",id).maybeSingle();
+  if(document.error || !document.data)throw new Error("Repair return facts could not be read");
+  const result=await assemble(c,[document.data as Row],sb);
+  if(result.error || result.rows.length!==1)throw new Error("Repair return facts could not be read");
+  return result.rows[0]!;
+}
 
 // ── GET / — the register (every permitted row; the rail counts need all) ────
 router.get("/", async (c) => {

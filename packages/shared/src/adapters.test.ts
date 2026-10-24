@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  warehouseConfirmationReportFromWire,
+  warehouseConfirmationReportToWire,
   catalogOptionPoolFromRow,
   catalogFabricFromRow,
   catalogFabricsHistoryFromRow,
@@ -1647,5 +1649,17 @@ describe("rental + service plan adapters (0247-0249)", () => {
       actor: null,
       occurredAt: "2026-12-01T10:00:00Z",
     });
+  });
+});
+
+describe("Warehouse preserved report retry",()=>{
+  it("round-trips explicit unknown Unit facts without changing the saved payload",()=>{
+    const wire={po_id:"PO-TEST",actual_site_id:null,goods_received_at:null,goods_received_time:null,
+      do_number:"",do_file_path:null,arrival_evidence:[],extra_lines:[],note:"",
+      lines:[{id:"00000000-0000-4000-8000-000000000001",received_now:null,damaged_qty:null,wrong_item_qty:null,
+        damaged_photos:[],wrong_item_photos:[],units:[{unit_code:"U-TEST",outcome:null,issue_kind:null,note:null}]}]};
+    const restored=warehouseConfirmationReportFromWire(wire);
+    expect(restored).not.toBeNull();
+    expect(JSON.parse(JSON.stringify(warehouseConfirmationReportToWire(restored!)))).toEqual(wire);
   });
 });

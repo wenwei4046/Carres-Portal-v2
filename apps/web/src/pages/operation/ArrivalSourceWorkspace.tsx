@@ -1,3 +1,4 @@
+import { invalidateReceivingReads } from "@/lib/receiving-reads";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -550,8 +551,7 @@ function ArrivalDetail({
   const refresh = async () => {
     await Promise.all([
       qc.invalidateQueries({ queryKey: ["arrival-source", id] }),
-      qc.invalidateQueries({ queryKey: ["operation", "warehouse-inbound"] }),
-      qc.invalidateQueries({ queryKey: ["operation", "warehouse-receipts"] }),
+      invalidateReceivingReads(qc),
     ]);
   };
   if (q.isLoading || options.isLoading)
