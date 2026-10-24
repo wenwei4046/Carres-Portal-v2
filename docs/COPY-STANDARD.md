@@ -3676,6 +3676,25 @@ does not merge their authority: Delivery arrangement remains editable operationa
 inside the Monitor row's expanded panels, never on the calendar card) and the issued DO remains a
 formal historical document.
 
+**New Delivery Order words — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22, relayed by YH
+2026-10-23); Jess was not part of it.** Office staff may open a Delivery Order from a Sales
+Order's lines, the Houzs way. This overturns the earlier ban on a `New DO` control (Delivery
+MASTER §3, §15). `Issue`, `Release` and `Approve` stay banned.
+
+| String | Where it appears |
+|---|---|
+| `New Delivery Order` | the Delivery Orders register's toolbar button and the dialog title |
+| `Pick a Sales Order and the goods to deliver.` | the dialog's one sentence |
+| `SO No` · `Find` | the dialog's Sales Order field and its button |
+| `Bed set` · `Sofa` | one tick per delivery group still free to ship (the existing group words) |
+| `{item} · Qty {n}` | each Sales Order line under its group |
+| `Other items` over `Go with the whole order, when every group is ticked.` | accessories, offered only while no DO is live |
+| `Everything on this Sales Order is already on a Delivery Order.` | nothing left to ship |
+| `This order travels on a Delivery Journey. Each leg issues its own Delivery Order.` | a Journey order |
+| `Sales Order not found.` | an SO No that matches nothing |
+| `Cancel` · `Create Delivery Order` | the footer |
+| `{DO No} created` | the toast after create |
+
 **Monitor + Delivery Orders register words — owner UI correction 2026-09-06.** The correction
 ruled these strings (the 2026-09-04 `NEEDS CHECKING` / `DELIVERY SCHEDULE` proposals are
 RETIRED — the rail is ONE `WORK TO DO` group):

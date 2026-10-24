@@ -1744,9 +1744,13 @@ three independent actions are open.
 
 ## Delivery Order — the system creates the document
 
-Sales Orders has no `New DO`, `Create DO`, `Issue`, `Release` or `Approve` control. Before a leg is
-ready, its Route gate states the outstanding governed requirements in plain English. When the
-Delivery-owned gate becomes true, the system creates the leg's Delivery Order idempotently.
+**OVERTURNED 2026-10-22 by Weisiang (Mr Lim): office staff may open a Delivery Order from SO lines (Houzs way). Jess's earlier rule kept below for history.** The Delivery Orders register's `New Delivery
+Order` opens a DO from this Sales Order's free delivery groups through the same issuing path and
+gates; the system still creates the leg's DO by itself when its gate becomes true.
+
+> Jess's earlier rule: Sales Orders has no `New DO`, `Create DO`, `Issue`, `Release` or `Approve` control. Before a leg is
+> ready, its Route gate states the outstanding governed requirements in plain English. When the
+> Delivery-owned gate becomes true, the system creates the leg's Delivery Order idempotently.
 
 ```
 ✓ DELIVERY ORDER

@@ -27,8 +27,9 @@
  * at most one primary queue; finished work leaves the queue and stays in the
  * status views.
  *
- * There is still NO create button: the SYSTEM issues a DO when a trip's
- * requirements are met (orders MASTER §8) — no Release, no Approve, no Issue.
+ * `New Delivery Order` (OVERTURNED 2026-10-22 by Weisiang, Mr Lim): office
+ * staff may open a DO from SO lines, the Houzs way. The SYSTEM still issues a
+ * DO when a trip's requirements are met; still no Release, Approve or Issue.
  */
 import { useCallback, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -55,6 +56,7 @@ import { printDeliveryOrder } from "./record-print";
 import Select from "@/components/kit/Select";
 import ModuleHeader from "./components/ModuleHeader";
 import DeliveryResultAction from "./components/DeliveryResultAction";
+import NewDeliveryOrderDialog from "./components/NewDeliveryOrderDialog";
 import {
   DeliveryProofUploadButton,
   DriverSubmissionViewer,
@@ -1108,6 +1110,7 @@ export default function DeliveryOrdersRegister() {
                 setSearchParams(next, { replace: false });
               }}
               toolbarStart={!filterRailOpen ? showFiltersButton : undefined}
+              toolbarEnd={<NewDeliveryOrderDialog />}
               statusSummary={(filtered) => {
                 /* Narrowed-versus-total stays explicit against the WHOLE
                    register (REGISTER STATUS FOOTER law) — a rail pick is a
