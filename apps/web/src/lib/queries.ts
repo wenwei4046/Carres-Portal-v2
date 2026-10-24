@@ -7710,7 +7710,7 @@ export interface DeliverySettingsPartnerRow extends DeliveryPartnerRow {
 }
 export interface DeliverySettingsResponse {
   partners: DeliverySettingsPartnerRow[];
-  drivers: Array<{ id: string; partner_id: string; name: string; phone: string | null; active: boolean }>;
+  drivers: Array<{ id: string; partner_id: string; name: string; phone: string | null; active: boolean; role?: "driver" | "helper" | null }>;
   vehicles: Array<{
     id: string;
     partner_id: string;

@@ -3652,8 +3652,10 @@ button exists anywhere on this surface**: the SYSTEM issues the document
 
 ## The Delivery module words (CARD-2026-09-04-delivery-01 — overwrites the 2026-08-24 one-word ruling)
 
-The Delivery module carries TWO navigation destinations under the module word **Delivery**:
-**Monitor** (`?tab=delivery`) and **Delivery Orders** (the formal-document register). The DO
+~~The Delivery module carries TWO navigation destinations under the module word **Delivery**:
+**Monitor** (`?tab=delivery`) and **Delivery Orders** (the formal-document register).~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): the
+Delivery module carries **Monitor**, **Delivery Orders** and the four Carres-lorry pages **Fleet Day**,
+**Live Map**, **Lorry Capacity** and **Crew Leave** (see "Carres lorries words" below). The DO
 object page is a door on a number, never navigation. **The Edit Delivery page is retired (owner
 ruling 2026-09-13)**: every arrangement write lives inside the Monitor row's expanded panels.
 `Delivery Work` remains banned; a formal DO remains a Delivery Order and its number remains a
@@ -3973,6 +3975,25 @@ roster holder yet shows its DUTY WORD where a name cannot stand — never a hand
 **System work has NO Done button** — an item leaves when its owning module
 records the completion fact. A human follow-up stays `ops_tasks`, labelled
 human, and is the only explicitly completable thing.
+
+## Carres lorries words — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22) · BUILT ON BRANCH `feat/fleet-crew-gps-capacity`, 0724 not applied
+
+Weisiang ruled "just clear Carress rules and Implement Houzs inside" (relayed by YH 2026-10-23); Jess was
+not part of this decision. YH 2026-10-23: "Carres has its own lorries". The words below are the ones the
+pages say (`apps/web/src/pages/operation/fleet.ts`, `FL`).
+
+| Where | The words |
+|---|---|
+| Delivery sidebar children | `Fleet Day` · `Live Map` · `Lorry Capacity` · `Crew Leave` |
+| The own-fleet Logistics company | `Carres Lorries` (seeded by 0724; its Vehicles and Drivers live in Settings → Logistics) |
+| Settings → Logistics → Drivers and Vehicles | `Role` · `Driver` · `Helper` |
+| Fleet Day columns and acts | `Day` · `Lorry` · `Capacity` · `Driver` · `Helper` · `Stops` · `Revenue` · `Crew` · `Proposed` · `Confirmed` · `Confirm crew` · `Run sheet` · `Print run sheets` · `No driver` · `No helper` · `No lorry matched` (note: `Delivery dates for Carres Lorries whose vehicle is not one of its plates.`) |
+| Fleet Day refusals | `This person is on leave that day.` · `This person is already on another lorry that day.` · `Choose an active driver.` · `Choose an active helper.` · `This lorry is not a Carres lorry.` · `Not saved. Try again.` |
+| Run sheet (print) | `Run sheet · {plate}` · `No.` · `Sales Order` · `Customer` · `Address` · `Phone` · `Time` · `Revenue` · `Signed` · `Print` · `No stops on {day}.` |
+| Live Map | `Lorry` · `Last seen` · `Position` · `Open map` · `No position yet` · `Over 30 minutes old` |
+| Lorry Capacity | `Month` · `Working days` (Mon–Sat) · `Trips` · `Utilisation` · `Stops` · `Stops per trip` · `Revenue` · `Revenue per trip` |
+| Crew Leave | `Crew` · `From` · `To` · `Reason` · `Add leave` · `Remove` · `No crew leave recorded.` |
+| Empty and failed states | `Carres Lorries is not set up. Add its Vehicles and Drivers in Settings, Logistics.` · `Carres Lorries has no lorry yet. Add one in Settings, Logistics, Carres Lorries, Vehicles.` · `This page could not be loaded. Try again.` |
 
 ## The Work Logistics card and external link words — owner rulings 2026-09-24 · model and link page BUILT · the card is NOT MOUNTED on any screen
 

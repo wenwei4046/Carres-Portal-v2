@@ -1470,7 +1470,10 @@ describe("PortalSidebar — the Delivery module's two destinations", () => {
         .getByTestId("nav-children-delivery")
         .querySelectorAll("[data-testid^='nav-child-']"),
     ).map((el) => el.textContent?.replace("Coming soon", "").trim());
-    expect(rows).toEqual(["Monitor", "Delivery Orders"]);
+    // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): Carres' own lorries add
+    // Fleet Day, Live Map, Lorry Capacity and Crew Leave after the two Delivery
+    // destinations. Jess was not part of this decision.
+    expect(rows).toEqual(["Monitor", "Delivery Orders", "Fleet Day", "Live Map", "Lorry Capacity", "Crew Leave"]);
   });
 
   it("Monitor opens ?tab=delivery and is the ONLY active row there", () => {
