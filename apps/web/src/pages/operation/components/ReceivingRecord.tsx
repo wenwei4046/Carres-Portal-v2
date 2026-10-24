@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Download, Printer } from "lucide-react";
+import Block from "@/components/kit/Block";
+import Button from "@/components/kit/Button";
 import {
   receivedByWords,
   documentDisplayNumber,
@@ -35,7 +37,7 @@ import { CMenu } from "@/components/carres/CPopover";
 import SavedEvidenceViewer from "@/components/kit/SavedEvidenceViewer";
 import DOFileUploadField from "@/components/DOFileUploadField";
 import ArrivalEvidenceUploadField from "@/components/ArrivalEvidenceUploadField";
-import { DOC_BTN, DocSection as Section, Prop } from "./workspace-doc";
+import { DOC_BTN, Prop } from "./workspace-doc";
 import { grnTemplateDataOf, type GrnAmendDraft } from "./grn-template-data";
 import "./receiving-workspace.css";
 import { receivingEventLabel } from "./receiving-event-label";
@@ -205,21 +207,18 @@ export default function ReceivingRecord({
     setDraft(null);
   };
 
-  /* ── the LEFT half — the Receiving Record, or the correction form ──────── */
-  const record = (
-    <div className="receiving-workspace receiving-record-sheet mx-auto w-full min-w-0 max-w-4xl px-4 py-3">
-      {/* ── ONE Object Header — back, the identity, the state ── */}
-      <button
+  const header = (
+    <header className="receiving-header flex shrink-0 flex-wrap items-center gap-3 border-b border-c-card-border bg-c-card px-4 py-3">
+      <Button
         type="button"
         onClick={onBack}
         data-testid="receiving-record-back"
-        className="text-body text-kit-blue-11 hover:underline"
+        iconOnly icon="back" aria-label="Back to Receiving" title="Back to Receiving"
       >
-        ‹ Receiving
-      </button>
-      <div className="mt-1 flex items-start gap-3">
+      </Button>
+      <div className="flex min-w-0 flex-1 items-center gap-3">
         <div className="min-w-0 flex-1">
-          <h2 className="text-page font-semibold font-mono text-kit-slate-12">
+          <h2 className="text-page font-semibold text-kit-slate-12">
             {isGrn ? displayNo : "Receiving"}
           </h2>
           <div className="text-meta text-base-500">
@@ -239,6 +238,42 @@ export default function ReceivingRecord({
         </span>}
       </div>
 
+          {r.po_id && r.status === "posted" && mayAmend && !amending && !voiding && (
+            <div className="receiving-actions flex shrink-0 items-center gap-2">
+              <Button
+                variant="primary"
+                onClick={startAmend}
+                data-testid="amend-receiving-door"
+              >
+                Amend Receiving
+              </Button>
+              <CMenu
+                label="More actions"
+                trigger={
+                  <button
+                    type="button"
+                    data-testid="grn-more-menu"
+                    className="rounded-control border border-kit-slate-5 bg-white px-3 py-1.5 text-body text-kit-slate-12 hover:bg-kit-slate-3"
+                  >
+                    More ▾
+                  </button>
+                }
+                items={[
+                  {
+                    key: "void",
+                    label: "Void Receiving",
+                    onSelect: () => setVoiding(true),
+                  },
+                ]}
+              />
+            </div>
+          )}
+    </header>
+  );
+
+  /* ── the LEFT half — the Receiving Record, or the correction form ──────── */
+  const record = (
+    <div className="receiving-workspace receiving-record-sheet mx-auto flex w-full min-w-0 max-w-4xl flex-col gap-3 p-3">
       {r.status === "voided" && (
         <div className="mt-2 rounded-card border border-kit-slate-5 bg-kit-slate-3 px-3 py-2 text-body text-kit-slate-12" data-testid="void-banner">
           Cancelled {r.void_at ? fmtDate(r.void_at.slice(0, 10)) : ""}
@@ -259,12 +294,15 @@ export default function ReceivingRecord({
       ) : (
         <>
           {/* ── The facts ─────────────────────────────────────────────── */}
-          <Section title="Receiving Details">
+          <Block title="Receiving Details">
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-x-4 gap-y-2 [&>div]:flex-col [&>div]:items-start [&>div]:gap-1 [&>div>span:first-child]:w-auto [&>div>span:last-child]:font-medium">
             <Prop label={isGrn ? "Linked PO" : "Linked PO"}>
               <span className="font-mono">{documentDisplayNumber(r.po_id ?? "")}</span>
             </Prop>
             <Prop label="Supplier">{r.supplier_name ?? ""}</Prop>
-            <Prop label="Supplier Deliver To">{r.warehouse_name ?? ""}</Prop>
+            {r.actual_site_name && r.actual_site_name !== r.warehouse_name ? (
+              <Prop label="Supplier Deliver To">{r.warehouse_name ?? "Not recorded"}</Prop>
+            ) : null}
             <Prop label="Goods arrived at">
               {r.actual_site_name ?? r.warehouse_name ?? ""}
             </Prop>
@@ -356,40 +394,12 @@ export default function ReceivingRecord({
                 </span>
               </Prop>
             ) : null}
-          </Section>
+            </div>
+          </Block>
 
-          {/* ── Unit results — Expected = Received + Not received ──────── */}
-          {(r.unit_results ?? []).length > 0 && (
-            <Section title="Unit results">
-              {(r.unit_results ?? []).map((u) => (
-                <div
-                  key={u.stock_item_id}
-                  className="flex items-center gap-2 py-0.5 text-body"
-                  data-testid={`unit-result-${u.unit_code}`}
-                >
-                  <span className="w-36 shrink-0 font-mono text-meta text-kit-slate-11">
-                    {u.unit_code}
-                  </span>
-                  <span
-                    className={
-                      u.outcome === "received"
-                        ? "text-kit-green-11"
-                        : u.outcome === "received_with_issue"
-                          ? "text-kit-red-11"
-                          : "text-kit-slate-9"
-                    }
-                  >
-                    {RECEIVING_UNIT_OUTCOME_LABEL[u.outcome]}
-                    {u.issue_kind === "wrong_item" ? " · wrong item" : ""}
-                    {u.issue_kind === "damaged" ? " · damaged" : ""}
-                  </span>
-                </div>
-              ))}
-            </Section>
-          )}
-
-          {/* ── Receiving Summary — this session, then the source's cumulative ── */}
-          <Section title="Receiving Summary">
+          {/* ── Lines ─────────────────────────────────────────────────── */}
+          <Block title="Items">
+          <div role="group" aria-label="Receiving Summary">
             <Prop label="Received Qty">
               <span className="tabular-nums">{totals.received}</span>
             </Prop>
@@ -420,10 +430,9 @@ export default function ReceivingRecord({
                 </Prop>
               </>
             )}
-          </Section>
+          </div>
 
-          {/* ── Lines ─────────────────────────────────────────────────── */}
-          <Section title="Items">
+
             {lines.map((l) => (
               <div key={l.id} className="receiving-item-row flex flex-wrap gap-2 py-1 text-body border-b border-kit-slate-4">
                 <span className="flex-1 min-w-0 font-mono text-kit-slate-12 break-words">
@@ -454,11 +463,40 @@ export default function ReceivingRecord({
                 </span>
               </div>
             ))}
-          </Section>
+          {(r.unit_results ?? []).length > 0 && (
+            <div role="group" aria-label="Unit results">
+              {(r.unit_results ?? []).map((u) => (
+                <div
+                  key={u.stock_item_id}
+                  className="flex items-center gap-2 py-0.5 text-body"
+                  data-testid={`unit-result-${u.unit_code}`}
+                >
+                  <span className="w-36 shrink-0 font-mono text-meta text-kit-slate-11">
+                    {u.unit_code}
+                  </span>
+                  <span
+                    className={
+                      u.outcome === "received"
+                        ? "text-kit-green-11"
+                        : u.outcome === "received_with_issue"
+                          ? "text-kit-red-11"
+                          : "text-kit-slate-9"
+                    }
+                  >
+                    {RECEIVING_UNIT_OUTCOME_LABEL[u.outcome]}
+                    {u.issue_kind === "wrong_item" ? " · wrong item" : ""}
+                    {u.issue_kind === "damaged" ? " · damaged" : ""}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          </Block>
 
           {/* ── Consequences ──────────────────────────────────────────── */}
           {r.status === "posted" && (
-            <Section title="What this saving did">
+            <Block title="What this saving did">
               <p className="text-body text-kit-slate-12">
                 Valid received Units entered Inventory at{" "}
                 {r.actual_site_name ?? r.warehouse_name ?? "the warehouse"}.
@@ -478,7 +516,7 @@ export default function ReceivingRecord({
                   Open in Claims
                 </Link>
               ) : null}
-            </Section>
+            </Block>
           )}
 
           {r.status === "submitted" && (
@@ -494,37 +532,7 @@ export default function ReceivingRecord({
 
           {/* ── The governed doors — Amend is primary; Void hides in
                  More ▾ (owner correction §5: not a normal action). ──────── */}
-          {r.po_id && r.status === "posted" && mayAmend && !voiding && (
-            <div className="mt-4 flex items-center gap-3">
-              <button
-                type="button"
-                onClick={startAmend}
-                data-testid="amend-receiving-door"
-                className="rounded-control border border-kit-slate-5 bg-white px-3 py-1.5 text-body text-kit-slate-12 hover:bg-kit-slate-3"
-              >
-                Amend Receiving
-              </button>
-              <CMenu
-                label="More actions"
-                trigger={
-                  <button
-                    type="button"
-                    data-testid="grn-more-menu"
-                    className="rounded-control border border-kit-slate-5 bg-white px-3 py-1.5 text-body text-kit-slate-12 hover:bg-kit-slate-3"
-                  >
-                    More ▾
-                  </button>
-                }
-                items={[
-                  {
-                    key: "void",
-                    label: "Void Receiving",
-                    onSelect: () => setVoiding(true),
-                  },
-                ]}
-              />
-            </div>
-          )}
+
 
           {voiding && (
             <VoidPanel
@@ -535,7 +543,7 @@ export default function ReceivingRecord({
           )}
 
           {/* ── History — the three-rank record grammar, append-only ──── */}
-          <Section title="History">
+          <Block title="History">
             {events.length === 0 ? (
               <div className="text-meta text-kit-slate-11">
                 No receiving activity yet.
@@ -594,7 +602,7 @@ export default function ReceivingRecord({
                 ))}
               </ul>
             )}
-          </Section>
+          </Block>
         </>
       )}
     </div>
@@ -604,6 +612,7 @@ export default function ReceivingRecord({
   if (!isGrn) {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-white" data-testid="receiving-record">
+        {header}
         {record}
       </div>
     );
@@ -613,14 +622,16 @@ export default function ReceivingRecord({
         the panes stack, Receiving Record first (owner correction §5). ───── */
   return (
     <div
-      className="flex min-h-0 flex-1 flex-col overflow-auto bg-kit-slate-3 lg:flex-row lg:overflow-hidden"
+      className="receiving-object flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-c-ground"
       data-testid="receiving-record"
     >
-      <div className="flex min-h-0 min-w-0 flex-col bg-white lg:w-1/2 lg:overflow-auto" data-testid="grn-record-pane">
+      {header}
+      <div className="receiving-object-panes">
+      <div className="receiving-facts-pane min-w-0" data-testid="grn-record-pane">
         {record}
       </div>
       <aside
-        className="min-h-0 min-w-0 border-t border-kit-slate-5 bg-kit-slate-3 px-4 py-4 lg:w-1/2 lg:border-l lg:border-t-0 lg:overflow-auto"
+        className="receiving-document-pane min-w-0 rounded-lg border border-c-card-border bg-c-info-bg px-2 py-2"
         aria-label="Official GRN preview"
         data-testid="grn-preview-pane"
       >
@@ -629,7 +640,7 @@ export default function ReceivingRecord({
             type="button"
             data-testid="grn-print"
             onClick={() => void openDocument("print")}
-            className="inline-flex h-7 items-center gap-1.5 rounded-control border border-kit-slate-5 bg-white px-2.5 text-body font-medium text-kit-slate-12 hover:bg-kit-slate-3"
+            className="inline-flex h-8 items-center gap-1.5 rounded-control border border-kit-slate-5 bg-white px-2.5 text-body font-medium text-kit-slate-12 hover:bg-kit-slate-3"
             title="A reprint carries the same number"
           >
             <Printer size={14} /> Print
@@ -638,7 +649,7 @@ export default function ReceivingRecord({
             type="button"
             data-testid="grn-download"
             onClick={() => void openDocument("download")}
-            className="inline-flex h-7 items-center gap-1.5 rounded-control border border-kit-slate-5 bg-white px-2.5 text-body font-medium text-kit-slate-12 hover:bg-kit-slate-3"
+            className="inline-flex h-8 items-center gap-1.5 rounded-control border border-kit-slate-5 bg-white px-2.5 text-body font-medium text-kit-slate-12 hover:bg-kit-slate-3"
           >
             <Download size={14} /> Download PDF
           </button>
@@ -672,6 +683,7 @@ export default function ReceivingRecord({
           )}
         </div>
       </aside>
+      </div>
     </div>
   );
 }
@@ -742,7 +754,7 @@ function SubmittedReview({
   });
 
   return (
-    <Section title="Check the count">
+    <Block title="Check the count">
       <p className="text-body text-kit-slate-12">
         {warehouseName} returned this count to Carres. Before Carres saves,
         there is no GRN and no stock moves.
@@ -837,7 +849,7 @@ function SubmittedReview({
           {err}
         </p>
       )}
-    </Section>
+    </Block>
   );
 }
 
@@ -952,7 +964,7 @@ function AmendPanel({
     "h-8 rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12";
 
   return (
-    <Section title="Amend Receiving">
+    <Block title="Amend Receiving">
       <p className="text-meta text-kit-slate-11">
         The original record is preserved; the correction and its reason join
         History, and the preview beside this form shows the corrected GRN with
@@ -1204,7 +1216,7 @@ function AmendPanel({
                 : "Save Amendment"}
         </button>
       </div>
-    </Section>
+    </Block>
   );
 }
 
@@ -1226,7 +1238,7 @@ function VoidPanel({
     onError: (e) => setErr(e.message),
   });
   return (
-    <Section title="Void Receiving">
+    <Block title="Void Receiving">
       {/* The impact review, BEFORE the act. */}
       <p className="text-body text-kit-slate-12" data-testid="void-impact">
         Voiding reverses this receiving completely: {totals.received} received
@@ -1276,6 +1288,6 @@ function VoidPanel({
               : "Void Receiving"}
         </button>
       </div>
-    </Section>
+    </Block>
   );
 }

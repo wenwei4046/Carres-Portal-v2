@@ -1,3 +1,25 @@
+## Receiving / Warehouse frontend correction evidence ·22Oct2026 · PR2111
+
+Earlier draft build failures were real delivery defects: unsupported test-query options and a missing goods-row property; both fixed. The subsequent full CI reached web tests and found six OperationApp failures from eagerly mounting hidden Warehouse work surfaces. Nested surfaces now mount on first visit, retain visited state and recognise legacy Monitor/Dashboard arrival aliases. OperationApp48/48, Receiving76/76 and Sidebar128/128 targeted checks pass (plus unchanged failed-save7/7 evidence). Latest complete affected-scope run124/124 covers Receiving and OperationApp. Required full CI remains pending; no release claim.
+
+Actual local real-component browser walk (illustrative fixtures, no production writes): Received → exact GRN → Back restores Received; Not received → pending expansion now shows source / Items / Unit ID / Pending Delivery Qty rather than receipt-result columns. Record measurements1440→702/702,1164→564/564,1025→494.5/494.5;390 stacks at366 content. Body scroll width equalled viewport at each size. Pending list also stays390 at390. Record and pending screenshots saved in the Planner's local visualizations. GRN Items now contains quantity summary and Unit results in one card; Receiving Details follows the current compact fact grid. Evidence, official PDF, actor/duty history and existing Amend/Void writers remain unchanged.
+
+PR preview is hosted at https://pr-2111.carres-portal.pages.dev and requires login. Successful preview build does not prove authenticated integration or owner preview approval. Full CI, final updated screenshot review, owner approval and production delivery are still separate gates. Non-PO pending source integration remains IT-owned; no backend/SQL scope is resumed.
+
+## Warehouse navigation ·22Oct2026
+
+Jess explicitly confirmed the frontend must show only Inbound / Inventory / Outbound. `portal-nav` now draws three primary entries; `WarehouseDirectionPage` reuses kit Tabs to nest the unchanged Arrival/Pickup schedules in their respective directions. Existing date/Site query parameters and deep links remain; schedule links highlight the corresponding parent. No Receiving, Loading, inventory or backend writer changed. Sidebar regression checks passed128/128; actual browser acceptance remains pending; this is branch implementation, not deployed proof.
+
+## Receiving frontend adoption ·22Oct2026
+
+Owner explicitly commissioned applying the latest Receiving UI to the ERP frontend in Planner. Backend remains IT-owned; the paused PR2100/SQL delivery and five-minute automation remain paused.
+
+**IMPLEMENTED ON BRANCH, NOT VERIFIED IN BROWSER / NOT DEPLOYED:** existing `OperationReceiving` now presents Not received / Received / Differences through kit Tabs; fresh visits start with expected PO goods, due-first, using the existing PO population and Receiving writer door. Existing received/date-filter deep links retain their register. Pending expansion reads existing PO Receiving Unit facts; no invented Unit IDs. Received/Differences retain server pagination, filters, export, cards and exact GRN identity; Group by uses DataGrid's shared presentation capability. `ReceivingRecord` adopts shared Block/Button, one header above both panes, header Amend/More doors, no duplicate identical delivery site, and a content-container820 breakpoint for the50:50 record/document split (stacked document900 below it). Existing mutations, PDFs, duty/actor facts and history remain.
+
+**Evidence:** existing Receiving75 tests and failed-save7 tests passed during this change; diff whitespace check passed. Typecheck is still running locally; browser connection became unavailable before a rendered walk, so visual conformance and full preview acceptance are NOT claimed. Local DEV-only real-component fixture: `http://127.0.0.1:5482/receiving-preview.html` (stubbed API; not production).
+
+**Remaining:** rendered whole-page review at1025/1164/1440 and narrow widths; reconcile remaining Items/Check-in composition against supplied design; all-source expected-arrival coverage (CO/repair versus current PO-only pending data) belongs to IT integration and must not be represented as complete. No main merge/release until required CI and actual changed-preview review. This is a frontend adoption in progress, not full Receiving delivery.
+
 # HANDOFF — Carres Portal v2 · continuous build
 
 Paste everything below the line into a fresh session. It is self-contained.

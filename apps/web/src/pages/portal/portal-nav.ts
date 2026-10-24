@@ -1,6 +1,5 @@
 import {
   LayoutDashboard,
-  CalendarDays,
   ClipboardList,
   ShoppingBag,
   Boxes,
@@ -175,13 +174,9 @@ export interface PortalModule {
   handleOnly?: true;
 }
 
-/** WHERE THE COLLAPSED WAREHOUSE ICON GOES — a NAMED destination, never "the
- *  first live row" (the same law Purchasing follows; owner review 2026-08-20).
- *  `Arrival Schedule` is where the warehouse day OPENS (Stock MASTER §7): the
- *  first question of the morning is what is coming in, because goods that have
- *  not arrived are the ones that stop every other job. Named, never derived
- *  from row order — owner ruling 2026-09-14 moved it off the retired Monitor. */
-export const WAREHOUSE_LANDING_KEY = "wh-arrival-schedule";
+/** Warehouse opens Inbound; directional schedules live inside Inbound/Outbound.
+ * Owner22Oct2026: exactly three primary Warehouse entries. */
+export const WAREHOUSE_LANDING_KEY = "wh-inbound";
 
 /** The collapsed Payments icon lands on `Monitor` — the daily collection
  *  desk — by name, never by row order (owner ruling 2026-09-12). */
@@ -509,55 +504,14 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         activeFor: ["path:/operation/delivery-orders"],
         section: "Delivery",
       },
-      /* THE WAREHOUSE MAP IS FIVE DESTINATIONS (owner ruling 2026-09-14):
-       * `Arrival Schedule · Pickup Schedule · Inbound · Inventory · Outbound`.
-       *
-       * The single combined `Monitor` is SUPERSEDED. It carried both
-       * directions on one board, and receiving goods and loading a lorry are
-       * two jobs, done by two people, on two sides of the building — one board
-       * meant every operator read past half of it all day. The two Schedules
-       * are independent destinations for that reason, which is also why
-       * neither page carries an internal direction tab.
-       *
-       * `?tab=warehouse-monitor` and `?tab=warehouse-dashboard` both still
-       * land — on Arrival Schedule, carrying their `date` and `site` — so no
-       * bookmark breaks (the `stock-onhand` precedent). `Inventory` is the one
-       * current Unit Register and its address is unchanged.
-       * Reports and Settings stay central: NO Report row, NO Settings row.
-       *
-       * The de-navigated legacy pages keep their routes (`?tab=stock-plan` ·
-       * `?tab=movements`) until their capabilities are relocated — reorder
-       * points/urgent restock and the event history are named next scopes in
-       * Stock MASTER §13; a direct URL still lands. */
-      {
-        key: "wh-arrival-schedule",
-        label: "Arrival Schedule",
-        icon: CalendarDays,
-        tab: "warehouse-arrival-schedule",
-        /* `activeFor` REPLACES the default tab match (PortalSidebar), so this
-         * row's OWN tab has to be listed beside the two retired addresses —
-         * otherwise the page lights nothing while it is the page you are on.
-         * The retired addresses light it while they resolve, so the sidebar
-         * never shows "nowhere" on a working bookmark. */
-        activeFor: [
-          "tab:warehouse-arrival-schedule",
-          "tab:warehouse-monitor",
-          "tab:warehouse-dashboard",
-        ],
-        section: "Warehouse",
-      },
-      {
-        key: "wh-pickup-schedule",
-        label: "Pickup Schedule",
-        icon: CalendarDays,
-        tab: "warehouse-pickup-schedule",
-        section: "Warehouse",
-      },
+      /* Owner22Oct2026: three primary pages; schedules remain reachable
+       * inside their direction, with existing bookmarked routes preserved. */
       {
         key: "wh-inbound",
         label: "Inbound",
         icon: ArrowDownLeft,
         tab: "warehouse-inbound",
+        activeFor: ["tab:warehouse-inbound", "tab:warehouse-arrival-schedule", "tab:warehouse-monitor", "tab:warehouse-dashboard"],
         section: "Warehouse",
       },
       { key: "stock", label: "Inventory", icon: Boxes, tab: "stock-onhand", section: "Warehouse" },
@@ -566,6 +520,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         label: "Outbound",
         icon: ArrowUpRight,
         tab: "warehouse-outbound",
+        activeFor: ["tab:warehouse-outbound", "tab:warehouse-pickup-schedule"],
         section: "Warehouse",
       },
       /* ⭐ PAYMENTS → Monitor · Payment Records (owner ruling 2026-09-12).
