@@ -69,7 +69,7 @@ evidenced.
 | Register, filters, reports and exports | KEEP shared DataGrid; IMPROVE the complete permission-scoped population, stable sort, totals and export rather than filtering a truncated 500-order sample | More than 500 matching orders do not disappear; list, totals and all-matching export reconcile; selected-row export is explicitly distinct; pagination changes loading only |
 | Monthly demand | KEEP two blocks, one month-row table, one-select Sales Location and existing rail; preserve active location/region/category through month, Before, After and no-date drill-down and return | The opened orders are the exact same population, no silent filter loss; no pivot, chart, multi-select or second coverage table |
 | Unknown facts and line attribution | IMPROVE unreadable versus genuine zero, missing catalogue versus source failure, and exact SO-line/Unit attribution | Unsupported purchase calculations are not zero; repeated SKUs do not establish line identity; uncertain legacy allocation stays visibly uncertain; Purchasing/Stock/Delivery own facts and calculations |
-| Staff amendments | KEEP the single whole-page draft and evidence gate; implement the current Staff amendments and Sales Approver, date and system-charge rulings in this MASTER | One request, one effective result after applicable gates; mixed changes never partially apply; ordinary changes do not wait for owner approval; actual submitter/confirmers and PIC notification preserved |
+| Staff amendments | KEEP the single whole-page draft and evidence gate; implement the current Staff amendments and Sales Approver, date and system-charge rulings in this MASTER | One request, one effective result after applicable gates; mixed changes never partially apply; ~~ordinary changes do not wait for owner approval~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): every amendment waits for the approver in the Amendments queue; actual submitter/confirmers and PIC notification preserved |
 | Concurrent editing | IMPROVE save/submit with the editor's original baseline, in addition to approval-time stale checks | Two editors cannot silently overwrite one another; conflict keeps the draft and exposes what changed; same amendment entry, no new draft engine |
 | Documents, history and failures | KEEP issued originals, immutable revisions, labelled reconstruction and real actor history; make failed original capture visible and retryable, with governed actionable write errors | File failure does not undo an effective revision, impersonate an actor, fabricate a signature or pass reconstruction off as the issued original; retry cannot duplicate the business change |
 | Existing approved document details | IMPROVE the multiple-PO cell to every PO number on one line, comma-separated, each its own link (owner 2026-10-06), and deliver already-approved numbering with compatibility | Old references remain searchable/linked, historical documents are never renumbered, no unrelated Subscription redesign |
@@ -599,8 +599,12 @@ second Purchasing, Warehouse, Delivery, Payment or Work screen.
 ```
 Sales Orders
 ├─ Outright Sales
+├─ Amendments
 └─ Subscription
 ```
+
+`Amendments` added 2026-10-22 on Weisiang's decision (Mr Lim, WhatsApp; Jess was not part of this
+decision): the approver's queue of every SO amendment, waiting first; a row opens its order.
 
 `Outright Sales` is the existing outright-order register and its governed SO detail/amendment
 journey. `Subscription` opens the Subscription-owned journey governed by `docs/rental/MASTER.md`;
@@ -2861,13 +2865,21 @@ operations, not a newly observed production-system test. The built Principal-onl
 `0564_the_amendment_carries_the_whole_change_and_the_customers_agreement.sql` does not match
 that operating model. The code remains unchanged; the following is the approved target.
 
-1. **Ordinary SO amendments do not need owner approval.** Staff submit once: one amendment
-   request and one final decision/outcome. Preserve the existing 0564 customer-agreement evidence
+1. ~~**Ordinary SO amendments do not need owner approval.** Staff submit once: one amendment
+   request and one final decision/outcome.~~
+   **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): every SO amendment waits for an approver, the Houzs way.**
+   Submission writes nothing on the order; the amendment waits as `Waiting for management` in the
+   **Sales Orders → Amendments** queue (`/operation/amendments`) until the approver records
+   `Approve and apply` (it applies through the existing 0564 engine and mints the next revision)
+   or `Reject` (nothing on the order changes). Approver today: the Principal role, the built 0564
+   gate; whether it narrows to a Duty is an open question for Weisiang. Preserve the existing 0564 customer-agreement evidence
    gate (signed document, customer confirmation reference or original agreement, with its governed
    evidence/reference rules). No evidence-free application is authorised.
 2. **Route from the changed line's actual PO coverage**, not another line's PO:
-   - No issued PO covers the changed line: an ordinary amendment takes effect on submission
-     with the required evidence, subject to the expressly undecided scopes below.
+   - ~~No issued PO covers the changed line: an ordinary amendment takes effect on submission
+     with the required evidence, subject to the expressly undecided scopes below.~~
+     **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): no amendment takes effect on submission. With or without an issued PO
+     it waits in the Amendments queue for the approver (item 1).**
    - An issued PO covers the changed line: **PO Duty must first record the supplier's answer
      that the change can be made**. Only then may it take effect. If the supplier has not answered
      or the supplier date is unknown, it waits; it never takes effect by default.

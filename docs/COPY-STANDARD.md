@@ -4985,6 +4985,22 @@ which the NO RELATIVE DATE WORDS rule permits; a printed date is still `fmtDate`
 | Shared portal navigation parent | `Sales Orders` | A duplicate standalone Sales Orders destination |
 | Ordinary outright customer sales | `Outright` (menu item under `Sales Orders`; page title `Sales Order / Outright` — owner-confirmed template 2026-10-08) | `Purchase` · `Outright Sales` (retired 2026-10-08) |
 | Subscription-owned customer journey | `Subscription` | `Purchase` |
+| The approver's queue of every SO amendment (Weisiang's decision, Mr Lim, WhatsApp 2026-10-22; Jess was not part of this decision) | `Amendments` (menu item and page title) | `Amendment Requests` · `Revisions` |
+
+**Amendments queue words (Weisiang's decision, 2026-10-22).** Reused approved words: `Waiting for
+management`, `Reason for change`, `Management decision reason`, `Approve and apply`, `Reject`.
+New on this screen:
+
+| Meaning | Use exactly |
+|---|---|
+| An amendment approved and applied | **Approved** |
+| An amendment the approver refused | **Rejected** |
+| An amendment its submitter took back | **Withdrawn** |
+| Column: who sent / who decided, and when | **Submitted by** · **Submitted** · **Decided by** · **Decided** |
+| Column: whether the customer's agreement is on record | **Customer agreement** — **Recorded** / **Not recorded** |
+| Footer count | **`{n} amendments · {w} waiting for management`** |
+| Empty queue | **No amendments yet.** |
+| Read failed | **The amendments could not be opened.** with `Try again` |
 
 The label does not rename the Sales Order document, its SO number, or the separate Purchasing
 module. Subscription reporting stays separate. Removing old navigation entries does not delete
