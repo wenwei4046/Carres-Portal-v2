@@ -542,7 +542,7 @@ function renderWithProviders(ui: React.ReactElement, entry = "/operation?tab=rec
   );
 }
 
-const renderPage = (entry?: string) =>
+const renderPage = (entry = "/operation?tab=receiving&view=records") =>
   renderWithProviders(<OperationReceiving />, entry);
 
 /** The Session is owned by the page in production; here a two-line harness
@@ -607,10 +607,20 @@ afterEach(() => {
 /* ═══ THE REGISTER ═════════════════════════════════════════════════════════ */
 
 describe("OperationReceiving — the formal GRN Register", () => {
-  it("uses the two approved views without duplicate column filters in the rail", () => {
+  it("shows expected pending goods rather than unrecorded receipt results on a fresh visit", () => {
+    renderPage("/operation?tab=receiving");
+    expect(screen.getByRole("tab", { name: "Not received" })).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(screen.getAllByRole("button", { name: "Expand row" })[0]);
+    const items = within(screen.getByRole("table", { name: "Items" }));
+    expect(items.getByRole("columnheader", { name: "Pending Delivery Qty" })).toBeInTheDocument();
+    expect(items.queryByText("Not counted")).not.toBeInTheDocument();
+    expect(items.queryByRole("columnheader", { name: "Received Qty" })).not.toBeInTheDocument();
+  });
+
+  it("uses the current three receiving stages without duplicate column filters", () => {
     renderPage();
-    const rail = within(screen.getByTestId("receiving-rail"));
-    expect(rail.getAllByRole("button").map(button => button.textContent)).toEqual(["GRN Records", "Receiving Differences"]);
+    const rail = within(screen.getByTestId("receiving-stages"));
+    expect(rail.getAllByRole("tab").map(tab => tab.textContent)).toEqual(["Not received", "Received", "Differences"]);
     expect(rail.queryAllByRole("checkbox")).toHaveLength(0);
     for (const label of ["Filter GRN Doc Date", "Filter Supplier", "Filter Goods arrived at"]) expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
   });
@@ -751,10 +761,10 @@ describe("OperationReceiving — the formal GRN Register", () => {
 
   it("switches the source view without creating another page or leaving cancelled-only active", async () => {
     renderPage("/operation?tab=receiving&cancelled=1");
-    fireEvent.click(screen.getByTestId("receiving-view-differences"));
+    fireEvent.mouseDown(screen.getByRole("tab", { name: /^Differences$/ }), { button: 0, ctrlKey: false });
     await waitFor(() => expect(h.registerAsks.at(-1)).toMatchObject({ view: "differences", cancelled: false, offset: 0 }));
-    expect(screen.getByTestId("receiving-view-differences")).toHaveAttribute("aria-pressed", "true");
-    fireEvent.click(screen.getByTestId("receiving-view-records"));
+    expect(screen.getByRole("tab", { name: /^Differences$/ })).toHaveAttribute("aria-selected", "true");
+    fireEvent.mouseDown(screen.getByRole("tab", { name: /^Received$/ }), { button: 0, ctrlKey: false });
     await waitFor(() => expect(h.registerAsks.at(-1)).toMatchObject({ view: "records" }));
   });
 
@@ -1022,12 +1032,12 @@ describe("OperationReceiving — the formal GRN Register", () => {
 
   it("keeps source view controls keyboard-focusable with explicit selected state", () => {
     renderPage();
-    const records = screen.getByTestId("receiving-view-records");
-    const differences = screen.getByTestId("receiving-view-differences");
+    const records = screen.getByRole("tab", { name: /^Received$/ });
+    const differences = screen.getByRole("tab", { name: /^Differences$/ });
     records.focus(); expect(records).toHaveFocus();
     differences.focus(); expect(differences).toHaveFocus();
-    expect(records).toHaveAttribute("aria-pressed", "true");
-    expect(differences).toHaveAttribute("aria-pressed", "false");
+    expect(records).toHaveAttribute("aria-selected", "true");
+    expect(differences).toHaveAttribute("aria-selected", "false");
   });
 
   it("Goods Received Date carries its KL clock, or says Time not recorded on an older GRN (0601)", () => {
@@ -1421,7 +1431,7 @@ describe("ReceivingRecord — the posted GRN, the review, the two doors", () => 
     expect(screen.queryByTestId("receiving-record-state")).not.toBeInTheDocument();
     // The three facts, corrected words: `Deliver To` · `Goods arrived at`
     // (no override = the instructed warehouse itself) · `Goods Received Date`.
-    expect(screen.getByText("Supplier Deliver To")).toBeInTheDocument();
+    expect(screen.queryByText("Supplier Deliver To")).not.toBeInTheDocument();
     expect(screen.getByText("Goods arrived at")).toBeInTheDocument();
     expect(screen.getByText("Goods Received Date")).toBeInTheDocument();
     expect(screen.queryByText("Actual Site")).not.toBeInTheDocument();
@@ -1446,8 +1456,8 @@ describe("ReceivingRecord — the posted GRN, the review, the two doors", () => 
     const record = screen.getByTestId("grn-record-pane");
     const preview = screen.getByTestId("grn-preview-pane");
     // Half-and-half at the governed desktop breakpoint; stacked below it.
-    expect(record.className).toContain("lg:w-1/2");
-    expect(preview.className).toContain("lg:w-1/2");
+    expect(record.parentElement).toHaveClass("receiving-object-panes");
+    expect(preview.parentElement).toBe(record.parentElement);
     // The preview is the REAL renderer's pane plus the two document acts.
     expect(within(preview).getByTestId("grn-pdf-pane")).toBeInTheDocument();
     expect(within(preview).getByTestId("grn-print")).toHaveTextContent("Print");

@@ -29,3 +29,28 @@
 @container receiving-form (width < 480px) {
   .receiving-item-row > :first-child { flex-basis: 100%; }
 }
+
+/* Current Purchasing record contract: measure the available object canvas,
+   not the browser width (Summary/Tasks may occupy part of it). */
+.receiving-object { container: receiving-object / inline-size; }
+.receiving-object-panes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+}
+.receiving-facts-pane .receiving-record-sheet { padding: 0; }
+.receiving-document-pane { min-height: 900px; }
+@container receiving-object (min-width: 820px) {
+  .receiving-object-panes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    flex: 1;
+    overflow: hidden;
+  }
+  .receiving-facts-pane, .receiving-document-pane { min-height: 0; overflow: auto; }
+}
+@media (max-width: 767px) {
+  .receiving-record-sheet button, .receiving-header button { min-height: 44px; }
+}

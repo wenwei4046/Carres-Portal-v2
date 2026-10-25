@@ -1,3 +1,4 @@
+import WarehouseDirectionPage from "./WarehouseDirectionPage";
 import { useEffect, useState } from "react";
 import { Menu } from "lucide-react";
 import PhoneTasksDoor from "./components/rail/PhoneTasksDoor";
@@ -622,17 +623,15 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
                 On hand surface. Same `?tab=` address, new page. */}
             {tab === "stock-onhand" && <WarehouseStockRegister />}
             {tab === "showroom" && <WarehouseStockRegister showroom />}
-            {/* WAREHOUSE (owner ruling 2026-09-14) — Arrival Schedule and
-                Pickup Schedule are two independent dated boards; Inbound and
-                Outbound are their own rail + Register work pages. */}
-            {tab === "warehouse-arrival-schedule" && (
-              <WarehouseWorkspace direction="arrival" />
+            {/* Three Warehouse pages; the two directional schedules are nested views. */}
+            {(tab === "warehouse-inbound" || tab === "warehouse-arrival-schedule") && (
+              <WarehouseDirectionPage direction="inbound" workSurface={<WarehouseInbound />}
+                scheduleSurface={<WarehouseWorkspace direction="arrival" />} />
             )}
-            {tab === "warehouse-pickup-schedule" && (
-              <WarehouseWorkspace direction="pickup" />
+            {(tab === "warehouse-outbound" || tab === "warehouse-pickup-schedule") && (
+              <WarehouseDirectionPage direction="outbound" workSurface={<WarehouseOutboundWork />}
+                scheduleSurface={<WarehouseWorkspace direction="pickup" />} />
             )}
-            {tab === "warehouse-inbound" && <WarehouseInbound />}
-            {tab === "warehouse-outbound" && <WarehouseOutboundWork />}
             {/* Non-PO inbound source object. Inbound owns the register; this
                 hidden destination owns creating and reviewing one source. */}
             {tab === "arrival-source" && <ArrivalSourceWorkspace />}

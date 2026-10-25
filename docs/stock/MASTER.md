@@ -62,6 +62,8 @@ never transfers write ownership.
 
 ## 2 · Navigation and words
 
+**Frontend adoption in progress ·22Oct2026 · PR2111, not deployed:** the application branch now draws three primary entries and nests the existing schedules through shared Tabs. Sidebar regression checks128/128 passed; rendered acceptance and required release checks remain owed. This implementation note does not alter the approved target below.
+
 **OWNER-APPROVED TARGET / NOT BUILT — 2026-10-22.** Jess approved three primary Warehouse
 entries: **Inbound · Inventory · Outbound**. `Arrival Schedule` becomes a view inside Inbound;
 `Pickup Schedule` becomes a view inside Outbound. This supersedes the 2026-09-14 requirement for
