@@ -1634,6 +1634,8 @@ Personal themes are removed by the owner23Oct2026 and the latest-kit adoption24O
 
 The current package's conflicts and evidence limits are resolved in **Reconciliation and limits ·24Oct2026** above. Earlier intake conflict tables are retired; Git holds them. Prototype implementation, owner design approval, React implementation, backend verification and production verification are separate states.
 
+<a id="kit-components"></a>
+
 ## Components and reuse · former 02
 
 **Current shared target · owner instruction 12 Oct 2026 · supplied 12 Oct.** Appearance comes exclusively from `01-design-tokens.md` and `ui/carres-tokens.css`. Replace existing kit internals; never create page-local copies. Existing component APIs and business contracts remain until deliberately migrated. Prototype HTML is a specimen, not application implementation.
