@@ -18,6 +18,7 @@ import {
   type TeamShowroomStaff,
 } from "@carres/shared";
 import Btn from "@/components/Btn";
+import Select from "@/components/kit/Select";
 import { fieldCls } from "@/components/Field";
 import { SectionBand, SectionCard } from "@/components/SectionPanel";
 import { useAuth } from "@/lib/auth";
@@ -274,6 +275,7 @@ function AddUserModal({
   const [title, setTitle] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
+  const [warehouseIndividual, setWarehouseIndividual] = useState(false);
   const [positionId, setPositionId] = useState("");
   const [reportsTo, setReportsTo] = useState("");
   const [password, setPassword] = useState("");
@@ -293,9 +295,10 @@ function AddUserModal({
     password.length >= 8 &&
     password === confirmPw &&
     (!external || companyName.trim().length > 0) &&
-    (!isWarehouse || warehouseId.length > 0);
+    (!isWarehouse || warehouses.some((w) => w.id === warehouseId));
 
   const submit = () => {
+    if (!valid || create.isPending) return;
     create.mutate(
       {
         name: name.trim(),
@@ -306,7 +309,7 @@ function AddUserModal({
         ...(external
           ? { companyName: companyName.trim() }
           : isWarehouse
-            ? { warehouseId }
+            ? { warehouseId, ...(warehouseIndividual ? { warehouseIndividual: true } : {}) }
             : {
                 positionId: positionId === "" ? null : positionId,
                 reportsToUserId: reportsTo === "" ? null : reportsTo,
@@ -349,7 +352,10 @@ function AddUserModal({
             Role
             <select
               value={role}
-              onChange={(e) => setRole(e.target.value as HrCreateTeamAccountInput["role"])}
+              onChange={(e) => {
+                setRole(e.target.value as HrCreateTeamAccountInput["role"]);
+                setWarehouseIndividual(false);
+              }}
               className={`${fieldCls} mt-1 font-normal`}
             >
               {roles.map((r) => (
@@ -377,28 +383,35 @@ function AddUserModal({
               />
             </label>
           ) : isWarehouse ? (
-            /* R6 — PICK a warehouse, never type one. A free-text name here
-               would mint nothing and bind nothing; the login has to point at
-               the same row the POs are bound to or it sees an empty list. */
-            <label className="col-span-2 text-meta text-base-700">
-              Warehouse
-              <select
+            <div className="col-span-2 grid gap-3">
+              <Select
+                id="hr-team-warehouse-account-type"
+                label="Warehouse account"
+                value={warehouseIndividual ? "individual" : "shared"}
+                onValueChange={(value) => setWarehouseIndividual(value === "individual")}
+                disabled={create.isPending}
+                options={[
+                  { value: "shared", label: "Shared login" },
+                  { value: "individual", label: "Individual login" },
+                ]}
+                hint={warehouseIndividual
+                  ? "Use the person's name. Receiving records who confirmed the goods."
+                  : "Shared logins cannot confirm receiving as a person."}
+              />
+              <Select
+                id="hr-team-warehouse-picker"
+                label="Warehouse"
+                required
                 value={warehouseId}
-                onChange={(e) => setWarehouseId(e.target.value)}
-                className={`${fieldCls} mt-1 font-normal`}
-                data-testid="hr-team-warehouse-picker"
-              >
-                <option value="">Warehouse</option>
-                {warehouses.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.name}
-                  </option>
-                ))}
-              </select>
-              <span className="block text-meta text-base-600 mt-1">
-                This login sees only what is coming to that warehouse.
-              </span>
-            </label>
+                onValueChange={setWarehouseId}
+                placeholder="Warehouse"
+                options={warehouses.map((w) => ({ value: w.id, label: w.name }))}
+                disabled={create.isPending || warehouses.length === 0}
+                hint={warehouses.length === 0
+                  ? "Warehouse choices are not available. Close this form and reload Team."
+                  : "Choose the existing receiving Site. Its company is set in Warehouse settings."}
+              />
+            </div>
           ) : (
             <>
               <label className="text-meta text-base-700">

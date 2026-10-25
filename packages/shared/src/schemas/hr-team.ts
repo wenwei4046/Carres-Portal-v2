@@ -131,8 +131,11 @@ export const hrCreateTeamAccountInput = z
     reportsToUserId: z.string().uuid().optional().nullable(),
     /** R6 — which EXISTING warehouse a `warehouse` login belongs to. */
     warehouseId: z.string().uuid().optional(),
+    /** Explicit named external operator; omitted preserves existing shared logins. */
+    warehouseIndividual: z.boolean().optional(),
   })
   .superRefine((v, ctx) => {
+    if (v.warehouseIndividual && v.role !== "warehouse") ctx.addIssue({code:z.ZodIssueCode.custom,path:["warehouseIndividual"],message:"Individual Warehouse identity applies only to Warehouse"});
     if ((v.role === "supplier" || v.role === "partner") && !v.companyName) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

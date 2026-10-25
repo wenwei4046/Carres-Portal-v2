@@ -1,3 +1,8 @@
+import ReceivingExtraObservations from "@/components/receiving/ReceivingExtraObservations";
+import ReceivingReportEvidence from "@/components/receiving/ReceivingReportEvidence";
+import {ReceivingSourceReservations} from "@/components/receiving/ReceivingSourceReservations";
+import BlockedReceivingReport from "./BlockedReceivingReport";
+import ReceivingExtraCustody from "@/components/receiving/ReceivingExtraCustody";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Download, Printer } from "lucide-react";
@@ -152,6 +157,8 @@ export default function ReceivingRecord({
     );
   }
 
+  if(r.status==="draft" && r.raw_report && typeof r.raw_report==="object")return <BlockedReceivingReport detail={detail} onBack={onBack}/>;
+
   const events = detail.events;
   const po = detail.po;
   const lines = (r.lines ?? []) as WarehouseReceiptLine[];
@@ -260,11 +267,11 @@ export default function ReceivingRecord({
         <>
           {/* ── The facts ─────────────────────────────────────────────── */}
           <Section title="Receiving Details">
-            <Prop label={isGrn ? "Linked PO" : "Linked PO"}>
-              <span className="font-mono">{documentDisplayNumber(r.po_id ?? "")}</span>
-            </Prop>
-            <Prop label="Supplier">{r.supplier_name ?? ""}</Prop>
-            <Prop label="Supplier Deliver To">{r.warehouse_name ?? ""}</Prop>
+            {r.po_id && <>
+              <Prop label="Linked PO"><span className="font-mono">{documentDisplayNumber(r.po_id)}</span></Prop>
+              <Prop label="Supplier">{r.supplier_name || "Not recorded"}</Prop>
+            </>}
+            <Prop label={r.arrival_source_id ? "Destination" : "Supplier Deliver To"}>{r.warehouse_name || "Not recorded"}</Prop>
             <Prop label="Goods arrived at">
               {r.actual_site_name ?? r.warehouse_name ?? ""}
             </Prop>
@@ -302,7 +309,8 @@ export default function ReceivingRecord({
                 </span>
               </Prop>
             ) : null}
-            <Prop label="Supplier DO No">
+            {detail.arrival_source && <Prop label="Document"><Link to={`/operation?tab=arrival-source&arrival=${encodeURIComponent(detail.arrival_source.id)}`} className="text-kit-blue-11 hover:underline">{documentDisplayNumber(detail.arrival_source.source_no)}</Link></Prop>}
+            <Prop label={r.arrival_source_id ? "Handover document number" : "Supplier DO No"}>
               <span className="font-mono">{r.do_number}</span>
               {r.do_file_url ? (
                 <a
@@ -315,6 +323,7 @@ export default function ReceivingRecord({
                 </a>
               ) : null}
             </Prop>
+            {detail.events.some(event=>event.payload?.reason==="Arrival evidence added") && <ReceivingReportEvidence receiptId={r.id} office/>}
             {(r.arrival_evidence ?? []).length > 0 && (
               <Prop label="Arrival evidence">
                 <span className="text-body text-kit-slate-12">
@@ -351,7 +360,7 @@ export default function ReceivingRecord({
                     ? ` · cover ${r.posted_duty_cover_name}`
                     : ""}
                   {r.posted_authority && r.posted_authority !== "grn_duty"
-                    ? ` · saved by ${r.posted_by_name ?? "Staff identity not recorded"} (${RECEIVING_AUTHORITY_LABEL[r.posted_authority]})`
+                    ? ` · saved by ${r.posted_by_name ?? "Staff identity not recorded"} (${RECEIVING_AUTHORITY_LABEL[r.posted_authority] ?? "Not recorded"})`
                     : ""}
                 </span>
               </Prop>
@@ -456,6 +465,9 @@ export default function ReceivingRecord({
             ))}
           </Section>
 
+          {Boolean(r.raw_report) && <ReceivingExtraObservations receiptId={r.id} office/>}
+          {isGrn && <ReceivingExtraCustody key={r.id} receiptId={r.id} hasExtra={extraQty > 0} />}
+
           {/* ── Consequences ──────────────────────────────────────────── */}
           {r.status === "posted" && (
             <Section title="What this saving did">
@@ -469,15 +481,21 @@ export default function ReceivingRecord({
                   ? " Damaged and wrong goods are controlled and never became available stock."
                   : ""}
               </p>
-              {hasIssue ? (
-                <Link
-                  to="/operation?tab=claims"
-                  className="mt-1.5 inline-block text-body text-kit-blue-11 hover:underline"
+              {hasIssue && (detail.related_records?.claims.length ? detail.related_records.claims.map(claim => (
+                <Link key={claim.id}
+                  to={`/operation?tab=claims${r.po_id ? `&po=${encodeURIComponent(r.po_id)}` : ""}&claim=${encodeURIComponent(claim.id)}`}
+                  className="mt-1.5 block text-body text-kit-blue-11 hover:underline"
                   data-testid="record-open-claims"
-                >
-                  Open in Claims
-                </Link>
-              ) : null}
+                >Open in Claims{claim.claim_no ? ` · ${claim.claim_no}` : ""}</Link>
+              )) : r.po_id ? (
+                <Link to={`/operation?tab=claims&po=${encodeURIComponent(r.po_id)}`}
+                  className="mt-1.5 inline-block text-body text-kit-blue-11 hover:underline"
+                  data-testid="record-open-claims">Open in Claims</Link>
+              ) : null)}
+              {detail.related_records?.returns.map(record => (
+                <Link key={record.id} to={`/operation?tab=purchase-returns&pr=${encodeURIComponent(record.id)}`}
+                  className="mt-1.5 block text-body text-kit-blue-11 hover:underline">{record.pr_no}</Link>
+              ))}
             </Section>
           )}
 
@@ -563,6 +581,7 @@ export default function ReceivingRecord({
                           : ""}
                       </div>
                     ) : null}
+                    <ReceivingSourceReservations value={e.payload?.source_reservations}/>
                     {e.event === "amended" && e.payload?.before ? (
                       /* Only the AFFECTED facts compare side by side. */
                       <div className="mt-1 grid max-w-md grid-cols-2 gap-2 rounded-card border border-kit-slate-5 p-2 text-meta">

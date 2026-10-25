@@ -2129,7 +2129,11 @@ dictionary with the approved Receiving build; each is registered here so no chat
 |---|---|---|
 | `Goods arrived at` | Receiving Details field · Register column · shared list location filter | Where the goods PHYSICALLY arrived — a warehouse, showroom or any other real site, never assumed to be a warehouse. It never overwrites `Supplier Deliver To` (where the PO instructed the supplier to deliver; `Deliver To` on other surfaces) — the instruction and the physical truth are two facts, both preserved. **Owner correction 2026-09-06:** the retired labels `Actual Site`, `Delivery Location` and `Goods Received At` may not appear on Receiving surfaces; `Delivery Location` stays reserved for the CUSTOMER's delivery address. |
 | `Extra Qty` | Receiving Summary · Register column | Goods that were not on the source PO/CO, recorded SEPARATELY. Extra goods never enter Inventory and never alter ordered/pending-delivery arithmetic. |
+| `Last saved report` | an unposted Receiving editor’s prior saved result | Preserved blockers describe the saved revision; edited physical facts require another save and retain original History. |
+| `Stock reservation` · `Reserved for original Sales Order` · `Existing reservation kept` · `Source needs checking` | actual posted Receiving event result | Show only Stock's exact Unit result. Unclear/cancelled/reduced source never becomes a guessed reservation or Work Done. |
+| `Your receiving Site or receiving company is not active. Ask Operation to check the setup.` · `This shared Warehouse login sends counts to Office. Use your own Warehouse account to confirm receiving.` · `Receiving confirmation is not available yet. Counts still go to Office.` · `Receiving is not available. Ask Operation to check your Warehouse account and Site.` | Warehouse readiness/admission | Current database result governs the entry; no account activation, grants or automatic fallback after a failed read. |
 | `Extra goods` | session section | The section that records `Extra Qty` lines. First check whether the goods belong to another PO or CO. |
+| `Recorded with` · `This is the original receiving report. It does not confirm the source of the extra goods.` | Extra custody's read-only original Receiving link | The linked GRN is the observation record, not verified purchase provenance, acceptance, return or completion. |
 | `Arrival evidence` | Receiving Details field | Photo AND video of the physical arrival — beside, never instead of, the `Signed DO photo`. |
 | `Received` · `Received with issue` · `Not received` | per-Unit outcome | The three physical results for a governed expected Unit (ERP-ARCHITECTURE §3.4, owner ruling 2026-09-01). `Received with issue` is a SUBSET of received — never counted twice. `Expected Units = Received Units + Not received Units`. (`Not received yet` stays the Route phrase for a PO-level absence; this row is the per-Unit outcome word.) |
 | `Amend Receiving` | the posted GRN's correction door | A posted GRN has no ordinary Edit. The original is preserved; the correction carries its reason, before/after, and an append-only `amended` event. |
@@ -2137,7 +2141,11 @@ dictionary with the approved Receiving build; each is registered here so no chat
 | `Cancelled` | GRN document status — shown only under the GRN No of a cancelled GRN, the object pill and the GRN paper | **Owner ruling 2026-09-17 (APPROVED / NOT BUILT):** a normal GRN shows no status label; `Valid` and the Status column are retired. `Posted` and `Voided` remain internal database statuses and never reach a normal user's screen. A cancelled GRN keeps its number and prints `CANCELLED` on the document. |
 | `Someone changed this GRN. Check it again.` · `{Unit ID} cannot change.` + `Reserved for {SO No}` · `On {DO No}` · `On {Claim No}` · `Delivered` · `Time not recorded` | Amend Receiving (owner ruling 2026-09-17; BUILT ON BRANCH, 0601) | Named-Unit amend refusals, one per locked Unit, and the unknown-time state of an older GRN. |
 | `GOODS RECEIVED NOTE` | the formal GRN document's title | The A4 document (SO-PDF-STANDARD chrome, money-free). A GRN number without this formal document is not sufficient. |
+| `Receiving report saved. No GRN created.` | individual Warehouse incomplete report and its read-only Office record | A preserved physical report remains unresolved; no formal GRN or Stock completion is implied. Draft PR2100, isolated model only. |
+| `Open Receiving` | Work action for the exact blocked report | Opens the original report; no second receipt, manual Done or legacy check-in is offered. It does not replace the Incoming row's existing `Receive` wording. |
 | `No GRN yet` | `Reports → Receiving & Inbound` cell for an unposted session | The formal GRN exists only from the posted session (purchasing/MASTER.md §7.3) — an honest absence, never `—`. The GRN REGISTER never needs it: a Register row exists only once the GRN does (owner correction 2026-09-06). |
+| `The original report stays in History. Check the goods again for the selected PO or CO.` | explicit source correction for an unposted individual Warehouse report | Source-correction branch draft only: the original receipt/key/revision remains; newly selected source quantities and Unit outcomes require a fresh count. |
+| `Reported PO No` | preserved Receiving report History | The exact submitted source text for that revision, including an unidentified report; it does not create a formal document link. |
 | `Find PO or CO` | the Start Receiving entrance | Receiving starts from the exact source. The search is CONTROLLED: an unknown delivery may record evidence but never invents a supplier, an order, a Session, a GRN or Inventory. |
 | `Only Operation staff may save a receiving.` | the refused act | The page states the same rule the SQL door holds (0601, owner ruling 2026-09-25): every active Operation staff member and the principal may post. `Only GRN duty may save a receiving.` and `Not your duty today` are RETIRED. Amend and Void keep the GRN Duty authority; their doors are simply not offered to anyone else. |
 | `Operation staff` | the posting label beside `Saved by` | A saver who is neither GRN Duty, its cover nor an Operations Superuser (0601). |
@@ -5839,7 +5847,8 @@ Receiving placement; UI MASTER owns Calendar. No posting/permission change is im
 
 | Surface | Approved words | Meaning |
 |---|---|---|
-| Receiving left-rail views | `GRN Records` · `Receiving Differences` | Formal receipts; source-linked discrepancy view, not a second Work queue |
+| Receiving left-rail views — Jess confirmed19Oct2026 | `Not received` · `Received` · `Differences` | Default Not received reads sent current-version POs with eligible pending goods, including partial receipts; earliest due first. Received retains the former GRN Records population/history/cancelled semantics. Differences retains its existing discrepancy population. No duplicate receipt writer or manual task completion |
+| Not received columns — same owner confirmation | `PO No` · `Supplier` · `Items` · `Due` · `Received` · `Check in` | Due shows the earliest outstanding governed arrival; `Late {n}d` is elapsed calendar days, not a new Work/calendar rule. Received shows accepted n / original ordered m. Check in opens the existing Receiving workspace for that PO; PO No opens the owning Purchase Order |
 | Shared list toolbar | `Search` · `Table` · `Cards` · `Page tools` · `Columns` | Reuse shared controls and existing action availability |
 | Right Working Panel sections | `Receipt details` · `Items & quantities` · `Evidence` · `Related records` · `History` | Receiving-owned facts and permitted actions |
 | Shared Calendar | `All modules` · `Filter by module` · `Filter by location` | Authorised implemented dated events; one owner/event/count; no duplicate Receiving arrival |
@@ -5913,3 +5922,60 @@ DEL-04 · DEL-05 · OFF-01/05, owner confirmed 9 Oct 2026). No dash is used as a
 | Work action, `Assign logistics` | line two `Choose the company that carries this delivery · due {date}` | the hard-coded `3 working days before · {date}` is retired |
 | Logistics card, first check | `{n} working days before · {date}` with `n` = the stored Contact lead (`Contact lead days`, DEL-05); at the default it reads the ruled `3 working days before`. `2 working days before` and `1 working day before` stay fixed (Workspace §5.9) | the contact day follows its one setting |
 
+
+### Team Warehouse account identity — 21 Oct 2026
+
+Existing Team account form only; explicit individual opt-in through the existing authorised writer.
+
+| Use | Exact words | Boundary |
+|---|---|---|
+| Account selector | `Warehouse account` · `Shared login` · `Individual login` | Shared default; no internal staff/Duty rights |
+| Individual hint | `Use the person's name. Receiving records who confirmed the goods.` | Named identity; not proof of operational admission |
+| Shared hint | `Shared logins cannot confirm receiving as a person.` | Count/report access retains existing permission |
+| Site hint | `Choose the existing receiving Site. Its company is set in Warehouse settings.` | Existing Warehouse only; no new Site/company writer |
+| Unavailable choices | `Warehouse choices are not available. Close this form and reload Team.` | Missing/failed list is not a confirmed zero; creation blocked |
+
+### Unidentified Warehouse delivery report — 21 Oct 2026
+
+Existing individual Warehouse draft writer and My receiving history; observation intake only.
+
+| Use | Exact words | Boundary |
+|---|---|---|
+| Entry / title | `Report unidentified delivery` | Incoming links to My receiving's same form; no source guessed |
+| Submit | `Save report` | Existing draft writer; no GRN/Stock/Work Done |
+| Guidance | `Record only what you observed. Operation checks the source. This report does not create a GRN or add Stock.` | Physical observation is not Purchasing acceptance |
+| Observation hint | `Describe the goods, visible labels, quantity and condition you observed. Do not guess a PO or Unit ID.` | Original Note preserves observed facts; no SKU/Unit minting |
+| Time validation | `Record Goods Received Date before Time.` | No invented date/time |
+| Result continuation | `Find this report in My receiving.` | Existing original report and History; source correction remains separate |
+
+### Original report evidence — 21 Oct 2026
+
+Receipt-bound attachment ledger only; uploading a file does not accept goods or complete Work.
+
+| Use | Exact words | Boundary |
+|---|---|---|
+| Evidence context | `Original report evidence` · `These files belong to the original report. They do not verify a PO or Unit.` | Original observation provenance, never accepted-source linkage |
+| Missing deployment | `Report evidence is not available yet.` | Fail closed; no arbitrary PO path fallback |
+| Denied | `Report evidence is not available to this person and Site.` | Original active individual/Site or existing Office read authority |
+| Pending transfer | `Evidence upload is not complete.` | A slot/object without finalised history is not attached evidence |
+| Genuinely empty | `No evidence recorded yet.` | Only after a successful authorised read |
+| History | `Arrival evidence added` | Append-only attachment event; original physical report/revision unchanged |
+| Read | `View proof` | Real saved object through the owning authorised reader |
+
+### Unposted goods held: original observations and investigation — 21 Oct 2026
+
+Existing Receiving report only. Immutable physical observation evidence; no available balance or disposition.
+
+| Use | Exact words | Boundary |
+|---|---|---|
+| Section / object | `Original observations` · `Original observation` · `Observation` · `Open observation {n}` | Separate measurements tied to exact original report/revision; never added together |
+| Physical recording | `Record goods held` · `Save observation` · `Label on goods` · `Observed Qty` · `Report revision` | Current qualified individual Warehouse/Site; no SKU/Unit identity inferred |
+| Quantity hint / validation | `Leave blank when not known.` · `Enter a whole quantity greater than zero.` | Unknown is null, never zero; known observations positive whole pieces |
+| Recorder / holder | `Recorded by` · `Received by` · `Goods arrived at` | Actual person and database Site/operating company retained separately; no Duty appointment |
+| Meaning | `Each row is a separate observation. Do not add these quantities together. A note does not accept or return goods.` | No Stock/Work/acceptance/return arithmetic |
+| Actual result | `Observation recorded. No GRN or Stock created.` | Only after owning writer confirms exact request |
+| Investigation | `Add investigation note` · `Investigation note` · `Investigation history` · `Save note` | Existing active Operation/Principal; append to exact observation; Warehouse cannot read Office notes |
+| Note result | `Investigation note recorded. No goods accepted or returned.` | No supplier decision, verified source or disposition implied |
+| Empty | `No observations recorded yet.` | Successful authorised read only |
+| Missing deployment | `Original observations are not available yet.` | No fallback writer |
+| Denied | `Original observations are not available for this account and Site.` | No pointless retry or fake empty |

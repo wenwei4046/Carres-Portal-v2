@@ -1,3 +1,4 @@
+import { readWarehouseReceivingWorkFact, type ReceivingWorkReceipt } from "../../lib/receiving-work-facts";
 import { loadCaseRemedyWork } from "../../lib/service-case-remedy-work";
 import { Hono, type Context } from "hono";
 import { sellableOf } from "./stock";
@@ -93,7 +94,9 @@ import { readWarehouseReceivingSettings } from "../../lib/warehouse-receiving-ca
 import { readDeliveryCalendar } from "../../lib/delivery-calendar";
 import { readPersonWorkDays } from "../../lib/person-work-days";
 import { chunk } from "../../lib/purchase-demand-read";
-import { userClient } from "../../lib/supabase";
+import { userClient, adminClient } from "../../lib/supabase";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { receivingActorNames } from "../../lib/receiving-actor-names";
 import type { AppEnv } from "../../types";
 import operationOrdersRouter from "./orders";
 import operationStockRouter from "./stock";
@@ -205,9 +208,9 @@ export async function officeCalendarOf(c: Context<AppEnv>): Promise<OfficeCalend
 
 /** The Delivery calendar for this request, as the caller (RLS). Never throws:
  *  an unreadable Warehouse calendar answers the built-in list. */
-async function deliveryCalendarFor(c: Context<AppEnv>): Promise<DeliveryCalendar> {
+async function deliveryCalendarFor(c: Context<AppEnv>, client = userClient(c.env, c.var.auth.jwt)): Promise<DeliveryCalendar> {
   try {
-    return (await readDeliveryCalendar(userClient(c.env, c.var.auth.jwt))).calendar;
+    return (await readDeliveryCalendar(client)).calendar;
   } catch {
     return DEFAULT_DELIVERY_CALENDAR;
   }
@@ -1100,29 +1103,18 @@ export function projectOverpaymentReviewWork(input: {
 
 export function receivingWorkSourceFromModuleFacts(data: {
   receipts: Array<{
-    id: string;
-    po_id: string;
-    supplier_name: string | null;
-    status: string;
-    goods_received_at?: string;
-    submitted_at: string;
-    /** The Site that physically received, else the PO's Warehouse. */
-    actual_site_id?: string | null;
-    warehouse_id?: string | null;
+    id: string; po_id: string | null; supplier_name: string | null; status: string;
+    goods_received_at?: string | null; submitted_at: string;
+    actual_site_id?: string | null; warehouse_id?: string | null;
+    has_raw_report?: boolean; validation_blockers?: unknown;
   }>;
 }): ReceivingWorkSource {
-  return {
-    submitted: data.receipts
-      .filter((row) => row.status === "submitted")
-      .map((row) => ({
-        id: row.id,
-        po_id: row.po_id,
-        supplier_name: row.supplier_name,
-        goods_received_at: row.goods_received_at,
-        submitted_at: row.submitted_at,
-        site_id: row.actual_site_id ?? row.warehouse_id ?? null,
-      })),
-  };
+  const blocked=(row:typeof data.receipts[number])=>row.status === "draft" && row.has_raw_report === true && Array.isArray(row.validation_blockers) && row.validation_blockers.length > 0;
+  return { submitted: data.receipts.filter(row=>row.status === "submitted" || blocked(row)).map(row=>({
+    id:row.id,po_id:row.po_id ?? "Receiving",supplier_name:row.supplier_name,
+    goods_received_at:row.goods_received_at ?? undefined,submitted_at:row.submitted_at,
+    site_id:row.actual_site_id ?? row.warehouse_id ?? null,...(blocked(row)?{blocked:true}:{}),
+  })) };
 }
 
 export function manualPurchaseWorkInputsFromRegister(
@@ -1416,7 +1408,7 @@ export function projectReceivingWork(input: {
         label: item.poId,
       },
       // Only an actual submitted physical report reaches this projection.
-      problem: "Goods arrived · GRN not posted",
+      problem: input.source.submitted.find(row=>row.id===item.receiptId)?.blocked ? "Receiving report saved. No GRN created." : "Goods arrived · GRN not posted",
       recipient: supplier,
       requiredResult: "GRN posted",
       destination: `/operation?tab=receiving&session=${encodeURIComponent(item.receiptId)}`,
@@ -1872,7 +1864,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
       }>(internal, "/manual-purchase", c),
       readInternal<{ receipts: Parameters<typeof receivingWorkSourceFromModuleFacts>[0]["receipts"] }>(
         internal,
-        "/warehouse-receipts?status=submitted",
+        "/warehouse-receipts/work-reports",
         c,
       ),
       readInternal<{ pos: PurchaseOrderArrivalSource[] }>(
@@ -2182,6 +2174,7 @@ function ledgerRow(r: Record<string, unknown>): WorkOccurrenceEvent {
 export function workCompletedOf(
   event: WorkOccurrenceEvent,
   staff: OperationWorkResponse["staff"],
+  recordedNames: ReadonlyMap<string,string> = new Map(),
 ): OperationWorkCompleted | null {
   const parsed = parseWorkOccurrenceId(event.occurrenceId);
   if (!parsed || !event.objectLabel || !event.resultReference) return null;
@@ -2193,7 +2186,7 @@ export function workCompletedOf(
     objectLabel: event.objectLabel,
     completedAt: event.at,
     completedBy: event.actorId
-      ? { userId: event.actorId, name: staff.find((person) => person.userId === event.actorId)?.name ?? null }
+      ? { userId: event.actorId, name: staff.find((person) => person.userId === event.actorId)?.name ?? recordedNames.get(event.actorId) ?? null }
       : null,
     resultReference: event.resultReference,
   };
@@ -2207,10 +2200,7 @@ function refusalOf(error: { code?: string; details?: string | null; message: str
   return new WorkLedgerRefusal("ledger_failed", error.message);
 }
 
-/** The Supabase ledger: reads under the caller's RLS, writes through 0584's doors. */
-export const supabaseWorkLedger: WorkLedger = {
-  async read(c, occurrenceIds) {
-    const sb = userClient(c.env, c.var.auth.jwt);
+export async function readWorkLedgerRows(sb: SupabaseClient, occurrenceIds: readonly string[]): Promise<WorkOccurrenceEvent[]> {
     const rows: WorkOccurrenceEvent[] = [];
     for (let i = 0; i < occurrenceIds.length; i += LEDGER_CHUNK) {
       const ids = occurrenceIds.slice(i, i + LEDGER_CHUNK);
@@ -2223,6 +2213,12 @@ export const supabaseWorkLedger: WorkLedger = {
       for (const r of (data ?? []) as Array<Record<string, unknown>>) rows.push(ledgerRow(r));
     }
     return rows;
+}
+
+/** The Supabase ledger: reads under the caller's RLS, writes through 0584's doors. */
+export const supabaseWorkLedger: WorkLedger = {
+  async read(c, occurrenceIds) {
+    return readWorkLedgerRows(userClient(c.env, c.var.auth.jwt), occurrenceIds);
   },
   async readCompleted(c, sinceIso) {
     // `at` is compared at Malaysian midnight, the same day the feed names.
@@ -2436,6 +2432,35 @@ export async function probePurchaseOrderWork(
   return items.map((item) => ({ ...item, id: currentId.get(item.id) ?? item.id }));
 }
 
+/** One physical report, using the feed's own projector/calendar and occurrence ledger. */
+export async function probeReceivingWork(
+  c: Context<AppEnv>, receiptId: string, ledger: WorkLedger = supabaseWorkLedger,
+): Promise<OperationWorkItem[] | null> {
+  const external=c.var.auth.role === "warehouse";
+  const sb=userClient(c.env,c.var.auth.jwt);
+  let row: ReceivingWorkReceipt | null;
+  if(external){
+    row=(await readWarehouseReceivingWorkFact(c,receiptId,null)).receipt;
+  } else {
+    const read=await sb.from("warehouse_receipts").select("*").eq("id",receiptId).maybeSingle();
+    if(read.error)throw new Error("Receiving Work could not be read");
+    row=read.data ? {...read.data,has_raw_report:read.data.raw_report != null} : null;
+  }
+  if(!row)return null;
+  const source=receivingWorkSourceFromModuleFacts({receipts:[{...row,id:receiptId,po_id:row.po_id ?? null,status:row.status,submitted_at:row.submitted_at,supplier_name:null}]});
+  if(!source.submitted.length)return [];
+  // The caller first attests its exact own report through USER JWT. Calendar and
+  // occurrence-generation metadata stay server-side; no personnel/table read is granted.
+  const metadata=external ? adminClient(c.env) : sb;
+  const site=row.actual_site_id ?? row.warehouse_id;
+  const [settings,calendar]=await Promise.all([readWarehouseReceivingSettings(metadata,site?[site]:[]),deliveryCalendarFor(c,metadata)]);
+  const today=todayIsoMYT();
+  const items=projectReceivingWork({source,duty:null,today,workingDaysLate:(due,report)=>warehouseReceivingDaysLate(due,today,report?.site_id?settings.get(report.site_id)??null:null,deliveryHolidaySet(calendar))});
+  const scopedLedger=external ? {...ledger,read:(_c:Context<AppEnv>,ids:readonly string[])=>readWorkLedgerRows(metadata,ids)} : ledger;
+  const {currentId}=await readWorkLedger(c,scopedLedger,items.map(item=>item.id));
+  return items.map(item=>({...item,id:currentId.get(item.id)??item.id}));
+}
+
 /** The SO Batch read and supplier doors, read as the caller — the window
  *  probe and completion facts see exactly what the Work feed sees. */
 async function readPoWindowSource(c: Context<AppEnv>): Promise<{
@@ -2552,8 +2577,24 @@ ledger: WorkLedger = supabaseWorkLedger,
     // send a second request to someone already asked.
     throw new HTTPException(503, { message: "Work status could not be loaded. Try again." });
   }
+  const recordedNames=new Map<string,string>();
+  const missingActors=completedEvents.filter(event=>event.actorId && !response.staff.some(person=>person.userId===event.actorId));
+  const receiptActors=new Map<string,Set<string>>();
+  for(const event of missingActors){
+    const parsed=parseWorkOccurrenceId(event.occurrenceId);
+    if(!parsed || !event.actorId)continue;
+    const causalRepairReceipt=parsed.module==="purchasing" && parsed.ruleKey==="repair_order.return_date_passed"
+      ? /(?:^|;)warehouse_receipts=([0-9a-f-]{36})(?:;|$)/i.exec(event.resultReference ?? "")?.[1] : null;
+    const receiptId=parsed.module==="receiving" ? parsed.objectId : causalRepairReceipt;
+    if(!receiptId)continue;
+    if(!receiptActors.has(receiptId))receiptActors.set(receiptId,new Set());
+    receiptActors.get(receiptId)!.add(event.actorId);
+  }
+  for(const [receiptId,actors] of receiptActors){
+    try {const names=await receivingActorNames(userClient(c.env,c.var.auth.jwt),receiptId,[...actors]);for(const [id,name] of Object.entries(names ?? {}))recordedNames.set(id,name);}catch { /* Unknown display names never invent an actor or a completion. */ }
+  }
   const completed = completedEvents
-    .map((event) => workCompletedOf(event, response.staff))
+    .map((event) => workCompletedOf(event, response.staff, recordedNames))
     .filter((row): row is OperationWorkCompleted => row !== null);
   return {
     response: { ...withWorkLifecycle(response, read.events, read.currentId), completed },

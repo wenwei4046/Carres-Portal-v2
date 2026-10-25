@@ -108,3 +108,113 @@ export const warehouseReceiptReturnInput = z
 export type WarehouseReceiptReturnInput = z.infer<
   typeof warehouseReceiptReturnInput
 >;
+
+/** Final physical report. Missing business facts must reach the receipt engine
+ * unchanged so it can retain the report with blockers. Shape/size validation is
+ * still enforced here; actor, Site, source and posting authority remain in SQL. */
+export const warehouseConfirmationReportInput = warehouseSubmitReceiptInput.partial().extend({
+  arrivalSourceId: z.string().uuid().nullish(),
+  handoverPerson: z.string().max(200).optional(),
+  arrivalUnits: z.array(z.object({
+    stockItemId: z.string().max(100).nullish(),
+    outcome: z.enum(["received", "received_with_issue", "not_received"]).nullish(),
+    issueKind: z.enum(["damaged", "wrong_item"]).nullish(),
+    note: z.string().max(300).nullish(),
+  }).strict()).max(200).optional(),
+  poId: z.string().max(100).nullish(),
+  actualSiteId: z.string().uuid().nullish(),
+  doNumber: z.string().max(64).nullish(),
+  doFilePath: z.string().max(500).nullish(),
+  goodsReceivedTime: z.string().datetime({ offset: true }).nullish(),
+  goodsReceivedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
+  goodsReceivedClock: z.string().regex(/^\d{2}:\d{2}$/).nullish(),
+  extraLines: z.array(z.object({sku:z.string().max(120).nullish(),qty:z.number().int().nonnegative().nullish(),note:z.string().max(300).optional()}).strict()).max(50).optional(),
+  lines: z.array(warehouseSubmitReceiptInput.shape.lines.element.extend({
+    id: z.string().max(100).nullish(),
+    receivedNow: z.number().int().nonnegative().nullish(),
+    damagedQty: z.number().int().nonnegative().nullish(),
+    wrongItemQty: z.number().int().nonnegative().nullish(),
+    units: z.array(z.object({
+      unitCode: z.string().max(64).nullish(),
+      outcome: z.enum(["received", "received_with_issue", "not_received"]).nullish(),
+      issueKind: z.enum(["damaged", "wrong_item"]).nullish(),
+      note: z.string().max(300).nullish(),
+    }).strict()).max(200).optional(),
+  }).strict()).max(500).optional(),
+}).strict();
+
+export const warehouseConfirmReceiptInput = z.object({
+  saveKey: z.string().uuid(),
+  receiptId: z.string().uuid().optional(),
+  revision: z.number().int().nonnegative().optional(),
+  report: warehouseConfirmationReportInput,
+}).strict().refine((value) => (value.receiptId === undefined) === (value.revision === undefined), {
+  message: "Receipt and revision must be supplied together",
+});
+export type WarehouseConfirmationReportInput = z.infer<typeof warehouseConfirmationReportInput>;
+export type WarehouseConfirmReceiptInput = z.infer<typeof warehouseConfirmReceiptInput>;
+
+
+/** Confirmation either produces a GRN or preserves the physical report. */
+export const warehouseConfirmationResult = z.object({
+  id: z.string().uuid(), receipt_id: z.string().uuid(),
+  status: z.enum(["draft", "posted"]), grn_no: z.string().nullable(),
+  revision: z.number().int().nonnegative(),
+  blockers: z.array(z.object({ code: z.string().min(1), message: z.string().min(1) })),
+  already_saved: z.boolean(),
+}).superRefine((result, ctx) => {
+  if (result.id !== result.receipt_id || (result.status === "posted"
+    ? !result.grn_no?.trim() || result.blockers.length !== 0
+    : result.grn_no !== null || result.blockers.length === 0)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Receipt confirmation returned an inconsistent result" });
+  }
+});
+export type WarehouseConfirmationResult = z.infer<typeof warehouseConfirmationResult>;
+
+export const receivingExtraCustodyNote = z.object({
+  id: z.string(), custody_id: z.string(), note: z.string(), actor_id: z.string(),
+  recorded_at: z.string(), request_key: z.string(),
+});
+
+/** Read-only physical custody evidence; no inventory identity or disposition. */
+export const receivingExtraCustodyEvidence = z.object({
+  recorded_with: z.object({ receipt_id: z.string().uuid(), grn_no: z.string().nullable() }).nullable().optional(),
+  custody: z.array(z.object({ id: z.string(), reported_sku: z.string(), reported_qty: z.number().int().positive(),
+    reported_note: z.string().nullable(), actual_site_id: z.string(), goods_received_at: z.string(),
+    holder_party_id: z.string().nullable().optional(), recorded_by: z.string().optional(), recorded_at: z.string().optional() })),
+  siteNames: z.record(z.string()),
+  holderNames: z.record(z.string()).optional(),
+  notes: z.array(receivingExtraCustodyNote.omit({ request_key: true })),
+  actorNames: z.record(z.string()),
+});
+
+export const warehouseConfirmationReadiness = z.object({
+  mode: z.enum(["legacy_count", "confirmation", "unavailable"]), reason: z.string().nullable(),
+});
+
+/** Canonical receipt-event projection; absence is not reservation success. */
+export const receivingSourceReservationResults=z.array(z.object({unit_code:z.string().min(1),result:z.enum(['source_reserved','existing_binding_preserved','source_reservation_needs_handling'])}));
+
+/** Receipt-bound evidence metadata. Pending upload is distinct from attached history. */
+export const receivingReportEvidenceFiles = z.object({
+  can_upload:z.boolean(),files:z.array(z.object({
+    id:z.string().uuid(),path:z.string().min(1).max(500),name:z.string().min(1).max(180),
+    event_id:z.string().uuid().nullable(),created_at:z.string().datetime({offset:true}),
+    kind:z.enum(["photo","video","pdf"]),
+  })).max(20),
+});
+export type ReceivingReportEvidenceFiles=z.infer<typeof receivingReportEvidenceFiles>;
+
+/** Independent observation snapshots, never summed as available stock/custody balance. */
+export const receivingExtraObservation = z.object({
+ id:z.string().uuid(),receipt_id:z.string().uuid(),report_revision:z.number().int().nonnegative(),report_snapshot:z.record(z.unknown()),
+ label:z.string().nullable(),qty:z.number().int().positive().nullable(),note:z.string(),goods_received_at:z.string().nullable(),
+ actual_site_id:z.string().uuid(),site_name:z.string(),holder_party_id:z.string().uuid(),holder_name:z.string(),
+ recorded_by:z.string().uuid(),actor_name:z.string(),recorded_at:z.string().datetime({offset:true}),request_key:z.string().uuid(),
+});
+export const receivingExtraObservationNote=z.object({id:z.string().uuid(),observation_id:z.string().uuid(),note:z.string(),actor_id:z.string().uuid(),actor_name:z.string(),recorded_at:z.string().datetime({offset:true}),request_key:z.string().uuid()});
+export const receivingExtraObservations=z.object({receipt_id:z.string().uuid(),revision:z.number().int().nonnegative(),can_record:z.boolean(),can_investigate:z.boolean(),observer:z.object({site_name:z.string(),holder_name:z.string(),actor_name:z.string()}).nullable(),observations:z.array(receivingExtraObservation),notes:z.array(receivingExtraObservationNote)});
+export const recordExtraObservationInput=z.object({revision:z.number().int().nonnegative(),key:z.string().uuid(),label:z.string().trim().max(120).nullable(),qty:z.number().int().positive().max(2147483647).nullable(),note:z.string().trim().max(300),day:z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable()}).strict().refine(v=>Boolean(v.label)||v.qty!==null||Boolean(v.note),{message:"Record what you observed"});
+export type ReceivingExtraObservation=z.infer<typeof receivingExtraObservation>;
+export type ReceivingExtraObservations=z.infer<typeof receivingExtraObservations>;
+export type RecordExtraObservationInput=z.infer<typeof recordExtraObservationInput>;

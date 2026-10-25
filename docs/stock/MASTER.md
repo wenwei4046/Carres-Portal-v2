@@ -326,6 +326,24 @@ the receipt (Purchasing §7.3); the reservation is written through Stock's exist
 above, with the same validation and one remaining-requirement arithmetic, so a piece is never counted
 both as bound Ready Stock and as open PO lineage. `Use this PO` is unchanged.
 
+**Implementation progress — 2026-10-20, SQL REVIEW DRAFT ONLY / NOT APPLIED.** A separate candidate
+extends the existing Stock reservation door with an internal receipt-only path and one shared
+coverage expression. A disposable target-schema clone, each act rolled back, proved an exact usable
+Unit with only one unambiguous original SO source becomes Reserved for that line; its absent peer
+stays Incoming and an existing GP binding survives. Cancelled SO, reduced requirement and inconsistent
+source refuse forced allocation and retain an exception on the receipt event. The Office companion
+is required for the same SO-before-PO lock order. No production/main upgrade, concurrent-writer proof,
+quantity-mode/multiple-SO allocation or application exception presentation is claimed. The approved
+target above remains incomplete; frozen Receiving PR2100 and its review preview were not changed.
+
+**21 Oct continuation — application read integration BUILT ON BRANCH / NOT DEPLOYED.** The posted
+canonical source-reservation results now reach Warehouse's save result/History and Office's Receiving
+History. An independent exact-Unit SO fixture produced GRN-261021-8139 and original SO reservation;
+absent peer stayed Incoming. Source exceptions are displayed as `Source needs checking`, never Done.
+Shared Tasks/Workspace invalidation is connected. The underlying SQL remains a reviewed candidate
+installed only in the disposable clean target model; quantity/multiple-SO allocation and production
+upgrade/release acceptance remain incomplete.
+
 Ready stock contains only exact Units satisfying every eligibility rule; every total drills to IDs.
 A customer shortage separates available Units from remaining demand: Warehouse receives dated
 preparation work for available Units, Purchasing receives dated arrival work for the missing demand,

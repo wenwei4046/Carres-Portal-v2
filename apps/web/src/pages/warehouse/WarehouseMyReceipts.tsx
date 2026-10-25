@@ -1,3 +1,8 @@
+import {ApiError} from "@/lib/api";
+import {warehouseAdmissionMessage} from "@/lib/warehouse-admission-message";
+import { useWarehouseConfirmationReadiness } from "@/lib/warehouse-confirmation";
+import WarehouseConfirmationReports from "./WarehouseConfirmationReports";
+import Button from "@/components/kit/Button";
 import {
   supplierClaimTypeLabel,
   warehouseReceiptStatusLabel,
@@ -28,7 +33,7 @@ const STATUS_PILL: Record<WarehouseReceiptStatus, string> = {
   returned: "pill-overdue",
 };
 
-export default function WarehouseMyReceipts() {
+function LegacyWarehouseMyReceipts() {
   const { data, isLoading, isError, error, refetch } = useWarehouseMyReceipts();
   const receipts = data?.receipts ?? [];
 
@@ -174,4 +179,13 @@ function Th({ children }: { children: React.ReactNode }) {
       {children}
     </th>
   );
+}
+
+export default function WarehouseMyReceipts() {
+  const readiness=useWarehouseConfirmationReadiness();
+  if(readiness.isPending)return <p role="status">Loading…</p>;
+  if(readiness.data?.mode==="legacy_count")return <><p role="status">{warehouseAdmissionMessage(readiness.data.reason)}</p><LegacyWarehouseMyReceipts/></>;
+  if(readiness.data?.mode==="confirmation")return <WarehouseConfirmationReports/>;
+  const denied=readiness.error instanceof ApiError&&[401,403].includes(readiness.error.status);
+  return <div role="alert"><p>{denied?warehouseAdmissionMessage(null):readiness.isError?"Could not be loaded":warehouseAdmissionMessage(readiness.data?.reason)}</p>{!denied&&<Button onClick={()=>void readiness.refetch()}>Try again</Button>}</div>;
 }

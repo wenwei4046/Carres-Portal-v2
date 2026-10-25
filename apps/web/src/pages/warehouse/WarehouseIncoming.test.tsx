@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import WarehouseIncoming from "./WarehouseIncoming";
+import { MemoryRouter } from "react-router-dom";
 
 /**
  * R6 (warehouse half) — what a warehouse login sees, and the gate on the count
@@ -103,11 +104,12 @@ const UNIT_PO = {
 
 function wrap(node: React.ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={qc}>{node}</QueryClientProvider>);
+  return render(<MemoryRouter><QueryClientProvider client={qc}>{node}</QueryClientProvider></MemoryRouter>);
 }
 
 function mockIncoming(pos: unknown[]) {
   apiFetchMock.mockImplementation((path: string) => {
+    if (path === "/api/warehouse/confirmation/readiness") return Promise.resolve({mode:"legacy_count",reason:"individual_required"});
     if (typeof path === "string" && path.includes("/api/warehouse/incoming"))
       return Promise.resolve({
         warehouse: { id: "wh-klang", name: "Carres Klang" },
@@ -122,6 +124,22 @@ beforeEach(() => {
 });
 
 describe("WarehouseIncoming", () => {
+  it("does not select legacy count after a failed admission read", async () => {
+    mockIncoming([PO]); const base = apiFetchMock.getMockImplementation()!;
+    apiFetchMock.mockImplementation((path:string) => path === "/api/warehouse/confirmation/readiness" ? Promise.reject(new Error("offline")) : base(path));
+    wrap(<WarehouseIncoming/>);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not be loaded");
+    expect(screen.queryByTestId("warehouse-count-note")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button",{name:"Return count to Carres"})).not.toBeInTheDocument();
+  });
+  it("does not use legacy quantities when the confirmation source reader is missing", async () => {
+    mockIncoming([PO]); const base = apiFetchMock.getMockImplementation()!;
+    apiFetchMock.mockImplementation((path:string) => path === "/api/warehouse/confirmation/readiness" ? Promise.resolve({mode:"confirmation",reason:null}) : path === "/api/warehouse/confirmation/incoming" ? Promise.reject(new Error("source unavailable")) : base(path));
+    wrap(<WarehouseIncoming/>);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not be loaded");
+    expect(screen.queryByRole("button",{name:"Return count to Carres"})).not.toBeInTheDocument();
+  });
+
   it("names the warehouse and what is on its way", async () => {
     mockIncoming([PO]);
     wrap(<WarehouseIncoming />);

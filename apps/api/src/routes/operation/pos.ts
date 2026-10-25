@@ -2044,14 +2044,17 @@ operationPosRouter.post("/:id/office-receive", requireOperation, async (c) => {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
-  // The SAME post-receive step `/receive` runs. Without it, goods booked in
-  // through the Workspace would sit unreserved while goods booked in through
-  // the old modal were reserved — one act, two outcomes, decided by which
-  // screen the operator happened to use.
-  try {
-    await autoReserveReceivedToSourceOrder(sb, c.req.param("id"));
-  } catch (e) {
-    console.error("post-receive auto-reserve failed (non-fatal):", e);
+  // Canonical receipt-scoped Stock results already include preserved bindings
+  // and unresolved source cases. Never let the legacy SKU pass override them.
+  // An older database omits this field and retains its existing behavior.
+  const hasSourceResult = data !== null && typeof data === "object" &&
+    Object.prototype.hasOwnProperty.call(data, "source_reservations");
+  if (!hasSourceResult) {
+    try {
+      await autoReserveReceivedToSourceOrder(sb, c.req.param("id"));
+    } catch (e) {
+      console.error("post-receive auto-reserve failed (non-fatal):", e);
+    }
   }
   return c.json(data);
 });

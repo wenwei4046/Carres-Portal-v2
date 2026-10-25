@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import HrTeamTab from "./HrTeamTab";
@@ -245,5 +245,70 @@ describe("HrTeamTab", () => {
       ).toBeInTheDocument(),
     );
     expect(screen.getByText("No showroom staff yet.")).toBeInTheDocument();
+  });
+});
+
+const TEST_SITE = { id: "7f000000-0000-4000-8000-000000000099", name: "TEST receiving Site" };
+
+async function openWarehouseAccount(warehouses = [TEST_SITE]) {
+  vi.mocked(apiFetch).mockReset();
+  vi.mocked(apiFetch).mockImplementation(async (url: string) => {
+    if (url === "/api/hr/team") return { ...TEAM, warehouses };
+    if (url === "/api/hr/team/accounts") return { id: "test-only", name: "TEST Named Person", staffCode: null };
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  render(wrap(<HrTeamTab />));
+  fireEvent.click(await screen.findByRole("button", { name: "Add user" }));
+  fireEvent.change(screen.getByLabelText("Role"), { target: { value: "warehouse" } });
+  for (const [label, value] of [["Name", "TEST Named Person"], ["Email", "test-person@example.invalid"], ["Temp password", "TEST-only-12345"], ["Confirm password", "TEST-only-12345"]]) {
+    fireEvent.change(screen.getByLabelText(label!), { target: { value } });
+  }
+}
+async function choose(label: string, option: string) {
+  fireEvent.keyDown(screen.getByRole("combobox", { name: label }), { key: "ArrowDown" });
+  fireEvent.click(await screen.findByRole("option", { name: option }));
+}
+function accountWrite() {
+  return vi.mocked(apiFetch).mock.calls.find(([url]) => url === "/api/hr/team/accounts");
+}
+
+describe("Team Warehouse identity form", () => {
+  it("defaults to shared and posts the selected existing Site without an individual flag", async () => {
+    await openWarehouseAccount();
+    expect(screen.getByRole("combobox", { name: "Warehouse account" })).toHaveTextContent("Shared login");
+    const add = screen.getAllByRole("button", { name: "Add user" }).at(-1)!;
+    expect(add).toBeDisabled();
+    await choose("Warehouse *", TEST_SITE.name);
+    fireEvent.click(add);
+    await waitFor(() => expect(accountWrite()).toBeDefined());
+    const body = JSON.parse(accountWrite()![1]!.body as string);
+    expect(body).toMatchObject({ role: "warehouse", warehouseId: TEST_SITE.id });
+    expect(body).not.toHaveProperty("warehouseIndividual");
+    expect(body).not.toHaveProperty("companyName");
+    expect(body).not.toHaveProperty("positionId");
+  });
+
+  it("posts explicit named-person intent and retains the selected Site", async () => {
+    await openWarehouseAccount();
+    await choose("Warehouse account", "Individual login");
+    await choose("Warehouse *", TEST_SITE.name);
+    fireEvent.click(screen.getAllByRole("button", { name: "Add user" }).at(-1)!);
+    await waitFor(() => expect(accountWrite()).toBeDefined());
+    expect(JSON.parse(accountWrite()![1]!.body as string)).toMatchObject({
+      name: "TEST Named Person", warehouseIndividual: true, warehouseId: TEST_SITE.id,
+    });
+  });
+
+  it("clears individual intent on role changes and blocks an unavailable Site list", async () => {
+    await openWarehouseAccount([]);
+    await choose("Warehouse account", "Individual login");
+    fireEvent.change(screen.getByLabelText("Role"), { target: { value: "operation" } });
+    expect(screen.queryByRole("combobox", { name: "Warehouse account" })).toBeNull();
+    fireEvent.change(screen.getByLabelText("Role"), { target: { value: "warehouse" } });
+    expect(screen.getByRole("combobox", { name: "Warehouse account" })).toHaveTextContent("Shared login");
+    expect(screen.getByRole("combobox", { name: "Warehouse *" })).toBeDisabled();
+    expect(screen.getByText(/Warehouse choices are not available/)).toBeVisible();
+    expect(screen.getAllByRole("button", { name: "Add user" }).at(-1)!).toBeDisabled();
+    expect(accountWrite()).toBeUndefined();
   });
 });

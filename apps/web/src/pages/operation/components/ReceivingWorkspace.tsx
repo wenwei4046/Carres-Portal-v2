@@ -341,7 +341,7 @@ function ReadMode({
           {/* A door, never a form: the claim already exists — the receive that
               recorded the problem opened it in the same transaction. */}
           <Link
-            to="/operation?tab=claims"
+            to={`/operation?tab=claims&po=${encodeURIComponent(po.id)}`}
             className="mt-1.5 inline-block text-body text-kit-blue-11 hover:underline"
             data-testid="receiving-open-claims"
           >

@@ -2469,6 +2469,179 @@ Staff selects purpose
 
 ### 7.3 Receiving and later defect
 
+**Receiving confirmation delivery status — 2026-10-19, draft PR #2100; BUILT IN ISOLATED TARGET-SCHEMA MODEL / NOT DEPLOYED.**
+The individual Warehouse path now uses an explicit readiness door, retains incomplete physical
+reports without a GRN, and corrects the same receipt/revision before the one posting engine.
+The isolated authenticated walk proved Warehouse-owned DO/damage uploads, PO receipt/Claim,
+existing explicit Unit reservation preservation, Transfer arrival without a fabricated PO or Unit,
+and the original blocked report's GRN Duty Work completing under the actual Warehouse actor.
+Normal Duty, dated cover, actual confirmer and receiving company remain separate facts. The
+company-count functions remain unchanged. Posted Extra has an immutable custody snapshot and
+append-only investigation notes; notes do not mean acceptance, return, available Stock or completion.
+These facts do not complete the approved target: independent custody of unposted Extra and its
+acceptance/return lifecycle, source re-identification, pure `po_line_sources` auto-reservation through
+Stock remain open. Warehouse repair-return now observes the existing RO projector under a scoped
+source attestation and completes only from this actor’s causal posted-event marker; the isolated
+walk preserved the original Work date and same-key retry created no duplicate. Historical RO age
+was a synthetic local TEST fixture; no Work completion was seeded. Real individual Warehouse
+admission/activation is also not complete. The broad SQL is an external review candidate, not a
+migration: exact current-main constraint upgrade/rollback is unverified and production SQL approval
+is pending separately from the frozen attachment-only fix. Model proof is not upgrade proof or
+production verification. Final-head CI and this actual preview's approval remain release gates.
+
+
+**PO/CO report source correction — 2026-10-20, separate source-correction branch DRAFT / ISOLATED MODEL ONLY.**
+An unposted individual Warehouse report can explicitly choose an admitted PO/CO using the existing
+source reader, then recheck physical results through the same confirmation modal/writer. Receipt,
+save key and revision remain the original; old source counts/Unit outcomes/photos are never mapped
+to the new source by SKU. History preserves each reported source and count. The local native walk
+changed an unidentified report to PO261019-8402, posted the same receipt as GRN-261020-4518 and
+preserved U1-000-010's GP261019-3843 reservation. This separate draft does not change frozen PR2100,
+prove production admission/upgrade, implement unknown-delivery intake UI, permit Site/non-PO source
+reclassification, or close the remaining Extra/Stock/account lifecycle gaps above.
+
+**Stock/Extra continuation — 2026-10-20, separate SQL REVIEW DRAFTS / NOT APPLIED.** The Stock-owned
+candidate proves only an exact usable Unit with one unambiguous original SO source, using the
+existing reserve door and shared coverage arithmetic; cancellation/reduced/unclear source is kept
+for handling. The Office companion preserves the same source-lock order. A separate Extra candidate
+accepts explicitly identified posted Extra against an existing admitted PO line by calling the
+existing `office_receive_post` writer, then stores the original custody-to-GRN/line link atomically.
+**That initial Extra acceptance candidate is WITHDRAWN / UNSAFE:** its local GRN/retry probe proved
+mechanics, not Purchasing acceptance authority or physical source provenance. GRN post authority,
+a selected PO line and free text cannot establish that the observed Extra belongs to those goods,
+supplier and source. The safe blocked replacement refuses before writes until a governed Purchasing
+resolution binds the original custody occurrence/version, verified goods, supplier/party, exact source
+and line, quantity, authorised decision/version and evidence. No SKU equality is used to invent this
+link. Two text-only arbitrary source attempts were refused with receipt/Stock/PO/custody unchanged.
+Existing unposted report source correction is unchanged. The draft return-link door accepts only a
+canonical approved Purchase Return Unit's actual evidenced handover of those accepted goods; an
+absent handover was refused. A positive return walk, API/UI integration, independent unposted Extra
+custody and direct unknown/count-only Extra return remain unbuilt/unverified. No note, document
+issue or link creates a Work Done fact. These candidates do not establish whole Receiving completion,
+production SQL approval, exact-main upgrade or release readiness.
+
+**Receiving integration — 2026-10-21, BUILT ON CONTINUATION BRANCH / LOCAL TARGET MODEL ONLY.**
+The existing source-correction save now refreshes both Workspace and the separate legacy Tasks cache.
+Warehouse's actual saved result, its History and Office's original Receiving record display the posted
+Stock event's exact Unit reservation result, including source exceptions without guessed allocation.
+An independent TEST SO/PO fixture (canonical PO/expected-Unit birth; upstream approval journey not
+claimed) posted the same corrected report as GRN-261021-8139: U1-000-015 Reserved for SO-990001,
+U1-000-016 Incoming, causal receiving Work completed by the actual Warehouse person. The first
+mixed MPR/SO fixture exposed invalid TEST lineage and is excluded from acceptance; the replacement
+clean model leaves original MPR source/issue history unchanged and its full Work reader returns 200.
+Personal Warehouse account creation has explicit API and existing Team form compatibility: an authorised People/HR
+request must opt into a named Warehouse person, with an existing Site; defaults remain shared,
+without internal staff code, position or duties. No real account was created or granted permissions.
+Admission failures name inactive Site/company and shared-login count mode. Stock SQL and its scoped
+history projection are installed only in the new disposable model, not production/main. Extra
+acceptance/return remain closed; the following owner-choice proposal is still unanswered. Full
+Receiving release, full-page/breakpoint acceptance and exact-main SQL upgrade remain unverified.
+
+**Unidentified delivery intake — 21 Oct 2026, CODE ON CONTINUATION BRANCH / NO PRODUCTION CLAIM.**
+Incoming links to the existing My receiving page's `Report unidentified delivery` form. The existing
+individual Warehouse confirmation writer retains a no-source draft with the signed-in Site, optional
+physical date/time, handover person/document number and observed goods/labels/count/condition in Note.
+No PO, line, Unit, SKU identity or Extra classification is inferred; no accepted quantity, GRN, Stock
+or Work Done is manufactured. Lost-response retry retains the exact body/key. The saved report is
+read through the same own-Site list and append-only History; later source correction retains its
+identity and rechecks physical results. Unknown-source evidence has a separate receipt-bound application continuation below; existing
+source-bound upload paths are not borrowed. Existing external SQL candidate/admission and production upgrade remain separate gates;
+this UI introduces no SQL or permission changes. Full production and operator acceptance unverified.
+
+**Original report evidence — 21 Oct 2026, BUILT ON BRANCH / SQL REVIEW ONLY / NOT PRODUCTION.**
+The existing shared multi-file picker can attach actual photo/video/PDF evidence only AFTER the
+original no-source draft exists. A separate private `receiving-report-proofs` bucket and evidence
+ledger bind server-generated paths to that receipt, its original actual person and database Site.
+The canonical current individual/Site/company admission is rechecked; other Warehouse persons,
+cross-Site actors, disabled identities and unqualified internal roles are refused. Existing authorised
+Office readers may read attached files, never upload for Warehouse through this door. All signing
+uses the user JWT, not admin elevation. The external `unidentified-report-evidence.NOT-APPROVED.sql`
+candidate adds only new objects/policies; it does not replace constraints or the existing receipt
+writer. Its application absence is explicit/fail-closed. Production approval and exact-main upgrade
+remain unperformed.
+
+A file slot is not attached evidence. The finaliser verifies the real Storage object's original
+owner, MIME and size, then appends one causal Receiving event with `Arrival evidence added` and
+idempotent file identity. It does not overwrite physical observations, receipt revision, source,
+Stock, Work completion or Extra custody. Same-file retry preserves its original slot and tolerates
+an already-uploaded object only after the finaliser's checks; attached files cannot be removed from
+the picker. Native isolated proof uploaded a TEST screenshot to the original2b5669a6 report after a
+failed request/retry. Both actual Warehouse and Office opened the image; downloaded6209-byte files
+matched the original SHA256. Repeated completion retained the same event; original receipt full row,
+Stock/Work/Extra hashes were unchanged. Same-Site-other-person/cross-Site/HR/disabled-owner RLS probes
+passed in a rolled-back fixture transaction. This is transport/access proof, not real-goods evidence
+or approval to apply SQL. Real video/PDF operator acceptance and complete-page acceptance remain owed.
+
+**Independent Office source-Stock candidate — 21 Oct 2026, SQL REVIEW / ROLLED-BACK MODEL ONLY.**
+The existing Office receipt writer can be evaluated with the canonical Stock source-conversion
+core independently of individual Warehouse admission. External review candidate
+`office-source-stock-independent.NOT-APPROVED.sql` retains existing Office authority, exact Unit
+validation, cancellation quantity, original receive engine, GP binding and source-first lock order;
+it requires neither the four foundation DROP statements nor Warehouse accounts/raw-report schema.
+It is an alternative to the bundled Stock/Office candidates, not another set to stack over them.
+The receipt's canonical source results must suppress the API's older SKU-based follow-on reserve,
+including unresolved/empty results; older databases without that result retain their current path.
+Eight incremental old-schema transaction probes passed, with original schema/functions restored
+by ROLLBACK. This is no production application or partial-release approval and does not shrink
+whole Receiving. A pre-existing Warehouse report still refuses duplicate Office receiving;
+independent Office receipt creates no fabricated completion for that report's Tasks. Extra
+acceptance/return and counted/multiple-source allocation remain outside this candidate's proof.
+
+**Unposted goods held / investigation — 21 Oct 2026, BUILT ON BRANCH / ADDITIVE SQL REVIEW / MODEL ONLY.**
+Original-report observation evidence is now independently recordable before a GRN, through the same
+Receiving module and current individual Warehouse/Site/company admission. Each immutable measurement
+retains the exact receipt/revision/raw report snapshot, optional observed label/quantity/physical date,
+actual observer and database operating company/Site with recorded names/time. Unknown remains null.
+The person is the actual recorder, not a new Duty/custodian appointment. Same-Site qualified colleagues
+may record their own observations under the existing Site scope; original report authorship is retained.
+It does not change the original receipt, its fields/revision, canonical posted Extra custody, Stock,
+Work or Receiving events. Observations are never summed as distinct/current available custody.
+
+Existing active Operation/Principal may append source-investigation Notes to the exact observation,
+with separate actual actor/time and idempotent key; these Office Notes are not exposed to Warehouse.
+Raw reported PO context is observation provenance, never verified Extra source, ownership, accepted
+purchase or disposition. No acceptance/return/purchase/Stock/Work Done door or actor default was added.
+The same original observations remain readable when the receipt later posts; no automatic identity
+matching to posted Extra, a source PO, SKU or Unit is inferred.
+
+External `unposted-extra-observations.NOT-APPROVED.sql` adds two report-evidence child tables and four
+guarded helpers only. It does not relax the existing custody NOT NULL constraints, create another
+Stock/current-custody balance or change the frozen6ffa/a16 candidates. No DROP is in this candidate;
+missing deployment is explicit/fail-closed. It depends on6ffa's individual helper/current Office
+context, not Stock conversion, a16 file storage or the unanswered Extra acceptance actor. Model proof
+recorded one actual TEST observation under2b5669a6 (2 pieces, unknown label/date, NETS Warehouse,
+Carres Klang, actual Warehouse person), then one Office investigation Note. Exact-body retries
+retained both IDs; original receipt/posted custody/old Notes/Stock/Work/events stayed unchanged.
+Unknown-quantity, stale-revision, cross-Site, unqualified role, direct-table and cross-report note
+probes are scoped local evidence, not production admission or full Extra lifecycle completion.
+
+**Extra decision record — MINIMAL PROPOSAL / NOT APPROVED / NOT BUILT, 2026-10-20.**
+The existing §9.5 Extra/source-gap rules require Purchasing's decision and verified provenance;
+they do not name the final Extra acceptance actor. PO Duty's existing Claim execution writer admits
+only return/repair/replacement, while GRN posting authority admits physical receipt, not this new
+decision. Do not infer a fourth Claim outcome or grant GRN Duty acceptance rights.
+
+Proposed minimum: keep the original custody observation immutable. Operation records source-search
+evidence; a separate, versioned Purchasing resolution binds that custody occurrence/revision,
+actual holder/Site, verified supplier/sender, goods identity (real Unit/label or governed counted
+specification), exact existing source/line and quantity, evidence and actual decision actor. A
+candidate source is distinct from a verified source. No SKU equality or the original receipt's PO
+establishes the link. Record one explicit outcome: continue source search, accept identified scope,
+or return identified scope. Approval does not move goods, create a GRN, satisfy Work or post money.
+Acceptance executes through the existing Receiving writer only against admitted purchase scope;
+new/unordered purchase scope still requires normal purchase approval. Exact-Unit return uses its
+existing approved Claim/Purchase Return and actual handover. Unknown/count-only direct Extra return
+needs its own admitted counted-custody handover; it cannot manufacture a Unit or reuse an unrelated PR.
+
+**One unresolved owner choice:** who may decide acceptance/return of the verified Extra scope?
+Proposed default is the existing Purchasing Approver; PO Duty prepares the source resolution and
+follows up, and Warehouse records physical execution. Alternative: PO Duty may decide only within
+an existing approved source/quantity, with commercial/new-scope exceptions staying with Purchasing
+Approver. Neither choice changes ordinary Receiving authority or requires a second approval of a
+normal receipt. Until this choice and its exact governed record are admitted, Extra acceptance stays
+blocked. Read-only original-report linkage and investigation notes may continue independently.
+
+
 **Register list PDF — BUILT ON RELEASE BRANCH / NOT YET DEPLOYED, 2026-10-05.**
 The authenticated Receiving list PDF action opened no preview or error. The shared grid previously
 called `window.open` after asynchronous population loading/rendering and ignored a blocked return.
@@ -4862,6 +5035,8 @@ overdelivery, price change, cancellation and post-send destination change retain
 
 
 ### 9.4 Receiving / GRN — owner instruction 2026-09-04 + owner correction 2026-09-06, PRODUCTION-VERIFIED
+
+**Receiving views — OWNER-APPROVED TARGET, Jess19Oct2026, runtime delivery in progress.** The three views are `Not received` (default), `Received`, `Differences`. This explicit confirmation supersedes the older two-view labels below; it does not adopt other Design27 prototype proposals. Not received reads current-version confirmed-sent POs with known eligible pending goods, including partial receipt, using canonical accepted/cancelled/pending arithmetic. It excludes unsent/stale-send, fully fulfilled and cancelled sources; unreadable quantities remain unavailable. Sort earliest outstanding governed supplier/source arrival first, unknown dates last. Columns: PO No, Supplier, Items, Due (amber `Late {n}d` for elapsed calendar days), Received n/m (accepted/original ordered), Check in. PO identity opens Purchasing; Check in opens the existing Receiving engine for that exact PO. Received renames GRN Records without changing posted/cancelled, partial or historical receipt semantics; Differences keeps its existing population. Preserve old records/differences/filter and exact PO/session/arrival deep links. Real Unit IDs, evidence, permissions, Amend/Void, Stock controls and Claim/Return ownership remain. No prototype CSS/localStorage, duplicate writer, automatic Warehouse posting or external account cutover is approved by this view change.
 
 **Receiving Session narrow layout, 2026-09-24 — #1574 + #1577 DEPLOYED; controls, actions and header production-verified.**
 The existing Receiving Details rows now stack by the form's available width,

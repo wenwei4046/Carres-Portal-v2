@@ -1336,3 +1336,19 @@ describe("PO cancellation owns current sending after goods end",()=> {
   expect(projectPurchaseOrderCancellationSendWork({...input,pos:[{...po,cancellation_version:2}]})).toHaveLength(0);
  });
 });
+
+describe("Receiving blocked-report ownership",()=>{
+  it("keeps an actual blocked Warehouse report under GRN Duty without pretending goods or a PO are known",()=>{
+    const source=receivingWorkSourceFromModuleFacts({receipts:[{id:"receipt-blocked",po_id:null,supplier_name:null,status:"draft",has_raw_report:true,validation_blockers:[{code:"source_not_available",message:"Source not available"}],submitted_at:"2026-10-19T10:00:00Z"}]});
+    const items=projectReceivingWork({source,duty:null,today:"2026-10-19",workingDaysLate:()=>0});
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ruleKey:"receiving.check_in",owner:{rule:"grn_duty"},problem:"Receiving report saved. No GRN created.",requiredResult:"GRN posted"});
+    expect(items[0].action).toBe("Open Receiving");
+    expect(items[0].destination).toContain("session=receipt-blocked");
+  });
+  it("does not promote an ordinary draft or a posted report into unresolved receiving work",()=>{
+    const common={po_id:null,supplier_name:null,submitted_at:"2026-10-19T10:00:00Z"};
+    const source=receivingWorkSourceFromModuleFacts({receipts:[{...common,id:"office-draft",status:"draft"},{...common,id:"saved",status:"posted",has_raw_report:true,validation_blockers:[]}]});
+    expect(source.submitted).toEqual([]);
+  });
+});

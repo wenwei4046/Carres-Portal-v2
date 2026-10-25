@@ -412,7 +412,7 @@ hrTeamRouter.post("/accounts", requireHr, async (c) => {
     staff_code: staffCode,
     // 0533: People/HR creates a named internal person — the one marker that
     // lets an account hold, cover, assign or execute a duty.
-    is_person: internal,
+    is_person: internal || (body.role === "warehouse" && body.warehouseIndividual === true),
     position_id: internal ? (body.positionId ?? null) : null,
     reports_to_user_id: internal ? (body.reportsToUserId ?? null) : null,
   });
