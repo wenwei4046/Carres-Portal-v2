@@ -26,6 +26,8 @@ import SignaturePad from "../dealer/new-order/SignaturePad";
  * OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp): office staff may create
  * Sales Orders (Houzs way). Jess's 2026-09-27 rule ("in the Sales Portal and
  * nowhere else") is kept for history in docs/orders/MASTER.md.
+ * Follows Houzs-ERP frontend/src/pages/scm-v2/SalesOrderNew.tsx:155 (office New SO page)
+ * per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
  *
  * ONE ENGINE. The page builds the Sales Portal's own body and posts it to
  * `POST /api/orders` → `create_order_from_sales_portal`, which already lets an
@@ -268,6 +270,7 @@ export default function OperationNewSalesOrder() {
 
         <Panel title={`Items (${f.lines.length})`} right={<Button size="sm" icon="add" onClick={() => set("lines", [...f.lines, newLine()])}>Add item</Button>}>
           <div className="flex flex-col gap-3">
+            {/* SKU pick pre-fills its price, still editable: follows Houzs-ERP frontend/src/pages/scm-v2/SalesOrderNew.tsx:732 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */}
             {f.lines.map((l, i) => (
               <div key={l.key} className="grid items-end gap-3 min-[768px]:grid-cols-[minmax(0,1fr)_96px_160px_auto]">
                 <Select id={`nso-sku-${l.key}`} label="Item" value={l.sku || undefined} options={skuOptions}
