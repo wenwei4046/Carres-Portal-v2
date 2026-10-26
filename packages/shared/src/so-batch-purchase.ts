@@ -1428,6 +1428,8 @@ export interface SoBatchSelectionSummary {
   documents: number;
   /** Empty when nothing is selected — a bar that says `0 selected` is noise. */
   text: string;
+  /** Same four facts, using governed SO/PO abbreviations when the toolbar is short. */
+  compactText: string;
 }
 
 export function soBatchSelectionSummary(
@@ -1442,11 +1444,12 @@ export function soBatchSelectionSummary(
     return ids?.length ? ids : [line.demandId];
   }))).size;
   const units = documents.reduce((sum, document) => sum + document.lines.reduce((qty, line) => qty + line.parts.reduce((n, part) => n + part.qty, 0), 0), 0);
-  if (lines === 0) return { lines: 0, units: 0, documents: 0, text: "" };
+  if (lines === 0) return { lines: 0, units: 0, documents: 0, text: "", compactText: "" };
   return {
     lines,
     units,
     documents: documents.length,
+    compactText: `${orders} SO · ${items} ${items === 1 ? "item" : "items"} · ${units} ${units === 1 ? "unit" : "units"} · ${documents.length} PO`,
     text: `${orders} ${orders === 1 ? "Sales Order" : "Sales Orders"} · ${items} ${items === 1 ? "item" : "items"} · ${units} ${units === 1 ? "unit" : "units"} · Issue ${
       documents.length
     } ${documents.length === 1 ? "PO" : "POs"}`,

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { apiFetch } from "@/lib/api";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import {
@@ -20,6 +20,7 @@ import ServiceCaseModal from "./components/ServiceCaseModal";
 import ServiceCaseNumbersPanel from "./components/ServiceCaseNumbersPanel";
 import ServiceCaseWizard from "./components/ServiceCaseWizard";
 import CaseOrderLink from "./components/CaseOrderLink";
+import Checkbox from "@/components/kit/Checkbox";
 
 /**
  * Operation Service Cases — the case (病历) list.
@@ -32,6 +33,11 @@ export default function OperationServiceCases() {
   const [state, setState] = useState<"" | "ongoing" | "closed">("");
   const [showCreate, setShowCreate] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  // 0711 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22), Houzs way: a
+  // My cases switch (mine + my downline, decided by the server) and a stage
+  // card filter (click a card, click it again to clear).
+  const [mine, setMine] = useState(false);
+  const [stageId, setStageId] = useState<string | null>(null);
 
   // J2 — `?case=<id>` opens that case straight away, which is what the order
   // drawer's Related-cases row links to. Consumed once and stripped from the
@@ -60,10 +66,11 @@ export default function OperationServiceCases() {
   }, [deepLinkCase]);
 
   const listQ = useQuery<ServiceCaseListResponse>({
-    queryKey: ["ops", "service-cases", "list", state],
+    queryKey: ["ops", "service-cases", "list", state, mine],
     queryFn: () => {
       const params = new URLSearchParams();
       if (state) params.set("state", state);
+      if (mine) params.set("mine", "1");
       return apiFetch(`/api/ops/service-cases?${params}`);
     },
     refetchInterval: 30_000,
@@ -72,7 +79,21 @@ export default function OperationServiceCases() {
     enabled: tab === "cases",
   });
 
-  const rows: ServiceCase[] = listQ.data?.items ?? [];
+  const allRows: ServiceCase[] = listQ.data?.items ?? [];
+  const stages = stageCounts(allRows);
+  // A picked stage with no cases left in this list (My cases / state switched)
+  // has no card to un-press, so it stops filtering instead of hiding every row.
+  const stageShown = stageId !== null && stages.some((st) => st.id === stageId);
+  const rows = stageShown ? allRows.filter((r) => (r.statusId ?? "") === stageId) : allRows;
+
+  // 0711 — the owner's name on each row, from the same staff list every
+  // Operation picker reads.
+  const staffQ = useQuery<{ staff?: Array<{ user_id: string; name: string | null }> }>({
+    queryKey: ["operation", "staff"],
+    queryFn: () => apiFetch("/api/operation/staff"),
+    staleTime: 60_000,
+  });
+  const nameOf = new Map((staffQ.data?.staff ?? []).map((p) => [p.user_id, p.name ?? ""]));
 
   // S4 — the deadline is counted in WORKING days, so the holiday calendar is
   // injected once for the whole table rather than rebuilt per row.
@@ -109,12 +130,37 @@ export default function OperationServiceCases() {
             {t === "cases" ? "Cases" : "Numbers"}
           </button>
         ))}
+        {/* 0711 — Houzs keeps Service Maintenance beside the cases. */}
+        <Link to="/operation/settings/service" className="ml-auto py-2 text-body text-base-500 hover:text-base-700">
+          Service Settings
+        </Link>
       </div>
 
       {tab === "numbers" ? (
         <ServiceCaseNumbersPanel />
       ) : (
       <>
+      {/* 0711 — one card per stage with its count (Houzs ServiceCases.tsx). */}
+      {/* Follows Houzs frontend/src/pages/ServiceCases.tsx:1226-1229 (stage cards,
+          click to filter) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */}
+      {stages.length > 0 && (
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {stages.map((st) => (
+            <button
+              key={st.id}
+              type="button"
+              aria-pressed={stageId === st.id}
+              data-testid={`case-stage-card-${st.id}`}
+              onClick={() => setStageId(stageId === st.id ? null : st.id)}
+              className={`kpi-box text-left ${stageId === st.id ? "border-base-900" : ""}`}
+            >
+              <span className="label text-base-500">{st.label}</span>
+              <span className="text-strong font-semibold t-num text-base-900 mt-1">{st.count}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Toolbar */}
       <div className="flex items-center gap-3 mb-4">
         <div className="flex rounded border border-base-200 overflow-hidden text-body">
@@ -133,6 +179,8 @@ export default function OperationServiceCases() {
             </button>
           ))}
         </div>
+
+        <Checkbox id="service-cases-mine" label="My cases" checked={mine} onCheckedChange={setMine} />
 
         <div className="flex-1" />
 
@@ -173,7 +221,8 @@ export default function OperationServiceCases() {
                     Derived from the case's own answers, so it costs no extra
                     query and cannot drift from the case view. */}
                 <th className="text-left px-3 py-2 font-medium">Next step</th>
-                <th className="text-left px-3 py-2 font-medium">Status</th>
+                <th className="text-left px-3 py-2 font-medium">Stage</th>
+                <th className="text-left px-3 py-2 font-medium">Owner</th>
                 <th className="text-left px-3 py-2 font-medium">Opened</th>
                 {/* S4 — 14 working days from the day it was reported. Derived
                     from the same clock the case view and the server read, so
@@ -234,6 +283,9 @@ export default function OperationServiceCases() {
                     <span className={`pill ${r.statusIsClosed ? "pill-confirmed" : "pill-neutral"}`}>
                       {r.statusLabel ?? "Unset"}
                     </span>
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap text-body text-base-700">
+                    {r.ownerUserId ? nameOf.get(r.ownerUserId) || null : null}
                   </td>
                   <td className="px-3 py-2 text-meta text-base-500 whitespace-nowrap">
                     {fmtDate(r.openedAt)}
@@ -366,4 +418,17 @@ function PriorityCell({ priority }: { priority: CasePriority | null }) {
   return (
     <span className="pill pill-neutral">{priority === "normal" ? "Normal" : "Low"}</span>
   );
+}
+
+/** 0711 — how many cases sit in each stage, in the order stages first appear.
+ *  A case with no stage counts under "Unset". */
+export function stageCounts(rows: readonly ServiceCase[]): { id: string; label: string; count: number }[] {
+  const out = new Map<string, { id: string; label: string; count: number }>();
+  for (const r of rows) {
+    const id = r.statusId ?? "";
+    const hit = out.get(id) ?? { id, label: r.statusLabel ?? "Unset", count: 0 };
+    hit.count += 1;
+    out.set(id, hit);
+  }
+  return [...out.values()];
 }

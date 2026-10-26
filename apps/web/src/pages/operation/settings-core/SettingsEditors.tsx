@@ -29,6 +29,7 @@ export const SECTION_LABEL: Record<SettingsEditorSection, string> = {
   warehouse: "Warehouse",
   delivery: "Delivery",
   issue_tracker: "Issue Tracker",
+  service: "Service",
 };
 
 export default function SettingsEditors() {

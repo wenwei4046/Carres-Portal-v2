@@ -62,6 +62,7 @@ type PurchasingPage =
   | "receiving"
   | "claims"
   | "purchase-returns"
+  | "consignment-returns"
   | "repair-orders"
   | "receiving-report"
   | "purchasing-report"
@@ -96,6 +97,8 @@ const PAGE_WORD: Record<PurchasingPage, string> = {
   claims: "Supplier Claims",
   /* §9.6, owner-confirmed 2026-09-18. The SIDEBAR's own word, not a new one. */
   "purchase-returns": "Purchase Returns",
+  /* The SIDEBAR's own word (0706, MASTER 9.10). */
+  "consignment-returns": "Consignment Returns",
   /* §9.7 — the SIDEBAR's own word. */
   "repair-orders": "Repair Orders",
   /* Central Reports → Receiving & Inbound (owner instruction 2026-09-04).
@@ -127,6 +130,8 @@ export default function PurchasingTabs({ right }: { right?: ReactNode } = {}) {
         ? "claims"
       : tabParam === "purchase-returns"
         ? "purchase-returns"
+      : tabParam === "consignment-returns"
+        ? "consignment-returns"
       : tabParam === "repair-orders"
         ? "repair-orders"
       : tabParam === "receiving-report"

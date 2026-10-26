@@ -173,7 +173,7 @@ export function registerSupplierClaimRecordRoutes(
       sb.from("document_sends").select("id, version, recipient, channel, note, sent_by, sent_at").eq("document_kind", "supplier_claim").eq("document_id", id).order("sent_at", { ascending: true }),
       sb.from("ops_stock_items").select("id, unit_code, identity_scope, qty, status").eq("hold_claim_id", id),
       sb.from("repair_orders").select("id, ro_no").eq("supplier_claim_id", id),
-      sb.from("purchase_returns").select("id, pr_no").eq("supplier_claim_id", id),
+      sb.from("purchase_returns").select("id, pr_no, is_consignment").eq("supplier_claim_id", id),
     ]);
     for (const r of [replies, sends, units]) {
       if (r.error) {
