@@ -216,6 +216,8 @@ deliveryOrdersRouter.get("/", requireOperationOrPrincipal, async (c) => {
  * 2026-10-23): office staff open a Delivery Order from a Sales Order's lines,
  * the Houzs way. Overturns Jess's "the system issues every DO" rule (Delivery
  * MASTER §3, §15; Orders MASTER); Jess was not part of the decision.
+ * Follows Houzs-ERP backend/src/scm/routes/delivery-orders-mfg.ts:3930
+ * (POST /from-sos: office picks SO lines into a DO) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
  *
  *   GET  /offer/:so — the SO's lines still free to ship: a line already on a
  *                     live DO of this order is not offered again.

@@ -8,6 +8,8 @@
 --   Houzs way. This overturns Jess's earlier rule that only the system issues
 --   a DO (docs/delivery/MASTER.md §3 and §15; docs/orders/MASTER.md "Delivery
 --   Order — the system creates the document"). Jess was not part of it.
+--   Follows Houzs-ERP backend/src/scm/routes/delivery-orders-mfg.ts:3930
+--   (POST /from-sos) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
 --
 -- WHAT THIS CHANGES
 --   One new door, delivery_office_document_mint(order, groups, number): the
