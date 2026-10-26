@@ -320,6 +320,8 @@ export function AutoSchedule() {
       for (const r of waiting) {
         const date = proposal.get(r.key);
         if (!date) continue;
+        // Date only, no company: follows Houzs frontend/src/pages/scm-v2/AutoSchedule.tsx:157,168 per
+        // Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. The lorry is given on Trips.
         try { await send("/date", { orderId: r.orderId, leg: r.leg, date }); } catch (e) { failed.push(`${r.so}: ${errorText(e)}`); }
       }
       return failed;
