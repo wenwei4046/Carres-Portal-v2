@@ -40,6 +40,7 @@
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
+  NEW_CONSIGNMENT_RETURN,
   PURCHASE_RETURN_ABSENT,
   PURCHASE_RETURN_COLUMN_LABEL,
   PURCHASE_RETURN_CONDITION_SECTION,
@@ -78,6 +79,7 @@ import {
 } from "./components/workspace-rail";
 import PurchaseReturnUnitsTable from "./components/PurchaseReturnUnitsTable";
 import PurchaseReturnRecord from "./PurchaseReturnRecord";
+import { ConsignmentReturnIssue } from "./components/PurchaseReturnIssue";
 import SecondLine from "./components/register-cell";
 
 /** `Absence` is a FACT, not an apology — `docs/COPY-STANDARD.md`. */
@@ -134,16 +136,24 @@ export interface PurchaseReturnsRegisterProps {
   errorTitle?: string;
   errorDetail?: string;
   onRetry?: () => void;
+  /** 0706: the Consignment Returns register: same grid, its own tab and words. */
+  consignment?: boolean;
+  /** 0706 §2: `New Consignment Return` (claimless, Houzs way). */
+  onNew?: () => void;
 }
 
 export function PurchaseReturnsRegister({
   returns,
   isLoading = false,
   isError = false,
+  consignment = false,
+  onNew,
   errorTitle = "Purchase Returns could not be loaded.",
   errorDetail,
   onRetry,
 }: PurchaseReturnsRegisterProps) {
+  const tab = consignment ? "consignment-returns" : "purchase-returns";
+  const noun = consignment ? "consignment returns" : "purchase returns";
   const [supplier, setSupplier] = useState<string | null>(null);
   const [condition, setCondition] = useState<PurchaseReturnCondition | null>(null);
   const [railOpen, setRailVisible] = useState(true);
@@ -235,7 +245,7 @@ export function PurchaseReturnsRegister({
         accessor: (row) => (
           <Link
             className="font-semibold text-kit-blue-11 hover:underline"
-            to={`/operation?tab=purchase-returns&pr=${encodeURIComponent(row.id)}`}
+            to={`/operation?tab=${tab}&pr=${encodeURIComponent(row.id)}`}
             data-testid={`purchase-return-open-${row.id}`}
           >
             {purchaseReturnNo(row.pr_no)}
@@ -418,7 +428,7 @@ export function PurchaseReturnsRegister({
         },
       },
     ],
-    [],
+    [tab],
   );
 
   if (isError) {
@@ -528,17 +538,20 @@ export function PurchaseReturnsRegister({
             leadingColumns={{ date: "pr_doc_date", identity: "pr_no" }}
             isLoading={isLoading}
             emptyMessage={
-              anyFilter ? "No matching purchase returns." : "No purchase returns."
+              anyFilter ? `No matching ${noun}.` : `No ${noun}.`
             }
-            searchPlaceholder="Search purchase returns…"
-            exportName="Purchase Returns"
+            searchPlaceholder={`Search ${noun}…`}
+            exportName={consignment ? "Consignment Returns" : "Purchase Returns"}
             toolbarStart={
-              !railOpen ? (
-                <ShowFiltersButton
-                  onShow={() => setRailVisible(true)}
-                  testId="purchase-returns-show-filters"
-                />
-              ) : null
+              <>
+                {!railOpen ? (
+                  <ShowFiltersButton
+                    onShow={() => setRailVisible(true)}
+                    testId="purchase-returns-show-filters"
+                  />
+                ) : null}
+                {onNew ? <Button variant="primary" onClick={onNew} data-testid="consignment-return-new-button">{NEW_CONSIGNMENT_RETURN}</Button> : null}
+              </>
             }
             /* ⭐ ONE TRACKED UNIT PER EXPANDED ROW (§9.6). The expansion is the
                per-Unit truth and the evidence door; the parent row never
@@ -577,15 +590,29 @@ export function PurchaseReturnsRegister({
  * claim can link straight into the returns it authorised without the operator
  * searching for them.
  */
-export default function OperationPurchaseReturns() {
+export default function OperationPurchaseReturns({ consignment = false }: { consignment?: boolean } = {}) {
   const [params, setParams] = useSearchParams();
   const claim = params.get("claim");
   const pr = params.get("pr");
-  const query = useOperationPurchaseReturns(claim);
+  const query = useOperationPurchaseReturns(claim, undefined, consignment);
+  const label = consignment ? "Consignment Returns" : "Purchase Returns";
   const status = (query.error as { status?: number } | null)?.status;
 
   /* `?pr=` opens the full-width record (§9.6: full width after issue); the
      register's own link and every Work card land here. */
+  /* 0706 §2: `?new=1` opens the claimless New Consignment Return form.
+     Follows Houzs frontend/src/App.tsx:950 (/purchase-consignment-returns/new)
+     per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
+  if (consignment && params.get("new") === "1") {
+    const close = (id?: string) => setParams((previous) => {
+      const next = new URLSearchParams(previous);
+      next.delete("new");
+      if (id) next.set("pr", id);
+      return next;
+    });
+    return <div className="flex h-full min-h-0 flex-col p-4"><ConsignmentReturnIssue onClose={() => close()} onIssued={(id) => close(id)} /></div>;
+  }
+
   if (pr) {
     return (
       <div className="relative h-full min-h-0">
@@ -603,10 +630,16 @@ export default function OperationPurchaseReturns() {
       returns={query.data?.returns ?? []}
       isLoading={query.isLoading}
       isError={query.isError}
+      consignment={consignment}
+      onNew={consignment ? () => setParams((previous) => {
+        const next = new URLSearchParams(previous);
+        next.set("new", "1");
+        return next;
+      }) : undefined}
       errorTitle={
         status === 403
-          ? "You do not have access to Purchase Returns."
-          : "Purchase Returns could not be loaded."
+          ? `You do not have access to ${label}.`
+          : `${label} could not be loaded.`
       }
       errorDetail={query.error?.message}
       onRetry={() => void query.refetch()}

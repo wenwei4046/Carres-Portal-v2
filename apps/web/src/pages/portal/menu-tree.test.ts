@@ -147,7 +147,7 @@ describe("the approved hierarchy", () => {
 
 /** THE ROUTE TRUTH — the Card's own minimum assertion. Words moved; no address did. */
 describe("the live destinations keep their exact current addresses", () => {
-  it("nine live pages, at their unchanged addresses", () => {
+  it("ten live pages, at their unchanged addresses", () => {
     expect(
       purchasing
         .filter((item) => !item.soon)
@@ -170,6 +170,8 @@ describe("the live destinations keep their exact current addresses", () => {
       ["Repair Orders", "/operation?tab=repair-orders"],
       /* Purchase Consignment Receive — follows Houzs frontend/src/components/Sidebar.tsx:552 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
       ["Purchase Consignment Receive", "/operation?tab=consignment-receives"],
+      /* 0706 — Consignment Returns opened with its register; no other address moved. */
+      ["Consignment Returns", "/operation?tab=consignment-returns"],
     ]);
   });
 
@@ -192,12 +194,11 @@ describe("the live destinations keep their exact current addresses", () => {
     expect(navItemHref(operation, item as PortalNavItem)).toBe("/operation?tab=purchase");
   });
 
-  it("the three still-planned pages are non-controls — no route may be invented for them", () => {
+  it("the two still-planned pages are non-controls — no route may be invented for them", () => {
     const soon = purchasing.filter((i) => i.soon);
     expect(soon.map(label)).toEqual([
       "Display Requests",
       "Consignment Orders",
-      "Consignment Returns",
     ]);
     for (const item of soon) {
       expect(item.path, item.key).toBeUndefined();

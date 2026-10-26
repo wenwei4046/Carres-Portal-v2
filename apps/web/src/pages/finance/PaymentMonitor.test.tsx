@@ -20,6 +20,7 @@ const state = vi.hoisted(() => ({
   settings: { data: { collection_timing: [] as unknown[], bank_accounts: [] }, isLoading: false, isError: false, isSuccess: true, refetch: vi.fn() },
   work: { data: undefined as unknown, isSuccess: true, isError: false, refetch: vi.fn() },
   orders: { data: { orders: [] as unknown[] } as unknown, isSuccess: true, isError: false, refetch: vi.fn() },
+  backdate: [] as unknown[],
 }));
 vi.mock("@/lib/queries", () => ({
   useInvoiceRegister: () => state.invoices,
@@ -42,6 +43,10 @@ vi.mock("@/lib/queries", () => ({
   useCollectionOutcomes: () => ({ data: { outcomes: [] }, isLoading: false, isError: false }),
   useCatalog: () => ({ data: { models: [{ id: "m1", name: "King Mattress" }], skus: [{ sku: "A", modelId: "m1" }] } }),
   useRecordPayment: () => ({ mutate: vi.fn(), isPending: false }),
+  // 0707 — the waiting backdated payments; none in these listing tests.
+  usePaymentBackdateRequests: () => ({ data: { requests: state.backdate } }),
+  useSalesOrderIdByNumber: (so: number | null) => ({ data: so === null ? undefined : { id: `o-${so}`, so } }),
+  useDecidePaymentBackdate: () => ({ mutate: vi.fn(), isPending: false }),
   qk: { finance: {
     invoiceRegister: () => ["finance", "invoice-register"],
     paymentRegister: () => ["finance", "payment-register"],
@@ -159,6 +164,7 @@ beforeEach(() => {
   state.settings.data = { collection_timing: [], bank_accounts: [] };
   state.work.data = undefined; state.work.isSuccess = true; state.work.isError = false;
   state.orders.isError = false; state.orders.isSuccess = true;
+  state.backdate = [];
   // o1 has nothing in the register; o2 and o3 hold their one piece.
   state.orders.data = { orders: [
     order("o1", 1300), order("o2", 1301, { units: [{ sku: "A", qty: 1 }] }),
@@ -650,10 +656,12 @@ describe("Payment Monitor — the payment workspace opens below the row", () => 
     await waitFor(() => expect(document.querySelector("[data-section=storage]")).toHaveFocus());
   });
 
-  it("finance reads the workspace; it does not post normal collection (§12)", () => {
+  // Follows Houzs backdateRequestNotify.ts:5-8 per Weisiang's ruling
+  // (2026-10-22): clear Carres rules, implement Houzs (YH 2026-10-26, Q14).
+  it("finance records a payment but does not ask the customer to pay", () => {
     auth.role = "finance";
     show("/finance/monitor?invoice=i3");
-    expect(screen.queryByRole("button", { name: "Record payment" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Record payment" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Ask customer to pay" })).not.toBeInTheDocument();
   });
 
@@ -674,6 +682,15 @@ describe("Payment Monitor — the payment workspace opens below the row", () => 
   it("a paid order's scope says its money is in Payment Records", () => {
     show("/finance/monitor?order=1303");
     expect(screen.getByText("SO-1303 needs no payment right now. Its money is in Payment Records.")).toBeInTheDocument();
+  });
+  it("0707 — an order with no Monitor row still shows its waiting backdated payment, for the approver to decide", () => {
+    auth.role = "principal";
+    state.backdate = [{ id: "r1", order_id: "o-1400", amount: 300, paid_on: "2026-08-01", method: "cash", kind: "payment",
+      reference: null, receipt_url: null, status: "waiting", requested_by: "someone-else", requested_at: "2026-09-14T03:00:00Z",
+      decided_by: null, decided_at: null, decision_reason: null, payment_id: null }];
+    show("/finance/monitor?order=1400");
+    expect(screen.getByRole("heading", { name: "Waiting for the Payment Approver" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Approve" })).toBeInTheDocument();
   });
 });
 

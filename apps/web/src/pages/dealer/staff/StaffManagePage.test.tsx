@@ -20,6 +20,14 @@ const ROSTER: StaffDto[] = [
 const patchMutate = vi.fn();
 const createOutletAsync = vi.fn();
 
+// The address pickers read Settings → Address lists (0722); this test has no QueryClient.
+vi.mock("@/lib/settings-queries", async (importOriginal) => {
+  const m = await import("@/data/malaysia-postcodes");
+  return {
+  ...(await importOriginal<typeof import("@/lib/settings-queries")>()),
+  useAddressLists: () => ({ states: m.MY_STATES, cities: m.getCities, postcodes: m.getPostcodes }),
+  };
+});
 vi.mock("@/lib/queries", () => ({
   useOutlets: () => ({ data: { outlets: [{ id: "o1", dealerId: "d1", name: "O1", address: "1 Jln" }, { id: "o2", dealerId: "d1", name: "O2", address: "2 Jln" }] }, isPending: false, error: null }),
   useStaffList: () => ({ data: { staff: ROSTER, activated: true, selfStaffId: null, storeKind: "dealer" }, isPending: false, error: null }),

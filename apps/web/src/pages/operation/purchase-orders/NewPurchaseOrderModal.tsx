@@ -1,6 +1,8 @@
 /**
  * New Purchase Order — office staff open a PO with no source, the Houzs way
  * (supplier, Supplier Deliver To, goods, PO Delivery Date).
+ * Follows Houzs-ERP backend/src/scm/routes/mfg-purchase-orders.ts:1014
+ * per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
  *
  * Weisiang's decision (Mr Lim, WhatsApp 2026-10-22, relayed by YH 2026-10-23):
  * "as long as they can open SO PO DO". It overturns Jess's "No blank
