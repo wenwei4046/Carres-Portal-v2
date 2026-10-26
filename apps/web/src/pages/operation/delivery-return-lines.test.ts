@@ -36,4 +36,9 @@ describe("deliveryReturnLinesOf — one row per Delivery Return line (Houzs DR d
     const [nr] = deliveryReturnLinesOf([ret({ refund_status: "not_refunded", refund_status_at: "2026-10-22T03:00:00Z", delivery_return_units: [unit("U-1", "10")] })], nameOf);
     expect(nr).toMatchObject({ pendingRefund: 0, refundedAt: null });
   });
+
+  it("a Unit with no order line has no price: null, never a guessed line", () => {
+    const [row] = deliveryReturnLinesOf([ret({ delivery_return_units: [{ unit_price: null, refund: null, condition: "NEW", ops_stock_items: { unit_code: "U-9", sku: "CODY-Q" } }] })], nameOf);
+    expect(row).toMatchObject({ unitPrice: null, lineRefund: null, pendingRefund: 0 });
+  });
 });

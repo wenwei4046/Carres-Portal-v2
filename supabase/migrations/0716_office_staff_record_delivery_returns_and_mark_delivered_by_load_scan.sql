@@ -79,11 +79,19 @@ alter table public.delivery_return_lines
   add column if not exists refund     numeric(12,2) not null default 0,
   add column if not exists condition  text not null default 'NEW'
     check (condition in ('NEW','OPENED','DAMAGED','DEFECTIVE'));
+-- A Unit's price is NULL when it names no order line: `reserved_order_line_id`
+-- exists only since 0471 and is written only by ops_stock_pool_draw
+-- (0471:65-68,343), so older or line-less Units have none. No line is guessed.
+-- Carres order_lines carry no per-line discount (0001:289-297), so refund =
+-- unit price, with no discount to take off (Houzs delivery-returns.ts:740).
 alter table public.delivery_return_units
-  add column if not exists unit_price numeric(12,2) not null default 0,
-  add column if not exists refund     numeric(12,2) not null default 0,
+  add column if not exists unit_price numeric(12,2),
+  add column if not exists refund     numeric(12,2),
   add column if not exists condition  text not null default 'NEW'
     check (condition in ('NEW','OPENED','DAMAGED','DEFECTIVE'));
+alter table public.delivery_return_units
+  alter column unit_price drop not null, alter column unit_price drop default,
+  alter column refund drop not null, alter column refund drop default;
 
 -- The Units a DO took out exactly: its 0424 snapshot, or (older DOs) the Units
 -- its delivered attempt recorded (0344).
@@ -190,19 +198,17 @@ begin
            ref_history   = array_append(coalesce(ref_history, '{}'::text[]), v_no),
            updated_at    = now()
      where id = u.id;
-    -- The Unit's price is its order line's unit price: the line it was
-    -- reserved for, else the order's first line of its SKU. Refund = that
-    -- price (one Unit). Follows Houzs delivery-returns.ts:1395-1410 (the DO
+    -- The Unit's price is the unit price of the order line it was reserved
+    -- and sold against; none recorded = NULL, never a guessed line. Refund =
+    -- that price (one Unit). Follows Houzs delivery-returns.ts:1395-1410 (the DO
     -- line's unit price is carried onto the return line) per Weisiang's
     -- ruling (2026-10-22): clear Carres rules, implement Houzs.
+    v_price := null;
     select ol.unit_price into v_price from public.order_lines ol
-     where ol.order_id = v_doc.order_id
-       and (ol.id = u.reserved_order_line_id or ol.sku = u.sku)
-     order by (ol.id = u.reserved_order_line_id) desc nulls last, ol.created_at, ol.id
-     limit 1;
+     where ol.order_id = v_doc.order_id and ol.id = u.reserved_order_line_id;
     v_cond := coalesce(nullif(p_conditions->>u.id::text, ''), 'NEW');
     insert into public.delivery_return_units (return_id, unit_id, unit_price, refund, condition)
-    values (v_id, u.id, coalesce(v_price, 0), coalesce(v_price, 0), v_cond);
+    values (v_id, u.id, v_price, v_price, v_cond);
     v_n := v_n + 1;
   end loop;
   if v_n <> cardinality(p_unit_ids) then

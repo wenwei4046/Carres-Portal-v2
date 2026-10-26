@@ -22,7 +22,9 @@ export const CONDITION_WORD: Record<string, string> = { NEW: "New", OPENED: "Ope
 const PAGE = "Delivery return lines";
 const NOTE = "Every recorded return is listed.";
 const day = (v: string | null) => v?.slice(0, 10) ?? "";
-const sumOf = (rows: ReturnLine[], f: (r: ReturnLine) => number) => rm(rows.reduce((t, r) => t + f(r), 0));
+const sumOf = (rows: ReturnLine[], f: (r: ReturnLine) => number | null) => rm(rows.reduce((t, r) => t + (f(r) ?? 0), 0));
+const NO_PRICE = "No price recorded";
+const priceText = (v: number | null) => (v === null ? NO_PRICE : rm(v));
 
 const COLUMNS: DataGridColumn<ReturnLine>[] = [
   { key: "doc", label: "Return No", width: 150, filterType: "numbering", filterValue: (r) => r.docNo, exportValue: (r) => r.docNo, accessor: (r) => r.docNo },
@@ -38,10 +40,10 @@ const COLUMNS: DataGridColumn<ReturnLine>[] = [
   { key: "condition", label: "Condition", width: 110, accessor: (r) => CONDITION_WORD[r.condition] ?? r.condition, filterType: "enum" },
   { key: "qty", label: "Qty", width: 80, align: "right", accessor: (r) => r.qty, numberValue: (r) => r.qty, exportValue: (r) => r.qty,
     footerTotal: (v) => v.reduce((t, r) => t + r.qty, 0) },
-  { key: "unitPrice", label: "Unit price", width: 120, align: "right", accessor: (r) => rm(r.unitPrice), numberValue: (r) => r.unitPrice,
-    sortFn: (a, b) => a.unitPrice - b.unitPrice, exportValue: (r) => r.unitPrice },
-  { key: "lineRefund", label: "Line refund", width: 130, align: "right", accessor: (r) => rm(r.lineRefund), numberValue: (r) => r.lineRefund,
-    sortFn: (a, b) => a.lineRefund - b.lineRefund, exportValue: (r) => r.lineRefund, footerTotal: (v) => sumOf(v, (r) => r.lineRefund) },
+  { key: "unitPrice", label: "Unit price", width: 120, align: "right", accessor: (r) => priceText(r.unitPrice), numberValue: (r) => r.unitPrice,
+    sortFn: (a, b) => (a.unitPrice ?? -1) - (b.unitPrice ?? -1), exportValue: (r) => r.unitPrice ?? NO_PRICE },
+  { key: "lineRefund", label: "Line refund", width: 130, align: "right", accessor: (r) => priceText(r.lineRefund), numberValue: (r) => r.lineRefund,
+    sortFn: (a, b) => (a.lineRefund ?? -1) - (b.lineRefund ?? -1), exportValue: (r) => r.lineRefund ?? NO_PRICE, footerTotal: (v) => sumOf(v, (r) => r.lineRefund) },
   { key: "site", label: "Site", width: 140, accessor: (r) => r.site, filterType: "enum" },
   { key: "received", label: "Received", width: 120, accessor: (r) => fmtDate(r.receivedAt), filterType: "date", dateValue: (r) => r.receivedAt,
     exportValue: (r) => day(r.receivedAt) },

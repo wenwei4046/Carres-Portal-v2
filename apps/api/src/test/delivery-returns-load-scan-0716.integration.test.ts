@@ -120,7 +120,8 @@ describe.skipIf(!URL)("Delivery Returns and Load scan (real PostgreSQL, 0716)", 
       await q("insert into ops_delivery_orders (id, order_id, do_number) values ($1, $2, $3)", [doId, order, doNo]);
     }
     await q("insert into order_lines (id, order_id, sku, qty, unit_price) values ($1, $2, 'IT-DL', 2, 150)", [LINE_C, ORDER_C]);
-    await q("insert into order_lines (order_id, sku, qty, unit_price) values ($1, 'IT-DR', 3, 99.5)", [ORDER_A]);
+    await q("insert into order_lines (id, order_id, sku, qty, unit_price) values ($1, $2, 'IT-DR', 3, 99.5)", [uid("e2"), ORDER_A]);
+    await q("update ops_stock_items set reserved_order_line_id = $1 where id = $2", [uid("e2"), U.a1]);
     for (const [k, order] of [["c1", ORDER_C], ["c2", ORDER_C], ["d1", ORDER_D]] as const) {
       await q(
         "insert into ops_stock_items (id, unit_code, sku, warehouse_id, status, sold_order_id, sold_at, qty) values ($1, $2, 'IT-DL', $3, 'sold', $4, now(), 1)",
@@ -264,6 +265,8 @@ describe.skipIf(!URL)("Delivery Returns and Load scan (real PostgreSQL, 0716)", 
     await as(OP);
     expect(await attempt("select public.delivery_return_record($1, $2, $3, 'Wrong colour') as r", [DO_D, [U.d1], PJ])).toMatchObject({ ok: true, r: { units: 1 } });
     expect(await unit("d1")).toMatchObject({ status: "free", warehouse_id: PJ });
+    // d1 names no order line (0471): no price, no guessed line.
+    expect((await q("select unit_price, refund from delivery_return_units where unit_id = $1", [U.d1])).rows[0]).toEqual({ unit_price: null, refund: null });
   });
 
   it("a returned Unit can be required by another order's DO", async () => {
