@@ -42,7 +42,7 @@ import repairOrdersRouter from "./routes/operation/repair-orders";
 // the ONE receive engine (0302).
 import warehouseReceiptsRouter from "./routes/operation/warehouse-receipts";
 import workActivityRouter from "./routes/operation/work-activity";
-import settingsCoreRouter, { companyProfileReadRouter } from "./routes/operation/settings-core";
+import settingsCoreRouter, { addressListsReadRouter, companyProfileReadRouter } from "./routes/operation/settings-core";
 import workspaceDutiesRouter from "./routes/operation/workspace-duties";
 import leaveRouter from "./routes/operation/leave";
 import saturdayOnCallRouter from "./routes/operation/saturday-on-call";
@@ -270,6 +270,9 @@ api.route("/operation/warehouse-settings", warehouseSettingsRouter);
 // signed-in account because every printed document carries it.
 api.route("/operation/settings", settingsCoreRouter);
 api.route("/company-profile", companyProfileReadRouter);
+// 0722 — Settings → Address lists (Weisiang's decision, Mr Lim, WhatsApp
+// 2026-10-22): every signed-in account reads the office's list changes.
+api.route("/address-lists", addressListsReadRouter);
 // 0232 staff assignment pool — GET / + PUT /:userId
 api.route("/operation/staff", opsStaffRouter);
 api.route("/operation/partners", operationPartnersRouter);
