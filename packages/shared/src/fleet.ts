@@ -256,7 +256,7 @@ export const rateCardFor = (cards: readonly RateCard[], partnerId: string, zoneI
 /** Houzs positional tiers: 1st unit + 2nd unit + each further unit, never below the minimum. Per order = one unit. */
 export function deliveryCost(card: RateCard, items: number): number {
   const units = card.basis === "order" ? 1 : Math.max(0, Math.floor(items));
-  // No units still pays the minimum charge (Houzs delivery-rate-card.ts: the min applies to any subtotal below it).
+  // No units still pays the minimum charge. Follows Houzs backend/src/scm/lib/delivery-rate-card.ts:406-409 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
   const sum = (units >= 1 ? card.firstUnit : 0) + (units >= 2 ? card.secondUnit : 0) + Math.max(0, units - 2) * card.furtherUnit;
   return Math.round(Math.max(sum, card.minCharge) * 100) / 100;
 }

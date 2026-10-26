@@ -112,6 +112,7 @@ export const FL = {
     not_own_lorry: "This lorry is not a Carres lorry.",
     /* a zone name or a company's rate card for that zone is already there (23505) */
     already_exists: "This is already saved. Edit the existing row instead.",
+    zone_has_rates: "This zone still has rate cards. Remove them in Rate Cards first.",
   } as Record<string, string>,
 } as const;
 

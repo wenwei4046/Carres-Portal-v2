@@ -73,10 +73,19 @@ begin
   select count(*) into v_n from delivery_setting_changes where what = 'delivery_rate_cards' and partner_id = v_carres;
   if v_n < 2 then raise exception 'FAIL: rate card changes not recorded (%)', v_n; end if;
 
-  -- Removing a zone removes its rate card, never the company's other row.
-  delete from delivery_zones where id = v_zone;
+  -- A zone with a rate card is refused; the card is never removed with it (Houzs; review #2131).
+  v_ok := false;
+  begin
+    delete from delivery_zones where id = v_zone;
+  exception when restrict_violation then v_ok := true;
+  end;
+  if not v_ok then raise exception 'FAIL: a zone with a rate card was removed'; end if;
   select count(*) into v_n from delivery_rate_cards where partner_id = v_carres;
-  if v_n <> 1 then raise exception 'FAIL: expected 1 rate card left, got %', v_n; end if;
+  if v_n <> 2 then raise exception 'FAIL: expected 2 rate cards kept, got %', v_n; end if;
+  -- Once its cards are removed, the zone goes.
+  delete from delivery_rate_cards where zone_id = v_zone;
+  delete from delivery_zones where id = v_zone;
+  if exists (select 1 from delivery_zones where id = v_zone) then raise exception 'FAIL: empty zone not removed'; end if;
 
   raise notice '0725 check: PASS';
 end;

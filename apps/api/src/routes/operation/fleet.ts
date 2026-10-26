@@ -179,6 +179,8 @@ router.post("/zones", requireSettingsEditor("delivery"), async (c) => {
 
 router.delete("/zones/:id", requireSettingsEditor("delivery"), async (c) => {
   const { error } = await userClient(c.env, c.var.auth.jwt).from("delivery_zones").delete().eq("id", c.req.param("id"));
+  // 23001 restrict_violation: rate cards still point at the zone (0725 on delete restrict); they are never removed with it.
+  if (error?.code === "23001") return c.json({ error: "conflict", code: "zone_has_rates", message: "Remove this zone's rate cards first." }, 409);
   if (error) return fail(c, error);
   return c.json({ ok: true });
 });

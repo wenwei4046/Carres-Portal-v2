@@ -115,7 +115,11 @@ on conflict do nothing;
 create table if not exists public.delivery_rate_cards (
   id           uuid primary key default gen_random_uuid(),
   partner_id   uuid not null references public.delivery_partners(id) on delete cascade,
-  zone_id      uuid references public.delivery_zones(id) on delete cascade,  -- null = every other zone
+  -- null = every other zone. Removing a zone never removes a rate card (Houzs: deleting a
+  -- zone rule leaves rate rules alone, Houzs backend/src/scm/routes/delivery-zones.ts:227-242);
+  -- a zone with rate cards is refused until its cards are removed. Follows Houzs per Weisiang's ruling
+  -- (2026-10-22): clear Carres rules, implement Houzs.
+  zone_id      uuid references public.delivery_zones(id) on delete restrict,
   basis        text not null default 'item' check (basis in ('item', 'order')),
   first_unit   numeric(10,2) not null check (first_unit >= 0),
   second_unit  numeric(10,2) not null check (second_unit >= 0),
@@ -123,6 +127,9 @@ create table if not exists public.delivery_rate_cards (
   min_charge   numeric(10,2) not null default 0 check (min_charge >= 0),
   created_at   timestamptz not null default now()
 );
+alter table public.delivery_rate_cards drop constraint if exists delivery_rate_cards_zone_id_fkey;
+alter table public.delivery_rate_cards add constraint delivery_rate_cards_zone_id_fkey
+  foreign key (zone_id) references public.delivery_zones(id) on delete restrict;
 create unique index if not exists delivery_rate_cards_one_per_zone_uidx
   on public.delivery_rate_cards (partner_id, coalesce(zone_id, '00000000-0000-0000-0000-000000000000'::uuid));
 comment on table public.delivery_rate_cards is

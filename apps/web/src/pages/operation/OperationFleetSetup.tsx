@@ -250,7 +250,11 @@ export function DeliveryZonesPage() {
     ...(canEdit ? [{ key: "act", label: "", exportLabel: FL.edit, width: 200, sortable: false, filterable: false, accessor: (r: Zone) => (
       <span className="flex gap-2" onClick={stop}>
         <Button size="sm" onClick={() => setForm({ id: r.id, name: r.name, postcodes: r.postcodes.join(", ") })}>{FL.edit}</Button>
-        <Button size="sm" onClick={() => write.mutate({ path: `/zones/${r.id}`, method: "DELETE" }, { onError: (e) => setMessage(refusalOf(e)) })}>{FL.remove}</Button>
+        <Button size="sm" onClick={() => {
+          // Asks first. Follows Houzs frontend/src/pages/scm-v2/DeliveryZones.tsx:93-98 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+          if (!window.confirm(`Remove zone ${r.name}? Its postcodes will have no zone. You can add it again later.`)) return;
+          write.mutate({ path: `/zones/${r.id}`, method: "DELETE" }, { onError: (e) => setMessage(refusalOf(e)) });
+        }}>{FL.remove}</Button>
       </span>
     ) } satisfies DataGridColumn<Zone>] : []),
   ];
