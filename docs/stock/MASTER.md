@@ -1134,8 +1134,10 @@ says NETS Warehouse` / `Look for U-1012 at NETS Warehouse and scan it again by T
 
 `Counts & Adjustments` contains scheduled counts, submitted counts, differences, recount,
 investigation, Adjustment request, Stock Adjustment Approver decision, completion and reversal in one control surface.
-The first count is blind. Difference is evidence requiring comparison and recount; it is not an
-automatic Adjustment.
+~~The first count is blind. Difference is evidence requiring comparison and recount; it is not an
+automatic Adjustment.~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): Blind count is optional, a tick on the Stock Take. Posting a
+Stock Take applies the difference at once: every Unit not counted is written off and counted goods
+with no Unit ID become new Units, both through the Stock Adjustment door (migration 0714).
 
 The page starts with the shared actual-date strip. Its Register defaults are:
 
@@ -1822,7 +1824,8 @@ state can be mistaken for physical Unit state.
 
 **2990 / MATURE ERP LESSON →** keep structured reason, factual note, actor/date and append-only
 correction history. Mature quality control confirms that suspect goods must immediately stop
-downstream use. Reject direct damage quantity adjustment, a general plus/minus form and a generic
+downstream use. Reject direct damage quantity adjustment, ~~a general plus/minus form~~ (OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): office staff
+have the Stock Adjustment form, §12.5) and a generic
 quality/quarantine object that competes with Carres Receiving, Stock, Claim and Service authority.
 
 **RULING → ADAPT + IMPROVE + REJECT.** An observed problem automatically removes the affected Unit
@@ -1873,8 +1876,9 @@ an ambiguous bucket.
 
 **RULING → ADAPT + IMPROVE + RESTRICT + REJECT.** Count snapshots the Portal Unit scope but hides
 the answer during the first physical pass. Unit identity, not equal aggregate quantity, determines
-match. Difference never automatically becomes Adjustment; ordinary operators cannot directly add
-or subtract Stock; skipped scope and casual mass match cannot complete a Count.
+match. ~~Difference never automatically becomes Adjustment; ordinary operators cannot directly add
+or subtract Stock;~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): posting a Stock Take applies the difference through Stock
+Adjustment, and office staff write Units off or add Units directly with a reason; skipped scope and casual mass match cannot complete a Count.
 
 **RECOMMENDED CARRES BUSINESS FLOW →** Portal snapshots expected Unit IDs; an individually signed-
 in NETS Warehouse person blindly scans observed Units and explicitly closes the scope; Portal then
@@ -1897,7 +1901,10 @@ Completed`. Count Register defaults are `Count No · Site · Stock date · Actua
 Submitted date · Scope · Counter avatar · Portal Units · Counted Units · Differences · State ·
 Work`. Count Detail contains scope, first Count, Count again, exact Unit differences,
 investigation, correction, Adjustment request, Stock Adjustment Approver decision, resulting Unit events and History.
-No ordinary-user plus/minus form exists.
+~~No ordinary-user plus/minus form exists.~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): office staff have a Stock Adjustment page:
+pick Units at a Site to write off (minus) or add new Units with their own Unit IDs (plus), with a
+reason. A Unit reserved for a Sales Order cannot be written off. No cost or value is recorded; Finance
+keeps valuation (migration 0714).
 
 **CROSS-MODULE CONNECTION →** Stock owns Count/Difference/investigation and physical correction;
 Receiving and Delivery/Outbound supply missing receipt/handover facts; Purchasing handles supplier
@@ -1956,7 +1963,8 @@ hidden by a whole-document state.
 
 **2990 / MATURE ERP LESSON →** keep 2990 Transfer number, From/To, paired OUT/IN events, batch/Unit
 trace and correction history. Mature ERP confirms that dispatch and receipt are separate facts and
-the carrier holds goods between them. Reject instant posting, overdraw warning with continue,
+the carrier holds goods between them. Reject ~~instant posting~~ (OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): an office Stock Transfer moves the picked Units at once),
+overdraw warning with continue,
 variant/batch flattening, Warehouse freight/cost allocation and destructive cancellation after
 dispatch.
 
@@ -1979,7 +1987,10 @@ same Transfer through Inbound, scans what arrived, checks identity/condition and
 outcome. Investigation compares origin handover, delivery acceptance and destination receipt
 without deleting conflicting evidence; each unmatched Unit receives its own concrete Action.
 
-**UI / PAGE / OBJECT PLACEMENT →** no Transfer top navigation is added. Outbound hosts origin work;
+**UI / PAGE / OBJECT PLACEMENT →** ~~no Transfer top navigation is added.~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): a Stock
+Transfer page sits under Warehouse: pick Units at the Pickup Location, choose the Delivery Location,
+Save moves them at once; Cancel with a reason moves them back while every Unit still stands at the
+Delivery Location (migration 0714). The handover Transfer below remains for goods that travel. Outbound hosts origin work;
 Inbound hosts destination work; Inventory shows current holder and History. Transfer Detail uses
 the Object Detail Template with `Transfer No · source request · exact Units · From · To · collection
 date · arrival date · delivery party · Outbound work · Inbound work · evidence · History`.
@@ -2356,7 +2367,7 @@ settlement; governed approval Duties and their limits preserve segregation.
 
 No relevant 2990 capability is adopted because of terminology or layout alone. Carres explicitly
 rejects negative Stock, shortage override, duplicate quantity/rack ledgers, direct adjustment,
-instant Transfer, automatic returned-stock availability, broad external administration, and
+~~instant Transfer~~ (overturned 2026-10-22 by Weisiang, §12.7), automatic returned-stock availability, broad external administration, and
 unmeasured pallet/license-plate/wave/labour/robotics complexity.
 
 ### 12.15 Fresh Houzs receipt/count reconciliation — 9 Oct 2026
@@ -2377,7 +2388,9 @@ unmeasured pallet/license-plate/wave/labour/robotics complexity.
 
 The Transfer Register states create-time posting and cancel-time reversal. A sampled confirmed Transfer object shows created/posted timestamps, disabled From/To/date fields, SKU quantities, notes and Edit/History/Cancel/Print doors. The Stock Card shows paired Transfer IN/OUT and document-linked cancellation adjustment rows. These are recorded historical projections, not a controlled write test or proof of physical handover. No transfer, edit, cancel, reservation, export, valuation or adjustment was performed.
 
-**KEEP / ADAPT / REJECT:** adapt per-Site/source-document drilldown and explicit dated history into the existing Inventory/Unit source. Keep §12.1 exact-Unit/quantity authority, §12.3 eligibility/reservation and §12.7 actual origin/carrier/destination events. Reject copying immediate location transfer, cancellation-based physical restoration, signed-quantity permission or a second Stock Card ledger. For traceable furniture, a SKU total cannot replace Unit identity/condition/holder; governed interchangeable quantity goods remain counted under their stored mode. Stock and forecast availability are separate concepts; a planned shortfall signals a source obligation, not permission to ship absent goods. Finance retains valuation ownership and field access; observing cost in Houzs grants no Carres economic-field right.
+**KEEP / ADAPT / REJECT:** adapt per-Site/source-document drilldown and explicit dated history into the existing Inventory/Unit source. Keep §12.1 exact-Unit/quantity authority, §12.3 eligibility/reservation and §12.7 actual origin/carrier/destination events. Reject copying ~~immediate location transfer, cancellation-based physical restoration, signed-quantity permission~~
+(OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): office Stock Transfer moves Units at once and Cancel moves them back; Stock Adjustment
+writes Units off or adds Units, always as exact Units, never a signed SKU quantity) or a second Stock Card ledger. For traceable furniture, a SKU total cannot replace Unit identity/condition/holder; governed interchangeable quantity goods remain counted under their stored mode. Stock and forecast availability are separate concepts; a planned shortfall signals a source obligation, not permission to ship absent goods. Finance retains valuation ownership and field access; observing cost in Houzs grants no Carres economic-field right.
 
 **Recommended provenance/coverage contract — PROPOSAL where extending approved law:** every reported stock amount/availability states its identity mode, actual Site/holder/ownership and relevant source/effective date. Current physical inventory, historic as-of stock and future demand/supply are separately scoped readings. A historical view requires reproducible source events/snapshots and coverage; it cannot project today's reservation or master-data change backwards as though it existed then. Incomplete loaded-row search and missing/failing source must remain explicit. Derived totals reconcile to exact Units or admitted quantity movements; no independent balance writer.
 
@@ -2462,7 +2475,7 @@ The UI Kit remains unfrozen pending the owner's rendered-design review.
 | G3 | mixed bulk and Unit identity cannot reserve traceable furniture truthfully; every sofa/independently saleable module uses Unit ID, while governed interchangeable goods may use quantity scope. | approved model rule; implementation gap only |
 | G4 | legacy take-out quantity/event errors do not change business design; exact affected Units/quantity and append-only event must agree. | engineering correctness gap |
 | G5 | the old audit claimed internal location was required. Challenged and rejected: Carres does not operate NETS internal storage and currently governs Site + actual holder, not Zone/Rack/Bin. Add finer position only after measured multi-outlet/finding need. | not a current business gap; intentional rejection with future trigger |
-| G6 | Add/Remove is not a Count. Blind Count, Count again, Difference, investigation and approved Adjustment are the complete control. | approved target / not built |
+| G6 | ~~Add/Remove is not a Count. Blind Count, Count again, Difference, investigation and approved Adjustment are the complete control.~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): Stock Adjustment, Stock Transfer and Stock Take (Blind optional, Post applies the difference) are office doors on Units. | BUILT on branch feat/stock-adjust-transfer-take, 0714 not applied |
 | G7 | generic reservation cannot prove customer promise; Sales Order binds/releases/substitutes the exact eligible Unit atomically. | integrity/authority consolidation gap |
 | G8 | one status cannot combine holder, Site, condition, availability, reservation and work; these remain separate facts over one event history. | engineering/authority consolidation gap |
 | G9 | Delivery selection without physical Warehouse handover lets digital state outrun reality; Outbound requires exact two-sided handover. | built exact-Unit handover; UI completion and driver distinction verified separately |

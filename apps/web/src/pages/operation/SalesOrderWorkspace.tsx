@@ -87,7 +87,8 @@ import {
   type SalesOrderRouteMap as SalesOrderRouteModel,
   customerLegDeliveryOf,
 } from "@carres/shared";
-import { getCities, getPostcodes, MY_STATES } from "@/data/malaysia-postcodes";
+import { keepCurrent } from "@/data/malaysia-postcodes";
+import { useAddressLists } from "@/lib/settings-queries";
 import FieldFrame from "@/components/kit/FieldFrame";
 import { CONTROL_BASE, CONTROL_BORDER } from "@/components/kit/field-recipe";
 import { addonSizeOptions, disposalUnitSizes } from "../dealer/new-order/draft";
@@ -1176,6 +1177,9 @@ function SalesOrderWorkspaceBody() {
 
   /* ── The draft — seeded from the order. ─────────────────────────────── */
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
+  /* State · City · Postcode lists: national file + Settings → Address lists
+     (0722, Weisiang's decision, Mr Lim, WhatsApp 2026-10-22). */
+  const addressLists = useAddressLists();
   const [baseline, setBaseline] = useState<Draft>(EMPTY_DRAFT);
   const [draftSeed, setDraftSeed] = useState<string>("");
   const order = detailQ.data?.order;
@@ -2666,18 +2670,18 @@ function SalesOrderWorkspaceBody() {
           <span className="grid grid-cols-2 gap-1.5">
             <CSelect id="so-state" label="State" placeholder="State" value={draft.customer_address_state} disabled={draft.customer_address_unknown}
               onChange={(v) => setDraft((d) => ({ ...d, ...addressCascadePatch("state", v) }))}
-              options={MY_STATES.map((st) => ({ value: st, label: st }))} />
+              options={keepCurrent(addressLists.states, draft.customer_address_state).map((st) => ({ value: st, label: st }))} />
             <CSelect id="so-city" label="City" placeholder={draft.customer_address_state ? "City" : "Pick a state first"} value={draft.customer_address_city}
               disabled={draft.customer_address_unknown || !draft.customer_address_state}
               onChange={(v) => setDraft((d) => ({ ...d, ...addressCascadePatch("city", v) }))}
-              options={getCities(draft.customer_address_state || null).map((c) => ({ value: c, label: c }))} />
+              options={keepCurrent(addressLists.cities(draft.customer_address_state || null), draft.customer_address_city).map((c) => ({ value: c, label: c }))} />
           </span>,
           [baseline.customer_address_city, baseline.customer_address_state].filter(Boolean).join(", "))}
         {row("postcode", "Postcode", factOf(draft.customer_address_postcode), ["customer_address_postcode"],
           <CSelect id="so-postcode" label="Postcode" placeholder={draft.customer_address_city ? "Postcode" : "Pick a city first"}
             value={draft.customer_address_postcode} disabled={draft.customer_address_unknown || !draft.customer_address_city}
             onChange={(v) => setField("customer_address_postcode", v)}
-            options={getPostcodes(draft.customer_address_state || null, draft.customer_address_city || null).map((pc) => ({ value: pc, label: pc }))} />,
+            options={keepCurrent(addressLists.postcodes(draft.customer_address_state || null, draft.customer_address_city || null), draft.customer_address_postcode).map((pc) => ({ value: pc, label: pc }))} />,
           baseline.customer_address_postcode)}
         {row("building-type", "Building type", factOf(draft.building_type), ["building_type"],
           <span className="flex flex-col gap-0.5">

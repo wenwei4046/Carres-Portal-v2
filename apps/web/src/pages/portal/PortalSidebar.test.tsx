@@ -777,11 +777,16 @@ describe("PortalSidebar — Commission is ONE HR entry (Loo 2026-07-27)", () => 
 });
 
 /**
- * ⭐ SALES ORDERS — ONE PARENT, TWO CHILDREN (Jess, owner ruling 2026-09-23).
+ * ⭐ SALES ORDERS — ONE PARENT (Jess, owner ruling 2026-09-23).
  *
  *     Sales Orders
  *     ├─ Outright        (was `Outright Sales`; owner 2026-10-08)
+ *     ├─ Amendments      (Weisiang, 2026-10-22)
  *     └─ Subscription
+ *
+ * `Amendments` joined between them on Weisiang's decision (Mr Lim, WhatsApp
+ * 2026-10-22; Jess was not part of this decision): every Sales Order amendment
+ * waits in an approver's queue, the Houzs way.
  *
  * `docs/orders/MASTER.md` "Portal navigation", `docs/ui/MASTER.md` and the
  * COPY-STANDARD "Sales Orders navigation" table. The module row is the parent;
@@ -793,15 +798,23 @@ describe("PortalSidebar — Commission is ONE HR entry (Loo 2026-07-27)", () => 
  * does not delete the legacy page whose menu row it removes.
  */
 describe("PortalSidebar — the approved Sales Orders tree", () => {
-  it("is exactly Outright then Subscription, under one Sales Orders parent", () => {
+  it("is exactly Outright, Amendments, Subscription, under one Sales Orders parent", () => {
     renderAt("/operation/orders");
     expect(module_("sales")).toHaveTextContent("Sales Orders");
     const group = screen.getByTestId("nav-children-sales");
     const rows = Array.from(group.querySelectorAll("[data-testid^='nav-child-']"));
     expect(rows.map((r) => r.textContent?.trim())).toEqual([
       "Outright",
+      "Amendments",
       "Subscription",
     ]);
+  });
+
+  it("on /operation/amendments only Amendments is lit", () => {
+    renderAt("/operation/amendments");
+    expect(child("amendments")).toHaveAttribute("href", "/operation/amendments");
+    expect(child("amendments").className).toContain("bg-c-select-pill");
+    expect(child("orders").className).not.toContain("bg-c-select-pill");
   });
 
   it("keeps both addresses exactly where they were", () => {
@@ -1060,7 +1073,6 @@ describe("PortalSidebar — the Purchasing map", () => {
          slice A (migration 0602). */
       "display-requests",
       "consignment-orders",
-      "consignment-returns",
     ]) {
       const row = child(key);
       expect(row.tagName, key).toBe("SPAN");
@@ -1084,6 +1096,16 @@ describe("PortalSidebar — the Purchasing map", () => {
     expect(row.getAttribute("href")).toBe("/operation?tab=purchase-returns");
     expect(row.getAttribute("aria-disabled")).not.toBe("true");
     expect(row.textContent).not.toContain("Coming soon");
+  });
+
+  it("Consignment Returns is a real door now; Consignment Orders still says Coming soon", () => {
+    renderAt("/operation?tab=purchase");
+    fireEvent.click(group_("purchasing-showroom"));
+    const row = child("consignment-returns");
+    expect(row.tagName).toBe("A");
+    expect(row.getAttribute("href")).toBe("/operation?tab=consignment-returns");
+    expect(row.textContent).not.toContain("Coming soon");
+    expect(child("consignment-orders").textContent).toContain("Coming soon");
   });
 
   it("Repair Orders is a real door now — §9.7 slice A", () => {
@@ -1534,6 +1556,12 @@ describe("PortalSidebar — the Warehouse module's four destinations", () => {
       "Pickup Schedule",
       "Inbound",
       "Inventory",
+      // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office Stock
+      // Adjustment, Transfer and Take join the rail after Inventory. This
+      // overturns Jess's "no Transfer row" above; Jess was not part of it.
+      "Stock Adjustment",
+      "Stock Transfer",
+      "Stock Take",
       "Outbound",
       // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): the Houzs-way
       // Warehouses page joins last. Jess was not part of this decision.
@@ -1768,7 +1796,7 @@ describe("PortalSidebar — owner17Oct temporary module rail", () => {
       expect(localStorage.getItem(COLLAPSE_KEY)).toBe("0");
       Object.defineProperty(window, "innerWidth", { configurable: true, value: 1164 });
       fireEvent(window, new Event("resize"));
-      expect(screen.getByTestId("portal-sidebar")).toHaveStyle({ width: "220px" });
+      expect(screen.getByTestId("portal-sidebar")).toHaveStyle({ width: "64px" });
       expect(localStorage.getItem(COLLAPSE_KEY)).toBe("0");
     } finally { Object.defineProperty(window, "innerWidth", { configurable: true, value: previousWidth }); }
   });

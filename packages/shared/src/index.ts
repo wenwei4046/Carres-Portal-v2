@@ -849,6 +849,12 @@ export {
   serviceCaseListResponseSchema,
   createServiceCaseInputSchema,
   updateServiceCaseInputSchema,
+  mayPickCaseOwner,
+  SERVICE_PICK_LISTS,
+  type ServicePickList,
+  serviceSettingsPatchSchema,
+  servicePickItemCreateSchema,
+  servicePickItemPatchSchema,
   caseLookupLineSchema,
   caseLookupOrderSchema,
   caseLookupResponseSchema,
@@ -2155,6 +2161,14 @@ export {
   type DeliveryOrderIssueInput,
   type DeliveryOrderIssueResult,
 } from "./delivery-order";
+// New Delivery Order (Weisiang's decision, 2026-10-22): what an office DO may still carry.
+export {
+  deliveryOrderOffer,
+  deliveryOrderScopeOf,
+  type DeliveryOrderOffer,
+  type DeliveryOrderOfferDoc,
+  type DeliveryOrderScope,
+} from "./delivery-order-offer";
 // The DO DOCUMENT status — ONE arithmetic over the void stamp (0356) + the
 // attempt history (0344); nothing stored (blueprint card 2026-08-16).
 export {
@@ -3301,6 +3315,8 @@ export * from "./payment-duplicate";
 export * from "./purchase-order-register";
 
 export { recordArrivalConfirmationInput, recordSupplierAnswersInput, recordSupplierReplyInput } from "./schemas/operation";
+export { newPurchaseOrderInput } from "./schemas/operation";
+export type { NewPurchaseOrderInput } from "./schemas/operation";
 export type { RecordSupplierAnswersInput } from "./schemas/operation";
 
 export {

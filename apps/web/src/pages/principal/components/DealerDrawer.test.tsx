@@ -37,6 +37,10 @@ vi.mock("@/lib/queries", () => ({
   useUpdateDealer: () => ({ mutateAsync, isPending: false }),
 }));
 
+vi.mock("@/lib/settings-queries", () => ({
+  useAddressLists: () => ({ states: ["Johor"], cities: () => [], postcodes: () => [] }),
+}));
+
 describe("DealerDrawer bank account (0598)", () => {
   beforeEach(() => mutateAsync.mockClear());
 

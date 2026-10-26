@@ -138,6 +138,7 @@ describe("finance ledger — who may read", () => {
     "/cash-flow?from=2026-09-01&to=2026-09-30",
     "/general-ledger?from=2026-09-01&to=2026-09-30",
     "/stock-value?monthEnd=2026-09-30",
+    "/stock-drops",
     "/collection?from=2026-09-01&to=2026-09-30",
     "/forecast?month=2026-10",
     "/ar-aging",
@@ -1925,6 +1926,40 @@ describe("GET /stock-value (0643)", () => {
     const res = await get("/stock-value?monthEnd=2026-09-30");
     expect(res.status).toBe(500);
     expect((await json(res)).message).toBe("The stock value could not be loaded. Try again.");
+  });
+});
+
+describe("GET /stock-drops (0714, read-only)", () => {
+  const drop = (unit: string, at: string, line: { cost: string | null; commercial_treatment: string } | null) => ({
+    adjustment_id: `a-${at}`, unit_id: unit,
+    stock_adjustments: { adjustment_no: `ADJ-${at}`, created_at: at, reason: "Water damage", warehouses: { name: "Carres Klang" } },
+    ops_stock_items: { unit_code: unit, sku: "SOFA-3S", qty: 1, purchase_order_lines: line },
+  });
+
+  it("reads only the written-off Units, values each at its PO line cost and totals the known value", async () => {
+    const { sb, calls } = fakeClient(() => ok([
+      drop("U1-000-001", "2026-10-20T02:00:00Z", { cost: "520.00", commercial_treatment: "chargeable" }),
+      drop("U1-000-002", "2026-10-25T02:00:00Z", null),
+      drop("U1-000-003", "2026-10-20T02:00:00Z", { cost: "99.00", commercial_treatment: "free_of_charge" }),
+    ]));
+    const res = await get("/stock-drops");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).not.toHaveBeenCalled();
+    expect(calls[0]!.name).toBe("stock_adjustment_units");
+    expect(ops(calls[0], "eq")).toEqual([["eq", "direction", "minus"]]);
+    const body = await json(res);
+    expect(body.rows.map((r: { unit_code: string; value: number | null }) => [r.unit_code, r.value])).toEqual([
+      ["U1-000-002", null], ["U1-000-001", 520], ["U1-000-003", 0],
+    ]);
+    expect(body.rows[1]).toMatchObject({ adjustment_no: "ADJ-2026-10-20T02:00:00Z", site_name: "Carres Klang", reason: "Water damage", unit_cost: 520 });
+    expect(body.total).toEqual({ units: 3, value: 52000, noCost: 1 });
+  });
+
+  it("refuses a row it cannot read", async () => {
+    fakeClient(() => ok([{ adjustment_id: "a", unit_id: "u", stock_adjustments: null, ops_stock_items: null }]));
+    const res = await get("/stock-drops");
+    expect(res.status).toBe(500);
+    expect((await json(res)).message).toBe("The stock drops could not be loaded. Try again.");
   });
 });
 
