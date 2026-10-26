@@ -153,6 +153,17 @@ describe.skipIf(!URL)("Customer consignment out and back on Units (real PostgreS
     await as(OP);
     const noSo = await attempt("select public.consignment_note_mark_sold($1, $2) as r", [[U.a], 1]);
     expect(noSo).toMatchObject({ ok: false, detail: "order_not_found" });
+    // A cancelled Sales Order cannot take the payment, so it cannot take the Unit.
+    await q("reset role");
+    await q("set local session_replication_role = replica");
+    const was = (await q("select status from orders where id = $1", [ORDER])).rows[0].status;
+    await q("update orders set status = 'cancelled' where id = $1", [ORDER]);
+    await as(OP);
+    const cancelled = await attempt("select public.consignment_note_mark_sold($1, $2) as r", [[U.a], SO]);
+    expect(cancelled).toMatchObject({ ok: false, detail: "order_cancelled" });
+    await q("reset role");
+    await q("update orders set status = $2 where id = $1", [ORDER, was]);
+    await q("set local session_replication_role = origin");
     await as(OP);
     const r = await attempt("select public.consignment_note_mark_sold($1, $2) as r", [[U.a], SO]);
     expect(r.ok).toBe(true);

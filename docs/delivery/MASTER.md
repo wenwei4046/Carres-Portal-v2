@@ -754,8 +754,11 @@ Delivery Orders    the formal Delivery Order register                    /operat
 Delivery Order     one formal DO, its evidence and history — a door on a number, never navigation
 ```
 
-The sidebar carries the Delivery module with exactly two children, in this order: **Monitor**
-and **Delivery Orders**. Monitor leads and is the collapsed icon's landing. **The Edit Delivery
+~~The sidebar carries the Delivery module with exactly two children, in this order: **Monitor**
+and **Delivery Orders**.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not
+part of this decision): after **Monitor** and **Delivery Orders** come the customer consignment
+rows **Customer Consignment Orders**, **Consignment Notes** and **Customer Consignment Returns**
+(migration 0719, Purchasing MASTER §3 customer side).** Monitor leads and is the collapsed icon's landing. **The Edit Delivery
 page is retired (owner ruling 2026-09-13):** every arrangement write lives inside the Monitor
 row's expanded panels (§8.6). There is no Delivery dashboard, Fleet, Trips, Regions, Schedule,
 Exceptions, Partners, Report or Delivery Returns destination; those capabilities live inside the

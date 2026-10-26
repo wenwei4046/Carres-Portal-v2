@@ -281,17 +281,23 @@ security definer
 set search_path = public
 as $$
 declare
-  v_order uuid;
-  u       public.ops_stock_items;
-  n       public.consignment_notes;
-  v_n     int := 0;
+  v_order  uuid;
+  v_status text;
+  u        public.ops_stock_items;
+  n        public.consignment_notes;
+  v_n      int := 0;
 begin
   if not public.is_operation() then
     raise exception 'forbidden' using errcode = '42501', detail = 'forbidden';
   end if;
-  select id into v_order from public.orders where so = p_so;
+  select id, status into v_order, v_status from public.orders where so = p_so;
   if v_order is null then
     raise exception 'Sales Order % not found', p_so using errcode = 'P0001', detail = 'order_not_found';
+  end if;
+  -- A cancelled Sales Order cannot take the payment (0351 refuses it), so it
+  -- cannot take the sold Unit either.
+  if v_status = 'cancelled' then
+    raise exception 'SO-% is cancelled', p_so using errcode = 'P0001', detail = 'order_cancelled';
   end if;
   if coalesce(cardinality(p_units), 0) = 0 then
     raise exception 'Pick at least one Unit' using errcode = 'P0001', detail = 'no_units';
