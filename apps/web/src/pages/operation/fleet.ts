@@ -95,7 +95,10 @@ export const FL = {
   everyOtherZone: "Every other zone",
   basis: "Per",
   perItem: "Item",
+  perSet: "Set",
   perOrder: "Delivery order",
+  perCustomer: "Customer",
+  perTrip: "Trip",
   firstUnit: "1st",
   secondUnit: "2nd",
   furtherUnit: "Each further",
@@ -118,7 +121,20 @@ export const FL = {
   date: "Date",
   bill: "Bill",
   items: "Items",
-  sofas: "Sofas",
+  sets: "Sets",
+  outstation: "Outstation",
+  outstationHint: "Seremban 40, Rawang 22.50",
+  outstationBad: "Write outstation as Seremban 40, Rawang 22.50.",
+  chargeCap: "Charge cap",
+  rounding: "Rounding",
+  roundNone: "No rounding",
+  round10sen: "Nearest 10 sen",
+  roundRm: "Nearest RM",
+  calculator: "Calculator",
+  sofaCompartments: "Sofa compartments",
+  sofaCompartmentsHint: "3, 5",
+  address: "Address",
+  total: "Total",
   billed: "Billed",
   expected: "Rate card cost",
   difference: "Difference",
@@ -127,7 +143,7 @@ export const FL = {
   noCard: "No rate card",
   noBilled: "No delivery order on a Logistics bill in these dates.",
   reconNote: "Service, pickup and disposal are not counted from the goods.",
-  reconRefused: "Only Finance or the people named for Delivery settings see delivery charges.",
+  reconRefused: "Only operation or Finance see delivery charges.",
   refusals: {
     on_leave: "This person is on leave that day.",
     already_crewed: "This person is already on another lorry that day.",
@@ -203,7 +219,7 @@ export function usePricing() {
 
 export interface ReconcileRow {
   doId: string; doNo: string; deliveryDate: string | null; partnerId: string; company: string; bills: string[];
-  zone: string | null; items: number; sofas: number; billed: number; expected: number | null;
+  zone: string | null; items: number; sets: number; billed: number; expected: number | null;
   lines: Array<{ kind: string; label: string; amount: number }>; difference: number | null; factsComplete: boolean;
 }
 

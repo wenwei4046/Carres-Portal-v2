@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  deliveryCharge, deliveryCost, deliveryFacts, dueFlag, formatSofaBands, parseSofaBands, postcodeRange, rateCardFor, worstFlag, zoneForPostcode,
+  deliveryCharge, deliveryCost, deliveryFacts, parseOutstation, dueFlag, formatSofaBands, parseSofaBands, postcodeRange, rateCardFor, worstFlag, zoneForPostcode,
   type RateCard,
 } from "./fleet";
 
@@ -32,18 +32,19 @@ describe("zone lookup", () => {
 describe("rate card cost", () => {
   const card = (over: Partial<RateCard>): RateCard => ({
     id: "c", partnerId: "nets", zoneId: "pj", basis: "item", firstUnit: 60, secondUnit: 40, furtherUnit: 30, minCharge: 0,
-    overageCap: null, overageEach: 0, sofaBrackets: [], serviceCharge: 0, pickupCharge: 0, disposalCharge: 0, ...over,
+    overageCap: null, overageEach: 0, sofaBrackets: [], serviceCharge: 0, pickupCharge: 0, disposalCharge: 0,
+    outstation: [], chargeCap: null, rounding: "none", ...over,
   });
   it("prices 1st, 2nd and each further item", () => {
-    expect(deliveryCost(card({}), 0)).toBe(0);
-    expect(deliveryCost(card({}), 1)).toBe(60);
-    expect(deliveryCost(card({}), 2)).toBe(100);
-    expect(deliveryCost(card({}), 4)).toBe(160);
+    expect(deliveryCost(card({}), { items: 0 })).toBe(0);
+    expect(deliveryCost(card({}), { items: 1 })).toBe(60);
+    expect(deliveryCost(card({}), { items: 2 })).toBe(100);
+    expect(deliveryCost(card({}), { items: 4 })).toBe(160);
   });
   it("per order is one unit; the minimum charge holds", () => {
-    expect(deliveryCost(card({ basis: "order" }), 7)).toBe(60);
-    expect(deliveryCost(card({ minCharge: 80 }), 1)).toBe(80);
-    expect(deliveryCost(card({ minCharge: 80 }), 0)).toBe(80); // Houzs: the minimum holds with no items
+    expect(deliveryCost(card({ basis: "order" }), { items: 7 })).toBe(60);
+    expect(deliveryCost(card({ minCharge: 80 }), { items: 1 })).toBe(80);
+    expect(deliveryCost(card({ minCharge: 80 }), { items: 0 })).toBe(80); // Houzs: the minimum holds with no items
 
   });
   it("zone card first, then the every-other-zone card, never another company's", () => {
@@ -59,7 +60,8 @@ describe("rate card cost", () => {
 describe("delivery charge, Houzs way", () => {
   const card = (over: Partial<RateCard>): RateCard => ({
     id: "c", partnerId: "nets", zoneId: null, basis: "item", firstUnit: 60, secondUnit: 40, furtherUnit: 30, minCharge: 0,
-    overageCap: null, overageEach: 0, sofaBrackets: [], serviceCharge: 0, pickupCharge: 0, disposalCharge: 0, ...over,
+    overageCap: null, overageEach: 0, sofaBrackets: [], serviceCharge: 0, pickupCharge: 0, disposalCharge: 0,
+    outstation: [], chargeCap: null, rounding: "none", ...over,
   });
   it("past the cap each unit costs the overage, not the further rate", () => {
     const c = card({ overageCap: 3, overageEach: 50 });
@@ -91,17 +93,40 @@ describe("delivery charge, Houzs way", () => {
   });
   it("sums in sen: no float drift", () => {
     expect(deliveryCharge(card({ firstUnit: 0.1, secondUnit: 0.2, furtherUnit: 0.1 }), { items: 3 }).total).toBe(0.4);
-    expect(deliveryCost(card({ basis: "order", overageCap: 1, overageEach: 99 }), 9)).toBe(60);
+    expect(deliveryCost(card({ basis: "order", overageCap: 1, overageEach: 99 }), { items: 9 })).toBe(60);
   });
-  it("goods to facts: sofas by build, accessories and services left out", () => {
+  it("goods to facts, Houzs per-DO tally: one drop, one customer, items leave sofas out, sets = max(frames, mattresses) + sofas", () => {
     const f = deliveryFacts([
       { sku: "M1401F-K", qty: 2 },
-      { sku: "hk55-3seater", qty: 1, attrs: { sofa_build_key: "A" } },
-      { sku: "hk55-3seater", qty: 2, attrs: { sofa_build_key: "A" } },
-      { sku: "hk55-3seater", qty: 1, attrs: { sofa_build_key: "B" } },
+      { sku: "Hilton Divan/Fab3-King", qty: 1 },
+      { sku: "hk55-3seater", qty: 3 },
       { sku: "UNKNOWN-THING", qty: 5 },
-    ]);
-    expect(f).toEqual({ items: 2, sofaCompartments: [3, 1] });
+    ], "PJ", "Jalan 1, Rawang");
+    expect(f).toEqual({ items: 3, sets: 5, drops: 1, customers: 1, zone: "PJ", address: "Jalan 1, Rawang" });
+    expect(f.sofaCompartments).toBeUndefined(); // Houzs passes none: sofa bands price only in the calculator
+  });
+  it("what the unit prices count: item, set, order, customer, trip (Houzs chargingUnitCount)", () => {
+    const f = { items: 4, sets: 2, drops: 3, customers: 2 };
+    expect(deliveryCharge(card({ basis: "item" }), f).total).toBe(160);
+    expect(deliveryCharge(card({ basis: "set" }), f).total).toBe(100);
+    expect(deliveryCharge(card({ basis: "order" }), f).total).toBe(130);
+    expect(deliveryCharge(card({ basis: "customer" }), f).total).toBe(100);
+    expect(deliveryCharge(card({ basis: "customer" }), { items: 0, drops: 3 }).total).toBe(130); // falls back to drops
+    expect(deliveryCharge(card({ basis: "trip" }), { items: 0 }).total).toBe(60);
+  });
+  it("outstation: one surcharge, the highest of the zone and towns in the address", () => {
+    const c = card({ outstation: [{ zone: "Melaka", amount: 300 }, { zone: "Johor", amount: 500 }, { zone: "Rawang", amount: 22.5 }] });
+    expect(deliveryCharge(c, { items: 0, zone: "MELAKA" }).total).toBe(300);
+    expect(deliveryCharge(c, { items: 0, zone: "Melaka", address: "12 Jalan Johor, 81200" }).total).toBe(500);
+    expect(deliveryCharge(c, { items: 1, address: "Lot 5, Rawang" }).lines.at(-1)).toEqual({ kind: "outstation", label: "Outstation Rawang", amount: 22.5 });
+    expect(deliveryCharge(c, { items: 0, address: "Seri Rawangan" }).total).toBe(0); // whole words only
+  });
+  it("charge cap, then rounding that never goes over the cap", () => {
+    expect(deliveryCharge(card({ chargeCap: 120 }), { items: 4 }).total).toBe(120);
+    expect(deliveryCharge(card({ firstUnit: 60.06, rounding: "10sen" }), { items: 1 }).total).toBe(60.1);
+    expect(deliveryCharge(card({ firstUnit: 60.5, rounding: "rm" }), { items: 1 }).total).toBe(61);
+    expect(deliveryCharge(card({ firstUnit: 494.96, chargeCap: 494.95, rounding: "10sen" }), { items: 1 }).total).toBe(494.9);
+    expect(deliveryCharge(card({ minCharge: 100, chargeCap: 80 }), { items: 0 }).total).toBe(80); // Houzs order: minimum, then cap
   });
   it("sofa bands read and print", () => {
     expect(parseSofaBands("1-3 50, 4 60.5, 5+ 90")).toEqual([
@@ -110,6 +135,8 @@ describe("delivery charge, Houzs way", () => {
     expect(parseSofaBands("")).toEqual([]);
     expect(parseSofaBands("3-1 50")).toBeNull();
     expect(parseSofaBands("1-3")).toBeNull();
+    expect(parseOutstation("Seremban 40, Kuala Pilah 22.50")).toEqual([{ zone: "Seremban", amount: 40 }, { zone: "Kuala Pilah", amount: 22.5 }]);
+    expect(parseOutstation("Seremban")).toBeNull();
     expect(formatSofaBands([{ min: 1, max: 3, amount: 50 }, { min: 4, max: 4, amount: 60 }, { min: 5, max: null, amount: 90 }])).toBe("1-3 50, 4 60, 5+ 90");
   });
 });

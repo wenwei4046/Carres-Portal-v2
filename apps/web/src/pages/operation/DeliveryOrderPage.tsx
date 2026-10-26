@@ -32,7 +32,7 @@ import WarehouseHandoverBlock from "./components/WarehouseHandoverBlock";
 import DeliveryResultAction from "./components/DeliveryResultAction";
 import DeliveryEvidencePanel from "./components/DeliveryEvidencePanel";
 import { NO_PROOF_REVIEW, proofReviewOf } from "./delivery-orders-register";
-import { deliveryCost, rateCardFor, zoneForPostcode } from "@carres/shared/fleet";
+import { deliveryCost, deliveryFacts, rateCardFor, zoneForPostcode } from "@carres/shared/fleet";
 import { rm } from "@/lib/format-currency";
 import { FL, usePricing } from "./fleet";
 
@@ -426,8 +426,9 @@ export default function DeliveryOrderPage() {
                   const zone = zoneForPostcode(order.customer_address, pricing.data.zones);
                   const card = rateCardFor(pricing.data.rates, partnerId, zone?.id ?? null);
                   if (!card) return <Absence>{FL.noRateCard}</Absence>;
-                  const items = tripLines.reduce((n, l) => n + (Number(l.qty) || 0), 0);
-                  return `${rm(deliveryCost(card, items))} · ${zone ? `${FL.zone} ${zone.name}` : FL.noZone}`;
+                  // Priced alone, Houzs per-DO tally (threepl-do-charge.ts:12-26) per Weisiang's ruling (2026-10-22).
+                  const facts = deliveryFacts(tripLines, zone?.name ?? null, order.customer_address ?? null);
+                  return `${rm(deliveryCost(card, facts))} · ${zone ? `${FL.zone} ${zone.name}` : FL.noZone}`;
                 })()}
               </Fact>
               <Fact label="Delivery appointment">

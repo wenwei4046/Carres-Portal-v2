@@ -142,7 +142,17 @@ alter table public.delivery_rate_cards
   add column if not exists sofa_brackets   jsonb not null default '[]'::jsonb check (jsonb_typeof(sofa_brackets) = 'array'),
   add column if not exists service_charge  numeric(10,2) not null default 0 check (service_charge >= 0),
   add column if not exists pickup_charge   numeric(10,2) not null default 0 check (pickup_charge >= 0),
-  add column if not exists disposal_charge numeric(10,2) not null default 0 check (disposal_charge >= 0);
+  add column if not exists disposal_charge numeric(10,2) not null default 0 check (disposal_charge >= 0),
+  -- Houzs OUTSTATION rules (zone or town -> surcharge) and the card envelope: charge cap and rounding
+  -- (Houzs 0207 lines 64-70, delivery-rate-card.ts:347-363,402-434).
+  add column if not exists outstation      jsonb not null default '[]'::jsonb check (jsonb_typeof(outstation) = 'array'),
+  add column if not exists charge_cap      numeric(10,2) check (charge_cap is null or charge_cap >= 0),
+  add column if not exists rounding        text not null default 'none' check (rounding in ('none', '10sen', 'rm'));
+-- What the unit prices count: Houzs basis ITEM | SET x aggregation UNIT | DROP | CUSTOMER | TRIP
+-- (Houzs 0244_scm_rate_card_aggregation_unit.sql) as one Carres word: item, set, order (= DROP), customer, trip.
+alter table public.delivery_rate_cards drop constraint if exists delivery_rate_cards_basis_check;
+alter table public.delivery_rate_cards add constraint delivery_rate_cards_basis_check
+  check (basis in ('item', 'set', 'order', 'customer', 'trip'));
 comment on table public.delivery_rate_cards is
   '0725 (Weisiang''s decision 2026-10-22, Houzs Delivery Rate Cards): a Logistics company''s price per zone — 1st, 2nd and each further unit (item or delivery order), overage past a cap, sofa compartment bands, service / pickup / disposal charges and a minimum charge.';
 
@@ -195,7 +205,9 @@ create trigger delivery_rate_cards_audit after insert or update or delete on pub
 -- with the rate card's computed cost; in Carres a Logistics company's bill is charged per delivery
 -- order (0689 supplier_bill_lines.delivery_order_id), so each billed DO is one row. This returns the
 -- facts; the charge is computed in packages/shared/src/fleet.ts deliveryCharge (API route). Read only.
--- Bill amounts are Finance's, so it is read by Finance readers and the people named for Delivery settings.
+-- Who reads it follows Houzs: the per-DO tally sits behind scmAreaGuard('scm.transportation.drivers')
+-- (Houzs backend/src/scm/index.ts:912), the delivery/dispatch area = Carres operation (is_operation);
+-- the bills themselves are Finance's (scm.finance.accounting, Houzs routes/threepl-do-charges.ts:119) = gl_may_read.
 create or replace function public.delivery_rate_reconcile(p_from date, p_to date)
 returns jsonb
 language plpgsql
@@ -204,8 +216,8 @@ security definer
 set search_path = public, pg_temp
 as $fn$
 begin
-  if not (public.gl_may_read() or public.settings_can_edit('delivery')) then
-    raise exception 'Only Finance or the people named for Delivery settings read delivery charges.'
+  if not (coalesce((select public.is_operation()), false) or public.gl_may_read()) then
+    raise exception 'Only operation or Finance read delivery charges.'
       using errcode = '42501', detail = 'not_allowed';
   end if;
   return coalesce((
@@ -235,4 +247,4 @@ $fn$;
 revoke all on function public.delivery_rate_reconcile(date, date) from public, anon;
 grant execute on function public.delivery_rate_reconcile(date, date) to authenticated;
 comment on function public.delivery_rate_reconcile(date, date) is
-  '0725 (Weisiang''s decision 2026-10-22, Houzs reconcile): each live delivery order on a live Logistics bill, with its billed amount, company, address and goods, for comparing with the rate card. Finance readers and Delivery settings editors.';
+  '0725 (Weisiang''s decision 2026-10-22, Houzs reconcile): each live delivery order on a live Logistics bill, with its billed amount, company, address and goods, for comparing with the rate card. operation and Finance readers (Houzs scm.transportation.drivers / scm.finance.accounting).';

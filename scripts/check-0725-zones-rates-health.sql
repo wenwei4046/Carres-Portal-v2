@@ -96,12 +96,22 @@ begin
   exception when check_violation then v_ok := true;
   end;
   if not v_ok then raise exception 'FAIL: sofa bands that are not a list were accepted'; end if;
+  -- Reconciliation: operation reads it (Houzs scm.transportation.drivers); someone else is refused.
+  perform delivery_rate_reconcile(null, null);
+  perform set_config('request.jwt.claim.sub', gen_random_uuid()::text, true);
   v_ok := false;
   begin
     perform delivery_rate_reconcile(null, null);
   exception when insufficient_privilege then v_ok := true;
   end;
-  if not v_ok then raise exception 'FAIL: reconciliation read by an operation user with no Finance or Delivery settings role'; end if;
+  if not v_ok then raise exception 'FAIL: reconciliation read by someone neither operation nor Finance'; end if;
+  perform set_config('request.jwt.claim.sub', v_op::text, true);
+  v_ok := false;
+  begin
+    insert into delivery_rate_cards (partner_id, first_unit, second_unit, further_unit, basis) values (v_carres, 1, 1, 1, 'pallet');
+  exception when check_violation then v_ok := true;
+  end;
+  if not v_ok then raise exception 'FAIL: unknown basis accepted'; end if;
 
   raise notice '0725 check: PASS';
 end;

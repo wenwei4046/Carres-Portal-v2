@@ -1,5 +1,8 @@
 import { useMemo, useState } from "react";
-import { dueFlag, formatSofaBands, parseSofaBands, worstFlag, zoneForPostcode, type DueFlag, type FleetCrew, type RateCard } from "@carres/shared/fleet";
+import {
+  deliveryCharge, dueFlag, formatOutstation, formatSofaBands, parseOutstation, parseSofaBands, worstFlag, zoneForPostcode,
+  type DueFlag, type FleetCrew, type RateBasis, type RateCard,
+} from "@carres/shared/fleet";
 import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import Button from "@/components/kit/Button";
@@ -298,7 +301,12 @@ export function DeliveryZonesPage() {
 const EMPTY_RATE = {
   id: null as string | null, zoneId: "all", basis: "item", firstUnit: "", secondUnit: "", furtherUnit: "", minCharge: "0",
   overageCap: "", overageEach: "0", sofaBands: "", serviceCharge: "0", pickupCharge: "0", disposalCharge: "0",
+  outstation: "", chargeCap: "", rounding: "none",
 };
+const BASIS_WORD: Record<RateBasis, string> = {
+  item: FL.perItem, set: FL.perSet, order: FL.perOrder, customer: FL.perCustomer, trip: FL.perTrip,
+};
+const ROUND_WORD: Record<string, string> = { none: FL.roundNone, "10sen": FL.round10sen, rm: FL.roundRm };
 type MoneyKey = "firstUnit" | "secondUnit" | "furtherUnit" | "minCharge" | "overageEach" | "serviceCharge" | "pickupCharge" | "disposalCharge";
 const MONEY_KEYS: MoneyKey[] = ["firstUnit", "secondUnit", "furtherUnit", "minCharge", "overageEach", "serviceCharge", "pickupCharge", "disposalCharge"];
 
@@ -324,21 +332,25 @@ function RateCardsView({ switcher }: { switcher: React.ReactNode }) {
   const rows = (q.data?.rates ?? []).filter((r) => r.partnerId === partnerId).sort((a, b) => zoneName(a.zoneId).localeCompare(zoneName(b.zoneId)));
   const num = (s: string) => Number(s);
   const bands = parseSofaBands(form.sofaBands);
+  const outstation = parseOutstation(form.outstation);
+  const capMoneyOk = form.chargeCap.trim() === "" || num(form.chargeCap) >= 0;
   const capOk = form.overageCap.trim() === "" || (Number.isInteger(num(form.overageCap)) && num(form.overageCap) >= 1);
-  const ready = MONEY_KEYS.every((k) => form[k].trim() !== "" && num(form[k]) >= 0) && capOk && bands !== null;
+  const ready = MONEY_KEYS.every((k) => form[k].trim() !== "" && num(form[k]) >= 0) && capOk && capMoneyOk && bands !== null && outstation !== null;
 
   const save = () => {
-    if (!partnerId || !bands) return;
+    if (!partnerId || !bands || !outstation) return;
     setMessage(null);
     const money = Object.fromEntries(MONEY_KEYS.map((k) => [k, num(form[k])]));
     write.mutate({ path: "/rates", body: {
       id: form.id, partnerId, zoneId: form.zoneId === "all" ? null : form.zoneId, basis: form.basis, ...money,
-      overageCap: form.overageCap.trim() === "" ? null : num(form.overageCap), sofaBrackets: bands,
+      overageCap: form.overageCap.trim() === "" ? null : num(form.overageCap), sofaBrackets: bands, outstation,
+      chargeCap: form.chargeCap.trim() === "" ? null : num(form.chargeCap), rounding: form.rounding,
     } }, { onSuccess: () => setForm(EMPTY_RATE), onError: (e) => setMessage(refusalOf(e)) });
   };
   const edit = (r: RateCard) => setForm({
     id: r.id, zoneId: r.zoneId ?? "all", basis: r.basis, overageCap: r.overageCap == null ? "" : String(r.overageCap),
-    sofaBands: formatSofaBands(r.sofaBrackets),
+    sofaBands: formatSofaBands(r.sofaBrackets), outstation: formatOutstation(r.outstation),
+    chargeCap: r.chargeCap == null ? "" : String(r.chargeCap), rounding: r.rounding,
     ...(Object.fromEntries(MONEY_KEYS.map((k) => [k, String(r[k])])) as Record<MoneyKey, string>),
   });
 
@@ -346,7 +358,7 @@ function RateCardsView({ switcher }: { switcher: React.ReactNode }) {
     ({ key, label, width, align: "right", accessor: (r) => rm(r[key]), numberValue: (r) => r[key] });
   const columns: DataGridColumn<RateCard>[] = [
     { key: "zone", label: FL.zone, width: 160, accessor: (r) => zoneName(r.zoneId) },
-    { key: "basis", label: FL.basis, width: 130, accessor: (r) => (r.basis === "order" ? FL.perOrder : FL.perItem) },
+    { key: "basis", label: FL.basis, width: 130, accessor: (r) => BASIS_WORD[r.basis] },
     moneyCol("firstUnit", FL.firstUnit),
     moneyCol("secondUnit", FL.secondUnit),
     moneyCol("furtherUnit", FL.furtherUnit, 130),
@@ -356,7 +368,10 @@ function RateCardsView({ switcher }: { switcher: React.ReactNode }) {
     moneyCol("serviceCharge", FL.serviceCharge),
     moneyCol("pickupCharge", FL.pickupCharge),
     moneyCol("disposalCharge", FL.disposalCharge),
+    { key: "outstation", label: FL.outstation, width: 180, accessor: (r) => formatOutstation(r.outstation) },
     moneyCol("minCharge", FL.minCharge),
+    { key: "chargeCap", label: FL.chargeCap, width: 110, align: "right", accessor: (r) => (r.chargeCap == null ? "" : rm(r.chargeCap)), numberValue: (r) => r.chargeCap ?? 0 },
+    { key: "rounding", label: FL.rounding, width: 130, accessor: (r) => ROUND_WORD[r.rounding] },
     ...(canEdit ? [{ key: "act", label: "", exportLabel: FL.edit, width: 200, sortable: false, filterable: false, accessor: (r: RateCard) => (
       <span className="flex gap-2" onClick={stop}>
         <Button size="sm" onClick={() => edit(r)}>{FL.edit}</Button>
@@ -364,14 +379,14 @@ function RateCardsView({ switcher }: { switcher: React.ReactNode }) {
       </span>
     ) } satisfies DataGridColumn<RateCard>] : []),
   ];
-  const input = (k: MoneyKey | "overageCap", word: string, w = "w-24") => (
+  const input = (k: MoneyKey | "overageCap" | "chargeCap", word: string, w = "w-24") => (
     <input type="number" min={0} step="0.01" aria-label={word} placeholder={word} className={`${field} ${w}`} value={form[k]}
       onChange={(e) => setForm({ ...form, [k]: e.target.value })} />
   );
 
   return (
     <Shell word={FL.rateCards} testId="rate-cards" failed={q.isError}>
-      <Refusal text={message ?? (bands === null ? FL.sofaBandsBad : null)} />
+      <Refusal text={message ?? (bands === null ? FL.sofaBandsBad : outstation === null ? FL.outstationBad : null)} />
       <DataGrid rows={rows} columns={columns} rowKey={(r) => r.id} storageKey="carres.operation.rate-cards.v2"
         appearance="reference" exportName={FL.rateCards} groupBanner={false} isLoading={!q.isSuccess && !q.isError}
         emptyMessage={FL.noRates}
@@ -385,7 +400,7 @@ function RateCardsView({ switcher }: { switcher: React.ReactNode }) {
                 <Select id="rate-zone" toolbar value={form.zoneId} onValueChange={(v) => setForm({ ...form, zoneId: v })}
                   options={[{ value: "all", label: FL.everyOtherZone }, ...(q.data?.zones ?? []).map((z) => ({ value: z.id, label: z.name }))]} />
                 <Select id="rate-basis" toolbar value={form.basis} onValueChange={(v) => setForm({ ...form, basis: v })}
-                  options={[{ value: "item", label: FL.perItem }, { value: "order", label: FL.perOrder }]} />
+                  options={Object.entries(BASIS_WORD).map(([value, label]) => ({ value, label }))} />
                 {input("firstUnit", FL.firstUnit)}
                 {input("secondUnit", FL.secondUnit)}
                 {input("furtherUnit", FL.furtherUnit)}
@@ -396,14 +411,54 @@ function RateCardsView({ switcher }: { switcher: React.ReactNode }) {
                 {input("serviceCharge", FL.serviceCharge)}
                 {input("pickupCharge", FL.pickupCharge)}
                 {input("disposalCharge", FL.disposalCharge)}
+                <input type="text" aria-label={FL.outstation} placeholder={`${FL.outstation}: ${FL.outstationHint}`} className={`${field} w-48`}
+                  value={form.outstation} onChange={(e) => setForm({ ...form, outstation: e.target.value })} />
                 {input("minCharge", FL.minCharge)}
+                {input("chargeCap", FL.chargeCap)}
+                <Select id="rate-rounding" toolbar value={form.rounding} onValueChange={(v) => setForm({ ...form, rounding: v })}
+                  options={Object.entries(ROUND_WORD).map(([value, label]) => ({ value, label }))} />
                 <Button size="sm" variant="primary" disabled={!ready} loading={write.isPending} onClick={save}>{form.id ? FL.save : FL.addRate}</Button>
                 {form.id ? <Button size="sm" onClick={() => setForm(EMPTY_RATE)}>{FL.cancel}</Button> : null}
               </>
             ) : null}
           </span>
         } />
+      <Calculator cards={rows} zoneName={zoneName} />
     </Shell>
+  );
+}
+
+/* Calculator: price any delivery on a card. Follows Houzs routes/delivery-rate-cards.ts:12-15 (POST /:id/compute, the
+   "cost calculator" panel) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. Writes nothing. */
+function Calculator({ cards, zoneName }: { cards: RateCard[]; zoneName: (id: string | null) => string }) {
+  const [c, setC] = useState({ cardId: "", items: "", sets: "", drops: "1", customers: "1", sofas: "", address: "", services: "", pickups: "", disposals: "" });
+  const card = cards.find((x) => x.id === c.cardId) ?? cards[0] ?? null;
+  if (!card) return null;
+  const sofas = c.sofas.split(",").map((x) => Number(x.trim())).filter((n) => n > 0);
+  const result = deliveryCharge(card, {
+    items: Number(c.items), sets: Number(c.sets), drops: Number(c.drops), customers: Number(c.customers), sofaCompartments: sofas,
+    zone: card.zoneId ? zoneName(card.zoneId) : null, address: c.address,
+    services: Number(c.services), pickups: Number(c.pickups), disposals: Number(c.disposals),
+  });
+  const box = (k: keyof typeof c, w: string, width = "w-20", type = "number") => (
+    <input type={type} min={0} aria-label={w} placeholder={w} className={`${field} ${width}`} value={c[k]} onChange={(e) => setC({ ...c, [k]: e.target.value })} />
+  );
+  return (
+    <section aria-label={FL.calculator} className="flex flex-col gap-2 border-t border-border p-4" data-testid="rate-calculator">
+      <h2 className="text-body font-semibold">{FL.calculator}</h2>
+      <span className="flex flex-wrap items-center gap-2">
+        <Select id="calc-card" toolbar value={card.id} onValueChange={(v) => setC({ ...c, cardId: v })}
+          options={cards.map((x) => ({ value: x.id, label: zoneName(x.zoneId) }))} />
+        {box("items", FL.items)}{box("sets", FL.sets)}{box("drops", FL.perOrder)}{box("customers", FL.perCustomer)}
+        {box("sofas", `${FL.sofaCompartments}: ${FL.sofaCompartmentsHint}`, "w-40", "text")}
+        {box("address", FL.address, "w-56", "text")}
+        {box("services", FL.serviceCharge)}{box("pickups", FL.pickupCharge)}{box("disposals", FL.disposalCharge)}
+      </span>
+      <ul className="text-body">
+        {result.lines.map((l, i) => <li key={i}>{l.label}: {rm(l.amount)}</li>)}
+        <li className="font-semibold">{FL.total}: {rm(result.total)}</li>
+      </ul>
+    </section>
   );
 }
 
@@ -422,7 +477,7 @@ function ReconcileView({ switcher }: { switcher: React.ReactNode }) {
     { key: "bill", label: FL.bill, width: 140, accessor: (r) => r.bills.join(", ") },
     { key: "zone", label: FL.zone, width: 120, accessor: (r) => r.zone ?? FL.noZone },
     { key: "items", label: FL.items, width: 80, align: "right", accessor: (r) => String(r.items), numberValue: (r) => r.items },
-    { key: "sofas", label: FL.sofas, width: 80, align: "right", accessor: (r) => String(r.sofas), numberValue: (r) => r.sofas },
+    { key: "sets", label: FL.sets, width: 80, align: "right", accessor: (r) => String(r.sets), numberValue: (r) => r.sets },
     { key: "expected", label: FL.expected, width: 130, align: "right", accessor: (r) => (r.expected == null ? "" : rm(r.expected)), numberValue: (r) => r.expected ?? 0 },
     { key: "billed", label: FL.billed, width: 120, align: "right", accessor: (r) => rm(r.billed), numberValue: (r) => r.billed },
     { key: "diff", label: FL.difference, width: 120, align: "right", accessor: (r) => (r.difference == null ? "" : rm(r.difference)), numberValue: (r) => r.difference ?? 0 },

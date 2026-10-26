@@ -2478,19 +2478,22 @@ auto-scheduling (left to the trips and master-list work).
   change in the settings history.
 
 - **Houzs charge rules on a card (2026-10-26, Weisiang's ruling 2026-10-22: clear Carres rules,
-  implement Houzs)** — a `Cap` with `Each over cap` (units past the cap cost the overage, not the
-  further rate), `Sofa bands` (a sofa is priced by its compartments, once per sofa, never as a unit; a
-  built sofa's compartments are its lines sharing one build), `Service` / `Pickup` / `Disposal` rate ×
-  count, then the `Minimum` lifts the total. Maths in `packages/shared/src/fleet.ts` `deliveryCharge`,
-  following Houzs `backend/src/scm/lib/delivery-rate-card.ts:292-437`.
-- **Reconciliation** (Rate Cards → `Reconciliation`, Houzs' Reconciliation tab) — each live DO on a
-  live Logistics bill (0689 bill lines name their DO): `Billed` vs the card's `Rate card cost`,
-  `Difference`, `Match` / `Mismatch` / `No rate card`. Read only. Service, pickup and disposal are not
-  counted from the goods (Houzs: facts partial). Read by Finance readers and the people named for
-  Delivery settings (`delivery_rate_reconcile`).
+  implement Houzs)** — `Per` is `Item` / `Set` / `Delivery order` / `Customer` / `Trip` (Houzs basis ×
+  aggregation); a `Cap` with `Each over cap`; `Sofa bands`; `Outstation` (zone or town → surcharge, the
+  highest that applies, once); `Service` / `Pickup` / `Disposal` rate × count; then `Minimum`, `Charge
+  cap` and `Rounding` (never over the cap). Maths in `packages/shared/src/fleet.ts` `deliveryCharge`,
+  following Houzs `backend/src/scm/lib/delivery-rate-card.ts:292-437`. A `Calculator` under the cards
+  prices any delivery (Houzs `/compute`).
+- **A delivery order is priced alone** (Houzs per-DO tally `threepl-do-charge.ts:1-26`): one drop, one
+  customer, `Item` leaves sofas out, `Set` = max(bed frames, mattresses) + sofas; sofa compartments are
+  not read from the goods (sofa bands price in the Calculator); Houzs' per-trip outstation fee is not
+  charged per DO.
+- **Reconciliation** (Rate Cards → `Reconciliation`) — each live DO on a live Logistics bill (0689):
+  `Billed` vs `Rate card cost`, `Difference`, `Match` / `Mismatch` / `No rate card`. Read by operation
+  (Houzs `scm.transportation.drivers`) and Finance readers (`delivery_rate_reconcile`).
 
-Not built (0725): Houzs' card charge cap and rounding, per-trip and per-customer counting, the
-outstation surcharge, and the free calculator panel.
+Not built (0725): Houzs' per-trip outstation fee (Houzs leaves it out of the per-DO tally); cost on
+Fleet Day trips.
 
 ## 16 · Production closure
 

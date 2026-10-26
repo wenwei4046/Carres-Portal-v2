@@ -148,14 +148,16 @@ router.post("/health", async (c) => {
 
 const RATE_COLS =
   "id, partner_id, zone_id, basis, first_unit, second_unit, further_unit, min_charge, " +
-  "overage_cap, overage_each, sofa_brackets, service_charge, pickup_charge, disposal_charge";
+  "overage_cap, overage_each, sofa_brackets, service_charge, pickup_charge, disposal_charge, outstation, charge_cap, rounding";
 type Row = Record<string, unknown>;
 const rateOut = (r: Row): RateCard => ({
-  id: String(r.id), partnerId: String(r.partner_id), zoneId: (r.zone_id as string | null) ?? null, basis: r.basis === "order" ? "order" : "item",
+  id: String(r.id), partnerId: String(r.partner_id), zoneId: (r.zone_id as string | null) ?? null, basis: (r.basis ?? "item") as RateCard["basis"],
   firstUnit: Number(r.first_unit), secondUnit: Number(r.second_unit), furtherUnit: Number(r.further_unit), minCharge: Number(r.min_charge),
   overageCap: r.overage_cap == null ? null : Number(r.overage_cap), overageEach: Number(r.overage_each ?? 0),
   sofaBrackets: (r.sofa_brackets ?? []) as RateCard["sofaBrackets"],
   serviceCharge: Number(r.service_charge ?? 0), pickupCharge: Number(r.pickup_charge ?? 0), disposalCharge: Number(r.disposal_charge ?? 0),
+  outstation: ((r.outstation ?? []) as RateCard["outstation"]).map((o) => ({ zone: o.zone, amount: Number(o.amount) })),
+  chargeCap: r.charge_cap == null ? null : Number(r.charge_cap), rounding: (r.rounding ?? "none") as RateCard["rounding"],
 });
 
 router.get("/pricing", async (c) => {
@@ -205,6 +207,7 @@ router.post("/rates", requireSettingsEditor("delivery"), async (c) => {
     second_unit: d.secondUnit, further_unit: d.furtherUnit, min_charge: d.minCharge,
     overage_cap: d.overageCap, overage_each: d.overageEach, sofa_brackets: d.sofaBrackets,
     service_charge: d.serviceCharge, pickup_charge: d.pickupCharge, disposal_charge: d.disposalCharge,
+    outstation: d.outstation, charge_cap: d.chargeCap, rounding: d.rounding,
   };
   const r = d.id
     ? await sb.from("delivery_rate_cards").update(row).eq("id", d.id).select("id").single()
@@ -221,8 +224,9 @@ router.delete("/rates/:id", requireSettingsEditor("delivery"), async (c) => {
 
 /* Reconciliation. Follows Houzs backend/src/scm/routes/delivery-rate-cards.ts:476-672 per Weisiang's
    ruling (2026-10-22): clear Carres rules, implement Houzs. Each delivery order on a live Logistics bill
-   (0689) is priced on its company's card for its zone and compared with what was billed. Like Houzs,
-   service / pickup / disposal are not in the goods, so they count 0 here (factsComplete false). */
+   (0689) is priced alone, one drop and one customer, the Houzs per-DO tally (backend/src/scm/lib/threepl-do-charge.ts:1-26),
+   on its company's card for its zone and compared with what was billed. Service / pickup / disposal are not in the
+   goods, so they count 0 here (factsComplete false, as Houzs). */
 const isoDay = /^\d{4}-\d{2}-\d{2}$/;
 router.get("/reconcile", async (c) => {
   const from = c.req.query("from") ?? null;
@@ -240,16 +244,16 @@ router.get("/reconcile", async (c) => {
   const rows = ((recR.data ?? []) as Row[]).map((r) => {
     // This trip's goods only: trip_groups null = the whole order (DeliveryOrderPage tripLines).
     const groups = (r.trip_groups ?? null) as string[] | null;
-    const lines = ((r.lines ?? []) as Array<{ sku: string; qty: number; attrs: Record<string, unknown> | null }>)
+    const lines = ((r.lines ?? []) as Array<{ sku: string; qty: number }>)
       .filter((l) => !groups?.length || groups.includes(deliveryGroupOf(l.sku) ?? ""));
     const zone = zoneForPostcode(r.address as string | null, zones);
     const card = rateCardFor(cards, String(r.partner_id), zone?.id ?? null);
-    const facts = deliveryFacts(lines);
+    const facts = deliveryFacts(lines, zone?.name ?? null, (r.address as string | null) ?? null);
     const charge = card ? deliveryCharge(card, facts) : null;
     const billed = Number(r.billed);
     return {
       doId: r.do_id, doNo: r.do_no, deliveryDate: r.delivery_date ?? null, partnerId: r.partner_id, company: r.partner_name,
-      bills: (r.bills ?? []) as string[], zone: zone?.name ?? null, items: facts.items, sofas: facts.sofaCompartments?.length ?? 0,
+      bills: (r.bills ?? []) as string[], zone: zone?.name ?? null, items: facts.items, sets: facts.sets ?? 0,
       billed, expected: charge?.total ?? null, lines: charge?.lines ?? [],
       difference: charge ? Math.round((billed - charge.total) * 100) / 100 : null,
       factsComplete: false,
