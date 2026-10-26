@@ -318,7 +318,7 @@ export function purchaseReturnWorkItems(
     workItem({ ruleKey, ref, objectId: pr.id, action, due }, owner, today, holidays);
   const out: PurchaseReturnWorkOccurrence[] = [];
   const pickup = purchaseReturnPickupState(pr);
-  if (pickup === "Fully picked up") return out;
+  if (pickup === "Fully picked up" || pr.cancelled_at) return out;
 
   if (!purchaseReturnSendLine(pr).sent) {
     const docDate = pr.pr_doc_date ? klDate(pr.pr_doc_date) : null;

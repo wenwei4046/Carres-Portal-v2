@@ -22,18 +22,31 @@
 --   5. `stock_record_supplier_return_pickup` lets a claimless return's Unit
 --      leave from free stock (`free → returned_to_supplier`, which the 0490
 --      hold guard already admits). A claim return is checked exactly as before.
+--   6. (YH, 2026-10-26) `purchasing_cancel_purchase_return` cancels a claimless
+--      return the supplier has not collected, with who and why, the Houzs way
+--      (Houzs `PATCH /purchase-returns/:id/cancel`). A cancelled return frees
+--      its Units for another return, leaves Stock's pickup list and adds no
+--      credit note to follow up.
 --
 -- Issuing still moves no stock (§7.4). A claimless return's Units stay `free`
 -- until the supplier collects them; a Unit sold or reserved meanwhile is
--- refused at pickup by name.
--- ponytail: no hold at issue, so the Unit can be sold before pickup; add an
--- issue-time hold if that happens in practice.
+-- refused at pickup by name; staff then cancel the return (section 6).
 
 begin;
 
 -- ── 1 · a return may name no claim ──────────────────────────────────────────
 
 alter table public.purchase_returns alter column supplier_claim_id drop not null;
+
+-- 6 (YH, 2026-10-26) · who cancelled a claimless return, when, and why.
+alter table public.purchase_returns
+  add column if not exists cancelled_at  timestamptz,
+  add column if not exists cancelled_by  uuid references auth.users(id),
+  add column if not exists cancel_reason text;
+alter table public.purchase_returns drop constraint if exists purchase_returns_cancel_says_why;
+alter table public.purchase_returns add constraint purchase_returns_cancel_says_why check (
+  (cancelled_at is null and cancel_reason is null)
+  or (cancelled_at is not null and coalesce(cancel_reason, '') ~ '[^[:space:]]'));
 
 comment on column public.purchase_returns.supplier_claim_id is
   '0713 (Weisiang''s decision, Mr Lim, WhatsApp 2026-10-22): NULL = an office Purchase Return opened with no claim (supplier + Units in stock). Overturns 0548''s NOT NULL "no blank + New" rule (Jess); Jess was not part of the decision.';
@@ -60,7 +73,7 @@ begin
   end if;
   select r.pr_no into v_doc
     from purchase_return_units u join purchase_returns r on r.id = u.purchase_return_id
-   where u.stock_item_id = p_item.id
+   where u.stock_item_id = p_item.id and r.cancelled_at is null
    limit 1;
   if v_doc is not null then
     return format('Already on %s', v_doc);
@@ -123,7 +136,8 @@ grant execute on function public.purchase_return_supplier_units(uuid) to authent
 
 -- ── 4 · the issue door: a claim, or (0713) a supplier ─────────────────────
 
-drop function public.purchasing_issue_purchase_return(uuid, jsonb, date);
+drop function if exists public.purchasing_issue_purchase_return(uuid, jsonb, date);
+drop function if exists public.purchasing_issue_purchase_return(uuid, jsonb, date, uuid);
 
 CREATE FUNCTION public.purchasing_issue_purchase_return(p_claim_id uuid, p_units jsonb, p_confirmed_pickup_date date DEFAULT NULL::date, p_supplier_id uuid DEFAULT NULL::uuid)
  RETURNS uuid
@@ -356,6 +370,9 @@ begin
   if not found then
     raise exception 'purchase return not found' using errcode = '42P01', detail = 'return_not_found';
   end if;
+  if v_pr.cancelled_at is not null then
+    raise exception '% is cancelled', v_pr.pr_no using errcode = 'P0001', detail = 'return_cancelled';
+  end if;
   if p_picked_up_at < date_trunc('day', v_pr.pr_doc_date) then
     raise exception 'the pickup cannot be before the return was issued (%)', v_pr.pr_no
       using errcode = '22023', detail = 'pickup_before_issue';
@@ -435,7 +452,132 @@ begin
 end;
 $function$;
 
--- ── 6 · sanity ──────────────────────────────────────────────────────────────
+-- ── 6 · cancel a claimless return the supplier has not collected ───────────
+--
+-- YH, 2026-10-26: "yes, can remove afterwards if not needed". A claimless
+-- return holds nothing at issue (§7.4, section 4), so a Unit can be sold
+-- before pickup and the return then cannot finish. Houzs cancels a purchase
+-- return that is not completed, and an already-cancelled one answers as
+-- cancelled (backend/src/scm/routes/purchase-returns.ts:1469-1505). Here
+-- "completed" is any Unit collected: those Units have left Carres.
+-- Nothing to undo on the Units: issuing put no hold on them and wrote no
+-- Unit history. Cancelling frees them for another return (section 2) and
+-- closes a credit note to follow up that Finance has not settled any of.
+create or replace function public.purchasing_cancel_purchase_return(p_return_id uuid, p_reason text)
+returns uuid
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $fn$
+declare
+  v_role   app_role := (select public.app_role());
+  v_pr     public.purchase_returns%rowtype;
+  v_reason text := nullif(btrim(coalesce(p_reason, '')), '');
+  v_actor  text;
+begin
+  if v_role is null or v_role not in ('operation', 'principal') then
+    raise exception 'operation or principal only' using errcode = '42501', detail = 'not_purchasing';
+  end if;
+  if v_reason is null then
+    raise exception 'Say why this return is cancelled' using errcode = '22023', detail = 'reason_missing';
+  end if;
+  if length(v_reason) > 500 then
+    raise exception 'Keep the reason to 500 characters' using errcode = '22023', detail = 'reason_too_long';
+  end if;
+
+  select * into v_pr from public.purchase_returns where id = p_return_id for update;
+  if not found then
+    raise exception 'purchase return not found' using errcode = 'P0002', detail = 'return_not_found';
+  end if;
+  if v_pr.cancelled_at is not null then
+    return v_pr.id;  -- Houzs: an already-cancelled return answers as cancelled.
+  end if;
+  if v_pr.supplier_claim_id is not null then
+    raise exception '% was issued from a claim. Change it on the claim', v_pr.pr_no
+      using errcode = '23514', detail = 'claim_return';
+  end if;
+  if exists (select 1 from public.purchase_return_units
+              where purchase_return_id = v_pr.id and actual_pickup_date is not null) then
+    raise exception 'The supplier has collected goods on %. It cannot be cancelled', v_pr.pr_no
+      using errcode = '23514', detail = 'already_collected';
+  end if;
+  if exists (select 1 from public.supplier_note_followups f
+               join public._supplier_note_followup_figures(f.id) fg on fg.followup_id = f.id
+              where f.purchase_return_id = v_pr.id and fg.status in ('part', 'settled')) then
+    raise exception 'Finance has settled a credit note on %. It cannot be cancelled', v_pr.pr_no
+      using errcode = '23514', detail = 'credit_note_settled';
+  end if;
+
+  update public.purchase_returns
+     set cancelled_at = now(), cancelled_by = auth.uid(), cancel_reason = v_reason
+   where id = v_pr.id;
+  update public.supplier_note_followups
+     set closed_at = now(), closed_by = (select u.id from public.app_users u where u.id = auth.uid()),
+         close_reason = format('%s cancelled: %s', v_pr.pr_no, v_reason), next_follow_up_on = null
+   where purchase_return_id = v_pr.id and closed_at is null;
+
+  v_actor := coalesce((select name from public.app_users where id = auth.uid()), initcap(v_role::text));
+  insert into public.audit_log (role, actor_text, action, ref)
+  values (v_role, v_actor, format('Purchase return cancelled · %s · %s', v_pr.pr_no, v_reason), v_pr.pr_no);
+  return v_pr.id;
+end;
+$fn$;
+revoke all on function public.purchasing_cancel_purchase_return(uuid, text) from public, anon;
+grant execute on function public.purchasing_cancel_purchase_return(uuid, text) to authenticated;
+
+-- A cancelled return owes no credit note (0676's function, one filter added).
+create or replace function public._supplier_note_followups_from_returns()
+returns integer
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $fn$
+declare
+  v_n integer;
+begin
+  insert into public.supplier_note_followups (supplier_id, kind, reason, purchase_return_id, amount, noted_on)
+  select pr.supplier_id, 'CREDIT', 'RETURN', pr.id, v.amount, (pr.pr_doc_date at time zone 'Asia/Kuala_Lumpur')::date
+    from public.purchase_returns pr
+    cross join lateral (
+      select round(sum(g.units * g.price), 2) as amount
+        from (
+          select least(count(*)::numeric, max(b.billed_qty)) as units, max(b.price) as price
+            from public.purchase_return_units pru
+            join public.ops_stock_items si on si.id = pru.stock_item_id
+            join lateral (
+              select r.receipt_id
+                from public.receiving_unit_results r
+               where r.stock_item_id = pru.stock_item_id
+                 and r.issue_kind is distinct from 'wrong_item'
+               order by r.created_at desc
+               limit 1) rr on true
+            join lateral (
+              select sum(bl.qty) as billed_qty,
+                     (select bl2.unit_price
+                        from public.supplier_bill_lines bl2
+                        join public.supplier_bills b2 on b2.id = bl2.bill_id
+                       where b2.status = 'confirmed'
+                         and bl2.warehouse_receipt_id = rr.receipt_id
+                         and bl2.po_line_id = si.po_line_id
+                       order by b2.confirmed_at desc, bl2.line_no desc
+                       limit 1) as price
+                from public.supplier_bill_lines bl
+                join public.supplier_bills b on b.id = bl.bill_id
+               where b.status = 'confirmed'
+                 and bl.warehouse_receipt_id = rr.receipt_id
+                 and bl.po_line_id = si.po_line_id) b on b.billed_qty > 0 and b.price is not null
+           where pru.purchase_return_id = pr.id
+           group by rr.receipt_id, si.po_line_id) g) v
+   where v.amount > 0
+     and pr.cancelled_at is null
+     and not exists (select 1 from public.supplier_note_followups f where f.purchase_return_id = pr.id)
+  on conflict do nothing;
+  get diagnostics v_n = row_count;
+  return v_n;
+end;
+$fn$;
+
+-- ── 7 · sanity ──────────────────────────────────────────────────────────────
 
 do $sanity$
 begin

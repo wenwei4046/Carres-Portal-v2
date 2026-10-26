@@ -180,6 +180,34 @@ describe("Issue Purchase Return", () => {
   });
 });
 
+describe("Cancel return (0713, YH 2026-10-26)", () => {
+  it("calls the cancel door with the trimmed reason", async () => {
+    const sb = client({ rpc: { purchasing_cancel_purchase_return: { data: PR } } });
+    const res = await call(sb, `/operation/purchase-returns/${PR}/cancel`, { method: "POST", body: { reason: "  Unit sold to a customer " } });
+    expect(res.status).toBe(200);
+    expect(sb.rpc.mock.calls.find(([n]) => n === "purchasing_cancel_purchase_return")?.[1]).toEqual({ p_return_id: PR, p_reason: "Unit sold to a customer" });
+  });
+
+  it("refuses a blank reason before reaching the door", async () => {
+    const sb = client();
+    const res = await call(sb, `/operation/purchase-returns/${PR}/cancel`, { method: "POST", body: { reason: "  " } });
+    expect(res.status).toBe(422);
+    expect(sb.rpc.mock.calls.some(([n]) => n === "purchasing_cancel_purchase_return")).toBe(false);
+  });
+
+  it("answers the door's refusal for a collected return in its own words", async () => {
+    const sb = client({ rpc: { purchasing_cancel_purchase_return: { error: { code: "23514", message: "The supplier has collected goods on PR-1. It cannot be cancelled", details: "already_collected" } } } });
+    const res = await call(sb, `/operation/purchase-returns/${PR}/cancel`, { method: "POST", body: { reason: "x" } });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "already_collected", message: "The supplier has collected goods on PR-1. It cannot be cancelled" });
+  });
+
+  it("is operation or principal only", async () => {
+    const res = await call(client(), `/operation/purchase-returns/${PR}/cancel`, { method: "POST", body: { reason: "x" }, role: "dealer" });
+    expect(res.status).toBe(403);
+  });
+});
+
 describe("send and pickup", () => {
   it("records `Return document sent to supplier` through its door", async () => {
     const sb = client();

@@ -32,6 +32,7 @@ import type { AppEnv } from "../../types";
  *   POST /:id/send                `Return document sent to supplier`
  *   POST /:id/pickup-confirmation `Confirmed Pickup` (evidenced)
  *   POST /:id/supplier-receipt    `Record supplier receipt` (0614)
+ *   POST /:id/cancel              `Cancel return` — a claimless return not yet collected (0713, YH 2026-10-26)
  *
  * Every write is a thin door onto a SECURITY DEFINER function; there is no
  * table write here (ERP-ARCHITECTURE law C). Issuing moves no stock (§7.4):
@@ -105,7 +106,7 @@ function failDoor(c: Context, error: { code?: string; message?: string; details?
   return c.json(m.body, m.status);
 }
 
-const DOCUMENT_COLUMNS = "id, pr_no, pr_doc_date, supplier_id, supplier_claim_id, warehouse_receipt_id, confirmed_pickup_date, created_by";
+const DOCUMENT_COLUMNS = "id, pr_no, pr_doc_date, supplier_id, supplier_claim_id, warehouse_receipt_id, confirmed_pickup_date, created_by, cancelled_at, cancelled_by, cancel_reason";
 
 /** Everything the register, the record and Work print, for these returns. */
 async function assemble(c: Context<AppEnv>, documents: Row[]): Promise<{ rows: PurchaseReturnDetail[]; error: unknown }> {
@@ -149,6 +150,7 @@ async function assemble(c: Context<AppEnv>, documents: Row[]): Promise<{ rows: P
       ...sends.rows.map((s) => s.sent_by as string | null),
       ...confirmations.rows.map((r) => r.recorded_by as string | null),
       ...receipts.rows.map((r) => r.recorded_by as string | null),
+      ...documents.map((d) => d.cancelled_by as string | null),
     ]),
   ]);
   for (const r of [supplierRes, claimRes, receiptRes]) if (r.error) return { rows: [], error: r.error };
@@ -191,6 +193,9 @@ async function assemble(c: Context<AppEnv>, documents: Row[]): Promise<{ rows: P
       // The ledger is the fact (0609); the 0548 column is not read.
       sent_at: docSends[0]?.sent_at ?? null,
       confirmed_pickup_date: str(row.confirmed_pickup_date),
+      cancelled_at: str(row.cancelled_at),
+      cancelled_by_name: row.cancelled_by ? actorNames.get(row.cancelled_by as string) ?? null : null,
+      cancel_reason: str(row.cancel_reason),
       sends: docSends,
       confirmations: (confirmationsBy.get(id) ?? []).map((r) => ({
         confirmed_pickup_date: r.confirmed_pickup_date as string,
@@ -484,6 +489,26 @@ purchaseReturnsRouter.post("/:id/send", purchaseReturnWorkCompletion("send"), as
     p_channel: parsed.data.channel,
     p_recipient: parsed.data.recipient,
     p_note: parsed.data.note || null,
+  });
+  if (error) return failDoor(c, error);
+  return c.json({ id: data ?? null });
+});
+
+// ----- POST /:id/cancel — `Cancel return` (0713, YH 2026-10-26) -----
+//
+// A claimless return whose Unit was sold before the supplier came. The door
+// refuses a claim return and one with any Unit collected; a second cancel
+// answers as cancelled (Houzs purchase-returns.ts:1486-1489).
+
+const cancelSchema = z.object({ reason: z.string().trim().min(1).max(500) });
+
+purchaseReturnsRouter.post("/:id/cancel", purchaseReturnWorkCompletion("cancel"), async (c) => {
+  gate(c);
+  const parsed = await parseJsonBody(c, cancelSchema);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("purchasing_cancel_purchase_return", {
+    p_return_id: c.req.param("id"),
+    p_reason: parsed.data.reason,
   });
   if (error) return failDoor(c, error);
   return c.json({ id: data ?? null });

@@ -6607,6 +6607,7 @@ issue, pickup or supplier-receipt proof. No return, Unit or custody event was wr
 **Purpose / source:** ~~return Carres-owned purchased goods only after an approved claim/outcome.~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp): return Carres-owned purchased goods after an approved claim, OR with no claim from `New Purchase Return` (supplier + free Units in stock, migration 0713). Jess was not part of this decision.
 ~~No blank `+ New`.~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp): `New Purchase Return` exists (Jess was not part of this decision). Keep the existing Claim → Purchasing authorisation → Stock physical pickup
 ownership chain (§7.4 and Stock MASTER §12.8). Issuing the document does not move stock.
+A claimless return holds nothing at issue, so its Unit can be sold before pickup. YH (2026-10-26) added `Cancel return` for that case: a claimless return with no Unit collected is cancelled with a reason (who, when, why kept); its Units are free for another return, it leaves Stock's pickup list and Work, and an unsettled credit note to follow up is closed (migration 0713, following Houzs `PATCH /purchase-returns/:id/cancel`).
 
 **Main columns, in order:** expand arrow → PR Doc Date → PR No → Supplier → Supplier Claim No
 → Category → PO No / Unit ID → GRN No → Items → Qty → Pickup Location → Return To
