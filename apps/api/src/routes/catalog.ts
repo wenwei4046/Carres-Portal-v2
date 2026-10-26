@@ -947,15 +947,18 @@ catalogRouter.delete("/skus/:id", async (c) => {
   }
   const compartmentId = (target as { compartment_id: string | null }).compartment_id;
   const targetModelId = (target as { model_id: string | null }).model_id;
+  let unOffered: Record<string, unknown>[] = [];
   if (compartmentId) {
     principalOnly(c, SOFA_COMPARTMENT_MSG);
     if (targetModelId) {
-      const { error: offErr } = await sb
+      const { data: offRows, error: offErr } = await sb
         .from("model_sofa_compartments")
         .delete()
         .eq("model_id", targetModelId)
-        .eq("compartment_id", compartmentId);
+        .eq("compartment_id", compartmentId)
+        .select("*");
       if (offErr) return fail(c, offErr);
+      unOffered = (offRows ?? []) as Record<string, unknown>[];
     }
   }
 
@@ -965,7 +968,12 @@ catalogRouter.delete("/skus/:id", async (c) => {
     .eq("id", id)
     .select("id, model_id")
     .maybeSingle();
-  if (error) return fail(c, error);
+  if (error) {
+    // 0721: a SKU in use is refused (sku_in_use), so the SKU stays. Put its
+    // compartment offer back, or the model silently stops offering it.
+    if (unOffered.length) await sb.from("model_sofa_compartments").insert(unOffered);
+    return fail(c, error);
+  }
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "sku not found" }, 404);
   }

@@ -801,6 +801,32 @@ describe("Catalog admin — DELETE /api/catalog/skus/:id (hard delete)", () => {
     expect(ops.indexOf("model_sofa_compartments")).toBeLessThan(ops.indexOf("product_skus"));
   });
 
+  // 0721: a SKU in use is refused by the database; its compartment offer is put back.
+  it("compartment sku in use (0721 sku_in_use): 422 and the offer row is restored", async () => {
+    const recorded: AdminCall[] = [];
+    const OFFER = { model_id: MODEL_ID_LIVE, compartment_id: "00000000-0000-0000-0000-00000000cc01", price_override: null, sort_order: 2 };
+    const base = buildWriteSb({
+      recorded,
+      reads: { product_skus: [targetRow({ compartment_id: OFFER.compartment_id })] },
+      writeError: { code: "P0001", message: "X is on orders, purchase orders, stock or bills, so it was not deleted." },
+    });
+    vi.mocked(userClient).mockReturnValue({
+      from: (t: string) => {
+        const ch = base.from(t) as unknown as Record<string, unknown>;
+        if (t === "model_sofa_compartments") ch.then = (r: (v: unknown) => unknown) => r({ data: [OFFER], error: null });
+        return ch;
+      },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/skus/${SKU_ID}`, { method: "DELETE", headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(recorded.find((r) => r.op === "insert" && r.table === "model_sofa_compartments")?.payload).toEqual([OFFER]);
+  });
+
   it("compartment sku (non-principal): 403 — the offer cleanup is principal-only, nothing deleted", async () => {
     const recorded: AdminCall[] = [];
     vi.mocked(userClient).mockReturnValue(
