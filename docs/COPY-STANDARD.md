@@ -1175,7 +1175,7 @@ Weisiang's decision; Jess was not part of it. New screen words:
 `New Purchase Return` (register button and page title) · `Choose the supplier` ·
 `No Units of this supplier in stock.` · Unit refusals `Not bought from this supplier` ·
 `Reserved for an order` · `On a claim hold` · `Consignment stock` · `Not in stock`.
-Cancel a claimless return (YH 2026-10-26, migration 0713): `Cancel return` → `Cancel this return?` ·
+Cancel a claimless return (YH 2026-10-26, migration 0713): register `Cancelled` under the PR No · `{PR No} is cancelled` (send, pickup confirmation and pickup refuse it) · `Cancel return` → `Cancel this return?` ·
 `Reason` · `Cancel return` · `Keep return`; record block `Cancelled` (`{date} · {who} · {reason}`),
 History `Cancelled`; refusals `{PR No} was issued from a claim. Change it on the claim` ·
 `The supplier has collected goods on {PR No}. It cannot be cancelled` ·

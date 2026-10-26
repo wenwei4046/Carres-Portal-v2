@@ -200,6 +200,15 @@ describe.skipIf(!URL)("a Purchase Return with no claim (real PostgreSQL, 0713, W
     expect(pickup.ok).toBe(false);
     expect((pickup as { detail: string }).detail).toBe("return_cancelled");
 
+    // The send and the pickup confirmation refuse a cancelled return.
+    await as(OP);
+    const sent = await attempt("select public.purchase_return_record_send($1::uuid, 'whatsapp', 'Ah Seng', null) as r", [id]);
+    expect(sent.ok).toBe(false);
+    expect((sent as { detail: string }).detail).toBe("return_cancelled");
+    const confirmed = await attempt("select public.purchase_return_record_pickup_confirmation($1::uuid, current_date + 1, 'Ah Seng') as r", [id]);
+    expect(confirmed.ok).toBe(false);
+    expect((confirmed as { detail: string }).detail).toBe("return_cancelled");
+
     // The Unit is no longer "Already on" the cancelled return.
     await q("reset role");
     await q("update ops_stock_items set status = 'free' where id = $1", [SOLD_LATER]);

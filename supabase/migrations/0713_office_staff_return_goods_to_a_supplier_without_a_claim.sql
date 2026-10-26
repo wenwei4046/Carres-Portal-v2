@@ -460,6 +460,7 @@ $function$;
 -- return that is not completed, and an already-cancelled one answers as
 -- cancelled (backend/src/scm/routes/purchase-returns.ts:1469-1505). Here
 -- "completed" is any Unit collected: those Units have left Carres.
+-- Follows Houzs purchase-returns.ts:1486-1489 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
 -- Nothing to undo on the Units: issuing put no hold on them and wrote no
 -- Unit history. Cancelling frees them for another return (section 2) and
 -- closes a credit note to follow up that Finance has not settled any of.
@@ -524,6 +525,35 @@ end;
 $fn$;
 revoke all on function public.purchasing_cancel_purchase_return(uuid, text) from public, anon;
 grant execute on function public.purchasing_cancel_purchase_return(uuid, text) to authenticated;
+
+-- A cancelled return takes no send and no pickup confirmation (coordinator,
+-- 2026-10-26): a guard on the two ledgers, so every door that writes them refuses.
+create or replace function public.purchase_return_refuse_cancelled()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $fn$
+declare
+  v_row jsonb := to_jsonb(new);
+  v_id uuid := coalesce(v_row ->> 'purchase_return_id', v_row ->> 'document_id')::uuid;
+  v_no text;
+begin
+  if tg_table_name = 'document_sends' and v_row ->> 'document_kind' is distinct from 'purchase_return' then
+    return new;
+  end if;
+  select pr_no into v_no from public.purchase_returns where id = v_id and cancelled_at is not null;
+  if found then
+    raise exception '% is cancelled', v_no using errcode = '23514', detail = 'return_cancelled';
+  end if;
+  return new;
+end;
+$fn$;
+drop trigger if exists purchase_return_refuse_cancelled on public.document_sends;
+create trigger purchase_return_refuse_cancelled before insert on public.document_sends
+  for each row execute function public.purchase_return_refuse_cancelled();
+drop trigger if exists purchase_return_refuse_cancelled on public.purchase_return_pickup_confirmations;
+create trigger purchase_return_refuse_cancelled before insert on public.purchase_return_pickup_confirmations
+  for each row execute function public.purchase_return_refuse_cancelled();
 
 -- A cancelled return owes no credit note (0676's function, one filter added).
 create or replace function public._supplier_note_followups_from_returns()

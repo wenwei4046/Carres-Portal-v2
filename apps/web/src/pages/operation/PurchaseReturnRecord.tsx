@@ -225,7 +225,9 @@ export const CANCEL_RETURN = "Cancel return";
 
 /** `Cancel return` (0713, YH 2026-10-26): a claimless return whose Unit was
  *  sold before the supplier came. The Units go back to free stock for another
- *  return; who cancelled and why is kept. */
+ *  return; who cancelled and why is kept.
+ *  Follows Houzs PurchaseReturnDetailV2.tsx:361-369,480 (confirm before cancel,
+ *  offered unless completed or cancelled) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
 function CancelDialog({ pr, onClose }: { pr: PurchaseReturnDetail; onClose: () => void }) {
   const door = usePurchaseReturnWrite(`/api/operation/purchase-returns/${encodeURIComponent(pr.id)}/cancel`);
   const [reason, setReason] = useState("");

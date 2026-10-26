@@ -479,3 +479,11 @@ describe("the page binds the register to its own read", () => {
     expect(screen.getByText("No purchase returns.")).toBeTruthy();
   });
 });
+
+describe("a cancelled return on the register (0713, YH 2026-10-26)", () => {
+  it("reads `Cancelled` under its PR No, and an open one does not", () => {
+    show([doc({ cancelled_at: "2026-10-26T04:00:00Z" }), doc({ id: "return-1043", pr_no: "20260915-1043" })]);
+    expect(screen.getByTestId("purchase-return-cancelled-return-1042").textContent).toBe("Cancelled");
+    expect(screen.queryByTestId("purchase-return-cancelled-return-1043")).toBeNull();
+  });
+});

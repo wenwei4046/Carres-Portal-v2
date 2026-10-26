@@ -240,16 +240,20 @@ export function PurchaseReturnsRegister({
         /* Identity opens the object (§6.7 rule 2): the full-width PR record
            (§9.6 creation door, built 2026-09-29). */
         accessor: (row) => (
-          <Link
-            className="font-semibold text-kit-blue-11 hover:underline"
-            to={`/operation?tab=purchase-returns&pr=${encodeURIComponent(row.id)}`}
-            data-testid={`purchase-return-open-${row.id}`}
-          >
-            {purchaseReturnNo(row.pr_no)}
-          </Link>
+          <div className="flex flex-col">
+            <Link
+              className="font-semibold text-kit-blue-11 hover:underline"
+              to={`/operation?tab=purchase-returns&pr=${encodeURIComponent(row.id)}`}
+              data-testid={`purchase-return-open-${row.id}`}
+            >
+              {purchaseReturnNo(row.pr_no)}
+            </Link>
+            {/* 0713 (YH 2026-10-26): a cancelled return keeps its number. */}
+            {row.cancelled_at && <span className="text-body text-kit-red-11" data-testid={`purchase-return-cancelled-${row.id}`}>Cancelled</span>}
+          </div>
         ),
-        searchValue: (row) => purchaseReturnNo(row.pr_no),
-        exportValue: (row) => purchaseReturnNo(row.pr_no),
+        searchValue: (row) => `${purchaseReturnNo(row.pr_no)}${row.cancelled_at ? " Cancelled" : ""}`,
+        exportValue: (row) => `${purchaseReturnNo(row.pr_no)}${row.cancelled_at ? " · Cancelled" : ""}`,
         filterType: "numbering",
       },
       {

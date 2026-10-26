@@ -499,6 +499,7 @@ purchaseReturnsRouter.post("/:id/send", purchaseReturnWorkCompletion("send"), as
 // A claimless return whose Unit was sold before the supplier came. The door
 // refuses a claim return and one with any Unit collected; a second cancel
 // answers as cancelled (Houzs purchase-returns.ts:1486-1489).
+// Follows Houzs backend/src/scm/routes/purchase-returns.ts:1558 (PATCH /:id/cancel) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
 
 const cancelSchema = z.object({ reason: z.string().trim().min(1).max(500) });
 
