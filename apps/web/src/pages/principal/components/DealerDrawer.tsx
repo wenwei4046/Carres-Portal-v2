@@ -9,7 +9,8 @@ import {
   type PrincipalDealerRecentOrder,
 } from "@/lib/queries";
 import { TOAST } from "@/lib/toast-copy";
-import { MY_STATES } from "@/data/malaysia-postcodes";
+import { keepCurrent } from "@/data/malaysia-postcodes";
+import { useAddressLists } from "@/lib/settings-queries";
 import DealerStatusPill from "./DealerStatusPill";
 
 /**
@@ -55,6 +56,8 @@ export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }:
   const { data, isLoading } = usePrincipalDealer(dealerId);
   const setStatus = useDealerSetStatus(dealerId);
   const update = useUpdateDealer(dealerId);
+  // States: national file + Settings → Address lists (0722, Weisiang's decision).
+  const addressLists = useAddressLists();
 
   // 2026-05-22 (Loo) — local editor state for the four newer fields. Synced
   // from server data via the effect below; touching any input flips dirty so
@@ -336,7 +339,7 @@ export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }:
                       className="w-full px-3 py-2 border border-base-200 rounded text-body outline-none focus:border-primary bg-white"
                     >
                       <option value="">Not set</option>
-                      {MY_STATES.map((s) => (
+                      {keepCurrent(addressLists.states, draft.state).map((s) => (
                         <option key={s} value={s}>
                           {s}
                         </option>

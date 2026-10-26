@@ -8,6 +8,7 @@
  * Work): it returns the shared `OfficeCalendar` shape with the owner defaults
  * while loading or when the storage is not installed.
  */
+import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   DEFAULT_OFFICE_CALENDAR,
@@ -23,6 +24,7 @@ import {
   type SettingsEditorSection,
 } from "@carres/shared";
 import { apiFetch } from "./api";
+import { MY_ADDRESS, applyAddressOverrides, type AddressOverride } from "@/data/malaysia-postcodes";
 
 /** The change record of a Settings section without its own history (SET-01). */
 export function useSettingsChanges(section: "sales_orders" | "issue_tracker") {
@@ -118,5 +120,46 @@ export function useSettingsEditorDoor(kind: "grant" | "revoke") {
     mutationFn: (input: { section: SettingsEditorSection; userId: string }) =>
       apiFetch<unknown>(`/api/operation/settings/editors/${kind}`, { method: "POST", body: JSON.stringify(input) }),
     onSettled: () => { void client.invalidateQueries({ queryKey: settingsKeys.editors }); },
+  });
+}
+
+/**
+ * Settings → Address lists (0722) — Weisiang's decision (Mr Lim, WhatsApp
+ * 2026-10-22; Jess was not part of it): the State · City · Postcode lists every
+ * address picker offers are the generated national file with the office's
+ * changes on top. While loading, or before 0722, the national file alone.
+ */
+const addressListsKey = ["address-lists"] as const;
+
+export function useAddressOverrides() {
+  return useQuery({
+    queryKey: addressListsKey,
+    queryFn: () => apiFetch<{ stored: boolean; rows: AddressOverride[] }>("/api/address-lists"),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useAddressLists() {
+  const rows = useAddressOverrides().data?.rows;
+  return useMemo(() => {
+    const map = rows?.length ? applyAddressOverrides(MY_ADDRESS, rows) : MY_ADDRESS;
+    return {
+      states: Object.keys(map).sort(),
+      cities: (state: string | null) => (state && map[state] ? Object.keys(map[state]).sort() : []),
+      postcodes: (state: string | null, city: string | null) =>
+        state && city && map[state]?.[city] ? [...new Set(map[state][city])].sort() : [],
+    };
+  }, [rows]);
+}
+
+export function useSaveAddressOverride() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { state: string; city: string | null; postcode: string | null; renameTo: string | null; hidden: boolean; remove?: boolean }) =>
+      apiFetch<unknown>("/api/operation/settings/address-lists", { method: "PUT", body: JSON.stringify(input) }),
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: addressListsKey });
+      void client.invalidateQueries({ queryKey: ["settings", "changes", "sales_orders"] });
+    },
   });
 }

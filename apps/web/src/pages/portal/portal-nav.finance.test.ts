@@ -42,7 +42,7 @@ describe("the Finance modules (Chew, 2026-10-03)", () => {
       "Receivables: AR · Receivables · Other debtors · Other receipts",
       "Bank & Cards: Daily Bank · Card settlement · Card money waiting · Money moves",
       "Ledger: Journal · Opening balances · General Ledger · Trial Balance · Self-check",
-      "Reports: Profit and Loss · Balance Sheet · Cash Flow · AP Aging · AR Aging · Collection · Card charges · Dealer commission · Stock value · Payment",
+      "Reports: Profit and Loss · Balance Sheet · Cash Flow · AP Aging · AR Aging · Collection · Card charges · Dealer commission · Stock value · Stock drops · Payment",
       "Forecast",
       "Rental Approver",
       "Subscriptions",
@@ -108,6 +108,7 @@ describe("the Finance modules (Chew, 2026-10-03)", () => {
       "card-charges": "/finance/reports/card-charges",
       "dealer-commission": "/finance/reports/dealer-commission",
       "stock-value": "/finance/reports/stock-value",
+      "stock-drops": "/finance/reports/stock-drops",
       "payment-report": "/finance/reports/payment",
       forecast: "/finance/reports/forecast",
     });
@@ -141,6 +142,9 @@ describe("the Finance modules (Chew, 2026-10-03)", () => {
       "operation:receiving-report",
       "operation:delivery-report",
       "operation:delivery-return-lines",
+      "operation:sales-order-lines",
+      "operation:delivery-order-lines",
+      "operation:sales-invoice-lines",
     ]);
     const financeKeys = new Set(FINANCE.items.map((it) => it.key));
     for (const key of opsReports) expect(financeKeys.has(key.split(":")[1]!), key).toBe(false);

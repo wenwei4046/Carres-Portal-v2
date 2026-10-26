@@ -86,7 +86,7 @@ export default function PortalSidebar({ drawer = false, compactForCanvas = false
   /** Below 768px the rail is a slide-in drawer (owner review 2026-09-25):
    *  always the named rail, no collapse toggle of its own. */
   drawer?: boolean;
-  /** The common shell needs the named toolbar and Tasks to fit together. */
+  /** Current Operations shell:64px at every width; full tree in its overlay. */
   compactForCanvas?: boolean;
   /** Uses the existing Tasks draft guard before making room for the menu. */
   onExpandForCanvas?: (expand: () => void) => void;
@@ -138,7 +138,7 @@ export default function PortalSidebar({ drawer = false, compactForCanvas = false
   const [detailExpanded, setDetailExpanded] = useState(false);
   useEffect(() => setDetailExpanded(false), [location.pathname, narrowDetail]);
   const autoDetail = isSalesOrderDetail && narrowDetail;
-  const autoCanvas = compactForCanvas && narrowDetail;
+  const autoCanvas = compactForCanvas;
   /* A drawer is always the named rail. */
   const collapsed = drawer ? false : autoCanvas ? true : autoDetail ? !detailExpanded : storedCollapsed;
   const toggleCollapse = () => {
@@ -596,7 +596,7 @@ export default function PortalSidebar({ drawer = false, compactForCanvas = false
       aria-label="Modules"
       data-testid="portal-sidebar"
       data-collapsed={collapsed || undefined}
-      className="sticky top-0 flex h-screen flex-col gap-[3px] overflow-hidden border-r border-c-head-line bg-c-ground px-2.5 py-3 text-c-body"
+      className={`sticky top-0 flex ${drawer ? "h-full min-h-0" : "h-screen"} flex-col gap-[3px] overflow-hidden border-r border-c-head-line bg-c-ground px-2.5 py-3 text-c-body`}
       style={{ width: collapsed ? 64 : 220, transition: "width 0.18s ease" }}
     >
       {/* Logo row — wordmark 20px open, heart mark 34px closed, the « / »

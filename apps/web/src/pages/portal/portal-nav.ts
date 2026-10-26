@@ -336,6 +336,11 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         badge: "orders",
         section: "Sales",
       },
+      /* `Amendments` — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was
+       * not part of this decision): every Sales Order amendment waits for an
+       * approver, the Houzs way. The approver's queue across every order; a row
+       * opens the order, where `Approve and apply` / `Reject` already live. */
+      { key: "amendments", label: "Amendments", icon: BadgeCheck, path: "/operation/amendments", section: "Sales" },
       /* ⭐ `Subscription` — THE SECOND CUSTOMER-ORDER DESTINATION (Jess, owner
        * ruling 2026-09-23). It opens the Subscription-owned journey governed by
        * `docs/rental/MASTER.md` — the agreements + deployed-unit registry this
@@ -479,7 +484,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "dealer-showroom", label: "Dealer", icon: Store, soon: true, section: "Showroom" },
       { key: "display-requests", label: "Display Requests", icon: Store, soon: true, section: "Purchasing", pageGroup: "purchasing-showroom" },
       { key: "consignment-orders", label: "Consignment Orders", icon: ArrowDownLeft, soon: true, section: "Purchasing", pageGroup: "purchasing-showroom" },
-      { key: "consignment-returns", label: "Consignment Returns", icon: Undo2, soon: true, section: "Purchasing", pageGroup: "purchasing-showroom" },
+      { key: "consignment-returns", label: "Consignment Returns", icon: Undo2, section: "Purchasing", pageGroup: "purchasing-showroom" },
 
       // Delivery (T11, Jess 2026-07-27) — **the ONE new menu item in the whole
       // build plan**; every other line upgrades an existing door, and its place
@@ -567,6 +572,12 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         section: "Warehouse",
       },
       { key: "stock", label: "Inventory", icon: Boxes, tab: "stock-onhand", section: "Warehouse" },
+      /* 0714 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office staff
+       * adjust, transfer and count stock the Houzs way. Overturns Jess's Stock
+       * MASTER §12.4/§12.5/§12.7; Jess was not part of this decision. */
+      { key: "stock-adjustments", label: "Stock Adjustment", icon: SlidersHorizontal, tab: "stock-adjustments", section: "Warehouse" },
+      { key: "stock-transfers", label: "Stock Transfer", icon: ArrowLeftRight, tab: "stock-transfers", section: "Warehouse" },
+      { key: "stock-takes", label: "Stock Take", icon: ClipboardList, tab: "stock-takes", section: "Warehouse" },
       {
         key: "wh-outbound",
         label: "Outbound",
@@ -622,6 +633,11 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       /* Follows Houzs frontend/src/pages/scm-v2/DeliveryReturnDetailListing.tsx:32-153
          per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
       { key: "delivery-return-lines", label: "Delivery return lines", icon: BarChart3, section: "Reports" },
+      /* Houzs detail-listing port (row 15): one row per document line, read
+         from each Register's own read. Awaits Jess's review. */
+      { key: "sales-order-lines", label: "Sales order lines", icon: BarChart3, section: "Reports" },
+      { key: "delivery-order-lines", label: "Delivery order lines", icon: BarChart3, section: "Reports" },
+      { key: "sales-invoice-lines", label: "Sales invoice lines", icon: BarChart3, section: "Reports" },
       /* The roster stays exactly the page it was; `?tab=suppliers` is
          unchanged, so every bookmark and deep link still lands. */
       { key: "suppliers", label: "Suppliers", icon: Truck, section: "Suppliers" },
@@ -778,6 +794,8 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "card-charges", label: "Card charges", icon: CreditCard, financePath: "/finance/reports/card-charges", section: "Reports" },
       { key: "dealer-commission", label: "Dealer commission", icon: Users, financePath: "/finance/reports/dealer-commission", section: "Reports" },
       { key: "stock-value", label: "Stock value", icon: Boxes, financePath: "/finance/reports/stock-value", section: "Reports" },
+      // 0714 — Stock's write-offs, read-only, valued as Stock value (YH 2026-10-26: no journal).
+      { key: "stock-drops", label: "Stock drops", icon: Boxes, financePath: "/finance/reports/stock-drops", section: "Reports" },
       // Payment MASTER §16: Reports → Payment, Payment's own report, unchanged.
       { key: "payment-report", label: "Payment", icon: Wallet, financePath: "/finance/reports/payment", section: "Reports" },
       // 0646 — a month's plan beside its actual; its own row after Reports.

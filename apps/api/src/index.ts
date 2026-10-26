@@ -42,7 +42,7 @@ import repairOrdersRouter from "./routes/operation/repair-orders";
 // the ONE receive engine (0302).
 import warehouseReceiptsRouter from "./routes/operation/warehouse-receipts";
 import workActivityRouter from "./routes/operation/work-activity";
-import settingsCoreRouter, { companyProfileReadRouter } from "./routes/operation/settings-core";
+import settingsCoreRouter, { addressListsReadRouter, companyProfileReadRouter } from "./routes/operation/settings-core";
 import workspaceDutiesRouter from "./routes/operation/workspace-duties";
 import leaveRouter from "./routes/operation/leave";
 import saturdayOnCallRouter from "./routes/operation/saturday-on-call";
@@ -133,6 +133,7 @@ import guaranteesRouter from "./routes/guarantees";
 import dosRouter from "./routes/storage/dos";
 // Phase A step 5 (migration 0137) — per-unit stock register.
 import opsStockRouter from "./routes/ops/stock";
+import stockMovesRouter from "./routes/ops/stock-moves";
 import opsStockPlanRouter from "./routes/ops/stock-plan";
 import opsStockEmergencyRouter from "./routes/ops/stock-emergency";
 // Migration 0140 — Service Notes (SN / Issue Tracker).
@@ -272,6 +273,9 @@ api.route("/operation/warehouse-settings", warehouseSettingsRouter);
 // signed-in account because every printed document carries it.
 api.route("/operation/settings", settingsCoreRouter);
 api.route("/company-profile", companyProfileReadRouter);
+// 0722 — Settings → Address lists (Weisiang's decision, Mr Lim, WhatsApp
+// 2026-10-22): every signed-in account reads the office's list changes.
+api.route("/address-lists", addressListsReadRouter);
 // 0232 staff assignment pool — GET / + PUT /:userId
 api.route("/operation/staff", opsStaffRouter);
 api.route("/operation/partners", operationPartnersRouter);
@@ -345,6 +349,8 @@ api.route("/supplier/threads", supplierThreadsRouter);
 api.route("/warehouse", warehouseReceivingRouter);
 api.route("/storage/dos", dosRouter);
 api.route("/ops/stock", opsStockRouter);
+// 0714 — Weisiang's decision (WhatsApp 2026-10-22): Stock Adjustment, Transfer, Take.
+api.route("/ops/stock-moves", stockMovesRouter);
 // K2 (0287) — the monthly ready stock plan. Mounted BELOW /ops/stock so the
 // K1 reorder routes on that router keep their paths unchanged.
 api.route("/ops/stock-plan", opsStockPlanRouter);

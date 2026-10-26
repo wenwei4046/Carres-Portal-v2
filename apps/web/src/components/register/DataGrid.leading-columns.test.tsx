@@ -211,3 +211,14 @@ describe("DataGrid · headerTone", () => {
     expect(container.querySelector('[class*="rootHeaderPaleBlue"]')).toBeNull();
   });
 });
+
+it("disables select-all when every visible row is ineligible", () => {
+  stubCanvas(1140);
+  const onToggleAll = vi.fn();
+  render(<DataGrid<Row> rows={ROWS} columns={COLUMNS} storageKey="test.select.none" rowKey={row => row.id}
+    selectable={{ selectedKeys: new Set(), onToggle: vi.fn(), onToggleAll, isSelectable: () => false }} />);
+  const selectAll = screen.getByRole("checkbox", { name: /^Select all rows$/ });
+  expect(selectAll).toBeDisabled();
+  fireEvent.click(selectAll);
+  expect(onToggleAll).not.toHaveBeenCalled();
+});
