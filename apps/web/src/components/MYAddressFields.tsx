@@ -1,4 +1,5 @@
-import { MY_STATES, getCities, getPostcodes } from "@/data/malaysia-postcodes";
+import { keepCurrent } from "@/data/malaysia-postcodes";
+import { useAddressLists } from "@/lib/settings-queries";
 
 interface AddressData {
   addressLine1: string;
@@ -23,10 +24,16 @@ interface Props {
  * Picking a new state resets city + postcode; picking a new city resets only
  * postcode. Keeps draft data tidy: a draft can never end up with a postcode
  * that doesn't belong to its city.
+ *
+ * The lists are the national file plus Settings → Address lists (0722,
+ * Weisiang's decision, Mr Lim, WhatsApp 2026-10-22; Jess was not part of it).
+ * A saved value the office has since hidden or renamed stays offered.
  */
 export default function MYAddressFields({ data, onChange }: Props) {
-  const cities = getCities(data.addressState || null);
-  const postcodes = getPostcodes(data.addressState || null, data.addressCity || null);
+  const lists = useAddressLists();
+  const states = keepCurrent(lists.states, data.addressState);
+  const cities = keepCurrent(lists.cities(data.addressState || null), data.addressCity);
+  const postcodes = keepCurrent(lists.postcodes(data.addressState || null, data.addressCity || null), data.addressPostcode);
   const cityDisabled = !data.addressState;
   const postcodeDisabled = !data.addressCity;
 
@@ -68,7 +75,7 @@ export default function MYAddressFields({ data, onChange }: Props) {
             className={ACTIVE_CLASS}
           >
             <option value="">Select state</option>
-            {MY_STATES.map((s) => (
+            {states.map((s) => (
               <option key={s} value={s}>
                 {s}
               </option>

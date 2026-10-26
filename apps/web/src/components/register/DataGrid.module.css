@@ -462,14 +462,19 @@ div:first-child > .columnsMenuGroup {
   min-height: 36px;
   overflow: visible;
   flex-wrap: nowrap;
-  gap: 10px;
+  --selection-gap: 10px;
+  gap: var(--selection-gap);
   padding: 0 6px 0 14px;
   border: 0;
   border-radius: var(--radius-round);
   background: var(--c-select-bg);
   color: var(--c-select-fg);
 }
+.root .toolbar.selectionBar[data-compact="true"] { gap: 4px; }
+.selectionMeasure { position: absolute; left: 0; top: 0; width: max-content; visibility: hidden; pointer-events: none; white-space: nowrap; }
+.selectionMeasure::before { content: attr(data-full-summary); }
 .selectionCount {
+  position: relative;
   font-family: var(--font-button);
   font-size: var(--fs-body);
   font-weight: 600;
@@ -1525,9 +1530,9 @@ div:first-child > .columnsMenuGroup {
   text-overflow: ellipsis;
 }
 /* Reuse the reserved condition bar's contained overflow contract: the
-   reference toolbar remains one 36px row; controls keep their intrinsic
+   reference toolbar and its selection bar remain one 36px row; controls keep their intrinsic
    widths instead of shrinking a parent over its fixed-width children. */
-.rootReference[data-presentation-tools] .toolbar:not(.selectionBar) {
+.rootReference[data-presentation-tools] .toolbar {
   height: 36px;
   min-height: 36px;
   flex-wrap: nowrap;
@@ -1536,15 +1541,15 @@ div:first-child > .columnsMenuGroup {
   scrollbar-width: thin;
   scrollbar-color: var(--c-head-line) transparent;
 }
-.rootReference[data-presentation-tools] .toolbar:not(.selectionBar) > :not(.searchResponsiveBox):not(.searchWrap) {
+.rootReference[data-presentation-tools] .toolbar > :not(.searchResponsiveBox):not(.searchWrap) {
   flex-shrink: 0;
 }
 /*32px controls plus a visible 4px horizontal track fit the existing 36px row.
   overflow:auto adds no track when the contents already fit. */
-.rootReference[data-presentation-tools] .toolbar:not(.selectionBar)::-webkit-scrollbar {
+.rootReference[data-presentation-tools] .toolbar::-webkit-scrollbar {
   height: 4px;
 }
-.rootReference[data-presentation-tools] .toolbar:not(.selectionBar)::-webkit-scrollbar-thumb {
+.rootReference[data-presentation-tools] .toolbar::-webkit-scrollbar-thumb {
   background: var(--c-head-line);
   border-radius: var(--radius-round);
 }
@@ -1562,7 +1567,7 @@ div:first-child > .columnsMenuGroup {
 .rootReference[data-presentation-tools] .toolbar > div:has(> [data-kit="tabs"]) {
   flex: none;
 }
-.rootReference .toolbar:not(.selectionBar) {
+.rootReference .toolbar {
   height: 36px;
   min-height: 36px;
   margin-bottom: 0;

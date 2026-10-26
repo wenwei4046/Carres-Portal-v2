@@ -9,6 +9,28 @@ Paste everything below the line into a fresh session. It is self-contained.
 
 ---
 
+**PURCHASING / SHARED SHELL BUGFIX ·23Oct2026 · BUILT ON BRANCH, RELEASE PENDING.**
+Authority read at main `e67129076`: UI MASTER §0/§0.1–0.3/§2.2/§5/§6.0 and current21Oct values;
+Purchasing §9.1 and COPY. Desktop dirty work and kit-docs draft remain intact. Receiving#2111 and
+Warehouse/Delivery PLAN are excluded. Production read-only as the existing Operation account:
+By supplier displayed3 groups of old demand with disabled ticks while By sales order To buy had0
+of33; closing Tasks left0 dialogs/overlays and body pointer-events:auto. The screenshot's active
+Pending work modal legitimately blocks background clicks. No evidence supports click-through.
+
+CONFORMS after scoped correction: existing TasksPill in all4 purchasing toolbars/selection bars;
+shared ShellTasks consumes new View tasks events without replaying old ones; Operations shared
+PortalSidebar stays64 with full navigation in kit Drawer; grouped To buy and Today reuse shared
+soBatchPurchaseStatus exact order-line coverage; existing eligibility/permissions/Issue PO and
+stock writers are retained; DataGrid select-all is disabled when no eligible row exists and its
+36px selection toolbar contains narrow overflow. Disabled group ticks reuse item reasons.
+NOT APPLICABLE: new business rule, SQL, Settings changes, purchase issuance or supplier transmission.
+
+Verification: purchasing/sidebar/shell/grid unique focused404/404 (392 unchanged cases plus final grid12); web typecheck and design guard PASS; the4 new outstanding-demand cases
+FAIL on detached main and PASS with the fix (negative control). Real fixture browser6/6 at825×804,
+1025×804 and1440×804: Got it/X/Escape/View tasks dismissal; no residual lock; group/item/all selection;
+expansion independence; Tasks and full navigation close retain selection; reload does not reopen
+acknowledged reminder. Local fixture PNGs in output/purchasing-shell-selection. Linux screenshot workflow39932935270 PASS,45 PNGs generated and37 changed against main; screenshots reviewed for shared nav and Tasks composition. Runtime is unchanged since capture except the empty-select-all callback guard. CI39933807539 passed types, all unit/integration tests and production build, then caught3 kit failures: selected-bar fit at1025/1164 plus an obsolete220px navigation assertion. Shared DataGrid now measures full versus same-fact compact SO/PO counts with the existing4px gap; the navigation test verifies64 plus its full-menu overlay. The3 previously failing browser cases pass locally; the full local functional kit then passed82 with76 existing platform/guard skips. Shared109 and focused web204 pass, as do typecheck/design guard. The final menu Status-clearance restoration plus all4 groupings and reminder/Tasks/selection walk pass30/30. Final exact-head CI, deployed SHA and authenticated production confirmation remain pending.
+
 **CURRENT RESPONSIBILITY · OWNER-APPROVED 22 Oct 2026.**
 Read UI MASTER **How design and IT work** and the current module MASTER before continuing.
 Design/Claude Design updates the one UI/UX specification while IT reuses/adapts Houzs and integrates

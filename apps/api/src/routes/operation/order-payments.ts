@@ -115,7 +115,11 @@ orderPaymentsRouter.get("/:id/payments", async (c) => {
 // reprint matches), minted by the one TS helper and handed to the RPC.
 orderPaymentsRouter.post("/:id/payments", async (c) => {
   const auth = c.var.auth;
-  requireOperationOrPrincipal(auth.role);
+  // Finance records a payment too, an old one with no request. Follows Houzs
+  // backend/src/services/backdateRequestNotify.ts:5-8 per Weisiang's ruling
+  // (2026-10-22): clear Carres rules, implement Houzs (YH 2026-10-26, Q14).
+  // payment_record (0707 part 2a) is the boundary; this only lets finance reach it.
+  if (auth.role !== "finance") requireOperationOrPrincipal(auth.role);
 
   const idCheck = ORDER_ID.safeParse(c.req.param("id"));
   if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
@@ -137,8 +141,57 @@ orderPaymentsRouter.post("/:id/payments", async (c) => {
     duplicateAck: parsed.data.duplicateAck,
   });
   if (error) return fail(c, error);
+  if (isWaiting(data)) return c.json({ pendingApproval: true, request: data.request }, 202);
   const out = data as { payment: unknown; orders_paid: number | null };
   return c.json({ payment: out.payment, ordersPaid: out.orders_paid }, 201);
+});
+
+/* 0707 — a paid date more than 14 days back is not recorded: payment_record
+   answers a waiting request for the Payment Approver instead. Nothing in it
+   counts until the approver decides. */
+function isWaiting(data: unknown): data is { pending_approval: true; request: unknown } {
+  return (data as { pending_approval?: unknown } | null)?.pending_approval === true;
+}
+
+const REQUEST_ID = z.string().uuid();
+const decideBackdateInput = z.object({
+  approve: z.boolean(),
+  reason: z.string().trim().max(500).optional(),
+  duplicateAck: z.boolean().optional(),
+});
+
+// GET /:id/payment-backdate — the order's backdated payment requests, newest first.
+orderPaymentsRouter.get("/:id/payment-backdate", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+  const { data, error } = await userClient(c.env, auth.jwt)
+    .from("payment_backdate_requests")
+    .select("id, order_id, amount, paid_on, method, kind, reference, receipt_url, status, requested_by, requested_at, decided_by, decided_at, decision_reason, payment_id")
+    .eq("order_id", idCheck.data)
+    .order("requested_at", { ascending: false });
+  if (error) return fail(c, error);
+  return c.json({ requests: data ?? [] });
+});
+
+// POST /:id/payment-backdate/:rid/decide — the SQL door decides who may
+// (Payment Approver duty or principal, never the requester).
+orderPaymentsRouter.post("/:id/payment-backdate/:rid/decide", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+  const ridCheck = REQUEST_ID.safeParse(c.req.param("rid"));
+  if (!ridCheck.success) throw new HTTPException(404, { message: "Request not found" });
+  const parsed = await parseJsonBody(c, decideBackdateInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const { data, error } = await userClient(c.env, auth.jwt).rpc("payment_backdate_decide", {
+    p_request_id: ridCheck.data,
+    p_approve: parsed.data.approve,
+    p_reason: parsed.data.reason ?? null,
+    p_duplicate_ack: parsed.data.duplicateAck ?? false,
+  });
+  if (error) return fail(c, error);
+  return c.json(data);
 });
 
 // DELETE /:id/payments/:pid — VOID a mis-keyed entry. 0430: the reason is
@@ -296,6 +349,7 @@ orderPaymentsRouter.post("/:id/storage/collect", async (c) => {
     duplicateAck: parsed.data.duplicateAck,
   });
   if (payErr) return fail(c, payErr);
+  if (isWaiting(data)) return c.json({ pendingApproval: true, request: data.request }, 202);
 
   const { data: control, error: ctrlErr } = await sb
     .from("ops_order_control")
@@ -634,6 +688,11 @@ async function recordPayment(
 ): Promise<{ data: any; error: any }> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let last: { data: any; error: any } = { data: null, error: null };
+  // 0707: a caller with no key gets one per request, never the receipt number.
+  // The receipt seeds on the order's payment count, which a waiting backdated
+  // request does not raise, so a second backdated payment on the same paid
+  // date would mint the same number and land on the first request.
+  const key = args.idempotencyKey ?? crypto.randomUUID();
   for (let attempt = 0; attempt < 3; attempt++) {
     const receiptNo = await nextReceiptNo(sb, orderId, args.paidOn, attempt);
     last = await sb.rpc("payment_record", {
@@ -647,7 +706,7 @@ async function recordPayment(
       p_receipt_url: args.receiptUrl ?? null,
       p_receipt_no: receiptNo,
       p_counts_toward_paid: true,
-      p_idempotency_key: args.idempotencyKey ?? receiptNo,
+      p_idempotency_key: key,
       p_duplicate_ack: args.duplicateAck ?? false,
     });
     // 23505 = the receipt number is taken. Anything else is the caller's answer.

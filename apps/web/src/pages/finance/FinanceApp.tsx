@@ -35,6 +35,7 @@ import CashFlow from "./reports/CashFlow";
 import ApAging from "./reports/ApAging";
 import ArAging from "./reports/ArAging";
 import StockValue from "./reports/StockValue";
+import StockDrops from "./reports/StockDrops";
 import Collection from "./reports/Collection";
 import Forecast from "./reports/Forecast";
 import ApOutstanding from "./payables/ApOutstanding";
@@ -158,6 +159,7 @@ export default function FinanceApp() {
           <Route path="reports/ar-aging" element={financeOnly(<ArAging />)} />
           {/* 0643 — the provisional month-end stock value (Chew 2026-10-03). */}
           <Route path="reports/stock-value" element={financeOnly(<StockValue />)} />
+          <Route path="reports/stock-drops" element={financeOnly(<StockDrops />)} />
           {/* 0644 — deposit and balance per salesperson (Chew 2026-10-03). */}
           <Route path="reports/collection" element={financeOnly(<Collection />)} />
           {/* 0646 — the plan for a month beside its actual (Chew 2026-10-03). */}

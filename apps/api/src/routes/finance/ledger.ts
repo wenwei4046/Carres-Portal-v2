@@ -54,6 +54,7 @@ import { arAgingQuery, arAgingReport, type ArAgingAnswer } from "@carres/shared/
 import { cashFlowQuery, cashFlowReport, type CashFlowAnswer } from "@carres/shared/cash-flow";
 import { generalLedgerBlocks, generalLedgerQuery, type GeneralLedgerAnswer, type ReportDrillAnswer } from "@carres/shared/general-ledger";
 import { stockValueQuery, stockValueReport, type StockValueAnswer } from "@carres/shared/stock-value";
+import { stockDropsTotal, stockDropUnitCost, stockDropValue, type StockDropPoLine, type StockDropRow } from "@carres/shared/stock-drops";
 import { collectionQuery, collectionReport, type CollectionAnswer } from "@carres/shared/collection";
 import { forecastQuery, forecastReport, forecastSaveInput, type ForecastAnswer, type ForecastSaved } from "@carres/shared/forecast";
 import { requireFinance, requireFinanceOrPurchasing } from "../../lib/auth-guards";
@@ -1413,6 +1414,54 @@ financeLedgerRouter.get("/stock-value", requireFinance, async (c) => {
     return failed(c, "The stock value");
   }
   return c.json(answer);
+});
+
+// ── Stock drops (0714; YH 2026-10-26: no journal, a read-only list) ──────────
+
+type StockDropRead = {
+  adjustment_id: string;
+  unit_id: string;
+  stock_adjustments: { adjustment_no: string; created_at: string; reason: string; warehouses: { name: string } | null } | null;
+  ops_stock_items: { unit_code: string; sku: string; qty: number; purchase_order_lines: StockDropPoLine | null } | null;
+};
+
+/** Every Unit Stock wrote off on a Stock Adjustment, newest first, each valued
+ *  at its PO line cost as the stock value is (0643). Reads only; posts nothing. */
+financeLedgerRouter.get("/stock-drops", requireFinance, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const read = await readAllPages<StockDropRead>((a, b) => sb
+    .from("stock_adjustment_units")
+    .select("adjustment_id, unit_id, stock_adjustments!inner(adjustment_no, created_at, reason, warehouses(name)), ops_stock_items!inner(unit_code, sku, qty, purchase_order_lines(cost, commercial_treatment))")
+    .eq("direction", "minus")
+    .order("adjustment_id")
+    .order("unit_id")
+    .range(a, b));
+  if ("tooMany" in read) return failed(c, "The stock drops");
+  if ("error" in read) return ledgerError(c, read.error, "The stock drops");
+  try {
+    const rows: StockDropRow[] = read.rows.map((r) => {
+      const adj = one(r.stock_adjustments);
+      const unit = one(r.ops_stock_items);
+      if (!adj || !unit) throw new Error("unreadable");
+      const unitCost = stockDropUnitCost(one(unit.purchase_order_lines));
+      return {
+        key: `${r.adjustment_id}:${r.unit_id}`,
+        adjustment_no: adj.adjustment_no,
+        dropped_at: adj.created_at,
+        site_name: one(adj.warehouses)?.name ?? null,
+        reason: adj.reason,
+        unit_code: unit.unit_code,
+        sku: unit.sku,
+        qty: unit.qty,
+        unit_cost: unitCost,
+        value: stockDropValue(unit.qty, unitCost),
+      };
+    });
+    rows.sort((x, y) => y.dropped_at.localeCompare(x.dropped_at) || x.unit_code.localeCompare(y.unit_code));
+    return c.json({ rows, total: stockDropsTotal(rows) });
+  } catch {
+    return failed(c, "The stock drops");
+  }
 });
 
 // ── Collection report (0644, Chew 2026-10-03) ───────────────────────────────

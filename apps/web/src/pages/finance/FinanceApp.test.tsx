@@ -21,6 +21,8 @@ vi.mock("@/lib/queries", () => {
     usePaymentSettings: () => ({ ...answered, data: { collection_timing: [], bank_accounts: [] } }),
     useOperationWork: () => ({ data: undefined }),
     useOperationOrders: () => ({ data: undefined, isSuccess: true, isError: false }),
+    // 0707 — the Monitor resolves a scoped SO with no row to its waiting requests.
+    useSalesOrderIdByNumber: () => ({ data: undefined }),
     useCatalog: () => ({ data: undefined }),
     useVoidPayment: () => ({ mutate: vi.fn(), isPending: false }),
     // The Payments object offers `Correct allocation` only to the Payment

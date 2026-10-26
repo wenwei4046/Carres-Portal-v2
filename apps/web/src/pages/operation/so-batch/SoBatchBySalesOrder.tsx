@@ -135,7 +135,7 @@ export function OrderItemRows({ label, lines, columns, stepBack, testId, before 
 
 export default function SoBatchBySalesOrder({
   orders, total, factsOf, blockedReason, today, isLoading, storageKey, sessionKey,
-  eligibleOf, isTicked, onToggleOrder, selectionSummary, selectionPrimary, toolbarEnd, toolbarAfterTools, toolbarStart,
+  eligibleOf, isTicked, onToggleOrder, selectionSummary, selectionSummaryCompact, selectionPrimary, toolbarEnd, toolbarAfterTools, toolbarStart,
   onOpenOrder, onRowDoubleClick, contextMenu, renderItems, emptyMessage, noMatchMessage, initialSearch, searchPlaceholder, warning, searchOf, poLinksOf, onOpenPo,
   onVisibleChange, onClearConditions, pageToolsItems,
 }: {
@@ -157,6 +157,7 @@ export default function SoBatchBySalesOrder({
   isTicked: (demandId: string) => boolean;
   onToggleOrder: (orderId: string, on: boolean) => void;
   selectionSummary: string;
+  selectionSummaryCompact?: string;
   selectionPrimary: ReactNode;
   toolbarEnd: ReactNode;
   toolbarAfterTools?: ReactNode;
@@ -326,7 +327,7 @@ export default function SoBatchBySalesOrder({
         palette="slate"
         presentationTools
         pageToolsItems={pageToolsItems}
-        toolbarAfterTools={toolbarAfterTools ?? (fit.tight ? undefined : <span aria-hidden className="block" style={{ width: FIXED.status + 8 }} />)}
+        toolbarAfterTools={toolbarAfterTools ? <div className="hidden items-center justify-end min-[768px]:flex" style={{ minWidth: FIXED.status + 8 }}>{toolbarAfterTools}</div> : (fit.tight ? undefined : <span aria-hidden className="block" style={{ width: FIXED.status + 8 }} />)}
         searchPresentation="icon"
         allowColumnGrouping={false}
         groupBanner={false}
@@ -365,6 +366,7 @@ export default function SoBatchBySalesOrder({
           testId: (order: SoBatchOrderRow) => `so-batch-select-${order.orderId}`,
         }}
         selectionSummary={() => selectionSummary}
+        selectionSummaryCompact={selectionSummaryCompact ? () => selectionSummaryCompact : undefined}
         selectionPrimary={selectionPrimary}
         statusSummary={(filtered) => {
           const line = filtered.length === total ? O.footer(total) : `${filtered.length} of ${O.footer(total)}`;
