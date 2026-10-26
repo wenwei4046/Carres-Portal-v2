@@ -17,6 +17,11 @@ import type { AppEnv } from "../../types";
  * name "Consignment Note"; Jess was not part of this decision. The supplier-side
  * Consignment Order / Return (CRTN) are untouched. Every write is one SECURITY
  * DEFINER door on the Unit register; this router only reads and passes through.
+ *
+ * Money follows Houzs (YH, chat 2026-10-26): the Customer Consignment Order
+ * carries each Unit's price and its own payments, and no Sales Order is used
+ * (Houzs consignment-orders.ts:286-300, 2171-2310; consignment-notes.ts:13-14),
+ * per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
  */
 const router = new Hono<AppEnv>();
 const uuid = z.string().uuid();
@@ -77,14 +82,32 @@ router.get("/units", requireOperationOrPrincipal, async (c) => {
 });
 
 // ── Customer Consignment Order ────────────────────────────────────────────────
+type OrderLine = { price: number | string };
+type OrderPayment = { amount: number | string };
+const sen = (v: number | string) => Math.round(Number(v) * 100);
+
+/**
+ * Total, paid and balance per order, like Houzs's local_total / paid / balance
+ * (Houzs consignment-orders.ts:286-300), per Weisiang's ruling (2026-10-22):
+ * clear Carres rules, implement Houzs. Summed in sen so RM never drifts.
+ */
+export function orderMoney(lines: OrderLine[], payments: OrderPayment[]) {
+  const total = lines.reduce((t, l) => t + sen(l.price), 0);
+  const paid = payments.reduce((t, p) => t + sen(p.amount), 0);
+  return { total: total / 100, paid: paid / 100, balance: (total - paid) / 100 };
+}
+
 router.get("/orders", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const orders = await read(
+  const rows = await read<Array<Record<string, unknown> & {
+    customer_consignment_order_units: OrderLine[]; customer_consignment_order_payments: OrderPayment[];
+  }>>(
     sb.from("customer_consignment_orders")
-      .select("id, order_no, customer_name, customer_phone, customer_address, note, created_at, customer_consignment_order_units(ops_stock_items(id, unit_code, sku, status, reserved_ref))")
+      .select("id, order_no, customer_name, customer_phone, customer_address, note, created_at, customer_consignment_order_units(price, sold_at, ops_stock_items(id, unit_code, sku, status, reserved_ref)), customer_consignment_order_payments(id, paid_at, method, amount, reference, note, created_at)")
       .order("created_at", { ascending: false })
       .limit(500),
   );
+  const orders = rows.map((o) => ({ ...o, ...orderMoney(o.customer_consignment_order_units, o.customer_consignment_order_payments) }));
   return c.json({ orders });
 });
 
@@ -92,12 +115,36 @@ router.post("/orders", requireOperationOrPrincipal, async (c) => {
   const body = await parseBody(c, z.object({
     dealerId: uuid.nullable().default(null),
     customer: customer.default({}),
-    unitIds: z.array(uuid).min(1),
+    lines: z.array(z.object({ unitId: uuid, price: z.number().nonnegative() })).min(1),
     note: z.string().optional(),
   }));
   return c.json(await rpc(c, "customer_consignment_order_create", {
-    p_dealer_id: body.dealerId, p_customer: body.customer, p_units: body.unitIds, p_note: body.note ?? null,
+    p_dealer_id: body.dealerId, p_customer: body.customer, p_lines: body.lines, p_note: body.note ?? null,
   }), 201);
+});
+
+/** Payments on the order, like Houzs POST/DELETE /consignment-orders/:docNo/payments (consignment-orders.ts:2218-2310). */
+router.post("/orders/:id/payments", requireOperationOrPrincipal, async (c) => {
+  const id = uuid.safeParse(c.req.param("id"));
+  if (!id.success) throw new HTTPException(400, { message: "order id required" });
+  const body = await parseBody(c, z.object({
+    amount: z.number().positive(),
+    method: z.string().regex(/^[a-z][a-z0-9_]{1,39}$/),
+    paidAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    reference: z.string().optional(),
+    note: z.string().optional(),
+  }));
+  return c.json(await rpc(c, "customer_consignment_payment_add", {
+    p_order_id: id.data, p_amount: body.amount, p_method: body.method, p_paid_at: body.paidAt ?? null,
+    p_reference: body.reference ?? null, p_note: body.note ?? null,
+  }), 201);
+});
+
+router.delete("/orders/:id/payments/:paymentId", requireOperationOrPrincipal, async (c) => {
+  const id = uuid.safeParse(c.req.param("id"));
+  const paymentId = uuid.safeParse(c.req.param("paymentId"));
+  if (!id.success || !paymentId.success) throw new HTTPException(400, { message: "ids required" });
+  return c.json(await rpc(c, "customer_consignment_payment_delete", { p_order_id: id.data, p_payment_id: paymentId.data }));
 });
 
 // ── Consignment Note ──────────────────────────────────────────────────────────
@@ -127,10 +174,14 @@ router.post("/notes", requireOperationOrPrincipal, async (c) => {
   }), 201);
 });
 
-/** Units sold at the customer: they go to the Sales Order that takes the payment. */
+/**
+ * Units sold at the customer: sold against their Customer Consignment Order
+ * line, no Sales Order. Follows Houzs consignment-notes.ts:13-14 per Weisiang's
+ * ruling (2026-10-22): clear Carres rules, implement Houzs.
+ */
 router.post("/notes/sold", requireOperationOrPrincipal, async (c) => {
-  const body = await parseBody(c, z.object({ unitIds: z.array(uuid).min(1), so: z.number().int().positive() }));
-  return c.json(await rpc(c, "consignment_note_mark_sold", { p_units: body.unitIds, p_so: body.so }));
+  const body = await parseBody(c, z.object({ unitIds: z.array(uuid).min(1) }));
+  return c.json(await rpc(c, "consignment_note_mark_sold", { p_units: body.unitIds }));
 });
 
 // ── Customer Consignment Return ───────────────────────────────────────────────

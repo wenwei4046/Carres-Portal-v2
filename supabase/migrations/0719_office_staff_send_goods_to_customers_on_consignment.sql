@@ -28,9 +28,14 @@
 -- no Sales Order delivery can take it (0341 only takes its own SO's reserved
 -- Units), and 0366's lineage trigger records every move.
 --
--- SOLD: the customer pays through the existing payment path, on a Sales Order.
--- `consignment_note_mark_sold` turns the Unit `sold` against that Sales Order;
--- the money is recorded on the Sales Order like any other payment.
+-- SOLD, THE HOUZS WAY (YH, chat 2026-10-26, per Weisiang's "follow Houzs"
+-- ruling of 2026-10-22): no Sales Order is involved. The Customer Consignment
+-- Order carries each Unit's price and its own payments, like Houzs's
+-- consignment_sales_orders / _items / _payments (Houzs 0153_consignment_module
+-- .sql:67-273; routes/consignment-orders.ts:2171-2310). A Consignment Note line
+-- points at its order line, like Houzs's consignment_so_item_id (Houzs
+-- routes/consignment-notes.ts:13-14). `consignment_note_mark_sold` turns the
+-- Unit `sold` against its order line; the money sits on the order.
 -- =============================================================================
 
 set search_path = public;
@@ -49,11 +54,34 @@ create table if not exists public.customer_consignment_orders (
   created_at       timestamptz not null default now()
 );
 
+-- Follows Houzs consignment_sales_order_items.unit_price_sen (Houzs 0153:212)
+-- per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+-- One line per Unit, so the line price is the Unit's selling price.
 create table if not exists public.customer_consignment_order_units (
-  order_id uuid not null references public.customer_consignment_orders(id),
-  unit_id  uuid not null references public.ops_stock_items(id),
+  order_id  uuid not null references public.customer_consignment_orders(id),
+  unit_id   uuid not null references public.ops_stock_items(id),
+  price     numeric(12,2) not null check (price >= 0),
+  sold_at   timestamptz,
   primary key (order_id, unit_id)
 );
+
+-- Follows Houzs consignment_sales_order_payments (Houzs 0153:258-273) per
+-- Weisiang's ruling (2026-10-22): the customer's money is recorded on the
+-- Customer Consignment Order, never on a Sales Order. Amount and method use
+-- Carres's order_payments shape (RM numeric, slug method).
+create table if not exists public.customer_consignment_order_payments (
+  id         uuid primary key default gen_random_uuid(),
+  order_id   uuid not null references public.customer_consignment_orders(id),
+  paid_at    date not null default (now() at time zone 'Asia/Kuala_Lumpur')::date,
+  method     text not null check (method ~ '^[a-z][a-z0-9_]{1,39}$'),
+  amount     numeric(12,2) not null check (amount > 0),
+  reference  text,
+  note       text,
+  created_by uuid default auth.uid(),
+  created_at timestamptz not null default now()
+);
+create index if not exists customer_consignment_order_payments_order_idx
+  on public.customer_consignment_order_payments(order_id);
 
 create table if not exists public.consignment_notes (
   id               uuid primary key default gen_random_uuid(),
@@ -69,10 +97,15 @@ create table if not exists public.consignment_notes (
   created_at       timestamptz not null default now()
 );
 
+-- order_id: the order line this Note line points at, like Houzs's
+-- consignment_so_item_id (Houzs routes/consignment-notes.ts:13-14), per
+-- Weisiang's ruling (2026-10-22). Null only on a blank Note.
 create table if not exists public.consignment_note_units (
-  note_id uuid not null references public.consignment_notes(id),
-  unit_id uuid not null references public.ops_stock_items(id),
-  primary key (note_id, unit_id)
+  note_id  uuid not null references public.consignment_notes(id),
+  unit_id  uuid not null references public.ops_stock_items(id),
+  order_id uuid,
+  primary key (note_id, unit_id),
+  foreign key (order_id, unit_id) references public.customer_consignment_order_units(order_id, unit_id)
 );
 
 create table if not exists public.customer_consignment_returns (
@@ -95,7 +128,7 @@ create table if not exists public.customer_consignment_return_units (
 do $$
 declare t text;
 begin
-  foreach t in array array['customer_consignment_orders','customer_consignment_order_units',
+  foreach t in array array['customer_consignment_orders','customer_consignment_order_units','customer_consignment_order_payments',
                            'consignment_notes','consignment_note_units',
                            'customer_consignment_returns','customer_consignment_return_units'] loop
     execute format('alter table public.%I enable row level security', t);
@@ -148,8 +181,12 @@ $$;
 -- Records the customer and the Units promised. The Units leave stock when the
 -- Consignment Note is issued, so an order nobody delivers never strands a Unit.
 
+-- p_lines: [{unitId, price}], each Unit with its selling price, like Houzs's
+-- order lines carrying unit_price_sen (Houzs 0153:212), per Weisiang's ruling
+-- (2026-10-22): clear Carres rules, implement Houzs.
+drop function if exists public.customer_consignment_order_create(uuid, jsonb, uuid[], text);
 create or replace function public.customer_consignment_order_create(
-  p_dealer_id uuid, p_customer jsonb, p_units uuid[], p_note text default null
+  p_dealer_id uuid, p_customer jsonb, p_lines jsonb, p_note text default null
 )
 returns jsonb
 language plpgsql
@@ -163,12 +200,21 @@ declare
   u      public.ops_stock_items;
   v_why  text;
   v_n    int := 0;
+  v_units uuid[];
+  v_price numeric;
 begin
   if not public.is_operation() then
     raise exception 'forbidden' using errcode = '42501', detail = 'forbidden';
   end if;
   v_c := public._consignment_customer(p_dealer_id, p_customer);
-  if coalesce(cardinality(p_units), 0) = 0 then
+  if coalesce(jsonb_typeof(p_lines), '') <> 'array' then
+    raise exception 'Pick at least one Unit' using errcode = 'P0001', detail = 'no_units';
+  end if;
+  select array_agg(distinct (l->>'unitId')::uuid) into v_units from jsonb_array_elements(p_lines) l;
+  if coalesce(cardinality(v_units), 0) <> jsonb_array_length(p_lines) then
+    raise exception 'Each Unit can be on the order once' using errcode = 'P0001', detail = 'duplicate_unit';
+  end if;
+  if coalesce(cardinality(v_units), 0) = 0 then
     raise exception 'Pick at least one Unit' using errcode = 'P0001', detail = 'no_units';
   end if;
 
@@ -178,15 +224,21 @@ begin
   values (v_id, v_no, p_dealer_id, v_c->>'name', v_c->>'phone', v_c->>'address',
           nullif(btrim(coalesce(p_note, '')), ''));
 
-  for u in select * from public.ops_stock_items where id = any(p_units) order by unit_code loop
+  for u in select * from public.ops_stock_items where id = any(v_units) order by unit_code loop
     v_why := public._consignment_out_refusal(u);
     if v_why is not null then
       raise exception '%', v_why using errcode = 'P0001', detail = 'unit_not_sendable';
     end if;
-    insert into public.customer_consignment_order_units values (v_id, u.id);
+    select (l->>'price')::numeric into v_price from jsonb_array_elements(p_lines) l
+     where (l->>'unitId')::uuid = u.id;
+    if v_price is null or v_price < 0 then
+      raise exception 'Enter the price of %', u.unit_code using errcode = 'P0001', detail = 'price_required';
+    end if;
+    insert into public.customer_consignment_order_units (order_id, unit_id, price)
+    values (v_id, u.id, round(v_price, 2));
     v_n := v_n + 1;
   end loop;
-  if v_n <> cardinality(p_units) then
+  if v_n <> cardinality(v_units) then
     raise exception 'a picked Unit was not found' using errcode = 'P0001', detail = 'unit_not_found';
   end if;
   return jsonb_build_object('id', v_id, 'orderNo', v_no, 'units', v_n);
@@ -251,7 +303,7 @@ begin
     update public.ops_stock_items
        set status = 'reserved', reserved_ref = v_no, updated_at = now()
      where id = u.id;
-    insert into public.consignment_note_units values (v_id, u.id);
+    insert into public.consignment_note_units (note_id, unit_id, order_id) values (v_id, u.id, p_order_id);
     v_n := v_n + 1;
   end loop;
   if v_n <> cardinality(p_units) then
@@ -272,32 +324,30 @@ as $$
    where nu.unit_id = u.id and u.status = 'reserved' and u.reserved_ref = n.note_no;
 $$;
 
--- ── 5 · Sold at the customer → the Sales Order that takes the payment ────────
+-- ── 5 · Sold at the customer → the order line that carries its price ────────
+-- Follows Houzs (routes/consignment-notes.ts:13-14 and 0153_consignment_module
+-- .sql:67-273) per Weisiang's ruling (2026-10-22): clear Carres rules,
+-- implement Houzs. No Sales Order: the Unit is sold against the Customer
+-- Consignment Order line its Note line points at, and the money is recorded on
+-- that order (section 5b). A Unit on a blank Note has no order line, so no
+-- price, and is refused.
 
-create or replace function public.consignment_note_mark_sold(p_units uuid[], p_so int)
+drop function if exists public.consignment_note_mark_sold(uuid[], int);
+create or replace function public.consignment_note_mark_sold(p_units uuid[])
 returns jsonb
 language plpgsql
 security definer
 set search_path = public
 as $$
 declare
-  v_order  uuid;
-  v_status text;
   u        public.ops_stock_items;
   n        public.consignment_notes;
+  v_order  uuid;
+  v_no     text;
   v_n      int := 0;
 begin
   if not public.is_operation() then
     raise exception 'forbidden' using errcode = '42501', detail = 'forbidden';
-  end if;
-  select id, status into v_order, v_status from public.orders where so = p_so;
-  if v_order is null then
-    raise exception 'Sales Order % not found', p_so using errcode = 'P0001', detail = 'order_not_found';
-  end if;
-  -- A cancelled Sales Order cannot take the payment (0351 refuses it), so it
-  -- cannot take the sold Unit either.
-  if v_status = 'cancelled' then
-    raise exception 'SO-% is cancelled', p_so using errcode = 'P0001', detail = 'order_cancelled';
   end if;
   if coalesce(cardinality(p_units), 0) = 0 then
     raise exception 'Pick at least one Unit' using errcode = 'P0001', detail = 'no_units';
@@ -308,18 +358,85 @@ begin
       raise exception '% is not out on a Consignment Note', u.unit_code
         using errcode = 'P0001', detail = 'unit_not_on_consignment';
     end if;
+    v_order := null;
+    select nu.order_id, o.order_no into v_order, v_no
+      from public.consignment_note_units nu
+      join public.customer_consignment_orders o on o.id = nu.order_id
+     where nu.note_id = n.id and nu.unit_id = u.id;
+    if v_order is null then
+      raise exception '% went out on a blank Consignment Note, so no Customer Consignment Order holds its price', u.unit_code
+        using errcode = 'P0001', detail = 'unit_not_on_order';
+    end if;
     update public.ops_stock_items
-       set status = 'sold', sold_at = now(), sold_order_id = v_order,
-           reserved_ref = 'SO-' || p_so,
+       set status = 'sold', sold_at = now(), sold_order_id = null,
+           reserved_ref = v_no,
            ref_history = array_append(coalesce(ref_history, '{}'::text[]), n.note_no),
            updated_at = now()
      where id = u.id;
+    update public.customer_consignment_order_units set sold_at = now()
+     where order_id = v_order and unit_id = u.id;
     v_n := v_n + 1;
   end loop;
   if v_n <> cardinality(p_units) then
     raise exception 'a picked Unit was not found' using errcode = 'P0001', detail = 'unit_not_found';
   end if;
-  return jsonb_build_object('orderId', v_order, 'so', p_so, 'units', v_n);
+  return jsonb_build_object('units', v_n);
+end;
+$$;
+
+-- ── 5b · Payments on the Customer Consignment Order ─────────────────────────
+-- Follows Houzs POST/DELETE /consignment-orders/:docNo/payments (Houzs
+-- routes/consignment-orders.ts:2218-2310) per Weisiang's ruling (2026-10-22):
+-- clear Carres rules, implement Houzs. Like Houzs, a payment is not capped at
+-- the balance.
+
+create or replace function public.customer_consignment_payment_add(
+  p_order_id uuid, p_amount numeric, p_method text,
+  p_paid_at date default null, p_reference text default null, p_note text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_id uuid;
+begin
+  if not public.is_operation() then
+    raise exception 'forbidden' using errcode = '42501', detail = 'forbidden';
+  end if;
+  if not exists (select 1 from public.customer_consignment_orders where id = p_order_id) then
+    raise exception 'order not found' using errcode = 'P0002', detail = 'order_not_found';
+  end if;
+  if p_amount is null or p_amount <= 0 then
+    raise exception 'Enter an amount above zero' using errcode = 'P0001', detail = 'amount_required';
+  end if;
+  if coalesce(p_method, '') !~ '^[a-z][a-z0-9_]{1,39}$' then
+    raise exception 'Choose the payment method' using errcode = 'P0001', detail = 'method_required';
+  end if;
+  insert into public.customer_consignment_order_payments (order_id, paid_at, method, amount, reference, note)
+  values (p_order_id, coalesce(p_paid_at, (now() at time zone 'Asia/Kuala_Lumpur')::date), p_method,
+          round(p_amount, 2), nullif(btrim(coalesce(p_reference, '')), ''), nullif(btrim(coalesce(p_note, '')), ''))
+  returning id into v_id;
+  return jsonb_build_object('id', v_id);
+end;
+$$;
+
+create or replace function public.customer_consignment_payment_delete(p_order_id uuid, p_payment_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.is_operation() then
+    raise exception 'forbidden' using errcode = '42501', detail = 'forbidden';
+  end if;
+  delete from public.customer_consignment_order_payments where id = p_payment_id and order_id = p_order_id;
+  if not found then
+    raise exception 'payment not found' using errcode = 'P0002', detail = 'payment_not_found';
+  end if;
+  return jsonb_build_object('id', p_payment_id);
 end;
 $$;
 
@@ -380,9 +497,11 @@ do $$
 declare f text;
 begin
   foreach f in array array[
-    'customer_consignment_order_create(uuid, jsonb, uuid[], text)',
+    'customer_consignment_order_create(uuid, jsonb, jsonb, text)',
     'consignment_note_create(uuid, uuid, jsonb, uuid[], date, text)',
-    'consignment_note_mark_sold(uuid[], int)',
+    'consignment_note_mark_sold(uuid[])',
+    'customer_consignment_payment_add(uuid, numeric, text, date, text, text)',
+    'customer_consignment_payment_delete(uuid, uuid)',
     'customer_consignment_return_create(uuid, uuid[], text)'] loop
     execute format('revoke all on function public.%s from public, anon', f);
     execute format('grant execute on function public.%s to authenticated', f);

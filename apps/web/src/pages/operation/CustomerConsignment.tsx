@@ -13,6 +13,8 @@ import { FieldError } from "@/components/kit/FieldFrame";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
+import { rm } from "@/lib/format-currency";
+import { useManualMethods } from "@/lib/payment-methods";
 
 /**
  * Customer Consignment Order · Consignment Note · Customer Consignment Return
@@ -24,8 +26,12 @@ import { fmtDate } from "@/lib/fmt-date";
  * consignment; no blank consignment documents) and COPY-STANDARD's ban on the
  * name "Consignment Note"; Jess was not part of this decision. These are the
  * CUSTOMER side; the supplier-side Consignment Order / Return are separate.
- * A Unit at the customer stays Carres-owned; a sold Unit goes to the Sales
- * Order that takes the payment.
+ * A Unit at the customer stays Carres-owned.
+ *
+ * Money follows Houzs (YH, chat 2026-10-26): the Customer Consignment Order
+ * carries each Unit's price and its own payments; no Sales Order is used
+ * (Houzs ConsignmentOrderDetail.tsx; consignment-orders.ts:2171-2310), per
+ * Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
  */
 
 const BASE = "/api/ops/customer-consignment";
@@ -37,6 +43,7 @@ type Customer = { name: string; phone: string; address: string };
 
 const post = <T,>(path: string, body: unknown) =>
   apiFetch<T>(`${BASE}${path}`, { method: "POST", body: JSON.stringify(body) });
+const PRICE_RE = /^\d+(\.\d{1,2})?$/;
 
 function useChoices() {
   return useQuery({
@@ -76,7 +83,10 @@ function Ticks({ list, picked, onChange, empty }: { list: Unit[]; picked: string
 }
 
 /** Pick a Site, then free Carres-owned Units standing there. */
-function StockPicker({ sites, picked, onChange }: { sites: Choice[]; picked: string[]; onChange: (ids: string[]) => void }) {
+function StockPicker({ sites, picked, onChange, prices, setPrices }: {
+  sites: Choice[]; picked: string[]; onChange: (ids: string[]) => void;
+  prices?: Record<string, string>; setPrices?: (p: Record<string, string>) => void;
+}) {
   const [siteId, setSiteId] = useState("");
   const [find, setFind] = useState("");
   const q = useQuery({
@@ -93,6 +103,11 @@ function StockPicker({ sites, picked, onChange }: { sites: Choice[]; picked: str
       {siteId && <Input id="cs-find" label="Find Unit" value={find} onChange={(e) => setFind(e.target.value)} />}
       {q.isError && <FieldError>The Units could not be loaded. Try again.</FieldError>}
       {q.isSuccess && <Ticks list={list} picked={picked} onChange={onChange} empty="No Units here." />}
+      {prices && setPrices && (q.data?.units ?? []).filter((u) => picked.includes(u.id)).map((u) => (
+        <Input key={u.id} id={`price-${u.id}`} label={`Price (RM) · ${u.unit_code}`} inputMode="decimal"
+          value={prices[u.id] ?? ""} onChange={(e) => setPrices({ ...prices, [u.id]: e.target.value })}
+          error={prices[u.id] && !PRICE_RE.test(prices[u.id]) ? "Enter an amount, e.g. 1200.00" : undefined} />
+      ))}
     </div>
   );
 }
@@ -115,10 +130,57 @@ const hasCustomer = (dealerId: string, c: Customer) => dealerId !== NO_DEALER ||
 const dealerOrNull = (dealerId: string) => (dealerId === NO_DEALER ? null : dealerId);
 
 // ── Customer Consignment Order ────────────────────────────────────────────────
+type OrderLine = UnitLink & { price: string | number; sold_at: string | null };
+type Payment = { id: string; paid_at: string; method: string; amount: string | number; reference: string | null; note: string | null };
 type OrderRow = {
   id: string; order_no: string; customer_name: string; customer_phone: string | null; note: string | null; created_at: string;
-  customer_consignment_order_units: UnitLink[];
+  customer_consignment_order_units: OrderLine[];
+  customer_consignment_order_payments: Payment[];
+  total: number; paid: number; balance: number;
 };
+
+/** Payments on one order, like Houzs's Consignment Order payments (consignment-orders.ts:2171-2310). */
+function OrderPayments({ order, onSaved }: { order: OrderRow; onSaved: () => void }) {
+  const m = useManualMethods();
+  const [amount, setAmount] = useState("");
+  const [method, setMethod] = useState("");
+  const [paidAt, setPaidAt] = useState("");
+  const [reference, setReference] = useState("");
+  const add = useMutation({
+    mutationFn: () => post(`/orders/${order.id}/payments`, {
+      amount: Number(amount), method, paidAt: paidAt || undefined, reference: reference || undefined,
+    }),
+    onSuccess: () => { setAmount(""); setReference(""); onSaved(); },
+  });
+  const remove = useMutation({
+    mutationFn: (id: string) => apiFetch(`${BASE}/orders/${order.id}/payments/${id}`, { method: "DELETE" }),
+    onSuccess: onSaved,
+  });
+  return (
+    <section className="flex flex-col gap-2" aria-label="Payments">
+      <h3 className="text-title">Payments</h3>
+      <p className="text-body">Total {rm(order.total)} · Paid {rm(order.paid)} · Balance {rm(order.balance)}</p>
+      {order.customer_consignment_order_payments.length === 0 && <p className="text-body text-c-muted">No payments yet.</p>}
+      {order.customer_consignment_order_payments.map((p) => (
+        <div key={p.id} className="flex items-center justify-between gap-2 text-body">
+          <span>{fmtDate(p.paid_at)} · {m.label(p.method)} · {rm(Number(p.amount))}{p.reference ? ` · ${p.reference}` : ""}</span>
+          <Button variant="neutral" loading={remove.isPending && remove.variables === p.id} onClick={() => remove.mutate(p.id)}>Remove</Button>
+        </div>
+      ))}
+      <Input id="ccp-amount" label="Amount (RM)" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)}
+        error={amount && !PRICE_RE.test(amount) ? "Enter an amount, e.g. 500.00" : undefined} />
+      <Select id="ccp-method" label="Payment Method" value={method || undefined} onValueChange={setMethod}
+        options={m.methods.map((x) => ({ value: x.value, label: x.label }))} />
+      <DatePicker id="ccp-date" label="Payment Date" value={paidAt || null} onChange={(v) => setPaidAt(v ?? "")} />
+      <Input id="ccp-ref" label="Reference" value={reference} onChange={(e) => setReference(e.target.value)} />
+      {(add.isError || remove.isError) && <FieldError>{errorText(add.error ?? remove.error)}</FieldError>}
+      <div>
+        <Button variant="primary" loading={add.isPending} disabled={!PRICE_RE.test(amount) || Number(amount) <= 0 || !method}
+          onClick={() => add.mutate()}>Add Payment</Button>
+      </div>
+    </section>
+  );
+}
 
 export function CustomerConsignmentOrders() {
   const qc = useQueryClient();
@@ -128,14 +190,21 @@ export function CustomerConsignmentOrders() {
   const [dealerId, setDealerId] = useState(NO_DEALER);
   const [c, setC] = useState<Customer>(EMPTY);
   const [picked, setPicked] = useState<string[]>([]);
+  const [prices, setPrices] = useState<Record<string, string>>({});
   const [note, setNote] = useState("");
-  const [sending, setSending] = useState<OrderRow | null>(null);
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const sending = (list.data?.orders ?? []).find((o) => o.id === sendingId) ?? null;
+  const setSending = (o: OrderRow | null) => setSendingId(o?.id ?? null);
+  const priced = picked.length > 0 && picked.every((id) => PRICE_RE.test(prices[id] ?? ""));
   const [sendPicked, setSendPicked] = useState<string[]>([]);
   const [date, setDate] = useState("");
   const done = () => void qc.invalidateQueries({ queryKey: ["customer-consignment"] });
   const save = useMutation({
-    mutationFn: () => post("/orders", { dealerId: dealerOrNull(dealerId), customer: c, unitIds: picked, note }),
-    onSuccess: () => { setOpen(false); setPicked([]); setC(EMPTY); setNote(""); setDealerId(NO_DEALER); done(); },
+    mutationFn: () => post("/orders", {
+      dealerId: dealerOrNull(dealerId), customer: c, note,
+      lines: picked.map((unitId) => ({ unitId, price: Number(prices[unitId]) })),
+    }),
+    onSuccess: () => { setOpen(false); setPicked([]); setPrices({}); setC(EMPTY); setNote(""); setDealerId(NO_DEALER); done(); },
   });
   const send = useMutation({
     mutationFn: () => post("/notes", { orderId: sending?.id, unitIds: sendPicked, deliveryDate: date || undefined }),
@@ -147,6 +216,9 @@ export function CustomerConsignmentOrders() {
     { key: "customer", label: "Customer", width: 200, accessor: (r) => r.customer_name },
     { key: "phone", label: "Phone", width: 130, accessor: (r) => r.customer_phone ?? "" },
     { key: "units", label: "Units", width: 280, accessor: (r) => codes(units(r.customer_consignment_order_units)) },
+    { key: "total", label: "Total", width: 120, accessor: (r) => rm(r.total) },
+    { key: "paid", label: "Paid", width: 120, accessor: (r) => rm(r.paid) },
+    { key: "balance", label: "Balance", width: 120, accessor: (r) => rm(r.balance) },
     { key: "note", label: "Note", width: 220, accessor: (r) => r.note ?? "" },
   ], []);
   const toSend = sending ? units(sending.customer_consignment_order_units).filter((u) => u.status === "free") : [];
@@ -167,18 +239,18 @@ export function CustomerConsignmentOrders() {
         description="The Units leave stock when their Consignment Note is issued."
         footer={<>
           <Button variant="neutral" onClick={() => setOpen(false)}>Close</Button>
-          <Button variant="primary" loading={save.isPending} disabled={!hasCustomer(dealerId, c) || picked.length === 0} onClick={() => save.mutate()}>Save</Button>
+          <Button variant="primary" loading={save.isPending} disabled={!hasCustomer(dealerId, c) || !priced} onClick={() => save.mutate()}>Save</Button>
         </>}>
         <div className="flex flex-col gap-3">
           <CustomerFields dealers={choices.data?.dealers ?? []} dealerId={dealerId} setDealerId={setDealerId} c={c} setC={setC} />
-          <StockPicker sites={choices.data?.sites ?? []} picked={picked} onChange={setPicked} />
+          <StockPicker sites={choices.data?.sites ?? []} picked={picked} onChange={setPicked} prices={prices} setPrices={setPrices} />
           <Textarea id="cco-note" label="Note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
           {save.isError && <FieldError>{errorText(save.error)}</FieldError>}
         </div>
       </Modal>
       <Modal open={sending !== null} onOpenChange={(o) => !o && setSending(null)} width="wide"
-        title={`Issue Consignment Note for ${sending?.order_no ?? ""}`}
-        description="The picked Units go to the customer. They stay Carres-owned."
+        title={`${sending?.order_no ?? ""} · Consignment Note and payments`}
+        description="Issue a Consignment Note for the picked Units, and record the customer's payments on this order."
         footer={<>
           <Button variant="neutral" onClick={() => setSending(null)}>Close</Button>
           <Button variant="primary" loading={send.isPending} disabled={sendPicked.length === 0} onClick={() => send.mutate()}>Issue Consignment Note</Button>
@@ -187,6 +259,7 @@ export function CustomerConsignmentOrders() {
           <DatePicker id="ccn-date" label="Delivery Date" value={date || null} onChange={(v) => setDate(v ?? "")} />
           <Ticks list={toSend} picked={sendPicked} onChange={setSendPicked} empty="Every Unit on this order has gone out." />
           {send.isError && <FieldError>{errorText(send.error)}</FieldError>}
+          {sending && <OrderPayments order={sending} onSaved={done} />}
         </div>
       </Modal>
     </Page>
@@ -217,15 +290,14 @@ export function ConsignmentNotes() {
   const [note, setNote] = useState("");
   const [selling, setSelling] = useState<NoteRow | null>(null);
   const [soldPicked, setSoldPicked] = useState<string[]>([]);
-  const [so, setSo] = useState("");
   const done = () => void qc.invalidateQueries({ queryKey: ["customer-consignment"] });
   const save = useMutation({
     mutationFn: () => post("/notes", { dealerId: dealerOrNull(dealerId), customer: c, unitIds: picked, deliveryDate: date || undefined, note }),
     onSuccess: () => { setOpen(false); setPicked([]); setC(EMPTY); setNote(""); setDate(""); setDealerId(NO_DEALER); done(); },
   });
   const sell = useMutation({
-    mutationFn: () => post("/notes/sold", { unitIds: soldPicked, so: Number(so) }),
-    onSuccess: () => { setSelling(null); setSoldPicked([]); setSo(""); done(); },
+    mutationFn: () => post("/notes/sold", { unitIds: soldPicked }),
+    onSuccess: () => { setSelling(null); setSoldPicked([]); done(); },
   });
   const columns = useMemo<DataGridColumn<NoteRow>[]>(() => [
     { key: "no", label: "Consignment Note No", width: 190, accessor: (r) => r.note_no },
@@ -266,13 +338,12 @@ export function ConsignmentNotes() {
       </Modal>
       <Modal open={selling !== null} onOpenChange={(o) => !o && setSelling(null)} width="wide"
         title={`Record sold Units on ${selling?.note_no ?? ""}`}
-        description="Sold Units go to the Sales Order. Record the customer's payment on that Sales Order."
+        description="Sold Units are sold at their Customer Consignment Order price. Record the customer's payment on that order."
         footer={<>
           <Button variant="neutral" onClick={() => setSelling(null)}>Close</Button>
-          <Button variant="primary" loading={sell.isPending} disabled={soldPicked.length === 0 || !/^\d+$/.test(so)} onClick={() => sell.mutate()}>Record sold</Button>
+          <Button variant="primary" loading={sell.isPending} disabled={soldPicked.length === 0} onClick={() => sell.mutate()}>Record sold</Button>
         </>}>
         <div className="flex flex-col gap-3">
-          <Input id="csn-so" label="SO No" inputMode="numeric" value={so} onChange={(e) => setSo(e.target.value.replace(/\D/g, ""))} />
           <Ticks list={out} picked={soldPicked} onChange={setSoldPicked} empty="No Units are at the customer on this note." />
           {sell.isError && <FieldError>{errorText(sell.error)}</FieldError>}
         </div>
