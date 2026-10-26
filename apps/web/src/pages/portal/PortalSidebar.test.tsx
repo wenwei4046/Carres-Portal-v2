@@ -1543,6 +1543,12 @@ describe("PortalSidebar — the Warehouse module's four destinations", () => {
       "Pickup Schedule",
       "Inbound",
       "Inventory",
+      // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office Stock
+      // Adjustment, Transfer and Take join the rail after Inventory. This
+      // overturns Jess's "no Transfer row" above; Jess was not part of it.
+      "Stock Adjustment",
+      "Stock Transfer",
+      "Stock Take",
       "Outbound",
     ]);
   });

@@ -561,6 +561,12 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         section: "Warehouse",
       },
       { key: "stock", label: "Inventory", icon: Boxes, tab: "stock-onhand", section: "Warehouse" },
+      /* 0714 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office staff
+       * adjust, transfer and count stock the Houzs way. Overturns Jess's Stock
+       * MASTER §12.4/§12.5/§12.7; Jess was not part of this decision. */
+      { key: "stock-adjustments", label: "Stock Adjustment", icon: SlidersHorizontal, tab: "stock-adjustments", section: "Warehouse" },
+      { key: "stock-transfers", label: "Stock Transfer", icon: ArrowLeftRight, tab: "stock-transfers", section: "Warehouse" },
+      { key: "stock-takes", label: "Stock Take", icon: ClipboardList, tab: "stock-takes", section: "Warehouse" },
       {
         key: "wh-outbound",
         label: "Outbound",
@@ -774,6 +780,8 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "card-charges", label: "Card charges", icon: CreditCard, financePath: "/finance/reports/card-charges", section: "Reports" },
       { key: "dealer-commission", label: "Dealer commission", icon: Users, financePath: "/finance/reports/dealer-commission", section: "Reports" },
       { key: "stock-value", label: "Stock value", icon: Boxes, financePath: "/finance/reports/stock-value", section: "Reports" },
+      // 0714 — Stock's write-offs, read-only, valued as Stock value (YH 2026-10-26: no journal).
+      { key: "stock-drops", label: "Stock drops", icon: Boxes, financePath: "/finance/reports/stock-drops", section: "Reports" },
       // Payment MASTER §16: Reports → Payment, Payment's own report, unchanged.
       { key: "payment-report", label: "Payment", icon: Wallet, financePath: "/finance/reports/payment", section: "Reports" },
       // 0646 — a month's plan beside its actual; its own row after Reports.
