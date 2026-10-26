@@ -34,6 +34,14 @@ export const REFUND_STATUS: { value: RefundStatus; label: string }[] = [
   { value: "refunded", label: "Refunded" },
   { value: "not_refunded", label: "Not refunded" },
 ];
+/* Each returned Unit or line carries a condition, default New. Follows Houzs
+   frontend/src/pages/scm-v2/DeliveryReturnFromDo.tsx:55,303 per Weisiang's ruling
+   (2026-10-22): clear Carres rules, implement Houzs. */
+type Condition = "NEW" | "OPENED" | "DAMAGED" | "DEFECTIVE";
+const CONDITIONS: { value: Condition; label: string }[] = [
+  { value: "NEW", label: "New" }, { value: "OPENED", label: "Opened" },
+  { value: "DAMAGED", label: "Damaged" }, { value: "DEFECTIVE", label: "Defective" },
+];
 export const refundLabel = (s: string) => REFUND_STATUS.find((r) => r.value === s)?.label ?? s;
 
 type ReturnRow = {
@@ -67,6 +75,7 @@ export function DeliveryReturns() {
   const [lookFor, setLookFor] = useState("");
   const [picked, setPicked] = useState<string[]>([]);
   const [lineQty, setLineQty] = useState<Record<string, number>>({});
+  const [cond, setCond] = useState<Record<string, Condition>>({});
   const [siteId, setSiteId] = useState("");
   const [reason, setReason] = useState("");
   const [editing, setEditing] = useState<ReturnRow | null>(null);
@@ -77,12 +86,12 @@ export function DeliveryReturns() {
     enabled: Boolean(lookFor),
     retry: false,
   });
-  const reset = () => { setOpen(false); setDoNo(""); setLookFor(""); setPicked([]); setLineQty({}); setReason(""); };
+  const reset = () => { setOpen(false); setDoNo(""); setLookFor(""); setPicked([]); setLineQty({}); setCond({}); setReason(""); };
   const byLine = units.data?.mode === "lines";
-  const pickedLines = Object.entries(lineQty).filter(([, q]) => q > 0).map(([orderLineId, qty]) => ({ orderLineId, qty }));
-  const find = () => { setPicked([]); setLineQty({}); setLookFor(doNo.trim()); };
+  const pickedLines = Object.entries(lineQty).filter(([, q]) => q > 0).map(([orderLineId, qty]) => ({ orderLineId, qty, condition: cond[orderLineId] ?? "NEW" }));
+  const find = () => { setPicked([]); setLineQty({}); setCond({}); setLookFor(doNo.trim()); };
   const save = useMutation({
-    mutationFn: () => post("", { deliveryOrderId: units.data?.deliveryOrder.id, ...(byLine ? { lines: pickedLines } : { unitIds: picked }), siteId, reason }),
+    mutationFn: () => post("", { deliveryOrderId: units.data?.deliveryOrder.id, ...(byLine ? { lines: pickedLines } : { unitIds: picked, conditions: Object.fromEntries(picked.map((id) => [id, cond[id] ?? "NEW"])) }), siteId, reason }),
     onSuccess: () => { reset(); void qc.invalidateQueries({ queryKey: ["delivery-returns"] }); },
   });
   const saveRefund = useMutation({
@@ -136,10 +145,14 @@ export function DeliveryReturns() {
             <div className="flex max-h-64 flex-col gap-2 overflow-auto rounded-control border border-c-line p-2" aria-label="Lines">
               {units.data.lines.every((l) => l.remaining === 0) && <p className="text-body text-c-muted">No delivered lines left to return on this DO.</p>}
               {units.data.lines.filter((l) => l.remaining > 0).map((l) => (
-                <Input key={l.id} id={`dr-line-${l.id}`} type="number" min={0} max={l.remaining}
-                  label={`${l.sku} · ${l.remaining} of ${l.qty} can come back`}
-                  value={String(lineQty[l.id] ?? 0)}
-                  onChange={(e) => setLineQty({ ...lineQty, [l.id]: Math.min(l.remaining, Math.max(0, Math.trunc(Number(e.target.value) || 0))) })} />
+                <div key={l.id} className="grid grid-cols-[1fr_10rem] items-end gap-2">
+                  <Input id={`dr-line-${l.id}`} type="number" min={0} max={l.remaining}
+                    label={`${l.sku} · ${l.remaining} of ${l.qty} can come back`}
+                    value={String(lineQty[l.id] ?? 0)}
+                    onChange={(e) => setLineQty({ ...lineQty, [l.id]: Math.min(l.remaining, Math.max(0, Math.trunc(Number(e.target.value) || 0))) })} />
+                  <Select id={`dr-line-cond-${l.id}`} label="Condition" value={cond[l.id] ?? "NEW"}
+                    onValueChange={(v) => setCond({ ...cond, [l.id]: v as Condition })} options={CONDITIONS} />
+                </div>
               ))}
             </div>
           )}
@@ -147,9 +160,13 @@ export function DeliveryReturns() {
             <div className="max-h-64 overflow-auto rounded-control border border-c-line p-2" aria-label="Units">
               {units.data.units.length === 0 && <p className="text-body text-c-muted">No delivered Units on this DO.</p>}
               {units.data.units.map((u) => (
-                <Checkbox key={u.id} id={`dr-unit-${u.id}`} label={`${u.unit_code} · ${u.sku}`}
-                  checked={picked.includes(u.id)}
-                  onCheckedChange={(on) => setPicked(on ? [...picked, u.id] : picked.filter((x) => x !== u.id))} />
+                <div key={u.id} className="grid grid-cols-[1fr_10rem] items-center gap-2">
+                  <Checkbox id={`dr-unit-${u.id}`} label={`${u.unit_code} · ${u.sku}`}
+                    checked={picked.includes(u.id)}
+                    onCheckedChange={(on) => setPicked(on ? [...picked, u.id] : picked.filter((x) => x !== u.id))} />
+                  <Select id={`dr-unit-cond-${u.id}`} label="Condition" value={cond[u.id] ?? "NEW"}
+                    onValueChange={(v) => setCond({ ...cond, [u.id]: v as Condition })} options={CONDITIONS} />
+                </div>
               ))}
             </div>
           )}

@@ -88,6 +88,7 @@ import OperationOpsRepair from "./OperationOpsRepair";
 import OperationOpsInventory from "./OperationOpsInventory";
 import WarehouseStockRegister from "./WarehouseStockRegister";
 import { DeliveryReturns, LoadScan } from "./DeliveryReturns";
+import { DeliveryReturnLinesReport } from "./DeliveryReturnLines";
 import WarehouseWorkspace from "./WarehouseWorkspace";
 import { LEGACY_SCHEDULE_TABS } from "./warehouse-schedule-view";
 import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
@@ -531,6 +532,8 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
             {/* Central Reports → Delivery (Delivery MASTER §12, CARD 17) —
                 reachable by direct URL, like the Receiving report. */}
             {tab === "delivery-report" && <OperationDeliveryReport />}
+            {/* Follows Houzs DeliveryReturnDetailListing.tsx:32-153 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */}
+            {tab === "delivery-return-lines" && <DeliveryReturnLinesReport />}
             {/* Preserve legacy bookmarks at the one Settings destination. */}
             {tab === "staff-duties" && <Navigate replace state={location.state} to={`/operation/settings/staff-duties?${new URLSearchParams([...searchParams].filter(([key]) => key !== "tab"))}`} />}
             {/* R2 — the supplier-claim queue: what receiving found wrong, and

@@ -20,13 +20,15 @@ import type { AppEnv } from "../../types";
  */
 const router = new Hono<AppEnv>();
 const uuid = z.string().uuid();
+/** Follows Houzs frontend/src/pages/scm-v2/DeliveryReturnFromDo.tsx:55 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
+const condition = z.enum(["NEW", "OPENED", "DAMAGED", "DEFECTIVE"]);
 
 router.get("/", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb
     .from("delivery_returns")
     .select(
-      "id, return_no, created_at, reason, refund_status, refund_status_at, warehouses(name), ops_delivery_orders(do_number), orders(so, customer_name), delivery_return_units(ops_stock_items(unit_code, sku)), delivery_return_lines(qty_returned, order_lines(sku))",
+      "id, return_no, created_at, received_at, reason, refund_status, refund_status_at, warehouses(name), ops_delivery_orders(do_number), orders(so, customer_name), delivery_return_units(unit_price, refund, condition, ops_stock_items(unit_code, sku)), delivery_return_lines(qty_returned, unit_price, refund, condition, order_lines(sku))",
     )
     .order("created_at", { ascending: false })
     .limit(500);
@@ -103,7 +105,9 @@ router.post("/", requireOperationOrPrincipal, async (c) => {
       .object({
         deliveryOrderId: uuid,
         unitIds: z.array(uuid).optional(),
-        lines: z.array(z.object({ orderLineId: uuid, qty: z.number().int().min(1) })).optional(),
+        /** Unit id → its condition; a Unit left out is NEW (Houzs delivery-returns.ts:1238-1252,1407). */
+        conditions: z.record(uuid, condition).optional(),
+        lines: z.array(z.object({ orderLineId: uuid, qty: z.number().int().min(1), condition: condition.optional() })).optional(),
         siteId: uuid,
         reason: z.string().trim().min(1, "Write the reason"),
       })
@@ -122,6 +126,7 @@ router.post("/", requireOperationOrPrincipal, async (c) => {
         p_unit_ids: body.unitIds ?? [],
         p_warehouse_id: body.siteId,
         p_reason: body.reason,
+        p_conditions: body.conditions ?? {},
       });
   if (error) return fail(c, error);
   return c.json(data, 201);

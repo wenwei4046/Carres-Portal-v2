@@ -119,7 +119,8 @@ describe.skipIf(!URL)("Delivery Returns and Load scan (real PostgreSQL, 0716)", 
       );
       await q("insert into ops_delivery_orders (id, order_id, do_number) values ($1, $2, $3)", [doId, order, doNo]);
     }
-    await q("insert into order_lines (id, order_id, sku, qty, unit_price) values ($1, $2, 'IT-DL', 2, 0)", [LINE_C, ORDER_C]);
+    await q("insert into order_lines (id, order_id, sku, qty, unit_price) values ($1, $2, 'IT-DL', 2, 150)", [LINE_C, ORDER_C]);
+    await q("insert into order_lines (order_id, sku, qty, unit_price) values ($1, 'IT-DR', 3, 99.5)", [ORDER_A]);
     for (const [k, order] of [["c1", ORDER_C], ["c2", ORDER_C], ["d1", ORDER_D]] as const) {
       await q(
         "insert into ops_stock_items (id, unit_code, sku, warehouse_id, status, sold_order_id, sold_at, qty) values ($1, $2, 'IT-DL', $3, 'sold', $4, now(), 1)",
@@ -193,7 +194,8 @@ describe.skipIf(!URL)("Delivery Returns and Load scan (real PostgreSQL, 0716)", 
     await as(OP);
     expect(await attempt("select public.delivery_return_record($1, $2, $3, ' ') as r", [DO_A, [U.a1], PJ])).toMatchObject({ ok: false, detail: "reason_required" });
     expect(await attempt("select public.delivery_return_record($1, $2, $3, 'x') as r", [DO_A, [U.b1], PJ])).toMatchObject({ ok: false, detail: "unit_not_on_do" });
-    const r = await attempt("select public.delivery_return_record($1, $2, $3, 'Customer changed mind') as r", [DO_A, [U.a1], PJ]);
+    const r = await attempt("select public.delivery_return_record($1, $2, $3, 'Customer changed mind', $4::jsonb) as r",
+      [DO_A, [U.a1], PJ, JSON.stringify({ [U.a1]: "DAMAGED" })]);
     expect(r.ok).toBe(true);
     const out = (r as unknown as { r: { returnNo: string; units: number; id: string } }).r;
     expect(out.returnNo).toMatch(/^DR-\d{8}-\d{4}$/);
@@ -201,6 +203,11 @@ describe.skipIf(!URL)("Delivery Returns and Load scan (real PostgreSQL, 0716)", 
     expect(await unit("a1")).toMatchObject({ status: "free", warehouse_id: PJ, holder_party_id: null });
     expect(await unit("a2")).toMatchObject({ status: "sold" });
     expect((await q("select refund_status from delivery_returns where id = $1", [out.id])).rows[0].refund_status).toBe("pending");
+    // Houzs line fields (Houzs delivery-returns.ts:733-760, 950-957): the order line's
+    // unit price, refund = price, the picked condition, received when recorded.
+    expect((await q("select unit_price::text, refund::text, condition from delivery_return_units where return_id = $1", [out.id])).rows[0])
+      .toEqual({ unit_price: "99.50", refund: "99.50", condition: "DAMAGED" });
+    expect((await q("select received_at is not null as ok from delivery_returns where id = $1", [out.id])).rows[0].ok).toBe(true);
     await as(OP);
     expect(await attempt("select public.delivery_return_record($1, $2, $3, 'again') as r", [DO_A, [U.a1], PJ])).toMatchObject({ ok: false, detail: "unit_not_delivered" });
     expect(await attempt("select public.delivery_return_set_refund_status($1, 'refunded') as r", [out.id])).toMatchObject({ ok: true, r: { refundStatus: "refunded" } });
@@ -218,6 +225,9 @@ describe.skipIf(!URL)("Delivery Returns and Load scan (real PostgreSQL, 0716)", 
     await as(OP);
     expect(await rec(DO_C, 1)).toMatchObject({ ok: true, r: { units: 1 } });
     await q("reset role");
+    // No condition picked = NEW (Houzs delivery-returns.ts:1407); refund = qty x unit price.
+    expect((await q("select unit_price::text, refund::text, condition from delivery_return_lines where order_line_id = $1", [LINE_C])).rows)
+      .toEqual([{ unit_price: "150.00", refund: "150.00", condition: "NEW" }]);
     const free = (await q("select count(*)::int n from ops_stock_items where id = any($1) and status = 'free' and warehouse_id = $2", [[U.c1, U.c2], PJ])).rows[0].n;
     expect(free).toBe(1);
     await as(OP);

@@ -62,6 +62,29 @@ create table if not exists public.delivery_return_lines (
   primary key (return_id, order_line_id)
 );
 
+-- What Houzs stores on a return line and header, so the Delivery return lines
+-- listing shows every Houzs column. Follows Houzs
+-- backend/scripts/scm-schema/2990s-full-schema.sql:207-235 (line: condition,
+-- unit_price_sen, refund_sen; header: received_at) and
+-- backend/src/scm/routes/delivery-returns.ts:733-760 (refund = qty x unit price)
+-- per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+-- Money is RM numeric(12,2), as Carres `order_lines.unit_price` (0001). A return
+-- is received the moment it is recorded (Houzs delivery-returns.ts:950-957).
+-- Condition values: Houzs frontend/src/pages/scm-v2/DeliveryReturnFromDo.tsx:55,
+-- default NEW (Houzs delivery-returns.ts:1407).
+alter table public.delivery_returns
+  add column if not exists received_at timestamptz not null default now();
+alter table public.delivery_return_lines
+  add column if not exists unit_price numeric(12,2) not null default 0,
+  add column if not exists refund     numeric(12,2) not null default 0,
+  add column if not exists condition  text not null default 'NEW'
+    check (condition in ('NEW','OPENED','DAMAGED','DEFECTIVE'));
+alter table public.delivery_return_units
+  add column if not exists unit_price numeric(12,2) not null default 0,
+  add column if not exists refund     numeric(12,2) not null default 0,
+  add column if not exists condition  text not null default 'NEW'
+    check (condition in ('NEW','OPENED','DAMAGED','DEFECTIVE'));
+
 -- The Units a DO took out exactly: its 0424 snapshot, or (older DOs) the Units
 -- its delivered attempt recorded (0344).
 create or replace function public._delivery_order_exact_units(p_doc public.ops_delivery_orders)
@@ -97,8 +120,13 @@ end $$;
 
 -- ── 2 · New Delivery Return: picked Units back into stock at a Site ──────────
 
+-- p_conditions: { unitId: 'NEW'|'OPENED'|'DAMAGED'|'DEFECTIVE' }, missing = NEW
+-- (Houzs delivery-returns.ts:1238-1252,1407). The 4-argument form is dropped so
+-- a re-run does not leave an ambiguous overload.
+drop function if exists public.delivery_return_record(uuid, uuid[], uuid, text);
 create or replace function public.delivery_return_record(
-  p_delivery_order_id uuid, p_unit_ids uuid[], p_warehouse_id uuid, p_reason text
+  p_delivery_order_id uuid, p_unit_ids uuid[], p_warehouse_id uuid, p_reason text,
+  p_conditions jsonb default '{}'::jsonb
 )
 returns jsonb
 language plpgsql
@@ -112,6 +140,8 @@ declare
   v_site text;
   u      public.ops_stock_items;
   v_n    int := 0;
+  v_price numeric(12,2);
+  v_cond  text;
 begin
   if not public.is_operation() then
     raise exception 'forbidden' using errcode = '42501', detail = 'forbidden';
@@ -160,7 +190,19 @@ begin
            ref_history   = array_append(coalesce(ref_history, '{}'::text[]), v_no),
            updated_at    = now()
      where id = u.id;
-    insert into public.delivery_return_units values (v_id, u.id);
+    -- The Unit's price is its order line's unit price: the line it was
+    -- reserved for, else the order's first line of its SKU. Refund = that
+    -- price (one Unit). Follows Houzs delivery-returns.ts:1395-1410 (the DO
+    -- line's unit price is carried onto the return line) per Weisiang's
+    -- ruling (2026-10-22): clear Carres rules, implement Houzs.
+    select ol.unit_price into v_price from public.order_lines ol
+     where ol.order_id = v_doc.order_id
+       and (ol.id = u.reserved_order_line_id or ol.sku = u.sku)
+     order by (ol.id = u.reserved_order_line_id) desc nulls last, ol.created_at, ol.id
+     limit 1;
+    v_cond := coalesce(nullif(p_conditions->>u.id::text, ''), 'NEW');
+    insert into public.delivery_return_units (return_id, unit_id, unit_price, refund, condition)
+    values (v_id, u.id, coalesce(v_price, 0), coalesce(v_price, 0), v_cond);
     v_n := v_n + 1;
   end loop;
   if v_n <> cardinality(p_unit_ids) then
@@ -251,7 +293,8 @@ begin
   values (v_id, v_no, v_doc.order_id, v_doc.id, p_warehouse_id, btrim(p_reason));
 
   for v_line in
-    select (e->>'orderLineId')::uuid as line_id, sum((e->>'qty')::int)::int as qty
+    select (e->>'orderLineId')::uuid as line_id, sum((e->>'qty')::int)::int as qty,
+           coalesce(max(nullif(e->>'condition', '')), 'NEW') as condition
       from jsonb_array_elements(p_lines) e group by 1 order by 1
   loop
     select * into v_ol from public.order_lines
@@ -280,7 +323,11 @@ begin
       raise exception 'only % Unit(s) of % sold to this order are on the register', v_moved, v_ol.sku
         using errcode = 'P0001', detail = 'units_not_on_register';
     end if;
-    insert into public.delivery_return_lines values (v_id, v_ol.id, v_line.qty);
+    -- Unit price from the order line, refund = qty x unit price. Follows Houzs
+    -- delivery-returns.ts:733-760 per Weisiang's ruling (2026-10-22): clear
+    -- Carres rules, implement Houzs.
+    insert into public.delivery_return_lines (return_id, order_line_id, qty_returned, unit_price, refund, condition)
+    values (v_id, v_ol.id, v_line.qty, v_ol.unit_price, v_ol.unit_price * v_line.qty, v_line.condition);
     v_total := v_total + v_line.qty;
   end loop;
 
@@ -728,8 +775,8 @@ $$;
 
 revoke execute on function public.delivery_load_scan(text) from public, anon;
 grant execute on function public.delivery_load_scan(text) to authenticated;
-revoke execute on function public.delivery_return_record(uuid, uuid[], uuid, text) from public, anon;
-grant execute on function public.delivery_return_record(uuid, uuid[], uuid, text) to authenticated;
+revoke execute on function public.delivery_return_record(uuid, uuid[], uuid, text, jsonb) from public, anon;
+grant execute on function public.delivery_return_record(uuid, uuid[], uuid, text, jsonb) to authenticated;
 revoke execute on function public.delivery_return_record_lines(uuid, jsonb, uuid, text) from public, anon;
 grant execute on function public.delivery_return_record_lines(uuid, jsonb, uuid, text) to authenticated;
 revoke execute on function public.delivery_return_set_refund_status(uuid, text) from public, anon;
