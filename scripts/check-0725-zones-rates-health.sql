@@ -87,6 +87,22 @@ begin
   delete from delivery_zones where id = v_zone;
   if exists (select 1 from delivery_zones where id = v_zone) then raise exception 'FAIL: empty zone not removed'; end if;
 
+  -- Houzs charge rules on a card: a sofa band list must be a list; reconciliation is refused to
+  -- an operation user who is neither Finance nor named for Delivery settings.
+  v_ok := false;
+  begin
+    insert into delivery_rate_cards (partner_id, zone_id, first_unit, second_unit, further_unit, sofa_brackets)
+    values (v_carres, gen_random_uuid(), 1, 1, 1, '{"min": 1}');
+  exception when check_violation then v_ok := true;
+  end;
+  if not v_ok then raise exception 'FAIL: sofa bands that are not a list were accepted'; end if;
+  v_ok := false;
+  begin
+    perform delivery_rate_reconcile(null, null);
+  exception when insufficient_privilege then v_ok := true;
+  end;
+  if not v_ok then raise exception 'FAIL: reconciliation read by an operation user with no Finance or Delivery settings role'; end if;
+
   raise notice '0725 check: PASS';
 end;
 $check$;

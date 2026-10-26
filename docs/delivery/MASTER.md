@@ -2477,8 +2477,20 @@ auto-scheduling (left to the trips and master-list work).
 - Zones and Rate Cards are Delivery settings: written by the people named for Delivery settings, every
   change in the settings history.
 
-Not built (0725): Houzs' sofa compartment brackets, cap-and-overage, service/pickup/disposal charges,
-rounding, per-trip and per-customer counting, and the billed-versus-computed reconciliation.
+- **Houzs charge rules on a card (2026-10-26, Weisiang's ruling 2026-10-22: clear Carres rules,
+  implement Houzs)** — a `Cap` with `Each over cap` (units past the cap cost the overage, not the
+  further rate), `Sofa bands` (a sofa is priced by its compartments, once per sofa, never as a unit; a
+  built sofa's compartments are its lines sharing one build), `Service` / `Pickup` / `Disposal` rate ×
+  count, then the `Minimum` lifts the total. Maths in `packages/shared/src/fleet.ts` `deliveryCharge`,
+  following Houzs `backend/src/scm/lib/delivery-rate-card.ts:292-437`.
+- **Reconciliation** (Rate Cards → `Reconciliation`, Houzs' Reconciliation tab) — each live DO on a
+  live Logistics bill (0689 bill lines name their DO): `Billed` vs the card's `Rate card cost`,
+  `Difference`, `Match` / `Mismatch` / `No rate card`. Read only. Service, pickup and disposal are not
+  counted from the goods (Houzs: facts partial). Read by Finance readers and the people named for
+  Delivery settings (`delivery_rate_reconcile`).
+
+Not built (0725): Houzs' card charge cap and rounding, per-trip and per-customer counting, the
+outstation surcharge, and the free calculator panel.
 
 ## 16 · Production closure
 

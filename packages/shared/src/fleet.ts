@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { lineCategory, lineKind } from "./line-category";
 
 /**
  * Carres' own lorries — Fleet Day, Run sheet, Live Map, Lorry Capacity and
@@ -235,6 +236,8 @@ export function zoneForPostcode<Z extends DeliveryZone>(raw: string | null | und
 }
 
 export type RateBasis = "item" | "order";
+/** One sofa compartment band: a sofa of `min`..`max` compartments (max null = "min and more") costs `amount`. */
+export interface SofaBracket { min: number; max: number | null; amount: number }
 export interface RateCard {
   id: string;
   partnerId: string;
@@ -245,6 +248,14 @@ export interface RateCard {
   secondUnit: number;
   furtherUnit: number;
   minCharge: number;
+  /** Units up to the cap price on 1st / 2nd / each further; each unit past it costs `overageEach`. null = no cap. */
+  overageCap: number | null;
+  overageEach: number;
+  /** A sofa is priced by its compartment band, never as a unit. */
+  sofaBrackets: SofaBracket[];
+  serviceCharge: number;
+  pickupCharge: number;
+  disposalCharge: number;
 }
 
 /** The company's card for a zone, else its "every other zone" card. */
@@ -253,12 +264,99 @@ export const rateCardFor = (cards: readonly RateCard[], partnerId: string, zoneI
   cards.find((c) => c.partnerId === partnerId && c.zoneId == null) ??
   null;
 
-/** Houzs positional tiers: 1st unit + 2nd unit + each further unit, never below the minimum. Per order = one unit. */
-export function deliveryCost(card: RateCard, items: number): number {
-  const units = card.basis === "order" ? 1 : Math.max(0, Math.floor(items));
-  // No units still pays the minimum charge. Follows Houzs backend/src/scm/lib/delivery-rate-card.ts:406-409 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
-  const sum = (units >= 1 ? card.firstUnit : 0) + (units >= 2 ? card.secondUnit : 0) + Math.max(0, units - 2) * card.furtherUnit;
-  return Math.round(Math.max(sum, card.minCharge) * 100) / 100;
+/** What one delivery order carries, for its charge. */
+export interface DeliveryFacts {
+  /** Goods counted on 1st / 2nd / each further, sofas excluded. */
+  items: number;
+  /** One entry per sofa: its compartments. */
+  sofaCompartments?: readonly number[];
+  services?: number;
+  pickups?: number;
+  disposals?: number;
+}
+export type ChargeKind = "unit" | "overage" | "sofa" | "service" | "pickup" | "disposal" | "minimum";
+export interface ChargeLine { kind: ChargeKind; label: string; amount: number }
+
+const sen = (rm: number) => Math.round((Number(rm) || 0) * 100);
+const whole = (n: number | null | undefined) => Math.max(0, Math.floor(Number(n) || 0));
+
+/**
+ * A delivery order's charge on a rate card, line by line. Follows Houzs
+ * backend/src/scm/lib/delivery-rate-card.ts:292-437 per Weisiang's ruling (2026-10-22): clear Carres rules,
+ * implement Houzs. Order: units (1st, 2nd, each further; past the cap each unit costs the overage),
+ * sofas by compartment band, service / pickup / disposal x count, then the minimum. Sums in whole sen.
+ * Per delivery order = one unit (Carres's own basis). Houzs' charge cap, rounding and per-trip /
+ * per-customer counting are not carried.
+ */
+export function deliveryCharge(card: RateCard, facts: DeliveryFacts): { total: number; lines: ChargeLine[] } {
+  const lines: Array<ChargeLine & { s: number }> = [];
+  const push = (kind: ChargeKind, label: string, s: number) => { if (s > 0) lines.push({ kind, label, amount: s / 100, s }); };
+  const units = card.basis === "order" ? 1 : whole(facts.items);
+  const cap = card.overageCap == null ? null : whole(card.overageCap);
+  const tier = [sen(card.firstUnit), sen(card.secondUnit), sen(card.furtherUnit)];
+  // Houzs delivery-rate-card.ts:305-324: past the cap, a unit costs the overage, not the top tier.
+  const capped = cap == null ? units : Math.min(units, cap);
+  const tiered = (capped >= 1 ? tier[0] : 0) + (capped >= 2 ? tier[1] : 0) + Math.max(0, capped - 2) * tier[2];
+  push("unit", `${capped} ${card.basis === "order" ? "delivery order" : capped === 1 ? "item" : "items"}`, tiered);
+  if (cap != null && units > cap) push("overage", `${units - cap} over ${cap}`, (units - cap) * sen(card.overageEach));
+  // Houzs delivery-rate-card.ts:326-345: one band per sofa, first band that fits.
+  for (const c of facts.sofaCompartments ?? []) {
+    const n = whole(c);
+    const band = card.sofaBrackets.find((b) => n >= whole(b.min) && (b.max == null || n <= whole(b.max)));
+    if (n > 0 && band) push("sofa", `Sofa ${n} compartments`, sen(band.amount));
+  }
+  // Houzs delivery-rate-card.ts:365-386: rate x count.
+  const each: Array<[ChargeKind, string, number | undefined, number]> = [
+    ["service", "Service", facts.services, card.serviceCharge],
+    ["pickup", "Pickup", facts.pickups, card.pickupCharge],
+    ["disposal", "Disposal", facts.disposals, card.disposalCharge],
+  ];
+  for (const [kind, word, count, rate] of each) {
+    const n = whole(count);
+    if (n > 0) push(kind, n > 1 ? `${word} x${n}` : word, n * sen(rate));
+  }
+  let total = lines.reduce((t, l) => t + l.s, 0);
+  // Houzs delivery-rate-card.ts:406-409: anything below the minimum is raised to it, even nothing.
+  if (total < sen(card.minCharge)) { push("minimum", "Minimum", sen(card.minCharge) - total); total = sen(card.minCharge); }
+  return { total: total / 100, lines: lines.map(({ s: _s, ...l }) => l) };
+}
+
+/** Sofa bands as typed: "1-3 50, 4-5 70, 6+ 90" (compartments, then RM). null = not readable. */
+export function parseSofaBands(text: string): SofaBracket[] | null {
+  const out: SofaBracket[] = [];
+  for (const part of text.split(",").map((x) => x.trim()).filter(Boolean)) {
+    const m = /^(\d{1,2})(?:(\+)|-(\d{1,2}))?\s+(\d+(?:\.\d{1,2})?)$/.exec(part);
+    if (!m) return null;
+    const min = Number(m[1]);
+    const max = m[2] ? null : Number(m[3] ?? m[1]);
+    if (min < 1 || (max != null && max < min)) return null;
+    out.push({ min, max, amount: Number(m[4]) });
+  }
+  return out;
+}
+export const formatSofaBands = (bands: readonly SofaBracket[]) =>
+  bands.map((b) => `${b.min}${b.max == null ? "+" : b.max === b.min ? "" : `-${b.max}`} ${b.amount}`).join(", ");
+
+/** Houzs positional tiers for a count of goods only (the DO page). */
+export const deliveryCost = (card: RateCard, items: number) => deliveryCharge(card, { items }).total;
+
+/**
+ * A delivery order's goods as charge facts. Follows Houzs delivery-rate-card.ts:23-27 per Weisiang's
+ * ruling (2026-10-22): clear Carres rules, implement Houzs — a sofa is not a unit, it is priced by its
+ * compartments. A built sofa's compartments are its lines sharing `attrs.sofa_build_key`.
+ */
+// ponytail: a sofa line with no build key counts its qty as one sofa's compartments; read a model's compartment count if that proves wrong.
+export function deliveryFacts(lines: ReadonlyArray<{ sku: string; qty: number; attrs?: Record<string, unknown> | null }>): DeliveryFacts {
+  let items = 0;
+  const sofas = new Map<string, number>();
+  lines.forEach((l, i) => {
+    const qty = whole(l.qty);
+    if (lineKind(l.sku) !== "core") return; // accessories and service lines are not goods on the lorry
+    if (lineCategory(l.sku) !== "sofa") { items += qty; return; }
+    const key = String(l.attrs?.sofa_build_key ?? `line-${i}`);
+    sofas.set(key, (sofas.get(key) ?? 0) + qty);
+  });
+  return { items, sofaCompartments: [...sofas.values()] };
 }
 
 const dateOrNull = isoDate.nullable();
@@ -287,4 +385,14 @@ export const rateCardInput = z.object({
   secondUnit: money,
   furtherUnit: money,
   minCharge: money.default(0),
+  overageCap: z.number().int().min(1).max(999).nullable().default(null),
+  overageEach: money.default(0),
+  sofaBrackets: z
+    .array(z.object({ min: z.number().int().min(1).max(99), max: z.number().int().min(1).max(99).nullable(), amount: money }))
+    .max(20)
+    .refine((bs) => bs.every((b) => b.max == null || b.min <= b.max), { message: "A band's lowest compartments must not be above its highest." })
+    .default([]),
+  serviceCharge: money.default(0),
+  pickupCharge: money.default(0),
+  disposalCharge: money.default(0),
 });

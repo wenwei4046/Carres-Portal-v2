@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { dueFlag, worstFlag, zoneForPostcode, type DueFlag, type FleetCrew, type RateCard } from "@carres/shared/fleet";
+import { dueFlag, formatSofaBands, parseSofaBands, worstFlag, zoneForPostcode, type DueFlag, type FleetCrew, type RateCard } from "@carres/shared/fleet";
 import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import Button from "@/components/kit/Button";
@@ -10,7 +10,10 @@ import { appTodayIso } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import { useDeliverySettings } from "@/lib/queries";
 import ModuleHeader from "./components/ModuleHeader";
-import { FL, refusalOf, useFleet, useFleetWrite, usePricing, useSettingsWrite, type FleetPayload, type PricingPayload } from "./fleet";
+import { ApiError } from "@/lib/api";
+import {
+  FL, refusalOf, useFleet, useFleetWrite, usePricing, useReconcile, useSettingsWrite, type FleetPayload, type PricingPayload, type ReconcileRow,
+} from "./fleet";
 
 /**
  * 0725 — Fleet, Fleet Health, Delivery Zones and Rate Cards. Weisiang's
@@ -287,11 +290,28 @@ export function DeliveryZonesPage() {
   );
 }
 
-/* ── Rate Cards (Houzs DeliveryRateCards: 1st / 2nd / each further unit per zone) ── */
+/* ── Rate Cards (Houzs DeliveryRateCards: 1st / 2nd / each further unit per zone, cap and overage,
+   sofa compartment bands, service / pickup / disposal, minimum; and the Reconciliation tab). Follows Houzs
+   frontend/src/pages/scm-v2/DeliveryRateCards.tsx:83-159 per Weisiang's ruling (2026-10-22): clear Carres
+   rules, implement Houzs. ── */
 
-const EMPTY_RATE = { id: null as string | null, zoneId: "all", basis: "item", firstUnit: "", secondUnit: "", furtherUnit: "", minCharge: "0" };
+const EMPTY_RATE = {
+  id: null as string | null, zoneId: "all", basis: "item", firstUnit: "", secondUnit: "", furtherUnit: "", minCharge: "0",
+  overageCap: "", overageEach: "0", sofaBands: "", serviceCharge: "0", pickupCharge: "0", disposalCharge: "0",
+};
+type MoneyKey = "firstUnit" | "secondUnit" | "furtherUnit" | "minCharge" | "overageEach" | "serviceCharge" | "pickupCharge" | "disposalCharge";
+const MONEY_KEYS: MoneyKey[] = ["firstUnit", "secondUnit", "furtherUnit", "minCharge", "overageEach", "serviceCharge", "pickupCharge", "disposalCharge"];
 
 export function RateCardsPage() {
+  const [view, setView] = useState<"cards" | "reconcile">("cards");
+  const switcher = (
+    <Select id="rate-view" toolbar value={view} onValueChange={(v) => setView(v === "reconcile" ? "reconcile" : "cards")}
+      options={[{ value: "cards", label: FL.rateCards }, { value: "reconcile", label: FL.reconciliation }]} />
+  );
+  return view === "cards" ? <RateCardsView switcher={switcher} /> : <ReconcileView switcher={switcher} />;
+}
+
+function RateCardsView({ switcher }: { switcher: React.ReactNode }) {
   const q = usePricing();
   const write = useFleetWrite();
   const canEdit = useCanEdit();
@@ -303,45 +323,61 @@ export function RateCardsPage() {
   const zoneName = (id: string | null) => (id ? q.data?.zones.find((z) => z.id === id)?.name ?? "" : FL.everyOtherZone);
   const rows = (q.data?.rates ?? []).filter((r) => r.partnerId === partnerId).sort((a, b) => zoneName(a.zoneId).localeCompare(zoneName(b.zoneId)));
   const num = (s: string) => Number(s);
-  const ready = [form.firstUnit, form.secondUnit, form.furtherUnit, form.minCharge].every((s) => s.trim() !== "" && num(s) >= 0);
+  const bands = parseSofaBands(form.sofaBands);
+  const capOk = form.overageCap.trim() === "" || (Number.isInteger(num(form.overageCap)) && num(form.overageCap) >= 1);
+  const ready = MONEY_KEYS.every((k) => form[k].trim() !== "" && num(form[k]) >= 0) && capOk && bands !== null;
 
   const save = () => {
-    if (!partnerId) return;
+    if (!partnerId || !bands) return;
     setMessage(null);
+    const money = Object.fromEntries(MONEY_KEYS.map((k) => [k, num(form[k])]));
     write.mutate({ path: "/rates", body: {
-      id: form.id, partnerId, zoneId: form.zoneId === "all" ? null : form.zoneId, basis: form.basis,
-      firstUnit: num(form.firstUnit), secondUnit: num(form.secondUnit), furtherUnit: num(form.furtherUnit), minCharge: num(form.minCharge),
+      id: form.id, partnerId, zoneId: form.zoneId === "all" ? null : form.zoneId, basis: form.basis, ...money,
+      overageCap: form.overageCap.trim() === "" ? null : num(form.overageCap), sofaBrackets: bands,
     } }, { onSuccess: () => setForm(EMPTY_RATE), onError: (e) => setMessage(refusalOf(e)) });
   };
+  const edit = (r: RateCard) => setForm({
+    id: r.id, zoneId: r.zoneId ?? "all", basis: r.basis, overageCap: r.overageCap == null ? "" : String(r.overageCap),
+    sofaBands: formatSofaBands(r.sofaBrackets),
+    ...(Object.fromEntries(MONEY_KEYS.map((k) => [k, String(r[k])])) as Record<MoneyKey, string>),
+  });
 
+  const moneyCol = (key: MoneyKey, label: string, width = 110): DataGridColumn<RateCard> =>
+    ({ key, label, width, align: "right", accessor: (r) => rm(r[key]), numberValue: (r) => r[key] });
   const columns: DataGridColumn<RateCard>[] = [
     { key: "zone", label: FL.zone, width: 160, accessor: (r) => zoneName(r.zoneId) },
     { key: "basis", label: FL.basis, width: 130, accessor: (r) => (r.basis === "order" ? FL.perOrder : FL.perItem) },
-    { key: "first", label: FL.firstUnit, width: 110, align: "right", accessor: (r) => rm(r.firstUnit), numberValue: (r) => r.firstUnit },
-    { key: "second", label: FL.secondUnit, width: 110, align: "right", accessor: (r) => rm(r.secondUnit), numberValue: (r) => r.secondUnit },
-    { key: "further", label: FL.furtherUnit, width: 130, align: "right", accessor: (r) => rm(r.furtherUnit), numberValue: (r) => r.furtherUnit },
-    { key: "min", label: FL.minCharge, width: 110, align: "right", accessor: (r) => rm(r.minCharge), numberValue: (r) => r.minCharge },
+    moneyCol("firstUnit", FL.firstUnit),
+    moneyCol("secondUnit", FL.secondUnit),
+    moneyCol("furtherUnit", FL.furtherUnit, 130),
+    { key: "cap", label: FL.overageCap, width: 90, align: "right", accessor: (r) => (r.overageCap == null ? "" : String(r.overageCap)), numberValue: (r) => r.overageCap ?? 0 },
+    moneyCol("overageEach", FL.overageEach, 130),
+    { key: "sofa", label: FL.sofaBands, width: 180, accessor: (r) => formatSofaBands(r.sofaBrackets) },
+    moneyCol("serviceCharge", FL.serviceCharge),
+    moneyCol("pickupCharge", FL.pickupCharge),
+    moneyCol("disposalCharge", FL.disposalCharge),
+    moneyCol("minCharge", FL.minCharge),
     ...(canEdit ? [{ key: "act", label: "", exportLabel: FL.edit, width: 200, sortable: false, filterable: false, accessor: (r: RateCard) => (
       <span className="flex gap-2" onClick={stop}>
-        <Button size="sm" onClick={() => setForm({ id: r.id, zoneId: r.zoneId ?? "all", basis: r.basis, firstUnit: String(r.firstUnit),
-          secondUnit: String(r.secondUnit), furtherUnit: String(r.furtherUnit), minCharge: String(r.minCharge) })}>{FL.edit}</Button>
+        <Button size="sm" onClick={() => edit(r)}>{FL.edit}</Button>
         <Button size="sm" onClick={() => write.mutate({ path: `/rates/${r.id}`, method: "DELETE" }, { onError: (e) => setMessage(refusalOf(e)) })}>{FL.remove}</Button>
       </span>
     ) } satisfies DataGridColumn<RateCard>] : []),
   ];
-  const money = (k: "firstUnit" | "secondUnit" | "furtherUnit" | "minCharge", word: string) => (
-    <input type="number" min={0} step="0.01" aria-label={word} placeholder={word} className={`${field} w-24`} value={form[k]}
+  const input = (k: MoneyKey | "overageCap", word: string, w = "w-24") => (
+    <input type="number" min={0} step="0.01" aria-label={word} placeholder={word} className={`${field} ${w}`} value={form[k]}
       onChange={(e) => setForm({ ...form, [k]: e.target.value })} />
   );
 
   return (
     <Shell word={FL.rateCards} testId="rate-cards" failed={q.isError}>
-      <Refusal text={message} />
-      <DataGrid rows={rows} columns={columns} rowKey={(r) => r.id} storageKey="carres.operation.rate-cards.v1"
+      <Refusal text={message ?? (bands === null ? FL.sofaBandsBad : null)} />
+      <DataGrid rows={rows} columns={columns} rowKey={(r) => r.id} storageKey="carres.operation.rate-cards.v2"
         appearance="reference" exportName={FL.rateCards} groupBanner={false} isLoading={!q.isSuccess && !q.isError}
         emptyMessage={FL.noRates}
         toolbarStart={
           <span className="flex flex-wrap items-center gap-2" data-testid="rate-cards-form">
+            {switcher}
             <Select id="rate-company" toolbar placeholder={FL.company} value={partnerId ?? undefined}
               onValueChange={(v) => { setPicked(v); setForm(EMPTY_RATE); }} options={companies.map((c) => ({ value: c.id, label: c.name }))} />
             {canEdit && partnerId ? (
@@ -350,10 +386,17 @@ export function RateCardsPage() {
                   options={[{ value: "all", label: FL.everyOtherZone }, ...(q.data?.zones ?? []).map((z) => ({ value: z.id, label: z.name }))]} />
                 <Select id="rate-basis" toolbar value={form.basis} onValueChange={(v) => setForm({ ...form, basis: v })}
                   options={[{ value: "item", label: FL.perItem }, { value: "order", label: FL.perOrder }]} />
-                {money("firstUnit", FL.firstUnit)}
-                {money("secondUnit", FL.secondUnit)}
-                {money("furtherUnit", FL.furtherUnit)}
-                {money("minCharge", FL.minCharge)}
+                {input("firstUnit", FL.firstUnit)}
+                {input("secondUnit", FL.secondUnit)}
+                {input("furtherUnit", FL.furtherUnit)}
+                {input("overageCap", FL.overageCap, "w-16")}
+                {input("overageEach", FL.overageEach)}
+                <input type="text" aria-label={FL.sofaBands} placeholder={`${FL.sofaBands}: ${FL.sofaBandsHint}`} className={`${field} w-48`}
+                  value={form.sofaBands} onChange={(e) => setForm({ ...form, sofaBands: e.target.value })} />
+                {input("serviceCharge", FL.serviceCharge)}
+                {input("pickupCharge", FL.pickupCharge)}
+                {input("disposalCharge", FL.disposalCharge)}
+                {input("minCharge", FL.minCharge)}
                 <Button size="sm" variant="primary" disabled={!ready} loading={write.isPending} onClick={save}>{form.id ? FL.save : FL.addRate}</Button>
                 {form.id ? <Button size="sm" onClick={() => setForm(EMPTY_RATE)}>{FL.cancel}</Button> : null}
               </>
@@ -364,3 +407,40 @@ export function RateCardsPage() {
   );
 }
 
+/* Reconciliation: each delivery order on a live Logistics bill, billed vs the rate card's charge.
+   Follows Houzs frontend/src/pages/scm-v2/DeliveryRateCards.tsx:615-680 per Weisiang's ruling (2026-10-22):
+   clear Carres rules, implement Houzs. */
+function ReconcileView({ switcher }: { switcher: React.ReactNode }) {
+  const [range, setRange] = useState({ from: "", to: "" });
+  const q = useReconcile(range);
+  const refused = q.error instanceof ApiError && q.error.status === 403;
+  const status = (r: ReconcileRow) => (r.expected == null ? FL.noCard : r.difference === 0 ? FL.match : FL.mismatch);
+  const columns: DataGridColumn<ReconcileRow>[] = [
+    { key: "do", label: FL.doNo, width: 140, accessor: (r) => r.doNo },
+    { key: "date", label: FL.date, width: 110, accessor: (r) => r.deliveryDate ?? "" },
+    { key: "company", label: FL.company, width: 160, accessor: (r) => r.company },
+    { key: "bill", label: FL.bill, width: 140, accessor: (r) => r.bills.join(", ") },
+    { key: "zone", label: FL.zone, width: 120, accessor: (r) => r.zone ?? FL.noZone },
+    { key: "items", label: FL.items, width: 80, align: "right", accessor: (r) => String(r.items), numberValue: (r) => r.items },
+    { key: "sofas", label: FL.sofas, width: 80, align: "right", accessor: (r) => String(r.sofas), numberValue: (r) => r.sofas },
+    { key: "expected", label: FL.expected, width: 130, align: "right", accessor: (r) => (r.expected == null ? "" : rm(r.expected)), numberValue: (r) => r.expected ?? 0 },
+    { key: "billed", label: FL.billed, width: 120, align: "right", accessor: (r) => rm(r.billed), numberValue: (r) => r.billed },
+    { key: "diff", label: FL.difference, width: 120, align: "right", accessor: (r) => (r.difference == null ? "" : rm(r.difference)), numberValue: (r) => r.difference ?? 0 },
+    { key: "status", label: FL.status, width: 130, accessor: (r) => (
+      <StatusPill tone={r.expected == null ? "neutral" : r.difference === 0 ? "success" : "danger"}>{status(r)}</StatusPill>
+    ) },
+  ];
+  const date = (k: "from" | "to", word: string) => (
+    <input type="date" aria-label={word} className={field} value={range[k]} onChange={(e) => setRange({ ...range, [k]: e.target.value })} />
+  );
+  return (
+    <Shell word={FL.rateCards} testId="rate-reconcile" failed={q.isError && !refused}>
+      <Refusal text={refused ? FL.reconRefused : null} />
+      <p className="px-4 pb-2 text-body">{FL.reconNote}</p>
+      <DataGrid rows={q.data?.rows ?? []} columns={columns} rowKey={(r) => r.doId} storageKey="carres.operation.rate-reconcile.v1"
+        appearance="reference" exportName={FL.reconciliation} groupBanner={false} isLoading={q.isLoading}
+        emptyMessage={FL.noBilled}
+        toolbarStart={<span className="flex flex-wrap items-center gap-2">{switcher}{date("from", FL.from)}{date("to", FL.to)}</span>} />
+    </Shell>
+  );
+}

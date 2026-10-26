@@ -132,8 +132,19 @@ alter table public.delivery_rate_cards add constraint delivery_rate_cards_zone_i
   foreign key (zone_id) references public.delivery_zones(id) on delete restrict;
 create unique index if not exists delivery_rate_cards_one_per_zone_uidx
   on public.delivery_rate_cards (partner_id, coalesce(zone_id, '00000000-0000-0000-0000-000000000000'::uuid));
+-- Houzs charge rules on the card. Follows Houzs backend/src/db/migrations-pg/0207_scm_delivery_rate_cards.sql:87-116
+-- (OVERAGE cap, SOFA_BRACKET bands, SERVICE / PICKUP / DISPOSE rates) per Weisiang's ruling (2026-10-22):
+-- clear Carres rules, implement Houzs. Kept on the card row (one card per company per zone) rather
+-- than Houzs' rule rows; sofa bands are a small list [{min, max|null, amount}].
+alter table public.delivery_rate_cards
+  add column if not exists overage_cap     smallint check (overage_cap is null or overage_cap >= 1),
+  add column if not exists overage_each    numeric(10,2) not null default 0 check (overage_each >= 0),
+  add column if not exists sofa_brackets   jsonb not null default '[]'::jsonb check (jsonb_typeof(sofa_brackets) = 'array'),
+  add column if not exists service_charge  numeric(10,2) not null default 0 check (service_charge >= 0),
+  add column if not exists pickup_charge   numeric(10,2) not null default 0 check (pickup_charge >= 0),
+  add column if not exists disposal_charge numeric(10,2) not null default 0 check (disposal_charge >= 0);
 comment on table public.delivery_rate_cards is
-  '0725 (Weisiang''s decision 2026-10-22, Houzs Delivery Rate Cards): a Logistics company''s price per zone — 1st, 2nd and each further unit (item or delivery order), with a minimum charge.';
+  '0725 (Weisiang''s decision 2026-10-22, Houzs Delivery Rate Cards): a Logistics company''s price per zone — 1st, 2nd and each further unit (item or delivery order), overage past a cap, sofa compartment bands, service / pickup / disposal charges and a minimum charge.';
 
 -- 4 · who reads and writes zones and rate cards ------------------------------
 do $grants$
@@ -177,3 +188,51 @@ create trigger delivery_zones_audit after insert or update or delete on public.d
 drop trigger if exists delivery_rate_cards_audit on public.delivery_rate_cards;
 create trigger delivery_rate_cards_audit after insert or update or delete on public.delivery_rate_cards
   for each row execute function public.delivery_zone_rate_audit();
+
+-- 5 · Reconciliation -------------------------------------------------------
+-- Follows Houzs backend/src/scm/routes/delivery-rate-cards.ts:476-672 (GET /reconcile) per Weisiang's
+-- ruling (2026-10-22): clear Carres rules, implement Houzs. Houzs compares a 3PL trip's billed cost
+-- with the rate card's computed cost; in Carres a Logistics company's bill is charged per delivery
+-- order (0689 supplier_bill_lines.delivery_order_id), so each billed DO is one row. This returns the
+-- facts; the charge is computed in packages/shared/src/fleet.ts deliveryCharge (API route). Read only.
+-- Bill amounts are Finance's, so it is read by Finance readers and the people named for Delivery settings.
+create or replace function public.delivery_rate_reconcile(p_from date, p_to date)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $fn$
+begin
+  if not (public.gl_may_read() or public.settings_can_edit('delivery')) then
+    raise exception 'Only Finance or the people named for Delivery settings read delivery charges.'
+      using errcode = '42501', detail = 'not_allowed';
+  end if;
+  return coalesce((
+    select jsonb_agg(jsonb_build_object(
+             'do_id', d.id, 'do_no', d.do_number, 'delivery_date', d.delivery_date,
+             'partner_id', p.id, 'partner_name', p.name, 'address', o.customer_address,
+             'trip_groups', d.trip_groups, 'billed', b.billed, 'bills', b.bills,
+             'lines', (select coalesce(jsonb_agg(jsonb_build_object('sku', l.sku, 'qty', l.qty, 'attrs', l.attrs)), '[]'::jsonb)
+                         from public.order_lines l where l.order_id = d.order_id))
+           order by d.delivery_date desc nulls last, d.do_number)
+      from public.ops_delivery_orders d
+      join public.orders o on o.id = d.order_id
+      left join public.ops_delivery_arrangements a on a.order_id = d.order_id and a.leg = d.leg
+      join public.delivery_partners p on coalesce(a.partner_id = p.id, d.logistics_partner = p.name)
+      join lateral (
+        select sum(bl.amount) as billed, jsonb_agg(distinct coalesce(sb.bill_no, sb.supplier_invoice_no)) as bills
+          from public.supplier_bill_lines bl
+          join public.supplier_bills sb on sb.id = bl.bill_id
+         where bl.delivery_order_id = d.id and sb.status <> 'cancelled'
+      ) b on b.billed is not null
+     where d.voided_at is null
+       and (p_from is null or d.delivery_date >= p_from)
+       and (p_to is null or d.delivery_date <= p_to)
+  ), '[]'::jsonb);
+end;
+$fn$;
+revoke all on function public.delivery_rate_reconcile(date, date) from public, anon;
+grant execute on function public.delivery_rate_reconcile(date, date) to authenticated;
+comment on function public.delivery_rate_reconcile(date, date) is
+  '0725 (Weisiang''s decision 2026-10-22, Houzs reconcile): each live delivery order on a live Logistics bill, with its billed amount, company, address and goods, for comparing with the rate card. Finance readers and Delivery settings editors.';

@@ -104,6 +104,30 @@ export const FL = {
   noRates: "This Logistics company has no rate card yet.",
   rateCardCost: "Rate card cost",
   noRateCard: "No rate card for this Logistics company and zone",
+  /* Houzs charge rules and reconciliation (Houzs DeliveryRateCards.tsx, Weisiang's ruling 2026-10-22). */
+  overageCap: "Cap",
+  overageEach: "Each over cap",
+  sofaBands: "Sofa bands",
+  sofaBandsHint: "1-3 50, 4+ 80",
+  sofaBandsBad: "Write sofa bands as 1-3 50, 4-5 70, 6+ 90.",
+  serviceCharge: "Service",
+  pickupCharge: "Pickup",
+  disposalCharge: "Disposal",
+  reconciliation: "Reconciliation",
+  doNo: "Delivery Order",
+  date: "Date",
+  bill: "Bill",
+  items: "Items",
+  sofas: "Sofas",
+  billed: "Billed",
+  expected: "Rate card cost",
+  difference: "Difference",
+  match: "Match",
+  mismatch: "Mismatch",
+  noCard: "No rate card",
+  noBilled: "No delivery order on a Logistics bill in these dates.",
+  reconNote: "Service, pickup and disposal are not counted from the goods.",
+  reconRefused: "Only Finance or the people named for Delivery settings see delivery charges.",
   refusals: {
     on_leave: "This person is on leave that day.",
     already_crewed: "This person is already on another lorry that day.",
@@ -175,6 +199,20 @@ export interface PricingPayload {
 
 export function usePricing() {
   return useQuery({ queryKey: ["fleet", "pricing"], queryFn: () => apiFetch<PricingPayload>("/api/operation/fleet/pricing") });
+}
+
+export interface ReconcileRow {
+  doId: string; doNo: string; deliveryDate: string | null; partnerId: string; company: string; bills: string[];
+  zone: string | null; items: number; sofas: number; billed: number; expected: number | null;
+  lines: Array<{ kind: string; label: string; amount: number }>; difference: number | null; factsComplete: boolean;
+}
+
+export function useReconcile(range: { from: string; to: string }) {
+  const qs = new URLSearchParams(Object.entries(range).filter(([, v]) => v)).toString();
+  return useQuery({
+    queryKey: ["fleet", "reconcile", range],
+    queryFn: () => apiFetch<{ rows: ReconcileRow[] }>(`/api/operation/fleet/reconcile${qs ? `?${qs}` : ""}`),
+  });
 }
 
 /** Lorry and crew rows are saved through Settings → Logistics' own doors, so both views re-read. */

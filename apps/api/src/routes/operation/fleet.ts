@@ -1,7 +1,9 @@
 import { Hono } from "hono";
 import {
-  deliveryZoneInput, fleetCrewConfirmInput, fleetCrewLeaveInput, fleetHealthInput, fleetPositionInput, rateCardInput,
+  deliveryCharge, deliveryFacts, deliveryZoneInput, fleetCrewConfirmInput, fleetCrewLeaveInput, fleetHealthInput, fleetPositionInput,
+  rateCardFor, rateCardInput, zoneForPostcode, type RateCard,
 } from "@carres/shared/fleet";
+import { deliveryGroupOf } from "@carres/shared/delivery-groups";
 import { requireOperation } from "../../lib/auth-guards";
 import { fail, parseJsonBody } from "../../lib/route-helpers";
 import { requireSettingsEditor } from "../../lib/settings-editor";
@@ -25,6 +27,7 @@ import type { AppEnv } from "../../types";
  *   GET    /pricing      Logistics companies, Delivery Zones and Rate Cards
  *   POST   /zones · DELETE /zones/:id   a zone and its postcode ranges
  *   POST   /rates · DELETE /rates/:id   a company's rate card for a zone
+ *   GET    /reconcile    each billed delivery order: billed vs the rate card's charge
  *   Zones and rates are Delivery settings: the people named for them write.
  *
  * Every rule lives in the SQL door and row security; the caller's own token
@@ -143,24 +146,31 @@ router.post("/health", async (c) => {
   return c.json(data);
 });
 
+const RATE_COLS =
+  "id, partner_id, zone_id, basis, first_unit, second_unit, further_unit, min_charge, " +
+  "overage_cap, overage_each, sofa_brackets, service_charge, pickup_charge, disposal_charge";
+type Row = Record<string, unknown>;
+const rateOut = (r: Row): RateCard => ({
+  id: String(r.id), partnerId: String(r.partner_id), zoneId: (r.zone_id as string | null) ?? null, basis: r.basis === "order" ? "order" : "item",
+  firstUnit: Number(r.first_unit), secondUnit: Number(r.second_unit), furtherUnit: Number(r.further_unit), minCharge: Number(r.min_charge),
+  overageCap: r.overage_cap == null ? null : Number(r.overage_cap), overageEach: Number(r.overage_each ?? 0),
+  sofaBrackets: (r.sofa_brackets ?? []) as RateCard["sofaBrackets"],
+  serviceCharge: Number(r.service_charge ?? 0), pickupCharge: Number(r.pickup_charge ?? 0), disposalCharge: Number(r.disposal_charge ?? 0),
+});
+
 router.get("/pricing", async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const [partnersR, zonesR, ratesR] = await Promise.all([
     sb.from("delivery_partners").select("id, name, own_fleet, active").order("name"),
     sb.from("delivery_zones").select("id, name, postcodes").order("name"),
-    sb.from("delivery_rate_cards").select("id, partner_id, zone_id, basis, first_unit, second_unit, further_unit, min_charge"),
+    sb.from("delivery_rate_cards").select(RATE_COLS),
   ]);
   for (const r of [partnersR, zonesR, ratesR]) if (r.error) return fail(c, r.error);
-  type Row = Record<string, unknown>;
   const rows = (r: { data: unknown }) => (r.data ?? []) as Row[];
   return c.json({
     companies: rows(partnersR).map((r) => ({ id: r.id, name: r.name, ownFleet: r.own_fleet === true, active: r.active !== false })),
     zones: rows(zonesR).map((r) => ({ id: r.id, name: r.name, postcodes: (r.postcodes ?? []) as string[] })),
-    rates: rows(ratesR).map((r) => ({
-      id: r.id, partnerId: r.partner_id, zoneId: r.zone_id ?? null, basis: r.basis,
-      firstUnit: Number(r.first_unit), secondUnit: Number(r.second_unit),
-      furtherUnit: Number(r.further_unit), minCharge: Number(r.min_charge),
-    })),
+    rates: rows(ratesR).map(rateOut),
   });
 });
 
@@ -193,6 +203,8 @@ router.post("/rates", requireSettingsEditor("delivery"), async (c) => {
   const row = {
     partner_id: d.partnerId, zone_id: d.zoneId, basis: d.basis, first_unit: d.firstUnit,
     second_unit: d.secondUnit, further_unit: d.furtherUnit, min_charge: d.minCharge,
+    overage_cap: d.overageCap, overage_each: d.overageEach, sofa_brackets: d.sofaBrackets,
+    service_charge: d.serviceCharge, pickup_charge: d.pickupCharge, disposal_charge: d.disposalCharge,
   };
   const r = d.id
     ? await sb.from("delivery_rate_cards").update(row).eq("id", d.id).select("id").single()
@@ -205,6 +217,45 @@ router.delete("/rates/:id", requireSettingsEditor("delivery"), async (c) => {
   const { error } = await userClient(c.env, c.var.auth.jwt).from("delivery_rate_cards").delete().eq("id", c.req.param("id"));
   if (error) return fail(c, error);
   return c.json({ ok: true });
+});
+
+/* Reconciliation. Follows Houzs backend/src/scm/routes/delivery-rate-cards.ts:476-672 per Weisiang's
+   ruling (2026-10-22): clear Carres rules, implement Houzs. Each delivery order on a live Logistics bill
+   (0689) is priced on its company's card for its zone and compared with what was billed. Like Houzs,
+   service / pickup / disposal are not in the goods, so they count 0 here (factsComplete false). */
+const isoDay = /^\d{4}-\d{2}-\d{2}$/;
+router.get("/reconcile", async (c) => {
+  const from = c.req.query("from") ?? null;
+  const to = c.req.query("to") ?? null;
+  if ((from && !isoDay.test(from)) || (to && !isoDay.test(to))) return c.json({ error: "bad_request", message: "Dates are YYYY-MM-DD." }, 400);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const [recR, zonesR, ratesR] = await Promise.all([
+    sb.rpc("delivery_rate_reconcile", { p_from: from, p_to: to }),
+    sb.from("delivery_zones").select("id, name, postcodes"),
+    sb.from("delivery_rate_cards").select(RATE_COLS),
+  ]);
+  for (const r of [recR, zonesR, ratesR]) if (r.error) return fail(c, r.error);
+  const zones = ((zonesR.data ?? []) as Row[]).map((z) => ({ id: String(z.id), name: String(z.name), postcodes: (z.postcodes ?? []) as string[] }));
+  const cards = ((ratesR.data ?? []) as unknown as Row[]).map(rateOut);
+  const rows = ((recR.data ?? []) as Row[]).map((r) => {
+    // This trip's goods only: trip_groups null = the whole order (DeliveryOrderPage tripLines).
+    const groups = (r.trip_groups ?? null) as string[] | null;
+    const lines = ((r.lines ?? []) as Array<{ sku: string; qty: number; attrs: Record<string, unknown> | null }>)
+      .filter((l) => !groups?.length || groups.includes(deliveryGroupOf(l.sku) ?? ""));
+    const zone = zoneForPostcode(r.address as string | null, zones);
+    const card = rateCardFor(cards, String(r.partner_id), zone?.id ?? null);
+    const facts = deliveryFacts(lines);
+    const charge = card ? deliveryCharge(card, facts) : null;
+    const billed = Number(r.billed);
+    return {
+      doId: r.do_id, doNo: r.do_no, deliveryDate: r.delivery_date ?? null, partnerId: r.partner_id, company: r.partner_name,
+      bills: (r.bills ?? []) as string[], zone: zone?.name ?? null, items: facts.items, sofas: facts.sofaCompartments?.length ?? 0,
+      billed, expected: charge?.total ?? null, lines: charge?.lines ?? [],
+      difference: charge ? Math.round((billed - charge.total) * 100) / 100 : null,
+      factsComplete: false,
+    };
+  });
+  return c.json({ rows });
 });
 
 export default router;
