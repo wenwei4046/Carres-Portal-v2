@@ -950,8 +950,8 @@ describe("PortalSidebar — the Purchasing map", () => {
       "Repair Orders",
       "Display Requests",
       "Consignment Orders",
-      /* Consignment Receives — follows Houzs frontend/src/components/Sidebar.tsx:552 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
-      "Consignment Receives",
+      /* Purchase Consignment Receive — follows Houzs frontend/src/components/Sidebar.tsx:552 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
+      "Purchase Consignment Receive",
       "Consignment Returns",
     ]);
   });

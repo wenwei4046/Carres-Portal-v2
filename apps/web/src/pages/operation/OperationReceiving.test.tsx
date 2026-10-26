@@ -802,7 +802,7 @@ describe("OperationReceiving — the formal GRN Register", () => {
   });
 
   // Follows Houzs frontend/src/components/Sidebar.tsx:552 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
-  it("the Consignment Receives page is the same register locked to Consignment Orders, with no way to unlock it", async () => {
+  it("the Purchase Consignment Receive page is the same register locked to Consignment Orders, with no way to unlock it", async () => {
     renderWithProviders(<OperationReceiving consignmentPage />);
     await waitFor(() => expect(h.registerAsks.at(-1)).toMatchObject({ consignment: true }));
     fireEvent.click(screen.getByRole("button", { name: "Filters" }));

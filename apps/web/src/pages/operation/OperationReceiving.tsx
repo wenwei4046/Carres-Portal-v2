@@ -90,7 +90,7 @@ function weekLabel(from: string, to: string): string {
 }
 
 /**
- * `consignmentPage` — the Consignment Receives page (Showroom drawer): the SAME
+ * `consignmentPage` — the Purchase Consignment Receive page (Showroom drawer): the SAME
  * GRN register and receipt engine, locked to receipts of Consignment Orders.
  * Follows Houzs frontend/src/components/Sidebar.tsx:552 and
  * frontend/src/pages/scm-v2/PurchaseConsignmentReceives.tsx:1-16 (its own

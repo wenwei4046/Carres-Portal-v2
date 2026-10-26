@@ -95,8 +95,8 @@ describe("the approved hierarchy", () => {
     expect(group("purchasing-showroom")).toEqual([
       "Display Requests",
       "Consignment Orders",
-      /* Consignment Receives — follows Houzs frontend/src/components/Sidebar.tsx:552 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
-      "Consignment Receives",
+      /* Purchase Consignment Receive — follows Houzs frontend/src/components/Sidebar.tsx:552 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
+      "Purchase Consignment Receive",
       "Consignment Returns",
     ]);
   });
@@ -168,8 +168,8 @@ describe("the live destinations keep their exact current addresses", () => {
       /* §9.7 — Repair Orders opened with slice A (migration 0602): register,
          object and Create page. No other address moved. */
       ["Repair Orders", "/operation?tab=repair-orders"],
-      /* Consignment Receives — follows Houzs frontend/src/components/Sidebar.tsx:552 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
-      ["Consignment Receives", "/operation?tab=consignment-receives"],
+      /* Purchase Consignment Receive — follows Houzs frontend/src/components/Sidebar.tsx:552 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
+      ["Purchase Consignment Receive", "/operation?tab=consignment-receives"],
     ]);
   });
 

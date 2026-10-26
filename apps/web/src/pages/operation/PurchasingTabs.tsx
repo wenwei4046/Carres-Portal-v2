@@ -89,7 +89,7 @@ const PAGE_WORD: Record<PurchasingPage, string> = {
   "purchase-orders": "Purchase Orders",
   receiving: "Receiving",
   /* The SIDEBAR's own word. Houzs Sidebar.tsx:552 (Weisiang 2026-10-22). */
-  "consignment-receives": "Consignment Receives",
+  "consignment-receives": "Purchase Consignment Receive",
   claims: "Supplier Claims",
   /* §9.6, owner-confirmed 2026-09-18. The SIDEBAR's own word, not a new one. */
   "purchase-returns": "Purchase Returns",

@@ -977,7 +977,7 @@ Rules:
 - There are no New Supplier or New SKU request pages. A blocked buy opens an in-context governed
   supplier/SKU request to Catalog/Master Data and returns to the same buy.
 - There is no Consignment Overview ~~or Consignment Receipts~~ page. Receiving handles purchased
-  and consignment goods; Stock Register reports supplier-owned Units. **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): a `Consignment Receives` page in the Showroom drawer, as Houzs has (Houzs frontend/src/components/Sidebar.tsx:552). It is the same Receiving GRN register locked to Consignment Orders; still one receipt engine.**
+  and consignment goods; Stock Register reports supplier-owned Units. **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): a `Purchase Consignment Receive` page in the Showroom drawer, as Houzs has (Houzs frontend/src/components/Sidebar.tsx:552). It is the same Receiving GRN register locked to Consignment Orders; still one receipt engine.**
 - Settings stays behind the global header gear. Reports use the central Reports area and Register
   export, not permanent Purchasing sidebar rows.
 
@@ -8623,7 +8623,7 @@ The final Carres model rejects:
 - a Purchase Demands page or a `Purchase Needs` synonym;
 - separate New Supplier/New SKU request destinations;
 - blank independent PO, Return, Repair, CO or CRTN creation;
-- separate Consignment Overview ~~or Consignment Receipts~~ (Consignment Receives OVERTURNED 2026-10-22, see the destinations list above);
+- separate Consignment Overview ~~or Consignment Receipts~~ (Purchase Consignment Receive OVERTURNED 2026-10-22, see the destinations list above);
 - `Acknowledged` after Carres has sent the PDF;
 - quiet post-send changes and silent price acceptance;
 - generic work words or relative `Today/Tomorrow` dates;

@@ -1235,10 +1235,10 @@ do not create a second business status, work queue or source of truth.
 | BUY pages | `SO Batch Purchase` · `Forecast Purchase` (owner 13 Oct 2026, under SO Batch Purchase) · `Manual Purchase Request` (owner rename 2026-09-23; was `Manual Purchase`) · `Purchase Orders`. **BUILT 2026-09-23** — the rail row, the page title, the create button, the register's empty/search/footer words, the object's back destination, its loading and failure sentences, the browser title and the shared review's way out all read `Manual Purchase Request`. The screen noun is the REQUEST; the purchase itself is the PO that answers it, and `MPR` was always Manual Purchase **Request**. |
 | RECEIVE pages | `Receiving` |
 | PROBLEMS pages | `Supplier Claims` · `Purchase Returns` · `Repair Orders` |
-| SHOWROOM pages | `Display Requests` · `Consignment Orders` · `Consignment Receives` · `Consignment Returns` |
+| SHOWROOM pages | `Display Requests` · `Consignment Orders` · `Purchase Consignment Receive` · `Consignment Returns` |
 
 Purchasing has no Home, module-specific Work, Purchase Demands, New Supplier/New SKU request,
-Consignment Overview, ~~Consignment Receipts,~~ Report or Settings sidebar destination. **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): a `Consignment Receives` page in the Showroom drawer, as Houzs has (Houzs frontend/src/components/Sidebar.tsx:552). It is the same Receiving GRN register locked to Consignment Orders; still one receipt engine.** New screen word: `Consignment Receives` (sidebar row and page header). The capability
+Consignment Overview, ~~Consignment Receipts,~~ Report or Settings sidebar destination. **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): a `Purchase Consignment Receive` page in the Showroom drawer, as Houzs has (Houzs frontend/src/components/Sidebar.tsx:552). It is the same Receiving GRN register locked to Consignment Orders; still one receipt engine.** New screen word: `Purchase Consignment Receive` (sidebar row and page header). The capability
 lives in its authority home: Registers, central Work/Reports/Settings, in-context Catalog governance
 or the one Receiving engine. `purchase_demand` remains an authoritative record, not a page.
 
