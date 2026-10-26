@@ -1181,6 +1181,9 @@ Do not use bare DR/CO/CRTN as explanatory action names. Keep existing number fam
 historical issued titles/versions. Consignment Order instructs the supplier to provide consignment
 goods; Consignment Return instructs/records goods handed back to the supplier. Neither title means
 physical execution is complete or a payable exists. Purchasing §§9.9–9.10 own these purposes.
+Claimless Consignment Return (0706 §2, Weisiang 2026-10-22, Houzs way): register button `New Consignment Return`;
+form action `Issue Consignment Return`; empty picker `No consigned Units from {supplier}.`; Unit refusals
+`Carres-owned stock` · `Not this supplier's goods` · `On a Supplier Claim` · `Reserved` · `Not in stock`.
 
 Do not replace both titles with Consignment Note or create a third manual document of that name.
 Staff enter one Display Request and use its source-prefilled execution documents. Showroom receipt

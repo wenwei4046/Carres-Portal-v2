@@ -545,6 +545,7 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
                 sends back. Read-only; issuing a return is §7.4's own door and
                 moving the goods is Stock's. */}
             {tab === "purchase-returns" && <OperationPurchaseReturns />}
+            {tab === "consignment-returns" && <OperationPurchaseReturns consignment />}
             {tab === "repair-orders" && <OperationRepairOrders />}
             {/* P1 — Purchasing → Settings: the numbers the ordering engine
                 reads. Manager-only; the tab is hidden for everyone else and

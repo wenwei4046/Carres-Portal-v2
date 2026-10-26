@@ -561,8 +561,8 @@ export const qk = {
     /** §9.6 — the Purchase Returns register. Keyed by the claim it is narrowed
      *  to, so the claim object's own view and the full register never share a
      *  cache entry and show each other's rows. */
-    purchaseReturns: (claim: string | null) =>
-      ["operation", "purchase-returns", claim ?? "all-claims"] as const,
+    purchaseReturns: (claim: string | null, consignment = false) =>
+      ["operation", "purchase-returns", claim ?? "all-claims", consignment ? "consignment" : "purchase"] as const,
     /** R6 — what the warehouse filed and is waiting on. Invalidated by a
      *  check-in, because a check-in IS a receive: the PO row, the claim queue
      *  and this queue all move together. */
@@ -4070,6 +4070,18 @@ export function usePurchaseReturnIssueSource(claimId: string | null) {
   });
 }
 
+/** 0706 §2: the claimless Consignment Return form's facts for one supplier,
+ *  read fresh each time (the `seen` token is only as good as its read). */
+export function useConsignmentReturnSource(supplierId: string | null) {
+  return useQuery({
+    queryKey: ["operation", "purchase-returns", "consignment-source", supplierId] as const,
+    enabled: Boolean(supplierId),
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+    queryFn: () => apiFetch<{ source: PurchaseReturnIssueSource }>(`/api/operation/purchase-returns/consignment-source?supplier=${encodeURIComponent(supplierId ?? "")}`),
+  });
+}
+
 /** A Purchase Return write (issue · send · pickup confirmation) or the claim's
  *  `Record what Carres does next`, refreshing the claim and return reads. A
  *  refusal is the door's own words. */
@@ -4088,14 +4100,18 @@ export function usePurchaseReturnWrite<T = unknown>(path: string) {
 export function useOperationPurchaseReturns(
   claimNo?: string | null,
   opts?: Partial<UseQueryOptions<PurchaseReturnsResponse>>,
+  /** 0706: the Consignment Returns register instead of the Purchase Returns one. */
+  consignment = false,
 ) {
   const claim = claimNo?.trim() || null;
   return useQuery({
-    queryKey: qk.operation.purchaseReturns(claim),
-    queryFn: () =>
-      apiFetch<PurchaseReturnsResponse>(
-        `/api/operation/purchase-returns${claim ? `?claim=${encodeURIComponent(claim)}` : ""}`,
-      ),
+    queryKey: qk.operation.purchaseReturns(claim, consignment),
+    queryFn: () => {
+      const qs = new URLSearchParams();
+      if (claim) qs.set("claim", claim);
+      if (consignment) qs.set("consignment", "1");
+      return apiFetch<PurchaseReturnsResponse>(`/api/operation/purchase-returns${qs.size ? `?${qs}` : ""}`);
+    },
     ...opts,
   });
 }
@@ -4142,7 +4158,7 @@ export interface SupplierClaimRecord {
   units: Array<{ id: string; unit_code: string | null; identity_scope: string; qty: number | null; status: string | null }>;
   requested_by_name: string | null;
   repair_orders: Array<{ id: string; ro_no: string }> | null;
-  purchase_returns: Array<{ id: string; pr_no: string }> | null;
+  purchase_returns: Array<{ id: string; pr_no: string; is_consignment?: boolean }> | null;
   authorised_outcome: string | null;
   plan_repair: { allowed: boolean; missing: string | null };
   /** §9.6 `Record what Carres does next` (0409 value, 0609 gate). */

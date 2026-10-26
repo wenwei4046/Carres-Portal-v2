@@ -174,6 +174,9 @@ const returns: PurchaseReturnListRow[] = [
    their own queries. A preview that leaves them without a client renders
    nothing at all — so the page is mounted exactly as the portal mounts it,
    with a client whose fetches are answered locally and never reach a network. */
+/* `?consignment=1` shows the same rows as Consignment Returns (0706). */
+const consignment = new URLSearchParams(window.location.search).has("consignment");
+
 const realFetch = window.fetch.bind(window);
 window.fetch = async (input, init) => {
   const url =
@@ -189,7 +192,10 @@ window.fetch = async (input, init) => {
        exercises the CONTAINER — hook, query key, states and all — not just the
        presentational half, so a walk measures the page the portal serves. */
     if (url.includes("/api/operation/purchase-returns")) {
-      return new Response(JSON.stringify({ returns }), {
+      const rows = consignment
+        ? returns.map((r) => ({ ...r, pr_no: `CRTN-${r.pr_no}`, is_consignment: true }))
+        : returns;
+      return new Response(JSON.stringify({ returns: rows }), {
         headers: { "Content-Type": "application/json" },
       });
     }
@@ -205,9 +211,9 @@ createRoot(document.getElementById("root")!).render(
   {/* The page's own address: the shared Purchasing header reads `?tab=` to
       decide which destination word it prints, so a preview mounted at "/"
       would render this page under another page's name. */}
-  <MemoryRouter initialEntries={["/operation?tab=purchase-returns"]}>
-    <PreviewFrame label="Purchase Returns (§9.6, illustrative data)">
-      <OperationPurchaseReturns />
+  <MemoryRouter initialEntries={[`/operation?tab=${consignment ? "consignment-returns" : "purchase-returns"}`]}>
+    <PreviewFrame label={`${consignment ? "Consignment Returns (§9.10" : "Purchase Returns (§9.6"}, illustrative data)`}>
+      <OperationPurchaseReturns consignment={consignment} />
     </PreviewFrame>
   </MemoryRouter>
   </QueryClientProvider>,

@@ -7531,7 +7531,7 @@ remain separate authoritative records; neither paper creation nor cancellation c
 records the supplier-owned goods to hand back and the actual collection result. It has its own
 register/object and existing number family. Source it from authorised removal, swap, supplier
 collection, overdelivery or Claim outcome; staff do not re-enter the goods already chosen on the
-Display Request. No independent blank create bypasses source/ownership controls.
+Display Request. ~~No independent blank create bypasses source/ownership controls.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): `New Consignment Return` on the Consignment Returns register starts a return straight from a supplier's consigned stock, no claim or other source, as Houzs does (Houzs frontend/src/pages/scm-v2/PurchaseConsignmentReturnNew.tsx:12-15). Ownership controls stay: only that supplier's free supplier-owned tracked Units qualify; a Unit on a claim goes back through its claim (0706 §2).**
 
 A standalone return issues its own price-free Consignment Return PDF with GOING BACK goods,
 actual collection location, party and confirmed date. A same-supplier swap uses the combined
