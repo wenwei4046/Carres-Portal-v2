@@ -61,7 +61,7 @@ describe.skipIf(!URL)("Delivery Returns and Load scan (real PostgreSQL, 0716)", 
   };
   const unit = async (k: keyof typeof U) => {
     await q("reset role");
-    return (await q("select status, warehouse_id from ops_stock_items where id = $1", [U[k]])).rows[0];
+    return (await q("select status, warehouse_id, holder_party_id from ops_stock_items where id = $1", [U[k]])).rows[0];
   };
 
   beforeAll(async () => {
@@ -96,6 +96,7 @@ describe.skipIf(!URL)("Delivery Returns and Load scan (real PostgreSQL, 0716)", 
     }
     // DO A's goods are out with Logistics; DO B's are still at the warehouse.
     await q("insert into delivery_handover_events (delivery_order_id, kind, duty, recorded_by) values ($1, 'received_by_logistics', 'logistics', $2)", [DO_A, OP]);
+    await q("update ops_stock_items set holder_party_id = (select id from stock_operating_parties where kind = 'delivery_operator' limit 1) where id = $1", [U.a1]);
     await q("set local session_replication_role = origin");
   });
 
@@ -153,7 +154,7 @@ describe.skipIf(!URL)("Delivery Returns and Load scan (real PostgreSQL, 0716)", 
     const out = (r as unknown as { r: { returnNo: string; units: number; id: string } }).r;
     expect(out.returnNo).toMatch(/^DR-\d{8}-\d{4}$/);
     expect(out.units).toBe(1);
-    expect(await unit("a1")).toMatchObject({ status: "free", warehouse_id: PJ });
+    expect(await unit("a1")).toMatchObject({ status: "free", warehouse_id: PJ, holder_party_id: null });
     expect(await unit("a2")).toMatchObject({ status: "sold" });
     expect((await q("select refund_status from delivery_returns where id = $1", [out.id])).rows[0].refund_status).toBe("pending");
     await as(OP);

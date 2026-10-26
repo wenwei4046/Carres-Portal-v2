@@ -120,6 +120,9 @@ begin
     update public.ops_stock_items
        set status        = 'free',
            warehouse_id  = p_warehouse_id,
+           -- Back at the Site, no longer with the carrier: a delivery-operator
+           -- holder would refuse the Unit's next DO handover (0440/0560).
+           holder_party_id = null,
            reserved_ref  = null,
            reserved_order_line_id = null,
            sold_at       = null,
