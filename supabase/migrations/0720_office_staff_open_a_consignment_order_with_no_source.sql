@@ -6,6 +6,8 @@
 -- Jess's "no blank order that bypasses its source" and "cloned business
 -- writers rejected" (docs/purchasing/MASTER.md §9.9 and the capability matrix);
 -- Jess was not part of this decision.
+-- Follows Houzs frontend/src/pages/scm-v2/PurchaseConsignmentOrderNew.tsx:2-10
+-- (blank Create form, priced lines) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
 --
 -- NOT a second creation engine. A Carres Consignment Order is a purchase order
 -- with `is_consignment` set (0426). This door calls the ONE creation authority

@@ -5,6 +5,8 @@
  * Weisiang's decision (Mr Lim, WhatsApp 2026-10-22, relayed by YH 2026-10-23):
  * "as long as they can open SO PO DO". It overturns Jess's "No blank
  * independent PO" rule in docs/purchasing/MASTER.md; Jess was not part of it.
+ * Follows Houzs backend/src/scm/routes/mfg-purchase-orders.ts:1329 (POST / opens a
+ * PO with no source) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
  *
  * The form only collects. `POST /api/operation/pos/new` sends it through the
  * one creation authority `purchasing_issue_pos_batch`, which keeps every

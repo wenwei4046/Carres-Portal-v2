@@ -1852,6 +1852,8 @@ operationPosRouter.get("/:id/print-data", requireOperation, async (c) => {
  * Carres supplier paper does too. Overturns Jess's "the supplier PDF is
  * price-free" (docs/purchasing/MASTER.md §9.9); Jess was not part of this
  * decision. An ordinary PO stays money-free: this adds nothing to it.
+ * Follows Houzs frontend/src/vendor/scm/lib/purchase-order-pdf.ts:585 (the line
+ * Amount prints on the order PDF) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
  *
  * Added beside the document, never over it: `consignment` and the Unit Price
  * per SKU. A SKU whose lines carry two different prices prints none rather
@@ -2015,6 +2017,8 @@ operationPosRouter.get("/:id/source-orders", requireOperation, async (c) => {
 // open SO PO DO". Office staff open a PO by naming the supplier, Deliver To,
 // goods and dates. This overturns Jess's "No blank independent PO" rule
 // (docs/purchasing/MASTER.md); Jess was not part of the decision.
+// Follows Houzs backend/src/scm/routes/mfg-purchase-orders.ts:1329 (POST / opens
+// a PO from supplier + lines, no source needed) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
 //
 // It is NOT a second creation authority. The one authority stays
 // `purchasing_issue_pos_batch`, which already accepts a line with no demand,
