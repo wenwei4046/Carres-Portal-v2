@@ -37,6 +37,8 @@ const U = {
 };
 const code = (key: keyof typeof U) => `U9${RUN}-${String(Object.keys(U).indexOf(key) + 100)}-001`;
 const SKU = `IT-MV-${HEX}`;
+const QSKU = `IT-MVQ-${HEX}`; // a counted-goods SKU (stock_identity_mode = 'quantity')
+const QROW = uid("c1");
 
 type Result = { ok: true; r: Record<string, unknown> } | { ok: false; why: string; detail: string };
 
@@ -84,6 +86,15 @@ describe.skipIf(!URL)("Stock Adjustment, Transfer and Take on Units (real Postgr
         [U[key], code(key), SKU, KLANG, reserved ? "reserved" : "free", reserved ? "SO2610-0001" : null],
       );
     }
+    await q(
+      `insert into product_skus (model_id, sku, variant, variant_kind, price, stock_identity_mode)
+       values (gen_random_uuid(), $1, 'IT', 'size', 0, 'exact_unit'), (gen_random_uuid(), $2, 'IT', 'size', 0, 'quantity')`,
+      [SKU, QSKU],
+    );
+    await q(
+      "insert into ops_stock_items (id, unit_code, identity_scope, sku, warehouse_id, status, qty) values ($1, $2, 'quantity', $3, $4, 'free', 40)",
+      [QROW, `QTY-${String(RUN).padStart(9, "0")}`, QSKU, KLANG],
+    );
     await q("set local session_replication_role = origin");
   });
 
@@ -125,6 +136,38 @@ describe.skipIf(!URL)("Stock Adjustment, Transfer and Take on Units (real Postgr
     expect((reserved as { why: string }).why).toContain("reserved for SO2610-0001");
     const noReason = await attempt("select public.stock_adjust_units($1, ' ', $2, '[]') as r", [KLANG, [U.b]]);
     expect(noReason).toMatchObject({ ok: false, detail: "reason_required" });
+  });
+
+  it("Stock Take leaves counted-goods rows out of the snapshot", async () => {
+    await as(OP);
+    const o = await attempt("select public.stock_count_open($1, false, null) as r", [KLANG]);
+    expect(o.ok).toBe(true);
+    const cnt = (o as unknown as { r: { id: string } }).r;
+    await q("reset role");
+    const rows = (await q("select unit_id from stock_count_units where count_id = $1", [cnt.id])).rows;
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.map((x) => x.unit_id)).not.toContain(QROW);
+    await q("delete from stock_count_units where count_id = $1", [cnt.id]);
+    await q("delete from stock_counts where id = $1", [cnt.id]);
+  });
+
+  it("Stock Adjustment refuses a counted-goods row in minus and a SKU not traced by Unit ID in plus", async () => {
+    await as(OP);
+    const qtyRow = await attempt("select public.stock_adjust_units($1, 'x', $2, '[]') as r", [KLANG, [QROW]]);
+    expect(qtyRow).toMatchObject({ ok: false, detail: "unit_not_adjustable" });
+    await as(OP);
+    const qtySku = await attempt("select public.stock_adjust_units($1, 'x', '{}', $2::jsonb) as r", [
+      KLANG, JSON.stringify([{ sku: QSKU, qty: 1 }]),
+    ]);
+    expect(qtySku).toMatchObject({ ok: false, detail: "plus_sku_not_exact_unit" });
+    await as(OP);
+    const typo = await attempt("select public.stock_adjust_units($1, 'x', '{}', $2::jsonb) as r", [
+      KLANG, JSON.stringify([{ sku: `NO-SUCH-${HEX}`, qty: 1 }]),
+    ]);
+    expect(typo).toMatchObject({ ok: false, detail: "plus_sku_not_exact_unit" });
+    await q("reset role");
+    const row = (await q("select status, qty from ops_stock_items where id = $1", [QROW])).rows[0];
+    expect(row).toMatchObject({ status: "free", qty: 40 });
   });
 
   it("Stock Transfer moves the Units at once and Cancel moves them back", async () => {

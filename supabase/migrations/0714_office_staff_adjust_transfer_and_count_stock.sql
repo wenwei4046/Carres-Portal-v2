@@ -165,6 +165,10 @@ begin
     if v_why is null and u.status = 'reserved' then
       v_why := u.unit_code || ' is reserved for ' || coalesce(u.reserved_ref, 'a Sales Order');
     end if;
+    -- A quantity row stands for N counted pieces (0442); one tick must not end all N.
+    if v_why is null and u.identity_scope = 'quantity' then
+      v_why := u.sku || ' is counted goods, not a Unit';
+    end if;
     if v_why is not null then
       raise exception '%', v_why using errcode = 'P0001', detail = 'unit_not_adjustable';
     end if;
@@ -185,6 +189,12 @@ begin
     if length(btrim(coalesce(r->>'sku', ''))) = 0 or v_n < 1 or v_n > 500 then
       raise exception 'Each added line needs an item and a quantity from 1 to 500'
         using errcode = 'P0001', detail = 'plus_line_invalid';
+    end if;
+    -- Only a SKU the Catalog traces one by one gets Unit IDs (0442 closed minting for any other).
+    if not exists (select 1 from public.product_skus s
+                    where s.sku = btrim(r->>'sku') and s.stock_identity_mode = 'exact_unit') then
+      raise exception '% is not an item traced by Unit ID', btrim(r->>'sku')
+        using errcode = 'P0001', detail = 'plus_sku_not_exact_unit';
     end if;
     with born as (
       insert into public.ops_stock_items
@@ -327,6 +337,7 @@ begin
   select v_id, i.id from public.ops_stock_items i
    where i.warehouse_id = p_warehouse_id
      and i.status in ('free','reserved','on_hold')
+     and i.identity_scope = 'unit'   -- counted goods are not ticked one by one
      and not i.needs_repair;
   get diagnostics v_n = row_count;
   return jsonb_build_object('id', v_id, 'countNo', v_no, 'units', v_n);
