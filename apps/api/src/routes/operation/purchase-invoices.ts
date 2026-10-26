@@ -12,8 +12,10 @@ import type { AppEnv } from "../../types";
  * purchase invoices inside the purchasing area, Houzs way. Jess's rule that no
  * finance fields appear in Operations is overturned; Jess was not part of this
  * decision. The bill itself stays Finance's record: this reads Finance's own
- * bills and paid figure and writes nothing. Entering, confirming and paying a
- * bill remain Finance's doors (finance + principal only in the database).
+ * bills and paid figure and writes nothing. Purchasing ENTERS a bill through
+ * Finance's own door, POST /api/finance/payables/bills (Chew, Finance, WhatsApp
+ * 2026-10-23, via YH; 0721). Confirming (posting) and paying a bill remain
+ * Finance's doors (finance + principal only in the database).
  */
 const purchaseInvoicesRouter = new Hono<AppEnv>();
 

@@ -76,6 +76,7 @@ import OperationAllOrders from "./OperationAllOrders";
 import OperationSuppliers from "./OperationSuppliers";
 import OperationSupplierItems from "./OperationSupplierItems";
 import OperationPurchaseInvoices from "./OperationPurchaseInvoices";
+import OperationPurchaseInvoiceNew from "./OperationPurchaseInvoiceNew";
 // 2026-05-20 — Phase A · AutoCount integration tabs.
 import OperationImport from "./OperationImport";
 import OperationInbox from "./OperationInbox";
@@ -199,8 +200,12 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
   const isLegacyPurchasingUrl =
     location.pathname === "/operation/purchasing" ||
     location.pathname.startsWith("/operation/purchasing/");
+  /* 0721 (Chew 2026-10-23): Purchasing enters a supplier bill on its own
+     page, Houzs's /purchase-invoices/new and /from-grn. The list stays the
+     `?tab=purchase-invoices` module. */
+  const isPurchaseInvoiceFormUrl = location.pathname.startsWith("/operation/purchase-invoices/");
   const isUrlDriven =
-    isProcurementUrl || isToOrderUrl || isOrdersUrl || isOldOrdersUrl ||
+    isProcurementUrl || isToOrderUrl || isOrdersUrl || isOldOrdersUrl || isPurchaseInvoiceFormUrl ||
     /* Edit Delivery (2026-08-24) is a real route. Its flag joined the
        GlobalTopBar suppression on day one but NOT this gate, so the URL fell
        through to the `?tab=` branch and rendered an empty main pane — found on
@@ -441,6 +446,8 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
             {/* Legacy address (owner ruling 2026-09-28): SO Batch Purchase. */}
             <Route path="purchasing/*" element={<Navigate to="/operation?tab=purchase" replace />} />
             <Route path="procurement" element={<OperationPurchaseOrders />} />
+            <Route path="purchase-invoices/new" element={<OperationPurchaseInvoiceNew />} />
+            <Route path="purchase-invoices/from-grn" element={<OperationPurchaseInvoiceNew fromGrn />} />
             <Route
               path="procurement/:slug"
               element={<TabbedProcurementShell />}

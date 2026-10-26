@@ -291,6 +291,7 @@ Each changes only what Finance needs on that screen; nothing else on Jess's scre
 | Person | Does |
 |---|---|
 | Finance user | Prepares payment vouchers. Keys supplier bills, other debtors and other receipts. Runs card and bank reconciliation and month-end. Reads the reports. |
+| Purchasing (role `operation`) | Keys a supplier bill from goods received, as a draft, on Operations → Purchase Invoices (`New bill`, `Bill from GRN`). Finance confirms it (that posts it) and pays it. Chew, WhatsApp 2026-10-23, via YH: 「Can be both to proceed the step first? Because the duties right now still at finance, coming maybe will be purchasing」 (0721). |
 | Checker | Any Finance user except the one who prepared the voucher. |
 | Finance Approver | The existing Workspace duty `finance_approver` (Workspace MASTER §4 Staff & Duties). It takes Finance users only, allows a cover, and the principal can always approve. Approves vouchers and money moves, and cancels confirmed Finance documents. Measured 2026-10-12: no person holds it yet, so a Finance user whose position carries the duty approves (the Finance test login does). Chew assigns it to a person when he creates the real users (「到时我创建了用户才指派」, 2026-10-12). |
 | Staff with permission | Raise a payment request with the bill attached (§3.3). Finance or the boss gives the permission. |
@@ -328,7 +329,7 @@ Deposit invoice rules:
 | Topic | Decision |
 |---|---|
 | Payment vouchers | Prepare → Check → Approve, as in §2. The voucher is the only way money leaves. |
-| Supplier bills | Keep: from a GRN at PO price, and through other creditors for non-goods bills. |
+| Supplier bills | Keep: from a GRN at PO price, and through other creditors for non-goods bills. ~~Only Finance enters a supplier bill (the rule in `supplier_bill_save_draft` since 0464: finance + principal).~~ OVERTURNED 2026-10-23 by Chew (Finance, WhatsApp via YH): Purchasing enters a supplier bill too, through the same door (0721). What Purchasing may send: a NEW draft whose every line is a GRN line (its quantity and the price on the supplier's bill), no account and no payables account, so the usual accounts apply. Changing a saved draft, confirming (posting), cancelling and every payment, advance, credit note and debit note stay finance + principal. A purchasing draft is the same row as a Finance draft, so it posts the same Dr each line, Cr payables when Finance confirms it (tested in `purchasing-supplier-bill-0721.integration.test.ts`). Non-goods bills (rent, transport, delivery orders) stay Finance's. |
 | Supplier advances | Keep. |
 | Supplier credit and debit notes | **Build.** This includes reading the supplier's paper and knocking the note off that supplier's invoices. A **debit note** (the supplier charges more) is its own document, with its own number and list, never mixed with bills; it is paid by a payment voucher and counts in AP and AP Aging (Chew 2026-10-03; **built in 0681**, "Supplier debit notes" below). A supplier never pays a credit back in money: the credit is knocked off the next bill, or a credit or debit note is raised, so no refund-from-supplier door is built. |
 | Supplier finance data (tax numbers, bank account) | **Build** as Finance's own record, linked to Purchasing's supplier. Purchasing screens do not change. |

@@ -11,7 +11,7 @@ import { BILL_STATUS_WORD, money, word } from "@/pages/finance/payables/payables
 import ModuleHeader from "./components/ModuleHeader";
 
 /**
- * PURCHASE INVOICES — the supplier bills, read-only, inside Purchasing.
+ * PURCHASE INVOICES — the supplier bills inside Purchasing.
  *
  * Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): purchasing staff see
  * purchase invoices and what is paid on them inside the purchasing area, Houzs
@@ -19,9 +19,13 @@ import ModuleHeader from "./components/ModuleHeader";
  * finance fields are overturned; Jess was not part of this decision.
  *
  * ONE LEDGER: every row is Finance's own bill, read through 0721's
- * `purchasing_supplier_bill_list` with Finance's own paid figure. Nothing here
- * writes. Entering, confirming and paying a bill stay on Finance → Bills
- * (finance + principal in the database); the principal gets a link there.
+ * `purchasing_supplier_bill_list` with Finance's own paid figure. The list
+ * writes nothing; the principal gets a link to Finance → Bills.
+ *
+ * ENTERING (Chew, Finance, WhatsApp 2026-10-23, via YH): "New bill" and "Bill
+ * from GRN" open OperationPurchaseInvoiceNew, which saves a draft through
+ * Finance's own bill door (0721). Confirming (posting) and paying a bill stay
+ * Finance's (finance + principal in the database).
  */
 type BillRow = {
   id: string;
@@ -64,9 +68,16 @@ export default function OperationPurchaseInvoices() {
     <div className="flex h-full min-h-0 flex-col">
       <ModuleHeader destinationHeader testId="purchase-invoices-destination-header" word="Purchase Invoices"
         docTitle="Purchase Invoices · Carres"
-        right={role === "principal"
-          ? <Button variant="neutral" onClick={() => navigate("/finance/bills")}>Open in Finance</Button>
-          : undefined} />
+        right={
+          <span className="flex items-center gap-2">
+            {/* 0721 (Chew 2026-10-23): Purchasing enters a bill, Houzs's New and From GRN. */}
+            <Button variant="neutral" onClick={() => navigate("/operation/purchase-invoices/from-grn")}
+              data-testid="purchase-invoice-from-grn">Bill from GRN</Button>
+            <Button variant="primary" icon="add" onClick={() => navigate("/operation/purchase-invoices/new")}
+              data-testid="purchase-invoice-new">New Bill</Button>
+            {role === "principal" && <Button variant="neutral" onClick={() => navigate("/finance/bills")}>Open in Finance</Button>}
+          </span>
+        } />
       <ListPageShell register>
         <DataGrid
           rows={rows}
@@ -83,7 +94,7 @@ export default function OperationPurchaseInvoices() {
           searchPlaceholder="Search bill, supplier or PO…"
           emptyMessage={query.isError
             ? "Purchase invoices could not be read. Refresh to try again."
-            : "No purchase invoice yet. Finance enters each supplier bill."}
+            : "No purchase invoice yet. Enter one with New Bill or Bill from GRN."}
         />
       </ListPageShell>
     </div>

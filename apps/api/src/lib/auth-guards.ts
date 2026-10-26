@@ -77,6 +77,22 @@ export const requireFinance: MiddlewareHandler<AppEnv> = async (c, next) => {
 };
 
 /**
+ * 0721 (Chew, Finance, WhatsApp 2026-10-23, via YH): admits `finance`,
+ * `principal` OR `operation` (Purchasing). Only for the doors Purchasing shares
+ * with Finance to ENTER a supplier bill from goods received: the GRNs left to
+ * bill, their lines, and saving a new draft. The database holds Purchasing to
+ * a new draft whose every line is from a GRN (`_purchasing_bill_draft_check`).
+ * Confirming, cancelling and paying keep `requireFinance`.
+ */
+export const requireFinanceOrPurchasing: MiddlewareHandler<AppEnv> = async (c, next) => {
+  const role = c.var.auth?.role;
+  if (role !== "finance" && role !== "principal" && role !== "operation") {
+    throw new HTTPException(403, { message: "Finance, Purchasing or Principal only" });
+  }
+  await next();
+};
+
+/**
  * 0244/0245 (2026-07-25) — admits `hr` OR `principal`. Mirrors the role gate
  * inside the HR RPCs (`hr_commission_source` / `hr_assign_salesperson`:
  * `if app_role() not in ('hr','principal') then raise '42501'`) and the RLS
