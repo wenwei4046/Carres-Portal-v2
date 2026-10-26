@@ -5977,3 +5977,22 @@ DEL-04 · DEL-05 · OFF-01/05, owner confirmed 9 Oct 2026). No dash is used as a
 | Work action, `Assign logistics` | line two `Choose the company that carries this delivery · due {date}` | the hard-coded `3 working days before · {date}` is retired |
 | Logistics card, first check | `{n} working days before · {date}` with `n` = the stored Contact lead (`Contact lead days`, DEL-05); at the default it reads the ruled `3 working days before`. `2 working days before` and `1 working day before` stay fixed (Workspace §5.9) | the contact day follows its one setting |
 
+## Service Cases, the Houzs way — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22) · BUILT 0711
+
+Weisiang ruled "just clear Carress rules and Implement Houzs inside". Jess was not part of this
+decision. These words are admitted for the Service Cases page, the case window and Settings → Service.
+
+| Meaning | Use exactly |
+|---|---|
+| Close button on an open case | `Close Case` (overturns the Service MASTER "Close case (as a button)" ban) |
+| Stage column, field and card filter | `Stage` |
+| Toolbar switch: my team's cases | `My cases` |
+| Case owner column and field | `Owner` · `Case owner` · placeholder `No owner yet` |
+| Field hint when the caller may not pick | `The sales order PIC picks the case owner` |
+| Owner refused (not the PIC) | `Only the sales order PIC can pick who owns this case.` |
+| Owner refused (not an office person) | `Pick an active office person to own this case.` |
+| Priority field and options | `Priority` · `Urgent` · `Normal` · `Low` |
+| Close refused | `Close failed: {reason}` |
+| Settings page and link | `Service Settings` · group `Service` |
+| Settings rows | `Default case owner` · `A new case goes to this person until the sales order PIC picks the case owner.` · `Stages` · `The stages staff pick on a case. A stage that closes the case cannot be added here.` · `Case types` · `The case types staff pick on a case.` · `In use` · `New stage` · `New case type` · `Add` |
+| Last closing stage, `In use` locked (YH, chat 2026-10-26) | hint `Close Case needs this stage.` · refused `Keep one stage that closes the case in use. Close Case needs it.` |
