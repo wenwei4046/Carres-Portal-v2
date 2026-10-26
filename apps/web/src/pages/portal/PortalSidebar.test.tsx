@@ -777,11 +777,16 @@ describe("PortalSidebar — Commission is ONE HR entry (Loo 2026-07-27)", () => 
 });
 
 /**
- * ⭐ SALES ORDERS — ONE PARENT, TWO CHILDREN (Jess, owner ruling 2026-09-23).
+ * ⭐ SALES ORDERS — ONE PARENT (Jess, owner ruling 2026-09-23).
  *
  *     Sales Orders
  *     ├─ Outright        (was `Outright Sales`; owner 2026-10-08)
+ *     ├─ Amendments      (Weisiang, 2026-10-22)
  *     └─ Subscription
+ *
+ * `Amendments` joined between them on Weisiang's decision (Mr Lim, WhatsApp
+ * 2026-10-22; Jess was not part of this decision): every Sales Order amendment
+ * waits in an approver's queue, the Houzs way.
  *
  * `docs/orders/MASTER.md` "Portal navigation", `docs/ui/MASTER.md` and the
  * COPY-STANDARD "Sales Orders navigation" table. The module row is the parent;
@@ -793,15 +798,23 @@ describe("PortalSidebar — Commission is ONE HR entry (Loo 2026-07-27)", () => 
  * does not delete the legacy page whose menu row it removes.
  */
 describe("PortalSidebar — the approved Sales Orders tree", () => {
-  it("is exactly Outright then Subscription, under one Sales Orders parent", () => {
+  it("is exactly Outright, Amendments, Subscription, under one Sales Orders parent", () => {
     renderAt("/operation/orders");
     expect(module_("sales")).toHaveTextContent("Sales Orders");
     const group = screen.getByTestId("nav-children-sales");
     const rows = Array.from(group.querySelectorAll("[data-testid^='nav-child-']"));
     expect(rows.map((r) => r.textContent?.trim())).toEqual([
       "Outright",
+      "Amendments",
       "Subscription",
     ]);
+  });
+
+  it("on /operation/amendments only Amendments is lit", () => {
+    renderAt("/operation/amendments");
+    expect(child("amendments")).toHaveAttribute("href", "/operation/amendments");
+    expect(child("amendments").className).toContain("bg-c-select-pill");
+    expect(child("orders").className).not.toContain("bg-c-select-pill");
   });
 
   it("keeps both addresses exactly where they were", () => {

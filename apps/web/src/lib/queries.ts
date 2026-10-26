@@ -6820,6 +6820,32 @@ export function useSalesOrderAmendmentImpact(amendmentId: string | null) {
   });
 }
 
+/** One row of the Amendments queue (Weisiang's decision, Mr Lim, WhatsApp
+ *  2026-10-22: every SO amendment waits for an approver, the Houzs way). */
+export interface AmendmentQueueRow {
+  id: string;
+  orderId: string;
+  so: number | null;
+  customerName: string | null;
+  status: "waiting" | "applied" | "rejected" | "withdrawn";
+  reason: string | null;
+  submittedBy: string | null;
+  submittedAt: string;
+  decidedBy: string | null;
+  decidedAt: string | null;
+  decisionNote: string | null;
+  agreementRecorded: boolean;
+}
+
+/* Under ["operation","sales-order-amendment"], so a decision made on the order
+   (useDecideSalesOrderAmendment below) refreshes the queue too. */
+export function useAmendmentQueue() {
+  return useQuery({
+    queryKey: ["operation", "sales-order-amendment", "queue"],
+    queryFn: () => apiFetch<{ amendments: AmendmentQueueRow[] }>("/api/operation/orders/amendments"),
+  });
+}
+
 export function useDecideSalesOrderAmendment(
   orderId: string,
   opts?: Partial<

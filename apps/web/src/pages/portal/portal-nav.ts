@@ -336,6 +336,11 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         badge: "orders",
         section: "Sales",
       },
+      /* `Amendments` — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was
+       * not part of this decision): every Sales Order amendment waits for an
+       * approver, the Houzs way. The approver's queue across every order; a row
+       * opens the order, where `Approve and apply` / `Reject` already live. */
+      { key: "amendments", label: "Amendments", icon: BadgeCheck, path: "/operation/amendments", section: "Sales" },
       /* ⭐ `Subscription` — THE SECOND CUSTOMER-ORDER DESTINATION (Jess, owner
        * ruling 2026-09-23). It opens the Subscription-owned journey governed by
        * `docs/rental/MASTER.md` — the agreements + deployed-unit registry this
