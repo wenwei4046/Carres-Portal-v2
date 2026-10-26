@@ -15,7 +15,9 @@ import pg from "pg";
  *           (consignment-notes.ts:13-14) per Weisiang's ruling (2026-10-22):
  *           clear Carres rules, implement Houzs.
  *   money   the order carries each Unit's price and its own payments, like
- *           Houzs consignment-orders.ts:2171-2310
+ *           Houzs consignment-orders.ts:2171-2310; a blank Note carries its
+ *           own line prices and payments, like Houzs consignment-notes.ts
+ *           :445,465 and :1074-1160
  *   return  Customer Consignment Return brings unsold Units back into stock
  *
  *   CARRES_TEST_DATABASE_URL=postgres://postgres@localhost:<port>/<db> pnpm --filter @carres/api test -- customer-consignment-0719
@@ -34,7 +36,7 @@ const DEALER = uid("5");
 const ORDER = uid("6");
 const KLANG = uid("61");
 const PJ = uid("62");
-const U = { a: uid("b1"), b: uid("b2"), c: uid("b3"), reserved: uid("b4"), supplier: uid("b5") };
+const U = { a: uid("b1"), b: uid("b2"), c: uid("b3"), reserved: uid("b4"), supplier: uid("b5"), d: uid("b6") };
 const code = (key: keyof typeof U) => `U8${RUN}-${String(Object.keys(U).indexOf(key) + 100)}-001`;
 const SKU = `IT-CS-${HEX}`;
 const SO = 900000 + (RUN % 90000);
@@ -153,21 +155,28 @@ describe.skipIf(!URL)("Customer consignment out and back on Units (real PostgreS
     expect(again).toMatchObject({ ok: false, detail: "unit_not_sendable" });
   });
 
-  it("a blank Consignment Note sends free Units to a typed customer", async () => {
+  it("a blank Consignment Note sends free Units to a typed customer, each with its own price", async () => {
+    const who = JSON.stringify({ name: "Puan Aini", phone: "012" });
     await as(OP);
-    const r = await attempt("select public.consignment_note_create(null, null, $1::jsonb, $2) as r", [JSON.stringify({ name: "Puan Aini", phone: "012" }), [U.c]]);
+    const unpriced = await attempt("select public.consignment_note_create(null, null, $1::jsonb, $2) as r", [who, [U.c, U.d]]);
+    expect(unpriced).toMatchObject({ ok: false, detail: "price_required" });
+    await as(OP);
+    const r = await attempt("select public.consignment_note_create(null, null, $1::jsonb, $2, null, null, $3::jsonb) as r",
+      [who, [U.c, U.d], JSON.stringify({ [U.c]: 300, [U.d]: 450.25 })]);
     expect(r.ok).toBe(true);
     expect((await unit("c")).status).toBe("reserved");
+    expect((await q("select price::text as p from consignment_note_units where unit_id = $1", [U.d])).rows[0].p).toBe("450.25");
+  });
+
+  it("a Note from an order takes each price from its order line", async () => {
+    await q("reset role");
+    expect((await q("select price::text as p from consignment_note_units where unit_id = $1", [U.b])).rows[0].p).toBe("899.50");
   });
 
   it("a Unit sold at the customer turns sold against its order line, no Sales Order", async () => {
     await as(OP);
     const notOut = await attempt("select public.consignment_note_mark_sold($1) as r", [[U.reserved]]);
     expect(notOut).toMatchObject({ ok: false, detail: "unit_not_on_consignment" });
-    // U.c went out on a blank Note: no order line holds its price.
-    await as(OP);
-    const blank = await attempt("select public.consignment_note_mark_sold($1) as r", [[U.c]]);
-    expect(blank).toMatchObject({ ok: false, detail: "unit_not_on_order" });
     await as(OP);
     const r = await attempt("select public.consignment_note_mark_sold($1) as r", [[U.a]]);
     expect(r.ok).toBe(true);
@@ -213,6 +222,31 @@ describe.skipIf(!URL)("Customer consignment out and back on Units (real PostgreS
     expect((await q("select sum(amount)::text as t from customer_consignment_order_payments where order_id = $1", [orderId])).rows[0].t).toBe("500.00");
     // No Sales Order took any money.
     expect((await q("select count(*)::int as n from order_payments where order_id = $1", [ORDER])).rows[0].n).toBe(0);
+  });
+
+  it("a Unit on a blank Note is sold on the Note and paid on the Note, the Houzs way", async () => {
+    await as(OP);
+    const r = await attempt("select public.consignment_note_mark_sold($1) as r", [[U.d]]);
+    expect(r.ok).toBe(true);
+    await q("reset role");
+    const note = (await q("select n.id, n.note_no from consignment_notes n join consignment_note_units nu on nu.note_id = n.id where nu.unit_id = $1", [U.d])).rows[0];
+    expect(await unit("d")).toMatchObject({ status: "sold", sold_order_id: null, reserved_ref: note.note_no });
+    await as(DEALER_USER);
+    expect(await attempt("select public.consignment_note_payment_add($1, 10, 'cash') as r", [note.id])).toMatchObject({ ok: false, detail: "forbidden" });
+    await as(OP);
+    expect(await attempt("select public.consignment_note_payment_add($1, 10, 'cash') as r", [uid("dead")])).toMatchObject({ ok: false, detail: "note_not_found" });
+    await as(OP);
+    expect(await attempt("select public.consignment_note_payment_add($1, 0, 'cash') as r", [note.id])).toMatchObject({ ok: false, detail: "amount_required" });
+    await as(OP);
+    const paid = await attempt("select public.consignment_note_payment_add($1, 450.25, 'cash') as r", [note.id]);
+    expect(paid.ok).toBe(true);
+    const payId = (paid as unknown as { r: { id: string } }).r.id;
+    await q("reset role");
+    expect((await q("select sum(amount)::text as t from consignment_note_payments where note_id = $1", [note.id])).rows[0].t).toBe("450.25");
+    await as(OP);
+    expect(await attempt("select public.consignment_note_payment_delete($1, $2) as r", [uid("dead"), payId])).toMatchObject({ ok: false, detail: "payment_not_found" });
+    await as(OP);
+    expect((await attempt("select public.consignment_note_payment_delete($1, $2) as r", [note.id, payId])).ok).toBe(true);
   });
 
   it("Customer Consignment Return brings unsold Units back to the chosen Site, with no money posted", async () => {

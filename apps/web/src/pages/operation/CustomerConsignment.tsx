@@ -139,29 +139,36 @@ type OrderRow = {
   total: number; paid: number; balance: number;
 };
 
-/** Payments on one order, like Houzs's Consignment Order payments (consignment-orders.ts:2171-2310). */
-function OrderPayments({ order, onSaved }: { order: OrderRow; onSaved: () => void }) {
+type Money = { total: number; paid: number; balance: number };
+
+/**
+ * A payments ledger on an order or a blank Note, like Houzs's Consignment
+ * Order payments (consignment-orders.ts:2171-2310) and Consignment Note
+ * payments (consignment-notes.ts:1074-1160), per Weisiang's ruling
+ * (2026-10-22): clear Carres rules, implement Houzs.
+ */
+function Payments({ path, money, payments, onSaved }: { path: string; money: Money; payments: Payment[]; onSaved: () => void }) {
   const m = useManualMethods();
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState("");
   const [paidAt, setPaidAt] = useState("");
   const [reference, setReference] = useState("");
   const add = useMutation({
-    mutationFn: () => post(`/orders/${order.id}/payments`, {
+    mutationFn: () => post(`${path}/payments`, {
       amount: Number(amount), method, paidAt: paidAt || undefined, reference: reference || undefined,
     }),
     onSuccess: () => { setAmount(""); setReference(""); onSaved(); },
   });
   const remove = useMutation({
-    mutationFn: (id: string) => apiFetch(`${BASE}/orders/${order.id}/payments/${id}`, { method: "DELETE" }),
+    mutationFn: (id: string) => apiFetch(`${BASE}${path}/payments/${id}`, { method: "DELETE" }),
     onSuccess: onSaved,
   });
   return (
     <section className="flex flex-col gap-2" aria-label="Payments">
       <h3 className="text-title">Payments</h3>
-      <p className="text-body">Total {rm(order.total)} · Paid {rm(order.paid)} · Balance {rm(order.balance)}</p>
-      {order.customer_consignment_order_payments.length === 0 && <p className="text-body text-c-muted">No payments yet.</p>}
-      {order.customer_consignment_order_payments.map((p) => (
+      <p className="text-body">Total {rm(money.total)} · Paid {rm(money.paid)} · Balance {rm(money.balance)}</p>
+      {payments.length === 0 && <p className="text-body text-c-muted">No payments yet.</p>}
+      {payments.map((p) => (
         <div key={p.id} className="flex items-center justify-between gap-2 text-body">
           <span>{fmtDate(p.paid_at)} · {m.label(p.method)} · {rm(Number(p.amount))}{p.reference ? ` · ${p.reference}` : ""}</span>
           <Button variant="neutral" loading={remove.isPending && remove.variables === p.id} onClick={() => remove.mutate(p.id)}>Remove</Button>
@@ -259,7 +266,7 @@ export function CustomerConsignmentOrders() {
           <DatePicker id="ccn-date" label="Delivery Date" value={date || null} onChange={(v) => setDate(v ?? "")} />
           <Ticks list={toSend} picked={sendPicked} onChange={setSendPicked} empty="Every Unit on this order has gone out." />
           {send.isError && <FieldError>{errorText(send.error)}</FieldError>}
-          {sending && <OrderPayments order={sending} onSaved={done} />}
+          {sending && <Payments path={`/orders/${sending.id}`} money={sending} payments={sending.customer_consignment_order_payments} onSaved={done} />}
         </div>
       </Modal>
     </Page>
@@ -267,11 +274,12 @@ export function CustomerConsignmentOrders() {
 }
 
 // ── Consignment Note ──────────────────────────────────────────────────────────
-type NoteRow = {
-  id: string; note_no: string; customer_name: string; customer_phone: string | null; delivery_date: string;
+type NoteRow = Money & {
+  id: string; note_no: string; order_id: string | null; customer_name: string; customer_phone: string | null; delivery_date: string;
   note: string | null; created_at: string;
   customer_consignment_orders: { order_no: string } | null;
-  consignment_note_units: UnitLink[];
+  consignment_note_units: OrderLine[];
+  consignment_note_payments: Payment[];
 };
 
 function useNotes() {
@@ -288,12 +296,19 @@ export function ConsignmentNotes() {
   const [picked, setPicked] = useState<string[]>([]);
   const [date, setDate] = useState("");
   const [note, setNote] = useState("");
-  const [selling, setSelling] = useState<NoteRow | null>(null);
+  const [prices, setPrices] = useState<Record<string, string>>({});
+  const priced = picked.length > 0 && picked.every((id) => PRICE_RE.test(prices[id] ?? ""));
+  const [sellingId, setSellingId] = useState<string | null>(null);
+  const selling = (list.data?.notes ?? []).find((n) => n.id === sellingId) ?? null;
+  const setSelling = (n: NoteRow | null) => setSellingId(n?.id ?? null);
   const [soldPicked, setSoldPicked] = useState<string[]>([]);
   const done = () => void qc.invalidateQueries({ queryKey: ["customer-consignment"] });
   const save = useMutation({
-    mutationFn: () => post("/notes", { dealerId: dealerOrNull(dealerId), customer: c, unitIds: picked, deliveryDate: date || undefined, note }),
-    onSuccess: () => { setOpen(false); setPicked([]); setC(EMPTY); setNote(""); setDate(""); setDealerId(NO_DEALER); done(); },
+    mutationFn: () => post("/notes", {
+      dealerId: dealerOrNull(dealerId), customer: c, unitIds: picked, deliveryDate: date || undefined, note,
+      prices: Object.fromEntries(picked.map((id) => [id, Number(prices[id])])),
+    }),
+    onSuccess: () => { setOpen(false); setPicked([]); setPrices({}); setC(EMPTY); setNote(""); setDate(""); setDealerId(NO_DEALER); done(); },
   });
   const sell = useMutation({
     mutationFn: () => post("/notes/sold", { unitIds: soldPicked }),
@@ -306,6 +321,8 @@ export function ConsignmentNotes() {
     { key: "order", label: "Order No", width: 170, accessor: (r) => r.customer_consignment_orders?.order_no ?? "" },
     { key: "out", label: "At customer", width: 260, accessor: (r) => codes(outOn(r.note_no, units(r.consignment_note_units))) },
     { key: "units", label: "Units", width: 260, accessor: (r) => codes(units(r.consignment_note_units)) },
+    { key: "total", label: "Total", width: 120, accessor: (r) => rm(r.total) },
+    { key: "balance", label: "Balance", width: 120, accessor: (r) => (r.order_id ? "On order" : rm(r.balance)) },
     { key: "note", label: "Note", width: 200, accessor: (r) => r.note ?? "" },
   ], []);
   const out = selling ? outOn(selling.note_no, units(selling.consignment_note_units)) : [];
@@ -326,19 +343,21 @@ export function ConsignmentNotes() {
         description="The picked Units go to the customer as soon as you save. They stay Carres-owned."
         footer={<>
           <Button variant="neutral" onClick={() => setOpen(false)}>Close</Button>
-          <Button variant="primary" loading={save.isPending} disabled={!hasCustomer(dealerId, c) || picked.length === 0} onClick={() => save.mutate()}>Save</Button>
+          <Button variant="primary" loading={save.isPending} disabled={!hasCustomer(dealerId, c) || !priced} onClick={() => save.mutate()}>Save</Button>
         </>}>
         <div className="flex flex-col gap-3">
           <CustomerFields dealers={choices.data?.dealers ?? []} dealerId={dealerId} setDealerId={setDealerId} c={c} setC={setC} />
           <DatePicker id="csn-date" label="Delivery Date" value={date || null} onChange={(v) => setDate(v ?? "")} />
-          <StockPicker sites={choices.data?.sites ?? []} picked={picked} onChange={setPicked} />
+          <StockPicker sites={choices.data?.sites ?? []} picked={picked} onChange={setPicked} prices={prices} setPrices={setPrices} />
           <Textarea id="csn-note" label="Note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
           {save.isError && <FieldError>{errorText(save.error)}</FieldError>}
         </div>
       </Modal>
       <Modal open={selling !== null} onOpenChange={(o) => !o && setSelling(null)} width="wide"
         title={`Record sold Units on ${selling?.note_no ?? ""}`}
-        description="Sold Units are sold at their Customer Consignment Order price. Record the customer's payment on that order."
+        description={selling?.order_id
+          ? "Sold Units are sold at their Customer Consignment Order price. Record the customer's payment on that order."
+          : "Sold Units are sold at their price on this note. Record the customer's payment below."}
         footer={<>
           <Button variant="neutral" onClick={() => setSelling(null)}>Close</Button>
           <Button variant="primary" loading={sell.isPending} disabled={soldPicked.length === 0} onClick={() => sell.mutate()}>Record sold</Button>
@@ -346,6 +365,9 @@ export function ConsignmentNotes() {
         <div className="flex flex-col gap-3">
           <Ticks list={out} picked={soldPicked} onChange={setSoldPicked} empty="No Units are at the customer on this note." />
           {sell.isError && <FieldError>{errorText(sell.error)}</FieldError>}
+          {selling && !selling.order_id && (
+            <Payments path={`/notes/${selling.id}`} money={selling} payments={selling.consignment_note_payments} onSaved={done} />
+          )}
         </div>
       </Modal>
     </Page>

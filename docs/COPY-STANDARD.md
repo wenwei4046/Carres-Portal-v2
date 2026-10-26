@@ -1217,6 +1217,7 @@ admitted by this naming ruling. Chinese explanations may accompany names in owne
 | Order dialog line | `The Units leave stock when their Consignment Note is issued.` |
 | Sold at the customer | `Record sold Units on {note no}` · button `Record sold` · `Sold Units are sold at their Customer Consignment Order price. Record the customer's payment on that order.` |
 | Order money (Houzs way, YH 2026-10-26 per Weisiang's ruling) | field `Price (RM) · {unit}` · columns `Total` · `Paid` · `Balance` · section `Payments` · fields `Amount (RM)` · `Payment Method` · `Payment Date` · `Reference` · button `Add Payment` |
+| Blank Consignment Note money (Houzs consignment-notes.ts:445,465, 1074-1160) | field `Price (RM) · {unit}` on a blank note · columns `Total` · `Balance` (`On order` when the note comes from an order) · `Sold Units are sold at their price on this note. Record the customer's payment below.` |
 | Return dialog line | `Unsold Units come back into stock. No refund: nothing was paid for them.` |
 | Columns | `Order No` · `Consignment Note No` · `Return No` · `Date` · `Delivery Date` · `Customer` · `Phone` · `Dealer` · `Units` · `At customer` · `Delivery Location` · `Note` |
 | Empty / refusal | `No customer consignment orders yet.` · `No consignment notes yet.` · `No customer consignment returns yet.` · `Every Unit on this order has gone out.` · `No Units are at the customer on this note.` · `No Units are at a customer.` · `{Unit ID} belongs to its supplier` · `{Unit ID} is not out on a Consignment Note` · `Choose the customer or dealer` |
