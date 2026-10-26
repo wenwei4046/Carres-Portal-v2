@@ -23,6 +23,7 @@ import {
   useSaveOrderControl,
   useSetOpsAssignedLogistic,
   useCollectStorage,
+  BACKDATE_WAITING_WORDS,
   useRequestStorageWaiver,
   useDecideStorageWaiver,
   useExtendStorage,
@@ -764,7 +765,7 @@ export function StorageCollectWaiver({
   const waiverStatus = control?.storage_waiver_status ?? "none";
 
   const collect = useCollectStorage(orderId, {
-    onSuccess: () => toast.success("Storage fee collected. Receipt issued"),
+    onSuccess: (out) => toast.success(out.pendingApproval ? BACKDATE_WAITING_WORDS : "Storage fee collected. Receipt issued"),
     onError: (e) => toast.error(`Couldn't collect: ${e.message}`),
   });
   const requestWaiver = useRequestStorageWaiver(orderId, {

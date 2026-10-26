@@ -16,6 +16,7 @@ import InvoiceRecordPayment from "./InvoiceRecordPayment";
 import InvoiceAskToPay from "./InvoiceAskToPay";
 import InvoicePaymentLink from "./InvoicePaymentLink";
 import InvoiceStorage from "./InvoiceStorage";
+import InvoiceBackdateRequests from "./InvoiceBackdateRequests";
 import InvoiceCollectionResult from "./InvoiceCollectionResult";
 import InvoiceVoidReplace from "./InvoiceVoidReplace";
 import InvoiceCollectionOwner from "./InvoiceCollectionOwner";
@@ -126,6 +127,11 @@ export default function PaymentCollectionWorkspace({ invoice, rows, timingRules,
   const money = soRemaining(rows, invoice.order_id);
   const canRecord = (role === "operation" || role === "principal")
     && invoice.status !== "voided" && money.known && money.outstanding > 0;
+  // Finance records a payment (an old one with no request). Follows Houzs
+  // backend/src/services/backdateRequestNotify.ts:5-8 per Weisiang's ruling
+  // (2026-10-22): clear Carres rules, implement Houzs (YH 2026-10-26, Q14).
+  const canRecordPayment = canRecord
+    || (role === "finance" && invoice.status !== "voided" && money.known && money.outstanding > 0);
   const facts = collectionFactsOf(invoice, rows, today, opts, timingRules, ownerOf(actor));
   // The ask door exists only when the shared clock says the money is
   // genuinely askable: never while Wait, never with no anchor, never when paid.
@@ -155,12 +161,12 @@ export default function PaymentCollectionWorkspace({ invoice, rows, timingRules,
       <button className="btn-secondary" disabled={printing} onClick={() => void printInvoice()}>Print</button>}
     {canRecord && !composing &&
       <button className="btn-secondary" onClick={() => setLinking(true)}>Create payment link</button>}
-    {canRecord && !composing &&
+    {canRecordPayment && !composing &&
       <button className="btn-primary" onClick={() => setRecording(true)}>Record payment</button>}
   </>;
   const body = statement
     ? <CustomerStatement orderId={invoice.order_id} onClose={() => setStatement(false)} />
-    : recording && canRecord
+    : recording && canRecordPayment
     ? <InvoiceRecordPayment invoice={invoice} rows={rows} onClose={() => setRecording(false)} />
     : linking && canRecord
       ? <InvoicePaymentLink invoice={invoice} rows={rows} onClose={() => setLinking(false)} />
@@ -313,6 +319,8 @@ function InvoiceObject({ invoice, facts: f, onAsk, onResult, correctionInFlight,
         {canCorrect && invoice.status === "issued" && invoice.invoice_no &&
           <InvoiceVoidReplace invoiceId={invoice.id} invoiceNo={invoice.invoice_no} />}
       </Facts>
+      {/* 0707 — a payment with an old paid date, waiting for the Payment Approver. */}
+      <InvoiceBackdateRequests orderId={invoice.order_id} />
       <Facts title="Related Payments">
         {payments.length ? payments.map((p) => <p key={p.id}>
           {p.receipt_no ?? "Receipt number missing"} · {rm(p.amount)} · {fmtDate(p.paid_on)}
