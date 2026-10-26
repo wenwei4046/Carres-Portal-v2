@@ -30,12 +30,15 @@
 --      GRN link (freight, a service) with an account from Finance's own list,
 --      but not one billing material already on a GRN of the bill; a bill with
 --      no GRN line (rent, a service) stays Finance's; purchasing may change its
---      OWN draft. ap_account_choices admits operation for that list, and
+--      OWN bill until a payment (section 5). ap_account_choices admits operation for that list, and
 --      purchasing_supplier_bill_draft() reads an own draft back for editing.
 --      A purchasing draft is the same row Finance's draft is, so confirming it
 --      posts through the same supplier_bill_confirm, Dr each line, Cr payables.
 --      supplier_bill_grn_candidates / supplier_bill_grn_lines admit operation
 --      so the bill form can list the GRNs left to bill.
+--      Q9 edit-until-paid (YH 2026-10-26, Houzs piLocked + resyncPiAccounting):
+--      Purchasing changes its own POSTED bill until any payment is against it;
+--      the posting is reversed and re-posted (section 5).
 --      Q8 (Chew, WhatsApp to YH 2026-10-26 12:34, "once they save should be
 --      direct go to related account as set"; Houzs posts on save): a bill
 --      Purchasing saves is confirmed (posted) in the same act (section 4).
@@ -52,7 +55,8 @@ begin;
 set local search_path = public, pg_temp;
 
 -- ── 1 · supplier bills, read-only, for purchasing ────────────────────────────
--- `mine`: the caller's own draft, which purchasing may change (2026-10-26).
+-- `mine`: the caller's own bill with no payment against it, which purchasing
+-- may change (Q9, 2026-10-26; Houzs piLocked, purchase-invoices.ts:270-284).
 drop function if exists public.purchasing_supplier_bill_list();
 create function public.purchasing_supplier_bill_list()
 returns table (id uuid, bill_no text, status text, supplier_id uuid, supplier_name text,
@@ -77,7 +81,8 @@ begin
          coalesce(p.paid, 0)::numeric(12,2),
          case when b.status = 'confirmed'
               then (b.total_amount - coalesce(p.paid, 0))::numeric(12,2) end,
-         (b.status = 'draft' and b.created_by is not distinct from auth.uid())
+         (b.status in ('draft', 'confirmed') and b.created_by is not distinct from auth.uid()
+          and not exists (select 1 from public.ap_bill_paid(b.id) hp where hp.held > 0))
     from public.supplier_bills b
     join public.suppliers s on s.id = b.supplier_id
     left join public.ap_bill_paid() p on p.bill_id = b.id
@@ -88,8 +93,9 @@ $fn$;
 revoke all on function public.purchasing_supplier_bill_list() from public, anon;
 grant execute on function public.purchasing_supplier_bill_list() to authenticated;
 
--- One draft bill, for its form (2026-10-26). Purchasing reads only its own
--- draft; finance and principal any. Goods lines that saving split by channel
+-- One bill, for its form (2026-10-26). Purchasing reads only its own bill,
+-- draft or posted, while no payment is against it (Houzs piLocked,
+-- purchase-invoices.ts:270-284); finance and principal any draft. Goods lines that saving split by channel
 -- (0683) come back as the one line that was typed. Null: not there / not yours.
 create or replace function public.purchasing_supplier_bill_draft(p_bill_id uuid)
 returns jsonb
@@ -107,8 +113,10 @@ begin
       using errcode = '42501', detail = 'forbidden';
   end if;
   select * into v_bill from public.supplier_bills where id = p_bill_id;
-  if not found or v_bill.status <> 'draft'
-     or (v_role = 'operation' and v_bill.created_by is distinct from auth.uid()) then
+  if not found or v_bill.status = 'cancelled'
+     or (v_role <> 'operation' and v_bill.status <> 'draft')
+     or (v_role = 'operation' and (v_bill.created_by is distinct from auth.uid()
+         or exists (select 1 from public.ap_bill_paid(v_bill.id) hp where hp.held > 0))) then
     return null;
   end if;
   return jsonb_build_object(
@@ -196,9 +204,9 @@ $rw$;
 -- lines with no GRN link (freight, a service) with an account from Finance's
 -- list, but such a line may not bill material already on one of the bill's
 -- GRNs. A bill that is only rent or a service stays Finance's. Purchasing may
--- change its OWN bill while it is a draft. Houzs locks a bill once a payment is
--- recorded; in Carres a bill is paid only after Finance confirms it, and a
--- confirmed bill's lines are frozen for everyone, so a draft is that window.
+-- change its OWN bill until any payment, advance or credit note is against it
+-- (Houzs piLocked, purchase-invoices.ts:270-284: paid_sen > 0 or cancelled
+-- locks it). A posted one is reopened by supplier_bill_save_draft (section 5).
 create or replace function public._purchasing_bill_draft_check(
   p_bill_id uuid, p_ap_account_code text, p_lines jsonb)
 returns void
@@ -217,9 +225,13 @@ begin
   if p_bill_id is not null then
     select * into v_bill from public.supplier_bills where id = p_bill_id;
     -- Not there: the bill door says so.
-    if found and (v_bill.created_by is distinct from auth.uid() or v_bill.status <> 'draft') then
-      raise exception 'Purchasing changes only its own draft bill. Ask Finance to change this one.'
+    if found and (v_bill.created_by is distinct from auth.uid() or v_bill.status = 'cancelled') then
+      raise exception 'Purchasing changes only its own bill. Ask Finance to change this one.'
         using errcode = '42501', detail = 'not_finance';
+    end if;
+    if found and exists (select 1 from public.ap_bill_paid(p_bill_id) hp where hp.held > 0) then
+      raise exception 'A payment is recorded against this bill, so its lines are locked. Ask Finance.'
+        using errcode = '42501', detail = 'bill_locked_paid';
     end if;
   end if;
   if nullif(btrim(coalesce(p_ap_account_code, '')), '') is not null then
@@ -337,6 +349,56 @@ $new$  -- 0721 (Q8, Chew 2026-10-26; Houzs posts on save): Purchasing's bill pos
   return v_id;
 end;$new$);
 
+-- ── 5 · purchasing edits its own posted bill until a payment (Q9, 2026-10-26)
+-- WHY HOUZS: Weisiang's ruling (Mr Lim, WhatsApp 2026-10-22) puts Houzs over
+-- Carres where they clash; YH (chat 2026-10-26) told us to build Q9 the Houzs
+-- way. Houzs lets a posted purchase invoice be edited until a payment is
+-- recorded (piLocked, purchase-invoices.ts:270-284) and keeps the ledger right
+-- by voiding the posted journal and posting a new one at the new total
+-- (resyncPiAccounting, accounting.ts:855+, called after an edit at
+-- purchase-invoices.ts:2018-2024). Carres does the same: gl_reverse the posted
+-- entry (a contra, nothing deleted), put the bill back to draft, replace the
+-- lines, and the save's supplier_bill_confirm posts again. The bill keeps its
+-- number. Finance's own bills, and anything with a payment, are unchanged.
+select pg_temp.mig0721_rewrite('public.supplier_bill_save_draft(uuid, uuid, text, date, jsonb, date, text, text)'::regprocedure,
+$old$    if v_bill.status <> 'draft' then
+      raise exception 'Only a draft bill can be changed.'$old$,
+$new$    -- 0721 (Q9, Houzs resyncPiAccounting): reverse, reopen, the save re-posts.
+    -- _purchasing_bill_draft_check held it to own + unpaid; re-read under the lock.
+    if v_role = 'operation' and v_bill.status = 'confirmed' then
+      if exists (select 1 from public.ap_bill_paid(p_bill_id) hp where hp.held > 0) then
+        raise exception 'A payment is recorded against this bill, so its lines are locked. Ask Finance.'
+          using errcode = '42501', detail = 'bill_locked_paid';
+      end if;
+      perform public.gl_reverse(v_bill.gl_entry_id, 'Bill edited by Purchasing before any payment');
+      update public.supplier_bills
+         set status = 'draft', gl_entry_id = null, confirmed_at = null, confirmed_by = null
+       where id = p_bill_id
+      returning * into v_bill;
+    end if;
+    if v_bill.status <> 'draft' then
+      raise exception 'Only a draft bill can be changed.'$new$);
+
+-- The frozen trigger lets a confirmed bill go back to draft only when its
+-- posting is already reversed and nothing is paid: the step above, nothing else.
+select pg_temp.mig0721_rewrite('public.supplier_bill_frozen()'::regprocedure,
+$old$  -- old.status = 'confirmed'
+  if new.status <> 'cancelled' then$old$,
+$new$  -- old.status = 'confirmed'
+  -- 0721 (Q9): reopened for a Purchasing edit, its posting already reversed.
+  if new.status = 'draft' and new.gl_entry_id is null
+     and exists (select 1 from public.gl_entries e where e.id = old.gl_entry_id and e.reversed)
+     and not exists (select 1 from public.ap_bill_paid(old.id) hp where hp.held > 0) then
+    return new;
+  end if;
+  if new.status <> 'cancelled' then$new$);
+
+-- A re-post keeps the bill's number (Houzs keeps the PI number on an edit).
+select pg_temp.mig0721_rewrite('public.supplier_bill_confirm(uuid)'::regprocedure,
+$old$  v_no := public.allocate_formal_document_code('SB', v_bill.id::text, v_bill.bill_date);$old$,
+$new$  v_no := coalesce(v_bill.bill_no,   -- 0721: a reopened bill keeps its number
+                   public.allocate_formal_document_code('SB', v_bill.id::text, v_bill.bill_date));$new$);
+
 -- ── sanity ───────────────────────────────────────────────────────────────────
 do $sanity_0721$
 begin
@@ -364,6 +426,11 @@ begin
                                    where n.nspname = 'public' and p.proname = 'payment_voucher_save_draft'
                                    order by p.pronargs desc limit 1))) = 0 then
     raise exception '0721: confirming, cancelling or paying a bill no longer reads as finance only';
+  end if;
+  if position('Bill edited by Purchasing before any payment' in pg_get_functiondef(
+       'public.supplier_bill_save_draft(uuid, uuid, text, date, jsonb, date, text, text)'::regprocedure)) = 0
+     or position('0721 (Q9)' in pg_get_functiondef('public.supplier_bill_frozen()'::regprocedure)) = 0 then
+    raise exception '0721: a posted purchasing bill is not reopened by reversal';
   end if;
   if has_function_privilege('authenticated', 'public._purchasing_bill_draft_check(uuid, text, jsonb)', 'EXECUTE') then
     raise exception '0721: _purchasing_bill_draft_check is callable on its own';

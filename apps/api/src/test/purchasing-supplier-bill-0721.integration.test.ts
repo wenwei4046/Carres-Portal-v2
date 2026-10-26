@@ -9,9 +9,10 @@ import pg from "pg";
  *     Chew 2026-10-26; Houzs), through
  *     supplier_bill_save_draft, the same function Finance uses;
  *   - it may add a freight/service line, not one for a GRN's own goods (Q9);
- *   - operation cannot change a posted bill, choose the payables or a goods
- *     line's account, enter a bill with no GRN, confirm Finance's bill,
- *     cancel or pay;
+ *   - operation cannot choose the payables or a goods line's account, enter a
+ *     bill with no GRN, confirm Finance's bill, cancel or pay;
+ *   - operation changes its own posted bill until a payment is against it: the
+ *     posting is reversed and re-posted (Q9; Houzs piLocked + resyncPiAccounting);
  *   - a purchasing bill posts exactly what a Finance bill for the same goods posts.
  *
  * One transaction, rolled back at the end.
@@ -143,9 +144,8 @@ describe.skipIf(!URL)("Purchasing enters a supplier bill (real PostgreSQL, 0721)
       .toMatchObject({ ok: false, code: "42501", detail: "unlinked_line_bills_grn_material" });
   });
 
-  it("Purchasing cannot change a posted bill, choose the payables or a goods line's account, or enter a bill with no GRN", async () => {
+  it("Purchasing cannot choose the payables or a goods line's account, or enter a bill with no GRN", async () => {
     await actAs(U.operation);
-    expect(await saveDraft(purchasingBill, `IT-PB-OP-${RUN}`, grnLine(1, 90))).toMatchObject({ ok: false, code: "42501" });
     expect(await saveDraft(null, `IT-PB-AP-${RUN}`, grnLine(1, 100), "2100"))
       .toMatchObject({ ok: false, code: "42501", detail: "not_finance" });
     expect(await saveDraft(null, `IT-PB-AC-${RUN}`, grnLine(1, 100, { account_code: expense })))
@@ -188,5 +188,36 @@ describe.skipIf(!URL)("Purchasing enters a supplier bill (real PostgreSQL, 0721)
     expect(a).toEqual(b);
     expect(a.map((l) => [l.debit, l.credit])).toEqual([["100.00", "0.00"], ["0.00", "100.00"]]);
     expect(a[1]).toMatchObject({ party_type: "SUPPLIER", party_id: supplierId });
+  });
+
+  // Q9 (YH 2026-10-26, Houzs): piLocked purchase-invoices.ts:270-284 locks on a
+  // payment; resyncPiAccounting accounting.ts:855+ voids and re-posts on an edit.
+  it("Purchasing edits its own posted bill: the old posting is reversed, the new one posted, the number kept", async () => {
+    await actAs(U.operation);
+    const before = (await q("select bill_no, gl_entry_id from supplier_bills where id = $1", [purchasingBill])).rows[0];
+    expect(await attempt("select public.purchasing_supplier_bill_draft($1) ->> 'id' as id", [purchasingBill]))
+      .toEqual({ ok: true, value: purchasingBill });
+    expect(await saveDraft(purchasingBill, `IT-PB-OP-${RUN}`, grnLine(1, 90))).toEqual({ ok: true, value: purchasingBill });
+    const after = (await q("select status, bill_no, gl_entry_id, total_amount::text as total from supplier_bills where id = $1", [purchasingBill])).rows[0];
+    expect(after).toMatchObject({ status: "confirmed", bill_no: before.bill_no, total: "90.00" });
+    expect(after.gl_entry_id).not.toBe(before.gl_entry_id);
+    const old = (await q(`select o.reversed, (select sum(debit)::text from gl_entry_lines where entry_id = o.reversed_by) as contra
+                            from gl_entries o where o.id = $1`, [before.gl_entry_id])).rows[0];
+    expect(old).toEqual({ reversed: true, contra: "100.00" });
+    expect((await posting(purchasingBill)).map((l) => [l.debit, l.credit])).toEqual([["90.00", "0.00"], ["0.00", "90.00"]]);
+  });
+
+  it("once a payment is against it, Purchasing's bill is locked", async () => {
+    await actAs(U.finance);
+    await q("set local session_replication_role = replica");
+    // A credit note applied (Finance's act; replica: no note row needed for the test).
+    await q("insert into supplier_credit_note_applications (note_id, bill_id, amount) values (gen_random_uuid(), $1, 10)",
+      [purchasingBill]);
+    await q("set local session_replication_role = origin");
+    await actAs(U.operation);
+    expect(await saveDraft(purchasingBill, `IT-PB-OP-${RUN}`, grnLine(1, 80)))
+      .toMatchObject({ ok: false, code: "42501", detail: "bill_locked_paid" });
+    expect(await attempt("select public.purchasing_supplier_bill_draft($1) as d", [purchasingBill])).toEqual({ ok: true, value: null });
+    expect((await q("select total_amount::text as t from supplier_bills where id = $1", [purchasingBill])).rows[0].t).toBe("90.00");
   });
 });

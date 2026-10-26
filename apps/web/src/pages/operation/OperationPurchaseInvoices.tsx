@@ -40,7 +40,7 @@ type BillRow = {
   total_amount: number | string;
   paid_total: number | string;
   unpaid: number | string | null;
-  /** 2026-10-26: the caller's own draft, which it may change. */
+  /** 2026-10-26: the caller's own bill with no payment against it, which it may change (Houzs piLocked). */
   mine: boolean;
 };
 
@@ -87,7 +87,7 @@ export default function OperationPurchaseInvoices() {
           columns={columns}
           rowKey={(r) => r.id}
           rowTestId={(r) => `purchase-invoice-row-${r.id}`}
-          // 2026-10-26 (YH, Houzs): your own draft opens to be changed.
+          // 2026-10-26 (YH, Houzs): your own bill opens to be changed until a payment.
           onRowClick={(r) => { if (r.mine) navigate(`/operation/purchase-invoices/${r.id}/edit`); }}
           storageKey="carres.operation.purchase-invoices.v1"
           appearance="reference"

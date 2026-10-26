@@ -36,9 +36,9 @@ import SalesOrderTabs from "./SalesOrderTabs";
  * lines a bill may carry lines with no GRN (freight, a service), with an
  * account from Finance's own list and a department; such a line may not bill a
  * GRN's own goods (the database refuses it by name). Purchasing changes its
- * own draft at `/operation/purchase-invoices/:id/edit`. Houzs locks a bill
- * once a payment is recorded; here a bill is paid only after Finance confirms
- * it, so a draft is the editable window.
+ * own bill at `/operation/purchase-invoices/:id/edit` until a payment is
+ * against it (Houzs piLocked); saving a posted one reverses and re-posts it
+ * (0721 §5, Houzs resyncPiAccounting).
  */
 type DraftDoc = {
   id: string; supplier_id: string; supplier_invoice_no: string; bill_date: string; due_date: string | null;
@@ -58,7 +58,7 @@ function draftLine(over: Partial<LineDraft>): LineDraft {
   };
 }
 
-/** `/operation/purchase-invoices/:id/edit`: Purchasing's own draft. */
+/** `/operation/purchase-invoices/:id/edit`: Purchasing's own bill, until a payment (Houzs piLocked). */
 export function OperationPurchaseInvoiceEdit() {
   const { id = "" } = useParams();
   const draft = useQuery<DraftDoc>({
@@ -66,7 +66,7 @@ export function OperationPurchaseInvoiceEdit() {
     queryFn: () => apiFetch(`/api/operation/purchase-invoices/${id}`),
   });
   if (draft.isLoading) return <p className="p-4">Loading the bill…</p>;
-  if (draft.isError || !draft.data) return <p className="p-4">This draft bill could not be opened. Only your own draft can be changed.</p>;
+  if (draft.isError || !draft.data) return <p className="p-4">This bill could not be opened. You can change only your own bill, until a payment is recorded.</p>;
   return <OperationPurchaseInvoiceNew draft={draft.data} />;
 }
 
