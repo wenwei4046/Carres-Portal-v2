@@ -141,6 +141,8 @@ export default function OperationServiceCases() {
       ) : (
       <>
       {/* 0711 — one card per stage with its count (Houzs ServiceCases.tsx). */}
+      {/* Follows Houzs frontend/src/pages/ServiceCases.tsx:1226-1229 (stage cards,
+          click to filter) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */}
       {stages.length > 0 && (
         <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {stages.map((st) => (

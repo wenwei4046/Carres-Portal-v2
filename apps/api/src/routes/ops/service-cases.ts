@@ -221,6 +221,8 @@ scRouter.get("/numbers", requireOperationOrPrincipal, async (c) => {
 // Lim, WhatsApp 2026-10-22). The default case owner and the two pick lists
 // (Case Type, Stage). Everyone in the office reads; the principal or a person
 // named for the `service` Settings section writes (RLS says the same).
+// Follows Houzs backend/src/routes/assr.ts:327 (default assignee setting)
+// per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
 // ─────────────────────────────────────────────────────────────────────────────
 const PICK_TABLE = { types: "service_case_types", statuses: "service_case_statuses" } as const;
 function pickTable(list: string) {
@@ -486,6 +488,8 @@ scRouter.get("/", requireOperationOrPrincipal, async (c) => {
   // 0711 My Cases — Weisiang's decision (WhatsApp 2026-10-22), Houzs
   // assrVisibility: what I and my downline own, raised, or are the SO PIC of.
   // The database decides who "my team" is (my_service_case_ids).
+  // Follows Houzs backend/src/services/assrVisibility.ts:214 (myCasesPredicateSql)
+  // per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
   if (c.req.query("mine") === "1") {
     const { data: mine, error: mineErr } = await sb.rpc("my_service_case_ids");
     if (mineErr) throw new HTTPException(500, { message: mineErr.message });
@@ -649,6 +653,8 @@ scRouter.patch("/:id", requireOperationOrPrincipal, async (c) => {
   // 0711 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): Close Case on
   // every open case, Houzs way. The S3 close gate (customer confirmation and
   // every chain step first) is overturned; the chain still shows what is open.
+  // Follows Houzs frontend/src/pages/ServiceCases.tsx:3594 (Close Case on every
+  // open case) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
 
   // 0711 — the Sales Order PIC picks the case owner (an admin).
   if (parsed.ownerUserId !== undefined) {

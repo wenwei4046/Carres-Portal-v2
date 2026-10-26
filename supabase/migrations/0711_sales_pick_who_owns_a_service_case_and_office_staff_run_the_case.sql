@@ -5,6 +5,9 @@
 -- Where a written Carres Service rule clashes with Houzs, the Houzs behaviour is
 -- built and the Carres rule is marked overturned in docs/service/MASTER.md.
 -- Jess was not part of this decision.
+-- Follows Houzs backend/src/services/assrVisibility.ts:214 (My Cases),
+-- frontend/src/pages/ServiceCases.tsx:3594 (Close Case on every open case) and
+-- backend/src/routes/assr.ts:327 (default assignee) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
 --
 --   1. service_cases.owner_user_id — the Case owner. The Sales Order PIC picks
 --      an admin to own the case (Houzs). Overturns Service MASTER "the Sales
