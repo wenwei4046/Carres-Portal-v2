@@ -254,7 +254,7 @@ test("Forecast Purchase: a request cannot be sent while production days are not 
 });
 
 /* Owner17Oct: narrow panels overlay rather than taking list width. */
-test("1025 shared panels overlay the unchanged canvas and restore the saved wide menu", async ({ page }) => {
+test("1025 shared panels overlay the unchanged canvas and keep the common64 menu", async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem("carres-menu-collapsed", "0");
     localStorage.setItem("shell-tasks-open", "0");
@@ -285,7 +285,11 @@ test("1025 shared panels overlay the unchanged canvas and restore the saved wide
   await page.locator('[data-testid^="forecast-select-"]:not([disabled])').first().check();
   await expect(page.getByTestId("selection-bar")).toHaveText(selection);
   await page.setViewportSize({ width: 1440, height: 900 });
-  await expect.poll(async () => Math.round((await nav.boundingBox())!.width)).toBe(220);
+  await expect.poll(async () => Math.round((await nav.boundingBox())!.width)).toBe(64);
+  await page.getByRole("button", { name: "Expand menu", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Menu", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "Menu", exact: true })).toHaveCount(0);
   await expect(page.getByTestId("selection-bar")).toHaveText(selection);
   expect(await page.evaluate(() => localStorage.getItem("carres-menu-collapsed"))).toBe("0");
 });

@@ -4,7 +4,7 @@ import { soRemaining } from "@carres/shared/payment-invoice-register";
 import { likelyDuplicatePayments } from "@carres/shared/payment-duplicate";
 import { SectionCard } from "@/components/SectionPanel";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { qk, useRecordPayment } from "@/lib/queries";
+import { BACKDATE_WAITING_WORDS, qk, useRecordPayment } from "@/lib/queries";
 import { apiFetch } from "@/lib/api";
 import InvoiceSendReceipt from "./InvoiceSendReceipt";
 import type { PaymentTemplateRow } from "@carres/shared/payment-templates";
@@ -49,6 +49,8 @@ export default function InvoiceRecordPayment({ invoice, rows, onClose }: {
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<{ receiptNo: string | null; stillNeeded: number } | null>(null);
   const [sendingReceipt, setSendingReceipt] = useState(false);
+  // 0707 — a paid date more than 14 days back waits for the Payment Approver.
+  const [waiting, setWaiting] = useState(false);
   const templatesQuery = useQuery<{ templates: PaymentTemplateRow[] }>({
     queryKey: ["finance", "payment-templates"],
     queryFn: () => apiFetch("/api/finance/payment-settings/templates"),
@@ -124,6 +126,11 @@ export default function InvoiceRecordPayment({ invoice, rows, onClose }: {
       },
       {
         onSuccess: (out) => {
+          if (out.pendingApproval) {
+            setWaiting(true);
+            setStep("done");
+            return;
+          }
           const receiptNo = (out.payment as { receipt_no?: string | null } | undefined)?.receipt_no ?? null;
           setResult({
             receiptNo,
@@ -136,6 +143,17 @@ export default function InvoiceRecordPayment({ invoice, rows, onClose }: {
         onSettled: () => setSaving(false),
       },
     );
+  }
+
+  if (step === "done" && waiting) {
+    return <div className="flex-1 overflow-auto p-4" data-testid="invoice-record-waiting">
+      <SectionCard><div className="p-4 text-body">
+        <h2 className="text-strong mb-2">Waiting for the Payment Approver</h2>
+        <p>Paid date is more than 14 days ago.</p>
+        <p>{BACKDATE_WAITING_WORDS}</p>
+        <button className="btn-secondary mt-3" onClick={onClose}>Back to invoice</button>
+      </div></SectionCard>
+    </div>;
   }
 
   if (step === "done" && result) {

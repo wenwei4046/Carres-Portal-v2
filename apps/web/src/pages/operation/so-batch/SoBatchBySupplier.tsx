@@ -49,7 +49,7 @@ const modelCode = (line: PurchaseDemandRow) => (line.skus?.length ? line.skus.jo
 
 export default function SoBatchBySupplier({
   groups, by = "supplier", today, isLoading, storageKey, sessionKey, canBuy, isTicked, onToggleLine, onToggleLines,
-  selectionSummary, selectionPrimary, toolbarEnd, toolbarAfterTools, toolbarStart, onOpenOrder, emptyMessage, noMatchMessage, onClearConditions, initialSearch, searchPlaceholder, lineExtras, warning,
+  selectionSummary, selectionSummaryCompact, selectionPrimary, toolbarEnd, toolbarAfterTools, toolbarStart, onOpenOrder, emptyMessage, noMatchMessage, onClearConditions, initialSearch, searchPlaceholder, lineExtras, warning,
 }: {
   groups: SupplierGroup[];
   /** How the rows are grouped. The columns follow it. */
@@ -65,6 +65,7 @@ export default function SoBatchBySupplier({
   onToggleLine: (demandId: string) => void;
   onToggleLines: (demandIds: string[], on: boolean) => void;
   selectionSummary: string;
+  selectionSummaryCompact?: string;
   selectionPrimary: ReactNode;
   toolbarEnd: ReactNode;
   /** Drawn after the ⋮ menu button, at the toolbar's end. */
@@ -296,7 +297,7 @@ export default function SoBatchBySupplier({
          one Status column short (where the design file has its Tasks button),
          so the button is not over Status and its menu never covers that
          column (owner 13 Oct 2026). */
-      toolbarAfterTools={toolbarAfterTools ?? (fit.tight ? undefined : <span aria-hidden className="block" style={{ width: W5.status + 8 }} />)}
+      toolbarAfterTools={toolbarAfterTools ? <div className="hidden items-center justify-end min-[768px]:flex" style={{ minWidth: W5.status + 8 }}>{toolbarAfterTools}</div> : (fit.tight ? undefined : <span aria-hidden className="block" style={{ width: W5.status + 8 }} />)}
       /* The top bar already searches everything; here search is one icon, so
          the tabs and the view button stay on one line (01 §4). */
       searchPresentation="icon"
@@ -414,10 +415,13 @@ export default function SoBatchBySupplier({
         },
         onToggleAll: (keys, allSelected) => onToggleLines(keys.flatMap((k) => buyable.get(k) ?? []), !allSelected),
         isSelectable: (g: SupplierGroup) => (buyable.get(g.key) ?? []).length > 0,
+        unselectableReason: (g: SupplierGroup) => g.ordered ? B.ordered
+          : [...new Set(g.lines.map(line => lineExtras?.(line).whyText).filter(Boolean))].join(" · ") || null,
         isIndeterminate: (g: SupplierGroup) => { const n = ticked(g); return n > 0 && n < (buyable.get(g.key) ?? []).length; },
         testId: (g: SupplierGroup) => `by-supplier-select-${g.key}`,
       }}
       selectionSummary={() => selectionSummary}
+        selectionSummaryCompact={selectionSummaryCompact ? () => selectionSummaryCompact : undefined}
       selectionPrimary={selectionPrimary}
       statusSummary={(filtered) => (
         <span className="block" data-testid="by-supplier-footer">

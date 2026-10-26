@@ -987,6 +987,7 @@ describe("the selection bar counts lines, units and documents", () => {
     expect(summary.units).toBe(7);
     expect(summary.documents).toBe(3);
     expect(summary.text).toBe("2 Sales Orders · 2 items · 7 units · Issue 3 POs");
+    expect(summary.compactText).toBe("2 SO · 2 items · 7 units · 3 PO");
   });
 
   it("says nothing at all when nothing is selected", () => {

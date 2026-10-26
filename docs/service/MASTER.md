@@ -18,7 +18,7 @@
 
 **APPROVED IN THIS CHAT — one current scope:** Operation shares routine service work with one per-Case owner and helpers (§7.9); every Case receives a substantive first response within two Office working days (§7.2); the scoped internal processing deadlines are §7.9; every formal repair/replacement/charge/customer-movement decision goes through Service Case Approver (§7.4), with no repeat approval for unchanged approved-scope follow-up. Original Case clock, source-module permissions and actual completion facts remain.
 
-**NOT COMPLETE:** Service Register/Working Panel/Object/Tasks shared UI is still awaiting the UI controller's combined review, not a local variant. No-remedy/withdrawn/reopen, unapproved Excel extensions and other explicitly marked proposals must not be silently implemented. Authorised Settings editability is approved direction (9 Oct; §7.16), but effective treatment and calendar conflicts remain unresolved and no editor/runtime change is claimed. No READY scope, Card, application code, live data change or deployment is authorised by this PLAN. Seven module reviews are recorded; they do not prove interfaces are connected. All scoped owner approvals must be available in the exact reviewed Git version before BUILD.
+**NOT COMPLETE:** Service Register/Working Panel/Object/Tasks shared UI is still awaiting the UI controller's combined review, not a local variant. No-remedy/withdrawn/reopen, unapproved Excel extensions and other explicitly marked proposals must not be silently implemented. ~~Authorised Settings editability is approved direction (9 Oct; §7.16), but effective treatment and calendar conflicts remain unresolved and no editor/runtime change is claimed.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp): Settings → Service Settings is built (0711): default case owner and the Case Type and Stage pick lists, edited by the owner or a person named for Service in Settings editors.** No READY scope, Card, application code, live data change or deployment is authorised by this PLAN. Seven module reviews are recorded; they do not prove interfaces are connected. All scoped owner approvals must be available in the exact reviewed Git version before BUILD.
 
 **STATUS IS DERIVED AND READS WHO + ACTION + OBJECT — OWNER RULING 2026-10-06 (Jess).** On
 being shown the current `Pending / In Progress / Follow-up / Resolved` dropdown, the owner ruled:
@@ -229,8 +229,8 @@ any credit note. Customer remedy and supplier recovery are separate: an authoris
 exchange is not held for a supplier reply.
 
 Every governed Service Case decision routes to the `Service Case Approver` Duty through the one
-Shared Duty Resolver. Service Settings stores the Duty key only; it never stores a manager's name
-or another approver list. The decision evidence preserves the normal Primary holder, today's Buddy
+Shared Duty Resolver. ~~Service Settings stores the Duty key only; it never stores a manager's name
+or another approver list.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp): Service Settings stores the default case owner (a named person, Houzs default assignee). Approver routing is unchanged by this.** The decision evidence preserves the normal Primary holder, today's Buddy
 cover and the actual authenticated actor separately.
 
 The Case `Documents` panel is the operator's one checklist. For every derived document it states
@@ -594,14 +594,15 @@ Service Note prints from the Case; data stays.
 
 **RULING 2026-10-06 (Jess) — routine Service Case work stays inside Operation and is SHARED.**
 *"operation wont pass back to sales person. service duty ppl need to share."* Therefore a governed
-`Service Duty` exists in Settings → Staff & Duties; the Sales Order PIC is never the Case owner and
-is not asked to do service work. The sharing mechanism below is the planner's decision under the
+`Service Duty` exists in Settings → Staff & Duties; ~~the Sales Order PIC is never the Case owner and
+is not asked to do service work.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp): "sales own the order and sales assign an admin to own the case". The Sales Order PIC (or the owner) picks the case owner, an office person, on the case; with no PIC on the order any office person may pick.** The sharing mechanism below is the planner's decision under the
 Constitution's engineering/design rule, recorded here so no chat asks it again:
 
-- **One Case, one owner, assigned by round robin.** A new Case goes to the next eligible active
+- ~~**One Case, one owner, assigned by round robin.** A new Case goes to the next eligible active
   Operation person in Staff & Duties order; the Case stays with that person until it closes, so the
   customer hears one voice. No name is written here (GLOBAL DUTY LAW): who is eligible today is
-  People's fact, and a departed person leaves the cycle on their last working day.
+  People's fact, and a departed person leaves the cycle on their last working day.~~
+  **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp): one Case, one owner, picked by the Sales Order PIC. Until someone picks, a new Case goes to the default case owner in Service Settings (Houzs default assignee). No round robin.**
 - **Leave/cover uses shared Workspace and People sources — approved direction, 9 Oct; implementation UNVERIFIED.** Workspace → Leave is the single submission entry; all leave types currently require no approval. Today’s submitted MC/Emergency/other dated leave activates qualified available cover immediately; future absence activates on its absence date. MC proof is optional (owner rule 9 Oct 2026); Emergency leave retains dates/reason. Login to submit MC is not working availability. Normal Case owner, current cover assignee and actual helper remain separate; return does not silently undo recorded cover. Service neither creates a Staff/Leave editor nor changes payroll/evidence acceptance. Future leave-approval policy changes need their own effective treatment and cannot waive Service business approvals.
 - **Direct assignment, ordinary help and lunch:** governed source/cover records show unfinished work directly in the recipient’s Tasks without a Take/Accept/Claim prerequisite; this does not claim Service Tasks are already admitted. Any authorised recipient of a customer call/message responds and records it, while follow-up keeps its accountable Case owner. Actual one-hour lunch (default13:00–14:00, permitted shift) retains assignments and is excluded from availability checks. Workspace owns the owner-approved10:00/14:01 check defaults; the observed10:15 morning value is runtime evidence, not a changed default. No Service-local check or assignment algorithm is introduced.
 - **No qualified recipient:** leave work visibly unassigned/blocked under the shared escalation rule; do not pause Case clocks, invent an actor or grant approval rights. PO/GRN monthly rota and the PO-only next-month newcomer rule do not turn Service per-Case ownership into a monthly sole holder.
@@ -693,9 +694,9 @@ named (entitlement result block · document checklist row with a state word · s
 
 ## 7.17 · Reports and export
 
-The BUILT Numbers engine (by month · by issue · by factory · average working days · on time · why
-late) moves to `Reports → Service`; `?tab=numbers` forwards there. The register exports the current
-view (Excel / list PDF) through the shared engine. No KPI strip on the register (UI MASTER §4).
+~~The BUILT Numbers engine (by month · by issue · by factory · average working days · on time · why
+late) moves to `Reports → Service`; `?tab=numbers` forwards there.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp): the Numbers (Houzs Quality Metrics) stay inside the Service module as the `Numbers` tab (`?tab=numbers`).** The register exports the current
+view (Excel / list PDF) through the shared engine. ~~No KPI strip on the register (UI MASTER §4).~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp): the case list shows one card per stage with its count; pressing a card filters the list (Houzs).**
 
 ## 7.18 · Responsive, states and copy — WAITING FOR THE KIT
 
@@ -716,7 +717,7 @@ only its missing-data words (§7.20).
 | Published progress (Dealer) | `Stock ready` · `Scheduling in progress` · `Delivery arranged {date}` | In production · Processing |
 | Absence words | `No sales order linked` · `Policy cannot be decided: delivery date not recorded` · `No supplier on the case` · `No photos on this case` · `Service Cases could not be read` | — · N/A · Unknown |
 | Intake questions | `Who told us?` · `Which item?` · `What is wrong?` · `Can the customer still use it?` · `What does the customer ask for?` · `Take the photos` | Who found it? · Case Type |
-| Doors | `Report a problem` (RESOLVED) · `New Case` · `Add to {Case No}` · `Publish progress` · `Mark public escalation` · `Record customer confirmed` | Raise case · Log complaint · Close case (as a button) |
+| Doors | `Report a problem` (RESOLVED) · `New Case` · `Add to {Case No}` · `Publish progress` · `Mark public escalation` · `Record customer confirmed` | Raise case · Log complaint · ~~Close case (as a button)~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp): `Close Case` is a button (Houzs)** |
 
 ## 7.21 · Reference-to-Carres capability matrix (object-level mining, 2026-10-06)
 
@@ -729,9 +730,9 @@ only its missing-data words (§7.20).
 | Intercom: conversation timeline + customer context beside it | Timeline tab + embedded SO in Info | KEEP (kit) | §5.2 three-rank history; no second customer store | UI master |
 | Houzs Service Case detail hierarchy (owner-selected reference 2026-10-01) | — | ADAPT (hierarchy only) | sections: result → decision → arrangements → evidence → history | UI master |
 | AutoCount: sortable headers, per-column filters, footer totals | DataGrid supports | KEEP | copy the power, not the 17 columns | UI master |
-| Zendesk/Intercom: assignee per ticket with round-robin | Operation sharing / per-Case owner rule approved; implementation not verified | ADAPT | Service Duty on the shared resolver, helpers retain owner | §7.9 |
+| Zendesk/Intercom: assignee per ticket with round-robin | ~~Operation sharing / per-Case owner rule approved; implementation not verified~~ | ~~ADAPT~~ | ~~Service Duty on the shared resolver, helpers retain owner~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp): Sales Order PIC picks the case owner; default owner from Service Settings; no round robin** | §7.9 |
 | Shopify: customer-visible order/return status page | Dealer request view (Purchasing §9.8) | ADAPT | published progress events, never raw status | §7.7 |
-| Any helpdesk: canned "closed" by agent | Carres closes only on customer confirmation (BUILT) | KEEP | the module's own law | §7.2 |
+| Any helpdesk: canned "closed" by agent | ~~Carres closes only on customer confirmation (BUILT)~~ | ~~KEEP~~ | ~~the module's own law~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp): staff press Close Case on any open case (Houzs); the customer confirmation gate is removed (0711)** | §7.2 |
 | Any helpdesk: free-text ticket body | five guided questions (BUILT) | KEEP | staff cannot fill free text | §7.3 |
 
 ### Fresh Houzs Service reconciliation — authenticated read-only evidence, 9 Oct 2026
@@ -741,10 +742,10 @@ Reference scope: Service Cases register and full `ASSR/2610-014` object observed
 | Reference lesson | Carres treatment and operator journey | Completion / failure evidence |
 |---|---|---|
 | One Case contains customer/supplier context, goods, evidence and dated actor history | KEEP the existing §7.1/§7.27 source-linked investigation and communication journey. Operations reads the same Case; Purchasing owns Claim/RO, Warehouse owns receipt/inspection and Delivery owns physical outcomes | Source identity, exact goods and actual recorder remain visible. Access collaborator and accountable owner are different facts; unread source is a visible gap, never a completed leg |
-| Sampled stage says Solution completed while resolution remains TBD; Verification/Pickup completed while explanatory text still awaits QC/supplier handover | REJECT importing the manual stage dropdown or treating stage labels as execution proof. This is a displayed inconsistency, not a tested Houzs enforcement defect. Carres keeps §7.2 first-open-obligation derivation and §7.5 independent legs | Missing approved remedy keeps Decision open; missing physical receipt or applicable inspection keeps its leg open. Partial goods, cancelled source and failed reads cannot close the remaining obligation; customer confirmation remains separate |
+| Sampled stage says Solution completed while resolution remains TBD; Verification/Pickup completed while explanatory text still awaits QC/supplier handover | ~~REJECT importing the manual stage dropdown or treating stage labels as execution proof.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp): staff set the stage by hand (Houzs); the follow-up chain still shows what is open.** This is a displayed inconsistency, not a tested Houzs enforcement defect. Carres keeps §7.2 first-open-obligation derivation and §7.5 independent legs | Missing approved remedy keeps Decision open; missing physical receipt or applicable inspection keeps its leg open. Partial goods, cancelled source and failed reads cannot close the remaining obligation; customer confirmation remains separate |
 | Current Ready stage includes QC result, inspection report and supplier-return date | ADAPT provenance and missing-evidence visibility, not a second Service QC writer. Operations opens the linked owning receipt/inspection/Claim/RO record, reads its accepted result, then communicates the outcome | Supplier promised return is not actual return; receipt is not passed inspection; uploaded report is not accepted QC. Exact affected goods and applicable accepted checks determine readiness (§7.27.5) |
-| Maintenance offers defaults, issue/resolution/priority/product/root-cause pools and priority-stage lead times | ADAPT governed classification and traceable configuration; Guarantee remains policy owner, Catalog product owner and shared Staff & Duties assignment owner. Free-form resolution pools cannot expand approved remedies or revive on-site inspection | Renamed/deactivated classification preserves historical meaning and source identity. No picker choice bypasses formal decision approval or customer/stock/money gates. Classification maintenance is a recommended capability, not an executed grant |
-| Lead Time states priority snapshots with edits affecting new cases and future stages of ongoing cases | REJECT copying the foreign timing treatment/defaults as law. Carres §7.16 explicitly leaves existing-Case effective treatment and calendar reconciliation unresolved. Recommended review contract: show rule version, trigger, calendar, applicability and old/new effect before any authorised change | Preserve original report date, deadline/contact/extension evidence. No silent reset, retroactive promise or priority edit to conceal lateness. This contract is PROPOSAL; approved current clocks continue until the specific treatment is resolved |
+| Maintenance offers defaults, issue/resolution/priority/product/root-cause pools and priority-stage lead times | ~~ADAPT governed classification and traceable configuration; Guarantee remains policy owner, Catalog product owner and shared Staff & Duties assignment owner. Free-form resolution pools cannot expand approved remedies or revive on-site inspection~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp): Service Settings keeps a default case owner and staff-maintained pick lists (Case Type, Stage) the Houzs way. Issue, resolution, product and root-cause lists are NOT BUILT yet.** | Renamed/deactivated classification preserves historical meaning and source identity. No picker choice bypasses formal decision approval or customer/stock/money gates. Classification maintenance is a recommended capability, not an executed grant |
+| Lead Time states priority snapshots with edits affecting new cases and future stages of ongoing cases | ~~REJECT copying the foreign timing treatment/defaults as law.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp): per-priority lead times follow Houzs (edits affect new cases). NOT BUILT yet: the 14 working-day clock still runs until a priority SLA table is added.** Carres §7.16 explicitly leaves existing-Case effective treatment and calendar reconciliation unresolved. Recommended review contract: show rule version, trigger, calendar, applicability and old/new effect before any authorised change | Preserve original report date, deadline/contact/extension evidence. No silent reset, retroactive promise or priority edit to conceal lateness. This contract is PROPOSAL; approved current clocks continue until the specific treatment is resolved |
 
 Acceptance supplements the existing §7.27.10 rather than replacing it: a visually completed stage with missing remedy/receipt/QC must still show the true open obligation; returned but failed-inspection goods must not become customer-ready; changing a classification must retain historical reports; rule edits must expose unresolved existing-Case treatment rather than guess. Existing approved ownership, approval, no-on-site-inspection and customer-confirmed closure laws are unchanged. No UI composition, application build or production acceptance is claimed.
 
@@ -771,8 +772,8 @@ Payment · Sales Order. Tally recorded here as sent / acknowledged / aligned.
 
 - No Carres on-site inspection stage (RULING). No `Inspection` ask.
 - No refund as a routine remedy; no `Refund` button.
-- No manual Case status, no manual Case Type, no manual priority.
-- No Case-level PIC field; owner comes from the Duty resolver.
+- ~~No manual Case status, no manual Case Type, no manual priority.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp): staff set the stage, Case Type and priority by hand (Houzs). A new case still starts its priority from "Can the customer still use it?".**
+- ~~No Case-level PIC field; owner comes from the Duty resolver.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp): the case has a Case owner picked by the Sales Order PIC. My Cases shows a person and their downline the cases they own, raised, or are the Sales Order PIC of (Houzs assrVisibility).**
 - No Case → Supplier Claim creation; no supplier call steps inside the Case.
 - No Service Note as a separate document type; the Visual Service Note derives from the Case.
 - No Service Case column or group on the Sales Orders register (RULING 2026-09-21).
@@ -789,7 +790,7 @@ Payment · Sales Order. Tally recorded here as sent / acknowledged / aligned.
 | `service_case_statuses` chosen by staff | derived step sentence; table keeps `is_closed` only |
 | `Collect the item from {customer}` | `{Logistics} to pick up the {item} from {customer}` |
 | `SC{YYMM}-NN` numbering | `CSYYMM-NNNN` |
-| Numbers tab on the module page | `Reports → Service` |
+| Numbers tab on the module page | ~~`Reports → Service`~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp): stays on the module page** |
 | `opened_at` editable | read-only after day one |
 | Service Note modal / print page | retired from the UI; Visual Service Note from the Case |
 
