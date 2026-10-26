@@ -128,9 +128,17 @@ describe.skipIf(!URL)("a backdated payment waits for the Payment Approver (real 
     expect(refused.ok && refused.value.request.status).toBe("refused");
     expect(await decide(id.value.request.id, true)).toEqual({ ok: false, detail: "already_decided" });
 
-    // a principal's own request is decided by somebody else
+    // a principal records an old payment directly, as the Houzs backdate
+    // right does (mfg-sales-orders.ts:3915): no request, the money counts now
     await actAs(U.principal);
-    const own = (await record(40, daysAgo(30), "kown")) as { ok: true; value: any };
+    const before = await paid();
+    const direct = (await record(40, daysAgo(30), "kown")) as { ok: true; value: any };
+    expect(direct.value.pending_approval).toBeFalsy();
+    expect(await paid()).toBe(before + 40);
+
+    // the approver keying an old payment still asks, and cannot decide it
+    await actAs(U.approver);
+    const own = (await record(45, daysAgo(30), "kapprover")) as { ok: true; value: any };
     expect(own.value.pending_approval).toBe(true);
     expect(await decide(own.value.request.id, true)).toEqual({ ok: false, detail: "own_request" });
 

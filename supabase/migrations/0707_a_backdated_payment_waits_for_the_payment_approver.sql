@@ -4,7 +4,10 @@
 -- THE RULE (ported from Houzs "Payment Backdate Requests", row 11 of the
 -- Houzs -> Carres port; DRAFT, awaits Jess's review): a customer payment whose
 -- paid date is more than 14 days before today (Kuala Lumpur) is not recorded
--- by the person keying it. It waits as a request; the Payment Approver duty
+-- by the operation person keying it. A principal records it directly (Houzs:
+-- the scm.payment.backdate holder keys an old slip with no request,
+-- mfg-sales-orders.ts:3915; YH 2026-10-26). Finance has no Record payment
+-- door in Carres, so nothing of Finance's is gated here. It waits as a request; the Payment Approver duty
 -- (Workspace -> Staff & Duties, the same duty that voids, reallocates and
 -- continues a likely duplicate, payment/MASTER.md section 12) approves or
 -- refuses it in Work. Nobody decides their own request.
@@ -184,7 +187,11 @@ $old$  return public._customer_payment_post(p_order_id, p_amount, p_paid_on, p_m
 $new$  -- 0707: a paid date more than 14 days back (Kuala Lumpur today) waits for
   -- the Payment Approver. A retry of a payment already recorded under this key
   -- still reaches the writer, which answers it with the original row.
+  -- A principal records it directly, as Houzs lets the holder of
+  -- scm.payment.backdate (Finance, Owner) key an old slip with no request
+  -- (Houzs backend/src/scm/routes/mfg-sales-orders.ts:3915; YH 2026-10-26).
   if p_paid_on < timezone('Asia/Kuala_Lumpur', now())::date - 14
+     and not coalesce(public.app_role() = 'principal', false)
      and not exists (select 1 from order_payments
                       where source_channel = 'manual_payment' and idempotency_key = v_key) then
     return public._payment_backdate_request(p_order_id, p_amount, p_paid_on, p_method, p_kind,
