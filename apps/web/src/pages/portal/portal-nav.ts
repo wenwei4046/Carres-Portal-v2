@@ -613,6 +613,11 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "purchasing-report", label: "Purchasing report", icon: BarChart3, section: "Reports" },
       { key: "receiving-report", label: "Receiving report", icon: BarChart3, section: "Reports" },
       { key: "delivery-report", label: "Delivery report", icon: BarChart3, section: "Reports" },
+      /* Houzs detail-listing port (row 15): one row per document line, read
+         from each Register's own read. Awaits Jess's review. */
+      { key: "sales-order-lines", label: "Sales order lines", icon: BarChart3, section: "Reports" },
+      { key: "delivery-order-lines", label: "Delivery order lines", icon: BarChart3, section: "Reports" },
+      { key: "sales-invoice-lines", label: "Sales invoice lines", icon: BarChart3, section: "Reports" },
       /* The roster stays exactly the page it was; `?tab=suppliers` is
          unchanged, so every bookmark and deep link still lands. */
       { key: "suppliers", label: "Suppliers", icon: Truck, section: "Suppliers" },

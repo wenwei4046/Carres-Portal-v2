@@ -3409,6 +3409,19 @@ create an `Acknowledged` state.
 Every word above is ruled. No terminology placeholder is left in Purchasing, and a chat that finds
 one has found a document that was missed.
 
+### Document line report words — central Reports (PROPOSED, awaits Jess's review)
+
+Three `Reports` rows, one row per document line, read from each Register's own read (Houzs
+detail-listing port, row 15): **`Sales order lines`** · **`Delivery order lines`** ·
+**`Sales invoice lines`**. Columns reuse governed words: `Proceed date` / `DO date` /
+`Invoice date` · `SO no.` / `DO No` / `Invoice No` · `SO no.` · `Customer` · `Item` · `Qty` ·
+`Unit price` · `Amount` (no money on Delivery order lines). Each add-on is its own line after the goods,
+`Item` = the add-on's catalog name. Footer: `{shown} of {total} lines ·`
+then the exclusion: `Rentals are not listed.` · `Cancelled delivery orders are not listed.` ·
+`Only issued sales invoices are listed.` Empty: `No lines yet.` + the same exclusion.
+Sales invoice lines add **`Lines from`**: `Invoice` (the invoice's own line, frozen at issue) or
+`Sales order today` (the invoice froze no lines, so the order's live line stands in).
+
 ## ⭐ THE YEAR RULE — owner ruling 2026-08-15 (Chai), portal-wide
 
 **`Wed, 12 Aug`. The year appears only when it is not the current year.**
