@@ -775,6 +775,8 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "card-charges", label: "Card charges", icon: CreditCard, financePath: "/finance/reports/card-charges", section: "Reports" },
       { key: "dealer-commission", label: "Dealer commission", icon: Users, financePath: "/finance/reports/dealer-commission", section: "Reports" },
       { key: "stock-value", label: "Stock value", icon: Boxes, financePath: "/finance/reports/stock-value", section: "Reports" },
+      // 0714 — Stock's write-offs, read-only, valued as Stock value (YH 2026-10-26: no journal).
+      { key: "stock-drops", label: "Stock drops", icon: Boxes, financePath: "/finance/reports/stock-drops", section: "Reports" },
       // Payment MASTER §16: Reports → Payment, Payment's own report, unchanged.
       { key: "payment-report", label: "Payment", icon: Wallet, financePath: "/finance/reports/payment", section: "Reports" },
       // 0646 — a month's plan beside its actual; its own row after Reports.

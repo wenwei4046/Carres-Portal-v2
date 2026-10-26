@@ -5328,7 +5328,7 @@ The Finance area of the Portal sidebar groups Finance's own pages into modules. 
 | `Receivables` | `AR · Receivables` · `Other debtors` · `Other receipts` |
 | `Bank & Cards` | `Daily Bank` · `Card settlement` · `Card money waiting` · `Money moves` |
 | `Ledger` | `Journal` · `General Ledger` · `Trial Balance` · `Self-check` |
-| `Reports` | `Profit and Loss` · `Balance Sheet` · `Cash Flow` · `AP Aging` · `AR Aging` (0686) · `Collection` · `Card charges` · `Dealer commission` · `Stock value` · `Payment` (Payment's own report, unchanged) |
+| `Reports` | `Profit and Loss` · `Balance Sheet` · `Cash Flow` · `AP Aging` · `AR Aging` (0686) · `Collection` · `Card charges` · `Dealer commission` · `Stock value` · `Stock drops` (0714) · `Payment` (Payment's own report, unchanged) |
 
 - `Dashboard` stays a plain row at the top. `Forecast` is a plain row after `Reports` (Chew, 3 Oct 2026).
 - A menu row's word is its page's title; the one exception is `AP · Payables`, which opens `Unpaid by Supplier` (RULING YH 2026-09-14). The Profit and Loss and the Balance Sheet are two pages, titled `Profit and Loss` and `Balance Sheet`; the browser tab reads `{title} · Carres`. The Reports page's door cards (`Open →`) are retired, because every report is a row.
@@ -5652,6 +5652,18 @@ These words are on screen in the branch and are not approved yet. Stock's own wo
 | Units | `Unit ID` · `SKU` · `Group` · `Status` · `Site` · `Held by` (hidden until asked for) · `Qty` · `Cost` · `Value` · `PO No`. A Unit with no cost recorded has empty Cost and Value cells. Search: `Search Units…` |
 | Footer | `{n} Units · {money}` · ` · {k} with no cost recorded` |
 | States | `Loading the stock value…` · `The stock value could not be loaded. Try again.` · `Carres held no Unit at the end of {date}.` |
+
+### PROPOSAL — PENDING CHEW · Stock drops, read-only (0714)
+
+YH (chat, 2026-10-26): a write-off posts no journal. Finance reads Stock's write-offs here instead. Each Unit is valued the way Stock value values it. These words are on screen in the branch and are not approved yet.
+
+| Where | Words |
+|---|---|
+| Menu | `Stock drops`, a row under `Reports` after `Stock value` |
+| Note | `The Units Stock wrote off, each at its PO line cost. Nothing is posted to the ledger.` · ` Known value {money}` · ` · {k} with no cost recorded` |
+| Units | `Date` · `Adjustment No` · `Site` · `Reason` · `Unit ID` · `SKU` · `Qty` · `Cost` · `Value deducted`. A Unit with no cost recorded reads `No cost recorded` in Cost and Value deducted, never `RM 0.00`. Search: `Search adjustment, reason or Unit ID…` |
+| Footer | `{n} Units · {money}` · ` · {k} with no cost recorded` |
+| States | `The stock drops could not be loaded. Try again.` · `Stock has written off no Unit.` |
 
 ### PROPOSAL — PENDING CHEW · Collection report (0644)
 

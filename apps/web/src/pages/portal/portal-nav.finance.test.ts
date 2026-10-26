@@ -42,7 +42,7 @@ describe("the Finance modules (Chew, 2026-10-03)", () => {
       "Receivables: AR · Receivables · Other debtors · Other receipts",
       "Bank & Cards: Daily Bank · Card settlement · Card money waiting · Money moves",
       "Ledger: Journal · Opening balances · General Ledger · Trial Balance · Self-check",
-      "Reports: Profit and Loss · Balance Sheet · Cash Flow · AP Aging · AR Aging · Collection · Card charges · Dealer commission · Stock value · Payment",
+      "Reports: Profit and Loss · Balance Sheet · Cash Flow · AP Aging · AR Aging · Collection · Card charges · Dealer commission · Stock value · Stock drops · Payment",
       "Forecast",
       "Rental Approver",
       "Subscriptions",
@@ -108,6 +108,7 @@ describe("the Finance modules (Chew, 2026-10-03)", () => {
       "card-charges": "/finance/reports/card-charges",
       "dealer-commission": "/finance/reports/dealer-commission",
       "stock-value": "/finance/reports/stock-value",
+      "stock-drops": "/finance/reports/stock-drops",
       "payment-report": "/finance/reports/payment",
       forecast: "/finance/reports/forecast",
     });
