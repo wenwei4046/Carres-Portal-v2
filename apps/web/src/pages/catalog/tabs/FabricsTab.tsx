@@ -15,7 +15,7 @@ import MaintenanceSidebar, {
   type MaintenanceSidebarGroup,
 } from "../components/MaintenanceSidebar";
 import FabricTierDeltasCard from "./FabricTierDeltasCard";
-import { buildFabricCsv, mergeFabricImport } from "@/lib/fabric-csv";
+import { buildFabricCsv, mergeFabricImport, type FabricCsvRow } from "@/lib/fabric-csv";
 import { downloadCsv, readFileToRecords } from "@/lib/sku-csv";
 
 /**
@@ -62,6 +62,7 @@ interface DraftRow {
   sofaTier: FabricTier;
   bedframeTier: FabricTier;
   active: boolean;
+  stock?: FabricCsvRow["stock"];
 }
 
 function toDraft(rows: CatalogFabricDto[]): DraftRow[] {
@@ -73,6 +74,7 @@ function toDraft(rows: CatalogFabricDto[]): DraftRow[] {
     sofaTier: f.sofaTier,
     bedframeTier: f.bedframeTier,
     active: f.active,
+    stock: f.stock,
   }));
 }
 
@@ -678,6 +680,9 @@ function FabricsPanel({
             sofaTier: r.sofaTier,
             bedframeTier: r.bedframeTier,
             active: r.active,
+            // Follows Houzs fabric-tracking.ts:264-275 per Weisiang's ruling
+            // (2026-10-22): stock columns ride the save; absent ones are kept.
+            ...r.stock,
           })),
       },
       {

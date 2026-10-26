@@ -442,4 +442,125 @@ begin
 end;
 $sanity_0721$;
 
+-- ── Fabric master stock columns ────────────────────────────────────────────
+-- Follows Houzs backend/src/scm/routes/fabric-tracking.ts:264-275 and
+-- frontend/src/vendor/scm/lib/fabric-csv.ts:42-53 per Weisiang's ruling
+-- (2026-10-22): clear Carres rules, implement Houzs. In Houzs these are plain
+-- stored integers on scm.fabric_trackings, typed in or imported by CSV
+-- (bulk-upsert); nothing computes them. Same names and units here.
+-- The batch save keeps a column's old value (by fabric code) when an entry
+-- does not carry it, the way 0226 carries `cost` forward.
+alter table public.catalog_fabrics
+  add column if not exists price_sen            integer not null default 0,
+  add column if not exists soh_sen              integer not null default 0,
+  add column if not exists po_outstanding_sen   integer not null default 0,
+  add column if not exists last_month_usage_sen integer not null default 0,
+  add column if not exists one_week_usage_sen   integer not null default 0,
+  add column if not exists two_weeks_usage_sen  integer not null default 0,
+  add column if not exists one_month_usage_sen  integer not null default 0,
+  add column if not exists shortage_sen         integer not null default 0,
+  add column if not exists reorder_point_sen    integer not null default 0,
+  add column if not exists lead_time_days       integer not null default 0;
+
+create or replace function public.catalog_fabrics_batch_save(
+  p_entries jsonb,
+  p_notes   text default null
+) returns jsonb
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_snapshot jsonb;
+  v_count    integer;
+  v_old      jsonb;
+begin
+  if p_entries is null or jsonb_typeof(p_entries) <> 'array' then
+    raise exception 'entries must be a json array' using errcode = '22023';
+  end if;
+
+  -- 0226 cost + 0721 stock columns, captured before the replace-all delete.
+  select coalesce(jsonb_object_agg(fabric_code, jsonb_build_object(
+           'cost', cost, 'price_sen', price_sen, 'soh_sen', soh_sen,
+           'po_outstanding_sen', po_outstanding_sen, 'last_month_usage_sen', last_month_usage_sen,
+           'one_week_usage_sen', one_week_usage_sen, 'two_weeks_usage_sen', two_weeks_usage_sen,
+           'one_month_usage_sen', one_month_usage_sen, 'shortage_sen', shortage_sen,
+           'reorder_point_sen', reorder_point_sen, 'lead_time_days', lead_time_days)), '{}'::jsonb)
+    into v_old
+    from public.catalog_fabrics;
+
+  delete from public.catalog_fabrics where id is not null;
+
+  insert into public.catalog_fabrics
+    (fabric_code, series, description, supplier_code,
+     sofa_tier, bedframe_tier, active, sort_order, cost,
+     price_sen, soh_sen, po_outstanding_sen, last_month_usage_sen, one_week_usage_sen,
+     two_weeks_usage_sen, one_month_usage_sen, shortage_sen, reorder_point_sen, lead_time_days,
+     updated_at, updated_by)
+  select
+    x.code,
+    nullif(btrim(coalesce(x.elem->>'series', '')), ''),
+    nullif(btrim(coalesce(x.elem->>'description', '')), ''),
+    nullif(btrim(coalesce(x.elem->>'supplierCode', '')), ''),
+    coalesce(nullif(btrim(coalesce(x.elem->>'sofaTier', '')), ''), 'PRICE_2'),
+    coalesce(nullif(btrim(coalesce(x.elem->>'bedframeTier', '')), ''), 'PRICE_2'),
+    coalesce((x.elem->>'active')::boolean, true),
+    x.ord,
+    (v_old->x.code->>'cost')::numeric,
+    coalesce((x.elem->>'priceSen')::integer,          (v_old->x.code->>'price_sen')::integer, 0),
+    coalesce((x.elem->>'sohSen')::integer,            (v_old->x.code->>'soh_sen')::integer, 0),
+    coalesce((x.elem->>'poOutstandingSen')::integer,  (v_old->x.code->>'po_outstanding_sen')::integer, 0),
+    coalesce((x.elem->>'lastMonthUsageSen')::integer, (v_old->x.code->>'last_month_usage_sen')::integer, 0),
+    coalesce((x.elem->>'oneWeekUsageSen')::integer,   (v_old->x.code->>'one_week_usage_sen')::integer, 0),
+    coalesce((x.elem->>'twoWeeksUsageSen')::integer,  (v_old->x.code->>'two_weeks_usage_sen')::integer, 0),
+    coalesce((x.elem->>'oneMonthUsageSen')::integer,  (v_old->x.code->>'one_month_usage_sen')::integer, 0),
+    coalesce((x.elem->>'shortageSen')::integer,       (v_old->x.code->>'shortage_sen')::integer, 0),
+    coalesce((x.elem->>'reorderPointSen')::integer,   (v_old->x.code->>'reorder_point_sen')::integer, 0),
+    coalesce((x.elem->>'leadTimeDays')::integer,      (v_old->x.code->>'lead_time_days')::integer, 0),
+    now(),
+    (select auth.uid())
+  from (
+    select btrim(e.elem->>'fabricCode') as code, e.elem, e.ord
+      from jsonb_array_elements(p_entries) with ordinality as e(elem, ord)
+  ) x
+  where coalesce(x.code, '') <> '';
+
+  get diagnostics v_count = row_count;
+
+  -- The history snapshot keeps the 0202 shape (no cost, no stock), as before.
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'fabricCode', fabric_code, 'series', series,
+           'description', description, 'supplierCode', supplier_code,
+           'sofaTier', sofa_tier, 'bedframeTier', bedframe_tier,
+           'active', active, 'sortOrder', sort_order) order by sort_order), '[]'::jsonb)
+    into v_snapshot
+    from public.catalog_fabrics;
+
+  insert into public.catalog_config_history (section, snapshot, effective_from, notes, created_by)
+  values ('fabrics', v_snapshot, (timezone('Asia/Kuala_Lumpur', now()))::date,
+          nullif(btrim(coalesce(p_notes, '')), ''), (select auth.uid()));
+
+  return jsonb_build_object('ok', true, 'count', v_count, 'snapshot', v_snapshot);
+end;
+$$;
+
+-- 0527 grants survive create or replace; restate them so this file stands alone.
+revoke all on function public.catalog_fabrics_batch_save(jsonb, text) from public, anon;
+grant execute on function public.catalog_fabrics_batch_save(jsonb, text) to authenticated;
+
+do $fabric_0721$
+begin
+  if (select count(*) from information_schema.columns
+       where table_schema = 'public' and table_name = 'catalog_fabrics'
+         and column_name in ('price_sen','soh_sen','po_outstanding_sen','last_month_usage_sen',
+                             'one_week_usage_sen','two_weeks_usage_sen','one_month_usage_sen',
+                             'shortage_sen','reorder_point_sen','lead_time_days')) <> 10
+     or position('reorderPointSen' in pg_get_functiondef(
+          'public.catalog_fabrics_batch_save(jsonb, text)'::regprocedure)) = 0
+     or has_function_privilege('anon', 'public.catalog_fabrics_batch_save(jsonb, text)', 'EXECUTE') then
+    raise exception '0721: fabric stock columns are not as intended';
+  end if;
+end;
+$fabric_0721$;
+
 commit;

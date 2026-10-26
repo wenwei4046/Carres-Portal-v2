@@ -1,4 +1,4 @@
-import type { FabricTier } from "@carres/shared";
+import { FABRIC_STOCK_KEYS, type FabricTier } from "@carres/shared";
 
 /**
  * Fabric master Export CSV / Import (CSV or Excel) for the Fabrics panel.
@@ -19,15 +19,27 @@ export interface FabricCsvRow {
   sofaTier: FabricTier;
   bedframeTier: FabricTier;
   active: boolean;
+  /** Houzs stock columns (sen / days). Absent = not loaded or not changed. */
+  stock?: Partial<Record<StockKey, number>>;
 }
 
-const COLUMNS = ["fabric_code", "series", "description", "supplier_code", "sofa_tier", "bedframe_tier", "active"] as const;
+type StockKey = (typeof FABRIC_STOCK_KEYS)[number];
+/** priceSen → price_sen: the same header names as Houzs fabric-csv.ts:42-53. */
+const stockCol = (k: StockKey) => k.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
+
+const COLUMNS = [
+  "fabric_code", "series", "description", "supplier_code", "sofa_tier", "bedframe_tier", "active",
+  ...FABRIC_STOCK_KEYS.map(stockCol),
+];
 
 const cell = (v: string) => (/[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
 
 export function buildFabricCsv(rows: FabricCsvRow[]): string {
   const lines = rows.map((r) =>
-    [r.fabricCode, r.series, r.description, r.supplierCode, r.sofaTier, r.bedframeTier, r.active ? "yes" : "no"]
+    [
+      r.fabricCode, r.series, r.description, r.supplierCode, r.sofaTier, r.bedframeTier, r.active ? "yes" : "no",
+      ...FABRIC_STOCK_KEYS.map((k) => (r.stock?.[k] === undefined ? "" : String(r.stock[k]))),
+    ]
       .map(cell)
       .join(","),
   );
@@ -56,7 +68,7 @@ export interface FabricImportResult {
 
 /** Merge header-keyed records into `current` by fabric code (upsert). */
 export function mergeFabricImport(current: FabricCsvRow[], records: Record<string, string>[]): FabricImportResult {
-  const rows = current.map((r) => ({ ...r }));
+  const rows: FabricCsvRow[] = current.map((r) => (r.stock ? { ...r, stock: { ...r.stock } } : { ...r }));
   const byCode = new Map(rows.map((r) => [r.fabricCode.trim().toUpperCase(), r]));
   const errors: string[] = [];
   let added = 0;
@@ -80,6 +92,19 @@ export function mergeFabricImport(current: FabricCsvRow[], records: Record<strin
         return;
       }
       tiers[field] = t;
+    }
+    // Houzs fabric-tracking.ts:300-308: whole numbers, a decimal is cut, a
+    // non-number refuses the row. Blank keeps the stored value.
+    const stock: Partial<Record<StockKey, number>> = {};
+    for (const k of FABRIC_STOCK_KEYS) {
+      const v = rec[stockCol(k)];
+      if (!v) continue;
+      const n = Number(v.replace(/,/g, ""));
+      if (!Number.isFinite(n)) {
+        errors.push(`Line ${line}: ${stockCol(k)} "${v}" is not a number.`);
+        return;
+      }
+      stock[k] = Math.trunc(n);
     }
     let active: boolean | undefined;
     if (rec.active) {
@@ -105,6 +130,7 @@ export function mergeFabricImport(current: FabricCsvRow[], records: Record<strin
     if (rec.supplier_code) row.supplierCode = rec.supplier_code;
     Object.assign(row, tiers);
     if (active !== undefined) row.active = active;
+    if (Object.keys(stock).length > 0) row.stock = { ...row.stock, ...stock };
     if (existing) {
       updated++;
     } else {

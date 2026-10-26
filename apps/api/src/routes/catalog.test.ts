@@ -6578,6 +6578,31 @@ describe("0202 — fabric master batch save + history", () => {
     });
   });
 
+  // 0721 — follows Houzs backend/src/scm/routes/fabric-tracking.ts:264-275 per
+  // Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+  it("PUT /fabrics — stock columns ride to the RPC only when sent; a decimal is refused", async () => {
+    const calls: { fn: string; args: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(buildRpcSb({ calls }));
+    const jwt = await makeJwt("principal", null);
+    const put = (entries: unknown[]) =>
+      app.fetch(
+        new Request("http://t/api/catalog/fabrics", {
+          method: "PUT",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ entries }),
+        }),
+        env,
+      );
+    const res = await put([{ fabricCode: "BF-01", sohSen: 1250, leadTimeDays: 14 }, { fabricCode: "BF-02" }]);
+    expect(res.status).toBe(200);
+    const sent = (calls[0].args as { p_entries: Record<string, unknown>[] }).p_entries;
+    expect(sent[0]).toMatchObject({ sohSen: 1250, leadTimeDays: 14 });
+    expect(sent[0]).not.toHaveProperty("priceSen");
+    expect(sent[1]).not.toHaveProperty("sohSen");
+    expect((await put([{ fabricCode: "BF-01", sohSen: 1.5 }])).status).toBe(422);
+    expect(calls).toHaveLength(1);
+  });
+
   it("PUT /fabrics — non-principal → 403, RPC never called", async () => {
     const calls: { fn: string; args: unknown }[] = [];
     vi.mocked(userClient).mockReturnValue(buildRpcSb({ calls }));

@@ -373,6 +373,7 @@ export {
   // 0202 — global fabric master schemas + input/Dto types.
   fabricTierValueSchema,
   catalogFabricSchema,
+  FABRIC_STOCK_KEYS,
   catalogFabricEntryInput,
   catalogFabricsBatchSaveInput,
   catalogFabricCostInput,

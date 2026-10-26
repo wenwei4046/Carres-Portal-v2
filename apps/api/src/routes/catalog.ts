@@ -65,6 +65,7 @@ import {
   purchasingSuppliersOnly,
   type SkuImportRow,
   type SkuImportFailure,
+  FABRIC_STOCK_KEYS,
 } from "@carres/shared";
 import { mapPgError, parseJsonBody, fail } from "../lib/route-helpers";
 import { userClient } from "../lib/supabase";
@@ -499,8 +500,12 @@ catalogRouter.get("/", async (c) => {
     // 0202 — global procurement fabric master (additive, OPTIONAL). Sorted in
     // JS by (sort_order, fabric_code) to mirror the plain `.select("*")` fetch
     // and stay mock-friendly, the way the 0182 option-pools branch sorts.
+    // 0721 — stock and usage are procurement data: Houzs serves them only on
+    // its full read, gated on scm.procurement.products (fabric-tracking.ts:415-430),
+    // so here only operation + principal receive them.
     fabrics: (fabricMasterR.data ?? [])
       .map((r) => Adapters.catalogFabricFromRow(r as DB.CatalogFabricRow))
+      .map((f) => (auth.role === "operation" || auth.role === "principal" ? f : { ...f, stock: undefined }))
       .sort((a, b) =>
         a.sortOrder !== b.sortOrder
           ? a.sortOrder - b.sortOrder
@@ -2616,6 +2621,10 @@ catalogRouter.put("/fabrics", async (c) => {
       sofaTier: e.sofaTier ?? "PRICE_2",
       bedframeTier: e.bedframeTier ?? "PRICE_2",
       active: e.active ?? true,
+      // 0721 — follows Houzs backend/src/scm/routes/fabric-tracking.ts:264-275 per
+      // Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+      // Absent keys stay absent so the RPC keeps the stored value.
+      ...Object.fromEntries(FABRIC_STOCK_KEYS.filter((k) => e[k] !== undefined).map((k) => [k, e[k]])),
     })),
     p_notes: parsed.data.notes ?? null,
   });

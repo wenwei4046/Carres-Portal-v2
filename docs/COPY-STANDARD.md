@@ -37,7 +37,7 @@ Source task-title examples: Share claim · {n} pc; Ask to confirm the claim resu
 Follows Houzs `frontend/src/pages/scm-v2/FabricTracking.tsx:66-129`. Buttons `Export CSV` · `Import` (principal only) ·
 toggle `{n} retired hidden` / `Showing {n} retired` · success `{n} new, {n} updated. Check the list, then press Save.` ·
 errors `No fabrics to export.` · `Could not read that file. Use a CSV or Excel file.` · `Nothing imported. {reasons}` ·
-reasons `Line {n}: fabric code is blank.` · `Line {n}: {column} "{value}" is not Price 1, 2 or 3.` · `Line {n}: active "{value}" is not yes or no.`
+stock columns (CSV headers, Houzs `fabric-csv.ts:42-53`) `price_sen` · `soh_sen` · `po_outstanding_sen` · `last_month_usage_sen` · `one_week_usage_sen` · `two_weeks_usage_sen` · `one_month_usage_sen` · `shortage_sen` · `reorder_point_sen` · `lead_time_days` · reasons `Line {n}: {column} "{value}" is not a number.` · reasons `Line {n}: fabric code is blank.` · `Line {n}: {column} "{value}" is not Price 1, 2 or 3.` · `Line {n}: active "{value}" is not yes or no.`
 
 ---
 
