@@ -21,6 +21,8 @@
 --   5. my_service_case_ids() — "My Cases": cases I or anyone under me (the
 --      app_users.reports_to_user_id tree) owns, raised, or is the Sales Order
 --      PIC of (Houzs assrVisibility.ts myCasesPredicateSql).
+--   6. The last stage that closes the case cannot be switched off, un-closed
+--      or deleted (YH, chat 2026-10-26), so Close Case always has a stage.
 --
 -- Additive except (2) and (3), which are the ruling itself. Rollback at foot.
 
@@ -148,7 +150,45 @@ grant execute on function public.my_service_case_ids() to authenticated;
 comment on function public.my_service_case_ids() is
   '0711 My Cases (Weisiang''s decision, WhatsApp 2026-10-22): cases the caller or their downline owns, raised, or is the Sales Order PIC of. Operation and principal only; anyone else gets nothing.';
 
+-- ── 6 · one stage that closes the case stays in use ─────────────────────────
+-- YH (chat, 2026-10-26): lock "In use" on the last closing stage. Close Case
+-- needs an active is_closed stage; switching the last one off (or un-closing
+-- or deleting it) would leave no way to close a case. Held for every caller,
+-- service role included. Renaming is untouched (fires only on active/is_closed).
+-- Definer so the count sees every stage whatever the caller's RLS shows.
+create or replace function public.service_case_status_keep_one_closing()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $fn$
+begin
+  if not (old.active and old.is_closed) then
+    return coalesce(new, old);
+  end if;
+  if tg_op = 'UPDATE' and new.active and new.is_closed then
+    return new;
+  end if;
+  -- Lock the other closing stages so two editors cannot each switch one off.
+  perform 1 from public.service_case_statuses
+    where active and is_closed and id <> old.id
+    for update;
+  if not found then
+    raise exception 'Keep one stage that closes the case in use. Close Case needs it.'
+      using errcode = '23514', detail = 'last_closing_stage';
+  end if;
+  return coalesce(new, old);
+end;
+$fn$;
+revoke execute on function public.service_case_status_keep_one_closing() from public, anon, authenticated;
+drop trigger if exists service_case_statuses_keep_one_closing on public.service_case_statuses;
+create trigger service_case_statuses_keep_one_closing
+  before update of active, is_closed or delete on public.service_case_statuses
+  for each row execute function public.service_case_status_keep_one_closing();
+
 -- ROLLBACK (manual):
+--   drop trigger if exists service_case_statuses_keep_one_closing on public.service_case_statuses;
+--   drop function if exists public.service_case_status_keep_one_closing();
 --   drop function if exists public.my_service_case_ids();
 --   drop trigger if exists service_cases_owner_pick_guard on public.service_cases;
 --   drop function if exists public.service_case_owner_pick_guard();

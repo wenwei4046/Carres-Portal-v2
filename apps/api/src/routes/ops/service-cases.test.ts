@@ -1320,6 +1320,27 @@ describe("0711 — the Sales Order PIC picks the case owner; staff edit priority
     expect(inserts.find(([t]) => t === "service_cases")?.[1]).toMatchObject({ owner_user_id: ADMIN });
   });
 
+  it("answers 409 with a clear message when the database keeps the last closing stage in use", async () => {
+    const refusal = { code: "23514", details: "last_closing_stage", message: "Keep one stage that closes the case in use. Close Case needs it." };
+    const chain: Record<string, unknown> = {
+      update: () => chain,
+      eq: () => Promise.resolve({ data: null, error: refusal }),
+    };
+    const sb = { from: vi.fn(() => chain), rpc: vi.fn(async () => ({ data: true, error: null })) };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await app.request(
+      "/api/ops/service-cases/settings/statuses/st-1",
+      {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${await makeJwt("principal")}`, "content-type": "application/json" },
+        body: JSON.stringify({ active: false }),
+      },
+      env,
+    );
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "last_closing_stage", message: refusal.message });
+  });
+
   it("My Cases narrows the list to the ids the database answers for me and my team", async () => {
     const { sb } = tableSb({ service_cases: [CASE_ROW, { ...CASE_ROW, id: "c2" }] }, ["c2"]);
     const res = await get("/ops/service-cases?mine=1", sb);

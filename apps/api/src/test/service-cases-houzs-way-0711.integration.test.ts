@@ -11,6 +11,8 @@ import pg from "pg";
  *   Close Case     a case closes without the customer's confirmation on file
  *   settings       the default owner is edited by the principal or a named
  *                  Service editor, never by any operation login
+ *   closing stage  the last stage that closes the case cannot be switched
+ *                  off, un-closed or deleted (YH, chat 2026-10-26)
  *
  * One transaction, rolled back. Run against a local copy of the chain:
  *   CARRES_TEST_DATABASE_URL=postgres://postgres@127.0.0.1:55432/<db> pnpm --filter @carres/api test -- service-cases-houzs-way
@@ -151,5 +153,24 @@ describe.skipIf(!URL)("Service Cases the Houzs way (real PostgreSQL, 0711)", () 
     expect(await attempt("update service_settings set default_owner_user_id = $1", [U.admin])).toBe("ok");
     await as(U.admin, "operation");
     expect((await q("select default_owner_user_id from service_settings")).rows[0].default_owner_user_id).toBe(U.admin);
+  });
+
+  it("the last stage that closes the case stays in use; renaming it still works (YH, chat 2026-10-26)", async () => {
+    await q("reset role");
+    // Only Resolved closes, then a second closing stage joins.
+    await q("update service_case_statuses set active = false where is_closed and code <> 'resolved'");
+    await q("insert into service_case_statuses (code, label, sort_order, is_closed) values ($1, 'IT Closed', 999, true)", [`it_close_${RUN}`]);
+    const set = (sql: string, code: string) => attempt(`update service_case_statuses set ${sql} where code = $1`, [code]);
+    await as(U.boss, "principal");
+    expect(await set("active = false", "resolved")).toBe("ok");
+    expect(await set("active = false", `it_close_${RUN}`)).toBe("23514");
+    expect(await set("is_closed = false", `it_close_${RUN}`)).toBe("23514");
+    expect(await set("label = 'IT Done'", `it_close_${RUN}`)).toBe("ok");
+    expect(await set("active = true", "resolved")).toBe("ok");
+    expect(await set("active = false", `it_close_${RUN}`)).toBe("ok");
+    expect(await set("active = false", "resolved")).toBe("23514");
+    await q("reset role");
+    expect(await attempt("update service_case_statuses set active = false where is_closed")).toBe("23514");
+    expect(await attempt("delete from service_case_statuses where code = 'resolved'")).toBe("23514");
   });
 });

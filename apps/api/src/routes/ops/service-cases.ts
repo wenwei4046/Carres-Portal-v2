@@ -285,6 +285,13 @@ scRouter.patch("/settings/:list/:itemId", requireOperationOrPrincipal, requireSe
   const parsed = await parseBody(c, servicePickItemPatchSchema);
   const sb = userClient(c.env, c.var.auth.jwt);
   const { error } = await sb.from(table).update(parsed).eq("id", c.req.param("itemId"));
+  // 0711 §6 (YH, chat 2026-10-26): the database keeps one closing stage in use.
+  if (error?.details === "last_closing_stage") {
+    return c.json(
+      { error: "conflict", code: "last_closing_stage", message: "Keep one stage that closes the case in use. Close Case needs it." },
+      409,
+    );
+  }
   if (error) throw new HTTPException(500, { message: error.message });
   return c.json({ ok: true });
 });

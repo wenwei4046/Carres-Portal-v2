@@ -85,34 +85,42 @@ function PickList({ list, title, help, items, canEdit, onChanged }: {
       apiFetch(`/api/ops/service-cases/settings/${list}/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
     onSuccess: onChanged,
   });
+  // YH (chat, 2026-10-26): Close Case needs a closing stage, so the last one in
+  // use stays in use (0711 §6 refuses it in the database too).
+  const closingInUse = items.filter((i) => i.isClosed && i.active).length;
   return (
     <section className="grid gap-2" data-testid={`service-pick-${list}`}>
       <h2 className="text-strong">{title}</h2>
       <p className="text-body text-kit-slate-11">{help}</p>
+      {edit.isError && <p role="alert" className="text-body">{edit.error.message}</p>}
       <ul className="grid gap-2">
-        {items.map((it) => (
-          <li key={it.id} className="flex items-center gap-3">
-            <div className="flex-1">
-              <Input
-                id={`service-${list}-${it.id}`}
-                aria-label={title}
-                defaultValue={it.label}
-                disabled={!canEdit}
-                onBlur={(e) => {
-                  const next = e.target.value.trim();
-                  if (next && next !== it.label) edit.mutate({ id: it.id, body: { label: next } });
-                }}
+        {items.map((it) => {
+          const locked = it.isClosed && it.active && closingInUse === 1;
+          return (
+            <li key={it.id} className="flex items-center gap-3">
+              <div className="flex-1">
+                <Input
+                  id={`service-${list}-${it.id}`}
+                  aria-label={title}
+                  defaultValue={it.label}
+                  disabled={!canEdit}
+                  onBlur={(e) => {
+                    const next = e.target.value.trim();
+                    if (next && next !== it.label) edit.mutate({ id: it.id, body: { label: next } });
+                  }}
+                />
+              </div>
+              <Checkbox
+                id={`service-${list}-${it.id}-active`}
+                label="In use"
+                checked={it.active}
+                disabled={!canEdit || locked}
+                onCheckedChange={(active) => edit.mutate({ id: it.id, body: { active } })}
               />
-            </div>
-            <Checkbox
-              id={`service-${list}-${it.id}-active`}
-              label="In use"
-              checked={it.active}
-              disabled={!canEdit}
-              onCheckedChange={(active) => edit.mutate({ id: it.id, body: { active } })}
-            />
-          </li>
-        ))}
+              {locked && <span className="text-meta text-kit-slate-11">Close Case needs this stage.</span>}
+            </li>
+          );
+        })}
       </ul>
       {canEdit && (
         <div className="flex items-end gap-3">

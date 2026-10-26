@@ -5937,3 +5937,4 @@ decision. These words are admitted for the Service Cases page, the case window a
 | Close refused | `Close failed: {reason}` |
 | Settings page and link | `Service Settings` · group `Service` |
 | Settings rows | `Default case owner` · `A new case goes to this person until the sales order PIC picks the case owner.` · `Stages` · `The stages staff pick on a case. A stage that closes the case cannot be added here.` · `Case types` · `The case types staff pick on a case.` · `In use` · `New stage` · `New case type` · `Add` |
+| Last closing stage, `In use` locked (YH, chat 2026-10-26) | hint `Close Case needs this stage.` · refused `Keep one stage that closes the case in use. Close Case needs it.` |
