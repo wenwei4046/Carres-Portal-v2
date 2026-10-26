@@ -12,7 +12,7 @@ import Textarea from "@/components/kit/Textarea";
 import { FieldError } from "@/components/kit/FieldFrame";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { apiFetch } from "@/lib/api";
-import { fmtDate } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { useDeliveryDays } from "@/lib/deadline-queries";
 import {
   OWN_LORRY, carrierOf, fillTimeSlots, ownFleetOf, planRows, planStatus, proposeDates, tripsOf,
@@ -297,7 +297,7 @@ export function DpOrders() {
 export function AutoSchedule() {
   const { q, rows, refresh } = usePlan();
   const days = useDeliveryDays();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = appTodayIso();
   const [start, setStart] = useState<string | null>(today);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [proposal, setProposal] = useState<Map<string, string>>(new Map());
