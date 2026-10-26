@@ -55,6 +55,13 @@ export interface InvoiceRegisterRow {
   replaces_invoice_id: string | null;
   created_at: string;
   order_id: string;
+  /** The invoice's own goods lines from its issue snapshot (0429); absent or
+   *  null when the snapshot holds none (dispatch-issued / pre-0429). */
+  snapshot_lines?: Array<{ order_line_id?: string; sku?: string | null; qty: number | string; unit_price: number | string | null }> | null;
+  /** 0712 office invoices: the add-ons this invoice bills (may be empty). */
+  snapshot_addons?: Array<{ addon_key?: string | null; qty: number | string; unit_price: number | string | null }> | null;
+  /** 'office' for a 0712 office part invoice. */
+  snapshot_from?: string | null;
   orders: {
     id: string;
     so: number;
@@ -90,7 +97,7 @@ export interface InvoiceRegisterRow {
      *  today` reads the same ledger the Work feed does. */
     latest_promise?: { promised_date: string; recorded_at: string } | null;
     order_lines: Array<{ sku?: string; qty: number; unit_price: number | string | null }>;
-    order_addons: Array<{ qty: number; unit_price: number | string | null }>;
+    order_addons: Array<{ addon_key?: string | null; qty: number; unit_price: number | string | null }>;
     ops_order_control: Array<{
       balance: number | string | null;
       confirmed_date: string | null;

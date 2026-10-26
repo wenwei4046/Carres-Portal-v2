@@ -13,7 +13,7 @@
  * With a task open the card stays 320 below 1280 wide, so a task takes no
  * room from the list (03 §8); from 1280 it may use the spare width.
  */
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { ContextualPanelSurface, rememberPanelOpener } from "@/components/kit/Drawer";
 import { create } from "zustand";
 import MIcon from "@/components/carres/MIcon";
@@ -100,12 +100,12 @@ export function TasksPill({ fallback = false }: { fallback?: boolean } = {}) {
       data-testid="tasks-pill"
       /* Below 768px the phone top bar carries its own Tasks door, so the
          pill hides there: one Tasks control per screen. */
-      className="flex h-8 shrink-0 items-center gap-2 rounded-lg border border-c-input-border bg-white px-3 text-[13px] font-medium text-c-ink hover:bg-c-info-bg max-[767px]:hidden"
+      className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-transparent px-2.5 text-[13px] font-medium text-c-secondary hover:bg-c-hover hover:text-c-ink max-[767px]:hidden"
     >
       <MIcon name="right_panel_open" size={18} />
       Tasks
       {left != null && left > 0 && (
-        <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-c-ink px-1 text-[11px] font-semibold tabular-nums text-white">{left}</span>
+        <span className="text-meta font-medium tabular-nums text-c-secondary">{left}</span>
       )}
     </button>
   );
@@ -118,6 +118,14 @@ export default function ShellTasks() {
   const guard = useTasksHost((s) => s.guard);
   const left = useTasksLeft();
   const pageHosts = useShellTasks((s) => s.pageHosts);
+  const tasksRequest = useTasksHost((s) => s.tasksRequest);
+  const lastRequest = useRef(tasksRequest);
+  useEffect(() => {
+    // A request is an event, not a persisted open preference. Remounting the
+    // shell must not replay an old reminder over a new form.
+    if (lastRequest.current !== tasksRequest && pageHosts === 0) setOpen(true);
+    lastRequest.current = tasksRequest;
+  }, [tasksRequest, pageHosts, setOpen]);
   if (pageHosts > 0) return null;
   const now = new Date();
   const weekday = now.toLocaleDateString("en-GB", { weekday: "long" });
