@@ -99,6 +99,7 @@ import {
   useUpdateOrder,
   useOrderPayments,
   useRecordPayment,
+  BACKDATE_WAITING_WORDS,
   useVoidPayment,
   useSaveOrderControl,
   useConfirmBooking,
@@ -5675,8 +5676,8 @@ function PaymentForm({
         receiptUrl,
       },
       {
-        onSuccess: () => {
-          toast.success("Payment recorded");
+        onSuccess: (out) => {
+          toast.success(out.pendingApproval ? BACKDATE_WAITING_WORDS : "Payment recorded");
           onDone();
         },
         onSettled: () => setSaving(false),

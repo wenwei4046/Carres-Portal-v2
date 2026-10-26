@@ -13,6 +13,7 @@ import {
 // Unified Internal Portal (2026-06-30) — the three private rails (Operation /
 // Principal / Finance) merged into ONE role-aware PortalSidebar.
 import PortalSidebar from "@/pages/portal/PortalSidebar";
+import Drawer from "@/components/kit/Drawer";
 import { useAuth } from "@/lib/auth";
 import OperationDashboard from "./OperationDashboard";
 // ⭐ SALES ORDER PRODUCTION CUTOVER (owner ruling, 2026-08-10 —
@@ -59,6 +60,7 @@ import OperationPurchaseOrders from "./purchase-orders/PurchaseOrdersPage";
 import OperationReceiving from "./OperationReceiving";
 import OperationReceivingReport from "./OperationReceivingReport";
 import OperationDeliveryReport from "./OperationDeliveryReport";
+import { DeliveryOrderLinesReport, SalesInvoiceLinesReport, SalesOrderLinesReport } from "./DocumentLinesReport";
 // R2 (0288) — the supplier-claim queue, fourth tab of the Purchasing module.
 import OperationSupplierClaims from "./OperationSupplierClaims";
 import OperationPurchaseReturns from "./OperationPurchaseReturns";
@@ -88,6 +90,7 @@ import OperationOpsRepair from "./OperationOpsRepair";
 import OperationOpsInventory from "./OperationOpsInventory";
 import WarehouseStockRegister from "./WarehouseStockRegister";
 import { AutoSchedule, DeliveryPlanning, DpOrders, Trips } from "./DeliveryPlanning";
+import { StockAdjustments, StockTransfers, StockTakes } from "./WarehouseStockMoves";
 import WarehouseWorkspace from "./WarehouseWorkspace";
 import { LEGACY_SCHEDULE_TABS } from "./warehouse-schedule-view";
 import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
@@ -99,11 +102,12 @@ import OperationStockPlan from "./OperationStockPlan";
 // Migration 0140 — Service Notes / Issue Tracker.
 import OperationServiceCases from "./OperationServiceCases";
 import OperationIssueTracker from "./OperationIssueTracker";
+import SalesOrderAmendments from "./SalesOrderAmendments";
 import IssueRelatedPartyReport from "./IssueRelatedPartyReport";
 import OperationGuarantees from "./OperationGuarantees";
 // Gmail-style right rail — Calendar (deliveries/day) · Keep notes · Tasks board.
 import ShellHeader, { ShellHeaderContext, useShellHeaderHost } from "./components/ShellHeader";
-import ShellTasks, { useShellTasks } from "./components/ShellTasks";
+import ShellTasks from "./components/ShellTasks";
 import { activeNavTitle } from "@/pages/portal/portal-nav";
 import type { MovementsFilters } from "@/lib/queries";
 
@@ -129,7 +133,6 @@ import type { MovementsFilters } from "@/lib/queries";
 export default function OperationApp({purchaseRequestContext=false}:{purchaseRequestContext?:boolean}={}) {
   const location = useLocation();
   const phone = usePhone();
-  const tasksPage = useShellTasks((s) => s.pageHosts);
   /* The system deals every order to a person (0504) — from the shell, so it
      runs whichever Operations page is opened. */
   useOrderDealSweep();
@@ -186,6 +189,9 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
      Page Header gear is the ERP's single Settings entry (ui/MASTER.md). */
   const isSettingsUrl = location.pathname.startsWith("/operation/settings");
   const isIssuesUrl = location.pathname.startsWith("/operation/issues");
+  /* Amendments queue — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22). Its
+     own prefix, not `/operation/orders/…`, so `Outright` does not light too. */
+  const isAmendmentsUrl = location.pathname.startsWith("/operation/amendments");
   /* 【WAREHOUSE】 CARD 02 — one exact Unit, addressed by its permanent Carres
      Unit ID. The Route shipped 2026-08-21 and never joined this gate, so the
      URL fell through to the `?tab=` branch and rendered the DASHBOARD over a
@@ -208,7 +214,7 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
        router. A new route joins BOTH lists in the same commit. */
     isEditDeliveryUrl ||
     isDeliveryOrdersUrl || isSettingsUrl || isIssuesUrl || isStockUnitUrl ||
-    isLegacyPurchasingUrl;
+    isLegacyPurchasingUrl || isAmendmentsUrl;
 
   const [tab, setTab] = useState<string>("dashboard");
   // Sidebar collapse moved into PortalSidebar (Unified Internal Portal,
@@ -252,6 +258,7 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
       || isDeliveryOrdersUrl
       || isSettingsUrl
       || isIssuesUrl
+      || isAmendmentsUrl
     )
       return;
     setMovementsPrefill((p) => (urlTab === "movements" ? p : undefined));
@@ -263,7 +270,7 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
        (the stock-onhand precedent). */
     setTab(LEGACY_SCHEDULE_TABS.has(urlTab) ? "warehouse-arrival-schedule" : urlTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlTab, isProcurementUrl, isToOrderUrl, isOrdersUrl, isOldOrdersUrl, isDeliveryOrdersUrl, isSettingsUrl, isIssuesUrl]);
+  }, [urlTab, isProcurementUrl, isToOrderUrl, isOrdersUrl, isOldOrdersUrl, isDeliveryOrdersUrl, isSettingsUrl, isIssuesUrl, isAmendmentsUrl]);
 
   // When the URL leaves a URL-driven section (e.g. user navigated via Back
   // to `/operation`), make sure the local tab state has a sensible value so
@@ -371,7 +378,12 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
           </div>
         </>
       ) : (
-        <PortalSidebar compactForCanvas={tasksPage === 0} />
+        <>
+          <PortalSidebar compactForCanvas onExpandForCanvas={() => setMenuOpen(true)} />
+          <Drawer open={menuOpen} onOpenChange={setMenuOpen} title="Menu">
+            <PortalSidebar drawer />
+          </Drawer>
+        </>
       )}
       <ShellHeaderContext.Provider value={shellHost.value}>
       <div className="flex min-h-0 min-w-0 flex-col overflow-hidden">
@@ -477,6 +489,7 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
                 saved or pasted link lands on that row, brief unfolded. */}
             <Route path="delivery/edit/:orderId" element={<EditDeliveryRedirect />} />
             <Route path="issues" element={<OperationIssueTracker />} />
+            <Route path="amendments" element={<SalesOrderAmendments />} />
             <Route path="issues/reports" element={<IssueRelatedPartyReport />} />
             {/* The office create door is RETIRED (owner ruling 2026-09-27): a
                 Sales Order is born in the Sales Portal. A saved or pasted link
@@ -531,6 +544,9 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
             {/* Central Reports → Delivery (Delivery MASTER §12, CARD 17) —
                 reachable by direct URL, like the Receiving report. */}
             {tab === "delivery-report" && <OperationDeliveryReport />}
+            {tab === "sales-order-lines" && <SalesOrderLinesReport />}
+            {tab === "delivery-order-lines" && <DeliveryOrderLinesReport />}
+            {tab === "sales-invoice-lines" && <SalesInvoiceLinesReport />}
             {/* Preserve legacy bookmarks at the one Settings destination. */}
             {tab === "staff-duties" && <Navigate replace state={location.state} to={`/operation/settings/staff-duties?${new URLSearchParams([...searchParams].filter(([key]) => key !== "tab"))}`} />}
             {/* R2 — the supplier-claim queue: what receiving found wrong, and
@@ -541,6 +557,7 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
                 sends back. Read-only; issuing a return is §7.4's own door and
                 moving the goods is Stock's. */}
             {tab === "purchase-returns" && <OperationPurchaseReturns />}
+            {tab === "consignment-returns" && <OperationPurchaseReturns consignment />}
             {tab === "repair-orders" && <OperationRepairOrders />}
             {/* P1 — Purchasing → Settings: the numbers the ordering engine
                 reads. Manager-only; the tab is hidden for everyone else and
@@ -626,6 +643,12 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
                 On hand surface. Same `?tab=` address, new page. */}
             {tab === "stock-onhand" && <WarehouseStockRegister />}
             {tab === "showroom" && <WarehouseStockRegister showroom />}
+            {/* 0714 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office staff
+                adjust, transfer and count stock the Houzs way. Overturns Jess's Stock
+                MASTER §12.4/§12.5/§12.7; Jess was not part of this decision. */}
+            {tab === "stock-adjustments" && <StockAdjustments />}
+            {tab === "stock-transfers" && <StockTransfers />}
+            {tab === "stock-takes" && <StockTakes />}
             {/* WAREHOUSE (owner ruling 2026-09-14) — Arrival Schedule and
                 Pickup Schedule are two independent dated boards; Inbound and
                 Outbound are their own rail + Register work pages. */}

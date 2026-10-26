@@ -216,7 +216,11 @@ result, proof, problems and history.
 - Bed-set goods remain inseparable. Sofa may travel separately only with customer agreement.
   Accessories do not block core large goods.
 - The issue preview states **This delivery** and **Remaining after this delivery**, with the reason.
-- **The SYSTEM issues the DO when its requirements are met.** No `New DO`, `Issue`, `Release` or
+- **OVERTURNED 2026-10-22 by Weisiang (Mr Lim): office staff may open a Delivery Order from SO lines (Houzs way). Jess's earlier rule kept below for history.** The Delivery Orders register's `New Delivery Order` picks
+  a Sales Order and its delivery groups still free to ship, and creates the DO through the one
+  issuing path (same goods, money and Finance gates; migration 0710 refuses goods already on a
+  live DO). The system still issues a DO by itself when requirements are met.
+  > Jess's earlier rule: **The SYSTEM issues the DO when its requirements are met.** No `New DO`, `Issue`, `Release` or
   `Approve` control exists on any surface. The one governed manual door is **`Request Delivery
   Order`** (owner ruling 2026-08-19): the outstation trip's door, the same single issuing path and
   the same gates, merely not waiting for the booking-confirm trigger.
@@ -2233,7 +2237,7 @@ only when a real vehicle-level fact exists.
 
 | Do not use in employee Delivery UI | Governed wording |
 |---|---|
-| Release · Issue · Approve · New DO | the SYSTEM issues the Delivery Order; `Request Delivery Order` is the one manual door |
+| Release · Issue · Approve | the SYSTEM issues the Delivery Order; office staff use `New Delivery Order` or `Request Delivery Order`. **OVERTURNED 2026-10-22 by Weisiang (Mr Lim): office staff may open a Delivery Order from SO lines (Houzs way). Jess's earlier rule kept below for history.** Jess's earlier row: "Release · Issue · Approve · New DO → the SYSTEM issues the Delivery Order; `Request Delivery Order` is the one manual door" |
 | Attempt · Create Delivery Visit | `Record Delivery Result` · `Delivery History` |
 | Not Delivered | `Failed Delivery` |
 | Contact Customer · Follow Up | the exact contact purpose |
@@ -2254,7 +2258,8 @@ only when a real vehicle-level fact exists.
 | `Call {partner} — confirm delivery date` | `Call NETS` over `Confirm the delivery date` |
 | Alert · Attention · Checklist · Due · Next Action · Priority, as Monitor columns | none; the three checks live in their columns |
 
-**Intentional rejects:** a New DO, Issue, Release or Approve control; a new payment exception
+**OVERTURNED 2026-10-22 by Weisiang (Mr Lim): office staff may open a Delivery Order from SO lines (Houzs way). Jess's earlier rule kept below for history.** `New DO` leaves this list; `New Delivery Order` is the register's door.
+**Intentional rejects:** a ~~New DO,~~ Issue, Release or Approve control; a new payment exception
 door; a Delivery dashboard, Fleet, ~~Trips, Regions, Schedule,~~ Exceptions, Partners, Report or
 Delivery Returns destination; a copy of an arrangement; route optimisation, ~~dispatch runs~~ or
 loading manifests (**OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): Trips, Regions, Delivery Planning, DP Orders and Auto-schedule are built; a Trip is the dispatch run.**); customer self-scheduling; a second quantity, stock, duty, calendar or owner

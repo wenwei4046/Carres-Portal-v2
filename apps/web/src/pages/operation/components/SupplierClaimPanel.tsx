@@ -350,7 +350,7 @@ function ResultSection({ claim, record, open, onNext, onIssue }: {
             const send = pr ? purchaseReturnSendLine({ sends: pr.sends ?? [] }) : null;
             const received = pr ? purchaseReturnSupplierReceivedDate(pr) : null;
             return <div key={ref.id} className="rounded-control border border-kit-slate-5 px-3 py-2 text-body text-kit-slate-12">
-              <Link className="font-semibold text-kit-blue-11 hover:underline" to={`/operation?tab=purchase-returns&pr=${encodeURIComponent(ref.id)}`}>{purchaseReturnNo(ref.pr_no)}</Link>
+              <Link className="font-semibold text-kit-blue-11 hover:underline" to={`/operation?tab=${ref.is_consignment ? "consignment-returns" : "purchase-returns"}&pr=${encodeURIComponent(ref.id)}`}>{purchaseReturnNo(ref.pr_no)}</Link>
               {pr ? <>
                 <p>{send?.sent ? `${send.text} · ${fmtDate(send.date)}` : "Sending not confirmed"}</p>
                 <p>{pr.confirmed_pickup_date ? `Confirmed Pickup Date ${fmtDate(pr.confirmed_pickup_date)}` : "Pickup date not confirmed"}{` · ${purchaseReturnPickupState(pr)}`}</p>
