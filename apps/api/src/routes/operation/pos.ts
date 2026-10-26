@@ -2077,7 +2077,9 @@ operationPosRouter.post("/new", requireOperation, async (c) => {
       supplier_id: input.supplierId,
       warehouse_id: warehouseId,
       destination_id: input.destinationId,
-      eta_date: input.etaDate ?? null,
+      // Houzs: a typed PO Delivery Date; a blank one defaults to today (MYT)
+      // (Houzs-ERP backend/src/scm/routes/mfg-purchase-orders.ts:1027).
+      eta_date: input.etaDate ?? todayIso(),
       procurement_partner_id: partnerId,
       so_refs: null,
       purpose: null,

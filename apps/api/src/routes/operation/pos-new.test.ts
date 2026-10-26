@@ -125,6 +125,13 @@ describe("POST /api/operation/pos/new — a Purchase Order with no source (Weisi
     expect((rpc.mock.calls[0] as unknown as [string, { p_pos: Array<Record<string, unknown>> }])[1].p_pos[0]!.warehouse_id).toBe(OWN_WH);
   });
 
+  it("a blank PO Delivery Date defaults to today (MYT), the Houzs way", async () => {
+    const { rpc } = client(ROWS, { data: { po_ids: ["PO4"] }, error: null });
+    await post({ ...BODY, etaDate: null });
+    const today = new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10);
+    expect((rpc.mock.calls[0] as unknown as [string, { p_pos: Array<Record<string, unknown>> }])[1].p_pos[0]!.eta_date).toBe(today);
+  });
+
   it("a Deliver To with no address is refused before a PO number is spent", async () => {
     const { rpc } = client({ ...ROWS, purchasing_destinations: [{ id: DEST, name: "Showroom", address: " ", warehouse_id: null }] }, { data: null, error: null });
     const res = await post(BODY);
