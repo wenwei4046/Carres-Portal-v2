@@ -74,6 +74,26 @@ begin
   if (select lat from fleet_last_positions() where vehicle_id = v_lorry1) <> 3.2 then
     raise exception 'FAIL: fleet_last_positions did not return the latest fix';
   end if;
+  -- Row security on a caller's own insert (Phase 7 review 2026-10-23).
+  perform set_config('role', 'authenticated', true);
+  begin
+    insert into fleet_lorry_positions (vehicle_id, lat, lng, recorded_at) values (v_lorry1, 3.3, 101.8, now() + interval '1 day');
+    raise exception 'FAIL: a future fix was accepted';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    insert into fleet_lorry_positions (vehicle_id, lat, lng, received_by) values (v_lorry1, 3.3, 101.8, gen_random_uuid());
+    raise exception 'FAIL: a fix named someone else as received_by';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    insert into fleet_crew_leave (crew_id, from_date, to_date, reason, recorded_by)
+    values (v_d1, date '2026-12-01', date '2026-12-01', 'AL', gen_random_uuid());
+    raise exception 'FAIL: leave named someone else as recorded_by';
+  exception when insufficient_privilege then null;
+  end;
+  insert into fleet_lorry_positions (vehicle_id, lat, lng) values (v_lorry1, 3.3, 101.8);
+  perform set_config('role', 'postgres', true);
   raise notice '0724 check: PASS';
 end;
 $check$;

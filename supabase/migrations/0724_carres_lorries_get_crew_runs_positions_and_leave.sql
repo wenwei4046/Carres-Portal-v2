@@ -137,8 +137,10 @@ drop policy if exists fleet_crew_leave_read on public.fleet_crew_leave;
 create policy fleet_crew_leave_read on public.fleet_crew_leave
   for select using ((select public.is_internal()));
 drop policy if exists fleet_crew_leave_write on public.fleet_crew_leave;
+-- recorded_by is the caller: the column default is not a guard, a direct
+-- insert could name someone else (Phase 7 review 2026-10-23).
 create policy fleet_crew_leave_write on public.fleet_crew_leave
-  for insert with check ((select public.is_operation()));
+  for insert with check ((select public.is_operation()) and recorded_by = (select auth.uid()));
 drop policy if exists fleet_crew_leave_remove on public.fleet_crew_leave;
 create policy fleet_crew_leave_remove on public.fleet_crew_leave
   for delete using ((select public.is_operation()));
@@ -162,8 +164,18 @@ drop policy if exists fleet_lorry_positions_read on public.fleet_lorry_positions
 create policy fleet_lorry_positions_read on public.fleet_lorry_positions
   for select using ((select public.is_internal()));
 drop policy if exists fleet_lorry_positions_write on public.fleet_lorry_positions;
+-- Phase 7 review (2026-10-23): a fix is for a Carres lorry, names the caller
+-- as received_by, and is not in the future (a future recorded_at would stay
+-- the "latest" fix on the Live Map until that time passes).
 create policy fleet_lorry_positions_write on public.fleet_lorry_positions
-  for insert with check ((select public.is_operation()));
+  for insert with check (
+    (select public.is_operation())
+    and received_by = (select auth.uid())
+    and recorded_at <= now() + interval '2 minutes'
+    and exists (select 1 from public.partner_fleet f
+                  join public.delivery_partners dp on dp.id = f.partner_id and dp.own_fleet
+                 where f.id = vehicle_id)
+  );
 
 create or replace function public.fleet_last_positions()
 returns table (vehicle_id uuid, lat numeric, lng numeric, recorded_at timestamptz, source text)
