@@ -9,6 +9,9 @@
 --   one: a part invoice bills only the quantities picked. This overturns
 --   Jess's rules in docs/payment/MASTER.md (no manual `Generate invoice` door;
 --   one live Sales Invoice per order). Jess was not part of this decision.
+--   Follows Houzs frontend/src/pages/scm-v2/SalesInvoiceFromDo.tsx:7-14 (a line
+--   invoiced across several invoices until remaining = qty - invoiced reaches 0)
+--   per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
 --
 -- WHAT A PART INVOICE NEEDS (Carres has no invoice-lines table)
 --   The invoice's own lines live in its immutable issue snapshot:

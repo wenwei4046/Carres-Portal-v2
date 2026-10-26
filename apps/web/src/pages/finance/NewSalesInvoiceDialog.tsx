@@ -5,6 +5,9 @@
  * the Houzs way (`SalesInvoiceFromDo.tsx`) rebuilt in the Carres kit. It
  * overturns Jess's rules in payment/MASTER.md (no manual `Generate invoice`;
  * one live Sales Invoice per order); Jess was not part of this decision.
+ * Follows Houzs frontend/src/pages/scm-v2/SalesInvoiceFromDo.tsx:7-12 (pick lines,
+ * qty 1..remaining) per Weisiang's ruling (2026-10-22): clear Carres rules,
+ * implement Houzs.
  *
  * Find by SO No or DO No. A DO ticks the goods it carries; an SO ticks every
  * line. Each line can be invoiced in parts until nothing is left (0712 keeps

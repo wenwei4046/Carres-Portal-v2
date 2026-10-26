@@ -28,6 +28,9 @@ export type OfficeInvoicePick = { picked: boolean; qty: number };
  * delivery groups; a whole-order DO carries every line). Found by a Sales
  * Order (`doGroups` undefined): every line. Each at what is left to invoice;
  * a line with nothing left is never ticked.
+ * Follows Houzs frontend/src/pages/scm-v2/SalesInvoiceFromDo.tsx:109,130 (pre-tick
+ * remaining lines at full qty) per Weisiang's ruling (2026-10-22): clear Carres
+ * rules, implement Houzs.
  */
 export function officeInvoicePrefill(
   lines: readonly OfficeInvoiceLine[],

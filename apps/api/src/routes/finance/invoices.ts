@@ -477,6 +477,9 @@ financeInvoicesRouter.post("/:id/issue", async (c) => {
  * or a Delivery Order, part invoices included — the Houzs way. Overturns
  * Jess's payment/MASTER.md rules (no manual Generate invoice; one live Sales
  * Invoice per order); Jess was not part of this decision.
+ * Follows Houzs frontend/src/pages/scm-v2/SalesInvoiceFromDo.tsx:7-10 (part
+ * invoices by line and qty) per Weisiang's ruling (2026-10-22): clear Carres
+ * rules, implement Houzs.
  *
  *   GET  /office-offer/:ref — `ref` is an SO No or a DO No; the order's lines
  *                             and what is left to invoice (0712), plus the
