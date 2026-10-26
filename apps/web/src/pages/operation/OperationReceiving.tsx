@@ -106,7 +106,7 @@ export function receivingAfterPost(params: URLSearchParams, receiptId: string): 
     else next.delete("queue");
     return next;
   }
-  for (const k of ["po", "find", "arrival"]) next.delete(k);
+  for (const k of ["po", "find", "arrival", "queue"]) next.delete(k);
   next.set("session", receiptId);
   return next;
 }
@@ -824,6 +824,7 @@ export default function OperationReceiving() {
     next.delete("arrival");
     next.delete("po");
     next.delete("find");
+    next.delete("queue");
     next.set("session", id);
     setParams(next);
   }
@@ -844,6 +845,7 @@ export default function OperationReceiving() {
     next.delete("session");
     next.delete("po");
     next.delete("find");
+    next.delete("queue");
     setParams(next);
   }
 
@@ -895,6 +897,7 @@ export default function OperationReceiving() {
             next.delete("find");
             next.set("po", ids[0]);
             if (ids.length > 1) next.set("queue", ids.slice(1).join(","));
+            else next.delete("queue");
             setParams(next);
           }}
         />

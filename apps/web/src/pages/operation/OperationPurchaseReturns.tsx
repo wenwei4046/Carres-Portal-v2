@@ -655,9 +655,14 @@ function NewPurchaseReturn({ onClose, onIssued }: { onClose: () => void; onIssue
   return (
     <div className="flex max-w-md flex-col gap-3 p-4" data-testid="purchase-return-new">
       <h1 className="text-page text-kit-slate-12">{NEW_PURCHASE_RETURN}</h1>
-      <Select id="purchase-return-new-supplier" label="Supplier" placeholder="Choose the supplier"
-        onValueChange={setSupplierId}
-        options={(suppliers.data?.suppliers ?? []).map((s) => ({ value: s.id, label: s.name }))} />
+      {suppliers.isError ? (
+        <div role="alert"><EmptyState title="Some information could not be refreshed." action={<Button variant="neutral" onClick={() => void suppliers.refetch()}>Try again</Button>} /></div>
+      ) : (
+        <Select id="purchase-return-new-supplier" label="Supplier" placeholder={suppliers.isLoading ? "Loading…" : "Choose the supplier"}
+          disabled={suppliers.isLoading}
+          onValueChange={setSupplierId}
+          options={(suppliers.data?.suppliers ?? []).map((s) => ({ value: s.id, label: s.name }))} />
+      )}
       <div><Button variant="neutral" onClick={onClose}>Cancel</Button></div>
     </div>
   );
