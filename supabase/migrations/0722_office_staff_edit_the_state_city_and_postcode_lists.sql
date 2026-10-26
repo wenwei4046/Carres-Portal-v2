@@ -7,6 +7,8 @@
 --   the Houzs SO Maintenance way. Jess and Loo were not part of this decision.
 --   It overturns Loo's 2026-07-19 "completeness comes from this dataset, not
 --   typing" (apps/web/src/data/malaysia-postcodes.ts).
+--   Follows Houzs frontend/src/pages/scm-v2/SalesOrderMaintenance.tsx:2-4 (States/Cities/Postcodes
+--   CRUD) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
 --
 -- WHAT THIS CHANGES
 --   address_list_overrides   one row per change on top of the generated

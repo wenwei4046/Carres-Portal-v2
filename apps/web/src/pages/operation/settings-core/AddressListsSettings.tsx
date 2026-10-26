@@ -8,6 +8,8 @@
  * address picker (MYAddressFields, the Sales Order customer card, the dealer
  * State) reads the result through `useAddressLists`. Editors: the Sales Order
  * Settings gate (TEAM-02). Words: COPY-STANDARD "Settings → Address lists".
+ * Follows Houzs frontend/src/pages/scm-v2/SalesOrderMaintenance.tsx:2-4 (States/Cities/Postcodes
+ * CRUD) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
  */
 import { useState } from "react";
 import { toast } from "sonner";

@@ -206,6 +206,8 @@ router.get("/can-edit/:section", requireOperationOrPrincipal, async (c) => {
 // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was not part of it):
 // office staff add, rename or hide a State, City or Postcode, Houzs way. The
 // read is `addressListsReadRouter` below (every signed-in account); this is
+// Follows Houzs frontend/src/pages/scm-v2/SalesOrderMaintenance.tsx:2-4 (States/Cities/Postcodes
+// CRUD) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
 // the one write, on the Sales Order Settings gate.
 const addressOverrideInput = z.object({
   state: z.string().trim().min(1).max(80),
