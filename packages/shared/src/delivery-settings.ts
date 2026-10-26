@@ -154,6 +154,8 @@ export const partnerVehicleInput = z.object({
   driverName: optionalText(120),
   driverPhone: optionalText(40),
   active: z.boolean().default(true),
+  /* 0724 (YH 2026-10-26): the Radius Velocity device on a Carres lorry; null clears it. */
+  velocityDeviceId: optionalText(64),
 });
 export type PartnerVehicleInput = z.infer<typeof partnerVehicleInput>;
 

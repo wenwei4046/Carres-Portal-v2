@@ -120,6 +120,8 @@ const DS = {
   roleDriver: "Driver",
   roleHelper: "Helper",
   addVehicle: "Add a vehicle",
+  /* 0724 (YH 2026-10-26): Carres lorries report positions through Radius Velocity. */
+  velocityDevice: "Velocity device",
   /* Services */
   stairCarry: "Stair carry",
   dismantling: "Dismantling",
@@ -353,7 +355,7 @@ interface PartnerDraft {
   handover: HandoverPoint[];
   fleet: {
     drivers: Array<{ id: string | null; name: string; phone: string; active: boolean; role: "driver" | "helper" | null }>;
-    vehicles: Array<{ id: string | null; plate: string; vehicleType: string; capacity: string; driverName: string; driverPhone: string; active: boolean }>;
+    vehicles: Array<{ id: string | null; plate: string; vehicleType: string; capacity: string; driverName: string; driverPhone: string; active: boolean; velocityDeviceId: string }>;
   };
   services: { stairCarry: boolean; dismantling: boolean; disposal: boolean; charges: string };
 }
@@ -407,6 +409,7 @@ function draftOf(p: DeliverySettingsPartnerRow, data: DeliverySettingsResponse):
           driverName: v.driver_name ?? "",
           driverPhone: v.driver_phone ?? "",
           active: v.active,
+          velocityDeviceId: v.velocity_device_id ?? "",
         })),
     },
     services: {
@@ -567,6 +570,8 @@ function PartnerObject({ data, partnerId, section }: { data: DeliverySettingsRes
               driverName: v.driverName.trim() || null,
               driverPhone: v.driverPhone.trim() || null,
               active: v.active,
+              /* 0724: sent only when changed, so the eight-argument door still answers before 0724. */
+              ...(v.velocityDeviceId.trim() !== (was?.velocityDeviceId ?? "").trim() ? { velocityDeviceId: v.velocityDeviceId.trim() || null } : {}),
             }),
           });
         }
@@ -856,6 +861,9 @@ function PartnerObject({ data, partnerId, section }: { data: DeliverySettingsRes
                         <Input id={`dp-vphone-${i}`} label={DS.driverPhone} value={v.driverPhone} onChange={(e) => {
                           const vehicles = [...draft.fleet.vehicles]; vehicles[i] = { ...v, driverPhone: e.target.value }; set("fleet", { ...draft.fleet, vehicles });
                         }} />
+                        <Input id={`dp-vdevice-${i}`} label={DS.velocityDevice} value={v.velocityDeviceId} onChange={(e) => {
+                          const vehicles = [...draft.fleet.vehicles]; vehicles[i] = { ...v, velocityDeviceId: e.target.value }; set("fleet", { ...draft.fleet, vehicles });
+                        }} />
                         <Select id={`dp-vactive-${i}`} label={DS.status} value={v.active ? "active" : "inactive"} onValueChange={(val) => {
                           const vehicles = [...draft.fleet.vehicles]; vehicles[i] = { ...v, active: val === "active" }; set("fleet", { ...draft.fleet, vehicles });
                         }} options={[{ value: "active", label: DS.active }, { value: "inactive", label: DS.inactive }]} />
@@ -866,7 +874,7 @@ function PartnerObject({ data, partnerId, section }: { data: DeliverySettingsRes
                   </div>
                 ))}
                 {canEdit ? (
-                  <Button size="sm" data-testid="delivery-settings-add-vehicle" onClick={() => set("fleet", { ...draft.fleet, vehicles: [...draft.fleet.vehicles, { id: null, plate: "", vehicleType: "", capacity: "", driverName: "", driverPhone: "", active: true }] })}>{DS.addVehicle}</Button>
+                  <Button size="sm" data-testid="delivery-settings-add-vehicle" onClick={() => set("fleet", { ...draft.fleet, vehicles: [...draft.fleet.vehicles, { id: null, plate: "", vehicleType: "", capacity: "", driverName: "", driverPhone: "", active: true, velocityDeviceId: "" }] })}>{DS.addVehicle}</Button>
                 ) : draft.fleet.vehicles.length === 0 ? <span className="text-kit-slate-9">{NOT_CONFIGURED}</span> : null}
               </div>
             </Row>

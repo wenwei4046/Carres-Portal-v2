@@ -12,6 +12,7 @@ declare
   v_d1 uuid; v_d2 uuid; v_h1 uuid;
   v_order uuid; v_n int; v_rev numeric;
   v_detail text;
+  v_other uuid; v_res jsonb;
 begin
   insert into auth.users (id, email) values (v_op, 'fleet-check@carres.test');
   insert into app_users (id, email, name, role, status) values (v_op, 'fleet-check@carres.test', 'Fleet check', 'operation', 'active');
@@ -74,6 +75,32 @@ begin
   if (select lat from fleet_last_positions() where vehicle_id = v_lorry1) <> 3.2 then
     raise exception 'FAIL: fleet_last_positions did not return the latest fix';
   end if;
+  -- Radius Velocity (YH 2026-10-26): the service door maps device, then plate,
+  -- to a Carres lorry; skips other companies' vehicles and future times; a
+  -- repeat (lorry, recorded_at) is a no-op.
+  update partner_fleet set velocity_device_id = 'DEV-7' where id = v_lorry2;
+  insert into delivery_partners (name) values ('Fleet check other co') returning id into v_other;
+  insert into partner_fleet (partner_id, plate, vehicle_type) values (v_other, 'OTH 1', 'Lorry');
+  v_res := fleet_store_velocity_fixes(jsonb_build_array(
+    jsonb_build_object('device_id', 'DEV-7', 'plate', 'NOT ITS PLATE', 'lat', 3.0, 'lng', 101.0, 'recorded_at', (now() - interval '3 hours')::text),
+    jsonb_build_object('device_id', 'DEV-9', 'plate', 'vab1234', 'lat', 3.0, 'lng', 101.0, 'recorded_at', (now() - interval '3 hours')::text),
+    jsonb_build_object('device_id', 'DEV-9', 'plate', 'VAB 1234', 'lat', 3.0, 'lng', 101.0, 'recorded_at', (now() - interval '3 hours')::text),
+    jsonb_build_object('device_id', 'DEV-X', 'plate', 'OTH 1', 'lat', 3.0, 'lng', 101.0, 'recorded_at', (now() - interval '3 hours')::text),
+    jsonb_build_object('device_id', 'DEV-9', 'plate', 'VAB 1234', 'lat', 3.0, 'lng', 101.0, 'recorded_at', (now() + interval '1 day')::text)));
+  if (v_res->>'stored')::int <> 2 or v_res->'unmatched' <> '["OTH 1"]'::jsonb then
+    raise exception 'FAIL: velocity store answered %', v_res;
+  end if;
+  if not exists (select 1 from fleet_lorry_positions where vehicle_id = v_lorry2 and device_id = 'DEV-7' and source = 'tracker')
+     or not exists (select 1 from fleet_lorry_positions where vehicle_id = v_lorry1 and device_id = 'DEV-9') then
+    raise exception 'FAIL: velocity fixes not matched by device then plate';
+  end if;
+  v_res := fleet_store_velocity_fixes(jsonb_build_array(
+    jsonb_build_object('device_id', 'DEV-7', 'plate', null, 'lat', 3.0, 'lng', 101.0, 'recorded_at', (now() - interval '3 hours')::text)));
+  if (v_res->>'stored')::int <> 0 then raise exception 'FAIL: a repeated fix was stored again'; end if;
+  if has_function_privilege('authenticated', 'public.fleet_store_velocity_fixes(jsonb)', 'execute') then
+    raise exception 'FAIL: a signed-in user may call the Velocity service door';
+  end if;
+
   -- Row security on a caller's own insert (Phase 7 review 2026-10-23).
   perform set_config('role', 'authenticated', true);
   begin
@@ -92,7 +119,7 @@ begin
     raise exception 'FAIL: leave named someone else as recorded_by';
   exception when insufficient_privilege then null;
   end;
-  insert into fleet_lorry_positions (vehicle_id, lat, lng) values (v_lorry1, 3.3, 101.8);
+  insert into fleet_lorry_positions (vehicle_id, lat, lng, recorded_at) values (v_lorry1, 3.3, 101.8, now() - interval '1 minute');
   perform set_config('role', 'postgres', true);
   raise notice '0724 check: PASS';
 end;
