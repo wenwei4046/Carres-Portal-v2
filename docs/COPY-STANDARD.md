@@ -3422,6 +3422,8 @@ detail-listing port, row 15): **`Sales order lines`** · **`Delivery order lines
 `Item` = the add-on's catalog name. Footer: `{shown} of {total} lines ·`
 then the exclusion: `Rentals are not listed.` · `Cancelled delivery orders are not listed.` ·
 `Only issued sales invoices are listed.` Empty: `No lines yet.` + the same exclusion.
+Sales invoice lines add **`Lines from`**: `Invoice` (the invoice's own line, frozen at issue) or
+`Sales order today` (the invoice froze no lines, so the order's live line stands in).
 
 ## ⭐ THE YEAR RULE — owner ruling 2026-08-15 (Chai), portal-wide
 

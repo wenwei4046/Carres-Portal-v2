@@ -59,6 +59,12 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const INVOICE_REGISTER_SELECT =
   "id,invoice_no,status,kind,amount,tax_amount,issued_at,voided_at,void_reason," +
   "replaces_invoice_id,created_at,order_id," +
+  // The invoice's OWN lines, frozen at issue (0429 snapshot; 0712 office part
+  // invoices add `addons` and `issued_from`). Reports → Sales invoice lines
+  // reads these — follows Houzs backend/src/scm/routes/reports.ts:502-528 per
+  // Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs — and falls back to the live order only when
+  // the snapshot holds no lines (dispatch-issued / pre-0429 invoices).
+  "snapshot_lines:snapshot->lines,snapshot_addons:snapshot->addons,snapshot_from:snapshot->>issued_from," +
   "orders(id,so,customer_name,customer_phone,source_ref,status,paid,delivery_date,delivery_date_tbd,delivered_at," +
   // The Finance Dashboard's A/R Aging counts an order's age from the day it
   // was placed — the same date finance_ar_aging (0062/0125) aged it by.

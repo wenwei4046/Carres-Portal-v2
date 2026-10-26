@@ -58,6 +58,12 @@ function LinesGrid({ kind, rows, loading, failed, retry }: {
       { key: "qty", label: "Qty", width: 80, align: "right", accessor: (r) => r.qty, numberValue: (r) => r.qty, exportValue: (r) => r.qty,
         footerTotal: (v) => sum(v, "qty") },
       ...money,
+      // An invoice line read from the live order (no snapshot line) says so.
+      ...(kind === "inv" ? [{
+        key: "from", label: "Lines from", width: 150,
+        accessor: (r: DocumentLine) => r.linesFrom === "order" ? "Sales order today" : "Invoice",
+        exportValue: (r: DocumentLine) => r.linesFrom === "order" ? "Sales order today" : "Invoice",
+      }] : []),
     ];
   }, [kind, w]);
 

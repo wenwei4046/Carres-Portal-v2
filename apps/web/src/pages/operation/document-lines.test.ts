@@ -63,17 +63,57 @@ describe("deliveryOrderLinesOf — one row per line on THIS trip", () => {
   });
 });
 
-describe("salesInvoiceLinesOf — the issued Sales Invoice's order lines", () => {
+describe("salesInvoiceLinesOf — the issued Sales Invoice's own lines", () => {
   const inv = (i: Partial<InvoiceRegisterRow>) => ({
     id: "i1", invoice_no: "INV-1", status: "issued", kind: "sales", issued_at: "2026-10-05", voided_at: null,
     order_id: "o1", orders: { id: "o1", so: 101, customer_name: "Tan", order_lines: [{ sku: "CODY-Q", qty: 3, unit_price: 100 }] },
     ...i,
   }) as unknown as InvoiceRegisterRow;
 
-  it("one row per order line of an issued Sales Invoice", () => {
+  it("with no snapshot lines, falls back to the order's live lines and marks them", () => {
     expect(salesInvoiceLinesOf([inv({})], nameOf, addonName)).toEqual([
-      { key: "i1:0", date: "2026-10-05", docNo: "INV-1", orderId: "o1", so: 101, customer: "Tan", item: "Cody", qty: 3, unitPrice: 100, amount: 300 },
+      { key: "i1:0", date: "2026-10-05", docNo: "INV-1", orderId: "o1", so: 101, customer: "Tan", item: "Cody", qty: 3, unitPrice: 100, amount: 300, linesFrom: "order" },
     ]);
+    expect(salesInvoiceLinesOf([inv({ snapshot_lines: null })], nameOf, addonName)[0]!.linesFrom).toBe("order");
+  });
+
+  it("reads the invoice's frozen snapshot lines, not the order as it is today", () => {
+    // The order changed after issue (qty 3 @ 100); the invoice froze 2 @ 90.
+    const rows = salesInvoiceLinesOf([inv({ snapshot_lines: [{ sku: "CODY-Q", qty: 2, unit_price: 90 }] })], nameOf, addonName);
+    expect(rows.map((r) => [r.item, r.qty, r.unitPrice, r.amount, r.linesFrom])).toEqual([["Cody", 2, 90, 180, "invoice"]]);
+  });
+
+  it("a whole-order snapshot froze goods only: its add-ons come live from the order, marked", () => {
+    const rows = salesInvoiceLinesOf([inv({
+      snapshot_lines: [{ sku: "CODY-Q", qty: 1, unit_price: 1000 }],
+      orders: { id: "o1", so: 101, customer_name: "Tan", order_lines: [],
+        order_addons: [{ addon_key: "disposal", qty: 1, unit_price: 50 }] } as unknown as InvoiceRegisterRow["orders"],
+    })], nameOf, addonName);
+    expect(rows.map((r) => [r.item, r.amount, r.linesFrom])).toEqual([["Cody", 1000, "invoice"], ["Disposal", 50, "order"]]);
+  });
+
+  it("an office part invoice (0712) bills only its own picked lines and add-ons", () => {
+    const orders = { id: "o1", so: 101, customer_name: "Tan",
+      order_lines: [{ sku: "CODY-Q", qty: 5, unit_price: 100 }],
+      order_addons: [{ addon_key: "disposal", qty: 1, unit_price: 50 }] } as unknown as InvoiceRegisterRow["orders"];
+    const rows = salesInvoiceLinesOf([
+      inv({ id: "i1", snapshot_from: "office", snapshot_lines: [{ order_line_id: "l1", sku: "CODY-Q", qty: "2", unit_price: "100" }],
+        snapshot_addons: [{ addon_key: "disposal", qty: 1, unit_price: 50 }], orders }),
+      inv({ id: "i2", invoice_no: "INV-2", snapshot_from: "office", snapshot_lines: [{ order_line_id: "l1", sku: "CODY-Q", qty: 3, unit_price: 100 }],
+        snapshot_addons: [], orders }),
+    ], nameOf, addonName);
+    expect(rows.map((r) => [r.docNo, r.item, r.qty, r.amount, r.linesFrom])).toEqual([
+      ["INV-1", "Cody", 2, 200, "invoice"],
+      ["INV-1", "Disposal", 1, 50, "invoice"],
+      ["INV-2", "Cody", 3, 300, "invoice"],
+    ]);
+  });
+
+  it("an office snapshot with no addons key still never borrows the order's add-ons", () => {
+    const rows = salesInvoiceLinesOf([inv({ snapshot_from: "office", snapshot_lines: [{ sku: "CODY-Q", qty: 1, unit_price: 100 }],
+      orders: { id: "o1", so: 101, customer_name: "Tan", order_lines: [],
+        order_addons: [{ addon_key: "disposal", qty: 1, unit_price: 50 }] } as unknown as InvoiceRegisterRow["orders"] })], nameOf, addonName);
+    expect(rows.map((r) => r.item)).toEqual(["Cody"]);
   });
 
   it("adds the order's add-ons, so the lines total the invoice amount", () => {
@@ -81,7 +121,7 @@ describe("salesInvoiceLinesOf — the issued Sales Invoice's order lines", () =>
       id: "o1", so: 101, customer_name: "Tan", order_lines: [{ sku: "CODY-Q", qty: 1, unit_price: 1000 }],
       order_addons: [{ addon_key: "delivery", qty: 1, unit_price: 50 }],
     } as unknown as InvoiceRegisterRow["orders"] })], nameOf, addonName);
-    expect(rows.map((r) => [r.item, r.amount])).toEqual([["Cody", 1000], ["delivery", 50]]);
+    expect(rows.map((r) => [r.item, r.amount, r.linesFrom])).toEqual([["Cody", 1000, "order"], ["delivery", 50, "order"]]);
     expect(rows.reduce((t, r) => t + (r.amount ?? 0), 0)).toBe(1050);
   });
 

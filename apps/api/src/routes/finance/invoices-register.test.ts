@@ -452,6 +452,12 @@ describe("INVOICE_REGISTER_SELECT is a well-formed select", () => {
     expect(INVOICE_REGISTER_SELECT_FOR_TEST).toMatch(/orders\([^()]*\bplaced_at\b/);
   });
 
+  it("carries the invoice's own snapshot lines and add-ons at the top level (Sales invoice lines)", () => {
+    expect(INVOICE_REGISTER_SELECT_FOR_TEST).toMatch(/^[^()]*\bsnapshot_lines:snapshot->lines,/);
+    expect(INVOICE_REGISTER_SELECT_FOR_TEST).toMatch(/^[^()]*\bsnapshot_addons:snapshot->addons,/);
+    expect(INVOICE_REGISTER_SELECT_FOR_TEST).toMatch(/^[^()]*\bsnapshot_from:snapshot->>issued_from,/);
+  });
+
   it("catches the exact truncation that shipped, and the shapes beside it", () => {
     // The production string, byte for byte.
     expect(selectIsWellFormed(
