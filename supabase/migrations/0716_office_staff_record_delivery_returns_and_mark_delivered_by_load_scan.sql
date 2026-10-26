@@ -235,7 +235,11 @@ begin
      or (select count(*) from public.ops_delivery_orders d
           where d.order_id = v_doc.order_id and d.voided_at is null
             and not exists (select public._delivery_order_exact_units(d))) > 1 then
-    raise exception '% covers only part of its order, so its lines cannot be told apart. Return by Unit instead.', v_doc.do_number
+    -- trip_groups names delivery groups, not lines: a line's group is derived in
+    -- TypeScript from its SKU (packages/shared/src/delivery-groups.ts:94-98) and
+    -- accessories belong to no group (:111-114), so SQL cannot tell which lines
+    -- this DO carried. Refused truthfully: there is no Unit list to fall back to.
+    raise exception '% cannot be returned in the system: it has no line or Unit list of its own. Ask IT.', v_doc.do_number
       using errcode = 'P0001', detail = 'do_not_whole_order';
   end if;
   if not exists (select 1 from public.orders o where o.id = v_doc.order_id and o.status = 'delivered') then
