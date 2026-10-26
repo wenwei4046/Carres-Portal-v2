@@ -35,6 +35,7 @@ import ActivitySettings from "./staff-duties/ActivitySettings";
 import OperationPurchasingSettings from "./OperationPurchasingSettings";
 import SalesOrderSettings from "./SalesOrderSettings";
 import IssueTrackerSettings from "./IssueTrackerSettings";
+import ServiceSettings from "./ServiceSettings";
 import PaymentSettings from "./PaymentSettings";
 import WarehouseSettings, { WAREHOUSE_SETTINGS_SECTIONS } from "./WarehouseSettings";
 import DeliverySettings from "./DeliverySettings";
@@ -43,6 +44,7 @@ import LunchTimeSettings from "./LunchTimeSettings";
 import CompanySettings from "./settings-core/CompanySettings";
 import OfficeSettings from "./settings-core/OfficeSettings";
 import SettingsEditors from "./settings-core/SettingsEditors";
+import AddressListsSettings from "./settings-core/AddressListsSettings";
 import { DELIVERY_SETTINGS_SECTIONS } from "@carres/shared";
 
 /**
@@ -74,10 +76,21 @@ const SECTIONS = [
   { group: "Office", items: [{ slug: "office", label: "Office" }] },
   { group: "Team and access", items: [{ slug: "settings-editors", label: "Settings editors" }] },
   { group: "Staff & Duties", items: [{ slug: "staff-duties", label: "Staff & Duties" }] },
-  { group: "Sales Orders", items: [{ slug: "sales-orders", label: "Sales Order Settings" }] },
+  /* Address lists (0722): Weisiang's decision (Mr Lim, WhatsApp 2026-10-22;
+     Jess was not part of it) — office staff edit the State, City and
+     Postcode lists, Houzs SO Maintenance way. */
+  {
+    group: "Sales Orders",
+    items: [
+      { slug: "sales-orders", label: "Sales Order Settings" },
+      { slug: "address-lists", label: "Address lists" },
+    ],
+  },
   { group: "Purchasing", items: [{ slug: "purchasing", label: "Purchasing Settings" }] },
   { group: "Payment", items: [{ slug: "payment", label: "Payment Settings" }] },
   { group: "Issue Tracker", items: [{ slug: "issue-tracker", label: "Issue Tracker Settings" }] },
+  // 0711 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): Houzs Service Maintenance.
+  { group: "Service", items: [{ slug: "service", label: "Service Settings" }] },
   {
     group: "Warehouse",
     items: WAREHOUSE_SETTINGS_SECTIONS.map((s) => ({
@@ -231,9 +244,11 @@ export default function SettingsWorkspace() {
           <Route path="office" element={<OfficeSettings />} />
           <Route path="settings-editors" element={<SettingsEditors />} />
           <Route path="sales-orders" element={<SalesOrderSettings />} />
+          <Route path="address-lists" element={<AddressListsSettings />} />
           <Route path="purchasing" element={<OperationPurchasingSettings embedded />} />
           <Route path="payment" element={<PaymentSettings />} />
           <Route path="issue-tracker" element={<IssueTrackerSettings />} />
+          <Route path="service" element={<ServiceSettings />} />
           <Route path="warehouse" element={<Navigate to="details" replace />} />
           <Route path="warehouse/:section" element={<WarehouseSettings />} />
           <Route path="delivery" element={<Navigate to="partners" replace />} />

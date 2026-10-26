@@ -14,12 +14,13 @@
 
 ---
 
-**SYSTEM-WIDE DOCUMENT NUMBER DISPLAY — Jess 2026-10-04, APPROVED TARGET / NOT BUILT.**
-All Carres date-bearing document numbers display a two-digit year, across modules and surfaces.
-This is not PO-only. COPY-STANDARD's “System-wide document number display” owns the exact contract:
-recognised year segment only; existing identity/history preserved; no borrowed PO version suffix,
-no changes to supplier-owned references or Unit IDs. Every module reads the same identity and
-presentation rule. Allocation and production adoption remain separately evidenced.
+**SYSTEM-WIDE DOCUMENT NUMBER DISPLAY — owner24Oct2026, APPROVED TARGET / NOT VERIFIED BUILT.**
+COPY-STANDARD's current numbering section owns the new shared separator shape: prefix directly
+followed by the governed date, then one hyphen before the serial (`DO261024-0001`). Preserve old
+sheet references, saved identities, issued files, source links, supplier references and Unit IDs.
+UI template examples do not authorise allocator/privacy/prefix changes or renumbering historical
+records. Module numbering authorities continue to own allocation; implementation and production
+adoption remain separately evidenced.
 
 # §0 · Why this document exists — the lesson in one page
 

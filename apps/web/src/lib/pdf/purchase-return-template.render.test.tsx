@@ -87,3 +87,17 @@ it("the template source can never print money (source scan)", () => {
   const src = fs.readFileSync(new URL("./purchase-return-template.tsx", import.meta.url), "utf8");
   expect(src).not.toMatch(/\bprice\b|\bamount\b|\bRM\b|credit_note/i);
 });
+
+it("a Consignment Return is titled CONSIGNMENT RETURN over GOING BACK goods, with no price", async () => {
+  const pages = await render(sample({ pr_no: "CRTN-20261022-0042", is_consignment: true }), "crtn-issued");
+  const first = pages[0]!;
+  expect(first.replace(/\s/g, "")).toContain("CONSIGNMENTRETURN");
+  expect(first).toContain("GOING BACK");
+  expect(first).toContain("CRTN-20261022-0042");
+  expect(first.replace(/\s/g, "")).not.toContain("PURCHASERETURN");
+  expect(first).not.toMatch(/\bRM\b|price|credit|refund|amount/i);
+  expect(first).not.toMatch(/[—–]/);
+  // A Purchase Return keeps its own title and prints no goods heading.
+  const plain = (await render(sample(), "pr-plain"))[0]!;
+  expect(plain).not.toContain("GOING BACK");
+});

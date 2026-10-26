@@ -73,9 +73,10 @@ function refusal(error: unknown): string {
 export default function PurchaseReturnRecord({ id, onBack }: { id: string; onBack: () => void }) {
   const read = usePurchaseReturn(id);
   const pr = read.data?.purchaseReturn ?? null;
+  const [word, tab] = pr?.is_consignment ? ["Consignment Returns", "consignment-returns"] : ["Purchase Returns", "purchase-returns"];
   return <div className="absolute inset-0 flex min-h-0 flex-col bg-background" data-testid="purchase-return-object">
-    <SalesOrderTabs identity={pr ? purchaseReturnNo(pr.pr_no) : "Purchase Return"} customer={pr?.supplier_name} backLabel="Purchase Returns"
-      backTo="/operation?tab=purchase-returns" onBack={(event) => { event.preventDefault(); onBack(); }} />
+    <SalesOrderTabs identity={pr ? purchaseReturnNo(pr.pr_no) : "Purchase Return"} customer={pr?.supplier_name} backLabel={word}
+      backTo={`/operation?tab=${tab}`} onBack={(event) => { event.preventDefault(); onBack(); }} />
     <div className="min-h-0 flex-1 overflow-auto p-4" data-testid="purchase-return-object-scroll">
       {read.isError ? <div role="alert"><EmptyState title="Purchase Returns could not be loaded." action={<Button variant="neutral" onClick={() => void read.refetch()}>Try again</Button>} /></div>
         : read.isLoading ? <EmptyState title="Loading…" />

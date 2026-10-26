@@ -37,6 +37,10 @@ begin;
 -- ── 1 · a return may name no claim ──────────────────────────────────────────
 
 alter table public.purchase_returns alter column supplier_claim_id drop not null;
+-- Merged with main's 0706 (2026-10-26): 0706 let a claim be NULL only for a
+-- Consignment Return. A claimless Carres-owned return is now allowed too, so
+-- that check goes. is_consignment and CRTN numbering stay (section 4).
+alter table public.purchase_returns drop constraint if exists purchase_returns_claim_or_consignment;
 
 -- 6 (YH, 2026-10-26) · who cancelled a claimless return, when, and why.
 alter table public.purchase_returns
@@ -158,6 +162,9 @@ declare
   v_count       int := 0;
   v_supplier_id uuid;
   v_receipt_id  uuid;
+  v_consign     int;
+  v_total       int;
+  v_pr_no       text;
 begin
   -- 0500's law: a NULL app_role must never fall through a gate.
   if v_role is null or v_role not in ('operation', 'principal') then
@@ -217,15 +224,33 @@ begin
       using errcode = '23514', detail = 'no_units';
   end if;
 
+  -- 0706 (kept on merge with main 2026-10-26): ONE return is wholly Carres
+  -- goods or wholly the supplier's. All the supplier's own goods go back as a
+  -- Consignment Return, numbered CRTN. (A claimless return refuses
+  -- supplier-owned Units by name in the loop, so it is never one.)
+  select count(*) filter (where i.ownership = 'supplier_consignment'), count(*)
+    into v_consign, v_total
+    from public.ops_stock_items i
+   where i.id in (select nullif(e ->> 'stock_item_id', '')::uuid from jsonb_array_elements(p_units) e);
+  if v_consign > 0 and v_consign < v_total then
+    raise exception 'a return cannot mix supplier-owned and Carres-owned Units'
+      using errcode = '23514', detail = 'mixed_ownership';
+  end if;
+  v_return_id := gen_random_uuid();
+  if v_consign > 0 and p_claim_id is not null then
+    v_pr_no := public.allocate_formal_document_code('CRTN', v_return_id::text);
+  end if;
+
   insert into public.purchase_returns (
-    supplier_claim_id, supplier_id, warehouse_receipt_id,
-    confirmed_pickup_date, created_by
+    id, supplier_claim_id, supplier_id, warehouse_receipt_id,
+    confirmed_pickup_date, created_by, is_consignment, pr_no
   )
   values (
-    v_claim.id, v_supplier_id, v_receipt_id,
-    p_confirmed_pickup_date, auth.uid()
-  )
-  returning id into v_return_id;
+    v_return_id, v_claim.id, v_supplier_id, v_receipt_id,
+    p_confirmed_pickup_date, auth.uid(), v_pr_no is not null,
+    coalesce(v_pr_no, 'PR-' || to_char(now() at time zone 'Asia/Kuala_Lumpur', 'YYYYMMDD')
+                      || '-' || nextval('public.purchase_returns_no_seq'))
+  );
 
   for v_unit in select * from jsonb_array_elements(p_units) loop
     select * into v_item from public.ops_stock_items
@@ -251,6 +276,14 @@ begin
     if v_refusal is not null then
       raise exception '%: %', coalesce(v_item.unit_code, 'Unit'), v_refusal
         using errcode = '23514', detail = 'unit_not_eligible', hint = v_refusal;
+    end if;
+    -- 0706 (kept): supplier-owned goods go back to THEIR supplier (the PO's
+    -- supplier_id), not the claim's other.
+    if v_item.ownership = 'supplier_consignment'
+       and (select po.supplier_id from public.purchase_orders po where po.id = v_item.po_no)
+           is distinct from v_supplier_id then
+      raise exception '%: Not %''s goods', coalesce(v_item.unit_code, 'Unit'), v_supplier.name
+        using errcode = '23514', detail = 'not_suppliers_goods';
     end if;
     -- A UNIT CHANGED UNDER THE FORM is refused by name; nothing is issued.
     if coalesce(v_unit ->> 'seen', '') = ''
@@ -555,7 +588,7 @@ drop trigger if exists purchase_return_refuse_cancelled on public.purchase_retur
 create trigger purchase_return_refuse_cancelled before insert on public.purchase_return_pickup_confirmations
   for each row execute function public.purchase_return_refuse_cancelled();
 
--- A cancelled return owes no credit note (0676's function, one filter added).
+-- A cancelled return owes no credit note (0706's function, one filter added).
 create or replace function public._supplier_note_followups_from_returns()
 returns integer
 language plpgsql
@@ -600,6 +633,7 @@ begin
            group by rr.receipt_id, si.po_line_id) g) v
    where v.amount > 0
      and pr.cancelled_at is null
+     and not pr.is_consignment   -- 0706 (kept): a Consignment Return owes no credit
      and not exists (select 1 from public.supplier_note_followups f where f.purchase_return_id = pr.id)
   on conflict do nothing;
   get diagnostics v_n = row_count;

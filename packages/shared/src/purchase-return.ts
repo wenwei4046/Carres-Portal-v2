@@ -26,6 +26,8 @@
  *  prefix is applied at the EDGE, on the way to the screen, and the stored
  *  `pr_no` is printed unchanged when it already carries its own prefix. */
 export const PURCHASE_RETURN_PREFIX = "PR-";
+/** 0706: a Consignment Return is numbered CRTN-, never shown behind PR-. */
+export const CONSIGNMENT_RETURN_PREFIX = "CRTN-";
 
 /** The retired prefix. Kept named so a stored `PRTN-1001` is re-presented
  *  rather than printed raw — and so nothing has to guess what it meant. */
@@ -42,7 +44,7 @@ const RETIRED_PURCHASE_RETURN_PREFIX = "PRTN-";
 export function purchaseReturnNo(stored: string | null | undefined): string {
   const raw = (stored ?? "").trim();
   if (!raw) return PURCHASE_RETURN_NOT_ISSUED;
-  if (raw.startsWith(PURCHASE_RETURN_PREFIX)) return raw;
+  if (raw.startsWith(PURCHASE_RETURN_PREFIX) || raw.startsWith(CONSIGNMENT_RETURN_PREFIX)) return raw;
   if (raw.startsWith(RETIRED_PURCHASE_RETURN_PREFIX)) {
     return PURCHASE_RETURN_PREFIX + raw.slice(RETIRED_PURCHASE_RETURN_PREFIX.length);
   }
@@ -257,6 +259,8 @@ export interface PurchaseReturnListRow {
   id: string;
   /** Stored reference; presented through `purchaseReturnNo`. */
   pr_no: string | null;
+  /** 0706: every Unit was supplier-owned, so this is a Consignment Return (CRTN). */
+  is_consignment?: boolean;
   /** §9.6: "PR Doc Date is the document date, not goods movement." */
   pr_doc_date: string | null;
   supplier_id: string | null;

@@ -26,6 +26,7 @@ vi.mock("@/lib/queries", () => ({
     paymentRegister: () => ["finance", "payment-register"],
   } },
   useRecordPayment: () => ({ mutate: state.mutate, isPending: false }),
+  BACKDATE_WAITING_WORDS: "Sent to the Payment Approver. This payment counts once it is approved.",
 }));
 vi.mock("@/lib/supabase", () => ({
   supabase: { storage: { from: () => ({ upload: state.upload }) } },
@@ -129,6 +130,18 @@ describe("Record payment (§16)", () => {
     expect(input).toMatchObject({ amount: 600, method: "bank", kind: "payment" });
     expect(input.receiptUrl).toMatch(/^orders-attachments\/orders\/o1\/payments\//);
     expect(input.idempotencyKey).toMatch(/^[0-9a-f-]{36}$/);
+  });
+  it("0707 — a payment the server holds for the Payment Approver is not called recorded", async () => {
+    state.mutate.mockImplementation((_input: unknown, cb: { onSuccess: (o: unknown) => void }) =>
+      cb.onSuccess({ pendingApproval: true, request: { id: "r1", status: "waiting" } }));
+    show();
+    const file = new File(["slip"], "slip.jpg", { type: "image/jpeg" });
+    fireEvent.change(screen.getByLabelText("Transfer slip"), { target: { files: [file] } });
+    typeBankReference();
+    fireEvent.click(screen.getByRole("button", { name: "Review payment" }));
+    fireEvent.click(screen.getByRole("button", { name: "Record payment" }));
+    await waitFor(() => expect(screen.getByText("Waiting for the Payment Approver")).toBeInTheDocument());
+    expect(screen.queryByText("Payment recorded")).not.toBeInTheDocument();
   });
   it("a cheque needs its number and the cheque photo word", () => {
     show();

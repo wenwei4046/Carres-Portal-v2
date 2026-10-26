@@ -264,6 +264,33 @@ describe("booking confirm — the door that completes the gate issues the docume
     expect(t.orders.update).toHaveBeenCalledWith({ do_number: null });
   });
 
+  it("an undated office DO (0710) gets the booking's date and KEEPS its number — the Houzs way", async () => {
+    const OFFICE = "DO2610-0710";
+    const t = tables({
+      orderDoNumber: OFFICE,
+      documentRow: {
+        id: "00000000-0000-0000-0000-0000000d0710",
+        do_number: OFFICE,
+        delivery_date: null, // opened by the office before the booking
+        time_slot: null,
+        voided_at: null,
+      },
+      attemptRows: [],
+    });
+    const sb = makeSb(t);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post(await makeJwt("operation"));
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("delivery_document_date_fill", {
+      p_do_id: "00000000-0000-0000-0000-0000000d0710",
+      p_date: OK_BODY.confirmedDate,
+      p_time_slot: OK_BODY.confirmedTimeSlot,
+    });
+    expect(sb.rpc).not.toHaveBeenCalledWith("delivery_order_void", expect.anything());
+    expect(t.orders.update).not.toHaveBeenCalledWith({ do_number: null });
+  });
+
   it("card §6 — a FAILED document is never voided; it keeps its exception and simply stops being active", async () => {
     const OLD = "DO-170826-9999";
     const t = tables({

@@ -75,6 +75,10 @@ export function supplierClaimLegacyWords(c: { carres_execution?: string | null; 
 export const RECORD_WHAT_CARRES_DOES_NEXT = "Record what Carres does next";
 export const WHAT_CARRES_DOES_NOT_RECORDED = "What Carres does · Not recorded";
 export const ISSUE_PURCHASE_RETURN = "Issue Purchase Return";
+/** 0706 §2 (Houzs way, Weisiang 2026-10-22): the claimless door's verb. */
+export const ISSUE_CONSIGNMENT_RETURN = "Issue Consignment Return";
+/** 0706 §2: the Consignment Returns register's create button. */
+export const NEW_CONSIGNMENT_RETURN = "New Consignment Return";
 export const RETURN_DOCUMENT_SENT = "Return document sent to supplier";
 export const NO_RETURN_WAS_ISSUED = "No return was issued.";
 
@@ -159,9 +163,13 @@ export interface PurchaseReturnIssueUnit {
 }
 
 export interface PurchaseReturnIssueSource {
-  /** null = `New Purchase Return` with no claim — Weisiang's decision (Mr Lim,
-   *  WhatsApp 2026-10-22), overturning Jess's "only after an approved claim". */
+  /** null = a return with no claim: `New Purchase Return` (Weisiang's decision,
+   *  Mr Lim, WhatsApp 2026-10-22, overturning Jess's "only after an approved
+   *  claim"), or a claimless Consignment Return (0706 §2, `consignment`). */
   claim_id: string | null;
+  /** 0706 §2: true when this source is for a claimless Consignment Return. */
+  consignment?: boolean;
+  /** The supplier a claimless return is issued to. */
   supplier_id?: string;
   claim_no: string | null;
   supplier_name: string | null;
@@ -210,6 +218,8 @@ export function purchaseReturnIssueMissing(source: PurchaseReturnIssueSource, pi
 export interface PurchaseReturnPrintData {
   /** null while issuing: the preview is the document it WILL be. */
   pr_no: string | null;
+  /** 0706: prints CONSIGNMENT RETURN over GOING BACK goods. */
+  is_consignment?: boolean;
   pr_doc_date: string;
   supplier: { name: string; contact: string | null };
   return_to: string | null;
