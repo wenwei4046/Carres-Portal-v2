@@ -11,6 +11,10 @@
  * A row opens its Sales Order, where the existing decision panel shows the
  * Before / After and its impact and records `Approve and apply` or `Reject`
  * (0564). The queue itself writes nothing.
+ *
+ * Follows Houzs frontend/src/pages/scm-v2/Amendments.tsx:1-4 (one queue of every
+ * amendment, Requested first) per Weisiang's ruling (2026-10-22): clear Carres
+ * rules, implement Houzs.
  */
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";

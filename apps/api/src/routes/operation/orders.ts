@@ -1188,6 +1188,10 @@ operationOrdersRouter.get("/monthly-demand", requireOperation, async (c) => {
    Waiting rows are read on their own, unlimited (one live amendment per order,
    0334 `amendments_one_live_per_order`), so an old waiting one is never cut
    off by the history cap.
+   Follows Houzs backend/src/scm/routes/so-amendments.ts:305 (`GET /`, one list
+   across orders) and frontend/src/pages/scm-v2/Amendments.tsx:2-3 (waiting
+   first, newest first) per Weisiang's ruling (2026-10-22): clear Carres rules,
+   implement Houzs.
    ponytail: decided history is the newest 1000 only; page it when it outgrows that. */
 const AMENDMENT_WAITING = ["submitted", "issued", "accepted"];
 const AMENDMENT_DECIDED = ["applied", "rejected", "withdrawn"];
