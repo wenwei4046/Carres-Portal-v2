@@ -5788,6 +5788,10 @@ export type PoChangeRequestRow = {
   status: "requested" | "first_approved" | "approved" | "rejected";
   requested_at: string; first_approved_at: string | null; decided_at: string | null; decision_note: string | null;
   supplier_name: string | null; requested_by_name: string | null; first_approved_by_name: string | null; decided_by_name: string | null;
+  /** YH 2026-10-26: the signed-in person filed it — another approver decides. */
+  mine: boolean;
+  /** A goods cancellation's supplier facts, as sent for approval; null otherwise. */
+  supplier_facts: { supplierStatement: string; fee: string; shipped: boolean | null; evidence: string[] } | null;
 };
 export function usePoChangeRequests(kind: "amendment" | "cancellation") {
   return useQuery({

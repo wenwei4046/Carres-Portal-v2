@@ -19,6 +19,11 @@
 --                     never today's Purchasing Approver),
 --                     level 2 Purchasing Approver, a different person, then
 --                     the existing cancel engine operation_cancel_po runs.
+--       "Purchasing Approver" here is any active Principal person — the role
+--       the duty requires — so the duty holder's own request is decided by
+--       another Principal (YH, chat 2026-10-26: "another person with
+--       equivalent permissions ... or more permissions"; Houzs gates on the
+--       approve permission, not one holder).
 --     Nobody decides their own request. The engine runs in the SAME
 --     transaction: if it refuses, the approval is not recorded either.
 -- 4 · The engines are no longer executable by signed-in callers, so the
@@ -141,8 +146,13 @@ begin
     end if;
     v_final := false;
   else
-    -- Amendment, or cancellation level 2 · Purchasing Approver.
-    perform public.purchasing_approver_gate();
+    -- Amendment, or cancellation level 2 · any active Principal person: today's
+    -- Purchasing Approver or another one with the same permission (see header).
+    if not public.is_operation() or not public.workspace_is_person(v_uid)
+       or public.app_role()::text is distinct from 'principal' then
+      raise exception 'Only the Purchasing Approver or another Principal gives this approval.'
+        using errcode = '42501', detail = 'not_purchase_approver';
+    end if;
     if v_uid is not distinct from r.first_approved_by then
       raise exception 'The second approval must be another person.' using errcode = '42501', detail = 'same_approver';
     end if;

@@ -1182,6 +1182,12 @@ Change text: `{SKU}: Qty {was} to {now}` (`, Deliver To changes`) · `{SKU}: can
 `Whole PO`. Refusals: `You cannot decide your own request.` · `Only PO Duty or its cover gives the
 first approval.` · `The second approval must be another person.` · `This purchase order already
 has a request waiting for approval.` · `Say why this request is rejected.`
+YH (chat, 2026-10-26): the requester's own open request reads `Waiting for another approver`
+(row status, dialog, PO flag). Cancellation columns add `Supplier reply` · `Fee` · `Shipped` ·
+`Evidence` (`{n} file` / `{n} files`); values reuse the cancel form's words. Row column `Actions`
+(`Approve` · `Reject`, opening the row dialog). Dialog link `Open {PO No}`. A PO with a waiting
+request shows the request's status word on the PO list Status cell and the PO page, linked to it.
+Refusal: `Only the Purchasing Approver or another Principal gives this approval.`
 
 ### Showroom navigation — owner ruling 2026-10-02
 

@@ -90,6 +90,7 @@ import {
 import { workspaceDutyActor } from "../workspace-duty-owner";
 import { useOfficeDays } from "@/lib/deadline-queries";
 import PurchasingTabs from "../PurchasingTabs";
+import { PoWaitingFlags, useWaitingPoChangeRequests } from "../OperationPoChangeRequests";
 import { CHANNEL_WORD, refreshPurchasingReads } from "../components/PoIssueEvidence";
 import { PoSupplierResultContent } from "../so-batch/PoSupplierResultPanel";
 import ChangeDeliverToForm from "./ChangeDeliverToForm";
@@ -464,6 +465,8 @@ export default function PurchaseOrdersPage() {
   const warehouseQ = useOperationWarehouse();
   const dutyQ = useWorkspaceDuties();
   const poDutyActor = workspaceDutyActor(dutyQ.data, "po_duty");
+  /* 0717 · YH 2026-10-26: a PO with a request waiting for approval says so. */
+  const waitingByPo = useWaitingPoChangeRequests();
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -1195,6 +1198,7 @@ export default function PurchaseOrdersPage() {
               : state === "Completed" ? <StatusPill tone="success">{state}</StatusPill>
               : <span className="text-body text-c-tab">{state}</span>}
             {note ? <span className={`break-words text-meta ${note.warn ? "text-c-warn-fg" : "text-c-secondary"}`}>{note.text}</span> : null}
+            <PoWaitingFlags waiting={waitingByPo.get(row.id)} />
           </span>
         );
       },
@@ -2054,6 +2058,13 @@ function CurrentAction({ row, owner, onIssue }: { row: RegisterRow; owner: { use
   );
 }
 
+/** 0717 · YH 2026-10-26: the request this PO waits on, linked to its queue. */
+function WaitingForApproval({ poId }: { poId: string }) {
+  const waiting = useWaitingPoChangeRequests().get(poId);
+  if (!waiting?.length) return null;
+  return <div className="flex flex-wrap gap-3 rounded-control border border-kit-slate-5 px-3 py-2" data-testid="po-object-waiting"><PoWaitingFlags waiting={waiting} /></div>;
+}
+
 function DocumentView({ row, owner, onIssue, units, receiving, claims, destinations, unitLoading, receivingLoading, claimsLoading, unitError, receivingError, claimsError, onRetryUnits, onRetryReceiving, onRetryClaims, onSupplierDateSaved }: {
   row: RegisterRow;
   owner: { userId: string; name: string | null } | null;
@@ -2103,6 +2114,7 @@ function DocumentView({ row, owner, onIssue, units, receiving, claims, destinati
     <div className="grid min-h-0 grid-cols-1 gap-3 p-3 sm:p-4 min-[1130px]:h-full min-[1130px]:grid-cols-2" data-testid="po-document-panes" data-layout="50-50">
       <div className="flex min-w-0 flex-col gap-3 min-[1130px]:min-h-0 min-[1130px]:overflow-y-auto" data-testid="po-document-facts-pane">
       <CurrentAction row={row} owner={owner} onIssue={onIssue} />
+      <WaitingForApproval poId={po.id} />
       <Block title="Purchase order">
         {/* The Sales Order fact grammar (owner, 2026-09-26): label over a
             boxed value, three to a row, 12px gaps — "got box … I want follow":

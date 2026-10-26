@@ -3505,7 +3505,7 @@ describe("PO saved sending screenshot reader", () => {
 describe("PO change requests (0717)",()=> {
  it("decides through the one SQL door and names who acted on the list",async()=> {
   const rpc=vi.fn(async(name:string)=>name==="actor_display_names"?{data:[{id:"u1",name:"Ah Mei"}],error:null}:{data:{id:"r1",status:"first_approved"},error:null});
-  const order=vi.fn(()=>({limit:async()=>({data:[{id:"r1",po_id:"PO-1",requested_by:"u1",first_approved_by:null,decided_by:null,purchase_orders:{suppliers:{name:"TEST Supplier"}}}],error:null})}));
+  const order=vi.fn(()=>({limit:async()=>({data:[{id:"r1",po_id:"PO-1",requested_by:"u1",first_approved_by:null,decided_by:null,payload:{action:"complete",supplierFacts:{supplierStatement:"agreed",fee:"no",shipped:false,evidence:["TEST.pdf"]}},purchase_orders:{suppliers:{name:"TEST Supplier"}}},{id:"r2",po_id:"PO-2",requested_by:"11111111-1111-1111-1111-000000000999",first_approved_by:null,decided_by:null,payload:{},purchase_orders:null}],error:null})}));
   const from=vi.fn((table:string)=>table==="salespersons"?{select:()=>({in:async()=>({data:[],error:null})})}:{select:()=>({eq:()=>({order})})});
   vi.mocked(userClient).mockReturnValue({rpc,from} as never);
   const token=await makeJwt("operation");
@@ -3515,6 +3515,9 @@ describe("PO change requests (0717)",()=> {
   expect(bad.status).toBe(422);
   const list=await app.fetch(new Request("https://api.test/api/operation/pos/change-requests?kind=cancellation",{headers:{Authorization:`Bearer ${token}`}}),env);
   expect(list.status).toBe(200);expect(from).toHaveBeenCalledWith("po_change_requests");
-  expect(((await list.json()) as {requests:unknown[]}).requests[0]).toMatchObject({id:"r1",supplier_name:"TEST Supplier",requested_by_name:"Ah Mei"});
+  const requests=((await list.json()) as {requests:Array<Record<string,unknown>>}).requests;
+  expect(requests[0]).toMatchObject({id:"r1",supplier_name:"TEST Supplier",requested_by_name:"Ah Mei",mine:false,supplier_facts:{supplierStatement:"agreed",fee:"no",shipped:false,evidence:["TEST.pdf"]}});
+  // YH 2026-10-26: the requester's own row says so; the raw payload stays server-side.
+  expect(requests[1]).toMatchObject({id:"r2",mine:true,supplier_facts:null});expect(requests[0]).not.toHaveProperty("payload");
  });
 });

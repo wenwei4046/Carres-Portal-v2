@@ -2336,7 +2336,7 @@ operationPosRouter.get("/change-requests", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb
     .from("po_change_requests")
-    .select("id, po_id, reason, summary, status, requested_by, requested_at, first_approved_by, first_approved_at, decided_by, decided_at, decision_note, purchase_orders(suppliers(name))")
+    .select("id, po_id, reason, summary, payload, status, requested_by, requested_at, first_approved_by, first_approved_at, decided_by, decided_at, decision_note, purchase_orders(suppliers(name))")
     .eq("kind", kind)
     .order("requested_at", { ascending: false })
     .limit(500);
@@ -2344,12 +2344,16 @@ operationPosRouter.get("/change-requests", requireOperation, async (c) => {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
-  const rows = (data ?? []) as unknown as Array<Record<string, unknown> & { purchase_orders?: { suppliers?: { name?: string } | null } | null }>;
+  const rows = (data ?? []) as unknown as Array<Record<string, unknown> & { payload?: unknown; purchase_orders?: { suppliers?: { name?: string } | null } | null }>;
   const names = await resolveActorNames(sb, rows.flatMap((r) => [r.requested_by, r.first_approved_by, r.decided_by] as Array<string | null>));
   const name = (id: unknown) => (typeof id === "string" ? names.get(id) ?? null : null);
   return c.json({
-    requests: rows.map(({ purchase_orders, ...r }) => ({
+    // YH, chat 2026-10-26: approvers see the request in full (the supplier
+    // facts a cancellation carries), and the requester sees it is theirs.
+    requests: rows.map(({ purchase_orders, payload, ...r }) => ({
       ...r,
+      mine: r.requested_by === c.var.auth.id,
+      supplier_facts: (payload as { supplierFacts?: unknown } | null)?.supplierFacts ?? null,
       supplier_name: purchase_orders?.suppliers?.name ?? null,
       requested_by_name: name(r.requested_by),
       first_approved_by_name: name(r.first_approved_by),

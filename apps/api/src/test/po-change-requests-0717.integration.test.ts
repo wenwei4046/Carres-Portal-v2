@@ -12,6 +12,7 @@ import pg from "pg";
  *   engines   signed-in staff can no longer run the revise / cancel engines
  *   amend     request → Purchasing Approver approves → the existing revise runs
  *   own       nobody decides their own request
+ *   cover     another Principal decides the Approver's own request (YH 2026-10-26)
  *   cancel    request → PO Duty level 1 → Purchasing Approver level 2 → cancel runs
  *   refusal   an engine refusal rolls the approval back
  *   record    supplier facts stay direct; `complete` is refused there
@@ -29,6 +30,7 @@ const uid = (tail: string) => `fffffff7-0717-4000-8000-${HEX}${tail.padStart(7, 
 const OP = uid("1");
 const DUTY = uid("2");
 const JESS = uid("3");
+const PRINCIPAL2 = uid("4");
 const SUPPLIER = uid("51");
 const WH = uid("61");
 const PO_A = `PO-IT717A-${HEX}`;
@@ -74,7 +76,7 @@ describe.skipIf(!URL)("PO amendment and cancellation queues (real PostgreSQL, 07
     await db.connect();
     await q("begin");
     await q("set local session_replication_role = replica");
-    for (const [id, role, name] of [[OP, "operation", "IT office"], [DUTY, "operation", "IT duty"], [JESS, "principal", "IT approver"]] as const) {
+    for (const [id, role, name] of [[OP, "operation", "IT office"], [DUTY, "operation", "IT duty"], [JESS, "principal", "IT approver"], [PRINCIPAL2, "principal", "IT principal"]] as const) {
       const email = `it-0717-${name.replace(" ", "")}-${RUN}@carres.test`;
       await q("insert into auth.users (id, email) values ($1, $2)", [id, email]);
       await q("insert into app_users (id, email, name, role, status, is_person) values ($1, $2, $3, $4, 'active', true)", [id, email, name, role]);
@@ -190,6 +192,22 @@ describe.skipIf(!URL)("PO amendment and cancellation queues (real PostgreSQL, 07
     expect((await decide(id, false, "Supplier did not ask")).ok).toBe(true);
     expect(await statusOf(id)).toBe("rejected");
     expect((await q("select qty from purchase_order_lines where id = $1", [LINE_A])).rows[0].qty).toBe(3);
+  });
+
+  it("the Approver's own request is decided by another Principal, never by the Approver (YH 2026-10-26)", async () => {
+    await as(JESS);
+    const filed = await request("amendment", PO_A, [{ line_id: LINE_A, qty: 2, destination_id: null }]);
+    expect(filed.ok, filed.ok ? "" : filed.why).toBe(true);
+    const id = idOf(filed);
+    await as(JESS);
+    expect(((await decide(id, true)) as { detail: string }).detail).toBe("own_request");
+    await as(OP);
+    expect(((await decide(id, true)) as { detail: string }).detail).toBe("not_purchase_approver");
+    await as(PRINCIPAL2);
+    const approved = await decide(id, true);
+    expect(approved.ok, approved.ok ? "" : approved.why).toBe(true);
+    expect(await statusOf(id)).toBe("approved");
+    expect((await q("select qty from purchase_order_lines where id = $1", [LINE_A])).rows[0].qty).toBe(2);
   });
 
   it("supplier facts stay direct; `complete` must go through the queue", async () => {
