@@ -120,6 +120,14 @@ describe.skipIf(!DB_URL)("Consignment Return numbering (real PostgreSQL, 0706)",
         [id, WH, code(n), claim, po ?? PO, supplier ? "supplier_consignment" : "carres_owned", supplier],
       );
     }
+    // 0706 §2: free stock with no claim (Houzs-way claimless Consignment Return).
+    for (const [id, n, own, po] of [[uid("c1"), 201, "supplier_consignment", PO], [uid("c2"), 202, "carres_owned", PO], [uid("c3"), 203, "supplier_consignment", PO2]] as const) {
+      await q(
+        `insert into ops_stock_items (id, sku, warehouse_id, status, unit_code, identity_scope, qty, po_no, ownership, supplier)
+         values ($1, 'IT-SKU', $2, 'free', $3, 'unit', 1, $4, $5, $6)`,
+        [id, WH, code(n), po, own, own === "carres_owned" ? null : `IT Hooka ${HEX}`],
+      );
+    }
     // Each billed Unit: received on a GRN, on a confirmed bill line for its PO line.
     for (const [pol, grn, bill, unit, n] of [[POL_P, GRN_P, BILL_P, uid("b9"), "P"], [POL_C, GRN_C, BILL_C, uid("ba"), "C"]] as const) {
       await q("insert into purchase_order_lines (id, po_id, sku, qty) values ($1, $2, 'IT-SKU-' || $3, 1)", [pol, PO, n]);
@@ -207,5 +215,59 @@ describe.skipIf(!DB_URL)("Consignment Return numbering (real PostgreSQL, 0706)",
     const n = async (id: string) => (await q("select count(*)::int as n from supplier_note_followups where purchase_return_id = $1", [id])).rows[0].n as number;
     expect(await n(pr.id)).toBe(1);
     expect(await n(cr.id)).toBe(0);
+  });
+
+  // Follows Houzs backend/src/scm/routes/purchase-consignment-returns.ts:442 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+  async function issueDirect(supplier: string, units: string[]): Promise<Result> {
+    await q("reset role");
+    const seen = new Map(
+      (await q("select id, updated_at::text as t from ops_stock_items where id = any($1::uuid[])", [units])).rows.map((r) => [r.id as string, r.t as string]),
+    );
+    await as(DUTY);
+    await q("savepoint s");
+    try {
+      const body = JSON.stringify(units.map((id) => ({ stock_item_id: id, seen: seen.get(id) })));
+      const r = await q("select public.purchasing_issue_consignment_return($1, $2::jsonb, null) as id", [supplier, body]);
+      await q("release savepoint s");
+      return { ok: true, id: r.rows[0].id as string };
+    } catch (e) {
+      await q("rollback to savepoint s");
+      const err = e as { message: string; detail?: string };
+      return { ok: false, why: err.message, detail: err.detail ?? "" };
+    }
+  }
+
+  it("the picker lists the supplier's free consigned Unit as returnable and a held one with its refusal", async () => {
+    await as(DUTY);
+    const rows = (await q("select stock_item_id, refusal from public.consignment_return_eligible_units($1)", [SUPPLIER])).rows as Array<{ stock_item_id: string; refusal: string | null }>;
+    expect(rows.find((r) => r.stock_item_id === uid("c1"))?.refusal).toBeNull();
+    expect(rows.find((r) => r.stock_item_id === uid("b4"))?.refusal).toBe("On a Supplier Claim");
+    expect(rows.some((r) => r.stock_item_id === uid("c2") || r.stock_item_id === uid("c3"))).toBe(false);
+  });
+
+  it("a Consignment Return starts straight from consigned stock, with no claim", async () => {
+    const r = await issueDirect(SUPPLIER, [uid("c1")]);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    await q("reset role");
+    const d = (await q("select pr_no, is_consignment, supplier_claim_id from purchase_returns where id = $1", [r.id])).rows[0];
+    expect(d.pr_no).toMatch(/^CRTN-/);
+    expect(d.is_consignment).toBe(true);
+    expect(d.supplier_claim_id).toBeNull();
+  });
+
+  it("a claimless return refuses Carres-owned stock, another supplier's goods and a Unit on a claim", async () => {
+    for (const [unit, why] of [[uid("c2"), "Carres-owned stock"], [uid("c3"), "Not this supplier's goods"], [uid("b4"), "On a Supplier Claim"]] as const) {
+      const r = await issueDirect(SUPPLIER, [unit]);
+      expect(r.ok ? "" : r.detail).toBe("unit_not_eligible");
+      expect(r.ok ? "" : r.why).toContain(why);
+    }
+  });
+
+  it("a Purchase Return of Carres goods can never be claimless", async () => {
+    await q("reset role");
+    await q("savepoint s");
+    await expect(q("insert into purchase_returns (supplier_id, pr_no) values ($1, 'PR-IT-NOCLAIM')", [SUPPLIER])).rejects.toThrow("purchase_returns_claim_or_consignment");
+    await q("rollback to savepoint s");
   });
 });

@@ -4070,6 +4070,18 @@ export function usePurchaseReturnIssueSource(claimId: string | null) {
   });
 }
 
+/** 0706 §2: the claimless Consignment Return form's facts for one supplier,
+ *  read fresh each time (the `seen` token is only as good as its read). */
+export function useConsignmentReturnSource(supplierId: string | null) {
+  return useQuery({
+    queryKey: ["operation", "purchase-returns", "consignment-source", supplierId] as const,
+    enabled: Boolean(supplierId),
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+    queryFn: () => apiFetch<{ source: PurchaseReturnIssueSource }>(`/api/operation/purchase-returns/consignment-source?supplier=${encodeURIComponent(supplierId ?? "")}`),
+  });
+}
+
 /** A Purchase Return write (issue · send · pickup confirmation) or the claim's
  *  `Record what Carres does next`, refreshing the claim and return reads. A
  *  refusal is the door's own words. */

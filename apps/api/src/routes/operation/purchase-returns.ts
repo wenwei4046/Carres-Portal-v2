@@ -320,13 +320,8 @@ async function readIssueSource(c: Context<AppEnv>, claimId: string): Promise<{ s
   ]);
   for (const r of [supplier, grn, units]) if (r.error) return { source: null, error: r.error };
   const unitRows = ((units.data ?? []) as Row[]);
-  const skus = [...new Set(unitRows.map((u) => u.sku as string).filter(Boolean))];
-  const catalog = await readAllIn(skus, (b, f, t) => sb.from("product_skus").select("sku, variant, product_models(name, category)").in("sku", b).range(f, t));
-  if (catalog.error) return { source: null, error: catalog.error };
-  const bySku = new Map(catalog.rows.map((r) => {
-    const model = (Array.isArray(r.product_models) ? (r.product_models as Row[])[0] : r.product_models) as Row | null;
-    return [r.sku as string, { item: str(model?.name), category: str(model?.category), spec: str(r.variant) }];
-  }));
+  const mapped = await unitsWithCatalog(sb, unitRows);
+  if (mapped.error) return { source: null, error: mapped.error };
   const s = supplier.data as { name?: string | null; return_address?: string | null; address?: string | null } | null;
   return {
     source: {
@@ -336,7 +331,24 @@ async function readIssueSource(c: Context<AppEnv>, claimId: string): Promise<{ s
       // Owner ruling 2026-09-29: the door's own resolution, shown with its source.
       ...purchaseReturnResolvedReturnTo(s ?? {}),
       grn_no: str((grn.data as Row | null)?.grn_no),
-      units: unitRows.map((u) => {
+      units: mapped.units,
+    },
+    error: null,
+  };
+}
+
+/** Each eligible Unit with its catalog snapshot (Category · Items), read here,
+ *  never taken from the browser. Shared by the claim door and 0706 §2. */
+async function unitsWithCatalog(sb: ReturnType<typeof userClient>, unitRows: Row[]): Promise<{ units: PurchaseReturnIssueSource["units"]; error: unknown }> {
+  const skus = [...new Set(unitRows.map((u) => u.sku as string).filter(Boolean))];
+  const catalog = await readAllIn(skus, (b, f, t) => sb.from("product_skus").select("sku, variant, product_models(name, category)").in("sku", b).range(f, t));
+  if (catalog.error) return { units: [], error: catalog.error };
+  const bySku = new Map(catalog.rows.map((r) => {
+    const model = (Array.isArray(r.product_models) ? (r.product_models as Row[])[0] : r.product_models) as Row | null;
+    return [r.sku as string, { item: str(model?.name), category: str(model?.category), spec: str(r.variant) }];
+  }));
+  return {
+    units: unitRows.map((u) => {
         const cat = bySku.get(u.sku as string);
         return {
           stock_item_id: u.stock_item_id as string,
@@ -350,7 +362,28 @@ async function readIssueSource(c: Context<AppEnv>, claimId: string): Promise<{ s
           refusal: str(u.refusal),
         };
       }),
-    },
+    error: null,
+  };
+}
+
+/** 0706 §2: the claimless Consignment Return form's facts — the supplier's
+ *  consigned Units with the door's own refusal words. Follows Houzs
+ *  backend/src/scm/routes/purchase-consignment-returns.ts:323-356 (the
+ *  returnable-receive-lines picker) per Weisiang's ruling (2026-10-22): clear
+ *  Carres rules, implement Houzs. */
+async function readConsignmentSource(c: Context<AppEnv>, supplierId: string): Promise<{ source: PurchaseReturnIssueSource | null; error: unknown }> {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const [supplier, units] = await Promise.all([
+    sb.from("suppliers").select("name, return_address, address").eq("id", supplierId).maybeSingle(),
+    sb.rpc("consignment_return_eligible_units", { p_supplier: supplierId }),
+  ]);
+  for (const r of [supplier, units]) if (r.error) return { source: null, error: r.error };
+  if (!supplier.data) return { source: null, error: null };
+  const mapped = await unitsWithCatalog(sb, (units.data ?? []) as Row[]);
+  if (mapped.error) return { source: null, error: mapped.error };
+  const s = supplier.data as { name?: string | null; return_address?: string | null; address?: string | null };
+  return {
+    source: { claim_id: null, supplier_id: supplierId, claim_no: null, supplier_name: s.name ?? null, ...purchaseReturnResolvedReturnTo(s), grn_no: null, units: mapped.units },
     error: null,
   };
 }
@@ -362,6 +395,16 @@ purchaseReturnsRouter.get("/issue-source", async (c) => {
   const { source, error } = await readIssueSource(c, claimId);
   if (error) return failDoor(c, error as never);
   if (!source) throw new HTTPException(404, { message: "claim not found" });
+  return c.json({ source });
+});
+
+purchaseReturnsRouter.get("/consignment-source", async (c) => {
+  gate(c);
+  const supplierId = c.req.query("supplier")?.trim() ?? "";
+  if (!/^[0-9a-f-]{36}$/i.test(supplierId)) return c.json({ error: "invalid_input", code: "invalid_param", message: "supplier is required" }, 422);
+  const { source, error } = await readConsignmentSource(c, supplierId);
+  if (error) return failDoor(c, error as never);
+  if (!source) throw new HTTPException(404, { message: "supplier not found" });
   return c.json({ source });
 });
 
@@ -398,6 +441,35 @@ purchaseReturnsRouter.post("/", purchaseReturnWorkCompletion("issue"), async (c)
   });
   const { data, error: doorError } = await userClient(c.env, c.var.auth.jwt).rpc("purchasing_issue_purchase_return", {
     p_claim_id: parsed.data.claim_id,
+    p_units: units,
+    p_confirmed_pickup_date: parsed.data.confirmed_pickup_date ?? null,
+  });
+  if (doorError) return failDoor(c, doorError);
+  return c.json({ id: data as string }, 201);
+});
+
+// ----- POST /consignment — a Consignment Return straight from consigned stock (0706 §2) -----
+// Follows Houzs backend/src/scm/routes/purchase-consignment-returns.ts:442 (a
+// supplier and lines, no claim) per Weisiang's ruling (2026-10-22): clear
+// Carres rules, implement Houzs.
+
+const consignmentIssueSchema = issueSchema.omit({ claim_id: true }).extend({ supplier_id: z.string().uuid() });
+
+// No Work completion: a claimless return answers no Work card (the issue card is a claim's).
+purchaseReturnsRouter.post("/consignment", async (c) => {
+  gate(c);
+  const parsed = await parseJsonBody(c, consignmentIssueSchema);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const { source, error } = await readConsignmentSource(c, parsed.data.supplier_id);
+  if (error) return failDoor(c, error as never);
+  if (!source) throw new HTTPException(404, { message: "supplier not found" });
+  const facts = new Map(source.units.map((u) => [u.stock_item_id, u]));
+  const units = parsed.data.units.map((u) => {
+    const f = facts.get(u.stock_item_id);
+    return { stock_item_id: u.stock_item_id, seen: u.seen, pickup_location: u.pickup_location?.trim() || null, category: f?.category ?? null, item: f?.item ?? null, item_spec: f?.item_spec ?? null };
+  });
+  const { data, error: doorError } = await userClient(c.env, c.var.auth.jwt).rpc("purchasing_issue_consignment_return", {
+    p_supplier_id: parsed.data.supplier_id,
     p_units: units,
     p_confirmed_pickup_date: parsed.data.confirmed_pickup_date ?? null,
   });

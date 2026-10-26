@@ -307,6 +307,38 @@ describe("GET /api/operation/purchase-returns", () => {
     expect(body.returns[0]!.is_consignment).toBe(true);
   });
 
+  // 0706 §2. Follows Houzs backend/src/scm/routes/purchase-consignment-returns.ts:442 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+  it("a claimless Consignment Return calls its own door with the supplier, never the claim door", async () => {
+    const SUP = "11111111-1111-4111-8111-111111111111";
+    const UNIT = "22222222-2222-4222-8222-222222222222";
+    const sb = client();
+    vi.mocked(sb.rpc).mockImplementation((async (name: string) =>
+      name === "purchasing_issue_consignment_return" ? { data: "new-id", error: null } : { data: [], error: null }) as never);
+    const base = sb.from;
+    vi.mocked(sb).from = vi.fn((t: string) => (t === "suppliers"
+      ? { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { name: "Hooka", return_address: "Lot 7" }, error: null }) }) }) }
+      : base(t))) as never;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request("http://t/api/operation/purchase-returns/consignment", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${jwt}`, "content-type": "application/json" },
+      body: JSON.stringify({ supplier_id: SUP, units: [{ stock_item_id: UNIT, seen: "t" }] }),
+    }), env);
+    expect(res.status).toBe(201);
+    const names = vi.mocked(sb.rpc).mock.calls.map((c) => c[0]);
+    expect(names).toContain("purchasing_issue_consignment_return");
+    expect(names).not.toContain("purchasing_issue_purchase_return");
+    const call = vi.mocked(sb.rpc).mock.calls.find((c) => c[0] === "purchasing_issue_consignment_return")!;
+    expect(((call as unknown[])[1] as { p_supplier_id: string }).p_supplier_id).toBe(SUP);
+  });
+
+  it("the claimless form refuses a missing supplier", async () => {
+    const res = await get(client(), "operation", "/consignment-source?supplier=nope");
+    expect(res.status).toBe(422);
+  });
+
   it("offers no door that edits or deletes a return", async () => {
     // Creation is `POST /` onto the ONE SQL door (0548/0609); nothing edits or
     // deletes a return (ERP-ARCHITECTURE law C: a door, never a duplicate).

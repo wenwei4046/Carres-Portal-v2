@@ -455,6 +455,20 @@ describe("the page binds the register to its own read", () => {
     expect(screen.queryByText("No purchase returns.")).toBeNull();
   });
 
+  // Follows Houzs frontend/src/App.tsx:950 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+  it("only the Consignment Returns register offers New Consignment Return (claimless, Houzs way)", () => {
+    returnsQuery.mockReturnValue({ ...idle, data: { returns: [] } });
+    const { unmount } = render(
+      <MemoryRouter initialEntries={["/operation?tab=consignment-returns"]}>
+        <OperationPurchaseReturns consignment />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("button", { name: "New Consignment Return" })).toBeTruthy();
+    unmount();
+    page();
+    expect(screen.queryByRole("button", { name: "New Consignment Return" })).toBeNull();
+  });
+
   it("the Consignment Returns register names its own failure", () => {
     returnsQuery.mockReturnValue({ ...idle, data: undefined, isError: true, error: { message: "boom" } });
     render(
