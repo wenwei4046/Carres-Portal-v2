@@ -16,6 +16,7 @@ import pg from "pg";
  *   cancel    request → PO Duty level 1 → Purchasing Approver level 2 → cancel runs
  *   refusal   an engine refusal rolls the approval back
  *   record    supplier facts stay direct; `complete` is refused there
+ *   withdraw  the requester or an approver pulls an open request back (Houzs)
  *
  *   CARRES_TEST_DATABASE_URL=postgres://postgres@localhost:<port>/<db> pnpm --filter @carres/api test -- 0717
  *
@@ -215,5 +216,27 @@ describe.skipIf(!URL)("PO amendment and cancellation queues (real PostgreSQL, 07
     const r = await attempt("select public.purchasing_record_po_cancellation($1, 'TEST', $2::jsonb)", [PO_A, JSON.stringify({ action: "complete" })]);
     expect(r.ok).toBe(false);
     expect((r as { detail: string }).detail).toBe("approval_required");
+  });
+
+  it("the requester or an approver withdraws an open request; nobody else can (Houzs withdraw)", async () => {
+    const withdraw = (id: string) => attempt("select public.purchasing_withdraw_po_change($1::uuid, null) as r", [id]);
+    await as(OP);
+    const amend = idOf(await request("amendment", PO_A, [{ line_id: LINE_A, qty: 1, destination_id: null }]));
+    await as(DUTY);
+    expect(((await withdraw(amend)) as { detail: string }).detail).toBe("withdraw_forbidden");
+    await as(OP);
+    expect((await withdraw(amend)).ok).toBe(true);
+    expect(await statusOf(amend)).toBe("withdrawn");
+    await as(OP);
+    expect(((await withdraw(amend)) as { detail: string }).detail).toBe("already_decided");
+    // The slot is free again; PO Duty may withdraw a cancellation it would approve.
+    await as(OP);
+    const cancel = idOf(await request("cancellation", PO_A, {}));
+    await as(DUTY);
+    expect((await withdraw(cancel)).ok).toBe(true);
+    expect(await statusOf(cancel)).toBe("withdrawn");
+    await q("reset role");
+    expect((await q("select status from purchase_orders where id = $1", [PO_A])).rows[0].status).toBe("open");
+    expect((await q("select qty from purchase_order_lines where id = $1", [LINE_A])).rows[0].qty).toBe(2);
   });
 });

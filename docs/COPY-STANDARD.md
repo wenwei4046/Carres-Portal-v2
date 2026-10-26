@@ -1188,6 +1188,7 @@ YH (chat, 2026-10-26): the requester's own open request reads `Waiting for anoth
 (`Approve` · `Reject`, opening the row dialog). Dialog link `Open {PO No}`. A PO with a waiting
 request shows the request's status word on the PO list Status cell and the PO page, linked to it.
 Refusal: `Only the Purchasing Approver or another Principal gives this approval.`
+Withdraw (Houzs): dialog button `Withdraw`; status `Withdrawn`; refusal `Only the person who asked, or an approver, can withdraw this request.`
 
 ### Showroom navigation — owner ruling 2026-10-02
 

@@ -2058,7 +2058,9 @@ function CurrentAction({ row, owner, onIssue }: { row: RegisterRow; owner: { use
   );
 }
 
-/** 0717 · YH 2026-10-26: the request this PO waits on, linked to its queue. */
+/** 0717 · YH 2026-10-26: the request this PO waits on, linked to its queue.
+ *  Follows Houzs frontend/src/pages/scm-v2/PurchaseOrderDetailV2.tsx:1402-1430
+ *  per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
 function WaitingForApproval({ poId }: { poId: string }) {
   const waiting = useWaitingPoChangeRequests().get(poId);
   if (!waiting?.length) return null;

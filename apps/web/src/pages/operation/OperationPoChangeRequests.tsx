@@ -22,6 +22,9 @@
  * cancellation's supplier facts, with Approve / Reject on the row (Houzs
  * scm-v2/CancelRequests.tsx "Actions" column). A PO with a waiting request
  * carries a flag on the PO pages linking here (`PoWaitingFlags`).
+ * Follows Houzs CancelRequests.tsx:174 (row Actions), document-cancel-queries.ts:237-254
+ * (approve / withdraw rules) and PurchaseOrderDetailV2.tsx:1402-1430 (PO flag)
+ * per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
  */
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -39,8 +42,8 @@ import PurchasingTabs from "./PurchasingTabs";
 type Kind = "amendment" | "cancellation";
 
 export const PO_CHANGE_STATUS_WORD: Record<Kind, Record<PoChangeRequestRow["status"], string>> = {
-  amendment: { requested: "Waiting for approval", first_approved: "Waiting for approval", approved: "Approved", rejected: "Rejected" },
-  cancellation: { requested: "Waiting for PO Duty", first_approved: "Waiting for Purchasing Approver", approved: "Approved", rejected: "Rejected" },
+  amendment: { requested: "Waiting for approval", first_approved: "Waiting for approval", approved: "Approved", rejected: "Rejected", withdrawn: "Withdrawn" },
+  cancellation: { requested: "Waiting for PO Duty", first_approved: "Waiting for Purchasing Approver", approved: "Approved", rejected: "Rejected", withdrawn: "Withdrawn" },
 };
 const NOUN: Record<Kind, [string, string]> = { amendment: ["amendment", "amendments"], cancellation: ["request", "requests"] };
 const isOpen = (r: PoChangeRequestRow) => r.status === "requested" || r.status === "first_approved";
@@ -100,6 +103,9 @@ export default function OperationPoChangeRequests({ kind }: { kind: Kind }) {
   const word = (r: PoChangeRequestRow) => statusWord(kind, r);
   const openRequest = (r: PoChangeRequestRow) => { setChosenId(r.id); setNote(""); setProblem(null); };
   const canDecide = (r: PoChangeRequestRow) => isOpen(r) && !r.mine;
+  /* Houzs withdraw: the requester or an approver (the server checks which);
+     an amendment only before it is decided. */
+  const canWithdraw = (r: PoChangeRequestRow) => isOpen(r) && (kind === "cancellation" || r.status === "requested");
   const [one, many] = NOUN[kind];
 
   const columns = useMemo<DataGridColumn<PoChangeRequestRow>[]>(() => [
@@ -140,10 +146,10 @@ export default function OperationPoChangeRequests({ kind }: { kind: Kind }) {
     setChosenId(null); setNote(""); setProblem(null);
     if (params.has("request")) setParams((current) => { const next = new URLSearchParams(current); next.delete("request"); return next; }, { replace: true });
   };
-  const act = (approve: boolean) => {
+  const act = (approve: boolean, withdraw = false) => {
     if (!chosen) return;
     setProblem(null);
-    decide.mutate({ id: chosen.id, approve, note: note.trim() || undefined }, {
+    decide.mutate({ id: chosen.id, approve, note: note.trim() || undefined, ...(withdraw ? { withdraw } : {}) }, {
       onSuccess: close,
       onError: (cause) => setProblem((cause as { body?: { message?: string } }).body?.message ?? (cause instanceof Error ? cause.message : "Not confirmed · Try again")),
     });
@@ -176,6 +182,7 @@ export default function OperationPoChangeRequests({ kind }: { kind: Kind }) {
         description={chosen ? word(chosen) : undefined}
         footer={<>
           <Button variant="neutral" onClick={close} disabled={decide.isPending}>Back</Button>
+          {chosen && canWithdraw(chosen) ? <Button variant="neutral" onClick={() => act(false, true)} disabled={decide.isPending}>Withdraw</Button> : null}
           {chosen && canDecide(chosen) ? <>
             <Button variant="neutral" onClick={() => act(false)} disabled={decide.isPending || !note.trim()}>Reject</Button>
             <Button variant="primary" onClick={() => act(true)} disabled={decide.isPending}>Approve</Button>
@@ -191,7 +198,7 @@ export default function OperationPoChangeRequests({ kind }: { kind: Kind }) {
           <Link className="text-meta font-medium text-kit-blue-11 hover:underline" to={`/operation?tab=purchase-orders&po=${encodeURIComponent(chosen.po_id)}`}>Open {chosen.po_id}</Link>
           {chosen.first_approved_by_name ? <div className="text-meta text-kit-slate-11">First approval {chosen.first_approved_by_name} · {fmtDate(chosen.first_approved_at)}</div> : null}
           {chosen.decision_note ? <div><div className="text-meta text-kit-slate-11">Decision reason</div><div>{chosen.decision_note}</div></div> : null}
-          {canDecide(chosen) ? <Textarea id="po-change-decision-reason" label="Decision reason" hint="Needed to reject."
+          {canWithdraw(chosen) ? <Textarea id="po-change-decision-reason" label="Decision reason" hint={canDecide(chosen) ? "Needed to reject." : undefined}
             value={note} onChange={(event) => setNote(event.target.value)} disabled={decide.isPending} /> : null}
           {problem ? <p role="alert" className="text-meta text-kit-red-11">{problem}</p> : null}
         </div> : null}

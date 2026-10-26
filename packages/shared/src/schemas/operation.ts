@@ -843,6 +843,8 @@ export const decidePoChangeInput = z.object({
   note: z.string().trim().max(500).optional(),
 }).strict();
 export type DecidePoChangeInput = z.infer<typeof decidePoChangeInput>;
+/** 0717 — withdraw an open PO change request (the Houzs withdraw); reason optional. */
+export const withdrawPoChangeInput = z.object({ note: z.string().trim().max(500).optional() }).strict();
 
 /**
  * `reservedDrilldownQuery` — GET /api/operation/warehouse/reserved-drilldown

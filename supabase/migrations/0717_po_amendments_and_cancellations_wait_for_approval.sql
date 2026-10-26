@@ -43,7 +43,7 @@ create table public.po_change_requests (
   summary text not null,
   payload jsonb not null,
   status text not null default 'requested'
-    check (status in ('requested','first_approved','approved','rejected')),
+    check (status in ('requested','first_approved','approved','rejected','withdrawn')),
   requested_by uuid not null references public.app_users(id),
   requested_at timestamptz not null default now(),
   first_approved_by uuid references public.app_users(id),
@@ -146,6 +146,7 @@ begin
     end if;
     v_final := false;
   else
+    -- Follows Houzs frontend/src/vendor/scm/lib/document-cancel-queries.ts:237-244 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
     -- Amendment, or cancellation level 2 · any active Principal person: today's
     -- Purchasing Approver or another one with the same permission (see header).
     if not public.is_operation() or not public.workspace_is_person(v_uid)
@@ -194,6 +195,43 @@ begin
 end;
 $fn$;
 
+-- 5 · purchasing_withdraw_po_change: the Houzs withdraw. The requester, or
+--     anyone who could decide it, pulls an open request back; it closes as
+--     `withdrawn`, which frees the one-open-request slot. An amendment only
+--     before it is decided (Houzs backend/src/scm/routes/po-amendments.ts:699-727,
+--     REQUESTED only); a cancellation at either level (Houzs
+--     backend/src/scm/shared/document-cancel.ts:269-277). The reason is optional.
+--     Follows Houzs (files above) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+create or replace function public.purchasing_withdraw_po_change(p_id uuid, p_note text)
+returns jsonb language plpgsql security definer set search_path = public, pg_temp as $fn$
+declare r public.po_change_requests; v_uid uuid := auth.uid(); v_principal boolean;
+begin
+  if not public.is_operation() or not public.workspace_is_person(v_uid) then
+    raise exception 'active authorised staff required' using errcode = '42501', detail = 'forbidden';
+  end if;
+  select * into r from public.po_change_requests where id = p_id for update;
+  if not found then
+    raise exception 'Request not found' using errcode = '22023', detail = 'not_found';
+  end if;
+  if r.status not in ('requested','first_approved') or (r.kind = 'amendment' and r.status <> 'requested') then
+    raise exception 'This request is already decided.' using errcode = '22023', detail = 'already_decided';
+  end if;
+  v_principal := public.app_role()::text = 'principal';
+  if v_uid is distinct from r.requested_by and not v_principal
+     and not (r.kind = 'cancellation' and public.purchasing_po_duty_may_act(v_uid)) then
+    raise exception 'Only the person who asked, or an approver, can withdraw this request.'
+      using errcode = '42501', detail = 'withdraw_forbidden';
+  end if;
+  update public.po_change_requests
+     set status = 'withdrawn', decided_by = v_uid, decided_at = now(),
+         decision_note = nullif(btrim(coalesce(p_note, '')), '')
+   where id = r.id;
+  insert into public.po_history(po_id, text, by_role, by_user_id)
+  values (r.po_id, format('%s withdrawn', initcap(r.kind)), public.app_role(), v_uid);
+  return jsonb_build_object('id', r.id, 'status', 'withdrawn');
+end;
+$fn$;
+
 -- Supplier facts and the commercial exception decision stay direct (§5.8.1);
 -- only `complete` — the act that cancels — waits for the queue.
 create or replace function public.purchasing_record_po_cancellation(p_po_id text, p_reason text, p_cancellation jsonb)
@@ -209,6 +247,8 @@ $fn$;
 revoke all on function public.purchasing_request_po_change(text,text,text,jsonb) from public, anon;
 revoke all on function public.purchasing_decide_po_change(uuid,boolean,text) from public, anon;
 revoke all on function public.purchasing_record_po_cancellation(text,text,jsonb) from public, anon;
+revoke all on function public.purchasing_withdraw_po_change(uuid,text) from public, anon;
+grant execute on function public.purchasing_withdraw_po_change(uuid,text) to authenticated;
 grant execute on function public.purchasing_request_po_change(text,text,text,jsonb) to authenticated;
 grant execute on function public.purchasing_decide_po_change(uuid,boolean,text) to authenticated;
 grant execute on function public.purchasing_record_po_cancellation(text,text,jsonb) to authenticated;

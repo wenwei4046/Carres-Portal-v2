@@ -11,6 +11,7 @@ import {
   assignPickupPartnerInput,
   cancelPoInput,
   decidePoChangeInput,
+  withdrawPoChangeInput,
   chasePoEventInput,
   listPurchaseOrdersQuery,
   normalizeSkuKey,
@@ -2368,6 +2369,21 @@ operationPosRouter.post("/change-requests/:requestId/decide", requireOperation, 
   const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("purchasing_decide_po_change", {
     p_id: c.req.param("requestId"),
     p_approve: parsed.data.approve,
+    p_note: parsed.data.note ?? null,
+  });
+  if (error) return mapSupplierCallError(c, error);
+  return c.json({ request: data });
+});
+
+// Follows Houzs backend/src/scm/routes/po-amendments.ts:699-727 and
+// backend/src/scm/shared/document-cancel.ts:269-277 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+// The Houzs withdraw: the requester, or anyone who could decide it, pulls an
+// open request back (`purchasing_withdraw_po_change` checks who).
+operationPosRouter.post("/change-requests/:requestId/withdraw", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, withdrawPoChangeInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("purchasing_withdraw_po_change", {
+    p_id: c.req.param("requestId"),
     p_note: parsed.data.note ?? null,
   });
   if (error) return mapSupplierCallError(c, error);

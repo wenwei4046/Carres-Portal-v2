@@ -61,5 +61,9 @@ describe("Cancellation Requests", () => {
     expect(dialog).toHaveTextContent("Waiting for another approver");
     expect(within(dialog).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(within(dialog).getByRole("link", { name: "Open PO-TEST-2" })).toHaveAttribute("href", "/operation?tab=purchase-orders&po=PO-TEST-2");
+    // The Houzs withdraw: the requester pulls their own request back.
+    mutate.mockClear();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Withdraw" }));
+    expect(mutate.mock.calls[0][0]).toEqual({ id: "r2", approve: false, note: undefined, withdraw: true });
   });
 });

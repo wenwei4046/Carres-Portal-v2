@@ -5785,7 +5785,7 @@ export function useRevisePo(poId: string | null) {
  *  A PO change waits here; the final approval runs the existing engine. */
 export type PoChangeRequestRow = {
   id: string; po_id: string; reason: string; summary: string;
-  status: "requested" | "first_approved" | "approved" | "rejected";
+  status: "requested" | "first_approved" | "approved" | "rejected" | "withdrawn";
   requested_at: string; first_approved_at: string | null; decided_at: string | null; decision_note: string | null;
   supplier_name: string | null; requested_by_name: string | null; first_approved_by_name: string | null; decided_by_name: string | null;
   /** YH 2026-10-26: the signed-in person filed it — another approver decides. */
@@ -5802,10 +5802,11 @@ export function usePoChangeRequests(kind: "amendment" | "cancellation") {
 export function useDecidePoChange() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, approve, note }: { id: string; approve: boolean; note?: string }) =>
+    /* `withdraw` — the Houzs withdraw (requester or an approver); else a decision. */
+    mutationFn: ({ id, approve, note, withdraw }: { id: string; approve: boolean; note?: string; withdraw?: boolean }) =>
       apiFetch<{ request: { id: string; status: string } }>(
-        `/api/operation/pos/change-requests/${encodeURIComponent(id)}/decide`,
-        { method: "POST", body: JSON.stringify({ approve, ...(note ? { note } : {}) }) },
+        `/api/operation/pos/change-requests/${encodeURIComponent(id)}/${withdraw ? "withdraw" : "decide"}`,
+        { method: "POST", body: JSON.stringify(withdraw ? (note ? { note } : {}) : { approve, ...(note ? { note } : {}) }) },
       ),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["operation", "pos"] });

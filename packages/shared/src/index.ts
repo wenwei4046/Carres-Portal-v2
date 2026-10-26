@@ -566,6 +566,7 @@ export {
   listPurchaseOrdersQuery,
   cancelPoInput,
   decidePoChangeInput,
+  withdrawPoChangeInput,
   listMovementsQuery,
   confirmProceedRequestInputSchema,
   reselectPartnerInput,

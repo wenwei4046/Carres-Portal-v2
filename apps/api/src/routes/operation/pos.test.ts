@@ -3511,6 +3511,8 @@ describe("PO change requests (0717)",()=> {
   const token=await makeJwt("operation");
   const decide=await app.fetch(new Request("https://api.test/api/operation/pos/change-requests/r1/decide",{method:"POST",headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},body:JSON.stringify({approve:true})}),env);
   expect(decide.status).toBe(200);expect(rpc).toHaveBeenCalledWith("purchasing_decide_po_change",{p_id:"r1",p_approve:true,p_note:null});
+  const withdraw=await app.fetch(new Request("https://api.test/api/operation/pos/change-requests/r1/withdraw",{method:"POST",headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},body:JSON.stringify({})}),env);
+  expect(withdraw.status).toBe(200);expect(rpc).toHaveBeenCalledWith("purchasing_withdraw_po_change",{p_id:"r1",p_note:null});
   const bad=await app.fetch(new Request("https://api.test/api/operation/pos/change-requests?kind=price",{headers:{Authorization:`Bearer ${token}`}}),env);
   expect(bad.status).toBe(422);
   const list=await app.fetch(new Request("https://api.test/api/operation/pos/change-requests?kind=cancellation",{headers:{Authorization:`Bearer ${token}`}}),env);
