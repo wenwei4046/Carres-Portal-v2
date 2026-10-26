@@ -87,6 +87,18 @@ describe("applyAddressOverrides", () => {
     expect(out.Johor).toBeUndefined();
   });
 
+  it("hides a renamed name and a postcode under it, by the name the pickers show", () => {
+    const out = applyAddressOverrides(base, [
+      { state: "Selangor", city: "Klang", postcode: null, rename_to: "Kelang", hidden: false },
+      { state: "Selangor", city: "Kelang", postcode: "41050", rename_to: null, hidden: true },
+      { state: "Johor", city: null, postcode: null, rename_to: "Johor Darul Takzim", hidden: false },
+      { state: "Johor Darul Takzim", city: null, postcode: null, rename_to: null, hidden: true },
+    ]);
+    expect(out.Selangor.Kelang).toEqual(["41000"]);
+    expect(out["Johor Darul Takzim"]).toBeUndefined();
+    expect(out.Johor).toBeUndefined();
+  });
+
   it("keeps a saved value the lists no longer offer, so an old order still shows it", () => {
     expect(keepCurrent(["A", "B"], "Z")).toEqual(["A", "B", "Z"]);
     expect(keepCurrent(["A", "B"], "A")).toEqual(["A", "B"]);

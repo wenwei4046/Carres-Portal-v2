@@ -55,7 +55,9 @@ export interface AddressOverride {
  * The lists the pickers offer: the generated national file with the office's
  * overrides on top (Weisiang's decision, Mr Lim, WhatsApp 2026-10-22; Jess was
  * not part of it). Adds first, then hides, then renames (a rename onto an
- * existing name merges the two). Never mutates `base`.
+ * existing name merges the two), then hides again: the form asks for "the
+ * names as the pickers show them", so a hide can name a renamed State or City.
+ * Never mutates `base`.
  */
 export function applyAddressOverrides(base: MalaysiaAddressMap, rows: AddressOverride[]): MalaysiaAddressMap {
   const out: MalaysiaAddressMap = {};
@@ -70,12 +72,15 @@ export function applyAddressOverrides(base: MalaysiaAddressMap, rows: AddressOve
     const codes = (st[r.city] ??= []);
     if (r.postcode && !codes.includes(r.postcode)) codes.push(r.postcode);
   }
-  for (const r of rows) {
-    if (!r.hidden || !out[r.state]) continue;
-    if (!r.city) delete out[r.state];
-    else if (!r.postcode) delete out[r.state][r.city];
-    else if (out[r.state][r.city]) out[r.state][r.city] = out[r.state][r.city].filter((p) => p !== r.postcode);
-  }
+  const hide = () => {
+    for (const r of rows) {
+      if (!r.hidden || !out[r.state]) continue;
+      if (!r.city) delete out[r.state];
+      else if (!r.postcode) delete out[r.state][r.city];
+      else if (out[r.state][r.city]) out[r.state][r.city] = out[r.state][r.city].filter((p) => p !== r.postcode);
+    }
+  };
+  hide();
   for (const r of rows) {
     const to = r.rename_to?.trim();
     if (!to || r.hidden || r.postcode || !out[r.state] || to === (r.city ?? r.state)) continue;
@@ -89,6 +94,7 @@ export function applyAddressOverrides(base: MalaysiaAddressMap, rows: AddressOve
       delete st[r.city];
     }
   }
+  hide();
   return out;
 }
 
