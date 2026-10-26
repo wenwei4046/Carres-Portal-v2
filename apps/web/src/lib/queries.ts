@@ -561,8 +561,8 @@ export const qk = {
     /** §9.6 — the Purchase Returns register. Keyed by the claim it is narrowed
      *  to, so the claim object's own view and the full register never share a
      *  cache entry and show each other's rows. */
-    purchaseReturns: (claim: string | null) =>
-      ["operation", "purchase-returns", claim ?? "all-claims"] as const,
+    purchaseReturns: (claim: string | null, consignment = false) =>
+      ["operation", "purchase-returns", claim ?? "all-claims", consignment ? "consignment" : "purchase"] as const,
     /** R6 — what the warehouse filed and is waiting on. Invalidated by a
      *  check-in, because a check-in IS a receive: the PO row, the claim queue
      *  and this queue all move together. */
@@ -4070,6 +4070,18 @@ export function usePurchaseReturnIssueSource(claimId: string | null) {
   });
 }
 
+/** 0706 §2: the claimless Consignment Return form's facts for one supplier,
+ *  read fresh each time (the `seen` token is only as good as its read). */
+export function useConsignmentReturnSource(supplierId: string | null) {
+  return useQuery({
+    queryKey: ["operation", "purchase-returns", "consignment-source", supplierId] as const,
+    enabled: Boolean(supplierId),
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+    queryFn: () => apiFetch<{ source: PurchaseReturnIssueSource }>(`/api/operation/purchase-returns/consignment-source?supplier=${encodeURIComponent(supplierId ?? "")}`),
+  });
+}
+
 /** A Purchase Return write (issue · send · pickup confirmation) or the claim's
  *  `Record what Carres does next`, refreshing the claim and return reads. A
  *  refusal is the door's own words. */
@@ -4088,14 +4100,18 @@ export function usePurchaseReturnWrite<T = unknown>(path: string) {
 export function useOperationPurchaseReturns(
   claimNo?: string | null,
   opts?: Partial<UseQueryOptions<PurchaseReturnsResponse>>,
+  /** 0706: the Consignment Returns register instead of the Purchase Returns one. */
+  consignment = false,
 ) {
   const claim = claimNo?.trim() || null;
   return useQuery({
-    queryKey: qk.operation.purchaseReturns(claim),
-    queryFn: () =>
-      apiFetch<PurchaseReturnsResponse>(
-        `/api/operation/purchase-returns${claim ? `?claim=${encodeURIComponent(claim)}` : ""}`,
-      ),
+    queryKey: qk.operation.purchaseReturns(claim, consignment),
+    queryFn: () => {
+      const qs = new URLSearchParams();
+      if (claim) qs.set("claim", claim);
+      if (consignment) qs.set("consignment", "1");
+      return apiFetch<PurchaseReturnsResponse>(`/api/operation/purchase-returns${qs.size ? `?${qs}` : ""}`);
+    },
     ...opts,
   });
 }
@@ -4142,7 +4158,7 @@ export interface SupplierClaimRecord {
   units: Array<{ id: string; unit_code: string | null; identity_scope: string; qty: number | null; status: string | null }>;
   requested_by_name: string | null;
   repair_orders: Array<{ id: string; ro_no: string }> | null;
-  purchase_returns: Array<{ id: string; pr_no: string }> | null;
+  purchase_returns: Array<{ id: string; pr_no: string; is_consignment?: boolean }> | null;
   authorised_outcome: string | null;
   plan_repair: { allowed: boolean; missing: string | null };
   /** §9.6 `Record what Carres does next` (0409 value, 0609 gate). */
@@ -6804,6 +6820,32 @@ export function useSalesOrderAmendmentImpact(amendmentId: string | null) {
   });
 }
 
+/** One row of the Amendments queue (Weisiang's decision, Mr Lim, WhatsApp
+ *  2026-10-22: every SO amendment waits for an approver, the Houzs way). */
+export interface AmendmentQueueRow {
+  id: string;
+  orderId: string;
+  so: number | null;
+  customerName: string | null;
+  status: "waiting" | "applied" | "rejected" | "withdrawn";
+  reason: string | null;
+  submittedBy: string | null;
+  submittedAt: string;
+  decidedBy: string | null;
+  decidedAt: string | null;
+  decisionNote: string | null;
+  agreementRecorded: boolean;
+}
+
+/* Under ["operation","sales-order-amendment"], so a decision made on the order
+   (useDecideSalesOrderAmendment below) refreshes the queue too. */
+export function useAmendmentQueue() {
+  return useQuery({
+    queryKey: ["operation", "sales-order-amendment", "queue"],
+    queryFn: () => apiFetch<{ amendments: AmendmentQueueRow[] }>("/api/operation/orders/amendments"),
+  });
+}
+
 export function useDecideSalesOrderAmendment(
   orderId: string,
   opts?: Partial<
@@ -8363,15 +8405,78 @@ function invalidateOrderMoney(
   ]);
 }
 
+/** 0707 — a backdated payment request, waiting for the Payment Approver. */
+export interface PaymentBackdateRequest {
+  id: string;
+  order_id: string;
+  amount: number;
+  paid_on: string;
+  method: string;
+  kind: "payment" | "deposit" | "storage";
+  reference: string | null;
+  receipt_url: string | null;
+  status: "waiting" | "approved" | "refused";
+  requested_by: string;
+  requested_at: string;
+  decided_by: string | null;
+  decided_at: string | null;
+  decision_reason: string | null;
+  payment_id: string | null;
+}
+
+/** 0707 — a paid date more than 14 days back is not recorded: the server
+ *  answers a waiting request instead, and nothing counts until it is approved. */
+export type RecordPaymentResult =
+  | { payment: OrderPaymentRow; pendingApproval?: undefined }
+  | { pendingApproval: true; request: PaymentBackdateRequest; payment?: undefined };
+
+export const BACKDATE_WAITING_WORDS =
+  "Sent to the Payment Approver. This payment counts once it is approved.";
+
+/** The order's backdated payment requests (0707), newest first. */
+export function usePaymentBackdateRequests(orderId: string | null) {
+  return useQuery({
+    queryKey: ["operation", "orders", orderId ?? "null", "payment-backdate"] as const,
+    queryFn: () =>
+      apiFetch<{ requests: PaymentBackdateRequest[] }>(
+        `/api/operation/orders/${orderId}/payment-backdate`,
+      ),
+    enabled: !!orderId,
+    staleTime: 10_000,
+  });
+}
+
+/** Approve or refuse one (0707). The SQL door decides who may: the Payment
+ *  Approver duty or a principal, never the person who asked. */
+export function useDecidePaymentBackdate(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<unknown, ApiError, { requestId: string; approve: boolean; reason?: string; duplicateAck?: boolean }>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, { requestId: string; approve: boolean; reason?: string; duplicateAck?: boolean }>({
+    mutationFn: ({ requestId, ...body }) =>
+      apiFetch(`/api/operation/orders/${orderId}/payment-backdate/${requestId}/decide`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await invalidateOrderMoney(qc, orderId);
+      await qc.invalidateQueries({ queryKey: qk.finance.invoiceRegister(), exact: true });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
 /** Record one payment on the ledger. */
 export function useRecordPayment(
   orderId: string,
-  opts?: Partial<UseMutationOptions<{ payment: OrderPaymentRow }, ApiError, RecordPaymentInput>>,
+  opts?: Partial<UseMutationOptions<RecordPaymentResult, ApiError, RecordPaymentInput>>,
 ) {
   const qc = useQueryClient();
-  return useMutation<{ payment: OrderPaymentRow }, ApiError, RecordPaymentInput>({
+  return useMutation<RecordPaymentResult, ApiError, RecordPaymentInput>({
     mutationFn: (input) =>
-      apiFetch<{ payment: OrderPaymentRow }>(
+      apiFetch<RecordPaymentResult>(
         `/api/operation/orders/${orderId}/payments`,
         { method: "POST", body: JSON.stringify(input) },
       ),
@@ -8410,7 +8515,7 @@ export function useCollectStorage(
   orderId: string,
   opts?: Partial<
     UseMutationOptions<
-      { payment: OrderPaymentRow; control: OpsOrderControl },
+      RecordPaymentResult & { control?: OpsOrderControl },
       ApiError,
       CollectStorageInput
     >
@@ -8418,12 +8523,12 @@ export function useCollectStorage(
 ) {
   const qc = useQueryClient();
   return useMutation<
-    { payment: OrderPaymentRow; control: OpsOrderControl },
+    RecordPaymentResult & { control?: OpsOrderControl },
     ApiError,
     CollectStorageInput
   >({
     mutationFn: (input) =>
-      apiFetch<{ payment: OrderPaymentRow; control: OpsOrderControl }>(
+      apiFetch<RecordPaymentResult & { control?: OpsOrderControl }>(
         `/api/operation/orders/${orderId}/storage/collect`,
         { method: "POST", body: JSON.stringify(input) },
       ),

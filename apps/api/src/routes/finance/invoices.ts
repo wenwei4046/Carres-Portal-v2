@@ -59,6 +59,12 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const INVOICE_REGISTER_SELECT =
   "id,invoice_no,status,kind,amount,tax_amount,issued_at,voided_at,void_reason," +
   "replaces_invoice_id,created_at,order_id," +
+  // The invoice's OWN lines, frozen at issue (0429 snapshot; 0712 office part
+  // invoices add `addons` and `issued_from`). Reports → Sales invoice lines
+  // reads these — follows Houzs backend/src/scm/routes/reports.ts:502-528 per
+  // Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs — and falls back to the live order only when
+  // the snapshot holds no lines (dispatch-issued / pre-0429 invoices).
+  "snapshot_lines:snapshot->lines,snapshot_addons:snapshot->addons,snapshot_from:snapshot->>issued_from," +
   "orders(id,so,customer_name,customer_phone,source_ref,status,paid,delivery_date,delivery_date_tbd,delivered_at," +
   // The Finance Dashboard's A/R Aging counts an order's age from the day it
   // was placed — the same date finance_ar_aging (0062/0125) aged it by.
@@ -71,7 +77,7 @@ const INVOICE_REGISTER_SELECT =
   // earlier payment instead of guessing from a figure alone.
   "order_payments(id,receipt_no,amount,paid_on,voided_at,reference,method)," +
   "payment_communications(id,kind,message_text,template_key,sent_screenshot_url,recorded_at)," +
-  "order_lines(sku,qty,unit_price),order_addons(qty,unit_price)," +
+  "order_lines(sku,qty,unit_price),order_addons(addon_key,qty,unit_price)," +
   // Payment Monitor Card 02 (2026-09-16): the confirmed delivery is
   // DELIVERY'S fact — its Delivery Orders and its arrangement per leg, then
   // the booking overlay only while its stage is `confirmed`. The shared
@@ -432,7 +438,7 @@ financeInvoicesRouter.post("/:id/issue", async (c) => {
   const inv: any = invoice;
   const { data: order, error: ordErr } = await sb
     .from("orders")
-    .select("id,so,customer_name,customer_phone,customer_address,order_lines(sku,qty,unit_price)")
+    .select("id,so,customer_name,customer_phone,customer_address,order_lines(sku,qty,unit_price),order_addons(id,addon_key,qty,unit_price)")
     .eq("id", inv.order_id)
     .maybeSingle();
   if (ordErr) {
@@ -458,6 +464,16 @@ financeInvoicesRouter.post("/:id/issue", async (c) => {
     lines: (ord.order_lines ?? []).map(
       (l: { sku: string; qty: number; unit_price: number | null }) => ({
         sku: l.sku, qty: Number(l.qty), unit_price: Number(l.unit_price ?? 0),
+      })),
+    // Add-ons are frozen too. Follows Houzs backend/src/scm/lib/si-from-do.ts:511
+    // (every billed line, accessories and services included, is copied into
+    // sales_invoice_items) per Weisiang's ruling (2026-10-22): clear Carres
+    // rules, implement Houzs. Same shape as 0712 office invoices and 0726.
+    addons: [...(ord.order_addons ?? [])]
+      .sort((a: { addon_key: string; id: string }, b: { addon_key: string; id: string }) =>
+        a.addon_key.localeCompare(b.addon_key) || a.id.localeCompare(b.id))
+      .map((a: { addon_key: string; qty: number; unit_price: number | null }) => ({
+        addon_key: a.addon_key, qty: Number(a.qty), unit_price: Number(a.unit_price ?? 0),
       })),
   };
   const { data, error } = await sb.rpc("payment_invoice_issue", {

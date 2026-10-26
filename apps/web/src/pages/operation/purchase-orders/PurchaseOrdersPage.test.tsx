@@ -199,6 +199,7 @@ vi.mock("../PurchasingTabs", () => ({
 }));
 
 vi.mock("@/lib/queries", () => ({
+  useCatalog: () => ({ data: undefined, isLoading: false, isError: false }),
   useMonthlyDemandFacts: () => ({ data: { orders: [], toBuyByLine: new Map() }, isLoading: false, isError: false, refetch }),
   useOperationPos: () => ({ data: queryData, isLoading: requiredLoading, isError: false, refetch }),
   useOperationSuppliers: () => ({
@@ -356,6 +357,18 @@ beforeEach(() => {
 /* ⭐ Purchasing MASTER §9.3 (Jess, 2026-09-17): nine columns, four groups,
    the SUPPLIER REPLY / RECEIVING / SUPPLIER / DELIVER TO rail and an ordered-goods category footer. */
 describe("Purchase Orders Register", () => {
+  /* Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office staff open a PO with no source, Houzs way. */
+  it("New Purchase Order opens the create form on the register", async () => {
+    useRealRegisterGrid = true;
+    renderPage();
+    fireEvent.click(await screen.findByTestId("po-new"));
+    const dialog = await screen.findByRole("dialog", { name: "New Purchase Order" });
+    for (const label of ["Supplier", "Supplier Deliver To", "PO Delivery Date", "SKU", "Qty", "Unit Price (RM)", "Note"]) {
+      expect(within(dialog).getAllByText(label).length).toBeGreaterThan(0);
+    }
+    expect(within(dialog).getByRole("button", { name: "Issue PO" })).toBeDisabled();
+  });
+
   /* ONE ROW MENU — owner ruling 2026-10-05: `View · Print`. */
   it("the row menu reads View · Print; View opens the read-first PO page", async () => {
     useRealRegisterGrid = true;

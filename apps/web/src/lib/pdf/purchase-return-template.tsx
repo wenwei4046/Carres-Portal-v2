@@ -253,6 +253,7 @@ export function PurchaseReturnTemplate(data: PurchaseReturnPrintData) {
           </View>
         </View>
       ) : null}
+      {data.is_consignment && ci === 0 ? <Text style={[styles.blockLabel, { marginTop: mm(3) }]}>GOING BACK</Text> : null}
       <View style={styles.tableHead}>
         <ColumnRules />
         <View style={styles.bNo}><Text style={[styles.th, { textAlign: "right" }]}>#</Text></View>
@@ -285,7 +286,7 @@ export function PurchaseReturnTemplate(data: PurchaseReturnPrintData) {
             </View>
             <View style={styles.docBlock}>
               <Text style={styles.docNumber}>{prId}</Text>
-              <Text style={styles.docTitle}>PURCHASE RETURN</Text>
+              <Text style={styles.docTitle}>{data.is_consignment ? "CONSIGNMENT RETURN" : "PURCHASE RETURN"}</Text>
             </View>
           </View>
           <View style={styles.headerRule} />

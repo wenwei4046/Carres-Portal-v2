@@ -374,6 +374,19 @@ export const MODULE_WORK_RULES: readonly WorkRuleDefinition[] = [
     completionFact: "the order's overpaid figure is RM 0 after allocation, or an approved refund covers it (order_refunds)",
   },
   {
+    /* 0707 (Houzs port, row 11; DRAFT, awaits Jess's review): a manual payment
+     * whose paid date is more than 14 days back waits for the Payment Approver
+     * (section 12 duty). Nobody decides their own request. */
+    key: "payment.approve_backdated_payment",
+    module: "payment",
+    trigger: "a manual payment was recorded with a paid date more than 14 days before today (payment_backdate_requests, waiting)",
+    owner: "the effective Payment Approver duty holder from Workspace; never the person who asked",
+    ownerRule: "payment_approver_duty",
+    action: "Approve RM {amount} paid on {weekday}, {day} {month}",
+    dueRule: "the day it was asked; no clock beyond that",
+    completionFact: "the request is approved (the payment is recorded through _customer_payment_post) or refused with a reason",
+  },
+  {
     /* §10 row 2 — the SAME act with a should-have-been-done state. It is its
      * own registry entry because its TRIGGER and its CLOCK are different: the
      * customer named a day, that day passed, and the money is still owed. The
@@ -620,6 +633,7 @@ const WORK_COMPLETION_STATEMENTS: Readonly<Record<string, string>> = {
   "purchasing.po_window": "Every PO issued from the window has its current version marked as sent",
   "payment.collect_customer_balance": "The outstanding balance is RM 0",
   "payment.review_overpayment": "The overpaid amount is RM 0 or an approved refund covers it",
+  "payment.approve_backdated_payment": "The approval or refusal decision is recorded",
   "payment.missed_promise": "The outstanding balance is RM 0",
   "payment.send_storage_invoice": "The live storage owing is RM 0",
   "purchasing.supplier_reply": "An evidenced supplier answer for the current PO version is recorded",

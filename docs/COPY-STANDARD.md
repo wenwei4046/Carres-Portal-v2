@@ -1,5 +1,12 @@
 # Carres Portal — Copy Standard
 
+## Current template copy correction — owner24Oct2026
+
+The latest Sales Order Template Spec in UI MASTER governs label case and missing values across all modules: field labels Title Case, table headers CAPS, sentences/notes sentence case. Missing values show nothing; `Not recorded` is retired as an empty-value placeholder, including quick cards and generated document fields. Keep labels, truthful read/error/permission/setup states and required-field validation. `Not received`, `No PO yet` and other actual business states remain facts, never invented to fill an empty value. Historical quoted observations containing the retired wording are evidence only. The optional Journey-step dash marks not-applicable, not a missing value. UI MASTER owns the exact current type/colour/geometry; this file owns copy.
+
+Order Route Overview uses one Journey line and Purchasing/Supplier, Warehouse, Logistics and Payment cards. `Now` is the current visual focus word; no generic GOODS band duplicates those cards. Source-qualified per-line goods facts survive inside their owners and Map/Documents. Existing parallel work is not serialised by the one Now marker. UI MASTER records the supplied nine display slots and the missing Ops§4 source; do not invent its business rules.
+
+
 ## Purchasing21Oct design vocabulary intake
 
 Presentation source: export28; [UI MASTER](ui/MASTER.md#purchasing-design-handoff--21-oct-2026--it-entry) and [Purchasing reconciliation](purchasing/MASTER.md#latest-purchasing-design-intake--21-oct-2026). This intake does not override existing governed action meanings, identifiers or approval permissions. Latest source vocabulary to map to existing components:
@@ -43,23 +50,9 @@ business vocabulary. The menu64/overlay/one-line-toolbar geometry and triggers l
 UI MASTER's17Oct narrow-panel contract; module facts, task wording and permissions are unchanged.
 
 
-## System-wide document number display — owner-confirmed 2026-10-04
+## System-wide document number display — owner24Oct2026
 
-**APPROVED TARGET / NOT BUILT across all surfaces.** The owner clarified that the two-digit
-year applies throughout the system, not only to PO. Every Carres date-bearing document number
-uses `YY` in its displayed date segment: for example `GRN-20261004-1234` displays as
-`GRN-261004-1234`, and `SCN-20261004-1234` as `SCN-261004-1234`. Already-short dates stay short;
-non-date legacy numbers acquire no invented date. Only the recognised year segment changes:
-never remove `20` from arbitrary serials, Unit IDs or supplier-provided invoice/DO references.
-
-Apply consistently to registers, cards, Working Panels, full details, related records, Work,
-Calendar links, search results, exports and newly rendered document previews. Preserve each
-family's governed prefix, separators, date granularity, serial and revision rules; PO's `-V{n}`
-is not a system-wide suffix. This presentation rule does not rewrite stored identities, source
-links, issued historical files or allocator policy. Search resolves original and displayed
-identities to the same record; any ambiguous result must retain source context, never guess.
-Cross-module adoption needs verification; no module may treat the rule as PO-only. Formal-number
-allocation continues to follow each family's approved numbering law.
+**APPROVED TARGET; APPLICATION ADOPTION NOT VERIFIED.** For the new date-bearing format, join the governed prefix directly to the date and use one hyphen before the serial: `DO261024-0001`, `PO260928-0004`, `GRN261008-0001`; PR/RO/DR/CO/TR follow the same separator shape. The supplied CR example is format evidence, not a new universal prefix. Preserve each family's approved identity, business partition, allocation/privacy and revision rules. A supplied serial example does not change random versus sequential allocation. Historical sheet references such as `PO/2607-035`, supplier-owned references, Unit IDs, issued documents and saved record identities remain unchanged. Do not renumber or silently normalise old documents; preserve original links and search resolution. Date-bearing new shapes use the governed original document date; examples do not permit guessing a missing date. UI MASTER owns presentation, while each module's numbering law owns allocation. Resolve any new allocator/date-granularity policy explicitly before build; no production data change is authorised here.
 
 ## Why this exists
 
@@ -341,6 +334,20 @@ deployed; owner walk owed.
 | Saturday on-call (Staff & Duties section, not a Duty) | section `Saturday on-call`, header `{name or Not assigned} · {9:00 AM} to {6:00 PM}`; purpose `Answers customer, driver and warehouse calls and WhatsApp. Not an Office workday. Routine work does not move.`; fact `Time` · `{start} to {end}`; rows `{Sat, 10 Oct}` · `{name}` or `Not assigned` · `On leave` · second line `Cover {name}`; editor `Edit time` (`Starts` · `Ends` · `Save` · `Cancel`) and `Assign` (`On call` with `Not assigned` · `Cover` with `No cover` · `Save` · `Cancel`) | Saturday Duty · Saturday shift · Office Saturday · On-call Duty · Duty roster |
 | Saturday on-call refusals | `Ends must be after Starts.` · `Choose a person.` · `Choose another person for Cover.` · `{name} cannot be on call. Choose an eligible active staff member.` · `These times changed. Cancel and try again.` · `Saturday on-call is set by Jess or a person she names.` · `Saturday on-call was not saved. Try again.` · failure `Saturday on-call could not be opened.` | the database's own sentence · Error |
 | Monthly PO / GRN rota in Duty history | `Assigned by system` on a monthly-rotation row (never the account that bootstrapped an older row); note `Monthly rotation`; future month under `Next` | Roster · Auto-assigned · Rota bot |
+
+## Backdated payment words (0707, Houzs port row 11) · BUILT, AWAITS JESS'S REVIEW
+
+A payment whose paid date is more than 14 days ago waits for the Payment Approver (payment
+MASTER §12). It does not count until approved.
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| The Work action | **`Approve RM {amount} paid on {weekday}, {day} {month}`** | Approve backdate · Backdate request |
+| The Work problem / the row's fact | **`Paid date is more than 14 days ago`** (row line ends with `.`) | Backdated · Late entry |
+| The recorder's result | **`Sent to the Payment Approver. This payment counts once it is approved.`** | Payment recorded · Pending approval |
+| The waiting section / done heading | **`Waiting for the Payment Approver`** · row `RM {amount} · Paid date: {date}` | In review |
+| The approver's controls | existing **`Approve`** · **`Refuse`** · **`Decision reason`** · **`Back`**; results `Approved` · `Refused` | Reject · Deny |
+| A likely duplicate at approval | existing duplicate refusal, then **`I opened the earlier payment and this is a different one.`** | — |
 
 ## Action copy / work clarity law — owner ruling 2026-08-11
 
@@ -1189,6 +1196,9 @@ Do not use bare DR/CO/CRTN as explanatory action names. Keep existing number fam
 historical issued titles/versions. Consignment Order instructs the supplier to provide consignment
 goods; Consignment Return instructs/records goods handed back to the supplier. Neither title means
 physical execution is complete or a payable exists. Purchasing §§9.9–9.10 own these purposes.
+Claimless Consignment Return (0706 §2, Weisiang 2026-10-22, Houzs way): register button `New Consignment Return`;
+form action `Issue Consignment Return`; empty picker `No consigned Units from {supplier}.`; Unit refusals
+`Carres-owned stock` · `Not this supplier's goods` · `On a Supplier Claim` · `Reserved` · `Not in stock`.
 
 Do not replace both titles with Consignment Note~~ or create a third manual document of that name~~. **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): `Consignment Note` is the customer-side delivery document ("Customer consignment words" below); it never replaces the two supplier titles.**
 Staff enter one Display Request and use its source-prefilled execution documents. Showroom receipt
@@ -1394,6 +1404,7 @@ sidebar page. Existing implementation constants do not override these approved p
 | `PO No` on SO Batch Purchase (owner ruling 2026-10-05) | every linked PO number on one line, separated by `, ` (`PO-260903-4316-V1, PO-260903-4585-V1`), each its own link; no `{n} POs` count; none: `Not ordered yet` |
 | Open local filter-rail control | `Hide filters` |
 | Hidden local filter-rail control | `Show filters` |
+| Compact selected Issue count (same four facts, only when measured toolbar space is short) | `{n} SO · {i} item(s) · {u} unit(s) · {p} PO`; full Sales Order and Issue wording stays on the count's hover title; all four quantities stay on screen. SO and PO are the existing document abbreviations. |
 | Selected Issue action | `1 selected · 1 unit · Issue 1 PO  [Clear]  [YJ]  [Issue PO]          [Export Excel (1)]` |
 | PO Duty owner chip title | `{name} · PO Duty` |
 | Dated cover chip title | `{cover name} · PO Duty cover for {normal holder}` |
@@ -2770,12 +2781,15 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | Report a problem on a Unit (owner-approved design 2026-09-26) | **`What did you see?`** with exactly **`Damaged` · `Not found` · `Wrong item` · `Missing component` · `Label / Unit ID problem` · `Something else`** · **`Photo`** · **`What happened, in one sentence`** · the consequence line **`After you submit, {Unit ID} reads Cannot sell · Waiting inspection until {Site} checks it and records the result.`** / **`{Unit ID} stays reserved for {SO No}. Sales sees this problem on the order until it is checked.`** · submit **`Report a problem`** · success **`Problem recorded as {Issue No}. {Unit ID} now reads Cannot sell · Waiting inspection.`** | Hold · Quarantine · Claim · Write-off · Remedy · Root cause · `Attention` · a status the observer picks |
 | The Work a Unit problem opens (Stock MASTER §6) | **`Check the damage on {Unit ID} and record the result`** · **`Look for {Unit ID} at {Site} and scan it again`** · **`Check {Unit ID} against its PO and record what arrived`** · **`Check which parts of {Unit ID} are missing and record them`** · **`Check the label on {Unit ID} and reprint it if needed`** · **`Check {Unit ID} and record what you find`**; owner **`GRN Duty`**, recipient the Site, due the next working day | `Damaged` · `Not found` · `Review` · `Handle` as an action |
 | Make available for sale dialog (owner ruling 2026-09-25/26) | five checks **`Stock Location is recorded` · `No reported problem is still open` · `Not in repair` · `Not on the road` · `No Sales Order reservation`**, a failing check adds its reason (`{n} reported problem(s) are still open` · `This Unit is in repair` · `This Unit is on the road` · `Reserved for {SO No}` · `No Site is recorded for this Unit`) · **`Confirm`** · the note **`Inventory Status returns to Available. Stock Condition stays {condition}, so Sales sees exactly what it sells.`** | Release · Unblock · Clear hold |
-| Count again dialog (owner ruling 2026-09-25/26) | **`{Site} gets the work again: Look for {Unit ID} at {Site} and scan it again, due the next working day. Finding it closes the work; not finding it becomes a difference for GRN Duty to check.`** · **`Count again`** | Recount · Re-scan · Stock take |
+| Count again dialog (owner ruling 2026-09-25/26) | **`{Site} gets the work again: Look for {Unit ID} at {Site} and scan it again, due the next working day. Finding it closes the work; not finding it becomes a difference for GRN Duty to check.`** · **`Count again`** | Recount · Re-scan · ~~Stock take~~ (OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): `Stock Take` is the page and document word, see the Stock Take row below) |
+| Stock Adjustment page (Weisiang's decision, WhatsApp 2026-10-22; overturns Stock MASTER §12.4/§12.5, Jess was not part of this decision) | page and sidebar **`Stock Adjustment`** · **`New Stock Adjustment`** · fields **`Site`** · **`Reason`** · **`Write off`** (pick Units) · **`Add`** (lines **`Item`** · **`Qty`** · **`Add line`** · **`Remove`**) · **`Find Unit`** · **`{n} Units picked`** · a Unit line **`{Unit ID} · {Item}`**, adding **`· Reserved for {SO No}`** or **`· In repair`** when it cannot be picked · **`No Units here.`** · columns **`Adjustment No`** · **`Date`** · **`Site`** · **`Reason`** · **`Written off`** · **`Added`** · **`Stock Take`** · empty **`No stock adjustments yet.`** | Add stock · Remove stock · Plus · Minus · Increase · Decrease · a signed quantity |
+| Stock Transfer page (Weisiang's decision, WhatsApp 2026-10-22; overturns Stock MASTER §12.7, Jess was not part of this decision) | page and sidebar **`Stock Transfer`** · **`New Stock Transfer`** · fields reuse the Transfer form words **`Pickup Location`** · **`Delivery Location`** · **`Reason`** · **`Units`** · **`Find Unit`** · the line **`The Units move as soon as you save.`** · columns **`Transfer No`** · **`Date`** · **`Pickup Location`** · **`Delivery Location`** · **`Units`** · **`Status`** (**`Posted`** · **`Cancelled`**) · **`Reason`** · **`Cancel transfer`** with **`The Units move back to the Pickup Location.`** · empty **`No stock transfers yet.`** | From / To · Moved · Reverse · Void |
+| Stock Take page (Weisiang's decision, WhatsApp 2026-10-22; overturns Stock MASTER §12.5, Jess was not part of this decision) | page and sidebar **`Stock Take`** · **`New Stock Take`** · **`Start`** · fields **`Site`** · **`Blind count`** · **`Note`** · **`Unit IDs counted`** (hint **`One Unit ID per line, or scan them.`**) · **`{n} Units counted`** · **`Goods with no Unit ID`** · **`Save`** · **`Post`** with **`Post writes off every Unit not counted and adds the goods with no Unit ID.`** · columns **`Count No`** · **`Date`** · **`Site`** · **`Blind count`** · **`Status`** (**`Open`** · **`Posted`**) · **`Stock Adjustment`** · **`Note`** · empty **`No stock takes yet.`** | Stocktake · Cycle count · Match all · Fill all to system |
 | Unit Detail `Current work` and `History` (owner ruling 2026-09-25/26) | `Current work` prints the Issue's official English, then **`{action} · {owner} · by {date}`** and the Issue number; empty **`Nothing to do for this Unit.`**; an Issue between actions reads **`Waiting for review`**. `History` has two sub-heads **`Site visits`** and **`Changes`** | To do (here) · Activity · Timeline |
 | Inventory's can-it-be-sold column (owner ruling 2026-09-25) | **`Inventory Status`** with exactly **`Available` · `Reserved` · `Cannot sell`**; the reason for `Cannot sell` lives in the **`Stock Condition`** column (`New` · `Display` · `Old` · `Damaged` · `Wrong item` · `In repair` · `Waiting inspection`); a `Damaged`/`Old` Unit may be `Available` again for clearance sale (owner 2026-09-25) | `Stock use` · `Not available` · `Blocked` · `Reserved / sold` · a condition word inside the status |
 | Inventory's three after-OUT columns (owner ruling 2026-09-25) | **`Ship Date`** (the day the goods left the warehouse with the Logistics company — the pair to `Goods Received Date`; owner chose the international word over SAP's `Goods Issue Date`) · **`Pickup By`** (the company whose driver took the goods — owner's short word; `Logistics` stays the transport-company noun elsewhere) · **`Delivery Location`** (where it is going); all three blank while the Unit stands in a Site | Handed over (as a column head) · Goods Out Date · Pickup Date · Dispatch Date · Picked By · Carrier · Shipped by · With NETS Delivery · In transit · On the way · a company inside `Stock Location` |
 | Inventory's place column (owner ruling 2026-09-25) | the existing heading **`Stock Location`** with the existing place words only: **`Carres Klang`** · **`PJ Showroom`** · `AL Sungai Buloh` · `HOUZS Balakong` — the Site the Unit stands in or last stood in. No holder column exists: Carres owns the goods | `Who has it` · `Site` (as a column head) · `Holder` · `Where` · `With NETS Delivery` (Delivery's Items-panel word, not Inventory's) · `In transit` · `On the way to {destination}` · `NETS` as a warehouse |
-| Inventory absence words (owner ruling 2026-09-25) | **`No SO`** (not promised to anyone) · **`Not received`** (no Receiving record — an `Incoming` Unit) · **`Not recorded`** (fact never captured — including a held Unit whose `Goods Received Date` was never captured; it WAS received, so it never reads `Not received`). `Unit ID` · `Product` · `Stock use` never print an absence word | `—` for an optional fact · a blank cell · N/A |
+| Inventory facts and missing values — reconciled24Oct2026 | `No SO` and `Not received` only for their governed factual states; missing facts show nothing. Required identity omissions remain defects | `Not recorded` as a missing-value placeholder; a fabricated identity or receipt |
 | Inventory footer's second line when goods are still owed (owner ruling 2026-09-25) | **`{n} still to arrive · see Inbound`** — the same Pending Delivery arithmetic Inbound prints, never a second count; absent when n is 0 | Incoming {n} in the footer · counting not-yet-received goods inside `{n} records` |
 | Unit and Stock event history | **History** | In & out · Movements · Movement log · Ledger |
 | Cross-Site movement object | **Transfer** | Movement · Relocation; it appears in Inbound/Outbound/Inventory rather than a fifth top page |
@@ -3030,7 +3044,7 @@ words and puts the reason after a `·`, exactly as stair carry already qualifies
 | Report a problem, now inside the `⋮` menu (icon only; its accessible name is `More actions` — owner ruling 2026-09-21) | **`Report a problem`** | Raise an issue · Log a complaint · New Service Case |
 | The delivery address the customer has not given yet | **`Address not given yet`** | Unknown · Fill in later · TBC |
 | The Sales Orders row context menu (ONE ROW MENU, owner ruling 2026-10-05) | **`View` · `Print` · `Cancel SO`** — `View · Print` are the shared row-menu words every register starts with (`documentRowMenu`); `Cancel SO` alone after the divider | `Edit` in the row menu (reached through View since 2026-10-05) · `Print PDF` (retired as a menu word 2026-09-26) · `Download official PDF` (the PO row's word until 2026-10-05) · `Preview` · `Copy to new Sales Order` · `Request Delivery Order` (Delivery's door, never a Sales Order row — Jess 2026-09-26) |
-| A cell with no value, anywhere in a register | **`Not recorded`** | `Not given` · Not provided · None · N/A · — · a blank cell. **ONE word, YH 2026-08-29.** The Sales Orders register printed TWO — `Not given` for a fact the customer never told us, `Not recorded` for one Carres never wrote down — 20 cells against 18 on the same table. The distinction is real and invisible: an operator sees two spellings of empty and must work out whether they differ. `Not recorded` survives because it is honest about EVERY column; nobody *gives* us an invoice number or a showroom. Neither word had ever been registered here, while `lib/locality.ts` claimed `Not given` was governed by this file |
+| A missing value in a register, record, card or document field — owner24Oct2026 | Leave the value empty; keep its label where needed | `Not recorded`, dash, N/A, fabricated zero/date or a fake business state. Read failures and missing required input remain explicit |
 | Sales Orders register `PO No` cell with several documents (owner ruling 2026-10-06) | every number on one line, comma-separated, each its own link — `PO-20260902-8370, PO-20260910-4031`; the column keeps its width and is dragged wider to read more | `{first No} + {n} more` (withdrawn 2026-10-06) · `2 Purchase Orders` · a popover |
 | Sales Orders register `DO No` cell with several documents | unchanged as built: `{n} Delivery Orders` opening the list of every number; changes only with the owner's approval | `{first No} + {n} more` |
 | Sales Orders register `PO No` / `DO No` cell when no PO or DO exists for the order yet — OWNER RULING 2026-09-21 (Jess) · BUILT (Sales Orders Card 12) | **`No PO yet`** · **`No DO yet`**, muted, one line (owner preference 2026-09-21; also the SO goods expansion's `Deliver To` before any PO line). 🟡 SO Batch Purchase prints `Not ordered yet` for the same fact — converging it is Purchasing's own round | `Not recorded` (says Carres failed to write a number down; the document simply does not exist yet) · `No delivery order yet` (too long for the cell, and a second grammar beside `PO No`) · a blank cell |
@@ -3432,6 +3446,19 @@ create an `Acknowledged` state.
 Every word above is ruled. No terminology placeholder is left in Purchasing, and a chat that finds
 one has found a document that was missed.
 
+### Document line report words — central Reports (PROPOSED, awaits Jess's review)
+
+Three `Reports` rows, one row per document line, read from each Register's own read (Houzs
+detail-listing port, row 15): **`Sales order lines`** · **`Delivery order lines`** ·
+**`Sales invoice lines`**. Columns reuse governed words: `Proceed date` / `DO date` /
+`Invoice date` · `SO no.` / `DO No` / `Invoice No` · `SO no.` · `Customer` · `Item` · `Qty` ·
+`Unit price` · `Amount` (no money on Delivery order lines). Each add-on is its own line after the goods,
+`Item` = the add-on's catalog name. Footer: `{shown} of {total} lines ·`
+then the exclusion: `Rentals are not listed.` · `Cancelled delivery orders are not listed.` ·
+`Only issued sales invoices are listed.` Empty: `No lines yet.` + the same exclusion.
+Sales invoice lines add **`Lines from`**: `Invoice` (the invoice's own line, frozen at issue) or
+`Sales order today` (the invoice froze no lines, so the order's live line stands in).
+
 ## ⭐ THE YEAR RULE — owner ruling 2026-08-15 (Chai), portal-wide
 
 **`Wed, 12 Aug`. The year appears only when it is not the current year.**
@@ -3694,6 +3721,25 @@ A Monitor card carries the arrangement facts, DO number and Delivery Status in o
 does not merge their authority: Delivery arrangement remains editable operational truth (edited
 inside the Monitor row's expanded panels, never on the calendar card) and the issued DO remains a
 formal historical document.
+
+**New Delivery Order words — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22, relayed by YH
+2026-10-23); Jess was not part of it.** Office staff may open a Delivery Order from a Sales
+Order's lines, the Houzs way. This overturns the earlier ban on a `New DO` control (Delivery
+MASTER §3, §15). `Issue`, `Release` and `Approve` stay banned.
+
+| String | Where it appears |
+|---|---|
+| `New Delivery Order` | the Delivery Orders register's toolbar button and the dialog title |
+| `Pick a Sales Order and the goods to deliver.` | the dialog's one sentence |
+| `SO No` · `Find` | the dialog's Sales Order field and its button |
+| `Bed set` · `Sofa` | one tick per delivery group still free to ship (the existing group words) |
+| `{item} · Qty {n}` | each Sales Order line under its group |
+| `Other items` over `Go with the whole order, when every group is ticked.` | accessories, offered only while no DO is live |
+| `Everything on this Sales Order is already on a Delivery Order.` | nothing left to ship |
+| `This order travels on a Delivery Journey. Each leg issues its own Delivery Order.` | a Journey order |
+| `Sales Order not found.` | an SO No that matches nothing |
+| `Cancel` · `Create Delivery Order` | the footer |
+| `{DO No} created` | the toast after create |
 
 **Monitor + Delivery Orders register words — owner UI correction 2026-09-06.** The correction
 ruled these strings (the 2026-09-04 `NEEDS CHECKING` / `DELIVERY SCHEDULE` proposals are
@@ -5004,6 +5050,22 @@ which the NO RELATIVE DATE WORDS rule permits; a printed date is still `fmtDate`
 | Shared portal navigation parent | `Sales Orders` | A duplicate standalone Sales Orders destination |
 | Ordinary outright customer sales | `Outright` (menu item under `Sales Orders`; page title `Sales Order / Outright` — owner-confirmed template 2026-10-08) | `Purchase` · `Outright Sales` (retired 2026-10-08) |
 | Subscription-owned customer journey | `Subscription` | `Purchase` |
+| The approver's queue of every SO amendment (Weisiang's decision, Mr Lim, WhatsApp 2026-10-22; Jess was not part of this decision) | `Amendments` (menu item and page title) | `Amendment Requests` · `Revisions` |
+
+**Amendments queue words (Weisiang's decision, 2026-10-22).** Reused approved words: `Waiting for
+management`, `Reason for change`, `Management decision reason`, `Approve and apply`, `Reject`.
+New on this screen:
+
+| Meaning | Use exactly |
+|---|---|
+| An amendment approved and applied | **Approved** |
+| An amendment the approver refused | **Rejected** |
+| An amendment its submitter took back | **Withdrawn** |
+| Column: who sent / who decided, and when | **Submitted by** · **Submitted** · **Decided by** · **Decided** |
+| Column: whether the customer's agreement is on record | **Customer agreement** — **Recorded** / **Not recorded** |
+| Footer count | **`{n} amendments · {w} waiting for management`** |
+| Empty queue | **No amendments yet.** |
+| Read failed | **The amendments could not be opened.** with `Try again` |
 
 The label does not rename the Sales Order document, its SO number, or the separate Purchasing
 module. Subscription reporting stays separate. Removing old navigation entries does not delete
@@ -5345,7 +5407,7 @@ The Finance area of the Portal sidebar groups Finance's own pages into modules. 
 | `Receivables` | `AR · Receivables` · `Other debtors` · `Other receipts` |
 | `Bank & Cards` | `Daily Bank` · `Card settlement` · `Card money waiting` · `Money moves` |
 | `Ledger` | `Journal` · `General Ledger` · `Trial Balance` · `Self-check` |
-| `Reports` | `Profit and Loss` · `Balance Sheet` · `Cash Flow` · `AP Aging` · `AR Aging` (0686) · `Collection` · `Card charges` · `Dealer commission` · `Stock value` · `Payment` (Payment's own report, unchanged) |
+| `Reports` | `Profit and Loss` · `Balance Sheet` · `Cash Flow` · `AP Aging` · `AR Aging` (0686) · `Collection` · `Card charges` · `Dealer commission` · `Stock value` · `Stock drops` (0714) · `Payment` (Payment's own report, unchanged) |
 
 - `Dashboard` stays a plain row at the top. `Forecast` is a plain row after `Reports` (Chew, 3 Oct 2026).
 - A menu row's word is its page's title; the one exception is `AP · Payables`, which opens `Unpaid by Supplier` (RULING YH 2026-09-14). The Profit and Loss and the Balance Sheet are two pages, titled `Profit and Loss` and `Balance Sheet`; the browser tab reads `{title} · Carres`. The Reports page's door cards (`Open →`) are retired, because every report is a row.
@@ -5670,6 +5732,18 @@ These words are on screen in the branch and are not approved yet. Stock's own wo
 | Footer | `{n} Units · {money}` · ` · {k} with no cost recorded` |
 | States | `Loading the stock value…` · `The stock value could not be loaded. Try again.` · `Carres held no Unit at the end of {date}.` |
 
+### PROPOSAL — PENDING CHEW · Stock drops, read-only (0714)
+
+YH (chat, 2026-10-26): a write-off posts no journal. Finance reads Stock's write-offs here instead. Each Unit is valued the way Stock value values it. These words are on screen in the branch and are not approved yet.
+
+| Where | Words |
+|---|---|
+| Menu | `Stock drops`, a row under `Reports` after `Stock value` |
+| Note | `The Units Stock wrote off, each at its PO line cost. Nothing is posted to the ledger.` · ` Known value {money}` · ` · {k} with no cost recorded` |
+| Units | `Date` · `Adjustment No` · `Site` · `Reason` · `Unit ID` · `SKU` · `Qty` · `Cost` · `Value deducted`. A Unit with no cost recorded reads `No cost recorded` in Cost and Value deducted, never `RM 0.00`. Search: `Search adjustment, reason or Unit ID…` |
+| Footer | `{n} Units · {money}` · ` · {k} with no cost recorded` |
+| States | `The stock drops could not be loaded. Try again.` · `Stock has written off no Unit.` |
+
 ### PROPOSAL — PENDING CHEW · Collection report (0644)
 
 These words are on screen in the branch and are not approved yet. `SO Doc Date` and `SO No` are the Orders words (Orders MASTER).
@@ -5904,6 +5978,19 @@ Each person's own lunch start; the activity check skips that lunch. Times print 
 | Not a staff member | Only a staff member can set a lunch time. | Shared logins record no lunch |
 | Staff & Duties check time bounds | `Morning check from {Office start} to {last minute before the Office lunch}. Afternoon check from {first minute after the Office lunch} to {last minute before Office end}. A person's afternoon check moves with their own lunch.` | WS-02 · WS-03 bounds follow Settings → Office (0677) |
 
+## Settings → Address lists · Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was not part of this decision) · migration 0722 · BUILT ON BRANCH, NOT APPLIED
+
+Office staff add, rename or hide a State, City or Postcode on top of the national list, the Houzs SO Maintenance way. Names print joined by ` · `; no dash.
+
+| Situation | Exact words | Source |
+|---|---|---|
+| Settings menu group / row and page title | Sales Orders · Address lists | Weisiang 2026-10-22 |
+| List section | List changes (`Every address picker offers the national list with these changes on top. Orders already saved keep the names they recorded.`) · empty `No list changes yet. The pickers offer the national list.` | 0722 |
+| One change | row name `{State} · {City} · {Postcode}` (missing parts left out) · value `Added` · `Renamed to {name}` · `Hidden` · button `Remove` | 0722 |
+| Form section | Change a name (`Leave City and Postcode empty to change a State. Leave Postcode empty to change a City. Use the names as the pickers show them.`) · State · City (optional) · Postcode (optional) · Change: `Add` · `Rename` · `Hide` · New name · Save change | 0722 |
+| Form gaps | `State is required` · `City is required for a postcode` · `A postcode is 5 digits` · `A postcode cannot be renamed. Hide it and add the new one` · `New name is required` | 0722 checks |
+| Saved toast / change record | `Address lists saved` · change record title `Address lists`, fields State · City · Postcode · Renamed to · Hidden, values `Yes` · `No` | Shared Settings words |
+
 ## Settings → Company · Office · Settings editors · owner 9 Oct 2026 (Carres Settings List COM · OFF · TEAM-02) · DEPLOYED 10 Oct 2026 (#1996); confirmed Settings design (rows with one explanation, change record as a disclosure) DEPLOYED 12 Oct 2026 (#2013); signed-in reader walk done 12 Oct 2026, editor save walk owed
 
 | Situation | Exact words | Source |
@@ -5939,3 +6026,22 @@ DEL-04 · DEL-05 · OFF-01/05, owner confirmed 9 Oct 2026). No dash is used as a
 | Work action, `Assign logistics` | line two `Choose the company that carries this delivery · due {date}` | the hard-coded `3 working days before · {date}` is retired |
 | Logistics card, first check | `{n} working days before · {date}` with `n` = the stored Contact lead (`Contact lead days`, DEL-05); at the default it reads the ruled `3 working days before`. `2 working days before` and `1 working day before` stay fixed (Workspace §5.9) | the contact day follows its one setting |
 
+## Service Cases, the Houzs way — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22) · BUILT 0711
+
+Weisiang ruled "just clear Carress rules and Implement Houzs inside". Jess was not part of this
+decision. These words are admitted for the Service Cases page, the case window and Settings → Service.
+
+| Meaning | Use exactly |
+|---|---|
+| Close button on an open case | `Close Case` (overturns the Service MASTER "Close case (as a button)" ban) |
+| Stage column, field and card filter | `Stage` |
+| Toolbar switch: my team's cases | `My cases` |
+| Case owner column and field | `Owner` · `Case owner` · placeholder `No owner yet` |
+| Field hint when the caller may not pick | `The sales order PIC picks the case owner` |
+| Owner refused (not the PIC) | `Only the sales order PIC can pick who owns this case.` |
+| Owner refused (not an office person) | `Pick an active office person to own this case.` |
+| Priority field and options | `Priority` · `Urgent` · `Normal` · `Low` |
+| Close refused | `Close failed: {reason}` |
+| Settings page and link | `Service Settings` · group `Service` |
+| Settings rows | `Default case owner` · `A new case goes to this person until the sales order PIC picks the case owner.` · `Stages` · `The stages staff pick on a case. A stage that closes the case cannot be added here.` · `Case types` · `The case types staff pick on a case.` · `In use` · `New stage` · `New case type` · `Add` |
+| Last closing stage, `In use` locked (YH, chat 2026-10-26) | hint `Close Case needs this stage.` · refused `Keep one stage that closes the case in use. Close Case needs it.` |

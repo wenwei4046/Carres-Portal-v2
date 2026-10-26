@@ -20,6 +20,7 @@ export const SETTINGS_EDITOR_SECTIONS = [
   "warehouse",
   "delivery",
   "issue_tracker",
+  "service",
 ] as const;
 export type SettingsEditorSection = (typeof SETTINGS_EDITOR_SECTIONS)[number];
 

@@ -67,6 +67,8 @@ vi.mock("@/lib/api", async () => {
 
 import { ApiError } from "@/lib/api";
 import SoBatchRegister from "./SoBatchRegister";
+// Tasks owns its Work read; these tests isolate the purchasing writer/stock reads.
+vi.mock("../use-open-work", () => ({ useOpenWorkSet: () => ({ items: [], hasData: false, error: false, generatedOn: null }) }));
 
 /**
  * SO BATCH PURCHASE — THE PERMANENT ORDER REGISTER
@@ -1228,7 +1230,7 @@ describe("selection — the parent checkbox is ALL eligible child demand", () =>
        `Use stock` joins only while a ticked line has a free Unit. The view
        button is there once, small, after the acts: the ticks are the same in
        every grouping, so the grouping can still be changed. */
-    expect(barButtons()).toEqual(["Clear", "Issue PO", "Page tools"]);
+    expect(barButtons()).toEqual(["Clear", "Issue PO", "Tasks", "Page tools"]);
     expect(screen.getAllByTestId("so-batch-view")).toHaveLength(1);
     expect(within(bar).getByTestId("so-batch-view")).toHaveAccessibleName("View: By sales order");
     expect(screen.queryByTestId("so-batch-selection-bar")).not.toBeInTheDocument();
@@ -3577,7 +3579,7 @@ describe("Use stock on the selection bar (owner 13 Oct 2026, round 3)", () => {
     await waitFor(() => expect(reads()).toEqual(["/api/operation/purchase/demands/o1/ready-stock"]));
     await settle();
     /* The selection bar is there, with its usual acts and nothing more. */
-    expect(barButtons()).toEqual(["Clear", "Issue PO", "Page tools"]);
+    expect(barButtons()).toEqual(["Clear", "Issue PO", "Tasks", "Page tools"]);
     expect(screen.queryByTestId("so-batch-use-stock")).toBeNull();
     expect(posts()).toEqual([]);
   });
@@ -3593,7 +3595,7 @@ describe("Use stock on the selection bar (owner 13 Oct 2026, round 3)", () => {
     expect(useStock().textContent).toBe("Use stock · 2");
     expect([...screen.getByTestId("so-batch-selection-actions").children].map((el) => el.getAttribute("data-testid")))
       .toEqual(["so-batch-use-stock", "so-batch-duty-chip", "so-batch-issue"]);
-    expect(barButtons()).toEqual(["Clear", "Use stock · 2", "Issue PO", "Page tools"]);
+    expect(barButtons()).toEqual(["Clear", "Use stock · 2", "Issue PO", "Tasks", "Page tools"]);
     /* Only the ticked Sales Orders were read, and reading reserved nothing. */
     expect([...new Set(reads())]).toEqual([
       "/api/operation/purchase/demands/o1/ready-stock",
@@ -3666,3 +3668,30 @@ describe("Use stock on the selection bar (owner 13 Oct 2026, round 3)", () => {
   });
 });
 
+
+// A pooled demand may outlive its order's exact coverage. Grouping must not
+// invite a second purchase while the order view correctly says Ordered.
+describe("grouped outstanding demand agrees with the order", () => {
+  it.each(["supplier", "category", "deadline"] as const)("%s excludes covered item lines and keeps an uncovered sibling selectable", (view) => {
+    const covered = { ...ORDER_O1.lines[0]!, orderLineId: "covered", qty: 1, stockTaken: 1 };
+    const open = { ...ORDER_O1.lines[0]!, orderLineId: "open", qty: 1, stockTaken: 0 };
+    renderRegister({
+      registerRows: [{ ...ORDER_O1, lines: [covered, open] }],
+      rows: [leaf({ id: "covered-demand", lineIds: ["covered"], toBuy: 1, fullyOnPo: true }), leaf({ id: "open-demand", lineIds: ["open"], toBuy: 1 })],
+    }, true, false, view);
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    expect(screen.queryByTestId("by-supplier-tick-covered-demand")).toBeNull();
+    expect(screen.getByTestId("by-supplier-tick-open-demand")).toBeEnabled();
+    fireEvent.click(screen.getByTestId("by-supplier-tick-open-demand"));
+    expect(screen.getByTestId("selection-bar")).toHaveTextContent("1 item · 1 unit");
+  });
+
+  it("does not call fully ordered goods To buy", () => {
+    renderRegister({
+      registerRows: [{ ...ORDER_O1, status: "ordered", lines: ORDER_O1.lines.map(line => ({ ...line, stockTaken: line.qty })) }],
+      rows: [LEAF_O1],
+    }, true, false, "supplier");
+    expect(screen.getByText("Nothing to buy. Every Sales Order already has its PO.")).toBeInTheDocument();
+    expect(screen.queryByTestId("by-supplier-select-s-hooka|mattress")).toBeNull();
+  });
+});
