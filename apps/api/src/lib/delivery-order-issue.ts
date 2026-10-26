@@ -79,15 +79,25 @@ export async function attemptDeliveryOrderIssue(
      *  booking confirmation — outstation trips need the paper before the
      *  partner has scheduled the customer. Never a free-form create. */
     waitBookingConfirm?: boolean;
+    /** New Delivery Order (Weisiang's decision, Mr Lim, WhatsApp 2026-10-22):
+     *  office staff open a DO from the SO's lines. The caller names the scope
+     *  (NULL = the whole order, else the picked delivery groups) and the
+     *  document mints through `delivery_office_document_mint` (0710), which
+     *  refuses goods already on a live DO. The SAME gates still apply: goods,
+     *  money (0362) and the Finance exception. Omit it and nothing changes. */
+    groups?: DeliveryGroupKey[] | null;
   },
 ): Promise<DeliveryOrderAttempt> {
   // The trip's scope is the one ALREADY booked (`booking_groups`), never a
   // caller's opinion: this issues the paper for the trip the customer
   // confirmed, and it does not get to decide what that trip carries.
+  // The one exception is the office's New Delivery Order (`opts.groups`).
+  const office = opts?.groups !== undefined;
   const first = await loadBookingContext(sb, orderId, null);
   if (!first.ok) return { outcome: "error", body: first.body, status: first.status };
-  const bookedScope =
-    (first.ctx.control?.booking_groups as DeliveryGroupKey[] | null) ?? null;
+  const bookedScope = office
+    ? (opts!.groups ?? null)
+    : ((first.ctx.control?.booking_groups as DeliveryGroupKey[] | null) ?? null);
   const loaded = bookedScope
     ? await loadBookingContext(sb, orderId, bookedScope)
     : first;
@@ -97,7 +107,8 @@ export async function attemptDeliveryOrderIssue(
 
   // Already issued → the same number. Not an error: a second number would be a
   // second document for one trip.
-  if (order.do_number) return { outcome: "already", doNumber: order.do_number };
+  // (The office door opens the NEXT trip; its mint refuses a double.)
+  if (order.do_number && !office) return { outcome: "already", doNumber: order.do_number };
 
   // ⭐ The two money questions (owner ruling 2026-08-19): the outstanding
   // figure against the approval record (0362), and Finance's exception (0355)
@@ -162,7 +173,20 @@ export async function attemptDeliveryOrderIssue(
   // 0542 · A SPLIT TRIP (the booking names its groups) mints through its own
   // governed door: the one-live index is keyed by trip, so an earlier trip
   // that already ran keeps its document and this trip gets its own.
-  if (bookedScope) {
+  if (office) {
+    const { data, error } = await sb.rpc("delivery_office_document_mint", {
+      p_order_id: orderId,
+      p_groups: bookedScope,
+      p_do_number: doNumber,
+    });
+    if (error) {
+      // 42501 role · P0001 money gate (0362) · 22023 a refused scope (0710).
+      const status = error.code === "42501" ? 403 : error.code === "P0001" || error.code === "22023" ? 409 : 500;
+      return { outcome: "error", body: { message: error.message, detail: error.details ?? null }, status };
+    }
+    const minted = (data as { do_number?: string } | null)?.do_number ?? doNumber;
+    if (minted !== doNumber) return { outcome: "already", doNumber: minted };
+  } else if (bookedScope) {
     const { data, error } = await sb.rpc("delivery_trip_document_mint", {
       p_order_id: orderId,
       p_do_number: doNumber,
@@ -203,7 +227,9 @@ export async function attemptDeliveryOrderIssue(
     await sb.rpc("operation_add_annotation", {
       p_order_id: orderId,
       p_content:
-        opts?.waitBookingConfirm === false
+        office
+          ? `${orderActionDone("issue_delivery_order")}: ${doNumber}, on New Delivery Order`
+          : opts?.waitBookingConfirm === false
           ? `${orderActionDone("issue_delivery_order")}: ${doNumber}, on Request Delivery Order`
           : `${orderActionDone("issue_delivery_order")}: ${doNumber}`,
       p_tag: null,
