@@ -117,6 +117,8 @@ export interface LoadingListRow {
  * The Loading List: one line per item per DO still to load. Houzs way — a line
  * leaves the list once the warehouse has loaded it; driver confirmation is not
  * waited for here (Outbound still shows it).
+ * Follows Houzs backend/src/scm/routes/loading-list.ts:1 (the warehouse loading
+ * queue) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
  */
 export function loadingListRows(cards: readonly WarehouseOutboundCard[]): LoadingListRow[] {
   const rows: LoadingListRow[] = [];

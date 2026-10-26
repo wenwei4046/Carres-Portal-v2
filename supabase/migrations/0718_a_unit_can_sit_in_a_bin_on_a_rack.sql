@@ -4,6 +4,8 @@
 -- "just clear Carress rules and Implement Houzs inside". Houzs keeps Racks and
 -- Bins per warehouse; Carres had none (Stock MASTER: "no Zone, Rack or Bin").
 -- That rule is overturned. Jess was not part of this decision.
+-- Follows Houzs backend/src/scm/routes/warehouse.ts:429-432 (Racks per warehouse)
+-- per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
 --
 -- STILL ONE LEDGER. A Bin is a named place at a Site. The Unit says which Bin it
 -- is in (`ops_stock_items.bin_id`); there is no second rack/bin stock table and

@@ -14,6 +14,8 @@
  *
  * Carres keeps its per-Unit model: every number here is a COUNT of Units read
  * from the one register. No second ledger, no cost (Finance owns valuation).
+ * Follows Houzs frontend/src/pages/scm-v2/Inventory.tsx:4-11 (Balances, Movements,
+ * Warehouses tabs) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
  */
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";

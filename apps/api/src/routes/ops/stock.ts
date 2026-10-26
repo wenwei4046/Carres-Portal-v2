@@ -1474,6 +1474,8 @@ function mapErr(error: { code?: string; message?: string }): HTTPException {
 // =====================================================================
 
 /** GET /bins?site=<warehouseId> — every Bin at a Site with the Units in it now. */
+// Follows Houzs backend/src/scm/routes/warehouse.ts:429-432 (Racks per warehouse)
+// per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
 opsStockRouter.get("/bins", requireOperationOrPrincipal, async (c) => {
   const site = c.req.query("site");
   if (!site) throw new HTTPException(400, { message: "Choose a Site" });
@@ -1543,6 +1545,8 @@ opsStockRouter.post("/register/:unitCode/bin", requireOperationOrPrincipal, asyn
 });
 
 /** GET /stock-card?sku=&site= — one item's Stock Card from the Unit lineage. */
+// Follows Houzs frontend/src/pages/scm-v2/StockCard.tsx:2-4 (per-SKU ledger,
+// optional warehouse scope) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
 opsStockRouter.get("/stock-card", requireOperationOrPrincipal, async (c) => {
   const sku = c.req.query("sku");
   if (!sku) throw new HTTPException(400, { message: "Choose an item" });
