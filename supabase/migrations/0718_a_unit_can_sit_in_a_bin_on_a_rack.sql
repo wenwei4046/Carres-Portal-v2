@@ -83,7 +83,7 @@ declare
   v_bin  public.warehouse_bins%rowtype;
 begin
   if (select public.app_role()) is null
-     or (select public.app_role())::text not in ('operation', 'principal', 'warehouse') then
+     or (select public.app_role())::text not in ('operation', 'principal') then  -- internal staff only; 'warehouse' is an external partner role
     raise exception 'forbidden' using errcode = '42501';
   end if;
 
@@ -124,3 +124,24 @@ revoke execute on function public.warehouse_bin_add(uuid, text, text) from publi
 revoke execute on function public.stock_unit_set_bin(text, uuid) from public, anon;
 grant execute on function public.warehouse_bin_add(uuid, text, text) to authenticated;
 grant execute on function public.stock_unit_set_bin(text, uuid) to authenticated;
+
+-- A Unit that changes Site (Transfer, Cancel, any other door) leaves its Bin:
+-- a Bin belongs to one Site, so the old one is cleared and the move is recorded.
+create or replace function public.trg_stock_unit_leaves_bin_on_site_change()
+returns trigger language plpgsql security definer set search_path = public, pg_temp as $$
+declare v_old text;
+begin
+  if new.bin_id is not null
+     and new.warehouse_id is distinct from old.warehouse_id
+     and not exists (select 1 from public.warehouse_bins b where b.id = new.bin_id and b.warehouse_id = new.warehouse_id) then
+    select rack || ' · ' || bin into v_old from public.warehouse_bins where id = new.bin_id;
+    new.bin_id := null;
+    insert into public.stock_unit_events (unit_id, unit_code, event, from_value, to_value, note, actor_id)
+    values (new.id, new.unit_code, 'bin_changed', v_old, null, 'moved Site', auth.uid());
+  end if;
+  return new;
+end; $$;
+revoke execute on function public.trg_stock_unit_leaves_bin_on_site_change() from public, anon, authenticated;
+drop trigger if exists stock_unit_leaves_bin_on_site_change on public.ops_stock_items;
+create trigger stock_unit_leaves_bin_on_site_change before update of warehouse_id on public.ops_stock_items
+  for each row execute function public.trg_stock_unit_leaves_bin_on_site_change();

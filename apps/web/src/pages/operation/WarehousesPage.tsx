@@ -213,7 +213,8 @@ export default function WarehousesPage() {
             ]}
           />
         ) : view === "bins" ? (
-          <RacksAndBins siteId={siteId} toolbar={<>{viewTabs}{sitePicker}</>} />
+          // key: a new Site starts fresh, so a Bin picked at the old Site is not kept.
+          <RacksAndBins key={siteId} siteId={siteId} toolbar={<>{viewTabs}{sitePicker}</>} />
         ) : (
           <LoadingList siteId={siteId} toolbar={<>{viewTabs}{sitePicker}</>} />
         )}
