@@ -228,6 +228,23 @@ describe.skipIf(!URL)("Delivery Returns and Load scan (real PostgreSQL, 0716)", 
     expect(await rec(DO_C, 1)).toMatchObject({ ok: false, detail: "qty_over_remaining" });
   });
 
+  it("a split-trip or second Unit-less DO cannot return by line (0356 trip_groups)", async () => {
+    await q("reset role");
+    await q("update ops_delivery_orders set trip_groups = '{g1}' where id = $1", [DO_C]);
+    await as(OP);
+    const lines = JSON.stringify([{ orderLineId: LINE_C, qty: 1 }]);
+    expect(await attempt("select public.delivery_return_record_lines($1, $2::jsonb, $3, 'x') as r", [DO_C, lines, PJ])).toMatchObject({ ok: false, detail: "do_not_whole_order" });
+    await q("reset role");
+    await q("update ops_delivery_orders set trip_groups = null where id = $1", [DO_C]);
+    await q("set local session_replication_role = replica");
+    await q("insert into ops_delivery_orders (id, order_id, do_number, trip) values ($1, $2, $3, 1)", [uid("d6"), ORDER_C, `DOIT${HEX}F`.toUpperCase()]);
+    await as(OP);
+    expect(await attempt("select public.delivery_return_record_lines($1, $2::jsonb, $3, 'x') as r", [DO_C, lines, PJ])).toMatchObject({ ok: false, detail: "do_not_whole_order" });
+    await q("reset role");
+    await q("update ops_delivery_orders set voided_at = now(), void_reason = 'rescheduled' where id = $1", [uid("d6")]);
+    await q("set local session_replication_role = origin");
+  });
+
   it("a DO with exact Units refuses the line path; attempt Units (0344) return by Unit", async () => {
     await as(OP);
     const lines = JSON.stringify([{ orderLineId: LINE_C, qty: 1 }]);

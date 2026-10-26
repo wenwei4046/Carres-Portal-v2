@@ -227,6 +227,17 @@ begin
     raise exception '% lists its exact Units: return the Units', v_doc.do_number
       using errcode = 'P0001', detail = 'do_has_units';
   end if;
+  -- A pre-0424 DO's goods are the order's lines scoped by trip_groups (NULL =
+  -- the whole order, 0356:31-32,72); a split trip or a second Unit-less DO on
+  -- the order (0356's materialiser mints one per orders.do_number, 0356:105-140)
+  -- means the order's lines are NOT this DO's lines. Refused, not guessed (YH 2026-10-26).
+  if v_doc.trip_groups is not null
+     or (select count(*) from public.ops_delivery_orders d
+          where d.order_id = v_doc.order_id and d.voided_at is null
+            and not exists (select public._delivery_order_exact_units(d))) > 1 then
+    raise exception '% covers only part of its order, so its lines cannot be told apart. Return by Unit instead.', v_doc.do_number
+      using errcode = 'P0001', detail = 'do_not_whole_order';
+  end if;
   if not exists (select 1 from public.orders o where o.id = v_doc.order_id and o.status = 'delivered') then
     raise exception '% is not delivered', v_doc.do_number using errcode = 'P0001', detail = 'do_not_delivered';
   end if;
