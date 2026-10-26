@@ -1210,7 +1210,7 @@ admitted by this naming ruling. Chinese explanations may accompany names in owne
 
 | Purpose | Exact words |
 |---|---|
-| Delivery rail rows (after `Delivery Orders`) | `Customer Consignment Orders` · `Consignment Notes` · `Customer Consignment Returns` |
+| `Consignment` module rows (after `Sales Orders`, the Houzs placement: Houzs-ERP `Sidebar.tsx:535-546`) | `Customer Consignment Orders` · `Consignment Notes` · `Customer Consignment Returns` |
 | Numbers | `CCO-YYYYMMDD-RRRR` (Order No) · `CSN-YYYYMMDD-RRRR` (Consignment Note No) · `CCR-YYYYMMDD-RRRR` (Return No). Not `CN`: refunds print credit notes as `CN-`. |
 | Create buttons / dialog titles | `New Customer Consignment Order` · `New Consignment Note` · `New Customer Consignment Return` |
 | Send an order's Units | `Issue Consignment Note for {order no}` · button `Issue Consignment Note` · `The picked Units go to the customer. They stay Carres-owned.` |

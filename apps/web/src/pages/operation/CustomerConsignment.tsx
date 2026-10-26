@@ -54,7 +54,7 @@ const errorText = (e: unknown) => (e instanceof Error ? e.message : "Could not s
 function Page({ word, testId, children }: { word: string; testId: string; children: React.ReactNode }) {
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid={testId}>
-      <ModuleHeader destinationHeader testId={`${testId}-header`} word={word} docTitle={`${word} · Delivery · Carres`} />
+      <ModuleHeader destinationHeader testId={`${testId}-header`} word={word} docTitle={`${word} · Consignment · Carres`} />
       {children}
     </div>
   );
