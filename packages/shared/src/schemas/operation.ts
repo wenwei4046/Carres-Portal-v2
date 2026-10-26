@@ -216,6 +216,28 @@ export const changePoDeliverToInput = z.object({
 }).strict();
 export type ChangePoDeliverToInput = z.infer<typeof changePoDeliverToInput>;
 
+/**
+ * `New Purchase Order` — POST /api/operation/pos/new → `purchasing_issue_pos_batch`.
+ * Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office staff open a PO
+ * with no source, the Houzs way (supplier, Deliver To, goods, dates). A blank
+ * `price` takes the Catalog price on the server; an entered one is sent as
+ * hand-entered and the engine's commercial gate decides it.
+ */
+export const newPurchaseOrderInput = z.object({
+  supplierId: z.string().uuid(),
+  destinationId: z.string().uuid(),
+  etaDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  procurementPartnerId: z.string().uuid().nullable().optional(),
+  note: z.string().trim().max(500).optional(),
+  lines: z.array(z.object({
+    sku: z.string().trim().min(1),
+    qty: z.number().int().min(1).max(10000),
+    // Positive only: a price of 0 is Free of Charge, which needs a reason this form does not collect.
+    price: z.number().positive().nullable().optional(),
+  }).strict()).min(1).max(100),
+}).strict();
+export type NewPurchaseOrderInput = z.infer<typeof newPurchaseOrderInput>;
+
 export const setLineOpsRemarkInput = z.object({
   text: z.string().max(500),
 }).strict();

@@ -34,6 +34,7 @@ import {
   useOperationWork,
   usePaymentSettings,
   usePaymentStorageCases,
+  useSalesOrderIdByNumber,
   type operationOrderListRow,
 } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
@@ -49,6 +50,7 @@ import { DATE_TO_BE_CONFIRMED_FULL } from "@/pages/operation/sales-order-guidanc
 import InvoiceCalendar, { type CalendarEntryKind } from "./InvoiceCalendar";
 import PaymentCollectionWorkspace from "./PaymentCollectionWorkspace";
 import NewSalesInvoiceDialog from "./NewSalesInvoiceDialog";
+import InvoiceBackdateRequests from "./InvoiceBackdateRequests";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { useDeliveryDays, useOfficeDays, usePersonOwnerCalendars } from "@/lib/deadline-queries";
 
@@ -348,6 +350,11 @@ export default function PaymentMonitor() {
     () => allRows.filter((r) => inOrderScope(r.door, orderScope)),
     [allRows, orderScope],
   );
+  // 0707 — a backdated payment can wait on an order with no Monitor row (no
+  // invoice yet, or nothing owed). The scoped order still shows its waiting
+  // requests so the Payment Approver has a place to decide them.
+  const unlistedScope = canReadWork && orderScope !== null && scopedRows.length === 0 ? orderScope : null;
+  const unlistedOrderQ = useSalesOrderIdByNumber(unlistedScope);
   const workItems = workQ.data?.items;
   // The owner rides ON the row: the shared DataGrid renders a cell from its
   // row data, and a column accessor that read outer state would show the
@@ -637,6 +644,7 @@ export default function PaymentMonitor() {
             {/* The governed Register shell; the Finance frame above it is a fixed
                 viewport, so the sheet scrolls INSIDE the page and an opened row
                 never pushes the listing or its footer off screen. */}
+            {unlistedScope !== null && unlistedOrderQ.data && <InvoiceBackdateRequests orderId={unlistedOrderQ.data.id} />}
             <ListPageShell register className="min-h-0 flex-1" testId="payment-monitor-work-list">
               <DataGrid rows={listRows} columns={columns} rowKey={(r) => r.orderId}
                 storageKey="carres.payment.monitor.v2" appearance="reference" exportName="Payment Monitor"

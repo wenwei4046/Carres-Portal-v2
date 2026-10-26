@@ -14,7 +14,12 @@ import {
  *
  *     Sales Orders
  *     ├─ Outright        (was `Outright Sales`; owner 2026-10-08)
+ *     ├─ Amendments      (Weisiang, 2026-10-22)
  *     └─ Subscription
+ *
+ * `Amendments` joined between them on Weisiang's decision (Mr Lim, WhatsApp
+ * 2026-10-22; Jess was not part of this decision): every Sales Order amendment
+ * waits in an approver's queue, the Houzs way.
  *
  * This file guards the MODEL — the words, the addresses and the one-place rule
  * — so a later rail refactor cannot quietly re-open a settled ruling.
@@ -31,13 +36,13 @@ describe("the approved Sales Orders navigation", () => {
     );
   });
 
-  it("holds exactly two children, in the approved order", () => {
+  it("holds exactly three children, in the approved order", () => {
     const block = navBlocks(OPERATIONS, "operation").find(
       (b) => b.kind === "module" && b.module.section === "Sales",
     );
     expect(block?.kind).toBe("module");
     const pages = block!.kind === "module" ? block!.pages : [];
-    expect(pages.map((p) => p.label)).toEqual(["Outright", "Subscription"]);
+    expect(pages.map((p) => p.label)).toEqual(["Outright", "Amendments", "Subscription"]);
   });
 
   /* NEITHER ADDRESS MOVED. "Menu removal does not delete orders, history,

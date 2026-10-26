@@ -2,16 +2,14 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import {
   CASE_EVIDENCE_BUCKET,
-  caseCloseBlockerMessage,
   caseEvidenceExtension,
   caseEvidenceGapMessage,
   caseEvidenceGaps,
   caseEvidenceMimeFits,
   caseEvidenceSlot,
   caseEvidenceUploadedSchema,
-  caseFollowUpPlan,
   caseNumbersMonths,
-  caseOpenSteps,
+  casePriorityFor,
   caseSlaClock,
   caseSlaRecordProblem,
   caseSlaWorkingDay,
@@ -19,11 +17,15 @@ import {
   caseStepDone,
   computeCaseNumbers,
   createServiceCaseInputSchema,
+  mayPickCaseOwner,
   myHolidaySet,
   recordCaseSlaInputSchema,
   recordCaseStepInputSchema,
   signCaseEvidenceUploadInputSchema,
   updateServiceCaseInputSchema,
+  serviceSettingsPatchSchema,
+  servicePickItemCreateSchema,
+  servicePickItemPatchSchema,
   type CaseEvidenceUploaded,
   type CaseFollowUpInput,
   type CaseNumbersCase,
@@ -32,6 +34,7 @@ import {
   type CaseWantKey,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
+import { requireSettingsEditor } from "../../lib/settings-editor";
 import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 import { parseBody } from "../../lib/route-helpers";
@@ -211,6 +214,88 @@ scRouter.get("/numbers", requireOperationOrPrincipal, async (c) => {
   return c.json(
     computeCaseNumbers({ cases, todayIso, period }, { holidays: myHolidaySet() }),
   );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 0711 — Service settings, Houzs Service Maintenance. Weisiang's decision (Mr
+// Lim, WhatsApp 2026-10-22). The default case owner and the two pick lists
+// (Case Type, Stage). Everyone in the office reads; the principal or a person
+// named for the `service` Settings section writes (RLS says the same).
+// Follows Houzs backend/src/routes/assr.ts:327 (default assignee setting)
+// per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+// ─────────────────────────────────────────────────────────────────────────────
+const PICK_TABLE = { types: "service_case_types", statuses: "service_case_statuses" } as const;
+function pickTable(list: string) {
+  const t = PICK_TABLE[list as keyof typeof PICK_TABLE];
+  if (!t) throw new HTTPException(404, { message: "Unknown list" });
+  return t;
+}
+const pickRow = (r: Record<string, unknown>) => ({
+  id: r.id, code: r.code, label: r.label, sortOrder: r.sort_order, active: r.active,
+  isClosed: r.is_closed ?? false,
+});
+
+scRouter.get("/settings", requireOperationOrPrincipal, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const [st, types, statuses] = await Promise.all([
+    sb.from("service_settings").select("default_owner_user_id").maybeSingle(),
+    sb.from("service_case_types").select("*").order("sort_order"),
+    sb.from("service_case_statuses").select("*").order("sort_order"),
+  ]);
+  const err = st.error ?? types.error ?? statuses.error;
+  if (err) throw new HTTPException(500, { message: err.message });
+  return c.json({
+    defaultOwnerUserId: (st.data as { default_owner_user_id?: string | null } | null)?.default_owner_user_id ?? null,
+    types: (types.data ?? []).map(pickRow),
+    statuses: (statuses.data ?? []).map(pickRow),
+  });
+});
+
+scRouter.patch("/settings", requireOperationOrPrincipal, requireSettingsEditor("service"), async (c) => {
+  const parsed = await parseBody(c, serviceSettingsPatchSchema);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  // The default owner becomes a case's owner, so it passes the same check.
+  if (parsed.defaultOwnerUserId !== null && !(await isActiveOfficePerson(sb, parsed.defaultOwnerUserId))) {
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: "Pick an active office person to own this case." },
+      422,
+    );
+  }
+  const { error } = await sb
+    .from("service_settings")
+    .update({ default_owner_user_id: parsed.defaultOwnerUserId, updated_by: c.var.auth.id, updated_at: new Date().toISOString() })
+    .eq("id", true);
+  if (error) throw new HTTPException(500, { message: error.message });
+  return c.json({ ok: true });
+});
+
+scRouter.post("/settings/:list", requireOperationOrPrincipal, requireSettingsEditor("service"), async (c) => {
+  const table = pickTable(c.req.param("list"));
+  const parsed = await parseBody(c, servicePickItemCreateSchema);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const code = `${parsed.label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")}_${Date.now().toString(36)}`;
+  const { data: last } = await sb.from(table).select("sort_order").order("sort_order", { ascending: false }).limit(1);
+  const sortOrder = ((last?.[0] as { sort_order?: number } | undefined)?.sort_order ?? 0) + 10;
+  const row: Record<string, unknown> = { code, label: parsed.label, sort_order: sortOrder };
+  const { error } = await sb.from(table).insert(row);
+  if (error) throw new HTTPException(500, { message: error.message });
+  return c.json({ ok: true }, 201);
+});
+
+scRouter.patch("/settings/:list/:itemId", requireOperationOrPrincipal, requireSettingsEditor("service"), async (c) => {
+  const table = pickTable(c.req.param("list"));
+  const parsed = await parseBody(c, servicePickItemPatchSchema);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.from(table).update(parsed).eq("id", c.req.param("itemId"));
+  // 0711 §6 (YH, chat 2026-10-26): the database keeps one closing stage in use.
+  if (error?.details === "last_closing_stage") {
+    return c.json(
+      { error: "conflict", code: "last_closing_stage", message: "Keep one stage that closes the case in use. Close Case needs it." },
+      409,
+    );
+  }
+  if (error) throw new HTTPException(500, { message: error.message });
+  return c.json({ ok: true });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -400,6 +485,17 @@ scRouter.get("/", requireOperationOrPrincipal, async (c) => {
   if (error) throw new HTTPException(500, { message: error.message });
 
   let rows = (data ?? []).map(shapeCase);
+  // 0711 My Cases — Weisiang's decision (WhatsApp 2026-10-22), Houzs
+  // assrVisibility: what I and my downline own, raised, or are the SO PIC of.
+  // The database decides who "my team" is (my_service_case_ids).
+  // Follows Houzs backend/src/services/assrVisibility.ts:214 (myCasesPredicateSql)
+  // per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+  if (c.req.query("mine") === "1") {
+    const { data: mine, error: mineErr } = await sb.rpc("my_service_case_ids");
+    if (mineErr) throw new HTTPException(500, { message: mineErr.message });
+    const ids = new Set((mine ?? []) as string[]);
+    rows = rows.filter((r) => ids.has(r.id));
+  }
   if (state === "closed")  rows = rows.filter((r) => r.statusIsClosed);
   if (state === "ongoing") rows = rows.filter((r) => !r.statusIsClosed);
 
@@ -467,6 +563,13 @@ scRouter.post("/", requireOperationOrPrincipal, async (c) => {
   // S3 — which factory this is about, so the follow-up can name it.
   const supplierId = await resolveSupplierId(sb, parsed.productSku);
 
+  // 0711 — nobody picked an owner yet: the Service settings default stands in
+  // until the Sales Order PIC picks (Houzs default assignee).
+  const { data: settings } = await sb
+    .from("service_settings")
+    .select("default_owner_user_id")
+    .maybeSingle();
+
   const { data: caseNo, error: seqErr } = await sb.rpc("next_case_no");
   if (seqErr || !caseNo) {
     throw new HTTPException(500, { message: seqErr?.message ?? "Failed to generate case number" });
@@ -490,9 +593,11 @@ scRouter.post("/", requireOperationOrPrincipal, async (c) => {
       opened_at:        parsed.openedAt        ?? todayIsoMYT(),
       created_by:       c.var.auth.id,
 
-      // S1 (0285) — the guided intake's answers. `priority` is NOT here and
-      // must never be: it is a generated column derived from `usable`, which
-      // is how "staff never pick a priority" is enforced rather than promised.
+      // S1 (0285) — the guided intake's answers. 0711 (Weisiang's decision,
+      // WhatsApp 2026-10-22): priority is no longer generated; a new case
+      // starts from `usable` and staff edit it afterwards.
+      priority:         casePriorityFor(parsed.usable),
+      owner_user_id:    (settings as { default_owner_user_id?: string | null } | null)?.default_owner_user_id ?? null,
       reported_by:      parsed.reportedBy      ?? null,
       order_line_id:    parsed.orderLineId     ?? null,
       product_sku:      parsed.productSku      ?? null,
@@ -530,7 +635,11 @@ scRouter.get("/:id", requireOperationOrPrincipal, async (c) => {
     .single();
 
   if (error || !row) throw new HTTPException(404, { message: "Service case not found" });
-  return c.json(shapeCase(row));
+  const soPicUserId = await soPicOf(sb, (row as { order_id: string | null }).order_id);
+  return c.json({
+    ...shapeCase(row),
+    ownerPickable: mayPickCaseOwner({ role: c.var.auth.role, callerId: c.var.auth.id, soPicUserId }),
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -541,50 +650,31 @@ scRouter.patch("/:id", requireOperationOrPrincipal, async (c) => {
   const parsed = await parseBody(c, updateServiceCaseInputSchema);
   const sb     = userClient(c.env, c.var.auth.jwt);
 
-  // ── S3 · the close gate ───────────────────────────────────────────────────
-  // The card's acceptance: **closing a case requires all its tasks closed +
-  // customer-confirmed.** The greyed-out status option is the courtesy; THIS is
-  // the rule, computed from the same shared plan the case view draws.
-  //
-  // Only the TRANSITION into a closed status is gated. A case that is already
-  // closed stays editable — the one live row on file is closed, and a gate that
-  // locked it would make its own history unfixable.
-  if (parsed.statusId) {
-    const { data: target } = await sb
-      .from("service_case_statuses")
-      .select("is_closed")
-      .eq("id", parsed.statusId)
+  // 0711 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): Close Case on
+  // every open case, Houzs way. The S3 close gate (customer confirmation and
+  // every chain step first) is overturned; the chain still shows what is open.
+  // Follows Houzs frontend/src/pages/ServiceCases.tsx:3594 (Close Case on every
+  // open case) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+
+  // 0711 — the Sales Order PIC picks the case owner (an admin).
+  if (parsed.ownerUserId !== undefined) {
+    const auth = c.var.auth;
+    const { data: cur, error: curErr } = await sb
+      .from("service_cases")
+      .select("order_id")
+      .eq("id", id)
       .maybeSingle();
-
-    if (target?.is_closed) {
-      const { data: row, error: readErr } = await sb
-        .from("service_cases")
-        .select(CASE_SELECT)
-        .eq("id", id)
-        .maybeSingle();
-      if (readErr) throw new HTTPException(500, { message: readErr.message });
-      if (!row) throw new HTTPException(404, { message: "Service case not found" });
-
-      const cur = row as unknown as RawCase;
-      const alreadyClosed = cur.service_case_statuses?.is_closed ?? false;
-      if (!alreadyClosed) {
-        const open = caseOpenSteps(
-          caseFollowUpPlan(followUpInput(cur)),
-          shapeProgress(cur.progress),
-        );
-        if (open.length > 0) {
-          return c.json(
-            {
-              error: "invalid_input",
-              code: "case_steps_open",
-              // Rule 6 — the error gives the fix, by name.
-              message: `Cannot close this case yet. Still to do: ${caseCloseBlockerMessage(open)}`,
-              open: open.map((s) => ({ step: s.key, label: s.label })),
-            },
-            422,
-          );
-        }
-      }
+    if (curErr) throw new HTTPException(500, { message: curErr.message });
+    if (!cur) throw new HTTPException(404, { message: "Service case not found" });
+    const soPicUserId = await soPicOf(sb, (cur as { order_id: string | null }).order_id);
+    if (!mayPickCaseOwner({ role: auth.role, callerId: auth.id, soPicUserId })) {
+      throw new HTTPException(403, { message: "Only the sales order PIC can pick who owns this case." });
+    }
+    if (parsed.ownerUserId !== null && !(await isActiveOfficePerson(sb, parsed.ownerUserId))) {
+      return c.json(
+        { error: "invalid_input", code: "invalid_param", message: "Pick an active office person to own this case." },
+        422,
+      );
     }
   }
 
@@ -609,6 +699,9 @@ scRouter.patch("/:id", requireOperationOrPrincipal, async (c) => {
   if (parsed.issueType       !== undefined) patch.issue_type       = parsed.issueType;
   if (parsed.usable          !== undefined) patch.usable           = parsed.usable;
   if (parsed.customerWants   !== undefined) patch.customer_wants   = parsed.customerWants;
+  // 0711 — staff edit the priority; the PIC-picked owner (checked above).
+  if (parsed.priority        !== undefined) patch.priority         = parsed.priority;
+  if (parsed.ownerUserId     !== undefined) patch.owner_user_id    = parsed.ownerUserId;
 
   const { error } = await sb.from("service_cases").update(patch).eq("id", id);
   if (error) throw new HTTPException(500, { message: error.message });
@@ -959,6 +1052,7 @@ interface RawCase {
    *  degrade-don't-crash reason as above. */
   sla_events?: unknown;
   supplier_id?: string | null;
+  owner_user_id?: string | null;
   suppliers?: { name: string } | { name: string }[] | null;
   service_case_types:    { label: string } | null;
   service_case_statuses: { label: string; is_closed: boolean } | null;
@@ -1021,7 +1115,33 @@ function shapeCase(r: RawCase) {
     // working days after `openedAt` and both sides derive it from the same
     // shared clock, so there is no number to go stale between them.
     slaEvents:       shapeSlaEvents(r.sla_events),
+
+    // 0711 — the case owner (Weisiang's decision, WhatsApp 2026-10-22).
+    ownerUserId:     r.owner_user_id ?? null,
   };
+}
+
+/** 0711 — may this person own a case: an active operation or principal account. */
+async function isActiveOfficePerson(sb: ReturnType<typeof userClient>, userId: string): Promise<boolean> {
+  const { data } = await sb.from("app_users").select("status, role").eq("id", userId).maybeSingle();
+  const p = data as { status?: string | null; role?: string } | null;
+  return !!p && (p.status ?? "active") === "active" && (p.role === "operation" || p.role === "principal");
+}
+
+/** 0711 — the Sales Order PIC of a case's order (ops_order_control), or null
+ *  when the case has no order or the order has no PIC yet. */
+async function soPicOf(
+  sb: ReturnType<typeof userClient>,
+  orderId: string | null,
+): Promise<string | null> {
+  if (!orderId) return null;
+  const { data, error } = await sb
+    .from("ops_order_control")
+    .select("assigned_staff")
+    .eq("order_id", orderId)
+    .maybeSingle();
+  if (error) throw new HTTPException(500, { message: error.message });
+  return (data as { assigned_staff?: string | null } | null)?.assigned_staff ?? null;
 }
 
 /** Unwrap the `suppliers(name)` embed. Null when the case names no product we
