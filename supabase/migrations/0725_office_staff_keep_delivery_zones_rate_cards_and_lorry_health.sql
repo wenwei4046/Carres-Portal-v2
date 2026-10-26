@@ -60,6 +60,10 @@ begin
   if not found then
     raise exception 'lorry not found' using errcode = 'P0002', detail = 'lorry_not_found';
   end if;
+  -- Fleet Health is for Carres' own lorries; another company keeps its own fleet (same rule as 0724's doors).
+  if not exists (select 1 from delivery_partners where id = v_old.partner_id and own_fleet) then
+    raise exception 'not a Carres lorry' using errcode = '22023', detail = 'not_own_lorry';
+  end if;
   update partner_fleet
      set puspakom_due = p_puspakom, road_tax_due = p_road_tax,
          insurance_due = p_insurance, service_due = p_service

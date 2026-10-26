@@ -39,6 +39,8 @@ describe("rate card cost", () => {
   it("per order is one unit; the minimum charge holds", () => {
     expect(deliveryCost(card({ basis: "order" }), 7)).toBe(60);
     expect(deliveryCost(card({ minCharge: 80 }), 1)).toBe(80);
+    expect(deliveryCost(card({ minCharge: 80 }), 0)).toBe(80); // Houzs: the minimum holds with no items
+
   });
   it("zone card first, then the every-other-zone card, never another company's", () => {
     const cards = [card({ id: "zone" }), card({ id: "other", zoneId: null }), card({ id: "x", partnerId: "al", zoneId: null })];

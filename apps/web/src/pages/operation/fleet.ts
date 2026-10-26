@@ -110,6 +110,8 @@ export const FL = {
     not_a_driver: "Choose an active driver.",
     not_a_helper: "Choose an active helper.",
     not_own_lorry: "This lorry is not a Carres lorry.",
+    /* a zone name or a company's rate card for that zone is already there (23505) */
+    already_exists: "This is already saved. Edit the existing row instead.",
   } as Record<string, string>,
 } as const;
 

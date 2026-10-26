@@ -36,6 +36,15 @@ begin
   if not exists (select 1 from delivery_setting_changes where what = 'lorry_health' and new_value->>'id' = v_lorry::text) then
     raise exception 'FAIL: lorry dates change not recorded';
   end if;
+  -- Another Logistics company's lorry is refused (review #2131).
+  insert into delivery_partners (name) values ('Other Co 0725') returning id into v_zone;
+  insert into partner_fleet (partner_id, plate, vehicle_type) values (v_zone, 'OTH 25', 'Lorry') returning id into v_zone;
+  v_ok := false;
+  begin
+    perform fleet_save_lorry_health(v_zone, '2026-11-01', null, null, null);
+  exception when invalid_parameter_value then v_ok := true;
+  end;
+  if not v_ok then raise exception 'FAIL: dates saved on another company''s lorry'; end if;
 
   -- Zones: a malformed postcode range is refused.
   v_ok := false;

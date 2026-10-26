@@ -256,8 +256,8 @@ export const rateCardFor = (cards: readonly RateCard[], partnerId: string, zoneI
 /** Houzs positional tiers: 1st unit + 2nd unit + each further unit, never below the minimum. Per order = one unit. */
 export function deliveryCost(card: RateCard, items: number): number {
   const units = card.basis === "order" ? 1 : Math.max(0, Math.floor(items));
-  if (units === 0) return 0;
-  const sum = card.firstUnit + (units >= 2 ? card.secondUnit : 0) + Math.max(0, units - 2) * card.furtherUnit;
+  // No units still pays the minimum charge (Houzs delivery-rate-card.ts: the min applies to any subtotal below it).
+  const sum = (units >= 1 ? card.firstUnit : 0) + (units >= 2 ? card.secondUnit : 0) + Math.max(0, units - 2) * card.furtherUnit;
   return Math.round(Math.max(sum, card.minCharge) * 100) / 100;
 }
 
