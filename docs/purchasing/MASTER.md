@@ -7555,8 +7555,8 @@ the Consignment Returns register helps find goods still awaiting supplier collec
 Read exact goods/current location from Stock. Keep planned collection separate from actual
 handover Units, recipient, time and proof. Supplier/collector acknowledgement belongs to this
 handover evidence, not another manually created Consignment Note. Partial collection leaves
-uncollected Units at their evidenced location and keeps remaining work. Issuing/sending the return
-is not proof of collection. Preserve versions and each actual event; cancel cannot teleport goods.
+uncollected Units at their evidenced location and keeps remaining work. ~~Issuing/sending the return
+is not proof of collection.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision) for `New Consignment Return` only: creating it takes the Units out of stock at once (`returned_to_supplier`), as Houzs does (Houzs backend/src/scm/routes/purchase-consignment-returns.ts:564). A claim-issued Consignment Return still waits for the pickup.** Preserve versions and each actual event; cancel cannot teleport goods.
 
 Stock owns custody and Purchasing owns supplier instruction. This is not a Site-to-Site Transfer:
 old goods at Carres warehouse still await supplier return. Unsold consignment return creates no

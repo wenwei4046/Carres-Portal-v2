@@ -84,6 +84,8 @@ describe.skipIf(!DB_URL)("Consignment Return numbering (real PostgreSQL, 0706)",
     const migration = readFileSync(new URL("../../../../supabase/migrations/0706_a_claim_on_supplier_owned_goods_is_returned_as_a_consignment_return.sql", import.meta.url), "utf8")
       .replace(/^begin;$/m, "").replace(/^commit;$/m, "");
     await q(migration);
+    // The stock-out follow-up (Houzs purchase-consignment-returns.ts:564), applied on top of 0706.
+    await q(readFileSync(new URL("../../../../supabase/migrations/9999_purchase_consignment_stockout.sql", import.meta.url), "utf8"));
     await q("set local session_replication_role = replica");
     const email = `it-0706-${RUN}@carres.test`;
     await q("insert into auth.users (id, email) values ($1, $2)", [DUTY, email]);
@@ -254,6 +256,8 @@ describe.skipIf(!DB_URL)("Consignment Return numbering (real PostgreSQL, 0706)",
     expect(d.pr_no).toMatch(/^CRTN-/);
     expect(d.is_consignment).toBe(true);
     expect(d.supplier_claim_id).toBeNull();
+    // Houzs purchase-consignment-returns.ts:564: stock leaves when the return is created.
+    expect((await q("select status from ops_stock_items where id = $1", [uid("c1")])).rows[0].status).toBe("returned_to_supplier");
   });
 
   it("a claimless return refuses Carres-owned stock, another supplier's goods and a Unit on a claim", async () => {

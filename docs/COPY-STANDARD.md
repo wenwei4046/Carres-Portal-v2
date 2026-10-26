@@ -1197,7 +1197,7 @@ goods; Consignment Return instructs/records goods handed back to the supplier. N
 physical execution is complete or a payable exists. Purchasing §§9.9–9.10 own these purposes.
 Claimless Consignment Return (0706 §2, Weisiang 2026-10-22, Houzs way): register button `New Consignment Return`;
 form action `Issue Consignment Return`; empty picker `No consigned Units from {supplier}.`; Unit refusals
-`Carres-owned stock` · `Not this supplier's goods` · `On a Supplier Claim` · `Reserved` · `Not in stock`.
+`Carres-owned stock` · `Not this supplier's goods` · `On a Supplier Claim` · `Reserved` · `Not in stock`. Form note `Issuing takes these Units out of stock.` (Houzs purchase-consignment-returns.ts:564).
 
 Do not replace both titles with Consignment Note or create a third manual document of that name.
 Staff enter one Display Request and use its source-prefilled execution documents. Showroom receipt
