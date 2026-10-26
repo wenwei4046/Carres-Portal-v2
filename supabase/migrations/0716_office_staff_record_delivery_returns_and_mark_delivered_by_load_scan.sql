@@ -50,11 +50,42 @@ create table if not exists public.delivery_return_units (
   primary key (return_id, unit_id)
 );
 
+-- Follows Houzs backend/src/scm/routes/delivery-returns.ts:78-79 (a return line
+-- points at a DO line with qty_returned) per Weisiang's ruling (2026-10-22):
+-- clear Carres rules, implement Houzs. YH chose this (2026-10-26) for DOs with
+-- no Unit list. A pre-0424 DO has no line table of its own: it delivered the
+-- whole order, so its lines are the order's `order_lines`.
+create table if not exists public.delivery_return_lines (
+  return_id     uuid not null references public.delivery_returns(id),
+  order_line_id uuid not null references public.order_lines(id),
+  qty_returned  int  not null check (qty_returned > 0),
+  primary key (return_id, order_line_id)
+);
+
+-- The Units a DO took out exactly: its 0424 snapshot, or (older DOs) the Units
+-- its delivered attempt recorded (0344).
+create or replace function public._delivery_order_exact_units(p_doc public.ops_delivery_orders)
+returns setof uuid
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select du.item_id from public.delivery_order_units du where du.delivery_order_id = p_doc.id
+  union
+  select au.item_id
+    from public.delivery_attempts a
+    join public.delivery_attempt_units au on au.attempt_id = a.id
+   where a.order_id = p_doc.order_id and a.do_number = p_doc.do_number
+     and au.outcome = 'delivered'
+$$;
+revoke execute on function public._delivery_order_exact_units(public.ops_delivery_orders) from public, anon, authenticated;
+
 -- Read for internal staff; writes only through the doors below.
 do $$
 declare t text;
 begin
-  foreach t in array array['delivery_returns','delivery_return_units'] loop
+  foreach t in array array['delivery_returns','delivery_return_units','delivery_return_lines'] loop
     execute format('alter table public.%I enable row level security', t);
     execute format('drop policy if exists %I on public.%I', t || '_read_internal', t);
     execute format('create policy %I on public.%I for select using ((select public.is_internal()))',
@@ -108,8 +139,7 @@ begin
 
   for u in select * from public.ops_stock_items
             where id = any(p_unit_ids) order by unit_code for update loop
-    if not exists (select 1 from public.delivery_order_units du
-                    where du.delivery_order_id = v_doc.id and du.item_id = u.id) then
+    if u.id not in (select public._delivery_order_exact_units(v_doc)) then
       raise exception '% is not on %', u.unit_code, v_doc.do_number
         using errcode = 'P0001', detail = 'unit_not_on_do';
     end if;
@@ -144,6 +174,107 @@ begin
           'operation');
 
   return jsonb_build_object('id', v_id, 'returnNo', v_no, 'units', v_n);
+end;
+$$;
+
+-- ── 2b · New Delivery Return by DO line and qty (no Unit list) ─────────────
+-- Follows Houzs frontend/src/pages/scm-v2/DeliveryReturnFromDo.tsx:8-17 (a
+-- line's return qty is 1..remaining, remaining = delivered - already returned)
+-- per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+-- Stock: Carres stock is the Unit register, so the qty moves that many Units of
+-- the line's SKU that were sold to this order back to `free`. If fewer such
+-- Units exist the return is refused: no stock is invented.
+
+create or replace function public.delivery_return_record_lines(
+  p_delivery_order_id uuid, p_lines jsonb, p_warehouse_id uuid, p_reason text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_doc   public.ops_delivery_orders;
+  v_id    uuid := gen_random_uuid();
+  v_no    text;
+  v_site  text;
+  v_line  record;
+  v_ol    public.order_lines;
+  v_done  int;
+  v_moved int;
+  v_total int := 0;
+begin
+  if not public.is_operation() then
+    raise exception 'forbidden' using errcode = '42501', detail = 'forbidden';
+  end if;
+  if length(btrim(coalesce(p_reason, ''))) = 0 then
+    raise exception 'Write the reason' using errcode = 'P0001', detail = 'reason_required';
+  end if;
+  if jsonb_typeof(p_lines) is distinct from 'array' or jsonb_array_length(p_lines) = 0 then
+    raise exception 'Pick at least one line' using errcode = 'P0001', detail = 'nothing_to_return';
+  end if;
+  select name into v_site from public.warehouses where id = p_warehouse_id;
+  if not found then
+    raise exception 'That Site does not exist' using errcode = 'P0001', detail = 'site_not_found';
+  end if;
+  select * into v_doc from public.ops_delivery_orders
+   where id = p_delivery_order_id and voided_at is null;
+  if not found then
+    raise exception 'That Delivery Order does not exist or is void'
+      using errcode = 'P0001', detail = 'do_not_found';
+  end if;
+  if exists (select public._delivery_order_exact_units(v_doc)) then
+    raise exception '% lists its exact Units: return the Units', v_doc.do_number
+      using errcode = 'P0001', detail = 'do_has_units';
+  end if;
+  if not exists (select 1 from public.orders o where o.id = v_doc.order_id and o.status = 'delivered') then
+    raise exception '% is not delivered', v_doc.do_number using errcode = 'P0001', detail = 'do_not_delivered';
+  end if;
+
+  v_no := public.allocate_formal_document_code('DR', v_id::text);
+  insert into public.delivery_returns (id, return_no, order_id, delivery_order_id, warehouse_id, reason)
+  values (v_id, v_no, v_doc.order_id, v_doc.id, p_warehouse_id, btrim(p_reason));
+
+  for v_line in
+    select (e->>'orderLineId')::uuid as line_id, sum((e->>'qty')::int)::int as qty
+      from jsonb_array_elements(p_lines) e group by 1 order by 1
+  loop
+    select * into v_ol from public.order_lines
+     where id = v_line.line_id and order_id = v_doc.order_id for update;
+    if not found then
+      raise exception 'That line is not on %', v_doc.do_number using errcode = 'P0001', detail = 'line_not_on_do';
+    end if;
+    select coalesce(sum(rl.qty_returned), 0) into v_done
+      from public.delivery_return_lines rl where rl.order_line_id = v_ol.id;
+    if v_line.qty is null or v_line.qty < 1 or v_line.qty > v_ol.qty - v_done then
+      raise exception '% can return 1 to % more', v_ol.sku, v_ol.qty - v_done
+        using errcode = 'P0001', detail = 'qty_over_remaining';
+    end if;
+    with back as (
+      update public.ops_stock_items i
+         set status = 'free', warehouse_id = p_warehouse_id, holder_party_id = null,
+             reserved_ref = null, reserved_order_line_id = null, sold_at = null, sold_order_id = null,
+             ref_history = array_append(coalesce(i.ref_history, '{}'::text[]), v_no), updated_at = now()
+       where i.id in (select s.id from public.ops_stock_items s
+                       where s.status = 'sold' and s.sold_order_id = v_doc.order_id and s.sku = v_ol.sku
+                       order by s.sold_at desc nulls last, s.unit_code
+                       limit v_line.qty for update)
+      returning i.id)
+    select count(*) into v_moved from back;
+    if v_moved < v_line.qty then
+      raise exception 'only % Unit(s) of % sold to this order are on the register', v_moved, v_ol.sku
+        using errcode = 'P0001', detail = 'units_not_on_register';
+    end if;
+    insert into public.delivery_return_lines values (v_id, v_ol.id, v_line.qty);
+    v_total := v_total + v_line.qty;
+  end loop;
+
+  insert into public.order_history (order_id, text, by_role)
+  values (v_doc.order_id,
+          format('Delivery Return %s · DO %s · %s unit(s) back in stock at %s by line and qty · %s',
+                 v_no, v_doc.do_number, v_total, v_site, btrim(p_reason)),
+          'operation');
+  return jsonb_build_object('id', v_id, 'returnNo', v_no, 'units', v_total);
 end;
 $$;
 
@@ -584,5 +715,7 @@ revoke execute on function public.delivery_load_scan(text) from public, anon;
 grant execute on function public.delivery_load_scan(text) to authenticated;
 revoke execute on function public.delivery_return_record(uuid, uuid[], uuid, text) from public, anon;
 grant execute on function public.delivery_return_record(uuid, uuid[], uuid, text) to authenticated;
+revoke execute on function public.delivery_return_record_lines(uuid, jsonb, uuid, text) from public, anon;
+grant execute on function public.delivery_return_record_lines(uuid, jsonb, uuid, text) to authenticated;
 revoke execute on function public.delivery_return_set_refund_status(uuid, text) from public, anon;
 grant execute on function public.delivery_return_set_refund_status(uuid, text) to authenticated;

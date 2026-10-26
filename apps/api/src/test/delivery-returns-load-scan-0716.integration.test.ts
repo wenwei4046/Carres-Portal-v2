@@ -33,10 +33,19 @@ const ORDER_B = uid("a2");
 const DO_A = uid("d1");
 const DO_B = uid("d2");
 const DO_A2 = uid("d3");
+// Old DOs (before 0424): C has no Unit list at all, D has only its attempt Units (0344).
+const ORDER_C = uid("a3");
+const ORDER_D = uid("a4");
+const DO_C = uid("d4");
+const DO_D = uid("d5");
+const LINE_C = uid("e1");
+const ATTEMPT_D = uid("f1");
 const DO_A_NO = `DOIT${HEX}A`.toUpperCase();
 const DO_B_NO = `DOIT${HEX}B`.toUpperCase();
 const DO_A2_NO = `DOIT${HEX}C`.toUpperCase();
-const U = { a1: uid("b1"), a2: uid("b2"), b1: uid("b3"), a3: uid("b4") };
+const DO_C_NO = `DOIT${HEX}D`.toUpperCase();
+const DO_D_NO = `DOIT${HEX}E`.toUpperCase();
+const U = { a1: uid("b1"), a2: uid("b2"), b1: uid("b3"), a3: uid("b4"), c1: uid("b5"), c2: uid("b6"), d1: uid("b7") };
 const code = (k: keyof typeof U) => `U8${RUN}-${100 + Object.keys(U).indexOf(k)}-001`;
 
 type Result = { ok: true; r: Record<string, unknown> } | { ok: false; why: string; detail: string };
@@ -103,6 +112,22 @@ describe.skipIf(!URL)("Delivery Returns and Load scan (real PostgreSQL, 0716)", 
     // Order A's second DO is out too (YH 2026-10-26: the scan checks the DO, not the order).
     await q("insert into delivery_handover_events (delivery_order_id, kind, duty, recorded_by) values ($1, 'received_by_logistics', 'logistics', $2)", [DO_A2, OP]);
     await q("update ops_stock_items set holder_party_id = (select id from stock_operating_parties where kind = 'delivery_operator' limit 1) where id = $1", [U.a1]);
+    for (const [order, doId, doNo] of [[ORDER_C, DO_C, DO_C_NO], [ORDER_D, DO_D, DO_D_NO]] as const) {
+      await q(
+        "insert into orders (id, status, dealer_id, customer_name, customer_phone, warehouse_id, source_system) values ($1, 'delivered', $2, 'IT customer', '0100000000', $3, 'autocount')",
+        [order, DEALER, KLANG],
+      );
+      await q("insert into ops_delivery_orders (id, order_id, do_number) values ($1, $2, $3)", [doId, order, doNo]);
+    }
+    await q("insert into order_lines (id, order_id, sku, qty, unit_price) values ($1, $2, 'IT-DL', 2, 0)", [LINE_C, ORDER_C]);
+    for (const [k, order] of [["c1", ORDER_C], ["c2", ORDER_C], ["d1", ORDER_D]] as const) {
+      await q(
+        "insert into ops_stock_items (id, unit_code, sku, warehouse_id, status, sold_order_id, sold_at, qty) values ($1, $2, 'IT-DL', $3, 'sold', $4, now(), 1)",
+        [U[k], code(k), KLANG, order],
+      );
+    }
+    await q("insert into delivery_attempts (id, order_id, attempt_no, result, do_number, leg) values ($1, $2, 1, 'delivered', $3, 0)", [ATTEMPT_D, ORDER_D, DO_D_NO]);
+    await q("insert into delivery_attempt_units (attempt_id, item_id, outcome) values ($1, $2, 'delivered')", [ATTEMPT_D, U.d1]);
     await q("set local session_replication_role = origin");
   });
 
@@ -180,6 +205,38 @@ describe.skipIf(!URL)("Delivery Returns and Load scan (real PostgreSQL, 0716)", 
     expect(await attempt("select public.delivery_return_record($1, $2, $3, 'again') as r", [DO_A, [U.a1], PJ])).toMatchObject({ ok: false, detail: "unit_not_delivered" });
     expect(await attempt("select public.delivery_return_set_refund_status($1, 'refunded') as r", [out.id])).toMatchObject({ ok: true, r: { refundStatus: "refunded" } });
     expect(await attempt("select public.delivery_return_set_refund_status($1, 'paid') as r", [out.id])).toMatchObject({ ok: false, detail: "bad_refund_status" });
+  });
+
+  // YH (2026-10-26): a DO with no Unit list returns by DO line and qty, the Houzs way
+  // (Houzs DeliveryReturnFromDo.tsx:8-17), capped at delivered minus already returned.
+  it("an old DO with no Unit list returns by line and qty, capped at what is left", async () => {
+    const lines = (qty: number) => JSON.stringify([{ orderLineId: LINE_C, qty }]);
+    const rec = (doId: string, qty: number) =>
+      attempt("select public.delivery_return_record_lines($1, $2::jsonb, $3, 'Customer changed mind') as r", [doId, lines(qty), PJ]);
+    await as(OP);
+    expect(await rec(DO_C, 3)).toMatchObject({ ok: false, detail: "qty_over_remaining" });
+    await as(OP);
+    expect(await rec(DO_C, 1)).toMatchObject({ ok: true, r: { units: 1 } });
+    await q("reset role");
+    const free = (await q("select count(*)::int n from ops_stock_items where id = any($1) and status = 'free' and warehouse_id = $2", [[U.c1, U.c2], PJ])).rows[0].n;
+    expect(free).toBe(1);
+    await as(OP);
+    expect(await rec(DO_C, 2)).toMatchObject({ ok: false, detail: "qty_over_remaining" });
+    await as(OP);
+    expect(await rec(DO_C, 1)).toMatchObject({ ok: true });
+    await as(OP);
+    expect(await rec(DO_C, 1)).toMatchObject({ ok: false, detail: "qty_over_remaining" });
+  });
+
+  it("a DO with exact Units refuses the line path; attempt Units (0344) return by Unit", async () => {
+    await as(OP);
+    const lines = JSON.stringify([{ orderLineId: LINE_C, qty: 1 }]);
+    expect(await attempt("select public.delivery_return_record_lines($1, $2::jsonb, $3, 'x') as r", [DO_A, lines, PJ])).toMatchObject({ ok: false, detail: "do_has_units" });
+    await as(OP);
+    expect(await attempt("select public.delivery_return_record_lines($1, $2::jsonb, $3, 'x') as r", [DO_D, lines, PJ])).toMatchObject({ ok: false, detail: "do_has_units" });
+    await as(OP);
+    expect(await attempt("select public.delivery_return_record($1, $2, $3, 'Wrong colour') as r", [DO_D, [U.d1], PJ])).toMatchObject({ ok: true, r: { units: 1 } });
+    expect(await unit("d1")).toMatchObject({ status: "free", warehouse_id: PJ });
   });
 
   it("a returned Unit can be required by another order's DO", async () => {

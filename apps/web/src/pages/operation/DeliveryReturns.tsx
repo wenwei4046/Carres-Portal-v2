@@ -26,6 +26,8 @@ import { fmtDate } from "@/lib/fmt-date";
 const BASE = "/api/operation/delivery-returns";
 type Site = { id: string; name: string };
 type PickUnit = { id: string; unit_code: string; sku: string };
+type PickLine = { id: string; sku: string; qty: number; returned: number; remaining: number };
+type Returnable = { deliveryOrder: { id: string; do_number: string }; mode: "units" | "lines"; units: PickUnit[]; lines: PickLine[] };
 export type RefundStatus = "pending" | "refunded" | "not_refunded";
 export const REFUND_STATUS: { value: RefundStatus; label: string }[] = [
   { value: "pending", label: "Pending" },
@@ -40,6 +42,7 @@ type ReturnRow = {
   ops_delivery_orders: { do_number: string } | null;
   orders: { so: number; customer_name: string } | null;
   delivery_return_units: { ops_stock_items: { unit_code: string; sku: string } | null }[];
+  delivery_return_lines?: { qty_returned: number; order_lines: { sku: string } | null }[];
 };
 
 const post = <T,>(path: string, body: unknown) =>
@@ -63,19 +66,23 @@ export function DeliveryReturns() {
   const [doNo, setDoNo] = useState("");
   const [lookFor, setLookFor] = useState("");
   const [picked, setPicked] = useState<string[]>([]);
+  const [lineQty, setLineQty] = useState<Record<string, number>>({});
   const [siteId, setSiteId] = useState("");
   const [reason, setReason] = useState("");
   const [editing, setEditing] = useState<ReturnRow | null>(null);
   const [refund, setRefund] = useState<RefundStatus>("pending");
   const units = useQuery({
     queryKey: ["delivery-returns", "units", lookFor],
-    queryFn: () => apiFetch<{ deliveryOrder: { id: string; do_number: string }; units: PickUnit[] }>(`${BASE}/delivered-units?do=${encodeURIComponent(lookFor)}`),
+    queryFn: () => apiFetch<Returnable>(`${BASE}/delivered-units?do=${encodeURIComponent(lookFor)}`),
     enabled: Boolean(lookFor),
     retry: false,
   });
-  const reset = () => { setOpen(false); setDoNo(""); setLookFor(""); setPicked([]); setReason(""); };
+  const reset = () => { setOpen(false); setDoNo(""); setLookFor(""); setPicked([]); setLineQty({}); setReason(""); };
+  const byLine = units.data?.mode === "lines";
+  const pickedLines = Object.entries(lineQty).filter(([, q]) => q > 0).map(([orderLineId, qty]) => ({ orderLineId, qty }));
+  const find = () => { setPicked([]); setLineQty({}); setLookFor(doNo.trim()); };
   const save = useMutation({
-    mutationFn: () => post("", { deliveryOrderId: units.data?.deliveryOrder.id, unitIds: picked, siteId, reason }),
+    mutationFn: () => post("", { deliveryOrderId: units.data?.deliveryOrder.id, ...(byLine ? { lines: pickedLines } : { unitIds: picked }), siteId, reason }),
     onSuccess: () => { reset(); void qc.invalidateQueries({ queryKey: ["delivery-returns"] }); },
   });
   const saveRefund = useMutation({
@@ -88,7 +95,10 @@ export function DeliveryReturns() {
     { key: "do", label: "DO No", width: 150, accessor: (r) => r.ops_delivery_orders?.do_number ?? "" },
     { key: "so", label: "SO No", width: 110, accessor: (r) => (r.orders ? `SO-${r.orders.so}` : "") },
     { key: "customer", label: "Customer", width: 200, accessor: (r) => r.orders?.customer_name ?? "" },
-    { key: "units", label: "Units", width: 260, accessor: (r) => r.delivery_return_units.map((u) => u.ops_stock_items?.unit_code).filter(Boolean).join(", ") },
+    { key: "units", label: "Units", width: 260, accessor: (r) => [
+      ...r.delivery_return_units.map((u) => u.ops_stock_items?.unit_code),
+      ...(r.delivery_return_lines ?? []).map((l) => (l.order_lines ? `${l.order_lines.sku} × ${l.qty_returned}` : null)),
+    ].filter(Boolean).join(", ") },
     { key: "site", label: "Site", width: 160, accessor: (r) => r.warehouses?.name ?? "", filterType: "enum" },
     { key: "reason", label: "Reason", width: 220, accessor: (r) => r.reason },
     { key: "refund", label: "Refund status", width: 140, accessor: (r) => refundLabel(r.refund_status), filterType: "enum" },
@@ -109,16 +119,31 @@ export function DeliveryReturns() {
       <Modal open={open} onOpenChange={(o) => (o ? setOpen(true) : reset())} width="wide" title="New Delivery Return"
         footer={<>
           <Button variant="neutral" onClick={reset}>Close</Button>
-          <Button variant="primary" loading={save.isPending} disabled={!units.data || picked.length === 0 || !siteId || !reason.trim()} onClick={() => save.mutate()}>Save</Button>
+          <Button variant="primary" loading={save.isPending} disabled={!units.data || (byLine ? pickedLines.length === 0 : picked.length === 0) || !siteId || !reason.trim()} onClick={() => save.mutate()}>Save</Button>
         </>}>
         <div className="flex flex-col gap-3">
           <div className="grid grid-cols-[1fr_auto] items-end gap-2">
             <Input id="dr-do" label="DO No" value={doNo} onChange={(e) => setDoNo(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") { setPicked([]); setLookFor(doNo.trim()); } }} />
-            <Button variant="neutral" disabled={!doNo.trim()} onClick={() => { setPicked([]); setLookFor(doNo.trim()); }}>Find</Button>
+              onKeyDown={(e) => { if (e.key === "Enter") find(); }} />
+            <Button variant="neutral" disabled={!doNo.trim()} onClick={find}>Find</Button>
           </div>
           {units.isError && <FieldError>{errorText(units.error)}</FieldError>}
-          {units.data && (
+          {units.data && byLine && (
+            /* No Unit list on this DO: return by DO line and qty, capped at
+               delivered minus already returned. Follows Houzs
+               frontend/src/pages/scm-v2/DeliveryReturnFromDo.tsx:8-17 per
+               Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
+            <div className="flex max-h-64 flex-col gap-2 overflow-auto rounded-control border border-c-line p-2" aria-label="Lines">
+              {units.data.lines.every((l) => l.remaining === 0) && <p className="text-body text-c-muted">No delivered lines left to return on this DO.</p>}
+              {units.data.lines.filter((l) => l.remaining > 0).map((l) => (
+                <Input key={l.id} id={`dr-line-${l.id}`} type="number" min={0} max={l.remaining}
+                  label={`${l.sku} · ${l.remaining} of ${l.qty} can come back`}
+                  value={String(lineQty[l.id] ?? 0)}
+                  onChange={(e) => setLineQty({ ...lineQty, [l.id]: Math.min(l.remaining, Math.max(0, Math.trunc(Number(e.target.value) || 0))) })} />
+              ))}
+            </div>
+          )}
+          {units.data && !byLine && (
             <div className="max-h-64 overflow-auto rounded-control border border-c-line p-2" aria-label="Units">
               {units.data.units.length === 0 && <p className="text-body text-c-muted">No delivered Units on this DO.</p>}
               {units.data.units.map((u) => (
