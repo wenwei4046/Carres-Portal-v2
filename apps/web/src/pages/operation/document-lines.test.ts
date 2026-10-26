@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { InvoiceRegisterRow } from "@carres/shared/payment-invoice-register";
 import type { DeliveryOrderRow, operationOrderListRow } from "@/lib/queries";
-import { deliveryOrderLinesOf, salesInvoiceLinesOf, salesOrderLinesOf } from "./document-lines";
+import { deliveryOrderLinesOf, deliveryReturnLinesOf, salesInvoiceLinesOf, salesOrderLinesOf, type DeliveryReturnRow } from "./document-lines";
 
 const nameOf = (sku: string) => (sku === "CODY-Q" ? "Cody" : undefined);
 const addonName = (key: string) => (key === "disposal" ? "Disposal" : undefined);
@@ -131,5 +131,34 @@ describe("salesInvoiceLinesOf — the issued Sales Invoice's own lines", () => {
       inv({ status: "voided", voided_at: "2026-10-06" }),
       inv({ kind: "storage" }),
     ], nameOf, addonName)).toEqual([]);
+  });
+});
+
+describe("deliveryReturnLinesOf — one row per Delivery Return line (Houzs DR detail listing)", () => {
+  const ret = (r: Partial<DeliveryReturnRow>) => ({
+    id: "r1", return_no: "DR-2610-001", created_at: "2026-10-20T02:00:00Z", reason: "Damaged",
+    refund_status: "pending", refund_status_at: null, warehouses: { name: "Klang" },
+    ops_delivery_orders: { do_number: "DO-2610-009" }, orders: { so: 101, customer_name: "tan ah kow" },
+    delivery_return_units: [], delivery_return_lines: [], ...r,
+  }) as DeliveryReturnRow;
+
+  it("folds a return's Units into one line per item, Qty = Units returned", () => {
+    const rows = deliveryReturnLinesOf([ret({ delivery_return_units: [
+      { ops_stock_items: { unit_code: "U-2", sku: "CODY-Q" } },
+      { ops_stock_items: { unit_code: "U-1", sku: "CODY-Q" } },
+      { ops_stock_items: null },
+    ] })], nameOf);
+    expect(rows).toEqual([{
+      key: "r1:0", date: "2026-10-20T02:00:00Z", docNo: "DR-2610-001", so: 101, customer: "Tan Ah Kow",
+      item: "Cody", qty: 2, doNo: "DO-2610-009", reason: "Damaged", site: "Klang", units: ["U-1", "U-2"],
+      refundStatus: "pending", refundStatusAt: null,
+    }]);
+  });
+
+  it("lists a return by DO line with its qty and no Units", () => {
+    const rows = deliveryReturnLinesOf([ret({ delivery_return_lines: [
+      { qty_returned: 3, order_lines: { sku: "SOFA-X" } },
+    ] })], nameOf);
+    expect(rows.map((r) => [r.item, r.qty, r.units])).toEqual([["SOFA-X", 3, []]]);
   });
 });

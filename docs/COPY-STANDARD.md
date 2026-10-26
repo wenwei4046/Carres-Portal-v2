@@ -3425,6 +3425,12 @@ then the exclusion: `Rentals are not listed.` · `Cancelled delivery orders are 
 Sales invoice lines add **`Lines from`**: `Invoice` (the invoice's own line, frozen at issue) or
 `Sales order today` (the invoice froze no lines, so the order's live line stands in).
 
+**`Delivery return lines`** (PROPOSED; Houzs Delivery Return Detail Listing, per Weisiang's ruling
+2026-10-22; shows rows only once #2122's Delivery Returns are merged): `Return date` · `Return No` ·
+`DO No` · `SO no.` · `Customer` · `Reason` · `Item` · `Units` · `Qty` · `Site` · `Refund status`
+(`Pending` / `Refunded` / `Not refunded`) · `Refund status date`. Footer:
+`{shown} of {total} lines · {n} returns`. Empty: `No lines yet. Every recorded return is listed.`
+
 ## ⭐ THE YEAR RULE — owner ruling 2026-08-15 (Chai), portal-wide
 
 **`Wed, 12 Aug`. The year appears only when it is not the current year.**

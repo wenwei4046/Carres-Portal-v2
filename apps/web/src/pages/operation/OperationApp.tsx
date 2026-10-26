@@ -59,7 +59,7 @@ import OperationPurchaseOrders from "./purchase-orders/PurchaseOrdersPage";
 import OperationReceiving from "./OperationReceiving";
 import OperationReceivingReport from "./OperationReceivingReport";
 import OperationDeliveryReport from "./OperationDeliveryReport";
-import { DeliveryOrderLinesReport, SalesInvoiceLinesReport, SalesOrderLinesReport } from "./DocumentLinesReport";
+import { DeliveryOrderLinesReport, DeliveryReturnLinesReport, SalesInvoiceLinesReport, SalesOrderLinesReport } from "./DocumentLinesReport";
 // R2 (0288) — the supplier-claim queue, fourth tab of the Purchasing module.
 import OperationSupplierClaims from "./OperationSupplierClaims";
 import OperationPurchaseReturns from "./OperationPurchaseReturns";
@@ -534,6 +534,8 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
             {tab === "sales-order-lines" && <SalesOrderLinesReport />}
             {tab === "delivery-order-lines" && <DeliveryOrderLinesReport />}
             {tab === "sales-invoice-lines" && <SalesInvoiceLinesReport />}
+            {/* Needs #2122 (0716 Delivery Returns); direct URL only, no nav entry until it merges. */}
+            {tab === "delivery-return-lines" && <DeliveryReturnLinesReport />}
             {/* Preserve legacy bookmarks at the one Settings destination. */}
             {tab === "staff-duties" && <Navigate replace state={location.state} to={`/operation/settings/staff-duties?${new URLSearchParams([...searchParams].filter(([key]) => key !== "tab"))}`} />}
             {/* R2 — the supplier-claim queue: what receiving found wrong, and

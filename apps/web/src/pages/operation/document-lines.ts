@@ -111,3 +111,65 @@ export function salesInvoiceLinesOf(invoices: readonly InvoiceRegisterRow[], nam
     return rows.map((row, i) => ({ ...row, linesFrom: tagged[i]!.from }));
   });
 }
+
+/** One Delivery Return as #2122's `GET /api/operation/delivery-returns` returns it (0716 tables). */
+export type DeliveryReturnRow = {
+  id: string; return_no: string; created_at: string; reason: string;
+  refund_status: string; refund_status_at: string | null;
+  warehouses: { name: string } | null;
+  ops_delivery_orders: { do_number: string } | null;
+  orders: { so: number; customer_name: string } | null;
+  delivery_return_units: { ops_stock_items: { unit_code: string; sku: string } | null }[];
+  delivery_return_lines?: { qty_returned: number; order_lines: { sku: string } | null }[];
+};
+
+export interface ReturnLine extends Omit<DocumentLine, "orderId" | "unitPrice" | "amount" | "linesFrom"> {
+  doNo: string;
+  reason: string;
+  site: string;
+  /** Unit IDs returned on this line; empty when the return was by DO line and qty. */
+  units: string[];
+  refundStatus: string;
+  refundStatusAt: string | null;
+}
+
+/**
+ * One row per Delivery Return line, the return repeated on every line. Follows
+ * Houzs frontend/src/pages/scm-v2/DeliveryReturnDetailListing.tsx:1-6 and
+ * backend/src/scm/routes/reports.ts:603-680 per Weisiang's ruling (2026-10-22):
+ * clear Carres rules, implement Houzs. A return by Unit has no line rows, so its
+ * Units fold into one line per item, Qty = Units returned.
+ */
+export function deliveryReturnLinesOf(returns: readonly DeliveryReturnRow[], nameOf: NameOf): ReturnLine[] {
+  return returns.flatMap((r) => {
+    const bySku = new Map<string, { qty: number; units: string[] }>();
+    for (const u of r.delivery_return_units ?? []) {
+      if (!u.ops_stock_items) continue;
+      const g = bySku.get(u.ops_stock_items.sku) ?? { qty: 0, units: [] };
+      g.qty += 1;
+      g.units.push(u.ops_stock_items.unit_code);
+      bySku.set(u.ops_stock_items.sku, g);
+    }
+    for (const l of r.delivery_return_lines ?? []) {
+      const sku = l.order_lines?.sku ?? "";
+      const g = bySku.get(sku) ?? { qty: 0, units: [] };
+      g.qty += l.qty_returned;
+      bySku.set(sku, g);
+    }
+    return [...bySku].map(([sku, g], i) => ({
+      key: `${r.id}:${i}`,
+      date: r.created_at,
+      docNo: r.return_no,
+      so: r.orders?.so ?? 0,
+      customer: displayCustomerName(r.orders?.customer_name ?? ""),
+      item: nameOf(sku) ?? sku,
+      qty: g.qty,
+      doNo: r.ops_delivery_orders?.do_number ?? "",
+      reason: r.reason,
+      site: r.warehouses?.name ?? "",
+      units: g.units.sort(),
+      refundStatus: r.refund_status,
+      refundStatusAt: r.refund_status_at,
+    }));
+  });
+}
