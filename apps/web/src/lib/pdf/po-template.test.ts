@@ -111,6 +111,14 @@ describe("po-template obeys docs/pdf/PO-PDF-STANDARD.md", () => {
     expect(text).toContain("ORDER TOTAL · RM 3,000.00");
   });
 
+  it("a Consignment Order charges no money on Cancelled Qty (Houzs has no part-cancelled line)", () => {
+    const base = twoLocationV2();
+    const lines = base.lines.map((l, i) => (i === 0 ? { ...l, cancelled_qty: 1, received_qty: 0 } : l));
+    const text = renderedText(PoTemplate({ ...base, lines, consignment: true, line_prices: { "B1201F-K": 500 } }));
+    expect(text).toContain("Unit Price RM 500.00 · Amount RM 1,500.00");
+    expect(text).toContain("ORDER TOTAL · RM 2,500.00");
+  });
+
   it("a Consignment Order line with no recorded price says so and prints no money total", () => {
     const text = renderedText(PoTemplate({ ...twoLocationV2(), consignment: true, line_prices: {} }));
     expect(text).toContain("Unit Price not recorded");

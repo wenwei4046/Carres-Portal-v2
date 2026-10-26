@@ -285,9 +285,13 @@ export function PoTemplate(data: PoTemplateData) {
      titled as one and prints its prices; an ordinary PO stays money-free. */
   const prices = data.consignment ? (data.line_prices ?? {}) : null;
   const priceOf = (line: PoLine) => prices?.[line.sku] ?? null;
+  /* Money is charged on what is still ordered: Houzs has no part-cancelled
+     line (a whole order is cancelled; its line total is qty × price,
+     Houzs purchase-order-pdf.ts:582-585), so Cancelled Qty carries no Amount. */
+  const pricedQty = (line: PoLine) => Math.max(0, Number(line.qty) - Number(line.cancelled_qty ?? 0));
   const amountOf = (ls: readonly PoLine[]) => {
     const each = ls.map((l) => priceOf(l));
-    return each.some((p) => p == null) ? null : ls.reduce((n, l, i) => n + Number(l.qty) * each[i]!, 0);
+    return each.some((p) => p == null) ? null : ls.reduce((n, l, i) => n + pricedQty(l) * each[i]!, 0);
   };
   const totalLabel = (label: string, ls: readonly PoLine[]) => {
     const amount = prices ? amountOf(ls) : null;
@@ -469,7 +473,7 @@ export function PoTemplate(data: PoTemplateData) {
                 {showVariant ? ` · ${line.description}` : ""}
               </Text>
               {bits.length > 0 ? <Text style={styles.descSub}>{bits.join(" · ")}</Text> : null}
-              {prices ? <Text style={styles.descSub}>{priceOf(line) == null ? "Unit Price not recorded" : `Unit Price ${formatMoney(priceOf(line)!, "RM")} · Amount ${formatMoney(priceOf(line)! * Number(line.qty), "RM")}`}</Text> : null}
+              {prices ? <Text style={styles.descSub}>{priceOf(line) == null ? "Unit Price not recorded" : `Unit Price ${formatMoney(priceOf(line)!, "RM")} · Amount ${formatMoney(priceOf(line)! * pricedQty(line), "RM")}`}</Text> : null}
               {Number(line.cancelled_qty??0)>0 ? <>
                 <Text style={styles.descSub}>Cancelled Qty {line.cancelled_qty} · Received Qty {line.received_qty??0} · Pending Delivery Qty {line.pending_qty??Math.max(0,line.qty-(line.received_qty??0)-(line.cancelled_qty??0))}</Text>
                 {cancelledRuns.map(run=><Text key={`cancelled-${run.first}`} style={styles.descSub}>Cancelled: <UnitCode code={run.first}/>{run.last?<Text> to <UnitCode code={run.last}/></Text>:null}</Text>)}
