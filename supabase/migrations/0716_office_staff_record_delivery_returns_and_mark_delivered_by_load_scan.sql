@@ -488,8 +488,10 @@ $function$;
 
 -- ── 7 · Load scan: a DO No or a Unit ID marks its DO Delivered ───────────────
 -- Weisiang's decision (2026-10-22): no signed DO, no photo. A Unit ID finds the
--- newest live DO that carries it. A repeat scan never writes twice: an order
--- already Delivered answers `already`.
+-- newest live DO that carries it. The check is per DO, not per order (YH,
+-- 2026-10-26): once the order reads Delivered, a scan of ANOTHER live DO still
+-- sells that DO's reserved Units; a DO with nothing left reserved answers
+-- `already`, so a repeat scan never writes twice.
 
 create or replace function public.delivery_load_scan(p_code text)
 returns jsonb
@@ -502,6 +504,8 @@ declare
   v_doc   public.ops_delivery_orders;
   v_order public.orders;
   v_res   jsonb;
+  v_sold  uuid[];
+  v_attempt_id uuid;
 begin
   if not public.is_operation() then
     raise exception 'forbidden' using errcode = '42501', detail = 'forbidden';
@@ -526,9 +530,49 @@ begin
       using errcode = 'P0001', detail = 'scan_not_found';
   end if;
 
-  select * into v_order from public.orders where id = v_doc.order_id;
+  select * into v_order from public.orders where id = v_doc.order_id for update;
   if v_order.status = 'delivered' then
-    return jsonb_build_object('already', true, 'do_number', v_doc.do_number, 'so', v_order.so);
+    -- Follows Houzs frontend/src/pages/scm-v2/DoLoadScan.tsx:54,68 (the scan writes
+    -- the status of the DO itself) per Weisiang's ruling (2026-10-22): clear
+    -- Carres rules, implement Houzs.
+    -- The order is Delivered by an earlier DO. THIS DO still owes its own
+    -- reserved Units; with none left it is already delivered.
+    if not exists (select 1 from public.delivery_order_units du
+                     join public.ops_stock_items i on i.id = du.item_id
+                    where du.delivery_order_id = v_doc.id and i.status = 'reserved') then
+      return jsonb_build_object('already', true, 'do_number', v_doc.do_number, 'so', v_order.so);
+    end if;
+    if not exists (select 1 from public.delivery_handover_events e
+                    where e.delivery_order_id = v_doc.id and e.kind = 'received_by_logistics') then
+      raise exception 'the goods are not out with logistics yet — record the handover and the logistics receipt first'
+        using errcode = '22023', detail = 'wrong_stage';
+    end if;
+    with sold as (
+      update public.ops_stock_items i
+         set status        = 'sold',
+             sold_at       = now(),
+             sold_order_id = v_order.id,
+             reserved_ref  = 'SO-' || v_order.so::text,
+             ref_history   = array_append(coalesce(i.ref_history, '{}'::text[]), 'SO-' || v_order.so::text),
+             updated_at    = now()
+       where i.id in (select du.item_id from public.delivery_order_units du where du.delivery_order_id = v_doc.id)
+         and i.status = 'reserved'
+      returning i.id)
+    select coalesce(array_agg(id), '{}'::uuid[]) into v_sold from sold;
+    insert into public.delivery_attempts (order_id, attempt_no, result, do_number, logistics_name, recorded_by, leg)
+    values (v_order.id,
+            (select coalesce(max(attempt_no), 0) + 1 from public.delivery_attempts where order_id = v_order.id),
+            'delivered', v_doc.do_number, v_doc.logistics_partner, auth.uid(), coalesce(v_doc.leg, 0))
+    returning id into v_attempt_id;
+    insert into public.delivery_attempt_units (attempt_id, item_id, outcome)
+    select v_attempt_id, unnest(v_sold), 'delivered';
+    insert into public.order_history (order_id, text, by_role)
+    values (v_order.id,
+            format('Delivered by load scan · DO %s · no signature or photo (Weisiang''s decision 2026-10-22) · %s unit(s) sold',
+                   v_doc.do_number, cardinality(v_sold)),
+            'operation');
+    return jsonb_build_object('already', false, 'status', 'delivered', 'do_number', v_doc.do_number,
+                              'so', v_order.so, 'units_sold', cardinality(v_sold), 'attempt_id', v_attempt_id);
   end if;
 
   v_res := public._delivery_mark_delivered(v_doc.order_id, v_doc.do_number, null, null, null, null, 'load_scan');

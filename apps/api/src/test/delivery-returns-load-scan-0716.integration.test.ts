@@ -32,9 +32,11 @@ const ORDER_A = uid("a1");
 const ORDER_B = uid("a2");
 const DO_A = uid("d1");
 const DO_B = uid("d2");
+const DO_A2 = uid("d3");
 const DO_A_NO = `DOIT${HEX}A`.toUpperCase();
 const DO_B_NO = `DOIT${HEX}B`.toUpperCase();
-const U = { a1: uid("b1"), a2: uid("b2"), b1: uid("b3") };
+const DO_A2_NO = `DOIT${HEX}C`.toUpperCase();
+const U = { a1: uid("b1"), a2: uid("b2"), b1: uid("b3"), a3: uid("b4") };
 const code = (k: keyof typeof U) => `U8${RUN}-${100 + Object.keys(U).indexOf(k)}-001`;
 
 type Result = { ok: true; r: Record<string, unknown> } | { ok: false; why: string; detail: string };
@@ -85,9 +87,11 @@ describe.skipIf(!URL)("Delivery Returns and Load scan (real PostgreSQL, 0716)", 
       await q("insert into ops_delivery_orders (id, order_id, do_number) values ($1, $2, $3)", [doId, order, doNo]);
     }
     const so = async (order: string) => `SO-${(await q("select so from orders where id = $1", [order])).rows[0].so}`;
+    // A split delivery (0542): the second trip has its own live DO.
+    await q("insert into ops_delivery_orders (id, order_id, do_number, trip) values ($1, $2, $3, 2)", [DO_A2, ORDER_A, DO_A2_NO]);
     const soA = await so(ORDER_A);
     const soB = await so(ORDER_B);
-    for (const [k, doId, ref] of [["a1", DO_A, soA], ["a2", DO_A, soA], ["b1", DO_B, soB]] as const) {
+    for (const [k, doId, ref] of [["a1", DO_A, soA], ["a2", DO_A, soA], ["b1", DO_B, soB], ["a3", DO_A2, soA]] as const) {
       await q(
         "insert into ops_stock_items (id, unit_code, sku, warehouse_id, status, reserved_ref, qty) values ($1, $2, 'IT-DR', $3, 'reserved', $4, 1)",
         [U[k], code(k), KLANG, ref],
@@ -96,6 +100,8 @@ describe.skipIf(!URL)("Delivery Returns and Load scan (real PostgreSQL, 0716)", 
     }
     // DO A's goods are out with Logistics; DO B's are still at the warehouse.
     await q("insert into delivery_handover_events (delivery_order_id, kind, duty, recorded_by) values ($1, 'received_by_logistics', 'logistics', $2)", [DO_A, OP]);
+    // Order A's second DO is out too (YH 2026-10-26: the scan checks the DO, not the order).
+    await q("insert into delivery_handover_events (delivery_order_id, kind, duty, recorded_by) values ($1, 'received_by_logistics', 'logistics', $2)", [DO_A2, OP]);
     await q("update ops_stock_items set holder_party_id = (select id from stock_operating_parties where kind = 'delivery_operator' limit 1) where id = $1", [U.a1]);
     await q("set local session_replication_role = origin");
   });
@@ -143,6 +149,19 @@ describe.skipIf(!URL)("Delivery Returns and Load scan (real PostgreSQL, 0716)", 
     expect(r).toMatchObject({ ok: true, r: { already: true, do_number: DO_A_NO } });
     await q("reset role");
     expect((await q("select count(*)::int n from delivery_attempts where order_id = $1", [ORDER_A])).rows[0].n).toBe(1);
+  });
+
+  it("a second DO of a Delivered order still sells its own Units, once", async () => {
+    await as(OP);
+    expect(await unit("a3")).toMatchObject({ status: "reserved" });
+    await as(OP);
+    const r = await attempt("select public.delivery_load_scan($1) as r", [DO_A2_NO]);
+    expect(r).toMatchObject({ ok: true, r: { already: false, units_sold: 1, do_number: DO_A2_NO } });
+    expect(await unit("a3")).toMatchObject({ status: "sold" });
+    await as(OP);
+    expect(await attempt("select public.delivery_load_scan($1) as r", [DO_A2_NO])).toMatchObject({ ok: true, r: { already: true } });
+    await q("reset role");
+    expect((await q("select count(*)::int n from delivery_attempts where order_id = $1", [ORDER_A])).rows[0].n).toBe(2);
   });
 
   it("a Delivery Return puts the picked Unit back in stock at the chosen Site, Refund status Pending", async () => {
