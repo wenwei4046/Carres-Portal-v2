@@ -32,6 +32,13 @@ Source task-title examples: Share claim · {n} pc; Ask to confirm the claim resu
 > Purchasing work must read [Purchasing UI dictionary](#purchasing-ui-dictionary) and the exact
 > per-page column lists in Purchasing MASTER §9.1–§9.4; older labels in other modules do not override it.
 
+### Fabrics panel Export / Import — Houzs Fabric Converter (Weisiang's ruling 2026-10-22; BUILT ON BRANCH #2126)
+
+Follows Houzs `frontend/src/pages/scm-v2/FabricTracking.tsx:66-129`. Buttons `Export CSV` · `Import` (principal only) ·
+toggle `{n} retired hidden` / `Showing {n} retired` · success `{n} new, {n} updated. Check the list, then press Save.` ·
+errors `No fabrics to export.` · `Could not read that file. Use a CSV or Excel file.` · `Nothing imported. {reasons}` ·
+reasons `Line {n}: fabric code is blank.` · `Line {n}: {column} "{value}" is not Price 1, 2 or 3.` · `Line {n}: active "{value}" is not yes or no.`
+
 ---
 
 ## Narrow contextual-panel copy — owner17Oct2026 · APPROVED TARGET / NOT BUILT
