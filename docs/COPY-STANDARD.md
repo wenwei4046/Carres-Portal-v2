@@ -5936,3 +5936,4 @@ rules in payment/MASTER.md; Jess was not part of this decision. Source: `apps/we
 | Total and buttons | `Invoice total {RM amount}` · `Cancel` · `Create Sales Invoice` | |
 | Toast | `{INV No} created` | |
 | API refusals | `Pick the goods to invoice.` | 422 from `POST /api/finance/invoices/office` |
+| Print Invoice, order on more than one live Sales Invoice (YH 2026-10-26; `DownloadInvoiceButton.tsx` `PRINT_INVOICE_COPY`) | label `Sales Invoice to print` · placeholder `Pick a Sales Invoice` · option `{INV No} · {qty} × {SKU}, …` (no lines: `{INV No}`) · toast `Invoice {INV No} opened` | one live invoice prints at once, as before |
