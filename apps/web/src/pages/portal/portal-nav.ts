@@ -479,6 +479,10 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "dealer-showroom", label: "Dealer", icon: Store, soon: true, section: "Showroom" },
       { key: "display-requests", label: "Display Requests", icon: Store, soon: true, section: "Purchasing", pageGroup: "purchasing-showroom" },
       { key: "consignment-orders", label: "Consignment Orders", icon: ArrowDownLeft, soon: true, section: "Purchasing", pageGroup: "purchasing-showroom" },
+      /* Follows Houzs frontend/src/components/Sidebar.tsx:552 per Weisiang's
+       * ruling (2026-10-22): clear Carres rules, implement Houzs. Overturns
+       * "no Consignment Receipts page" above; still ONE receipt engine. */
+      { key: "consignment-receives", label: "Consignment Receives", icon: PackageCheck, section: "Purchasing", pageGroup: "purchasing-showroom" },
       { key: "consignment-returns", label: "Consignment Returns", icon: Undo2, soon: true, section: "Purchasing", pageGroup: "purchasing-showroom" },
 
       // Delivery (T11, Jess 2026-07-27) — **the ONE new menu item in the whole

@@ -89,7 +89,15 @@ function weekLabel(from: string, to: string): string {
     : `${left} to ${right}`;
 }
 
-export default function OperationReceiving() {
+/**
+ * `consignmentPage` — the Consignment Receives page (Showroom drawer): the SAME
+ * GRN register and receipt engine, locked to receipts of Consignment Orders.
+ * Follows Houzs frontend/src/components/Sidebar.tsx:552 and
+ * frontend/src/pages/scm-v2/PurchaseConsignmentReceives.tsx:1-16 (its own
+ * Purchase Consignment Receive list) per Weisiang's ruling (2026-10-22): clear
+ * Carres rules, implement Houzs.
+ */
+export default function OperationReceiving({ consignmentPage = false }: { consignmentPage?: boolean } = {}) {
   const [params, setParams] = useSearchParams();
   const view = params.get("view") === "differences" ? "differences" : "records";
   const sessionId = params.get("session");
@@ -120,7 +128,7 @@ export default function OperationReceiving() {
   /** `Consignment goods` — the Consignment Receive entry, Houzs way: the same
    *  Receiving, narrowed to Consignment Orders (Weisiang's decision, Mr Lim,
    *  WhatsApp 2026-10-22; Jess was not part of it). */
-  const consignmentSel = params.get("consignment") === "1";
+  const consignmentSel = consignmentPage || params.get("consignment") === "1";
   const [search, setSearch] = useState("");
   const [offset, setOffset] = useState(0);
   const [presentation, setPresentation] = useState("table");
@@ -648,7 +656,7 @@ export default function OperationReceiving() {
     receivedSel !== null ||
     dateChosen ||
     cancelledSel ||
-    consignmentSel;
+    (consignmentSel && !consignmentPage);
 
   /**
    * ⭐ THE ACTIVE CONDITIONS LIVE IN THE TOOLBAR — owner correction 2026-09-18.
@@ -719,7 +727,7 @@ export default function OperationReceiving() {
           },
         ]
       : []),
-    ...(consignmentSel
+    ...(consignmentSel && !consignmentPage
       ? [{ key: "consignment", label: "Consignment goods", onClear: () => setFacet("consignment", null) }]
       : []),
   ];
@@ -1010,10 +1018,10 @@ export default function OperationReceiving() {
                       <FilterRailRow label="Cancelled GRNs" count={facets.cancelled} active={cancelledSel}
                         onClick={() => setFacet("cancelled", cancelledSel ? null : "1")} testId="rail-cancelled" />
                     </div>}
-                    <div className="border-t border-kit-slate-5 py-2">
+                    {!consignmentPage && <div className="border-t border-kit-slate-5 py-2">
                       <FilterRailRow label="Consignment goods" count={facets.consignment ?? 0} active={consignmentSel}
                         onClick={() => setFacet("consignment", consignmentSel ? null : "1")} testId="rail-consignment" />
-                    </div>
+                    </div>}
                   </div>
                 </CPopover>
               </>}

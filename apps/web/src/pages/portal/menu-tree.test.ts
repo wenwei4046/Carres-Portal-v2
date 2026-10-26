@@ -95,12 +95,14 @@ describe("the approved hierarchy", () => {
     expect(group("purchasing-showroom")).toEqual([
       "Display Requests",
       "Consignment Orders",
+      /* Consignment Receives — follows Houzs frontend/src/components/Sidebar.tsx:552 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
+      "Consignment Receives",
       "Consignment Returns",
     ]);
   });
 
-  it("is exactly eleven pages", () => {
-    expect(purchasing).toHaveLength(11);
+  it("is exactly twelve pages", () => {
+    expect(purchasing).toHaveLength(12);
   });
 
   it("no row carries a hairline — Reports are central, not a Purchasing row", () => {
@@ -145,7 +147,7 @@ describe("the approved hierarchy", () => {
 
 /** THE ROUTE TRUTH — the Card's own minimum assertion. Words moved; no address did. */
 describe("the live destinations keep their exact current addresses", () => {
-  it("eight live pages, at their unchanged addresses", () => {
+  it("nine live pages, at their unchanged addresses", () => {
     expect(
       purchasing
         .filter((item) => !item.soon)
@@ -166,6 +168,8 @@ describe("the live destinations keep their exact current addresses", () => {
       /* §9.7 — Repair Orders opened with slice A (migration 0602): register,
          object and Create page. No other address moved. */
       ["Repair Orders", "/operation?tab=repair-orders"],
+      /* Consignment Receives — follows Houzs frontend/src/components/Sidebar.tsx:552 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
+      ["Consignment Receives", "/operation?tab=consignment-receives"],
     ]);
   });
 

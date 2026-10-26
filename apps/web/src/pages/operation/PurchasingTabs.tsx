@@ -58,6 +58,7 @@ type PurchasingPage =
   | "forecast-purchase"
   | "purchase-orders"
   | "receiving"
+  | "consignment-receives"
   | "claims"
   | "purchase-returns"
   | "repair-orders"
@@ -87,6 +88,8 @@ const PAGE_WORD: Record<PurchasingPage, string> = {
   "forecast-purchase": "Forecast Purchase",
   "purchase-orders": "Purchase Orders",
   receiving: "Receiving",
+  /* The SIDEBAR's own word. Houzs Sidebar.tsx:552 (Weisiang 2026-10-22). */
+  "consignment-receives": "Consignment Receives",
   claims: "Supplier Claims",
   /* §9.6, owner-confirmed 2026-09-18. The SIDEBAR's own word, not a new one. */
   "purchase-returns": "Purchase Returns",
@@ -113,6 +116,8 @@ export default function PurchasingTabs({ right }: { right?: ReactNode } = {}) {
       ? "forecast-purchase"
       : tabParam === "receiving"
       ? "receiving"
+      : tabParam === "consignment-receives"
+      ? "consignment-receives"
       : tabParam === "claims"
         ? "claims"
       : tabParam === "purchase-returns"

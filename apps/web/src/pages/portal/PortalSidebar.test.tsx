@@ -924,7 +924,7 @@ describe("PortalSidebar — the Purchasing map", () => {
     expect(tree.querySelector(".border-t")).toBeNull();
   });
 
-  it("eleven pages in the approved order, and not a twelfth", () => {
+  it("twelve pages in the approved order, and not a thirteenth", () => {
     renderAt("/operation?tab=purchase");
     for (const key of [
       "purchasing-buy",
@@ -950,6 +950,8 @@ describe("PortalSidebar — the Purchasing map", () => {
       "Repair Orders",
       "Display Requests",
       "Consignment Orders",
+      /* Consignment Receives — follows Houzs frontend/src/components/Sidebar.tsx:552 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
+      "Consignment Receives",
       "Consignment Returns",
     ]);
   });

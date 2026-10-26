@@ -524,6 +524,9 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
                 Purchase Order menu (TabbedProcurementShell at
                 /operation/procurement); this is tab-state driven. */}
             {tab === "receiving" && <OperationReceiving />}
+            {/* Consignment Receives — follows Houzs frontend/src/App.tsx:945 per
+                Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */}
+            {tab === "consignment-receives" && <OperationReceiving consignmentPage />}
             {/* Central Reports → Receiving & Inbound (2026-09-04 card) —
                 reachable by direct URL, like the Purchasing Report. */}
             {tab === "receiving-report" && <OperationReceivingReport />}
