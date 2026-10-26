@@ -154,6 +154,7 @@ import rentalRouter from "./routes/rental";
 import { runContactByCron, runFollowUpMaintenanceCron } from "./cron/contact-by";
 import { runDealerCommissionCloseCron } from "./cron/dealer-commission-close";
 import { runWorkActivityCron } from "./cron/work-activity";
+import { runVelocityPoll } from "./cron/velocity-poll";
 import { runDutyRotaCron } from "./cron/duty-rota";
 import type { AppEnv, Bindings } from "./types";
 
@@ -384,6 +385,17 @@ export default {
       (async () => {
         /* The activity check runs every minute 08:00–20:59 MYT every day; the
            stored Office calendar decides which days and hours count. */
+        /* 0724 (YH 2026-10-26): Radius Velocity lorry positions every 5 minutes,
+           as Houzs. A no-op until the VELOCITY_* secrets are set.
+           Follows Houzs backend/src/index.ts:648-654 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
+        if (_event.cron === "*/5 * * * *") {
+          const r = await runVelocityPoll(env).catch((e) => {
+            console.error("[cron velocity]", e instanceof Error ? e.message : e);
+            return { skipped: true } as const;
+          });
+          if (!("skipped" in r)) console.log(`[cron velocity] ${JSON.stringify(r)}`);
+          return;
+        }
         if (_event.cron === "* 0-12 * * *") {
           await runWorkActivityCron(env);
           return;

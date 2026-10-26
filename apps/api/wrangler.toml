@@ -13,8 +13,9 @@ compatibility_flags = ["nodejs_compat"]
 
 # Cron triggers. Times in UTC; MYT = UTC + 8.
 # Contact-by auto follow-up (migration 0197): 09:00 MYT daily.
+# 0724 Radius Velocity lorry positions: every 5 minutes (no-op until its secrets are set).
 [triggers]
-crons = ["0 1 * * *", "* 0-12 * * *"]
+crons = ["0 1 * * *", "* 0-12 * * *", "*/5 * * * *"]
 
 [observability]
 enabled = true
@@ -46,4 +47,4 @@ enabled = true
 
 # Production triggers are explicit; environment triggers are not inherited.
 [env.production.triggers]
-crons = ["0 1 * * *", "* 0-12 * * *"]
+crons = ["0 1 * * *", "* 0-12 * * *", "*/5 * * * *"]

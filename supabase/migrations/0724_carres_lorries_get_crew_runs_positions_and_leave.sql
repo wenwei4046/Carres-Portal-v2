@@ -155,8 +155,16 @@ create table if not exists public.fleet_lorry_positions (
   source      text not null default 'driver_app' check (source in ('driver_app', 'tracker')),
   received_by uuid references auth.users(id) default auth.uid()
 );
-create index if not exists fleet_lorry_positions_latest_idx
-  on public.fleet_lorry_positions (vehicle_id, recorded_at desc);
+-- Velocity device id (YH 2026-10-26: Radius Velocity, as Houzs; see §8).
+alter table public.fleet_lorry_positions add column if not exists device_id text;
+-- One fix per lorry per moment: a parked lorry reports the same fix on every
+-- poll, and the repeat is a no-op (Houzs scm.lorry_positions UNIQUE (lorry_id,
+-- recorded_at)). Follows Houzs 20261014T1500_scm_lorry_positions.sql:20-34
+-- per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+-- Also serves "latest per lorry" by a backward scan.
+drop index if exists public.fleet_lorry_positions_latest_idx;
+create unique index if not exists fleet_lorry_positions_lorry_time_key
+  on public.fleet_lorry_positions (vehicle_id, recorded_at);
 alter table public.fleet_lorry_positions enable row level security;
 revoke all on public.fleet_lorry_positions from public, anon, authenticated;
 grant select, insert on public.fleet_lorry_positions to authenticated;
@@ -271,3 +279,96 @@ end;
 $fn$;
 revoke all on function public.fleet_confirm_crew(date, uuid, uuid, uuid) from public, anon;
 grant execute on function public.fleet_confirm_crew(date, uuid, uuid, uuid) to authenticated;
+
+-- 8 · Radius Velocity trackers -------------------------------------------------
+-- YH (chat, 2026-10-26): Carres lorries use Radius Velocity, the same as Houzs
+-- (Houzs backend/src/scm/lib/velocity-poll.ts). No tracker is fitted yet: the
+-- API's 5-minute cron does nothing until VELOCITY_REFRESH_TOKEN and
+-- VELOCITY_CUSTOMER_ID are set as Worker secrets.
+-- Follows Houzs backend/src/scm/lib/velocity-poll.ts:89-110 (device to lorry,
+-- ON CONFLICT (lorry_id, recorded_at) DO NOTHING) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+alter table public.partner_fleet add column if not exists velocity_device_id text;
+comment on column public.partner_fleet.velocity_device_id is
+  '0724 (YH 2026-10-26): the Radius Velocity device fitted to this lorry. Blank: the fix is matched by plate.';
+create unique index if not exists partner_fleet_velocity_device_key
+  on public.partner_fleet (velocity_device_id) where velocity_device_id is not null;
+
+-- The Settings vehicle door gains the device; the eight-argument door keeps working.
+create or replace function public.delivery_save_partner_vehicle(
+  p_partner_id uuid, p_vehicle_id uuid, p_plate text, p_vehicle_type text, p_capacity text,
+  p_driver_name text, p_driver_phone text, p_active boolean, p_velocity_device_id text
+) returns jsonb
+language plpgsql security definer
+set search_path = public, pg_temp
+as $fn$
+declare
+  v_saved jsonb;
+  v_old text;
+  v_device text := nullif(btrim(coalesce(p_velocity_device_id, '')), '');
+begin
+  -- the same blank refusals as the 8-argument door (0560), asked here too so
+  -- the migration gate sees this last definition ask for a real answer.
+  if coalesce(p_plate, '') !~ '[^[:space:]]' then
+    raise exception 'the vehicle plate is required' using errcode = '22023', detail = 'plate_required';
+  end if;
+  if coalesce(p_vehicle_type, '') !~ '[^[:space:]]' then
+    raise exception 'the vehicle type is required' using errcode = '22023', detail = 'vehicle_type_required';
+  end if;
+  select velocity_device_id into v_old from partner_fleet where id = p_vehicle_id;
+  v_saved := public.delivery_save_partner_vehicle(p_partner_id, p_vehicle_id, p_plate, p_vehicle_type,
+                                                  p_capacity, p_driver_name, p_driver_phone, p_active);
+  if v_old is distinct from v_device then
+    update partner_fleet set velocity_device_id = v_device where id = (v_saved->>'id')::uuid;
+    perform public.delivery_record_setting_change('partner_vehicle_device', p_partner_id,
+      case when v_old is null then null else jsonb_build_object('velocity_device_id', v_old) end,
+      jsonb_build_object('id', v_saved->>'id', 'velocity_device_id', v_device));
+  end if;
+  return v_saved || jsonb_build_object('velocity_device_id', v_device);
+end;
+$fn$;
+revoke all on function public.delivery_save_partner_vehicle(uuid, uuid, text, text, text, text, text, boolean, text) from public, anon;
+grant execute on function public.delivery_save_partner_vehicle(uuid, uuid, text, text, text, text, text, boolean, text) to authenticated;
+
+-- The cron's one door (service role only; no user JWT reaches it). Each fix is
+-- matched to a Carres lorry by its device id, else by plate; a fix for any other
+-- vehicle, from the future or off the globe is not stored; a repeat is a no-op.
+create or replace function public.fleet_store_velocity_fixes(p_fixes jsonb)
+returns jsonb
+language plpgsql security definer
+set search_path = public, pg_temp
+as $fn$
+declare
+  v_stored int;
+  v_unmatched jsonb;
+begin
+  with fix as (
+    select x.device_id, x.plate, x.lat, x.lng, x.recorded_at
+      from jsonb_to_recordset(coalesce(p_fixes, '[]'::jsonb))
+           as x(device_id text, plate text, lat numeric, lng numeric, recorded_at timestamptz)
+  ), matched as (
+    select fix.*,
+           (select f.id from partner_fleet f
+              join delivery_partners dp on dp.id = f.partner_id and dp.own_fleet
+             where f.velocity_device_id = fix.device_id
+                or public.fleet_plate_key(f.plate) = public.fleet_plate_key(fix.plate)
+             order by (f.velocity_device_id is not distinct from fix.device_id) desc
+             limit 1) as vehicle_id
+      from fix
+  ), ins as (
+    insert into fleet_lorry_positions (vehicle_id, device_id, lat, lng, recorded_at, source, received_by)
+    select m.vehicle_id, m.device_id, m.lat, m.lng, m.recorded_at, 'tracker', null
+      from matched m
+     where m.vehicle_id is not null
+       and m.recorded_at <= now() + interval '2 minutes'
+       and m.lat between -90 and 90 and m.lng between -180 and 180
+    on conflict (vehicle_id, recorded_at) do nothing
+    returning 1
+  )
+  select (select count(*) from ins),
+         coalesce((select jsonb_agg(distinct coalesce(m.plate, m.device_id)) from matched m where m.vehicle_id is null), '[]'::jsonb)
+    into v_stored, v_unmatched;
+  return jsonb_build_object('stored', v_stored, 'unmatched', v_unmatched);
+end;
+$fn$;
+revoke all on function public.fleet_store_velocity_fixes(jsonb) from public, anon, authenticated;
+grant execute on function public.fleet_store_velocity_fixes(jsonb) to service_role;

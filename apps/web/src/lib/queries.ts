@@ -7720,6 +7720,8 @@ export interface DeliverySettingsResponse {
     driver_name: string | null;
     driver_phone: string | null;
     active: boolean;
+    /** 0724 (YH 2026-10-26): the Radius Velocity device on a Carres lorry. */
+    velocity_device_id?: string | null;
   }>;
   templates: DeliveryTemplateRow[];
   changes: DeliverySettingChangeRow[];
