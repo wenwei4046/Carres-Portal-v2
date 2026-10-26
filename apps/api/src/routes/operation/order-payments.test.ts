@@ -260,6 +260,26 @@ describe("POST /:id/payments", () => {
     expect(res.status).toBe(403);
   });
 
+  // Follows Houzs backdateRequestNotify.ts:5-8 per Weisiang's ruling
+  // (2026-10-22): clear Carres rules, implement Houzs (YH 2026-10-26, Q14).
+  it("finance reaches Record payment (payment_record decides)", async () => {
+    const sb = makeSb(
+      { order_payments: { list: { data: null, error: null, count: 0 } } },
+      { data: { payment: { id: PAY_ID, order_id: ORDER_ID, amount: 10 }, orders_paid: 10 }, error: null },
+    );
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/payments`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: 10, paidOn: "2026-06-26", method: "bank", kind: "deposit" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+  });
+
   it("422 when amount is non-positive", async () => {
     const jwt = await makeJwt("operation");
     const res = await app.fetch(

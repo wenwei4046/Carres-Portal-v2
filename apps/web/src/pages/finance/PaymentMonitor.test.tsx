@@ -656,10 +656,12 @@ describe("Payment Monitor — the payment workspace opens below the row", () => 
     await waitFor(() => expect(document.querySelector("[data-section=storage]")).toHaveFocus());
   });
 
-  it("finance reads the workspace; it does not post normal collection (§12)", () => {
+  // Follows Houzs backdateRequestNotify.ts:5-8 per Weisiang's ruling
+  // (2026-10-22): clear Carres rules, implement Houzs (YH 2026-10-26, Q14).
+  it("finance records a payment but does not ask the customer to pay", () => {
     auth.role = "finance";
     show("/finance/monitor?invoice=i3");
-    expect(screen.queryByRole("button", { name: "Record payment" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Record payment" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Ask customer to pay" })).not.toBeInTheDocument();
   });
 

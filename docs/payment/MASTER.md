@@ -916,7 +916,7 @@ release. A live unpaid Storage Invoice prevents Delivery Order creation.
 | Responsible Delivery Operation (the order's collection owner — the individual the Sales Order was dealt to, 0504) | ordinary balance collection, storage-invoice collection, free-storage requests through Operation authority, delivery/storage contact, evidence, normal posting/receipt |
 | Finance Control Duty | bank/payment evidence exception |
 | Storage Waiver Approver | mattress/bedframe day 22–30 decision |
-| Payment Approver | void, reallocation, overpayment review, a payment whose paid date is more than 14 days ago (0707: keyed by Operation it waits in `payment_backdate_requests` and counts only once approved; the person who recorded it cannot approve it; a principal records it directly, as Houzs lets the backdate right do, YH 2026-10-26) |
+| Payment Approver | void, reallocation, overpayment review, a payment whose paid date is more than 14 days ago (0707: keyed by Operation it waits in `payment_backdate_requests` and counts only once approved; the person who recorded it cannot approve it; Finance and a principal record it directly, and Finance has the Record payment door. Follows Houzs backend/src/services/backdateRequestNotify.ts:5-8 and mfg-sales-orders.ts:3915 per Weisiang's ruling 2026-10-22 (clear Carres rules, implement Houzs); YH 2026-10-26, Q14) |
 | Finance | read/export, external bank control, Finance Exception |
 | Manager | Payment settings; Workspace still owns duty assignment |
 

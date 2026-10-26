@@ -115,7 +115,11 @@ orderPaymentsRouter.get("/:id/payments", async (c) => {
 // reprint matches), minted by the one TS helper and handed to the RPC.
 orderPaymentsRouter.post("/:id/payments", async (c) => {
   const auth = c.var.auth;
-  requireOperationOrPrincipal(auth.role);
+  // Finance records a payment too, an old one with no request. Follows Houzs
+  // backend/src/services/backdateRequestNotify.ts:5-8 per Weisiang's ruling
+  // (2026-10-22): clear Carres rules, implement Houzs (YH 2026-10-26, Q14).
+  // payment_record (0707 part 2a) is the boundary; this only lets finance reach it.
+  if (auth.role !== "finance") requireOperationOrPrincipal(auth.role);
 
   const idCheck = ORDER_ID.safeParse(c.req.param("id"));
   if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });

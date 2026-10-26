@@ -24,6 +24,7 @@ const U = {
   approver: uid("2"), // operation, holds payment_approver in Staff & Duties
   principal: uid("3"),
   stranger: uid("4"), // a JWT with no app_users row
+  finance: uid("5"),
 };
 const DEALER = uid("d1");
 const SALES = uid("d2");
@@ -69,7 +70,7 @@ describe.skipIf(!URL)("a backdated payment waits for the Payment Approver (real 
     today = (await q("select timezone('Asia/Kuala_Lumpur', now())::date::text as d")).rows[0].d;
     // the ledger is not what this suite tests: it starts after every date used here
     await q("update gl_config set go_live_on = timezone('Asia/Kuala_Lumpur', now())::date + 1 where id");
-    for (const [id, role] of [[U.recorder, "operation"], [U.approver, "operation"], [U.principal, "principal"]] as const) {
+    for (const [id, role] of [[U.recorder, "operation"], [U.approver, "operation"], [U.principal, "principal"], [U.finance, "finance"]] as const) {
       const email = `it-bd-${role}-${id.slice(-4)}-${RUN}@carres.test`;
       await q("insert into auth.users (id, email) values ($1, $2)", [id, email]);
       await q("insert into app_users (id, email, name, role, status, is_person) values ($1, $2, $3, $4, 'active', true)", [
@@ -135,6 +136,14 @@ describe.skipIf(!URL)("a backdated payment waits for the Payment Approver (real 
     const direct = (await record(40, daysAgo(30), "kown")) as { ok: true; value: any };
     expect(direct.value.pending_approval).toBeFalsy();
     expect(await paid()).toBe(before + 40);
+
+    // finance records an old payment directly too. Follows Houzs
+    // backdateRequestNotify.ts:5-8 per Weisiang's ruling (2026-10-22): clear
+    // Carres rules, implement Houzs (YH 2026-10-26, Q14).
+    await actAs(U.finance);
+    const fin = (await record(35, daysAgo(30), "kfinance")) as { ok: true; value: any };
+    expect(fin.value.pending_approval).toBeFalsy();
+    expect(await paid()).toBe(before + 75);
 
     // the approver keying an old payment still asks, and cannot decide it
     await actAs(U.approver);
