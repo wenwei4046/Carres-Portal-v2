@@ -1346,7 +1346,7 @@ describe("payment.approve_backdated_payment", () => {
   };
   const request = {
     id: "req-1", order_id: "order-9", amount: 300, paid_on: "2026-09-01",
-    requested_at: "2026-10-22T03:00:00Z", orders: { so: 3001, customer_name: "Tan Qu Qu" },
+    requested_at: "2026-10-22T03:00:00Z", requested_by: "recorder", orders: { so: 3001, customer_name: "Tan Qu Qu" },
   };
   it("raises one approval per waiting request, owned by the Payment Approver duty", async () => {
     const { projectBackdatedPaymentWork } = await import("./work");
@@ -1354,7 +1354,7 @@ describe("payment.approve_backdated_payment", () => {
     expect(item).toMatchObject({
       id: "payment:req-1:payment.approve_backdated_payment",
       action: "Approve RM 300.00 paid on Tue, 1 Sep",
-      destination: "/finance/monitor?order=order-9",
+      destination: "/finance/monitor?order=3001",
     });
     expect(item?.owner.dutyKey).toBe("payment_approver");
     expect(item?.owner.acting).toEqual(approver);
@@ -1362,6 +1362,14 @@ describe("payment.approve_backdated_payment", () => {
   it("with nobody holding the duty the item stays, honestly ownerless", async () => {
     const { projectBackdatedPaymentWork } = await import("./work");
     const [item] = projectBackdatedPaymentWork({ requests: [request], approver: null, today: "2026-10-23" });
+    expect(item?.owner.state).toBe("not_assigned");
+  });
+  it("the approver's own request is not theirs to decide: it waits for a principal (Houzs own_request)", async () => {
+    const { projectBackdatedPaymentWork } = await import("./work");
+    const [item] = projectBackdatedPaymentWork({
+      requests: [{ ...request, requested_by: approver.userId }], approver: duty, today: "2026-10-23",
+    });
+    expect(item?.owner.acting).toBeNull();
     expect(item?.owner.state).toBe("not_assigned");
   });
 });

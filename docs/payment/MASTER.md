@@ -777,7 +777,7 @@ object · Cover rule. Object identity is row/card header; owner is metadata/avat
 | Free request day 22–30 | Storage Waiver Approver | same | decision exists |
 | Overpaid/unallocated money | Payment Approver | `Review RM {amount}` | allocated/classified |
 | Suspected wrong/duplicate | Payment Approver | `Review payment RM {amount}` | distinct/corrected/voided |
-| Paid date more than 14 days ago (`payment.approve_backdated_payment`, 0707, awaits Jess's review) | Payment Approver | `Approve RM {amount} paid on {weekday}, {day} {month}` | approved or refused |
+| Paid date more than 14 days ago (`payment.approve_backdated_payment`, 0707, awaits Jess's review) | Payment Approver; a principal when the acting approver keyed it (Houzs own_request rule) | `Approve RM {amount} paid on {weekday}, {day} {month}` | approved or refused |
 | Finance Exception | Finance Control Duty | `Review payment evidence` | exception resolved |
 
 **ONE SALES ORDER, ONE COLLECTION OWNER — AND IT IS THE PERSON THE ORDER WAS DEALT TO (owner

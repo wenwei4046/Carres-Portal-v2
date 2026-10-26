@@ -1108,6 +1108,7 @@ export interface BackdatedPaymentRequestRow {
   amount: number;
   paid_on: string;
   requested_at: string;
+  requested_by: string;
   orders: { so: number | null; customer_name: string | null } | null;
 }
 
@@ -1116,8 +1117,12 @@ export function projectBackdatedPaymentWork(input: {
   approver: WorkspaceDutyResolution | null;
   today: string;
 }): OperationWorkItem[] {
-  const owner = input.approver;
   return input.requests.map((request) => {
+    /* Houzs (so-payment-backdate-requests.ts:79, :332): nobody decides their
+       own request, "Another admin has to". When the acting Payment Approver
+       keyed it, the item is not theirs: it waits for a principal. */
+    const selfKeyed = input.approver?.actingPerson?.userId === request.requested_by;
+    const owner = selfKeyed ? null : input.approver;
     const amount = `RM ${Number(request.amount).toFixed(2)}`;
     const paidOn = invoiceArrivalDayWord(request.paid_on);
     const soRef = request.orders?.so != null ? `SO-${request.orders.so}` : "SO";
@@ -1135,7 +1140,7 @@ export function projectBackdatedPaymentWork(input: {
       ownerState: owner?.state ?? "not_assigned",
       ownerName: owner?.actingPerson?.name ?? null,
       ownerUserId: owner?.actingPerson?.userId ?? null,
-      ...(owner?.actingPerson ? {} : { ownerDuty: "Payment Approver" }),
+      ...(owner?.actingPerson ? {} : { ownerDuty: selfKeyed ? "Principal" : "Payment Approver" }),
       tone: "warning",
       locked: false,
       broken: false,
@@ -1148,7 +1153,9 @@ export function projectBackdatedPaymentWork(input: {
       problem: "Paid date is more than 14 days ago",
       recipient: request.orders?.customer_name ?? null,
       requiredResult: "Approve or refuse recorded",
-      destination: `/finance/monitor?order=${encodeURIComponent(request.order_id)}`,
+      // The Monitor's order scope is the SO number; it lists the order's
+      // waiting requests even when the order has no invoice row yet.
+      destination: request.orders?.so != null ? `/finance/monitor?order=${request.orders.so}` : "/finance/monitor",
       today: input.today,
     });
   });
@@ -1157,7 +1164,7 @@ export function projectBackdatedPaymentWork(input: {
 async function readBackdatedPaymentRequests(c: Context<AppEnv>): Promise<BackdatedPaymentRequestRow[]> {
   const { data, error } = await userClient(c.env, c.var.auth.jwt)
     .from("payment_backdate_requests")
-    .select("id,order_id,amount,paid_on,requested_at,orders(so,customer_name)")
+    .select("id,order_id,amount,paid_on,requested_at,requested_by,orders(so,customer_name)")
     .eq("status", "waiting");
   if (error) throw new Error("Backdated payment requests could not be read");
   return (data ?? []) as unknown as BackdatedPaymentRequestRow[];
