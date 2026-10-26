@@ -24,7 +24,8 @@ import ModuleHeader from "./components/ModuleHeader";
  *
  * ENTERING (Chew, Finance, WhatsApp 2026-10-23, via YH): "New bill" and "Bill
  * from GRN" open OperationPurchaseInvoiceNew, which saves a draft through
- * Finance's own bill door (0721). Confirming (posting) and paying a bill stay
+ * Finance's own bill door (0721), and saving posts it (Q8, Chew 2026-10-26,
+ * Houzs way). Cancelling and paying a bill stay
  * Finance's (finance + principal in the database).
  */
 type BillRow = {
@@ -39,6 +40,8 @@ type BillRow = {
   total_amount: number | string;
   paid_total: number | string;
   unpaid: number | string | null;
+  /** 2026-10-26: the caller's own draft, which it may change. */
+  mine: boolean;
 };
 
 export default function OperationPurchaseInvoices() {
@@ -84,6 +87,8 @@ export default function OperationPurchaseInvoices() {
           columns={columns}
           rowKey={(r) => r.id}
           rowTestId={(r) => `purchase-invoice-row-${r.id}`}
+          // 2026-10-26 (YH, Houzs): your own draft opens to be changed.
+          onRowClick={(r) => { if (r.mine) navigate(`/operation/purchase-invoices/${r.id}/edit`); }}
           storageKey="carres.operation.purchase-invoices.v1"
           appearance="reference"
           fillColumn="supplier"

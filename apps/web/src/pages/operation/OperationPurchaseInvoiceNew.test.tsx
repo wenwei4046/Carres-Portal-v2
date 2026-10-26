@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import OperationPurchaseInvoiceNew from "./OperationPurchaseInvoiceNew";
+import OperationPurchaseInvoiceNew, { OperationPurchaseInvoiceEdit } from "./OperationPurchaseInvoiceNew";
 
 /* 0721 (Chew, Finance, WhatsApp 2026-10-23, via YH): Purchasing enters a bill
    from goods received through Finance's own bill door. Names are invented. */
@@ -40,6 +40,7 @@ function renderAt(path: string) {
         <Routes>
           <Route path="/operation/purchase-invoices/new" element={<OperationPurchaseInvoiceNew />} />
           <Route path="/operation/purchase-invoices/from-grn" element={<OperationPurchaseInvoiceNew fromGrn />} />
+          <Route path="/operation/purchase-invoices/:id/edit" element={<OperationPurchaseInvoiceEdit />} />
           <Route path="/operation" element={<div>Purchase Invoices list</div>} />
         </Routes>
       </MemoryRouter>
@@ -50,6 +51,9 @@ function renderAt(path: string) {
 beforeEach(() => {
   api.calls = [];
   api.routes = {
+    [`${B}/accounts`]: { rows: [{ code: "6100", name: "Freight In", kind: "EXPENSE", for_bill_line: true },
+      { code: "1000", name: "Bank", kind: "ASSET", for_bill_line: false }] },
+    "/api/finance/ledger/departments": { rows: [{ department_type: "OFFICE", department_id: null, name: "Office" }] },
     "/api/operation/suppliers": { suppliers: [{ id: SUP, name: "Lumen Sofa Works" }] },
     [`${B}/bills/grn-candidates`]: { rows: [{ receipt_id: GRN, grn_no: "GRN-A1", po_id: "PO-3001", supplier_id: SUP,
       supplier_name: "Lumen Sofa Works", received_on: "2026-10-20", posted_at: "2026-10-20T02:00:00Z",
@@ -96,5 +100,44 @@ describe("Purchasing enters a supplier bill (0721)", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Use this GRN" }));
     await waitFor(() => expect(screen.getByTestId("purchase-invoice-save")).toBeEnabled());
     expect(api.calls.some((c) => c.url.startsWith(`${B}/bills/grn-candidates?supplierId=${SUP}`))).toBe(true);
+  });
+
+  // YH (chat 2026-10-26), following Houzs: a freight or service line beside the GRN lines.
+  it("Add other line: a no-GRN line with an account from Finance's list and a department saves beside the GRN", async () => {
+    renderAt("/operation/purchase-invoices/from-grn");
+    fireEvent.click(await screen.findByRole("button", { name: "Use this GRN" }));
+    await screen.findByTestId("purchase-invoice-lines");
+    fireEvent.change(screen.getByLabelText("Supplier invoice No"), { target: { value: "LSW-903" } });
+    fireEvent.click(screen.getByTestId("purchase-invoice-add-other"));
+    await screen.findByRole("option", { name: "6100 Freight In" });
+    expect(screen.queryByRole("option", { name: "1000 Bank" })).toBeNull();
+    fireEvent.change(screen.getByLabelText("Description on line 2"), { target: { value: "Freight" } });
+    fireEvent.change(screen.getByLabelText("Account on line 2"), { target: { value: "6100" } });
+    fireEvent.change(screen.getByLabelText("Amount on line 2"), { target: { value: "30" } });
+    expect(screen.getByTestId("purchase-invoice-save")).toHaveTextContent("Save: pick the department on line 2");
+    await screen.findByRole("option", { name: "Office" });
+    fireEvent.change(screen.getByLabelText("Department on line 2"), { target: { value: "OFFICE" } });
+    fireEvent.click(screen.getByTestId("purchase-invoice-save"));
+    await screen.findByText("Purchase Invoices list");
+    expect(api.calls.find((c) => c.method === "POST")?.body).toMatchObject({
+      lines: [{ warehouseReceiptId: GRN }, { accountCode: "6100", description: "Freight", amount: 30, departmentType: "OFFICE" }],
+    });
+  });
+
+  it("Edit: Purchasing's own draft opens with its lines and saves back to the same bill", async () => {
+    const BILL = "77777777-7777-4777-8777-777777777777";
+    api.routes[`/api/operation/purchase-invoices/${BILL}`] = { id: BILL, supplier_id: SUP, supplier_invoice_no: "LSW-904",
+      bill_date: "2026-10-21", due_date: null, narration: null,
+      lines: [{ warehouse_receipt_id: GRN, po_line_id: POL, grn_no: "GRN-A1", sku: "SOFA-3S", description: "SOFA-3S",
+        account_code: null, qty: 2, unit_price: 100, amount: 200, department_type: null, department_id: null }] };
+    renderAt(`/operation/purchase-invoices/${BILL}/edit`);
+    await screen.findByTestId("purchase-invoice-lines");
+    expect(screen.getByLabelText("Supplier invoice No")).toHaveValue("LSW-904");
+    fireEvent.change(screen.getByLabelText("Unit price on line 1"), { target: { value: "90" } });
+    fireEvent.click(screen.getByTestId("purchase-invoice-save"));
+    await screen.findByText("Purchase Invoices list");
+    const put = api.calls.find((c) => c.method === "PUT");
+    expect(put?.url).toBe(`${B}/bills/${BILL}`);
+    expect(put?.body).toMatchObject({ lines: [{ warehouseReceiptId: GRN, poLineId: POL, qty: 2, unitPrice: 90, accountCode: null }] });
   });
 });

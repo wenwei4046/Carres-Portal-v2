@@ -56,7 +56,7 @@ import { generalLedgerBlocks, generalLedgerQuery, type GeneralLedgerAnswer, type
 import { stockValueQuery, stockValueReport, type StockValueAnswer } from "@carres/shared/stock-value";
 import { collectionQuery, collectionReport, type CollectionAnswer } from "@carres/shared/collection";
 import { forecastQuery, forecastReport, forecastSaveInput, type ForecastAnswer, type ForecastSaved } from "@carres/shared/forecast";
-import { requireFinance } from "../../lib/auth-guards";
+import { requireFinance, requireFinanceOrPurchasing } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody, readAllPages } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -411,7 +411,8 @@ async function readChart(sb: Sb): Promise<{ chart: LedgerChart } | { error: PgEr
 }
 
 // 0540: the finance departments, for every Department filter and line picker.
-financeLedgerRouter.get("/departments", requireFinance, async (c) => {
+// 2026-10-26: Purchasing picks a no-GRN bill line's department too (fin_departments is is_internal()).
+financeLedgerRouter.get("/departments", requireFinanceOrPurchasing, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("fin_departments");
   if (error) return ledgerError(c, error, "The department list");

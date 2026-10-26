@@ -82,7 +82,9 @@ export const requireFinance: MiddlewareHandler<AppEnv> = async (c, next) => {
  * with Finance to ENTER a supplier bill from goods received: the GRNs left to
  * bill, their lines, and saving a new draft. The database holds Purchasing to
  * a new draft whose every line is from a GRN (`_purchasing_bill_draft_check`).
- * Confirming, cancelling and paying keep `requireFinance`.
+ * Cancelling and paying keep `requireFinance`. Q8 (Chew 2026-10-26, Houzs): a
+ * bill Purchasing saves posts in the database on save; the confirm route stays
+ * `requireFinance`.
  */
 export const requireFinanceOrPurchasing: MiddlewareHandler<AppEnv> = async (c, next) => {
   const role = c.var.auth?.role;

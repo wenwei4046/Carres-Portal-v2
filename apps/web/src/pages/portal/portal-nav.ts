@@ -619,7 +619,8 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "supplier-items", label: "Supplier items", icon: Boxes, section: "Suppliers" },
       /* Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): the supplier bills,
          inside Purchasing, Houzs way. Jess was not part of this decision. Chew
-         (2026-10-23): Purchasing enters a bill too; Finance confirms and pays (0721). */
+         (2026-10-23): Purchasing enters a bill too, and (Q8, Chew
+         2026-10-26) saving posts it; Finance pays (0721). */
       { key: "purchase-invoices", label: "Purchase Invoices", icon: Receipt, section: "Suppliers" },
       {
         key: "service-notes",

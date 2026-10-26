@@ -1280,10 +1280,20 @@ describe("Purchasing (operation) enters a supplier bill, and cannot pay", () => 
     expect(await res.json()).toMatchObject({ code: "purchasing_bills_goods_received" });
   });
 
-  it("operation cannot change, confirm or cancel a bill, nor touch any payment", async () => {
+  it("2026-10-26 (YH, Houzs): PUT /bills/:id and GET /accounts admit operation; the database holds it to its own draft", async () => {
+    const sb = mockRpc({ data: BILL_ID, error: null });
+    const res = await call(`/bills/${BILL_ID}`, { method: "PUT", body: grnBill, role: "operation" });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_bill_save_draft", expect.objectContaining({ p_bill_id: BILL_ID }));
+    mockRpc({ data: [], error: null });
+    expect((await call("/accounts", { role: "operation" })).status).toBe(200);
+    mockRpc({ data: null, error: { code: "42501", message: "Purchasing changes only its own draft bill.", details: "not_finance" } });
+    expect((await call(`/bills/${BILL_ID}`, { method: "PUT", body: grnBill, role: "operation" })).status).toBe(403);
+  });
+
+  it("operation cannot confirm or cancel a bill, nor touch any payment", async () => {
     const sb = mockRpc({ data: BILL_ID, error: null });
     const refused: Array<[string, string, unknown?]> = [
-      ["PUT", `/bills/${BILL_ID}`, grnBill],
       ["POST", `/bills/${BILL_ID}/confirm`],
       ["POST", `/bills/${BILL_ID}/cancel`, { reason: "x" }],
       ["GET", `/bills/${BILL_ID}`],
@@ -1295,7 +1305,6 @@ describe("Purchasing (operation) enters a supplier bill, and cannot pay", () => 
       ["POST", `/vouchers/${VOUCHER_ID}/advance-applications`, { billId: BILL_ID, amount: 1 }],
       ["POST", "/credit-notes", {}],
       ["POST", "/debit-notes", {}],
-      ["GET", "/accounts"],
     ];
     for (const [method, path, body] of refused) {
       const res = await call(path, { method, body, role: "operation" });

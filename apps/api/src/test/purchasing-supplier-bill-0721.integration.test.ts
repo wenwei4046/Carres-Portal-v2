@@ -2,21 +2,23 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
 
 /**
- * 0721 ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§3 ON A REAL POSTGRESQL: Purchasing enters a supplier bill through
+ * 0721 §3 ON A REAL POSTGRESQL: Purchasing enters a supplier bill through
  * Finance's own door (Chew, Finance, WhatsApp 2026-10-23, relayed by YH).
  *
- *   - operation saves a NEW draft bill from a posted GRN through
+ *   - operation saves a bill from a posted GRN and it posts on save (Q8,
+ *     Chew 2026-10-26; Houzs), through
  *     supplier_bill_save_draft, the same function Finance uses;
- *   - operation cannot change a saved bill, choose an account, bill a line
- *     that is not goods received, confirm, cancel or pay;
- *   - Finance confirms the purchasing draft and it posts exactly what a
- *     Finance-entered bill for the same goods posts.
+ *   - it may add a freight/service line, not one for a GRN's own goods (Q9);
+ *   - operation cannot change a posted bill, choose the payables or a goods
+ *     line's account, enter a bill with no GRN, confirm Finance's bill,
+ *     cancel or pay;
+ *   - a purchasing bill posts exactly what a Finance bill for the same goods posts.
  *
  * One transaction, rolled back at the end.
  *
  *   CARRES_TEST_DATABASE_URL=postgres://postgres@localhost:<port>/<db> pnpm --filter @carres/api test -- purchasing-supplier-bill-0721
  *
- * Without the URL every case is SKIPPED ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â reported as skipped, never as passed.
+ * Without the URL every case is SKIPPED — reported as skipped, never as passed.
  */
 const URL = process.env.CARRES_TEST_DATABASE_URL ?? "";
 const LOCAL = /^postgres(ql)?:\/\/[^@/]*@?(localhost|127\.0\.0\.1|\[::1\])(:\d+)?\//.test(URL);
@@ -109,8 +111,13 @@ describe.skipIf(!URL)("Purchasing enters a supplier bill (real PostgreSQL, 0721)
   });
 
   let purchasingBill = "";
+  const undo = async (sql: string, params: unknown[]) => {
+    await q("savepoint u");
+    try { return await attempt(sql, params); } finally { await q("rollback to savepoint u"); }
+  };
 
-  it("Purchasing sees the GRN left to bill and saves a new draft bill from it", async () => {
+  // Q8 (Chew, WhatsApp to YH 2026-10-26 12:34; Houzs posts on save).
+  it("Purchasing saves a bill from a posted GRN and it posts at once, through Finance's own confirm", async () => {
     await actAs(U.operation);
     const candidates = await attempt("select count(*)::int as n from public.supplier_bill_grn_candidates($1) where receipt_id = $2", [supplierId, GRN]);
     expect(candidates).toEqual({ ok: true, value: 1 });
@@ -120,44 +127,59 @@ describe.skipIf(!URL)("Purchasing enters a supplier bill (real PostgreSQL, 0721)
     const saved = await saveDraft(null, `IT-PB-OP-${RUN}`, grnLine(1, 100));
     expect(saved).toEqual({ ok: true, value: expect.any(String) });
     purchasingBill = (saved as { value: string }).value;
-    const row = (await q("select status, created_by, total_amount::text as total, gl_entry_id from supplier_bills where id = $1", [purchasingBill])).rows[0];
-    expect(row).toEqual({ status: "draft", created_by: U.operation, total: "100.00", gl_entry_id: null });
+    const row = (await q("select status, created_by, total_amount::text as total, gl_entry_id is not null as posted from supplier_bills where id = $1", [purchasingBill])).rows[0];
+    expect(row).toEqual({ status: "confirmed", created_by: U.operation, total: "100.00", posted: true });
   });
 
-  it("Purchasing cannot change a saved bill, choose an account, or bill anything but goods received", async () => {
+  it("Purchasing adds a freight line with an account, but not a no-GRN line for the GRN's own goods (Q9, Houzs)", async () => {
     await actAs(U.operation);
-    expect(await saveDraft(purchasingBill, `IT-PB-OP-${RUN}`, grnLine(1, 90)))
-      .toMatchObject({ ok: false, code: "42501", detail: "not_finance" });
+    const freight = { account_code: expense, description: "Freight", amount: 30, department_type: "OFFICE" };
+    const both = JSON.stringify([...JSON.parse(grnLine(1, 100)), freight]);
+    expect(await undo("select public.supplier_bill_save_draft(null, $1, $2, $3::date, $4::jsonb) as id",
+      [supplierId, `IT-PB-FR-${RUN}`, billDate, both])).toMatchObject({ ok: true });
+    const dup = JSON.stringify([...JSON.parse(grnLine(1, 100)),
+      { ...freight, description: "same goods", sku: `it-sku-0721-${RUN}` }]);
+    expect(await saveDraft(null, `IT-PB-DUP-${RUN}`, dup))
+      .toMatchObject({ ok: false, code: "42501", detail: "unlinked_line_bills_grn_material" });
+  });
+
+  it("Purchasing cannot change a posted bill, choose the payables or a goods line's account, or enter a bill with no GRN", async () => {
+    await actAs(U.operation);
+    expect(await saveDraft(purchasingBill, `IT-PB-OP-${RUN}`, grnLine(1, 90))).toMatchObject({ ok: false, code: "42501" });
     expect(await saveDraft(null, `IT-PB-AP-${RUN}`, grnLine(1, 100), "2100"))
       .toMatchObject({ ok: false, code: "42501", detail: "not_finance" });
     expect(await saveDraft(null, `IT-PB-AC-${RUN}`, grnLine(1, 100, { account_code: expense })))
       .toMatchObject({ ok: false, code: "42501", detail: "not_finance" });
     expect(await saveDraft(null, `IT-PB-FREE-${RUN}`,
-      JSON.stringify([{ account_code: expense, description: "Transport", amount: 50, department_type: "OFFICE" }])))
+      JSON.stringify([{ account_code: expense, description: "Rent", amount: 50, department_type: "OFFICE" }])))
       .toMatchObject({ ok: false, code: "42501", detail: "purchasing_bills_goods_received" });
   });
 
-  it("Purchasing cannot confirm, cancel or pay a bill", async () => {
+  it("Purchasing cannot confirm, change or read Finance's draft, cancel a bill, or pay", async () => {
+    await actAs(U.finance);
+    const fin = await saveDraft(null, `IT-PB-FINFREE-${RUN}`,
+      JSON.stringify([{ account_code: expense, description: "Rent", amount: 10, department_type: "OFFICE" }]));
+    expect(fin).toMatchObject({ ok: true });
+    const finBill = (fin as { value: string }).value;
+
     await actAs(U.operation);
-    expect(await attempt("select public.supplier_bill_confirm($1)", [purchasingBill]))
-      .toMatchObject({ ok: false, code: "42501" });
-    expect(await attempt("select public.supplier_bill_cancel($1, 'IT')", [purchasingBill]))
-      .toMatchObject({ ok: false, code: "42501" });
+    expect(await attempt("select public.supplier_bill_confirm($1)", [finBill])).toMatchObject({ ok: false, code: "42501" });
+    expect(await saveDraft(finBill, `IT-PB-FINFREE-${RUN}`, grnLine(1, 100))).toMatchObject({ ok: false, code: "42501", detail: "not_finance" });
+    expect(await attempt("select public.purchasing_supplier_bill_draft($1) as d", [finBill])).toEqual({ ok: true, value: null });
+    expect(await attempt("select public.supplier_bill_cancel($1, 'IT')", [purchasingBill])).toMatchObject({ ok: false, code: "42501" });
     expect(await attempt(
       `select public.payment_voucher_save_draft(null, 'SUPPLIER_BILLS', $1, 'IT payee', $2::date, $3, '[]'::jsonb,
                jsonb_build_array(jsonb_build_object('bill_id', $4::text, 'amount', 100)), 'BANK_TRANSFER', null, null)`,
       [supplierId, billDate, expense, purchasingBill]))
       .toMatchObject({ ok: false, code: "42501" });
-    const still = (await q("select status from supplier_bills where id = $1", [purchasingBill])).rows[0].status;
-    expect(still).toBe("draft");
+    expect((await q("select status from supplier_bills where id = $1", [finBill])).rows[0].status).toBe("draft");
   });
 
-  it("confirmed by Finance, a purchasing bill posts exactly what a Finance bill for the same goods posts", async () => {
+  it("a purchasing bill posts exactly what a Finance bill for the same goods posts", async () => {
     await actAs(U.finance);
     const financeSaved = await saveDraft(null, `IT-PB-FIN-${RUN}`, grnLine(1, 100));
     expect(financeSaved).toMatchObject({ ok: true });
     const financeBill = (financeSaved as { value: string }).value;
-    expect(await attempt("select public.supplier_bill_confirm($1)", [purchasingBill])).toMatchObject({ ok: true });
     expect(await attempt("select public.supplier_bill_confirm($1)", [financeBill])).toMatchObject({ ok: true });
 
     const a = await posting(purchasingBill);

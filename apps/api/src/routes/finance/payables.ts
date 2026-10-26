@@ -63,7 +63,8 @@ import type { AppEnv } from "../../types";
  *     GET  /bills/:id                   supplier_bill_document
  *     POST /bills                       supplier_bill_save_draft (new draft). 0721: this,
  *                                       grn-candidates and grn-lines also admit operation
- *                                       (Purchasing, Chew 2026-10-23); nothing else does
+ *                                       (Purchasing, Chew 2026-10-23); so do PUT /bills/:id (own
+ *                                       draft) and GET /accounts (YH 2026-10-26)
  *     PUT  /bills/:id                   supplier_bill_save_draft (rewrite a draft)
  *     POST /bills/:id/confirm           supplier_bill_confirm — posts the bill
  *     POST /bills/:id/cancel            supplier_bill_cancel — reverses it if confirmed
@@ -278,7 +279,8 @@ payablesRouter.post("/read-bill", requireFinance, async (c) => {
   return c.json(answer);
 });
 
-payablesRouter.get("/accounts", requireFinance, async (c) => {
+// 2026-10-26 (YH, Houzs): Purchasing picks a no-GRN line's account from this list.
+payablesRouter.get("/accounts", requireFinanceOrPurchasing, async (c) => {
   const { data, error } = await sb(c).rpc("ap_account_choices");
   if (error) return pgFail(c, error);
   return c.json({ rows: data ?? [] });
@@ -496,7 +498,8 @@ payablesRouter.post("/bills", requireFinanceOrPurchasing, async (c) => {
   return c.json({ id: data as string }, 201);
 });
 
-payablesRouter.put("/bills/:id", requireFinance, async (c) => {
+// 2026-10-26 (YH, Houzs): Purchasing changes its OWN draft; the database refuses the rest.
+payablesRouter.put("/bills/:id", requireFinanceOrPurchasing, async (c) => {
   const id = c.req.param("id");
   if (!UUID_RE.test(id)) return badId(c, "bill");
   const body = await parseJsonBody(c, supplierBillDraftInput);
