@@ -151,6 +151,10 @@ describe("POST /api/finance/invoices/:id/issue", () => {
         id: ORDER_ID, so: 1300, customer_name: "LIM KUAN YANG",
         customer_phone: "0123", customer_address: "1 Jalan",
         order_lines: [{ sku: "MS01-K", qty: 2, unit_price: 500 }],
+        order_addons: [
+          { id: "a2", addon_key: "disposal", qty: 1, unit_price: "50.00" },
+          { id: "a1", addon_key: "delivery", qty: 1, unit_price: 50 },
+        ],
       },
     };
     const sb = {
@@ -176,6 +180,11 @@ describe("POST /api/finance/invoices/:id/issue", () => {
         so: "SO-1300", amount: 1100,
         customer: expect.objectContaining({ name: "LIM KUAN YANG" }),
         lines: [{ sku: "MS01-K", qty: 2, unit_price: 500 }],
+        // 0726 / Houzs si-from-do.ts:511: add-ons are frozen with the goods.
+        addons: [
+          { addon_key: "delivery", qty: 1, unit_price: 50 },
+          { addon_key: "disposal", qty: 1, unit_price: 50 },
+        ],
       }),
     });
   });

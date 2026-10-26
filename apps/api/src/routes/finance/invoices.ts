@@ -438,7 +438,7 @@ financeInvoicesRouter.post("/:id/issue", async (c) => {
   const inv: any = invoice;
   const { data: order, error: ordErr } = await sb
     .from("orders")
-    .select("id,so,customer_name,customer_phone,customer_address,order_lines(sku,qty,unit_price)")
+    .select("id,so,customer_name,customer_phone,customer_address,order_lines(sku,qty,unit_price),order_addons(id,addon_key,qty,unit_price)")
     .eq("id", inv.order_id)
     .maybeSingle();
   if (ordErr) {
@@ -464,6 +464,16 @@ financeInvoicesRouter.post("/:id/issue", async (c) => {
     lines: (ord.order_lines ?? []).map(
       (l: { sku: string; qty: number; unit_price: number | null }) => ({
         sku: l.sku, qty: Number(l.qty), unit_price: Number(l.unit_price ?? 0),
+      })),
+    // Add-ons are frozen too. Follows Houzs backend/src/scm/lib/si-from-do.ts:511
+    // (every billed line, accessories and services included, is copied into
+    // sales_invoice_items) per Weisiang's ruling (2026-10-22): clear Carres
+    // rules, implement Houzs. Same shape as 0712 office invoices and 0726.
+    addons: [...(ord.order_addons ?? [])]
+      .sort((a: { addon_key: string; id: string }, b: { addon_key: string; id: string }) =>
+        a.addon_key.localeCompare(b.addon_key) || a.id.localeCompare(b.id))
+      .map((a: { addon_key: string; qty: number; unit_price: number | null }) => ({
+        addon_key: a.addon_key, qty: Number(a.qty), unit_price: Number(a.unit_price ?? 0),
       })),
   };
   const { data, error } = await sb.rpc("payment_invoice_issue", {

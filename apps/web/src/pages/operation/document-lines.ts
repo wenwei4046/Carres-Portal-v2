@@ -96,7 +96,7 @@ export function salesInvoiceLinesOf(invoices: readonly InvoiceRegisterRow[], nam
     if (r.kind !== "sales" || r.status !== "issued" || r.voided_at || !o) return [];
     const snapGoods = Array.isArray(r.snapshot_lines) ? r.snapshot_lines : null;
     // 0712 office invoices always freeze their add-ons (possibly none); a
-    // whole-order snapshot (0429/0476) froze goods only, so its add-ons are live.
+    // whole-order snapshot froze goods only before 0726, so its add-ons are live.
     const snapAddons = Array.isArray(r.snapshot_addons) ? r.snapshot_addons
       : r.snapshot_from === "office" ? [] : null;
     const tag = (from: "invoice" | "order") => (l: Line) => ({ line: l, from });
