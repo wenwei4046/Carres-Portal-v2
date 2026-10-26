@@ -1976,6 +1976,10 @@ operationPosRouter.get("/:id/source-orders", requireOperation, async (c) => {
 
 // ----- POST /new — a Purchase Order with no source (Houzs way) -----
 //
+// Follows Houzs-ERP backend/src/scm/routes/mfg-purchase-orders.ts:1014
+// (createMfgPurchaseOrderHandler: supplier + Purchase Location + lines, no
+// source SO) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+//
 // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22, relayed by YH 2026-10-23):
 // "just clear Carress rules and Implement Houzs inside, as long as they can
 // open SO PO DO". Office staff open a PO by naming the supplier, Deliver To,
