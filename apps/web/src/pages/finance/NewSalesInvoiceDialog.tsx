@@ -118,7 +118,12 @@ export default function NewSalesInvoiceDialog() {
 
   const setPick = (id: string, next: Partial<OfficeInvoicePick>) =>
     setPicks((cur) => ({ ...cur, [id]: { ...(cur[id] ?? { picked: false, qty: 0 }), ...next } }));
+  // Found by SO: shows every live SO line like Houzs SalesInvoiceNew.tsx:261-263
+  // (Weisiang's ruling 2026-10-22), but fills what is left: YH Q15 option C
+  // (2026-10-26), so a part-invoiced SO needs no edits. A line with 0 left shows
+  // unticked and cannot be ticked. Found by DO: only lines with something left.
   const open_ = lines.filter((l) => l.left > 0);
+  const shown = found?.delivery_order ? open_ : lines;
 
   return (
     <>
@@ -175,7 +180,7 @@ export default function NewSalesInvoiceDialog() {
                 <p className="text-kit-slate-11">{NSI_COPY.nothingLeft}</p>
               ) : (
                 <>
-                  {open_.map((l) => {
+                  {shown.map((l) => {
                     const p = picks[l.order_line_id] ?? { picked: false, qty: 0 };
                     return (
                       <div key={l.order_line_id} className="flex items-end gap-3">
@@ -183,6 +188,7 @@ export default function NewSalesInvoiceDialog() {
                           id={`new-si-line-${l.order_line_id}`}
                           label={`${l.sku} · ${rm(l.unit_price)} · ${NSI_COPY.left(l.left)}`}
                           checked={p.picked}
+                          disabled={l.left <= 0}
                           onCheckedChange={(on) => setPick(l.order_line_id, { picked: on === true })}
                         />
                         <Input
@@ -192,7 +198,7 @@ export default function NewSalesInvoiceDialog() {
                           min={1}
                           max={l.left}
                           value={String(p.qty)}
-                          disabled={!p.picked}
+                          disabled={!p.picked || l.left <= 0}
                           onChange={(e) => setPick(l.order_line_id, { qty: Number(e.target.value) })}
                         />
                       </div>

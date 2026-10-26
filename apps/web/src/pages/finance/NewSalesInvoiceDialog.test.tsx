@@ -67,4 +67,24 @@ describe("New Sales Invoice", () => {
     await screen.findByText("This Sales Order is already on Sales Invoice INV-011026-0001.");
     expect(screen.getByRole("button", { name: "Create Sales Invoice" })).toBeDisabled();
   });
+
+  it("found by a part-invoiced SO, shows every line: a fully billed one unticked and locked, a part one at what is left", async () => {
+    state.fetch.mockResolvedValueOnce({
+      ...OFFER,
+      delivery_order: null,
+      lines: [
+        { order_line_id: "bed", sku: "MS12 Firmcare 10inch Queen", qty: 2, unit_price: 1000, invoiced: 1, left: 1 },
+        { order_line_id: "sofa", sku: "SF03 Muro 2 Seater", qty: 1, unit_price: 500, invoiced: 1, left: 0 },
+      ],
+    });
+    show();
+    fireEvent.click(screen.getByRole("button", { name: "New Sales Invoice" }));
+    fireEvent.change(screen.getByLabelText("SO No or DO No"), { target: { value: "1300" } });
+    fireEvent.click(screen.getByRole("button", { name: "Find" }));
+    const sofa = await screen.findByRole("checkbox", { name: /SF03 Muro .* 0 left to invoice/ });
+    expect(sofa).not.toBeChecked();
+    expect(sofa).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: /MS12 Firmcare/ })).toBeChecked();
+    expect(screen.getByLabelText("Qty", { selector: "#new-si-qty-bed" })).toHaveValue(1);
+  });
 });

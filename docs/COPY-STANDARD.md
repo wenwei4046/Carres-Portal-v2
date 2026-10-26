@@ -5930,7 +5930,7 @@ rules in payment/MASTER.md; Jess was not part of this decision. Source: `apps/we
 | Dialog help line | `Pick a Sales Order or Delivery Order and the goods to invoice. You can invoice part now and the rest later.` | part invoices are allowed |
 | Find field and button | `SO No or DO No` · `Find` | a DO ticks the goods it carries; an SO ticks every line |
 | Not found | `No Sales Order or Delivery Order has that number.` | |
-| Line | `{SKU} · {price} · {n} left to invoice` · qty field `Qty` | quantity still to invoice on that line |
+| Line | `{SKU} · {price} · {n} left to invoice` · qty field `Qty` | quantity still to invoice on that line. Found by SO: every live SO line shows; a line with `0 left to invoice` shows unticked and cannot be ticked (YH Q15 option C, 2026-10-26). Found by DO: only lines with something left |
 | Refusals | `Everything on this Sales Order is already invoiced.` · `This Sales Order is already on Sales Invoice {INV No}.` · `This Sales Order is cancelled.` | the door offers nothing to create |
 | Add-ons | `Delivery and other charges go on this invoice.` | add-ons ride on the order's first office invoice |
 | Total and buttons | `Invoice total {RM amount}` · `Cancel` · `Create Sales Invoice` | |
