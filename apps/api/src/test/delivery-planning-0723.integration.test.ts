@@ -139,7 +139,16 @@ describe.skipIf(!URL)("Delivery planning, DP Orders and Trips (real PostgreSQL, 
     expect(await arr(CO)).toMatchObject({ partner_id: NETS, planned_date: TUE, confirmed_date: TUE });
   });
 
-  it("a company job with no agreed day keeps only the planned day", async () => {
+  it("a company's agreed day is not cancelled here: it is changed on Monitor (YH 2026-10-26)", async () => {
+    await as(OP);
+    const cancel = "select public.delivery_plan_cancel($1, 0::smallint, 'NETS asked to move it') as r";
+    expect(await attempt(cancel, [CO])).toMatchObject({ ok: false, detail: "company_date_agreed" });
+    expect(await arr(CO)).toMatchObject({ partner_id: NETS, planned_date: TUE, confirmed_date: TUE });
+  });
+
+  it("a company job with no agreed day keeps only the planned day, and may be cancelled", async () => {
+    // Monitor clears the agreed day (its own door, outside 0723).
+    await q("update ops_delivery_arrangements set confirmed_date = null where order_id = $1 and leg = 0", [CO]);
     await as(OP);
     expect(await attempt("select public.delivery_plan_cancel($1, 0::smallint, 'NETS asked to move it') as r", [CO])).toMatchObject({ ok: true });
     expect(await attempt(plan, [CO, MON, null, null, null])).toMatchObject({ ok: true });

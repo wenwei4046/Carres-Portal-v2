@@ -30,7 +30,8 @@
 -- §15 (no New DO / dispatch runs) and the §10 research line rejecting mandatory
 -- time slots. Unchanged: changing an EXISTING company still goes through
 -- `Change logistics` on Monitor with a reason, and a day the company has
--- already agreed is changed on Monitor, never silently here.
+-- already agreed is changed on Monitor, never silently here, and is not
+-- cancelled here either (YH 2026-10-26).
 -- =============================================================================
 
 set search_path = public;
@@ -320,6 +321,13 @@ begin
   v_day := case when found then public.delivery_trip_day(a) end;
   if v_day is null then
     raise exception 'This delivery has no delivery job to cancel' using errcode = 'P0001', detail = 'no_job';
+  end if;
+  -- YH 2026-10-26: a day the Logistics company has agreed is changed on Monitor,
+  -- so cancelling it here is refused too (else cancel + re-plan moves it).
+  if a.partner_id is not null and a.confirmed_date is not null
+     and not exists (select 1 from public.delivery_partners p where p.id = a.partner_id and p.own_fleet) then
+    raise exception 'The Logistics company has agreed % for this delivery. Change it on Monitor.', a.confirmed_date
+      using errcode = 'P0001', detail = 'company_date_agreed';
   end if;
   update public.ops_delivery_arrangements
      set confirmed_date = null, confirmed_time = null, planned_date = null,

@@ -11,11 +11,12 @@ import Tabs from "@/components/kit/Tabs";
 import Textarea from "@/components/kit/Textarea";
 import { FieldError } from "@/components/kit/FieldFrame";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
-import { apiFetch } from "@/lib/api";
+import { Link } from "react-router-dom";
+import { ApiError, apiFetch } from "@/lib/api";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { useDeliveryDays } from "@/lib/deadline-queries";
 import {
-  OWN_LORRY, carrierOf, fillTimeSlots, ownFleetOf, planRows, planStatus, proposeDates, tripsOf,
+  OWN_LORRY, carrierOf, companyDateAgreed, fillTimeSlots, ownFleetOf, planRows, planStatus, proposeDates, tripsOf,
   type PlanFeed, type PlanRegion, type PlanRow,
 } from "./delivery-planning";
 
@@ -130,16 +131,26 @@ function CancelJob({ row, onClose, onSaved }: { row: PlanRow; onClose: () => voi
     mutationFn: () => send("/cancel", { orderId: row.orderId, leg: row.leg, reason }),
     onSuccess: () => { onSaved(); onClose(); },
   });
+  // YH 2026-10-26: a day the Logistics company agreed is changed on Monitor, never cancelled here.
+  const refusedCode = cancel.error instanceof ApiError ? (cancel.error.body as { code?: string } | null)?.code : undefined;
+  const agreed = companyDateAgreed(row) || refusedCode === "company_date_agreed";
   return (
     <Modal open onOpenChange={(o) => !o && onClose()} title={`Cancel delivery job · ${row.so}`}
       footer={<>
         <Button variant="neutral" onClick={onClose}>Close</Button>
-        <Button variant="primary" loading={cancel.isPending} disabled={!reason.trim()} onClick={() => cancel.mutate()}>Cancel delivery job</Button>
+        {!agreed && <Button variant="primary" loading={cancel.isPending} disabled={!reason.trim()} onClick={() => cancel.mutate()}>Cancel delivery job</Button>}
       </>}>
       <div className="flex flex-col gap-3">
-        <p className="text-body">{fmtDate(row.day ?? "")} · {row.carrier}{row.timeSlot ? ` · ${row.timeSlot}` : ""}. The order goes back to Waiting for a date.</p>
-        <Textarea id="cancel-reason" label="Reason" required rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />
-        {cancel.isError && <FieldError>{errorText(cancel.error)}</FieldError>}
+        <p className="text-body">{fmtDate(row.day ?? "")} · {row.carrier}{row.timeSlot ? ` · ${row.timeSlot}` : ""}.{agreed ? "" : " The order goes back to Waiting for a date."}</p>
+        {agreed ? (
+          <p role="alert" className="text-body" data-testid="cancel-company-date-agreed">
+            {`The Logistics company has agreed ${fmtDate(row.day ?? "")} for this delivery. Change it on `}
+            <Link className="text-kit-blue-11" to="/operation?tab=delivery">Monitor</Link>.
+          </p>
+        ) : (
+          <Textarea id="cancel-reason" label="Reason" required rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />
+        )}
+        {cancel.isError && !agreed && <FieldError>{errorText(cancel.error)}</FieldError>}
       </div>
     </Modal>
   );

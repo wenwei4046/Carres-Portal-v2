@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fillTimeSlots, ownFleetOf, planRows, planStatus, proposeDates, tripsOf, type PlanFeed } from "./delivery-planning";
+import { companyDateAgreed, fillTimeSlots, ownFleetOf, planRows, planStatus, proposeDates, tripsOf, type PlanFeed } from "./delivery-planning";
 
 // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): Delivery Planning,
 // Auto-schedule and Trips the Houzs way. Jess was not part of this decision.
@@ -45,6 +45,15 @@ describe("Delivery Planning rows", () => {
     expect(e).toMatchObject({ carrier: "Not assigned", ownLorry: false, scheduled: false });
     expect(planStatus(e)).toBe("Planned");
     expect(ownFleetOf(feed.companies)?.id).toBe("own");
+  });
+
+  it("only a Logistics company's agreed day is refused for cancel here (YH 2026-10-26)", () => {
+    const rows = planRows(feed);
+    const d = rows.find((r) => r.orderId === "d")!;
+    expect(companyDateAgreed(d)).toBe(false); // own lorry: Carres's own day
+    expect(companyDateAgreed(rows.find((r) => r.orderId === "e")!)).toBe(false); // not assigned
+    expect(companyDateAgreed({ ...d, partnerId: "nets", ownLorry: false })).toBe(true);
+    expect(companyDateAgreed({ ...d, partnerId: "nets", ownLorry: false, scheduled: false })).toBe(false);
   });
 });
 

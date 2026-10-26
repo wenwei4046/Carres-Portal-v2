@@ -99,6 +99,9 @@ export function planRows(feed: PlanFeed): PlanRow[] {
 export const planStatus = (r: PlanRow) =>
   !r.day ? "Waiting for a date" : r.scheduled ? "Scheduled" : r.partnerId ? `Planned, ${r.carrier} may change it` : "Planned";
 
+/** A day a Logistics company agreed: changed or cancelled on Monitor only (YH 2026-10-26). */
+export const companyDateAgreed = (r: PlanRow) => r.scheduled && r.partnerId !== null && !r.ownLorry;
+
 /** One trip = one day + one carrier, stops in order. */
 export type Trip = { key: string; day: string; carrier: string; stops: PlanRow[] };
 export function tripsOf(rows: PlanRow[]): Trip[] {
