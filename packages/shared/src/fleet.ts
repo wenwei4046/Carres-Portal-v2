@@ -168,6 +168,11 @@ export const fleetPositionInput = z.object({
   vehicleId: uuid,
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
-  recordedAt: z.string().datetime({ offset: true }).optional(),
+  /* Not in the future: the Live Map shows the latest fix per lorry (row security refuses it too). */
+  recordedAt: z
+    .string()
+    .datetime({ offset: true })
+    .refine((v) => Date.parse(v) <= Date.now() + 2 * 60_000, { message: "The time is in the future." })
+    .optional(),
   source: z.enum(["driver_app", "tracker"]).default("driver_app"),
 });

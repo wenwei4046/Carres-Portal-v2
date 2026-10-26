@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groupRuns, lorryCapacity, proposeCrew, workingDays, type FleetCrew, type FleetLorry, type FleetStop } from "./fleet";
+import { fleetPositionInput, groupRuns, lorryCapacity, proposeCrew, workingDays, type FleetCrew, type FleetLorry, type FleetStop } from "./fleet";
 
 // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): Houzs Fleet Day / Lorry Capacity.
 const lorry = (id: string, plate: string): FleetLorry => ({ id, plate, vehicleType: "Lorry", capacity: null, active: true });
@@ -66,5 +66,15 @@ describe("groupRuns and lorryCapacity", () => {
     expect(l1).toMatchObject({ trips: 2, stops: 3, revenue: 1000, revenuePerTrip: 500, stopsPerTrip: 1.5 });
     expect(l1.utilisation).toBeCloseTo(2 / 6);
     expect(l2).toMatchObject({ trips: 0, utilisation: 0, revenuePerTrip: null });
+  });
+});
+
+describe("fleetPositionInput", () => {
+  const fix = { vehicleId: "11111111-1111-4111-8111-111111111111", lat: 3.1, lng: 101.6 };
+  it("refuses a fix from the future, which would stay the latest on the Live Map", () => {
+    const later = new Date(Date.now() + 60 * 60_000).toISOString();
+    expect(fleetPositionInput.safeParse({ ...fix, recordedAt: later }).success).toBe(false);
+    expect(fleetPositionInput.safeParse({ ...fix, recordedAt: new Date().toISOString() }).success).toBe(true);
+    expect(fleetPositionInput.safeParse(fix).success).toBe(true);
   });
 });
