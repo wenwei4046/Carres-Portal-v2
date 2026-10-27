@@ -108,8 +108,11 @@ export function IssueForm({ source, onClose, onIssued }: { source: PurchaseRetur
   const [confirmed, setConfirmed] = useState<string | null>(null);
   const [tried, setTried] = useState(false);
   const claimless = source.claim_id === null;
-  const door = usePurchaseReturnWrite<{ id: string }>(claimless ? "/api/operation/purchase-returns/consignment" : "/api/operation/purchase-returns");
-  const title = claimless ? ISSUE_CONSIGNMENT_RETURN : ISSUE_PURCHASE_RETURN;
+  /* Claimless is either main's Consignment Return (0706 §2) or this branch's
+     New Purchase Return (0713); `consignment` tells them apart. */
+  const consignmentReturn = source.consignment === true;
+  const door = usePurchaseReturnWrite<{ id: string }>(consignmentReturn ? "/api/operation/purchase-returns/consignment" : "/api/operation/purchase-returns");
+  const title = consignmentReturn ? ISSUE_CONSIGNMENT_RETURN : ISSUE_PURCHASE_RETURN;
   const missing = purchaseReturnIssueMissing(source, picked);
   const supplier = source.supplier_name ?? "the supplier";
 

@@ -434,7 +434,7 @@ purchaseReturnsRouter.get("/consignment-source", async (c) => {
 // From a claim (`claim_id`), or — Weisiang's decision (Mr Lim, WhatsApp
 // 2026-10-22) — with no claim (`supplier_id`): `New Purchase Return`. One door.
 
-const issueSchema = z.object({
+const issueBodySchema = z.object({
   claim_id: z.string().uuid().optional(),
   supplier_id: z.string().uuid().optional(),
   units: z.array(z.object({
@@ -443,7 +443,8 @@ const issueSchema = z.object({
     pickup_location: z.string().trim().max(160).nullable().optional(),
   })).min(1).max(200),
   confirmed_pickup_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
-}).refine((b) => Boolean(b.claim_id) !== Boolean(b.supplier_id), { message: "name a claim or a supplier" });
+});
+const issueSchema = issueBodySchema.refine((b) => Boolean(b.claim_id) !== Boolean(b.supplier_id), { message: "name a claim or a supplier" });
 
 purchaseReturnsRouter.post("/", purchaseReturnWorkCompletion("issue"), async (c) => {
   gate(c);
@@ -480,7 +481,7 @@ purchaseReturnsRouter.post("/", purchaseReturnWorkCompletion("issue"), async (c)
 // supplier and lines, no claim) per Weisiang's ruling (2026-10-22): clear
 // Carres rules, implement Houzs.
 
-const consignmentIssueSchema = issueSchema.omit({ claim_id: true }).extend({ supplier_id: z.string().uuid() });
+const consignmentIssueSchema = issueBodySchema.omit({ claim_id: true }).extend({ supplier_id: z.string().uuid() });
 
 // No Work completion: a claimless return answers no Work card (the issue card is a claim's).
 purchaseReturnsRouter.post("/consignment", async (c) => {

@@ -652,7 +652,6 @@ export default function OperationPurchaseReturns({ consignment = false }: { cons
 
   return (
     <PurchaseReturnsRegister
-      onNew={() => setCreating(true)}
       returns={query.data?.returns ?? []}
       isLoading={query.isLoading}
       isError={query.isError}
@@ -661,7 +660,7 @@ export default function OperationPurchaseReturns({ consignment = false }: { cons
         const next = new URLSearchParams(previous);
         next.set("new", "1");
         return next;
-      }) : undefined}
+      }) : () => setCreating(true)}
       errorTitle={
         status === 403
           ? `You do not have access to ${label}.`
