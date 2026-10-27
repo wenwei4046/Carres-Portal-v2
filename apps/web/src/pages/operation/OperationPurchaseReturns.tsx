@@ -17,10 +17,12 @@
  *   FLAT      — "do not invent status groups". The rail carries the conditions;
  *               the grid stays one ungrouped list.
  *   READ-ONLY — "Issuing the document does not move stock", and the physical
- *               pickup is Stock's (§7.4, Stock MASTER §12.8). There is no
- *               blank `+ New` here because only an approved Claim/outcome
- *               creates a return, and no batch action because a register that
- *               selects nothing has nothing to act on (§6.7 rule 5).
+ *               pickup is Stock's (§7.4, Stock MASTER §12.8). No batch action
+ *               because a register that selects nothing has nothing to act on
+ *               (§6.7 rule 5). `New Purchase Return` (supplier + Units in
+ *               stock, no claim) is Weisiang's decision (Mr Lim, WhatsApp
+ *               2026-10-22), overturning Jess's "only an approved Claim
+ *               creates a return"; Jess was not part of it.
  *   PURCHASING'S OWN — no Finance, no Credit Consequence, no Work column.
  *
  * ── WHERE ITS ROWS COME FROM ────────────────────────────────────────────────
@@ -64,7 +66,9 @@ import {
   type PurchaseReturnCondition,
   type PurchaseReturnListRow,
 } from "@carres/shared";
-import { useOperationPurchaseReturns } from "@/lib/queries";
+import { useOperationPurchaseReturns, useOperationSuppliers } from "@/lib/queries";
+import Select from "@/components/kit/Select";
+import PurchaseReturnIssue from "./components/PurchaseReturnIssue";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import Button from "@/components/kit/Button";
 import EmptyState from "@/components/kit/EmptyState";
@@ -138,7 +142,8 @@ export interface PurchaseReturnsRegisterProps {
   onRetry?: () => void;
   /** 0706: the Consignment Returns register: same grid, its own tab and words. */
   consignment?: boolean;
-  /** 0706 §2: `New Consignment Return` (claimless, Houzs way). */
+  /** `New Purchase Return` (Weisiang's decision, Mr Lim, WhatsApp 2026-10-22),
+   *  or on the consignment register `New Consignment Return` (0706 §2). */
   onNew?: () => void;
 }
 
@@ -243,16 +248,20 @@ export function PurchaseReturnsRegister({
         /* Identity opens the object (§6.7 rule 2): the full-width PR record
            (§9.6 creation door, built 2026-09-29). */
         accessor: (row) => (
-          <Link
-            className="font-semibold text-kit-blue-11 hover:underline"
-            to={`/operation?tab=${tab}&pr=${encodeURIComponent(row.id)}`}
-            data-testid={`purchase-return-open-${row.id}`}
-          >
-            {purchaseReturnNo(row.pr_no)}
-          </Link>
+          <div className="flex flex-col">
+            <Link
+              className="font-semibold text-kit-blue-11 hover:underline"
+              to={`/operation?tab=${tab}&pr=${encodeURIComponent(row.id)}`}
+              data-testid={`purchase-return-open-${row.id}`}
+            >
+              {purchaseReturnNo(row.pr_no)}
+            </Link>
+            {/* 0713 (YH 2026-10-26): a cancelled return keeps its number. */}
+            {row.cancelled_at && <span className="text-body text-kit-red-11" data-testid={`purchase-return-cancelled-${row.id}`}>Cancelled</span>}
+          </div>
         ),
-        searchValue: (row) => purchaseReturnNo(row.pr_no),
-        exportValue: (row) => purchaseReturnNo(row.pr_no),
+        searchValue: (row) => `${purchaseReturnNo(row.pr_no)}${row.cancelled_at ? " Cancelled" : ""}`,
+        exportValue: (row) => `${purchaseReturnNo(row.pr_no)}${row.cancelled_at ? " · Cancelled" : ""}`,
         filterType: "numbering",
       },
       {
@@ -550,7 +559,11 @@ export function PurchaseReturnsRegister({
                     testId="purchase-returns-show-filters"
                   />
                 ) : null}
-                {onNew ? <Button variant="primary" onClick={onNew} data-testid="consignment-return-new-button">{NEW_CONSIGNMENT_RETURN}</Button> : null}
+                {onNew ? (
+                  consignment
+                    ? <Button variant="primary" onClick={onNew} data-testid="consignment-return-new-button">{NEW_CONSIGNMENT_RETURN}</Button>
+                    : <Button variant="primary" onClick={onNew} data-testid="purchase-returns-new">{NEW_PURCHASE_RETURN}</Button>
+                ) : null}
               </>
             }
             /* ⭐ ONE TRACKED UNIT PER EXPANDED ROW (§9.6). The expansion is the
@@ -597,6 +610,7 @@ export default function OperationPurchaseReturns({ consignment = false }: { cons
   const query = useOperationPurchaseReturns(claim, undefined, consignment);
   const label = consignment ? "Consignment Returns" : "Purchase Returns";
   const status = (query.error as { status?: number } | null)?.status;
+  const [creating, setCreating] = useState(false);
 
   /* `?pr=` opens the full-width record (§9.6: full width after issue); the
      register's own link and every Work card land here. */
@@ -625,6 +639,17 @@ export default function OperationPurchaseReturns({ consignment = false }: { cons
     );
   }
 
+  if (creating) {
+    return <NewPurchaseReturn onClose={() => setCreating(false)} onIssued={(id) => {
+      setCreating(false);
+      setParams((previous) => {
+        const next = new URLSearchParams(previous);
+        next.set("pr", id);
+        return next;
+      });
+    }} />;
+  }
+
   return (
     <PurchaseReturnsRegister
       returns={query.data?.returns ?? []}
@@ -635,7 +660,7 @@ export default function OperationPurchaseReturns({ consignment = false }: { cons
         const next = new URLSearchParams(previous);
         next.set("new", "1");
         return next;
-      }) : undefined}
+      }) : () => setCreating(true)}
       errorTitle={
         status === 403
           ? `You do not have access to ${label}.`
@@ -644,5 +669,32 @@ export default function OperationPurchaseReturns({ consignment = false }: { cons
       errorDetail={query.error?.message}
       onRetry={() => void query.refetch()}
     />
+  );
+}
+
+export const NEW_PURCHASE_RETURN = "New Purchase Return";
+
+/**
+ * `New Purchase Return` with no claim: pick the supplier, then the same issue
+ * form lists that supplier's Units in stock. Weisiang's decision (Mr Lim,
+ * WhatsApp 2026-10-22); Jess was not part of it.
+ */
+function NewPurchaseReturn({ onClose, onIssued }: { onClose: () => void; onIssued: (id: string) => void }) {
+  const suppliers = useOperationSuppliers();
+  const [supplierId, setSupplierId] = useState("");
+  if (supplierId) return <PurchaseReturnIssue supplierId={supplierId} onClose={onClose} onIssued={onIssued} />;
+  return (
+    <div className="flex max-w-md flex-col gap-3 p-4" data-testid="purchase-return-new">
+      <h1 className="text-page text-kit-slate-12">{NEW_PURCHASE_RETURN}</h1>
+      {suppliers.isError ? (
+        <div role="alert"><EmptyState title="Some information could not be refreshed." action={<Button variant="neutral" onClick={() => void suppliers.refetch()}>Try again</Button>} /></div>
+      ) : (
+        <Select id="purchase-return-new-supplier" label="Supplier" placeholder={suppliers.isLoading ? "Loading…" : "Choose the supplier"}
+          disabled={suppliers.isLoading}
+          onValueChange={setSupplierId}
+          options={(suppliers.data?.suppliers ?? []).map((s) => ({ value: s.id, label: s.name }))} />
+      )}
+      <div><Button variant="neutral" onClick={onClose}>Cancel</Button></div>
+    </div>
   );
 }

@@ -594,7 +594,8 @@ opsStockRouter.get("/supplier-returns", requireOperationOrPrincipal, async (c) =
   const { data: docs, error: docErr } = await sb
     .from("purchase_returns")
     .select("id, pr_no, pr_doc_date, confirmed_pickup_date, supplier_id")
-    .in("id", open);
+    .in("id", open)
+    .is("cancelled_at", null);
   if (docErr) throw mapErr(docErr);
   const supplierIds = [...new Set((docs ?? []).map((d) => d.supplier_id as string))];
   const { data: suppliers, error: supErr } = supplierIds.length

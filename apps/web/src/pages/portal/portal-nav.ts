@@ -518,6 +518,12 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         activeFor: ["path:/operation/delivery-orders"],
         section: "Delivery",
       },
+      /* 0716 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office staff
+       * record Delivery Returns and mark DOs Delivered by load scan, the Houzs
+       * way. Overturns Jess's "exactly two children" (Delivery MASTER §8); Jess
+       * was not part of this decision. */
+      { key: "delivery-returns", label: "Delivery Returns", icon: Undo2, tab: "delivery-returns", section: "Delivery" },
+      { key: "load-scan", label: "Load Scan", icon: PackageCheck, tab: "load-scan", section: "Delivery" },
       /* THE WAREHOUSE MAP IS FIVE DESTINATIONS (owner ruling 2026-09-14):
        * `Arrival Schedule · Pickup Schedule · Inbound · Inventory · Outbound`.
        *
@@ -628,6 +634,9 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "purchasing-report", label: "Purchasing report", icon: BarChart3, section: "Reports" },
       { key: "receiving-report", label: "Receiving report", icon: BarChart3, section: "Reports" },
       { key: "delivery-report", label: "Delivery report", icon: BarChart3, section: "Reports" },
+      /* Follows Houzs frontend/src/pages/scm-v2/DeliveryReturnDetailListing.tsx:32-153
+         per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
+      { key: "delivery-return-lines", label: "Delivery return lines", icon: BarChart3, section: "Reports" },
       /* Houzs detail-listing port (row 15): one row per document line, read
          from each Register's own read. Awaits Jess's review. */
       { key: "sales-order-lines", label: "Sales order lines", icon: BarChart3, section: "Reports" },
