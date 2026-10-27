@@ -1516,13 +1516,11 @@ describe("PortalSidebar — the Delivery module's two destinations", () => {
         .getByTestId("nav-children-delivery")
         .querySelectorAll("[data-testid^='nav-child-']"),
     ).map((el) => el.textContent?.replace("Coming soon", "").trim());
-    // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office Delivery
-    // Returns and Load Scan join the rail after Delivery Orders. This
-    // overturns Jess's "exactly two children"; Jess was not part of it.
-        // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): Delivery Planning, DP
-    // Orders, Auto-schedule and Trips join the rail after Delivery Orders. This
-    // overturns Jess's "exactly two children"; Jess was not part of it.
-    expect(rows).toEqual(["Monitor", "Delivery Orders", "Delivery Returns", "Load Scan", "Delivery Planning", "DP Orders", "Auto-schedule", "Trips"]);
+    // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): Delivery Returns, Load
+    // Scan, Delivery Planning, DP Orders, Auto-schedule and Trips, then Carres' own
+    // lorries (Fleet Day, Live Map, Lorry Capacity, Crew Leave) join the rail after
+    // Delivery Orders. This overturns Jess's "exactly two children"; Jess was not part of it.
+    expect(rows).toEqual(["Monitor", "Delivery Orders", "Delivery Returns", "Load Scan", "Delivery Planning", "DP Orders", "Auto-schedule", "Trips", "Fleet Day", "Live Map", "Lorry Capacity", "Crew Leave"]);
   });
 
   it("Monitor opens ?tab=delivery and is the ONLY active row there", () => {

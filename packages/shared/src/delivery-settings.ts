@@ -140,6 +140,8 @@ export const partnerDriverInput = z.object({
   name: trimmed(120).min(1, "The driver name is required."),
   phone: optionalText(40),
   active: z.boolean().default(true),
+  /* 0724 (Weisiang's decision 2026-10-22): a crew member drives or helps. */
+  role: z.enum(["driver", "helper"]).nullish(),
 });
 export type PartnerDriverInput = z.infer<typeof partnerDriverInput>;
 
@@ -152,6 +154,8 @@ export const partnerVehicleInput = z.object({
   driverName: optionalText(120),
   driverPhone: optionalText(40),
   active: z.boolean().default(true),
+  /* 0724 (YH 2026-10-26): the Radius Velocity device on a Carres lorry; null clears it. */
+  velocityDeviceId: optionalText(64),
 });
 export type PartnerVehicleInput = z.infer<typeof partnerVehicleInput>;
 

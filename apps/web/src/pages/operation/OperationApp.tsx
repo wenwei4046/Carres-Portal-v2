@@ -60,6 +60,7 @@ import OperationPurchaseOrders from "./purchase-orders/PurchaseOrdersPage";
 import OperationReceiving from "./OperationReceiving";
 import OperationReceivingReport from "./OperationReceivingReport";
 import OperationDeliveryReport from "./OperationDeliveryReport";
+import { CrewLeavePage, FleetDayPage, FleetLiveMapPage, LorryCapacityPage } from "./OperationFleet";
 import { DeliveryOrderLinesReport, SalesInvoiceLinesReport, SalesOrderLinesReport } from "./DocumentLinesReport";
 // R2 (0288) — the supplier-claim queue, fourth tab of the Purchasing module.
 import OperationSupplierClaims from "./OperationSupplierClaims";
@@ -563,6 +564,12 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
             {tab === "delivery-report" && <OperationDeliveryReport />}
             {/* Follows Houzs DeliveryReturnDetailListing.tsx:32-153 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */}
             {tab === "delivery-return-lines" && <DeliveryReturnLinesReport />}
+            {/* 0724 — Carres' own lorries, the Houzs way (Weisiang's decision
+                2026-10-22; Jess was not part of this decision). */}
+            {tab === "fleet-day" && <FleetDayPage />}
+            {tab === "fleet-map" && <FleetLiveMapPage />}
+            {tab === "fleet-capacity" && <LorryCapacityPage />}
+            {tab === "crew-leave" && <CrewLeavePage />}
             {tab === "sales-order-lines" && <SalesOrderLinesReport />}
             {tab === "delivery-order-lines" && <DeliveryOrderLinesReport />}
             {tab === "sales-invoice-lines" && <SalesInvoiceLinesReport />}

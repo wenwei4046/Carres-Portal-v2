@@ -7797,7 +7797,7 @@ export interface DeliverySettingsPartnerRow extends DeliveryPartnerRow {
 }
 export interface DeliverySettingsResponse {
   partners: DeliverySettingsPartnerRow[];
-  drivers: Array<{ id: string; partner_id: string; name: string; phone: string | null; active: boolean }>;
+  drivers: Array<{ id: string; partner_id: string; name: string; phone: string | null; active: boolean; role?: "driver" | "helper" | null }>;
   vehicles: Array<{
     id: string;
     partner_id: string;
@@ -7807,6 +7807,8 @@ export interface DeliverySettingsResponse {
     driver_name: string | null;
     driver_phone: string | null;
     active: boolean;
+    /** 0724 (YH 2026-10-26): the Radius Velocity device on a Carres lorry. */
+    velocity_device_id?: string | null;
   }>;
   templates: DeliveryTemplateRow[];
   changes: DeliverySettingChangeRow[];

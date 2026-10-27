@@ -49,6 +49,8 @@ import {
   ClipboardX,
   Factory,
   Handshake,
+  MapPin,
+  Gauge,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@carres/shared/domain";
@@ -554,6 +556,14 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "dp-orders", label: "DP Orders", icon: ClipboardList, tab: "dp-orders", section: "Delivery" },
       { key: "auto-schedule", label: "Auto-schedule", icon: CalendarClock, tab: "auto-schedule", section: "Delivery" },
       { key: "trips", label: "Trips", icon: Truck, tab: "trips", section: "Delivery" },
+      /* CARRES' OWN LORRIES (0724) — Weisiang's decision (Mr Lim, WhatsApp
+       * 2026-10-22): Houzs Fleet Day, Live Map, Lorry Capacity and Crew
+       * Leave. Jess was not part of this decision; her "no Fleet / Trips
+       * destination" rejection (Delivery MASTER §15) is marked overturned. */
+      { key: "fleet-day", label: "Fleet Day", icon: Users, section: "Delivery" },
+      { key: "fleet-map", label: "Live Map", icon: MapPin, section: "Delivery" },
+      { key: "fleet-capacity", label: "Lorry Capacity", icon: Gauge, section: "Delivery" },
+      { key: "crew-leave", label: "Crew Leave", icon: CalendarOff, section: "Delivery" },
       /* THE WAREHOUSE MAP IS FIVE DESTINATIONS (owner ruling 2026-09-14):
        * `Arrival Schedule · Pickup Schedule · Inbound · Inventory · Outbound`.
        *

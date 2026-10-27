@@ -32,6 +32,7 @@ import correctionWorkRouter from "./routes/operation/correction-work";
 import operationOrdersRouter from "./routes/operation/orders";
 import operationPartnersRouter from "./routes/operation/partners";
 import deliverySettingsRouter from "./routes/operation/delivery-settings";
+import fleetRouter from "./routes/operation/fleet";
 import peopleWorkDaysRouter from "./routes/operation/people-work-days";
 import operationPosRouter from "./routes/operation/pos";
 import operationReceiveThreadsRouter from "./routes/operation/receive-threads";
@@ -158,6 +159,7 @@ import rentalRouter from "./routes/rental";
 import { runContactByCron, runFollowUpMaintenanceCron } from "./cron/contact-by";
 import { runDealerCommissionCloseCron } from "./cron/dealer-commission-close";
 import { runWorkActivityCron } from "./cron/work-activity";
+import { runVelocityPoll } from "./cron/velocity-poll";
 import { runDutyRotaCron } from "./cron/duty-rota";
 import type { AppEnv, Bindings } from "./types";
 
@@ -286,6 +288,8 @@ api.route("/address-lists", addressListsReadRouter);
 api.route("/operation/staff", opsStaffRouter);
 api.route("/operation/partners", operationPartnersRouter);
 api.route("/operation/delivery-settings", deliverySettingsRouter);
+// 0724 · Carres own lorries (Weisiang's decision 2026-10-22, Houzs way).
+api.route("/operation/fleet", fleetRouter);
 // 0678 — the responsible person's recorded working week (People/HR), read-only.
 api.route("/operation/people", peopleWorkDaysRouter);
 api.route("/operation/pos", operationPosRouter);
@@ -399,6 +403,17 @@ export default {
       (async () => {
         /* The activity check runs every minute 08:00–20:59 MYT every day; the
            stored Office calendar decides which days and hours count. */
+        /* 0724 (YH 2026-10-26): Radius Velocity lorry positions every 5 minutes,
+           as Houzs. A no-op until the VELOCITY_* secrets are set.
+           Follows Houzs backend/src/index.ts:648-654 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
+        if (_event.cron === "*/5 * * * *") {
+          const r = await runVelocityPoll(env).catch((e) => {
+            console.error("[cron velocity]", e instanceof Error ? e.message : e);
+            return { skipped: true } as const;
+          });
+          if (!("skipped" in r)) console.log(`[cron velocity] ${JSON.stringify(r)}`);
+          return;
+        }
         if (_event.cron === "* 0-12 * * *") {
           await runWorkActivityCron(env);
           return;
