@@ -467,6 +467,11 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         section: "Purchasing",
         pageGroup: "purchasing-buy",
       },
+      /* PO Amendments · Cancellation Requests (0717) — Weisiang's decision
+       * (Mr Lim, WhatsApp 2026-10-22; Jess was not part of this decision):
+       * a PO change or cancellation waits for approval, the Houzs way. */
+      { key: "po-amendments", label: "PO Amendments", icon: BadgeCheck, section: "Purchasing", pageGroup: "purchasing-buy" },
+      { key: "po-cancellation-requests", label: "Cancellation Requests", icon: ClipboardX, section: "Purchasing", pageGroup: "purchasing-buy" },
 
       /* RECEIVE — one page today, and it still earns its own drawer: the
        * receipt is its own step in the operator's day, and the drawer is where
@@ -522,6 +527,12 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         activeFor: ["path:/operation/delivery-orders"],
         section: "Delivery",
       },
+      /* 0716 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office staff
+       * record Delivery Returns and mark DOs Delivered by load scan, the Houzs
+       * way. Overturns Jess's "exactly two children" (Delivery MASTER §8); Jess
+       * was not part of this decision. */
+      { key: "delivery-returns", label: "Delivery Returns", icon: Undo2, tab: "delivery-returns", section: "Delivery" },
+      { key: "load-scan", label: "Load Scan", icon: PackageCheck, tab: "load-scan", section: "Delivery" },
       /* 0719 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office staff send
        * goods to customers on consignment and take unsold goods back, Houzs way.
        * Overturns Jess's Purchasing MASTER consignment rules and the Consignment
@@ -596,6 +607,10 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         tab: "warehouse-outbound",
         section: "Warehouse",
       },
+      // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): the Houzs-way
+      // Warehouses page (Sites · Inventory by item · Racks and Bins · Loading
+      // List · Stock Card). Jess was not part of this decision.
+      { key: "wh-warehouses", label: "Warehouses", icon: Warehouse, tab: "warehouses", section: "Warehouse" },
       /* ⭐ PAYMENTS → Monitor · Payment Records (owner ruling 2026-09-12).
        *
        * `Monitor` is the full-width collection control listing keyed on the
@@ -641,6 +656,9 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "purchasing-report", label: "Purchasing report", icon: BarChart3, section: "Reports" },
       { key: "receiving-report", label: "Receiving report", icon: BarChart3, section: "Reports" },
       { key: "delivery-report", label: "Delivery report", icon: BarChart3, section: "Reports" },
+      /* Follows Houzs frontend/src/pages/scm-v2/DeliveryReturnDetailListing.tsx:32-153
+         per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
+      { key: "delivery-return-lines", label: "Delivery return lines", icon: BarChart3, section: "Reports" },
       /* Houzs detail-listing port (row 15): one row per document line, read
          from each Register's own read. Awaits Jess's review. */
       { key: "sales-order-lines", label: "Sales order lines", icon: BarChart3, section: "Reports" },

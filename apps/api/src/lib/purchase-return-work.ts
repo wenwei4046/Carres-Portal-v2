@@ -90,6 +90,8 @@ export function purchaseReturnWorkResult(ruleKey: string, facts: PurchaseReturnD
     return ruleKey === PURCHASE_RETURN_WORK_RULE.issue && facts.returnIds.length ? `purchase_returns=${facts.returnIds.join(",")}` : null;
   }
   const pr = facts;
+  // A cancelled return (0713, YH 2026-10-26) owes nothing more.
+  if (pr.cancelled_at) return `purchase_returns.cancelled_at=${pr.cancelled_at}`;
   switch (ruleKey) {
     case PURCHASE_RETURN_WORK_RULE.send:
       return purchaseReturnSendLine(pr).sent ? `document_sends=purchase_return:${pr.id}` : null;
@@ -111,6 +113,7 @@ const DOOR_RULES = {
   issue: [PURCHASE_RETURN_WORK_RULE.issue],
   send: [PURCHASE_RETURN_WORK_RULE.send],
   pickup: [PURCHASE_RETURN_WORK_RULE.confirmTomorrowsPickup, PURCHASE_RETURN_WORK_RULE.pickupMissed],
+  cancel: [PURCHASE_RETURN_WORK_RULE.send, PURCHASE_RETURN_WORK_RULE.confirmTomorrowsPickup, PURCHASE_RETURN_WORK_RULE.pickupMissed],
 } as const;
 
 function spec(door: keyof typeof DOOR_RULES): WorkCompletionSpec<PurchaseReturnDetail | ClaimFacts | null> {
