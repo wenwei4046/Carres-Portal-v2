@@ -9,6 +9,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { SoBatchOrderRow, SoBatchPurchaseResponse } from "@carres/shared";
 import { soBatchAction } from "@carres/shared";
 
+// The shared Tasks host owns its Work query; isolate purchase read assertions.
+vi.mock("./use-open-work", () => ({ useOpenWorkSet: () => ({ items: [], hasData: false, error: false, generatedOn: null }) }));
 const navigate = vi.fn();
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");

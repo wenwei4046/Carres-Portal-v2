@@ -75,6 +75,8 @@ export interface GrnRegisterFactRow {
   extra: boolean;
   /** A cancelled (voided) GRN. It keeps its row and its number forever. */
   cancelled: boolean;
+  /** Receipt of a Consignment Order (`purchase_orders.is_consignment`). */
+  consignment?: boolean;
   /** What the Search box may match — the placeholder's own list: GRN, PO,
    *  supplier or DO number. Lower-cased by the builder, not the caller. */
   searchText: string;
@@ -93,6 +95,8 @@ export interface GrnRegisterSelection {
   to?: string | null;
   /** `Cancelled GRNs` — true narrows to them. Absent lists both. */
   cancelled?: boolean | null;
+  /** `Consignment goods` — true narrows to receipts of Consignment Orders. */
+  consignment?: boolean | null;
   q?: string | null;
   columns?: RegisterColumnQuery | null;
 }
@@ -118,6 +122,7 @@ export interface GrnRegisterView {
     /** Overlapping by construction — never summed into a total. */
     receivedWith: Record<GrnReceivedWith, number>;
     cancelled: number;
+    consignment: number;
   };
 }
 
@@ -128,6 +133,7 @@ type FacetKey =
   | "receivedWith"
   | "grnDate"
   | "cancelled"
+  | "consignment"
   | "";
 
 function hasReceivedWith(r: GrnRegisterFactRow, kind: GrnReceivedWith): boolean {
@@ -161,6 +167,8 @@ function matchesExcept(
     return false;
   if (except !== "cancelled" && sel.cancelled === true && !r.cancelled)
     return false;
+  if (except !== "consignment" && sel.consignment === true && !r.consignment)
+    return false;
   if (except !== "grnDate") {
     // A record with no creation date on file is not given one: it simply is
     // not in any dated answer.
@@ -191,6 +199,7 @@ export function buildGrnRegisterView(
     extra: 0,
   };
   let cancelled = 0;
+  let consignment = 0;
   const filtered: GrnRegisterFactRow[] = [];
   for (const r of rows) {
     if (matchesExcept(r, sel, "category"))
@@ -209,6 +218,7 @@ export function buildGrnRegisterView(
       if (r.extra) receivedWith.extra += 1;
     }
     if (matchesExcept(r, sel, "cancelled") && r.cancelled) cancelled += 1;
+    if (matchesExcept(r, sel, "consignment") && r.consignment) consignment += 1;
     if (matchesExcept(r, sel, "")) filtered.push(r);
   }
   const sort = sel.columns?.sort;
@@ -224,7 +234,7 @@ export function buildGrnRegisterView(
   return {
     total: filtered.length,
     pageIds: filtered.slice(from, from + Math.max(1, limit)).map((r) => r.id),
-    facets: { category, supplier, site, grnDate, receivedWith, cancelled },
+    facets: { category, supplier, site, grnDate, receivedWith, cancelled, consignment },
   };
 }
 

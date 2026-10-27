@@ -199,6 +199,7 @@ for (const width of WIDTHS) {
     expect(await carresCheck(page), "ticked: carres-check.js").toEqual(PASS);
 
     expect((await page.getByTestId("selection-bar").boundingBox())!.height).toBe(36);
+    await page.screenshot({ path: `output/purchasing-shell-selection/selection-${width}.png`, fullPage: true });
     await page.getByTestId("selection-bar").getByRole("button", { name: "Page tools", exact: true }).click();
     await expect(page.getByRole("menuitem", { name: "Export Excel (1)", exact: true })).toBeVisible();
     expect(await carresCheck(page), "selection export remains reachable inside the existing menu").toEqual(PASS);

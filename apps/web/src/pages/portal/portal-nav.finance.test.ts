@@ -42,7 +42,7 @@ describe("the Finance modules (Chew, 2026-10-03)", () => {
       "Receivables: AR · Receivables · Other debtors · Other receipts",
       "Bank & Cards: Daily Bank · Card settlement · Card money waiting · Money moves",
       "Ledger: Journal · Opening balances · General Ledger · Trial Balance · Self-check",
-      "Reports: Profit and Loss · Balance Sheet · Cash Flow · AP Aging · AR Aging · Collection · Card charges · Dealer commission · Stock value · Payment",
+      "Reports: Profit and Loss · Balance Sheet · Cash Flow · AP Aging · AR Aging · Collection · Card charges · Dealer commission · Stock value · Stock drops · Payment",
       "Forecast",
       "Rental Approver",
       "Subscriptions",
@@ -108,6 +108,7 @@ describe("the Finance modules (Chew, 2026-10-03)", () => {
       "card-charges": "/finance/reports/card-charges",
       "dealer-commission": "/finance/reports/dealer-commission",
       "stock-value": "/finance/reports/stock-value",
+      "stock-drops": "/finance/reports/stock-drops",
       "payment-report": "/finance/reports/payment",
       forecast: "/finance/reports/forecast",
     });
@@ -127,7 +128,7 @@ describe("the Finance modules (Chew, 2026-10-03)", () => {
   it("no other area has a page in a Finance module", () => {
     /* `Reports` left this set on 2026-10-08: the owner gave Operations its own
        Reports module under DATA (Layout Standard §2). The modules stay apart —
-       it holds only the three Operations report pages, none of them Finance's. */
+       it holds only the Operations report pages, none of them Finance's. */
     const financeSections = new Set(["Payables", "Receivables", "Bank & Cards", "Ledger", "Forecast"]);
     const elsewhere = PORTAL_NAV.filter((g) => g.area !== "finance").flatMap((g) =>
       g.items.filter((it) => it.section && financeSections.has(it.section)).map((it) => `${g.area}:${it.key}`),
@@ -140,6 +141,10 @@ describe("the Finance modules (Chew, 2026-10-03)", () => {
       "operation:purchasing-report",
       "operation:receiving-report",
       "operation:delivery-report",
+      "operation:delivery-return-lines",
+      "operation:sales-order-lines",
+      "operation:delivery-order-lines",
+      "operation:sales-invoice-lines",
     ]);
     const financeKeys = new Set(FINANCE.items.map((it) => it.key));
     for (const key of opsReports) expect(financeKeys.has(key.split(":")[1]!), key).toBe(false);

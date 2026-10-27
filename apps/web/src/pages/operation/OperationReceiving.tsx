@@ -45,6 +45,7 @@ import Button from "@/components/kit/Button";
 import Tabs from "@/components/kit/Tabs";
 import Drawer from "@/components/kit/Drawer";
 import PurchasingTabs from "./PurchasingTabs";
+import Checkbox from "@/components/kit/Checkbox";
 import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
 // ⭐ HEADER PALETTE MATCHES THE PURCHASING REGISTERS (owner request 2026-09-15)
 // — the same approved light slate blue-grey table header as SO Batch
@@ -89,7 +90,41 @@ function weekLabel(from: string, to: string): string {
     : `${left} to ${right}`;
 }
 
-export default function OperationReceiving() {
+/**
+ * ⭐ ONE DELIVERY, SEVERAL POs OF ONE SUPPLIER — Weisiang's decision (Mr Lim,
+ * WhatsApp 2026-10-22), overturning Jess's "no multi-PO receipt workflow";
+ * Jess was not part of it. `?queue=` holds the POs still to receive: each post
+ * opens the next PO in the same one Receiving engine.
+ * ponytail: one GRN per PO, received in turn; one combined GRN if asked.
+ */
+export function receivingAfterPost(params: URLSearchParams, receiptId: string): URLSearchParams {
+  const next = new URLSearchParams(params);
+  const [head, ...rest] = (params.get("queue") ?? "").split(",").filter(Boolean);
+  if (head) {
+    next.set("po", head);
+    if (rest.length) next.set("queue", rest.join(","));
+    else next.delete("queue");
+    return next;
+  }
+  for (const k of ["po", "find", "arrival", "queue"]) next.delete(k);
+  next.set("session", receiptId);
+  return next;
+}
+
+/** A PO joins the ticked set only when it is the same supplier's. */
+export function sameSupplierPick(picked: readonly operationPoListRow[], po: operationPoListRow): boolean {
+  return picked.every((p) => p.supplier_id === po.supplier_id);
+}
+
+/**
+ * `consignmentPage` — the Purchase Consignment Receive page (Showroom drawer): the SAME
+ * GRN register and receipt engine, locked to receipts of Consignment Orders.
+ * Follows Houzs frontend/src/components/Sidebar.tsx:552 and
+ * frontend/src/pages/scm-v2/PurchaseConsignmentReceives.tsx:1-16 (its own
+ * Purchase Consignment Receive list) per Weisiang's ruling (2026-10-22): clear
+ * Carres rules, implement Houzs.
+ */
+export default function OperationReceiving({ consignmentPage = false }: { consignmentPage?: boolean } = {}) {
   const [params, setParams] = useSearchParams();
   const view = params.get("view") === "differences" ? "differences" : "records";
   const sessionId = params.get("session");
@@ -117,6 +152,10 @@ export default function OperationReceiving() {
   const fromSel = params.get("from");
   const toSel = params.get("to");
   const cancelledSel = params.get("cancelled") === "1";
+  /** `Consignment goods` — the Consignment Receive entry, Houzs way: the same
+   *  Receiving, narrowed to Consignment Orders (Weisiang's decision, Mr Lim,
+   *  WhatsApp 2026-10-22; Jess was not part of it). */
+  const consignmentSel = consignmentPage || params.get("consignment") === "1";
   const [search, setSearch] = useState("");
   const [offset, setOffset] = useState(0);
   const [presentation, setPresentation] = useState("table");
@@ -142,6 +181,7 @@ export default function OperationReceiving() {
     fromSel,
     toSel,
     cancelledSel ? "1" : "",
+    consignmentSel ? "c" : "",
     search,
   ].join("|");
   useEffect(() => {
@@ -160,6 +200,7 @@ export default function OperationReceiving() {
     from: fromSel,
     to: toSel,
     cancelled: cancelledSel,
+    consignment: consignmentSel,
     q: search,
   };
   const registerQ = useOperationGrnRegister(registerFilters);
@@ -216,7 +257,7 @@ export default function OperationReceiving() {
     setParams(next, { replace: true });
   }
 
-  const RAIL_KEYS = ["category", "supplier", "site", "received", "from", "to", "cancelled"];
+  const RAIL_KEYS = ["category", "supplier", "site", "received", "from", "to", "cancelled", "consignment"];
   function clearRail() {
     const next = new URLSearchParams(params);
     for (const key of RAIL_KEYS) next.delete(key);
@@ -641,7 +682,8 @@ export default function OperationReceiving() {
     siteSel !== null ||
     receivedSel !== null ||
     dateChosen ||
-    cancelledSel;
+    cancelledSel ||
+    (consignmentSel && !consignmentPage);
 
   /**
    * ⭐ THE ACTIVE CONDITIONS LIVE IN THE TOOLBAR — owner correction 2026-09-18.
@@ -711,6 +753,9 @@ export default function OperationReceiving() {
             onClear: () => setFacet("cancelled", null),
           },
         ]
+      : []),
+    ...(consignmentSel && !consignmentPage
+      ? [{ key: "consignment", label: "Consignment goods", onClear: () => setFacet("consignment", null) }]
       : []),
   ];
 
@@ -797,6 +842,7 @@ export default function OperationReceiving() {
     next.delete("arrival");
     next.delete("po");
     next.delete("find");
+    next.delete("queue");
     next.set("session", id);
     setParams(next);
   }
@@ -817,6 +863,7 @@ export default function OperationReceiving() {
     next.delete("session");
     next.delete("po");
     next.delete("find");
+    next.delete("queue");
     setParams(next);
   }
 
@@ -846,6 +893,7 @@ export default function OperationReceiving() {
         <p role="status" className="p-4 text-body">Loading…</p>
       ) : poId ? (
         <PoReceivingView
+          key={poId}
           poId={poId}
           pos={pos}
           suppliers={supplierById}
@@ -854,7 +902,7 @@ export default function OperationReceiving() {
           dutyKnown={!dutyQ.isLoading}
           backLabel="Receiving"
           onBack={closeObject}
-          onOpenSession={openSession}
+          onOpenSession={(id) => setParams(receivingAfterPost(params, id))}
         />
       ) : finding ? (
         <FindPoView
@@ -862,10 +910,12 @@ export default function OperationReceiving() {
           suppliers={supplierById}
           loading={posQ.isLoading}
           onBack={closeObject}
-          onPick={(id) => {
+          onPick={(ids) => {
             const next = new URLSearchParams(params);
             next.delete("find");
-            next.set("po", id);
+            next.set("po", ids[0]);
+            if (ids.length > 1) next.set("queue", ids.slice(1).join(","));
+            else next.delete("queue");
             setParams(next);
           }}
         />
@@ -1000,6 +1050,10 @@ export default function OperationReceiving() {
                       <FilterRailRow label="Cancelled GRNs" count={facets.cancelled} active={cancelledSel}
                         onClick={() => setFacet("cancelled", cancelledSel ? null : "1")} testId="rail-cancelled" />
                     </div>}
+                    {!consignmentPage && <div className="border-t border-kit-slate-5 py-2">
+                      <FilterRailRow label="Consignment goods" count={facets.consignment ?? 0} active={consignmentSel}
+                        onClick={() => setFacet("consignment", consignmentSel ? null : "1")} testId="rail-consignment" />
+                    </div>}
                   </div>
                 </CPopover>
               </>}
@@ -1065,9 +1119,11 @@ function FindPoView({
   suppliers: Map<string, SupplierRow>;
   loading: boolean;
   onBack: () => void;
-  onPick: (poId: string) => void;
+  onPick: (poIds: string[]) => void;
 }) {
   const [q, setQ] = useState("");
+  const [ticked, setTicked] = useState<string[]>([]);
+  const pickedPos = pos.filter((p) => ticked.includes(p.id));
   const candidates = useMemo(() => {
     const owing = pos.filter(poStillOwes);
     const needle = q.trim().toLowerCase();
@@ -1125,12 +1181,20 @@ function FindPoView({
               0,
             );
             return (
+              <div key={p.id} className="flex items-center gap-2">
+              <Checkbox
+                id={`receiving-tick-${p.id}`}
+                label=""
+                ariaLabel={`Tick ${p.id}`}
+                checked={ticked.includes(p.id)}
+                disabled={!ticked.includes(p.id) && !sameSupplierPick(pickedPos, p)}
+                onCheckedChange={(on) => setTicked((prev) => (on === true ? [...prev, p.id] : prev.filter((x) => x !== p.id)))}
+              />
               <button
-                key={p.id}
                 type="button"
-                onClick={() => onPick(p.id)}
+                onClick={() => onPick([p.id])}
                 data-testid={`receiving-find-${p.id}`}
-                className="flex items-center gap-3 py-2.5 text-left hover:bg-kit-slate-3"
+                className="flex min-w-0 flex-1 items-center gap-3 py-2.5 text-left hover:bg-kit-slate-3"
               >
                 <span className="w-44 shrink-0 font-mono text-body text-base-900">
                   {p.id}
@@ -1147,10 +1211,18 @@ function FindPoView({
                   </span>
                 ) : null}
               </button>
+              </div>
             );
           })
         )}
       </div>
+      {ticked.length > 0 ? (
+        <div className="mt-3">
+          <Button variant="primary" onClick={() => onPick(ticked)} data-testid="receiving-find-receive-selected">
+            {`Receive selected (${ticked.length})`}
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

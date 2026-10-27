@@ -32,3 +32,11 @@ STAFF_SESSION_SECRET=any-long-random-string
 STRIPE_SECRET_KEY=sk_test_your-test-mode-secret-key
 STRIPE_WEBHOOK_SECRET=whsec_your-test-mode-webhook-signing-secret
 
+# 0724 Radius Velocity lorry positions (YH 2026-10-26, same as Houzs). No tracker
+# is fitted yet. Leave both unset and the 5-minute poll does nothing. When the
+# trackers arrive, set them in production with `wrangler secret put
+# VELOCITY_REFRESH_TOKEN --env production` (and VELOCITY_CUSTOMER_ID: the numeric
+# key from GET /vapi/v1/accounts/users/customers, not the account number).
+# Never paste a real value here, in a chat, a commit or a test.
+# VELOCITY_REFRESH_TOKEN=
+# VELOCITY_CUSTOMER_ID=

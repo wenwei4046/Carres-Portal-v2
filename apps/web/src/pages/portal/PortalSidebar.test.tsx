@@ -363,6 +363,7 @@ describe("a module is an expandable PARENT ROW, never a heading", () => {
       "module-showroom",
       "group-head-sales",
       "module-sales",
+      "module-consignment",
       "group-head-supply-chain",
       "module-purchasing",
       "module-warehouse",
@@ -543,7 +544,9 @@ describe("the tree line", () => {
     renderAt("/operation?tab=purchase"); // BUY open: three pages
     expect(trunk("purchase").style.height).toBe("100%");
     expect(trunk("manual-purchase").style.height).toBe("100%");
-    expect(trunk("purchase-orders").style.height).toBe("calc(50% - 8px)");
+    /* 0717 · the BUY group now ends at Cancellation Requests (Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was not part of this decision)). */
+    expect(trunk("purchase-orders").style.height).toBe("100%");
+    expect(trunk("po-cancellation-requests").style.height).toBe("calc(50% - 8px)");
   });
 
   it("the current page's elbow takes the theme colour; the others stay grey", () => {
@@ -777,11 +780,16 @@ describe("PortalSidebar — Commission is ONE HR entry (Loo 2026-07-27)", () => 
 });
 
 /**
- * ⭐ SALES ORDERS — ONE PARENT, TWO CHILDREN (Jess, owner ruling 2026-09-23).
+ * ⭐ SALES ORDERS — ONE PARENT (Jess, owner ruling 2026-09-23).
  *
  *     Sales Orders
  *     ├─ Outright        (was `Outright Sales`; owner 2026-10-08)
+ *     ├─ Amendments      (Weisiang, 2026-10-22)
  *     └─ Subscription
+ *
+ * `Amendments` joined between them on Weisiang's decision (Mr Lim, WhatsApp
+ * 2026-10-22; Jess was not part of this decision): every Sales Order amendment
+ * waits in an approver's queue, the Houzs way.
  *
  * `docs/orders/MASTER.md` "Portal navigation", `docs/ui/MASTER.md` and the
  * COPY-STANDARD "Sales Orders navigation" table. The module row is the parent;
@@ -793,15 +801,23 @@ describe("PortalSidebar — Commission is ONE HR entry (Loo 2026-07-27)", () => 
  * does not delete the legacy page whose menu row it removes.
  */
 describe("PortalSidebar — the approved Sales Orders tree", () => {
-  it("is exactly Outright then Subscription, under one Sales Orders parent", () => {
+  it("is exactly Outright, Amendments, Subscription, under one Sales Orders parent", () => {
     renderAt("/operation/orders");
     expect(module_("sales")).toHaveTextContent("Sales Orders");
     const group = screen.getByTestId("nav-children-sales");
     const rows = Array.from(group.querySelectorAll("[data-testid^='nav-child-']"));
     expect(rows.map((r) => r.textContent?.trim())).toEqual([
       "Outright",
+      "Amendments",
       "Subscription",
     ]);
+  });
+
+  it("on /operation/amendments only Amendments is lit", () => {
+    renderAt("/operation/amendments");
+    expect(child("amendments")).toHaveAttribute("href", "/operation/amendments");
+    expect(child("amendments").className).toContain("bg-c-select-pill");
+    expect(child("orders").className).not.toContain("bg-c-select-pill");
   });
 
   it("keeps both addresses exactly where they were", () => {
@@ -924,7 +940,7 @@ describe("PortalSidebar — the Purchasing map", () => {
     expect(tree.querySelector(".border-t")).toBeNull();
   });
 
-  it("eleven pages in the approved order, and not a twelfth", () => {
+  it("fourteen pages in the approved order, and not a fifteenth", () => {
     renderAt("/operation?tab=purchase");
     for (const key of [
       "purchasing-buy",
@@ -944,12 +960,17 @@ describe("PortalSidebar — the Purchasing map", () => {
       "Forecast Purchase",
       "Manual Purchase Request",
       "Purchase Orders",
+      /* 0717 · Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was not part of this decision). */
+      "PO Amendments",
+      "Cancellation Requests",
       "Receiving",
       "Supplier Claims",
       "Purchase Returns",
       "Repair Orders",
       "Display Requests",
       "Consignment Orders",
+      /* Purchase Consignment Receive — follows Houzs frontend/src/components/Sidebar.tsx:552 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
+      "Purchase Consignment Receive",
       "Consignment Returns",
     ]);
   });
@@ -1012,7 +1033,7 @@ describe("PortalSidebar — the Purchasing map", () => {
         .getByTestId("nav-group-children-purchasing-buy")
         .querySelectorAll("[data-testid^='nav-child-']"),
     ).map((el) => el.textContent?.replace("Coming soon", "").trim());
-    expect(rows).toEqual(["SO Batch Purchase", "Forecast Purchase", "Manual Purchase Request", "Purchase Orders"]);
+    expect(rows).toEqual(["SO Batch Purchase", "Forecast Purchase", "Manual Purchase Request", "Purchase Orders", "PO Amendments", "Cancellation Requests"]);
   });
 
   it("the rail word is `Manual Purchase Request`, in BUY (owner 2026-09-23)", () => {
@@ -1060,7 +1081,6 @@ describe("PortalSidebar — the Purchasing map", () => {
          slice A (migration 0602). */
       "display-requests",
       "consignment-orders",
-      "consignment-returns",
     ]) {
       const row = child(key);
       expect(row.tagName, key).toBe("SPAN");
@@ -1084,6 +1104,16 @@ describe("PortalSidebar — the Purchasing map", () => {
     expect(row.getAttribute("href")).toBe("/operation?tab=purchase-returns");
     expect(row.getAttribute("aria-disabled")).not.toBe("true");
     expect(row.textContent).not.toContain("Coming soon");
+  });
+
+  it("Consignment Returns is a real door now; Consignment Orders still says Coming soon", () => {
+    renderAt("/operation?tab=purchase");
+    fireEvent.click(group_("purchasing-showroom"));
+    const row = child("consignment-returns");
+    expect(row.tagName).toBe("A");
+    expect(row.getAttribute("href")).toBe("/operation?tab=consignment-returns");
+    expect(row.textContent).not.toContain("Coming soon");
+    expect(child("consignment-orders").textContent).toContain("Coming soon");
   });
 
   it("Repair Orders is a real door now — §9.7 slice A", () => {
@@ -1457,6 +1487,22 @@ describe("PortalSidebar — the menu stores no open groups", () => {
  * (`docs/delivery/MASTER.md` §7 still holds them as approved targets); they are
  * simply not NAVIGATION until they are pages.
  */
+/* Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): customer consignment
+ * sits in its own Consignment module right after Sales, the Houzs placement
+ * (Houzs-ERP Sidebar.tsx:535-546). Delivery keeps its two destinations. */
+describe("PortalSidebar — the Consignment module", () => {
+  it("carries the three customer consignment pages, in Houzs order", () => {
+    renderAt("/operation?tab=consignment-notes");
+    expect(screen.getByTestId("nav-module-consignment")).toBeInTheDocument();
+    const rows = Array.from(
+      screen
+        .getByTestId("nav-children-consignment")
+        .querySelectorAll("[data-testid^='nav-child-']"),
+    ).map((el) => el.textContent?.replace("Coming soon", "").trim());
+    expect(rows).toEqual(["Customer Consignment Orders", "Consignment Notes", "Customer Consignment Returns"]);
+  });
+});
+
 describe("PortalSidebar — the Delivery module's two destinations", () => {
   /* THE FOUR-PAGE MAP (CARD-2026-09-04-delivery-01): Monitor → Delivery
    * Orders → Delivery Order → Edit Delivery. The first two are NAVIGATION;
@@ -1470,7 +1516,13 @@ describe("PortalSidebar — the Delivery module's two destinations", () => {
         .getByTestId("nav-children-delivery")
         .querySelectorAll("[data-testid^='nav-child-']"),
     ).map((el) => el.textContent?.replace("Coming soon", "").trim());
-    expect(rows).toEqual(["Monitor", "Delivery Orders"]);
+    // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): Delivery Returns, Load
+    // Scan, Delivery Planning, DP Orders, Auto-schedule and Trips, then Carres' own
+    // lorries (Fleet Day, Live Map, Lorry Capacity, Crew Leave, then 0725 Fleet, Fleet Health, Delivery Zones, Rate Cards) join the rail after
+    // Delivery Orders. This overturns Jess's "exactly two children"; Jess was not part of it.
+    expect(rows).toEqual(["Monitor", "Delivery Orders", "Delivery Returns", "Load Scan", "Delivery Planning", "DP Orders", "Auto-schedule", "Trips", "Fleet Day", "Live Map", "Lorry Capacity", "Crew Leave",
+      "Fleet", "Fleet Health", "Delivery Zones", "Rate Cards",
+    ]);
   });
 
   it("Monitor opens ?tab=delivery and is the ONLY active row there", () => {
@@ -1534,7 +1586,16 @@ describe("PortalSidebar — the Warehouse module's four destinations", () => {
       "Pickup Schedule",
       "Inbound",
       "Inventory",
+      // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office Stock
+      // Adjustment, Transfer and Take join the rail after Inventory. This
+      // overturns Jess's "no Transfer row" above; Jess was not part of it.
+      "Stock Adjustment",
+      "Stock Transfer",
+      "Stock Take",
       "Outbound",
+      // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): the Houzs-way
+      // Warehouses page joins last. Jess was not part of this decision.
+      "Warehouses",
     ]);
   });
 
@@ -1765,7 +1826,7 @@ describe("PortalSidebar — owner17Oct temporary module rail", () => {
       expect(localStorage.getItem(COLLAPSE_KEY)).toBe("0");
       Object.defineProperty(window, "innerWidth", { configurable: true, value: 1164 });
       fireEvent(window, new Event("resize"));
-      expect(screen.getByTestId("portal-sidebar")).toHaveStyle({ width: "220px" });
+      expect(screen.getByTestId("portal-sidebar")).toHaveStyle({ width: "64px" });
       expect(localStorage.getItem(COLLAPSE_KEY)).toBe("0");
     } finally { Object.defineProperty(window, "innerWidth", { configurable: true, value: previousWidth }); }
   });

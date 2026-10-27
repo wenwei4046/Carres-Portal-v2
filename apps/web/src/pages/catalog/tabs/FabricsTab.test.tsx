@@ -282,3 +282,24 @@ describe("FabricsTab — Fabric Pricing saved lists (Loo 2026-07-07)", () => {
     });
   });
 });
+
+// Follows Houzs frontend/src/pages/scm-v2/FabricTracking.tsx:49-87 per
+// Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+describe("FabricsTab — Houzs Fabric Converter parity", () => {
+  it("hides retired fabrics by default, one click shows them", () => {
+    const retired = { ...FABRIC_CG, active: false };
+    render(wrap(<FabricsTab catalog={makeCatalog([FABRIC_BF, retired])} isPrincipal={false} />));
+    expect(screen.queryByTestId("fabric-row-CG-001")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("fabrics-show-retired"));
+    expect(screen.getByTestId("fabric-row-CG-001")).toBeInTheDocument();
+  });
+
+  it("Export is for everyone, Import is principal-only", () => {
+    const { unmount } = render(wrap(<FabricsTab catalog={makeCatalog([FABRIC_BF])} isPrincipal={false} />));
+    expect(screen.getByTestId("fabrics-export")).toBeInTheDocument();
+    expect(screen.queryByTestId("fabrics-import")).not.toBeInTheDocument();
+    unmount();
+    render(wrap(<FabricsTab catalog={makeCatalog([FABRIC_BF])} isPrincipal />));
+    expect(screen.getByTestId("fabrics-import")).toBeInTheDocument();
+  });
+});

@@ -373,6 +373,7 @@ export {
   // 0202 — global fabric master schemas + input/Dto types.
   fabricTierValueSchema,
   catalogFabricSchema,
+  FABRIC_STOCK_KEYS,
   catalogFabricEntryInput,
   catalogFabricsBatchSaveInput,
   catalogFabricCostInput,
@@ -565,6 +566,8 @@ export {
   ListOperationOrdersQuery,
   listPurchaseOrdersQuery,
   cancelPoInput,
+  decidePoChangeInput,
+  withdrawPoChangeInput,
   listMovementsQuery,
   confirmProceedRequestInputSchema,
   reselectPartnerInput,
@@ -849,6 +852,12 @@ export {
   serviceCaseListResponseSchema,
   createServiceCaseInputSchema,
   updateServiceCaseInputSchema,
+  mayPickCaseOwner,
+  SERVICE_PICK_LISTS,
+  type ServicePickList,
+  serviceSettingsPatchSchema,
+  servicePickItemCreateSchema,
+  servicePickItemPatchSchema,
   caseLookupLineSchema,
   caseLookupOrderSchema,
   caseLookupResponseSchema,
@@ -2155,6 +2164,14 @@ export {
   type DeliveryOrderIssueInput,
   type DeliveryOrderIssueResult,
 } from "./delivery-order";
+// New Delivery Order (Weisiang's decision, 2026-10-22): what an office DO may still carry.
+export {
+  deliveryOrderOffer,
+  deliveryOrderScopeOf,
+  type DeliveryOrderOffer,
+  type DeliveryOrderOfferDoc,
+  type DeliveryOrderScope,
+} from "./delivery-order-offer";
 // The DO DOCUMENT status — ONE arithmetic over the void stamp (0356) + the
 // attempt history (0344); nothing stored (blueprint card 2026-08-16).
 export {
@@ -3301,6 +3318,8 @@ export * from "./payment-duplicate";
 export * from "./purchase-order-register";
 
 export { recordArrivalConfirmationInput, recordSupplierAnswersInput, recordSupplierReplyInput } from "./schemas/operation";
+export { newPurchaseOrderInput } from "./schemas/operation";
+export type { NewPurchaseOrderInput } from "./schemas/operation";
 export type { RecordSupplierAnswersInput } from "./schemas/operation";
 
 export {
@@ -3455,3 +3474,14 @@ export * from "./courier-dispatch";
 export { purchaseRequestReleaseSchema, type PurchaseRequestRelease } from "./purchase-request-context";
 
 export * from "./po-send-evidence";
+
+// Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): Houzs-way Stock Card and
+// Loading List, counted from Units. Jess was not part of this decision.
+export {
+  stockCardLines,
+  loadingListRows,
+  type StockCardUnit,
+  type StockCardEvent,
+  type StockCardLine,
+  type LoadingListRow,
+} from "./warehouse-houzs-views";

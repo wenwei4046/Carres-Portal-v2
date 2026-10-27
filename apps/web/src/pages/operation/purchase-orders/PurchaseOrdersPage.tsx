@@ -71,6 +71,7 @@ import { SO_HEAD_ROW, SO_ROW, SO_TABLE, SO_TD, SO_TH } from "../components/so-do
 import TableScroller from "@/components/TableScroller";
 import type { PoTemplateData } from "@/lib/pdf/types";
 import {
+  useCatalog,
   useMonthlyDemandFacts,
   useOperationPoAudit,
   useOperationPos,
@@ -90,9 +91,11 @@ import {
 import { workspaceDutyActor } from "../workspace-duty-owner";
 import { useOfficeDays } from "@/lib/deadline-queries";
 import PurchasingTabs from "../PurchasingTabs";
+import { PoWaitingFlags, useWaitingPoChangeRequests } from "../OperationPoChangeRequests";
 import { CHANNEL_WORD, refreshPurchasingReads } from "../components/PoIssueEvidence";
 import { PoSupplierResultContent } from "../so-batch/PoSupplierResultPanel";
 import ChangeDeliverToForm from "./ChangeDeliverToForm";
+import NewPurchaseOrderModal from "./NewPurchaseOrderModal";
 import GoodsMiniTable, { goodsCategoryOf, type GoodsMiniLine } from "../components/GoodsMiniTable";
 import { lineConfigBits } from "../../dealer/new-order/special-addons-picker";
 import { personInitials } from "@/lib/staff-avatar";
@@ -464,9 +467,25 @@ export default function PurchaseOrdersPage() {
   const warehouseQ = useOperationWarehouse();
   const dutyQ = useWorkspaceDuties();
   const poDutyActor = workspaceDutyActor(dutyQ.data, "po_duty");
+  /* 0717 · YH 2026-10-26: a PO with a request waiting for approval says so. */
+  const waitingByPo = useWaitingPoChangeRequests();
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
+  /* New Purchase Order — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22):
+     office staff open a PO with no source, the Houzs way. Catalog is read only
+     once the form opens. */
+  const [newPoOpen, setNewPoOpen] = useState(false);
+  /* New Consignment Order — the same form and door, marked consignment
+     (Weisiang's decision, Mr Lim, WhatsApp 2026-10-22; Jess was not part of it). */
+  const [newPoConsignment, setNewPoConsignment] = useState(false);
+  const catalogQ = useCatalog({ enabled: newPoOpen });
+  const newPoSkus = useMemo(() => {
+    const models = new Map((catalogQ.data?.models ?? []).map((m) => [m.id, m.name]));
+    return (catalogQ.data?.skus ?? [])
+      .filter((s) => !s.discontinuedAt)
+      .map((s) => ({ sku: s.sku, supplierId: s.supplierId, label: `${s.sku} · ${models.get(s.modelId) ?? ""} ${s.variant}`.trim() }));
+  }, [catalogQ.data]);
   const restoredListing = poListingReturnOf(location.state);
   const [filter, setFilter] = useState<RailFilter>(() => restoredListing?.filter ?? RAIL_CLEAR);
   /* The personal saved-layout pilot (ui MASTER §6.7 rule 4). A failed read
@@ -1195,6 +1214,7 @@ export default function PurchaseOrdersPage() {
               : state === "Completed" ? <StatusPill tone="success">{state}</StatusPill>
               : <span className="text-body text-c-tab">{state}</span>}
             {note ? <span className={`break-words text-meta ${note.warn ? "text-c-warn-fg" : "text-c-secondary"}`}>{note.text}</span> : null}
+            <PoWaitingFlags waiting={waitingByPo.get(row.id)} />
           </span>
         );
       },
@@ -1249,6 +1269,20 @@ export default function PurchaseOrdersPage() {
   return (
     <div ref={canvasRef} className={`${registerStyles.page} flex h-full min-h-0 flex-col`} data-testid="purchase-orders-register">
       <PurchasingTabs />
+      <NewPurchaseOrderModal
+        open={newPoOpen}
+        onOpenChange={setNewPoOpen}
+        suppliers={(suppliersQ.data?.suppliers ?? []).map((s) => ({ id: s.id, name: s.name }))}
+        destinations={activeDestinations}
+        skus={newPoSkus}
+        consignment={newPoConsignment}
+        onIssued={(poId) => {
+          setNewPoOpen(false);
+          refreshPurchasingReads();
+          void posQ.refetch();
+          if (poId) setParams((current) => { const next = new URLSearchParams(current); next.set("po", poId); next.delete("view"); return next; });
+        }}
+      />
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
         {railOpen && (
         <FilterRail
@@ -1397,6 +1431,8 @@ export default function PurchaseOrdersPage() {
                     testId="purchase-orders-show-filters"
                   />
                 )}
+                <Button size="sm" icon="add" onClick={() => { setNewPoConsignment(false); setNewPoOpen(true); }} data-testid="po-new">New Purchase Order</Button>
+                <Button size="sm" icon="add" onClick={() => { setNewPoConsignment(true); setNewPoOpen(true); }} data-testid="po-new-consignment">New Consignment Order</Button>
                 {overview && stateTabs}
               </>}
               statusSummary={(filtered, selectedRows) => {
@@ -2054,6 +2090,15 @@ function CurrentAction({ row, owner, onIssue }: { row: RegisterRow; owner: { use
   );
 }
 
+/** 0717 · YH 2026-10-26: the request this PO waits on, linked to its queue.
+ *  Follows Houzs frontend/src/pages/scm-v2/PurchaseOrderDetailV2.tsx:1402-1430
+ *  per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
+function WaitingForApproval({ poId }: { poId: string }) {
+  const waiting = useWaitingPoChangeRequests().get(poId);
+  if (!waiting?.length) return null;
+  return <div className="flex flex-wrap gap-3 rounded-control border border-kit-slate-5 px-3 py-2" data-testid="po-object-waiting"><PoWaitingFlags waiting={waiting} /></div>;
+}
+
 function DocumentView({ row, owner, onIssue, units, receiving, claims, destinations, unitLoading, receivingLoading, claimsLoading, unitError, receivingError, claimsError, onRetryUnits, onRetryReceiving, onRetryClaims, onSupplierDateSaved }: {
   row: RegisterRow;
   owner: { userId: string; name: string | null } | null;
@@ -2103,6 +2148,7 @@ function DocumentView({ row, owner, onIssue, units, receiving, claims, destinati
     <div className="grid min-h-0 grid-cols-1 gap-3 p-3 sm:p-4 min-[1130px]:h-full min-[1130px]:grid-cols-2" data-testid="po-document-panes" data-layout="50-50">
       <div className="flex min-w-0 flex-col gap-3 min-[1130px]:min-h-0 min-[1130px]:overflow-y-auto" data-testid="po-document-facts-pane">
       <CurrentAction row={row} owner={owner} onIssue={onIssue} />
+      <WaitingForApproval poId={po.id} />
       <Block title="Purchase order">
         {/* The Sales Order fact grammar (owner, 2026-09-26): label over a
             boxed value, three to a row, 12px gaps — "got box … I want follow":
@@ -2389,5 +2435,5 @@ function RevisionForm({
       ? activeDestinations
       : [currentDestination, ...activeDestinations];
     return <div key={line.id} className="grid grid-cols-1 gap-2 border-b border-kit-slate-4 pb-3 sm:grid-cols-[minmax(0,1fr)_88px_minmax(150px,0.8fr)]"><div><div className="text-body">{line.model_name ?? line.sku}</div><div className="text-meta text-kit-slate-11">{line.sku} · {line.received_qty} received</div></div><label className="text-meta text-kit-slate-11">Qty<input aria-label={`Qty for ${line.sku}`} type="number" min={Math.max(1, line.received_qty)} value={value} className="mt-1 h-8 w-full rounded-control border border-kit-slate-5 px-2 text-right" onChange={(event) => setDraft((current) => ({ ...current, [line.id]: event.target.value }))} /></label><label className="text-meta text-kit-slate-11">Deliver To<select aria-label={`Deliver To for ${line.sku}`} value={destinationDraft[line.id] ?? currentDestinationId} className="mt-1 h-8 w-full rounded-control border border-kit-slate-5 bg-white px-2" onChange={(event) => setDestinationDraft((current) => ({ ...current, [line.id]: event.target.value }))}>{currentDestinationId ? null : <option value="" disabled>Not recorded</option>}{pickerDestinations.map((destination) => { const closed = !activeDestinations.some((active) => active.id === destination.id); return <option key={destination.id} value={destination.id} disabled={closed}>{destination.name}{closed ? " (closed)" : ""}</option>; })}</select></label></div>;
-  })}</div><label className="mt-4 block text-meta text-kit-slate-11">Why<input className="mt-1 h-8 w-full rounded-control border border-kit-slate-5 px-2" value={reason} onChange={(event) => setReason(event.target.value)} /></label>{gap ? <div className="mt-3"><div className="text-meta text-kit-red-11">{gap}</div><div className="text-meta text-kit-slate-11">{action}</div></div> : null}{error ? <div className="mt-3"><div className="text-meta text-kit-red-11">The revision could not be saved</div><div className="text-meta text-kit-slate-11">{error}</div></div> : null}<div className="mt-4 flex justify-end gap-2"><button type="button" className="h-8 rounded-control border border-kit-slate-5 px-3 text-body font-medium" onClick={onCancel}>Cancel</button><button type="button" disabled={!!gap || save.isPending} className="h-8 rounded-control bg-kit-blue-9 px-3 text-body font-semibold text-white disabled:bg-kit-slate-6" onClick={() => { if (gap) return; setError(null); save.mutate({ reason: reason.trim(), lines: changes }, { onSuccess: onSaved, onError: (cause) => setError(cause instanceof Error ? cause.message : String(cause)) }); }}>{save.isPending ? "Saving…" : `Save PO V${(po.version ?? 1) + 1}`}</button></div></div>;
+  })}</div><label className="mt-4 block text-meta text-kit-slate-11">Why<input className="mt-1 h-8 w-full rounded-control border border-kit-slate-5 px-2" value={reason} onChange={(event) => setReason(event.target.value)} /></label>{gap ? <div className="mt-3"><div className="text-meta text-kit-red-11">{gap}</div><div className="text-meta text-kit-slate-11">{action}</div></div> : null}{error ? <div className="mt-3"><div className="text-meta text-kit-red-11">The revision could not be saved</div><div className="text-meta text-kit-slate-11">{error}</div></div> : null}<div className="mt-4 flex justify-end gap-2"><button type="button" className="h-8 rounded-control border border-kit-slate-5 px-3 text-body font-medium" onClick={onCancel}>Cancel</button><button type="button" disabled={!!gap || save.isPending} className="h-8 rounded-control bg-kit-blue-9 px-3 text-body font-semibold text-white disabled:bg-kit-slate-6" onClick={() => { if (gap) return; setError(null); save.mutate({ reason: reason.trim(), lines: changes }, { onSuccess: onSaved, onError: (cause) => setError(cause instanceof Error ? cause.message : String(cause)) }); }}>{save.isPending ? "Saving…" : "Send for approval"}</button></div></div>;
 }

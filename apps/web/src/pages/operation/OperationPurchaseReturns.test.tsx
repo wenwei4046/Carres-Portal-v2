@@ -435,12 +435,48 @@ describe("the page binds the register to its own read", () => {
 
   it("narrows to one Supplier Claim when the address names it", () => {
     page({}, "/operation?tab=purchase-returns&claim=SC-1038");
-    expect(returnsQuery).toHaveBeenCalledWith("SC-1038");
+    expect(returnsQuery).toHaveBeenCalledWith("SC-1038", undefined, false);
   });
 
   it("asks for every return when no claim is named", () => {
     page();
-    expect(returnsQuery).toHaveBeenCalledWith(null);
+    expect(returnsQuery).toHaveBeenCalledWith(null, undefined, false);
+  });
+
+  it("the Consignment Returns register asks for consignment returns and says so when there are none", () => {
+    returnsQuery.mockReturnValue({ ...idle, data: { returns: [] } });
+    render(
+      <MemoryRouter initialEntries={["/operation?tab=consignment-returns"]}>
+        <OperationPurchaseReturns consignment />
+      </MemoryRouter>,
+    );
+    expect(returnsQuery).toHaveBeenCalledWith(null, undefined, true);
+    expect(screen.getByText("No consignment returns.")).toBeTruthy();
+    expect(screen.queryByText("No purchase returns.")).toBeNull();
+  });
+
+  // Follows Houzs frontend/src/App.tsx:950 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+  it("only the Consignment Returns register offers New Consignment Return (claimless, Houzs way)", () => {
+    returnsQuery.mockReturnValue({ ...idle, data: { returns: [] } });
+    const { unmount } = render(
+      <MemoryRouter initialEntries={["/operation?tab=consignment-returns"]}>
+        <OperationPurchaseReturns consignment />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("button", { name: "New Consignment Return" })).toBeTruthy();
+    unmount();
+    page();
+    expect(screen.queryByRole("button", { name: "New Consignment Return" })).toBeNull();
+  });
+
+  it("the Consignment Returns register names its own failure", () => {
+    returnsQuery.mockReturnValue({ ...idle, data: undefined, isError: true, error: { message: "boom" } });
+    render(
+      <MemoryRouter initialEntries={["/operation?tab=consignment-returns"]}>
+        <OperationPurchaseReturns consignment />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("Consignment Returns could not be loaded.")).toBeTruthy();
   });
 
   it("says a read FAILED rather than showing an empty register", () => {
@@ -477,5 +513,13 @@ describe("the page binds the register to its own read", () => {
   it("distinguishes genuinely empty from loading", () => {
     page({ data: { returns: [] }, isLoading: false });
     expect(screen.getByText("No purchase returns.")).toBeTruthy();
+  });
+});
+
+describe("a cancelled return on the register (0713, YH 2026-10-26)", () => {
+  it("reads `Cancelled` under its PR No, and an open one does not", () => {
+    show([doc({ cancelled_at: "2026-10-26T04:00:00Z" }), doc({ id: "return-1043", pr_no: "20260915-1043" })]);
+    expect(screen.getByTestId("purchase-return-cancelled-return-1042").textContent).toBe("Cancelled");
+    expect(screen.queryByTestId("purchase-return-cancelled-return-1043")).toBeNull();
   });
 });

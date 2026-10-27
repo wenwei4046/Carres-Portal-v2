@@ -79,6 +79,11 @@ const WAREHOUSE_TABS = new Set([
   "warehouse-monitor",
   "warehouse-dashboard",
   "stock-onhand",
+  // Weisiang's decision 2026-10-22: the Houzs-way Warehouses page.
+  "warehouses",
+  "stock-adjustments",
+  "stock-transfers",
+  "stock-takes",
 ]);
 
 function moduleSettingsFor(

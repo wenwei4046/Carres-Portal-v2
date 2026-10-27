@@ -110,6 +110,7 @@ import { loadRepairOrderWork } from "../../lib/repair-order-work";
 import { loadSupplierClaimWork } from "../../lib/supplier-claim-work";
 import { loadPurchaseReturnWork } from "../../lib/purchase-return-work";
 import {
+  invoiceArrivalDayWord,
   invoiceNeeded,
   invoicePaymentTiming,
   orderCollectionClockStartIso,
@@ -898,8 +899,16 @@ export function projectPaymentCollectionWork(input: {
   ownerCalendarFor?: (orderId: string) => OwnerCalendar;
 }): OperationWorkItem[] {
   const calendars = input.calendars ?? workFeedCalendarsOf();
+  // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): an order may carry
+  // several part Sales Invoices (0712). The balance is the ORDER's, so the
+  // customer is asked once per order, on its first issued Sales Invoice.
+  const askedOrders = new Set<string>();
   return input.invoices.flatMap((invoice) => {
     if (invoice.status !== "issued" || !invoice.orders) return [];
+    if (invoice.kind === "sales") {
+      if (askedOrders.has(invoice.order_id)) return [];
+      askedOrders.add(invoice.order_id);
+    }
     const timingRule = collectionTimingFor(input.timingRules, invoice.issued_at?.slice(0, 10) ?? input.today);
     const ownerCalendar = input.ownerCalendarFor?.(invoice.order_id) ?? calendars.owner;
     const { timing, clock } = invoicePaymentTiming(invoice, input.today, calendars.delivery, undefined, timingRule, ownerCalendar);
@@ -1096,6 +1105,77 @@ export function projectOverpaymentReviewWork(input: {
       today: input.today,
     })];
   });
+}
+
+/** 0707 — a payment whose paid date is more than 14 days back waits as a
+ *  request; the Payment Approver approves or refuses it. One item per waiting
+ *  request. Nothing in it counts until it is approved. */
+export interface BackdatedPaymentRequestRow {
+  id: string;
+  order_id: string;
+  amount: number;
+  paid_on: string;
+  requested_at: string;
+  requested_by: string;
+  orders: { so: number | null; customer_name: string | null } | null;
+}
+
+export function projectBackdatedPaymentWork(input: {
+  requests: readonly BackdatedPaymentRequestRow[];
+  approver: WorkspaceDutyResolution | null;
+  today: string;
+}): OperationWorkItem[] {
+  return input.requests.map((request) => {
+    /* Houzs (so-payment-backdate-requests.ts:79, :332): nobody decides their
+       own request, "Another admin has to". When the acting Payment Approver
+       keyed it, the item is not theirs: it waits for a principal. */
+    const selfKeyed = input.approver?.actingPerson?.userId === request.requested_by;
+    const owner = selfKeyed ? null : input.approver;
+    const amount = `RM ${Number(request.amount).toFixed(2)}`;
+    const paidOn = invoiceArrivalDayWord(request.paid_on);
+    const soRef = request.orders?.so != null ? `SO-${request.orders.so}` : "SO";
+    const workItem: WorkItem = {
+      ruleKey: "payment.approve_backdated_payment",
+      module: "payment",
+      soRef,
+      orderId: request.order_id,
+      action: `Approve ${amount} paid on ${paidOn}`,
+      ownerRule: "payment_approver_duty",
+      ownerDutyKey: "payment_approver",
+      normalOwner: owner?.normalOwner ?? null,
+      activeCover: owner?.activeCover ?? null,
+      actingPerson: owner?.actingPerson ?? null,
+      ownerState: owner?.state ?? "not_assigned",
+      ownerName: owner?.actingPerson?.name ?? null,
+      ownerUserId: owner?.actingPerson?.userId ?? null,
+      ...(owner?.actingPerson ? {} : { ownerDuty: selfKeyed ? "Principal" : "Payment Approver" }),
+      tone: "warning",
+      locked: false,
+      broken: false,
+      // Due the day it was asked; no rule gives it a longer clock.
+      dueIso: request.requested_at.slice(0, 10),
+      workingDaysLate: 0,
+    };
+    return operationWorkItemFromProjection(workItem, {
+      object: { kind: "payment_backdate_request", id: request.id, label: soRef },
+      problem: "Paid date is more than 14 days ago",
+      recipient: request.orders?.customer_name ?? null,
+      requiredResult: "Approve or refuse recorded",
+      // The Monitor's order scope is the SO number; it lists the order's
+      // waiting requests even when the order has no invoice row yet.
+      destination: request.orders?.so != null ? `/finance/monitor?order=${request.orders.so}` : "/finance/monitor",
+      today: input.today,
+    });
+  });
+}
+
+async function readBackdatedPaymentRequests(c: Context<AppEnv>): Promise<BackdatedPaymentRequestRow[]> {
+  const { data, error } = await userClient(c.env, c.var.auth.jwt)
+    .from("payment_backdate_requests")
+    .select("id,order_id,amount,paid_on,requested_at,requested_by,orders(so,customer_name)")
+    .eq("status", "waiting");
+  if (error) throw new Error("Backdated payment requests could not be read");
+  return (data ?? []) as unknown as BackdatedPaymentRequestRow[];
 }
 
 export function receivingWorkSourceFromModuleFacts(data: {
@@ -2106,6 +2186,9 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
       ...paymentItems,
       ...storageInvoiceItems,
       ...overpaymentItems,
+      ...projectBackdatedPaymentWork({
+        requests: await readBackdatedPaymentRequests(c), approver: paymentApprover, today,
+      }),
     ]),
     loadWorkSource("issue_tracker", observedAt, async () => issueItems),
     /* Tasks one employee adds for another (Workspace MASTER, Jess 2026-10-14). */

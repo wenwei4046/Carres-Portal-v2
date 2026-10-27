@@ -24,6 +24,14 @@ const h = vi.hoisted(() => ({
   editAddonMutateAsync: vi.fn(async () => ({})),
 }));
 
+// The address pickers read Settings → Address lists (0722); this test has no QueryClient.
+vi.mock("@/lib/settings-queries", async (importOriginal) => {
+  const m = await import("@/data/malaysia-postcodes");
+  return {
+  ...(await importOriginal<typeof import("@/lib/settings-queries")>()),
+  useAddressLists: () => ({ states: m.MY_STATES, cities: m.getCities, postcodes: m.getPostcodes }),
+  };
+});
 vi.mock("@/lib/queries", () => ({
   useOrder: () => ({ data: h.order, isLoading: false }),
   useCatalog: () => ({ data: CATALOG }),

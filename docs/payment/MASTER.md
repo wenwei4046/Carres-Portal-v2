@@ -91,7 +91,7 @@ former invoice-keyed model completely.**
 the same figure the Sales Order page and PDF print as `Balance due`. **An Invoice never asks for
 money.** The customer is asked to pay against the Sales Order (`SO No` and its `Balance due`); the
 Invoice is the closing document, issued automatically the moment `Balance due` reaches RM 0 and sent
-with the Receipt. There is no manual `Generate invoice` door and no draft/issue step for staff.
+with the Receipt. ~~There is no manual `Generate invoice` door and no draft/issue step for staff.~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp): office staff (operation, finance, principal) open a Sales Invoice by hand from Payment Monitor → `New Sales Invoice`, found by SO No or DO No, and may invoice part of the goods now and the rest later (Houzs `SalesInvoiceFromDo` way; migration `0712`). The automatic issue above still runs for an order no one has invoiced by hand. Jess was not part of this decision.
 Unknown and zero differ. No screen recalculates `Balance due` or storage independently.
 
 **`Balance due` IS THE GOODS MONEY ONLY; STORAGE KEEPS ITS OWN PAPER — OWNER RULING (Jess,
@@ -777,6 +777,7 @@ object · Cover rule. Object identity is row/card header; owner is metadata/avat
 | Free request day 22–30 | Storage Waiver Approver | same | decision exists |
 | Overpaid/unallocated money | Payment Approver | `Review RM {amount}` | allocated/classified |
 | Suspected wrong/duplicate | Payment Approver | `Review payment RM {amount}` | distinct/corrected/voided |
+| Paid date more than 14 days ago (`payment.approve_backdated_payment`, 0707, awaits Jess's review) | Payment Approver; a principal when the acting approver keyed it (Houzs own_request rule) | `Approve RM {amount} paid on {weekday}, {day} {month}` | approved or refused |
 | Finance Exception | Finance Control Duty | `Review payment evidence` | exception resolved |
 
 **ONE SALES ORDER, ONE COLLECTION OWNER — AND IT IS THE PERSON THE ORDER WAS DEALT TO (owner
@@ -915,7 +916,7 @@ release. A live unpaid Storage Invoice prevents Delivery Order creation.
 | Responsible Delivery Operation (the order's collection owner — the individual the Sales Order was dealt to, 0504) | ordinary balance collection, storage-invoice collection, free-storage requests through Operation authority, delivery/storage contact, evidence, normal posting/receipt |
 | Finance Control Duty | bank/payment evidence exception |
 | Storage Waiver Approver | mattress/bedframe day 22–30 decision |
-| Payment Approver | void, reallocation, overpayment review |
+| Payment Approver | void, reallocation, overpayment review, a payment whose paid date is more than 14 days ago (0707: keyed by Operation it waits in `payment_backdate_requests` and counts only once approved; the person who recorded it cannot approve it; Finance and a principal record it directly, and Finance has the Record payment door. Follows Houzs backend/src/services/backdateRequestNotify.ts:5-8 and mfg-sales-orders.ts:3915 per Weisiang's ruling 2026-10-22 (clear Carres rules, implement Houzs); YH 2026-10-26, Q14) |
 | Finance | read/export, external bank control, Finance Exception |
 | Manager | Payment settings; Workspace still owns duty assignment |
 
@@ -1323,7 +1324,7 @@ Migration `0429` is APPLIED (tracker tail confirmed) and PR #1108 merged as `60e
 the ERP page, POS page and API Worker converged that exact SHA and the served bundle carries
 the Invoices Register's own strings. `invoices` now carries the governed lifecycle: kind
 (Sales/Storage/Additional Storage), draft → issued → voided status, immutable issue snapshot,
-void reason/actors and the replacement lineage; one live Sales Invoice per order; allocations
+void reason/actors and the replacement lineage; ~~one live Sales Invoice per order~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp): one live automatic (whole-order) Sales Invoice per order, but an order may carry several office part Sales Invoices, each billing only its own lines, never more than the order holds (`0712`; Jess was not part of this decision); allocations
 may name an invoice. `payment_invoice_prepare` drafts idempotently, `payment_invoice_issue`
 mints the governed `INV-DDMMYY-NNNN` number and freezes the snapshot, and
 `payment_invoice_void_replace` — Payment Approver duty via the Shared Duty Resolver, or

@@ -20,6 +20,7 @@ import principalPartnersRouter from "./routes/principal/partners";
 import operationStockRouter from "./routes/operation/stock";
 import operationOrdersFeedRouter from "./routes/operation/orders-feed";
 import operationSuppliersOverviewRouter from "./routes/operation/suppliers-overview";
+import purchaseInvoicesRouter from "./routes/operation/purchase-invoices";
 import operationBadgesRouter from "./routes/operation/badges";
 import registerLayoutsRouter from "./routes/operation/register-layouts";
 import operationDashboardRouter from "./routes/operation/dashboard";
@@ -31,6 +32,7 @@ import correctionWorkRouter from "./routes/operation/correction-work";
 import operationOrdersRouter from "./routes/operation/orders";
 import operationPartnersRouter from "./routes/operation/partners";
 import deliverySettingsRouter from "./routes/operation/delivery-settings";
+import fleetRouter from "./routes/operation/fleet";
 import peopleWorkDaysRouter from "./routes/operation/people-work-days";
 import operationPosRouter from "./routes/operation/pos";
 import operationReceiveThreadsRouter from "./routes/operation/receive-threads";
@@ -42,7 +44,7 @@ import repairOrdersRouter from "./routes/operation/repair-orders";
 // the ONE receive engine (0302).
 import warehouseReceiptsRouter from "./routes/operation/warehouse-receipts";
 import workActivityRouter from "./routes/operation/work-activity";
-import settingsCoreRouter, { companyProfileReadRouter } from "./routes/operation/settings-core";
+import settingsCoreRouter, { addressListsReadRouter, companyProfileReadRouter } from "./routes/operation/settings-core";
 import workspaceDutiesRouter from "./routes/operation/workspace-duties";
 import leaveRouter from "./routes/operation/leave";
 import saturdayOnCallRouter from "./routes/operation/saturday-on-call";
@@ -53,6 +55,8 @@ import dispatchCustomerLegRouter from "./routes/operation/dispatch-customer-leg"
 import deliveryChainRouter from "./routes/operation/delivery-chain";
 import orderControlRouter from "./routes/operation/order-control";
 import deliveryOrdersRouter from "./routes/operation/delivery-orders";
+import deliveryReturnsRouter from "./routes/operation/delivery-returns";
+import deliveryPlanningRouter from "./routes/operation/delivery-planning";
 // 0379 — Delivery's OWN arrangement doors (owner correction 2026-08-24).
 import deliveryArrangementsRouter from "./routes/operation/delivery-arrangements";
 import paymentApprovalsRouter from "./routes/operation/payment-approvals";
@@ -132,6 +136,8 @@ import guaranteesRouter from "./routes/guarantees";
 import dosRouter from "./routes/storage/dos";
 // Phase A step 5 (migration 0137) — per-unit stock register.
 import opsStockRouter from "./routes/ops/stock";
+import customerConsignmentRouter from "./routes/ops/customer-consignment";
+import stockMovesRouter from "./routes/ops/stock-moves";
 import opsStockPlanRouter from "./routes/ops/stock-plan";
 import opsStockEmergencyRouter from "./routes/ops/stock-emergency";
 // Migration 0140 — Service Notes (SN / Issue Tracker).
@@ -153,6 +159,7 @@ import rentalRouter from "./routes/rental";
 import { runContactByCron, runFollowUpMaintenanceCron } from "./cron/contact-by";
 import { runDealerCommissionCloseCron } from "./cron/dealer-commission-close";
 import { runWorkActivityCron } from "./cron/work-activity";
+import { runVelocityPoll } from "./cron/velocity-poll";
 import { runDutyRotaCron } from "./cron/duty-rota";
 import type { AppEnv, Bindings } from "./types";
 
@@ -237,6 +244,11 @@ api.route("/operation/orders", deliveryChainRouter);
 // 0159 P2 control overlay — GET + PUT /:id/control
 api.route("/operation/orders", orderControlRouter);
 api.route("/operation/delivery-orders", deliveryOrdersRouter);
+// 0716 — Weisiang's decision (WhatsApp 2026-10-22): Delivery Returns + Load scan.
+api.route("/operation/delivery-returns", deliveryReturnsRouter);
+// 0723 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): Delivery Planning, DP Orders,
+// Auto-schedule and Trips with time slots, Houzs way. Jess was not part of this decision.
+api.route("/operation/delivery-planning", deliveryPlanningRouter);
 api.route("/operation/delivery-arrangements", deliveryArrangementsRouter);
 api.route("/operation/delivery-arrangements", deliveryLinksRouter);
 // 0362 — the Delivery Payment Approval: raise · decide · read (owner ruling 2026-08-19)
@@ -269,10 +281,15 @@ api.route("/operation/warehouse-settings", warehouseSettingsRouter);
 // signed-in account because every printed document carries it.
 api.route("/operation/settings", settingsCoreRouter);
 api.route("/company-profile", companyProfileReadRouter);
+// 0722 — Settings → Address lists (Weisiang's decision, Mr Lim, WhatsApp
+// 2026-10-22): every signed-in account reads the office's list changes.
+api.route("/address-lists", addressListsReadRouter);
 // 0232 staff assignment pool — GET / + PUT /:userId
 api.route("/operation/staff", opsStaffRouter);
 api.route("/operation/partners", operationPartnersRouter);
 api.route("/operation/delivery-settings", deliverySettingsRouter);
+// 0724 · Carres own lorries (Weisiang's decision 2026-10-22, Houzs way).
+api.route("/operation/fleet", fleetRouter);
 // 0678 — the responsible person's recorded working week (People/HR), read-only.
 api.route("/operation/people", peopleWorkDaysRouter);
 api.route("/operation/pos", operationPosRouter);
@@ -285,6 +302,7 @@ api.route("/operation/stock-alerts", stockAlertsRouter);
 api.route("/operation/stock", operationStockRouter);
 api.route("/operation/orders-feed", operationOrdersFeedRouter);
 api.route("/operation/suppliers-overview", operationSuppliersOverviewRouter);
+api.route("/operation/purchase-invoices", purchaseInvoicesRouter);
 api.route("/operation", thresholdsRouter);
 api.route("/operation/suppliers", operationSuppliersRouter);
 api.route("/operation/warehouse", operationWarehouseRouter);
@@ -342,6 +360,10 @@ api.route("/supplier/threads", supplierThreadsRouter);
 api.route("/warehouse", warehouseReceivingRouter);
 api.route("/storage/dos", dosRouter);
 api.route("/ops/stock", opsStockRouter);
+// 0719 — Weisiang's decision (WhatsApp 2026-10-22): Customer Consignment Order, Consignment Note, Customer Consignment Return.
+api.route("/ops/customer-consignment", customerConsignmentRouter);
+// 0714 — Weisiang's decision (WhatsApp 2026-10-22): Stock Adjustment, Transfer, Take.
+api.route("/ops/stock-moves", stockMovesRouter);
 // K2 (0287) — the monthly ready stock plan. Mounted BELOW /ops/stock so the
 // K1 reorder routes on that router keep their paths unchanged.
 api.route("/ops/stock-plan", opsStockPlanRouter);
@@ -381,6 +403,17 @@ export default {
       (async () => {
         /* The activity check runs every minute 08:00–20:59 MYT every day; the
            stored Office calendar decides which days and hours count. */
+        /* 0724 (YH 2026-10-26): Radius Velocity lorry positions every 5 minutes,
+           as Houzs. A no-op until the VELOCITY_* secrets are set.
+           Follows Houzs backend/src/index.ts:648-654 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
+        if (_event.cron === "*/5 * * * *") {
+          const r = await runVelocityPoll(env).catch((e) => {
+            console.error("[cron velocity]", e instanceof Error ? e.message : e);
+            return { skipped: true } as const;
+          });
+          if (!("skipped" in r)) console.log(`[cron velocity] ${JSON.stringify(r)}`);
+          return;
+        }
         if (_event.cron === "* 0-12 * * *") {
           await runWorkActivityCron(env);
           return;

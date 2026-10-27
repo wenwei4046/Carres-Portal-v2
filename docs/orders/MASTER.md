@@ -1,5 +1,14 @@
 # ORDERS — MASTER
 
+## Current Order Route presentation — owner24Oct2026
+
+The latest Sales Order Template Spec in `../ui/MASTER.md` replaces the old GOODS/DELIVERY/PAYMENT group-band Overview with one Journey line and party cards: Purchasing/Supplier, Warehouse, Logistics and Payment. Overview, Map and Documents read the same source-owned facts. Remove the duplicate GOODS Overview band; retain per-SO-line procurement, PO/source, received/accepted/damaged/wrong quantities, exact Units, location and evidence within the owning party card and source-linked Map/Documents. This is a presentation correction, not permission to discard the goods-chain readers or merge goods with stock ownership.
+
+One Now is the recommended current focus; parallel procurement, booking, collection and preparation remain independently actionable under their own permissions/gates. Completed labels report actual results, optional steps show not-applicable only when their source says so. Never derive delivery completion, proof acceptance, DO issuance or customer agreement from prototype arrays, ETA or the first unfinished node. The supplied9 display slots are captured in UI MASTER; the referenced Ops§4 source is unavailable in the supplied package, so exact business-step admission is not established by prototype comments.
+
+Historical group-band dimensions/status evidence below describes the old presentation, not a second current design. Detailed business truths/readers remain binding. Missing values now show nothing; failure and required-field messages remain explicit. Document separator shape follows current COPY; allocator policy and stored identities are not changed by the template. No application implementation, production verification or Receiving#2111 work is commissioned by this reconciliation.
+
+
 **Design handoff21Oct2026:** Purchasing export28 includes the SO Outright v12 and DO Unit-reader examples. Shared measurements, states and the resolved21Oct baseline are maintained only in [UI MASTER](../ui/MASTER.md#purchasing-design-handoff--21-oct-2026--it-entry); this is not an independent claim that the whole Sales Order design was newly reviewed. IT owns backend implementation.
 
 **All listing appearance — the shared listing template (UI MASTER §6.0):** follow
@@ -69,7 +78,7 @@ evidenced.
 | Register, filters, reports and exports | KEEP shared DataGrid; IMPROVE the complete permission-scoped population, stable sort, totals and export rather than filtering a truncated 500-order sample | More than 500 matching orders do not disappear; list, totals and all-matching export reconcile; selected-row export is explicitly distinct; pagination changes loading only |
 | Monthly demand | KEEP two blocks, one month-row table, one-select Sales Location and existing rail; preserve active location/region/category through month, Before, After and no-date drill-down and return | The opened orders are the exact same population, no silent filter loss; no pivot, chart, multi-select or second coverage table |
 | Unknown facts and line attribution | IMPROVE unreadable versus genuine zero, missing catalogue versus source failure, and exact SO-line/Unit attribution | Unsupported purchase calculations are not zero; repeated SKUs do not establish line identity; uncertain legacy allocation stays visibly uncertain; Purchasing/Stock/Delivery own facts and calculations |
-| Staff amendments | KEEP the single whole-page draft and evidence gate; implement the current Staff amendments and Sales Approver, date and system-charge rulings in this MASTER | One request, one effective result after applicable gates; mixed changes never partially apply; ordinary changes do not wait for owner approval; actual submitter/confirmers and PIC notification preserved |
+| Staff amendments | KEEP the single whole-page draft and evidence gate; implement the current Staff amendments and Sales Approver, date and system-charge rulings in this MASTER | One request, one effective result after applicable gates; mixed changes never partially apply; ~~ordinary changes do not wait for owner approval~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): every amendment waits for the approver in the Amendments queue; actual submitter/confirmers and PIC notification preserved |
 | Concurrent editing | IMPROVE save/submit with the editor's original baseline, in addition to approval-time stale checks | Two editors cannot silently overwrite one another; conflict keeps the draft and exposes what changed; same amendment entry, no new draft engine |
 | Documents, history and failures | KEEP issued originals, immutable revisions, labelled reconstruction and real actor history; make failed original capture visible and retryable, with governed actionable write errors | File failure does not undo an effective revision, impersonate an actor, fabricate a signature or pass reconstruction off as the issued original; retry cannot duplicate the business change |
 | Existing approved document details | IMPROVE the multiple-PO cell to every PO number on one line, comma-separated, each its own link (owner 2026-10-06), and deliver already-approved numbering with compatibility | Old references remain searchable/linked, historical documents are never renumbered, no unrelated Subscription redesign |
@@ -600,8 +609,12 @@ second Purchasing, Warehouse, Delivery, Payment or Work screen.
 ```
 Sales Orders
 ├─ Outright Sales
+├─ Amendments
 └─ Subscription
 ```
+
+`Amendments` added 2026-10-22 on Weisiang's decision (Mr Lim, WhatsApp; Jess was not part of this
+decision): the approver's queue of every SO amendment, waiting first; a row opens its order.
 
 `Outright Sales` is the existing outright-order register and its governed SO detail/amendment
 journey. `Subscription` opens the Subscription-owned journey governed by `docs/rental/MASTER.md`;
@@ -1761,9 +1774,13 @@ three independent actions are open.
 
 ## Delivery Order — the system creates the document
 
-Sales Orders has no `New DO`, `Create DO`, `Issue`, `Release` or `Approve` control. Before a leg is
-ready, its Route gate states the outstanding governed requirements in plain English. When the
-Delivery-owned gate becomes true, the system creates the leg's Delivery Order idempotently.
+**OVERTURNED 2026-10-22 by Weisiang (Mr Lim): office staff may open a Delivery Order from SO lines (Houzs way). Jess's earlier rule kept below for history.** The Delivery Orders register's `New Delivery
+Order` opens a DO from this Sales Order's free delivery groups through the same issuing path and
+gates; the system still creates the leg's DO by itself when its gate becomes true.
+
+> Jess's earlier rule: Sales Orders has no `New DO`, `Create DO`, `Issue`, `Release` or `Approve` control. Before a leg is
+> ready, its Route gate states the outstanding governed requirements in plain English. When the
+> Delivery-owned gate becomes true, the system creates the leg's Delivery Order idempotently.
 
 ```
 ✓ DELIVERY ORDER
@@ -1948,11 +1965,7 @@ whole map, but never below **0.7×**: text scaled past that is an unreadable str
 map too wide for the floor opens **centred on the Sales Order** and the operator pans; `⛶` remains
 the explicit whole-map fit and may go smaller because the operator asked for it.
 
-**THREE ROUTES READ AS THREE GROUPS — owner ruling 2026-08-17.** One uppercase **group band** —
-`GOODS` · `DELIVERY` · `PAYMENT` · `LOAN` (conditional) — `PAYMENT` since 2026-09-26 (Jess: *"remove money, but payment"*; the page's word since 2026-09-21) — sits above each route's columns; columns
-inside a group sit 32px apart and **groups sit 72px apart**. The band is where a route says its
-name: edges carry no route captions. Colour still belongs to STATE alone (blue CURRENT · green
-done · amber exception); routes are told apart by band and spacing, never by hue.
+**CURRENT OVERVIEW — owner24Oct2026.** The Journey line and Purchasing/Supplier, Warehouse, Logistics and Payment party cards replace the old GOODS/DELIVERY/PAYMENT group bands. Use UI MASTER Template1–7. Map may retain source-qualified parallel lanes; do not repeat a generic GOODS band beside the party-card Overview or use historical32/72px band spacing as current visual law.
 
 **The Sales Order is the ONLY root**, and goods, delivery and money leave it simultaneously. The
 origin carries its number and labelled SO Date as evidence but **no circular `Open SO-{n} →`
@@ -2878,13 +2891,21 @@ operations, not a newly observed production-system test. The built Principal-onl
 `0564_the_amendment_carries_the_whole_change_and_the_customers_agreement.sql` does not match
 that operating model. The code remains unchanged; the following is the approved target.
 
-1. **Ordinary SO amendments do not need owner approval.** Staff submit once: one amendment
-   request and one final decision/outcome. Preserve the existing 0564 customer-agreement evidence
+1. ~~**Ordinary SO amendments do not need owner approval.** Staff submit once: one amendment
+   request and one final decision/outcome.~~
+   **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): every SO amendment waits for an approver, the Houzs way.**
+   Submission writes nothing on the order; the amendment waits as `Waiting for management` in the
+   **Sales Orders → Amendments** queue (`/operation/amendments`) until the approver records
+   `Approve and apply` (it applies through the existing 0564 engine and mints the next revision)
+   or `Reject` (nothing on the order changes). Approver today: the Principal role, the built 0564
+   gate; whether it narrows to a Duty is an open question for Weisiang. Preserve the existing 0564 customer-agreement evidence
    gate (signed document, customer confirmation reference or original agreement, with its governed
    evidence/reference rules). No evidence-free application is authorised.
 2. **Route from the changed line's actual PO coverage**, not another line's PO:
-   - No issued PO covers the changed line: an ordinary amendment takes effect on submission
-     with the required evidence, subject to the expressly undecided scopes below.
+   - ~~No issued PO covers the changed line: an ordinary amendment takes effect on submission
+     with the required evidence, subject to the expressly undecided scopes below.~~
+     **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): no amendment takes effect on submission. With or without an issued PO
+     it waits in the Amendments queue for the approver (item 1).**
    - An issued PO covers the changed line: **PO Duty must first record the supplier's answer
      that the change can be made**. Only then may it take effect. If the supplier has not answered
      or the supplier date is unknown, it waits; it never takes effect by default.

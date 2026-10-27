@@ -47,7 +47,7 @@ SO changes without issued-PO coverage do not acquire this supplier gate. See Ord
 
 **KEEP before/after and linked origins; REJECT foreign application order.** Carres preserves the preceding owner-approved pre-effectiveness supplier-answer gate for SO changes covered by issued POs. Recommended source contract: capture exact submitted SO revision, affected PO revision/line/source allocations and supplier response evidence; show original versus proposed goods/quantity/destination and the current-source differences. Obtain the existing qualified approvals and supplier answer before the covered SO amendment becomes effective. Purchasing then applies its own governed PO change, preserving the same PO identity and historical receipts/Units, and follows the exact-current-version send journey (§§5.4–5.6). A supplier promise/date answer alone does not mint a revision (§5.7).
 
-**Recommended conflict and multi-source acceptance — PROPOSAL where extending the approved dependency.** Re-reading a changed live SO must not silently replace the proposal that was reviewed. A changed SO/PO revision, new receipt, allocation change or lost permission produces a named conflict and a fresh review; retained draft/evidence does not imply approval. When one SO change affects several POs or a shared PO line covers several SOs, enumerate each affected source and independently satisfied supplier/approval conditions; one visible approved row cannot certify the whole scope. Application/retry must not double procurement coverage, recreate received Units or mark a newly revised PDF sent. Keep request, approval, effective application, supplier sending and supplier response as distinct events with actual actor/version/time. Existing rule-specific qualifications apply; advisory department routing never grants approval rights. These contracts refine the approved dependency for review, not commission a new amendment register or implementation.
+**Recommended conflict and multi-source acceptance — PROPOSAL where extending the approved dependency.** Re-reading a changed live SO must not silently replace the proposal that was reviewed. A changed SO/PO revision, new receipt, allocation change or lost permission produces a named conflict and a fresh review; retained draft/evidence does not imply approval. When one SO change affects several POs or a shared PO line covers several SOs, enumerate each affected source and independently satisfied supplier/approval conditions; one visible approved row cannot certify the whole scope. Application/retry must not double procurement coverage, recreate received Units or mark a newly revised PDF sent. Keep request, approval, effective application, supplier sending and supplier response as distinct events with actual actor/version/time. Existing rule-specific qualifications apply; advisory department routing never grants approval rights. ~~These contracts refine the approved dependency for review, not commission a new amendment register or implementation.~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): a PO Amendments register exists (Purchasing → `PO Amendments`, migration 0717). A PO quantity / Deliver To change is sent for approval; the Purchasing Approver approves or rejects it, and approval runs the existing PO revision (`purchasing_revise_po`) unchanged, minting the next version for the §5.6 send journey. Nobody decides their own request. YH (chat, 2026-10-26): "Purchasing Approver" on both queues means today's holder or any other active Principal person (the role the duty requires), so the holder's own request is decided by another Principal; the requester reads `Waiting for another approver`, and a PO with a waiting request carries a flag on the PO pages linking to it. Houzs withdraw (coordinator, 2026-10-26; Houzs po-amendments.ts:699-727, document-cancel.ts:269-277): the requester, or anyone who could decide it, may `Withdraw` an open request (an amendment only before it is decided); it closes as `Withdrawn` and frees the PO for a new request.
 
 **All listing appearance — BUILT 2026-09-17 (SLICE 1) · authenticated walk OWED (approved Jess, 2026-09-17):** follow
 [UI MASTER §6.7 Portal-wide listing readability](../ui/MASTER.md#portal-wide-listing-readability--built-2026-09-17-slice-1--authenticated-walk-owed).
@@ -822,7 +822,7 @@ Purchase Invoice engine. No receipt, amendment, void, invoice or return was exec
 | Source and expected arrival | RESOLVED: PO/CO and other admitted sources own expected goods; supplier dates stay Purchasing-owned. A supplier dispatch/DO is evidence of supplier statement, not GRN. | Prove source-line and split-batch dates remain separate from actual arrival. No duplicate PO/Receiving ETA writer. |
 | Daily ownership and missed arrival | RESOLVED: Operation checks missing arrivals and contacts suppliers; Warehouse performs physical work. | CONTRADICTION FOUND: Workspace's older action table instructed check-in merely because a date passed. Its target is corrected. The Work feed correction is deployed in #1907 (2026-10-05), with live scenario acceptance still owed: actual submitted reports alone create Receiving work; missed arrivals use Purchasing/PO Duty and the existing per-line arrival authority. |
 | Warehouse identities and permissions | APPROVED TARGET / NOT BUILT: individually authenticated, source/Site-authorised confirmation, company receiver and individual actor distinct. | Existing role gates do not deliver the new rule. No broad Warehouse finance, adjustment, amend or void rights. |
-| Receipt entry and evidence | KEEP the source-prefilled one engine; confirm actual Unit outcomes or counted quantities, actual date/Site, DO and evidence. | No blank unrelated receipt, identity minting or supplier-reported automatic receipt. Missing evidence preserves an unposted report. |
+| Receipt entry and evidence | KEEP the source-prefilled one engine; confirm actual Unit outcomes or counted quantities, actual date/Site, DO and evidence. | ~~No blank unrelated receipt, identity minting or supplier-reported automatic receipt. Missing evidence preserves an unposted report.~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp): office staff may receive goods that have no source: raise a no-source New Purchase Order (#2114) and receive it in the same engine, so Units are born the way Receiving creates them. No separate blank-receipt screen. Jess was not part of this decision. |
 | Partial receipt and remaining quantity | RESOLVED: valid received scope completes; remaining acceptable supply stays outstanding. | Example: ordered 10, physically arrived 8 including 1 damaged means Received Qty 7, Damaged Qty 1, physically missing 2, Pending Delivery Qty 3. Never add damage to the 3 again. |
 | Automatic GRN and retries | APPROVED TARGET / NOT BUILT: valid Warehouse confirmation posts through Receiving and creates the formal GRN once. | Existing submit/review split is a real implementation gap. Prove no duplicate receipt/stock after retries or concurrent confirmation, and no false success on failure. |
 | Condition, custody and eligibility | RESOLVED: physical custody, accepted quantity and saleability differ. Damage/wrong goods retain hold; rejected goods remain with supplier. | Existing reservations survive valid arrival; extra goods cannot silently satisfy expected lines or create available stock. |
@@ -845,10 +845,10 @@ it did not post a document. Houzs-derived functionality is not proof of original
 
 | Reference capability | Current Carres equivalent / owner | Decision | Why / dependency |
 |---|---|---|---|
-| Houzs outstanding PO-line selection and partial quantity | Source-linked Receiving / Purchasing | KEEP + ADAPT | Reuse source identity and remaining scope; do not rebuild an independent purchase document. |
+| Houzs outstanding PO-line selection and partial quantity | Source-linked Receiving / Purchasing | KEEP + ADAPT | ~~Reuse source identity and remaining scope; do not rebuild an independent purchase document.~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp): office picks outstanding PO lines from one or more POs of the same supplier for one delivery; same Receiving engine, one GRN per PO. Jess was not part of this decision. |
 | Houzs standalone GRN detail, source link and downstream document links | GRN object/PDF, Related records / Receiving | ADAPT | Reuse proven document navigation inside Carres's approved Working Panel/full-page grammar. |
-| Houzs `qtyAccepted = qtyReceived`, rejected zero in new-form construction | Per-Unit condition and accepted quantity / Receiving + Stock | REJECT | Carres explicitly distinguishes damaged/wrong physical arrival from accepted supply. |
-| Houzs transfer to invoice and return | Supplier Bills / Finance; authorised Claim-to-Return / Purchasing | RELOCATE + KEEP | A convenient link is useful; it cannot transfer Finance permissions or bypass Claim authorisation. |
+| Houzs `qtyAccepted = qtyReceived`, rejected zero in new-form construction | Per-Unit condition and accepted quantity / Receiving + Stock | REJECT | ~~Carres explicitly distinguishes damaged/wrong physical arrival from accepted supply.~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp): accepted quantity defaults to the received quantity and stays editable (Receiving already prefills it; damaged/wrong stay per-Unit outcomes). Jess was not part of this decision. |
+| Houzs transfer to invoice and return | Supplier Bills / Finance; authorised Claim-to-Return / Purchasing | RELOCATE + KEEP | ~~A convenient link is useful; it cannot transfer Finance permissions or bypass Claim authorisation.~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp): office may also open a Purchase Return with no claim (`New Purchase Return`: supplier + Units in stock). Jess was not part of this decision. |
 | Houzs posting response can carry movement/recount errors | One validated Carres receipt engine | REJECT blind copy | GRN and stock failure/retry consistency must be proven, not inferred from a success-looking document. |
 | Odoo partial receipt retains remaining demand; received-quantity billing | Existing partial receipt and GRN-billable lines | KEEP | Confirms useful separation of receipt, remaining supply and bill; foreign policies are not Carres authority. |
 
@@ -895,12 +895,15 @@ Useful proven capability:
 
 Capability deliberately rejected or improved:
 
-- blank PO/return/consignment creation without a governed source;
-- delete and right-click commands that hide authority;
+- blank PO/return/~~consignment~~ creation without a governed source; **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): on the customer side a Consignment Note and a Customer Consignment Return may be created blank (Houzs way, migration 0719). The supplier-side Consignment Order / Consignment Return are unchanged.**
+- blank return/consignment creation without a governed source; the PO part is overturned:
+  **OVERTURNED 2026-10-22 by Weisiang (Mr Lim): office staff may open a PO without a source (Houzs way). Jess's earlier rule kept below for history.**
+  > Jess's earlier rule: "blank PO/return/consignment creation without a governed source;"
+- ~~delete and right-click commands that hide authority;~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): purchasing staff bulk-delete products on Operations → Catalog → SKU Master, Houzs way. The database refuses, by name, a SKU that orders, purchase orders, stock Units or supplier bills name (0721); that SKU is turned off instead. Selling price stays Master Admin only.
 - many cloned consignment engines whose document type, ownership and accounting meaning diverge;
 - a separate consignment-receipt workflow when one Goods Receipt can preserve ownership;
 - model/quantity-only consignment control without exact Unit identity;
-- finance fields and settlement decisions inside Operations;
+- ~~finance fields and settlement decisions inside Operations;~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): purchasing staff see the supplier bills, with Total, Paid and Unpaid, on Operations → Suppliers → Purchase Invoices, Houzs way. It is a read of Finance's own bills (0721); ~~entering, confirming~~ and paying a bill stay Finance's (entering: Chew 2026-10-23; posting on save: Chew 2026-10-26, Houzs way). OVERTURNED 2026-10-23 by Chew (Finance, WhatsApp via YH; "Can be both to proceed the step first? Because the duties right now still at finance, coming maybe will be purchasing"): purchasing staff enter a supplier bill from goods received with `New bill` or `Bill from GRN` on Purchase Invoices (`/operation/purchase-invoices/new`, `/from-grn`, Houzs's `/scm/purchase-invoices/new` and `/from-grn`). It is Finance's own bill door (`POST /api/finance/payables/bills` → `supplier_bill_save_draft`, 0721): a new draft, every line from a GRN, the PO's price unless the supplier's bill says otherwise, no account choice. Finance confirms it (that posts it) and pays it; Purchasing cannot change a saved bill, confirm, cancel or pay. Houzs posts a purchase invoice as it is created; Carres keeps Finance's confirm step until Chew says otherwise. Q9 edit-until-paid (YH 2026-10-26, Houzs piLocked purchase-invoices.ts:270-284 and resyncPiAccounting accounting.ts:855+): Purchasing changes its own posted bill until any payment, advance or credit note is against it; the save reverses the old posting (gl_reverse) and posts the new one, keeping the bill number (0721 §5).
 - `RelationshipMap` terminology and a UI system separate from Carres Shell/Register/Object Detail.
 
 ### 3.2 Mature ERP / WMS / logistics lessons
@@ -938,6 +941,8 @@ Primary references: [Dynamics purchase requisitions](https://learn.microsoft.com
 | Consignment order | Supplier-owned sofas are hard to count; purchased Hooka/Ohana displays are mixed in | Mature ERP keeps supplier ownership on receipt; 2990 has documents but fragmented truth | **ADAPT + IMPROVE** | Approved display/claim swap creates CO; exact Units and supplier ownership are fixed before delivery | Issue CO, send Unit IDs, record promise, receive through the one Receiving engine | `Consignment Orders` Register; source-linked supplier instruction (§9.9) | Display Request; Stock Unit; Goods Receipt; Consignment Return |
 | Consignment return | Removal/swap may be arranged informally | Physical handover, not document issue, changes custody | **IMPROVE** | Approved remove/swap/claim/overdelivery creates return; combined swap shares one Consignment Order PDF (§9.9) | Send standalone return if needed; obtain collection date; scan and prove handover | `Consignment Returns` Register; source-linked return and handover (§9.10) | CO swap, Stock custody, supplier proof; no refund/credit on unsold consignment |
 
+**Customer side — OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): Carres-owned goods also go OUT on consignment, the Houzs way. `Customer Consignment Order` (CCO) records the customer or dealer and the Units; the `Consignment Note` (CSN, from a CCO or blank) is the delivery document that moves the Units into the customer's custody (reserved to the Note number, still Carres-owned); the CCO carries each Unit's price and its own payments, the Houzs way (YH, chat 2026-10-26, per Weisiang's ruling; Houzs consignment-orders.ts:2171-2310): a Unit sold there is marked sold against its CCO line with `Record sold` and the payment is recorded on the CCO, never on a Sales Order; a blank Note carries its own line prices and payments, as Houzs does (consignment-notes.ts:445,465, 1074-1160), so a Unit on it is sold against the Note and paid on the Note; `Customer Consignment Return` (CCR, blank allowed) brings unsold Units back into stock with no refund, because nothing was paid for them. The rows above stay the supplier-side Consignment Order / Return. BUILT on branch `feat/customer-consignment-houzs-way`, migration 0719 NOT APPLIED.**
+
 ---
 
 ## 4 · Final navigation and information architecture
@@ -974,8 +979,8 @@ Rules:
 - There is no Purchase Demands page. Demand is a record, not a staff destination.
 - There are no New Supplier or New SKU request pages. A blocked buy opens an in-context governed
   supplier/SKU request to Catalog/Master Data and returns to the same buy.
-- There is no Consignment Overview or Consignment Receipts page. Receiving handles purchased
-  and consignment goods; Stock Register reports supplier-owned Units.
+- There is no Consignment Overview ~~or Consignment Receipts~~ page. Receiving handles purchased
+  and consignment goods; Stock Register reports supplier-owned Units. **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): a `Purchase Consignment Receive` page in the Showroom drawer, as Houzs has (Houzs frontend/src/components/Sidebar.tsx:552). It is the same Receiving GRN register locked to Consignment Orders; still one receipt engine.**
 - Settings stays behind the global header gear. Reports use the central Reports area and Register
   export, not permanent Purchasing sidebar rows.
 
@@ -1477,7 +1482,7 @@ remain. PR #1105 carries the dependent application and deployment proof.
 
 **Fresh Houzs Supplier adaptation — read-only, 9 Oct 2026.** Supplier register exposes Active/Inactive/Blocked and supply-category facets; sampled full supplier shows governed identity/contact/address, SKU mappings, lead-time/pricing destinations, recent PO history and a performance scorecard. Only Overview was inspected; nested price/lead-time editors, save/retire/block and performance arithmetic were not tested. Foreign contacts, terms, rates and score values are not copied.
 
-KEEP the complete supplier setup and category-specific working-calendar law above plus §11's source-owned addresses/channels. ADAPT source-linked attention/history: Operations finds the existing supplier, checks the exact approved SKU relationship and relevant production category/calendar, corrects a genuine gap through its qualified owner, then resumes the original demand. Supplier activity/category alone never proves SKU compatibility or capacity; a missing contact cannot be replaced with a guessed recipient. Historical POs/PDF versions retain their original identity/address snapshots when current master data changes. Catalog owns price maintenance; Finance owns creditor terms/accounts/settlement. Reference financial fields do not enlarge Operation access.
+KEEP the complete supplier setup and category-specific working-calendar law above plus §11's source-owned addresses/channels. ADAPT source-linked attention/history: Operations finds the existing supplier, checks the exact approved SKU relationship and relevant production category/calendar, corrects a genuine gap through its qualified owner, then resumes the original demand. Supplier activity/category alone never proves SKU compatibility or capacity; a missing contact cannot be replaced with a guessed recipient. Historical POs/PDF versions retain their original identity/address snapshots when current master data changes. Catalog owns price maintenance; ~~Finance owns creditor terms/accounts/settlement.~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): purchasing staff edit a supplier's payment terms on the Suppliers page, Houzs way, in the same `terms_days` field Finance's bill form reads (0530); Finance keeps creditor accounts and settlement. Reference financial fields do not enlarge Operation access.
 
 Recommended supplier-performance acceptance connects §12's existing reporting target: disclose denominator, partial/late receipt treatment, expected-versus-actual date source, calendar and as-of/coverage before showing a rate. No recorded defect is not automatically proven perfect quality; no accepted receipts is not zero-percent performance. Supplier retirement/block behavior must distinguish new procurement admission from continuing existing receipt/claim/repair/return obligations; exact admission policy remains a review decision, not an adopted foreign status rule. No second scoring engine or blanket stop of existing operational work.
 
@@ -1709,6 +1714,7 @@ facts, the one send area and the completion fact below.
 
 ### 5.7 The original date, the truthful reply, one arrival arithmetic, the kept document
 
+**Does not apply to `New Purchase Order` — OVERTURNED 2026-10-23 for that door only (YH: "follow houzs"; see §New Purchase Order).**
 **PO DELIVERY DATE — OWNER CORRECTION (Jess, 2026-09-22). BUILT on BOTH issue doors
 (`poDeliveryDateOf`): Manual Purchase in CARD 13, SO Batch Purchase in CARD 13-B
 (2026-09-23). Neither door adds transit days any more. What the convergence did
@@ -1997,17 +2003,21 @@ a manually selectable substitute for cancelling the SO: show that source reason 
 effective Orders cancellation. Purchasing never changes the customer's demand by choosing a reason.
 
 **Who may help.** Any active authorised Operation person, and Jess as an authorised Principal
-person, may request cancellation and complete the ordinary evidenced cancellation below without
-holding PO Duty or changing assignment first. Preserve `Assigned to`; record each actual updater
+person, may request cancellation ~~and complete the ordinary evidenced cancellation below without
+holding PO Duty or changing assignment first~~. OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): completing a cancellation is
+`Send for approval`: it waits in `Cancellation Requests` for PO Duty (its cover or an Operations
+Superuser, never today's Purchasing Approver), then the Purchasing Approver, a different person;
+the second approval runs this engine. Supplier facts and the commercial exception decision stay
+direct. Preserve `Assigned to`; record each actual updater
 and completer, time, quantity, reason and evidence. Medical leave does not create a duty-only gate.
 This grants no commercial exception approval, Finance powers or self-approval exception. Workspace
 §3 remains the owner of assignment and actual-actor presentation.
 
 | Supplier facts | Purchasing result |
 |---|---|
-| Supplier explicitly cannot supply the identified outstanding quantity, with evidence | Operation may cancel that quantity. Deposits, refunds or other financial matters remain Finance follow-up; cancellation never settles them. A supplier fee demand or contradictory shipping evidence requires exception handling. |
+| Supplier explicitly cannot supply the identified outstanding quantity, with evidence | ~~Operation may cancel that quantity.~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): Operation sends the cancellation for the two approvals. Deposits, refunds or other financial matters remain Finance follow-up; cancellation never settles them. A supplier fee demand or contradictory shipping evidence requires exception handling. |
 | Carres requests cancellation; supplier agreement is not yet evidenced | Retain the outstanding commitment and procurement coverage; show `Waiting for supplier to agree`. Do not treat a request as cancellation or trigger duplicate buying. |
-| Supplier agrees and explicitly confirms no cancellation fee | Operation may complete the cancellation without additional owner approval. Existing deposits/refunds remain Finance's responsibility and do not require Operation to inspect money. |
+| Supplier agrees and explicitly confirms no cancellation fee | ~~Operation may complete the cancellation without additional owner approval.~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): Operation sends it for the two approvals (PO Duty, then Purchasing Approver). Existing deposits/refunds remain Finance's responsibility and do not require Operation to inspect money. |
 | Supplier disagrees, goods have shipped, or a cancellation fee is requested | Do not complete an ordinary cancellation. Purchasing Approver handles the commercial exception under existing authority; Finance handles money. A cancellation fee is not a PO unit-price change and must not be put through a price-change flow merely for convenience. |
 | Cancellation fee is not confirmed | Keep the request pending and retain procurement coverage while the supplier facts are confirmed. Do not silently interpret an unknown answer as no fee. |
 
@@ -2565,7 +2575,7 @@ The user-facing gate uses two lines:
 
 **Houzs PO/GRN source reconciliation — authenticated reference, 9 Oct 2026; recommended verification contract.** Read-only reference inspection opened a current PO Register, quick view, full object and History, and a GRN Register, quick view and full object. PO rendered ordered/received/balance, per-line warehouse/allocation, original/expected/submitted dates, source activity and sending/amendment/receipt doors. Its loaded history retained an actual creator and change count. GRN separately rendered Supplier DO, receipt/post dates, header source PO and per-line source POs/ordered/received quantities; sampled lines linked more than the header's one PO. No send, confirm, receipt, cancel, amendment, edit, posting or file action was performed. Rendered status/activity is not independent delivery or posting proof; foreign amounts and rack assignments are not Carres rules.
 
-**KEEP / ADAPT / REJECT:** keep §5.6's exact-version recorded sending and §7.3's one Receiving writer, expected-Unit/quantity modes, individual receiver and actual physical outcome. Adapt source-linked drilldown and explicit remaining quantities where a Carres reader still lacks them. Reject deriving receipt scope from one header PO or SKU text, adopting Houzs's rack placement, equating Submitted with evidenced current-version send, and counting a GRN as a payable/supplier acceptance by itself. This comparison creates no permission for mixed suppliers or a new multi-PO receipt workflow; Carres's existing admitted session scope remains controlling.
+~~**KEEP / ADAPT / REJECT:** keep §5.6's exact-version recorded sending and §7.3's one Receiving writer, expected-Unit/quantity modes, individual receiver and actual physical outcome. Adapt source-linked drilldown and explicit remaining quantities where a Carres reader still lacks them. Reject deriving receipt scope from one header PO or SKU text, adopting Houzs's rack placement, equating Submitted with evidenced current-version send, and counting a GRN as a payable/supplier acceptance by itself. This comparison creates no permission for mixed suppliers or a new multi-PO receipt workflow; Carres's existing admitted session scope remains controlling.~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp): office may receive several POs of the same supplier in one delivery (tick POs, `Receive selected`; one GRN per PO, same engine). Mixed suppliers stay refused. Jess was not part of this decision.
 
 **Recommended reader/acceptance contract — PROPOSAL where extending approved law:** each receipt result carries its admitted source document/version and source-line identity, actual receiving Site, applicable expected Unit IDs or quantity mode, accepted/issue/rejected/pending results, Supplier DO/evidence and actual confirmer. Per-line source references, not the header summary, govern exact consequence matching. Readers of SO, PO, Inbound and Stock must agree after canonical re-read; no unscoped join by equal SKU, display number or date. Where a receipt contains multiple admitted source lines, preserve each lineage and apply accepted consequences once to its own remaining obligation. Missing/invalid links remain explicit and invoke the existing source correction; do not attach a receipt to a convenient order.
 
@@ -2869,7 +2879,7 @@ replaced by one row per Sales Order on the same kit list as `By supplier`, so no
   order whose answer could not be confirmed offers no stock until its record has been read again.
 - **While lines are ticked** the selection bar stands where the toolbar was: the count, `Clear`, `Use stock`, the PO
   Duty chip, `Issue PO`, `Export Excel (n)`, and the view button as one small button, because the ticks are the same
-  in every grouping and the grouping can still be changed. One line at 1164 and 1440.
+  in every grouping and the grouping can still be changed. One line at 1164 and 1440. The shared DataGrid uses the COPY-standard SO/PO short count only when its full wording does not fit; Sales Order, item, Unit and PO quantities remain visible and every action keeps its control.
 - **Kept from the old list:** eligibility and the duplicate-PO protection, the one tick set and the one `Issue PO` door,
   the PO Duty chip, `Export Excel (n)` for the ticked rows, Export in ⋮, the rail and its counts, the quick card,
   `Purchase Orders` in the ⋮ menu (supplier preparation for the Sales Orders in view: this tab, the rail and the
@@ -4486,8 +4496,18 @@ on `auth.uid()`; a shape check refuses any key but order/hidden/widths/sort; 10 
 listing; one default. Routes `/api/operation/register-layouts` run as the caller. **Owed:** saving
 a layout and pressing `PO sent to supplier` on production.
 
-**Purpose / source:** every numbered supplier purchase commitment and version. No blank independent
-PO; source is approved demand. The listing answers to whom, what, and when goods should arrive.
+**OVERTURNED 2026-10-22 by Weisiang (Mr Lim): office staff may open a PO without a source (Houzs way). Jess's earlier rule kept below for history.** (Weisiang, WhatsApp 2026-10-22 6:29 PM, relayed by YH 2026-10-23: "just clear Carress rules and Implement Houzs inside, as long as they can open SO PO DO". Jess was not part of this decision. Built as `New Purchase Order` on the PO register → `POST /api/operation/pos/new` → the existing `purchasing_issue_pos_batch`.)
+
+**OVERTURNED 2026-10-23 for `New Purchase Order` only, by YH following Weisiang's Houzs-wins ruling (Mr Lim, WhatsApp 2026-10-22; Jess was not part of this decision).** YH, 2026-10-23: "follow houzs". Two of Jess's rules do not apply to `New Purchase Order`; Manual Purchase and SO Batch Purchase keep both:
+- ~~The PO Delivery Date is PO Date + the Settings production days (§5.7, owner correction 2026-09-22).~~ On `New Purchase Order` the PO Delivery Date is typed; left blank, it is today. Houzs: `expectedAt = dateOrNull(body.expectedAt) ?? todayMyt()` [Houzs-ERP backend/src/scm/routes/mfg-purchase-orders.ts:1027].
+- ~~One PO goes to one supplier for one category.~~ One `New Purchase Order` may mix categories; each line keeps its own category. Houzs: one header insert, each line with its own category [same file :1244, :1287].
+
+> Jess's earlier rule: "**Purpose / source:** every numbered supplier purchase commitment and version. No blank independent
+> PO; source is approved demand."
+
+**Purpose / source (current):** every numbered supplier purchase commitment and version. A PO comes
+from approved demand (SO Batch Purchase, Manual Purchase) or is opened directly by office staff with
+no source (`New Purchase Order`). The listing answers to whom, what, and when goods should arrive.
 Quantity progress belongs to Warehouse Inbound / Receiving and PO detail.
 
 **OVERVIEW DISPLAY — owner's 12 Oct 2026 package · BUILT 12 Oct 2026 · the page's first display.**
@@ -6604,9 +6624,10 @@ Hide filters control made the empty message and footer readable, and the desktop
 state was restored afterwards. This is not populated-row, pinning, evidence, permission,
 issue, pickup or supplier-receipt proof. No return, Unit or custody event was written.
 
-**Purpose / source:** return Carres-owned purchased goods only after an approved claim/outcome.
-No blank `+ New`. Keep the existing Claim → Purchasing authorisation → Stock physical pickup
+**Purpose / source:** ~~return Carres-owned purchased goods only after an approved claim/outcome.~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp): return Carres-owned purchased goods after an approved claim, OR with no claim from `New Purchase Return` (supplier + free Units in stock, migration 0713). Jess was not part of this decision.
+~~No blank `+ New`.~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp): `New Purchase Return` exists (Jess was not part of this decision). Keep the existing Claim → Purchasing authorisation → Stock physical pickup
 ownership chain (§7.4 and Stock MASTER §12.8). Issuing the document does not move stock.
+A claimless return holds nothing at issue, so its Unit can be sold before pickup. YH (2026-10-26) added `Cancel return` for that case: a claimless return with no Unit collected is cancelled with a reason (who, when, why kept); its Units are free for another return, it leaves Stock's pickup list and Work, and an unsettled credit note to follow up is closed (migration 0713, following Houzs `PATCH /purchase-returns/:id/cancel`).
 
 **Main columns, in order:** expand arrow → PR Doc Date → PR No → Supplier → Supplier Claim No
 → Category → PO No / Unit ID → GRN No → Items → Qty → Pickup Location → Return To
@@ -7120,8 +7141,8 @@ this ruling does not prescribe shared accounts or replace individual actor/proxy
 
 Consignment display applies to Carres' own showrooms only. They may hold supplier-owned display
 goods or purchased Carres-owned goods, with the §7.7 display-only sales boundary unchanged.
-Dealers buy goods from Carres; their showroom locations do not receive consignment under this
-operating model. A Dealer purchase belongs to the Sales/commercial source, never an internal
+~~Dealers buy goods from Carres; their showroom locations do not receive consignment under this
+operating model.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): a dealer or a customer may hold Carres-owned goods on consignment through a Customer Consignment Order and its Consignment Note (§3 customer side). Supplier-owned display goods still stay in Carres showrooms.** A Dealer purchase belongs to the Sales/commercial source, never an internal
 Manual Purchase, Stock Transfer or supplier consignment display placement solely because its
 destination is a showroom. A company having several locations changes destination and access
 scope, not the commercial nature of the transaction. No Dealer credit or new payment/ownership
@@ -7476,19 +7497,19 @@ Workspace. Existing approvals, custody evidence, permissions and supplier-docume
 confirms the supplier-owned goods Carres requests and where they are to be delivered/collected.
 It is an instruction to obtain goods on consignment, not an outright purchase, payable or proof
 of receipt. Keep Consignment Orders and Consignment Returns as distinct, plainly named objects
-and register destinations. Do not rename them collectively Consignment Note or introduce that as
-a third manually created document. Staff still enter the Display Request once; intent and verified
+and register destinations. Do not rename them collectively Consignment Note~~ or introduce that as
+a third manually created document~~. **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): `Consignment Note` now exists as the CUSTOMER-side delivery document (§3 customer side), created from a Customer Consignment Order or blank. It never renames these supplier documents.** Staff still enter the Display Request once; intent and verified
 ownership derive the correct source-linked order and/or return, with existing facts prefilled.
 
 **Source / identity:** source-linked Display Request under §9.8 or authorised Supplier Claim replacement outcome;
-no blank order that bypasses its source. Manual arrangement entry follows §9.8. Official issue
+~~no blank order that bypasses its source.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): office staff may open a Consignment Order with no source and with prices on the lines (`New Consignment Order` on the PO register → `POST /api/operation/pos/new` with `consignment: true` → 0720 `purchasing_issue_consignment_order`, which calls the one `purchasing_issue_pos_batch` and marks the issued orders `is_consignment`), Houzs way.** Manual arrangement entry follows §9.8. Official issue
 allocates new incoming exact Unit IDs under §6.2; existing outgoing Units keep their identities.
 Preserve numbering families, old titles/versions and source links. No historical document rewrite,
 new CN allocator or application changes follow from this planning ruling.
 
 **Commercial boundary:** apply §9.8 quotation recording and Sales-confirmation rules. Missing or
-unconfirmed price does not block the agreed consignment movement. The supplier PDF is price-free:
-no supplier cost, customer selling price, price total or settlement amount. Keep commercial
+unconfirmed price does not block the agreed consignment movement. ~~The supplier PDF is price-free:
+no supplier cost, customer selling price, price total or settlement amount.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): the Consignment Order PDF shows each line's recorded Unit Price and Amount, a group TOTAL and an ORDER TOTAL, Houzs way; an ordinary Purchase Order PDF stays money-free.** Keep commercial
 versions/evidence internally; issue, send and receipt never accept unconfirmed terms or create a
 payable. Future Catalog costs do not overwrite historical terms.
 
@@ -7531,7 +7552,7 @@ remain separate authoritative records; neither paper creation nor cancellation c
 records the supplier-owned goods to hand back and the actual collection result. It has its own
 register/object and existing number family. Source it from authorised removal, swap, supplier
 collection, overdelivery or Claim outcome; staff do not re-enter the goods already chosen on the
-Display Request. No independent blank create bypasses source/ownership controls.
+Display Request. ~~No independent blank create bypasses source/ownership controls.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): `New Consignment Return` on the Consignment Returns register starts a return straight from a supplier's consigned stock, no claim or other source, as Houzs does (Houzs frontend/src/pages/scm-v2/PurchaseConsignmentReturnNew.tsx:12-15). Ownership controls stay: only that supplier's free supplier-owned tracked Units qualify; a Unit on a claim goes back through its claim (0706 §2).**
 
 A standalone return issues its own price-free Consignment Return PDF with GOING BACK goods,
 actual collection location, party and confirmed date. A same-supplier swap uses the combined
@@ -7542,8 +7563,8 @@ the Consignment Returns register helps find goods still awaiting supplier collec
 Read exact goods/current location from Stock. Keep planned collection separate from actual
 handover Units, recipient, time and proof. Supplier/collector acknowledgement belongs to this
 handover evidence, not another manually created Consignment Note. Partial collection leaves
-uncollected Units at their evidenced location and keeps remaining work. Issuing/sending the return
-is not proof of collection. Preserve versions and each actual event; cancel cannot teleport goods.
+uncollected Units at their evidenced location and keeps remaining work. ~~Issuing/sending the return
+is not proof of collection.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision) for `New Consignment Return` only: creating it takes the Units out of stock at once (`returned_to_supplier`), as Houzs does (Houzs backend/src/scm/routes/purchase-consignment-returns.ts:564). A claim-issued Consignment Return still waits for the pickup.** Preserve versions and each actual event; cancel cannot teleport goods.
 
 Stock owns custody and Purchasing owns supplier instruction. This is not a Site-to-Site Transfer:
 old goods at Carres warehouse still await supplier return. Unsold consignment return creates no
@@ -7647,12 +7668,12 @@ scope is approved by this research.
 
 | Reference capability and inspected evidence | Carres owner/current equivalent | Disposition and dependency |
 |---|---|---|
-| 2990 supplier-side Purchase Consignment Order, linked receives/returns; `apps/api/src/routes/purchase-consignment-orders.ts` | Purchasing and Receiving; formal Carres Consignment Order not built | ADAPT source/child links and ordered/received/remaining facts; no blank Carres order creation |
+| 2990 supplier-side Purchase Consignment Order, linked receives/returns; `apps/api/src/routes/purchase-consignment-orders.ts` | Purchasing and Receiving; formal Carres Consignment Order not built | ADAPT source/child links and ordered/received/remaining facts; ~~no blank Carres order creation~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): office staff open a Consignment Order with no source, Houzs way (0720).** |
 | 2990 shared PO PDF renderer with `docTitle: PURCHASE CONSIGNMENT ORDER`; `PurchaseConsignmentOrderDetail.tsx:307–311` | Shared document kit | COPY PRINCIPLE, NOT READY for direct migration: Carres's combined incoming/outgoing layout and price exclusion differ |
-| 2990 separate supplier-side route/tables; create/edit line/cancel/delete operations | Shared Carres source-owned document/receipt capabilities | REJECT cloned business writers; sharing a PDF does not prove one common transaction engine |
+| 2990 separate supplier-side route/tables; create/edit line/cancel/delete operations | Shared Carres source-owned document/receipt capabilities | ~~REJECT cloned business writers~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): a Consignment Order is built Houzs way, but through the existing PO writer (0720 wraps `purchasing_issue_pos_batch`), not a cloned engine.** Sharing a PDF does not prove one common transaction engine |
 | 2990 receive/return remaining-quantity guards and downstream edit lock; `purchase-consignment-receives.ts:270–380` | Receiving/Stock exact Units | ADAPT prevent over-receipt/over-return and inspect downstream effects; Carres amendments preserve actual receipt history |
 | 2990 return creation books inventory OUT and cancellation reconciles it back; `purchase-consignment-returns.ts:1–65` | Stock physical handover | REJECT document-status-driven custody changes: Carres needs actual handover, not cancel-to-teleport |
-| 2990 Consignment Note sends goods to customer/showroom, `consignment-notes.ts:1–80`; outward Consignment Order uses sales tables | Delivery/Stock goods movement; supplier-owned display is not sold in Carres | RELOCATE reference meaning; no evidence here that the named note auto-notifies supplier after customer success |
+| 2990 Consignment Note sends goods to customer/showroom, `consignment-notes.ts:1–80`; outward Consignment Order uses sales tables | Delivery/Stock goods movement; supplier-owned display is not sold in Carres | ~~RELOCATE reference meaning~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): KEEP the Houzs meaning on the customer side: Consignment Note sends Carres-owned Units to a customer or dealer (§3 customer side, migration 0719)**; no evidence here that the named note auto-notifies supplier after customer success |
 | Odoo owner dimension and ownership-based stock moves (official consignment documentation) | Stock Unit ownership | KEEP owner separate from Site; documentation search corroborated concept, full page fetch timed out |
 | Oracle returns before/after consumption advice and invoice (official return examples) | Service, Purchasing and Finance | ADAPT need to distinguish unsold return from post-sale customer return; REJECT importing Oracle ownership/accounting policy as Carres law |
 | Dynamics supplier-owned receipt without accounting posting (official consignment process) | Receiving consignment flag and Finance bill guard | KEEP proven separation of receipt and payable; Carres successful-customer-delivery trigger remains its own law |
@@ -7868,8 +7889,8 @@ confirmed/arranged dates from the owning schedules; an unknown date is not inven
 on a calendar. Customer information and selling prices stay out of supplier consignment PDFs.
 **DOCUMENT PURPOSE AND ACKNOWLEDGEMENT — APPROVED TARGET / NOT BUILT; Jess, 2026-09-29.**
 §9.9 owns Consignment Order (obtain supplier-owned goods); §9.10 owns Consignment Return (hand
-goods back). Do not merge their names into Consignment Note or add a third manually created
-acknowledgement. Actual showroom receipt and supplier collection evidence attach to their owning
+goods back). Do not merge their names into Consignment Note ~~or add a third manually created
+acknowledgement~~. **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): the customer-side Consignment Note (§3) is a separate document; supplier acknowledgement stays on the owning actions.** Actual showroom receipt and supplier collection evidence attach to their owning
 actions. One arrangement pre-fills the correct documents; one combined swap PDF can cover the two
 instructions while receipt and handover remain independently evidenced. Detailed shared-kit
 composition still needs design closure; naming approval is not rendered-screen acceptance.
@@ -8167,7 +8188,7 @@ credit and payment remain distinct owning facts. No sale-notice matching interfa
 - Detailed register/copy recommendations and the Finance interface remain the current consolidated
   proposal. Finance's precise matching/posting contract is not proved by the existing ordinary
   bill UI. This is a real boundary to close before claiming complete cross-module readiness.
-- Current non-goals remain: fixed capacity, new Consignment Note, second inventory/task/settlement
+- Current non-goals remain: fixed capacity, ~~new Consignment Note~~ (**OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): the customer-side Consignment Note is built, §3**), second inventory/task/settlement
   ledger, automatic price acceptance, automatic ownership reversal, supplier account rollout,
   external-channel cutover, and production backfill without its own verification/authorisation.
 - A complete owner review of the remaining proposal, authoritative persistence and the outstanding
@@ -8512,13 +8533,13 @@ closed the remaining Houzs capability choices for this review as follows:
 |---|---|
 | Supplier on-time / quality performance | KEEP the approved §12 delivery/claim performance reporting target; complete through the reporting surface, not a new Purchasing scoring engine. Approved does not mean built. |
 | Scheduled future supplier prices | Catalog owns price maintenance; do not create a competing Purchasing price scheduler. |
-| Copy previous PO | REJECT for this scope. New purchases continue from authorised source demand; no blank/independent PO entrance. This is a scope ruling, not a verified claim about a Houzs button's runtime behaviour. |
-| Multi-PO printing / multi-PO date recording | DEFER until measured operator need warrants it. Existing multi-line recording within one PO remains; it is not equivalent to cross-PO bulk operation. |
+| Copy previous PO | **OVERTURNED 2026-10-22 by Weisiang (Mr Lim): office staff may open a PO without a source (Houzs way). Jess's earlier rule kept below for history.** `New Purchase Order` on the PO register is the blank/independent PO entrance; Copy previous PO itself is still not built. Jess's earlier rule: "REJECT for this scope. New purchases continue from authorised source demand; no blank/independent PO entrance. This is a scope ruling, not a verified claim about a Houzs button's runtime behaviour." |
+| Multi-PO printing / multi-PO date recording | ~~DEFER until measured operator need warrants it. Existing multi-line recording within one PO remains; it is not equivalent to cross-PO bulk operation.~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp): multi-PO receiving is in: tick several POs of one supplier and receive them in turn (one GRN per PO). Multi-PO printing still deferred. Jess was not part of this decision. |
 | Excess receipt | KEEP Receiving's Extra Qty handling and existing stock-availability safeguards; do not introduce a second overreceipt engine. |
 
 **Fresh Houzs cancellation/return reconciliation — read-only, 9 Oct 2026.** Cancellation Requests loaded Open and All views; All showed mixed SO/PO/DO history with requester, reason, requested time, approval actor/time and remarks. The page describes two SO approvals versus reason-only PO/DO cancellation. Purchase Returns register and full `HC-PRT-2610-001` showed two goods lines, source reference, return/post dates and a repair reason saying no credit note is owed, while the footer said awaiting credit note. These are observed display facts, not verified transition/stock/accounting behavior; no cancellation, approval, completion, edit or print executed.
 
-- **KEEP / ADAPT provenance, REJECT foreign approval shortcuts:** Carres §5.8.1 remains the sole outstanding-PO cancellation journey: select exact unreceived scope → record supplier agreement/inability and fee state with evidence → ordinary cancellation or qualified exception → preserve quantities/version → recompute remaining source demand → notify Finance for its own follow-up. A reason, withdrawn request or history row never substitutes for an effective source cancellation. Do not import the reference two-level SO chain into Orders or make a reason-only DO cancellation override Delivery custody/gates.
+- **KEEP / ADAPT provenance, REJECT foreign approval shortcuts:** ~~Carres §5.8.1 remains the sole outstanding-PO cancellation journey~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): a PO cancellation goes through the `Cancellation Requests` queue with two approvals, PO Duty (or its cover) then the Purchasing Approver, a different person; the second approval runs the §5.8.1 engine unchanged (migration 0717). The §5.8.1 steps below still apply inside that engine: select exact unreceived scope → record supplier agreement/inability and fee state with evidence → ordinary cancellation or qualified exception → preserve quantities/version → recompute remaining source demand → notify Finance for its own follow-up. A reason, withdrawn request or history row never substitutes for an effective source cancellation. Do not import the reference two-level SO chain into Orders or make a reason-only DO cancellation override Delivery custody/gates.
 - **KEEP separate execution objects:** the reference repair-labelled return does not justify merging Carres Purchase Return and Repair Order. §9.5 authorised outcome selects §9.6 supplier return or §9.7 repair; physical pickup, supplier receipt, return receipt and inspection retain their owning records. A source label must identify the actual document type, not infer GRN solely from a displayed “Transfer From” caption or PO-like number.
 - **IMPROVE recommended cross-source reporting:** use §12's existing performance scope to distinguish unreceived cancelled quantities, returned goods, goods with supplier for repair, accepted supplier receipts and separately Finance-confirmed credits/refunds. Preserve exact source/document/goods lineage and missing coverage. Operation's money-free view links the financial continuation without exposing foreign credit/rate/tax columns or declaring settlement. This reporting refinement is PROPOSAL, not a new ledger or permission.
 - **Acceptance:** a pending supplier cancellation remains covered; concurrent receipt prevents cancellation of received scope; cancelled/withdrawn requests cannot erase physical events; a repair requiring return/inspection cannot complete merely because no credit is expected; a supplier return awaiting financial follow-up may show its completed physical facts without claiming financial settlement. Source read failure remains unknown. Actual current Carres enforcement and reference amendment objects remain unverified.
@@ -8610,7 +8631,7 @@ The final Carres model rejects:
 - a Purchase Demands page or a `Purchase Needs` synonym;
 - separate New Supplier/New SKU request destinations;
 - blank independent PO, Return, Repair, CO or CRTN creation;
-- separate Consignment Overview or Consignment Receipts;
+- separate Consignment Overview ~~or Consignment Receipts~~ (Purchase Consignment Receive OVERTURNED 2026-10-22, see the destinations list above);
 - `Acknowledged` after Carres has sent the PDF;
 - quiet post-send changes and silent price acceptance;
 - generic work words or relative `Today/Tomorrow` dates;
