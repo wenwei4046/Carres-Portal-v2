@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { lineCategory, lineKind } from "./line-category";
 
 /**
  * Carres' own lorries — Fleet Day, Run sheet, Live Map, Lorry Capacity and
@@ -175,4 +176,298 @@ export const fleetPositionInput = z.object({
     .refine((v) => Date.parse(v) <= Date.now() + 2 * 60_000, { message: "The time is in the future." })
     .optional(),
   source: z.enum(["driver_app", "tracker"]).default("driver_app"),
+});
+
+/* ── 0725 · Fleet Health, Delivery Zones, Rate Cards ─────────────────────────
+ * Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): the Houzs way (Houzs
+ * FleetHealth, DeliveryZones + zone-classify.ts, DeliveryRateCards +
+ * delivery-rate-card.ts). Jess was not part of this decision.
+ */
+
+export type DueFlag = "overdue" | "due_soon" | "ok" | "not_recorded";
+
+/** A lorry date: overdue once the day has passed, due soon within `soonDays` (Houzs: 30). */
+export function dueFlag(due: string | null | undefined, today: string, soonDays = 30): DueFlag {
+  if (!due) return "not_recorded";
+  if (due < today) return "overdue";
+  const soon = new Date(`${today}T00:00:00Z`);
+  soon.setUTCDate(soon.getUTCDate() + soonDays);
+  return due <= soon.toISOString().slice(0, 10) ? "due_soon" : "ok";
+}
+
+/** The worst of a lorry's flags, for one status per lorry. */
+export function worstFlag(flags: readonly DueFlag[]): DueFlag {
+  for (const f of ["overdue", "due_soon", "not_recorded"] as const) if (flags.includes(f)) return f;
+  return "ok";
+}
+
+export interface DeliveryZone { id: string; name: string; postcodes: string[] }
+
+const RANGE = /^(\d{2}|\d{5})(?:-(\d{2}|\d{5}))?$/;
+/** One zone entry as an inclusive 5-digit range: "47" = 47000–47999, "46-47", "58200-58299", "58200". */
+export function postcodeRange(entry: string): [number, number] | null {
+  const m = RANGE.exec(entry.trim());
+  if (!m) return null;
+  const lo = Number(m[1].padEnd(5, "0"));
+  const hi = Number((m[2] ?? m[1]).padEnd(5, "9"));
+  return lo <= hi ? [lo, hi] : null;
+}
+
+/** A 5-digit Malaysian postcode in free text (not glued to other digits). */
+export const parsePostcode = (raw: string | null | undefined) => /(?<!\d)(\d{5})(?!\d)/.exec(raw ?? "")?.[1] ?? null;
+
+/** Which zone a postcode (or an address holding one) falls in. The narrowest range wins (Houzs rule). */
+export function zoneForPostcode<Z extends DeliveryZone>(raw: string | null | undefined, zones: readonly Z[]): Z | null {
+  const pc = parsePostcode(raw);
+  if (!pc) return null;
+  const n = Number(pc);
+  let best: Z | null = null;
+  let width = Infinity;
+  for (const z of zones) {
+    for (const entry of z.postcodes) {
+      const r = postcodeRange(entry);
+      if (r && r[0] <= n && n <= r[1] && r[1] - r[0] < width) {
+        best = z;
+        width = r[1] - r[0];
+      }
+    }
+  }
+  return best;
+}
+
+/**
+ * What the 1st / 2nd / each further price counts. Follows Houzs backend/src/scm/lib/delivery-rate-card.ts:32-50,170-190
+ * (basis ITEM | SET x aggregation UNIT | DROP | CUSTOMER | TRIP) per Weisiang's ruling (2026-10-22): clear Carres
+ * rules, implement Houzs. Carres keeps one word: item / set = Houzs UNIT on ITEM / SET; order = DROP; customer =
+ * CUSTOMER; trip = TRIP.
+ */
+export type RateBasis = "item" | "set" | "order" | "customer" | "trip";
+export type RateRounding = "none" | "10sen" | "rm";
+/** One sofa compartment band: a sofa of `min`..`max` compartments (max null = "min and more") costs `amount`. */
+export interface SofaBracket { min: number; max: number | null; amount: number }
+/** Houzs OUTSTATION: a surcharge when the delivery is in this zone (a Delivery Zone name) or this town (a word in the address). */
+export interface Outstation { zone: string; amount: number }
+export interface RateCard {
+  id: string;
+  partnerId: string;
+  /** null = every other zone */
+  zoneId: string | null;
+  basis: RateBasis;
+  firstUnit: number;
+  secondUnit: number;
+  furtherUnit: number;
+  minCharge: number;
+  /** Units up to the cap price on 1st / 2nd / each further; each unit past it costs `overageEach`. null = no cap. */
+  overageCap: number | null;
+  overageEach: number;
+  /** A sofa is priced by its compartment band. */
+  sofaBrackets: SofaBracket[];
+  outstation: Outstation[];
+  serviceCharge: number;
+  pickupCharge: number;
+  disposalCharge: number;
+  /** Houzs card envelope: the most a delivery can cost, and rounding. */
+  chargeCap: number | null;
+  rounding: RateRounding;
+}
+
+/** The company's card for a zone, else its "every other zone" card. */
+export const rateCardFor = (cards: readonly RateCard[], partnerId: string, zoneId: string | null) =>
+  cards.find((c) => c.partnerId === partnerId && zoneId != null && c.zoneId === zoneId) ??
+  cards.find((c) => c.partnerId === partnerId && c.zoneId == null) ??
+  null;
+
+/** What one delivery carries, for its charge (Houzs DeliveryFacts). */
+export interface DeliveryFacts {
+  /** Goods other than sofas (Houzs itemCount). */
+  items: number;
+  /** max(bed frames, mattresses) + sofas (Houzs deriveSetCount). */
+  sets?: number;
+  drops?: number;
+  customers?: number;
+  /** One entry per sofa: its compartments. */
+  sofaCompartments?: readonly number[];
+  zone?: string | null;
+  address?: string | null;
+  services?: number;
+  pickups?: number;
+  disposals?: number;
+}
+export type ChargeKind = "unit" | "overage" | "sofa" | "outstation" | "service" | "pickup" | "disposal" | "minimum" | "cap" | "rounding";
+export interface ChargeLine { kind: ChargeKind; label: string; amount: number }
+
+const sen = (rm: number) => Math.round((Number(rm) || 0) * 100);
+const whole = (n: number | null | undefined) => Math.max(0, Math.floor(Number(n) || 0));
+const word = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim();
+
+/** Houzs chargingUnitCount (delivery-rate-card.ts:170-190). Customers fall back to drops. */
+export function chargeUnits(basis: RateBasis, f: DeliveryFacts): number {
+  switch (basis) {
+    case "trip": return 1;
+    case "order": return whole(f.drops ?? 1);
+    case "customer": return whole(f.customers) || whole(f.drops ?? 1);
+    case "set": return whole(f.sets);
+    default: return whole(f.items);
+  }
+}
+
+/** Houzs farthestZone + townsInAddress (delivery-rate-card.ts:221-264): the zone, plus every town named in the
+ *  address; the one the card charges most for wins, ties keep the first. */
+export function outstationFor(rules: readonly Outstation[], f: Pick<DeliveryFacts, "zone" | "address">): Outstation | null {
+  const text = ` ${word(f.address ?? "")} `;
+  const candidates = [f.zone ?? "", ...rules.map((r) => r.zone).filter((z) => word(z) && text.includes(` ${word(z)} `))];
+  let best: Outstation | null = null;
+  for (const c of candidates) {
+    const rule = rules.find((r) => word(r.zone) === word(c) && word(c));
+    if (rule && (!best || sen(rule.amount) > sen(best.amount))) best = rule;
+  }
+  return best;
+}
+
+/**
+ * A delivery's charge on a rate card, line by line. Follows Houzs backend/src/scm/lib/delivery-rate-card.ts:292-437
+ * per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. Units (1st, 2nd, each further; past the
+ * cap each unit costs the overage), sofas by compartment band, outstation, service / pickup / disposal x count, then
+ * the minimum, the charge cap and rounding (rounding never breaks the cap). Sums in whole sen. Houzs' per-trip
+ * outstation fee is not priced: Carres bills per delivery order, and Houzs leaves it out of a per-DO tally
+ * (backend/src/scm/lib/threepl-do-charge.ts:5-8).
+ */
+export function deliveryCharge(card: RateCard, facts: DeliveryFacts): { total: number; lines: ChargeLine[] } {
+  const lines: Array<ChargeLine & { s: number }> = [];
+  const push = (kind: ChargeKind, label: string, s: number) => { if (s !== 0) lines.push({ kind, label, amount: s / 100, s }); };
+  const units = chargeUnits(card.basis, facts);
+  const cap = card.overageCap == null ? null : whole(card.overageCap);
+  const tier = [sen(card.firstUnit), sen(card.secondUnit), sen(card.furtherUnit)];
+  // Houzs delivery-rate-card.ts:305-324: past the cap, a unit costs the overage, not the top tier.
+  const capped = cap == null ? units : Math.min(units, cap);
+  const tiered = (capped >= 1 ? tier[0] : 0) + (capped >= 2 ? tier[1] : 0) + Math.max(0, capped - 2) * tier[2];
+  push("unit", `${capped} ${card.basis === "order" ? "delivery order" : card.basis}${capped === 1 ? "" : "s"}`, tiered);
+  if (cap != null && units > cap) push("overage", `${units - cap} over ${cap}`, (units - cap) * sen(card.overageEach));
+  // Houzs delivery-rate-card.ts:326-345: one band per sofa, first band that fits.
+  for (const c of facts.sofaCompartments ?? []) {
+    const n = whole(c);
+    const band = card.sofaBrackets.find((b) => n >= whole(b.min) && (b.max == null || n <= whole(b.max)));
+    if (n > 0 && band) push("sofa", `Sofa ${n} compartments`, sen(band.amount));
+  }
+  // Houzs delivery-rate-card.ts:347-363: one outstation surcharge, the highest that applies.
+  const os = outstationFor(card.outstation, facts);
+  if (os) push("outstation", `Outstation ${os.zone}`, sen(os.amount));
+  // Houzs delivery-rate-card.ts:365-386: rate x count.
+  const each: Array<[ChargeKind, string, number | undefined, number]> = [
+    ["service", "Service", facts.services, card.serviceCharge],
+    ["pickup", "Pickup", facts.pickups, card.pickupCharge],
+    ["disposal", "Disposal", facts.disposals, card.disposalCharge],
+  ];
+  for (const [kind, w, count, rate] of each) {
+    const n = whole(count);
+    if (n > 0) push(kind, n > 1 ? `${w} x${n}` : w, n * sen(rate));
+  }
+  // Houzs delivery-rate-card.ts:402-434: minimum, then cap, then rounding that never goes over the cap.
+  let total = lines.reduce((t, l) => t + l.s, 0);
+  const min = sen(card.minCharge);
+  if (total < min) { push("minimum", "Minimum", min - total); total = min; }
+  const top = card.chargeCap == null ? null : sen(card.chargeCap);
+  if (top != null && total > top) { push("cap", "Charge cap", top - total); total = top; }
+  if (card.rounding !== "none" && total > 0) {
+    const step = card.rounding === "rm" ? 100 : 10;
+    let r = Math.round(total / step) * step;
+    if (top != null && r > top) r = Math.floor(total / step) * step;
+    push("rounding", card.rounding === "rm" ? "Rounding (nearest RM)" : "Rounding (nearest 10 sen)", r - total);
+    total = r;
+  }
+  return { total: total / 100, lines: lines.map(({ s: _s, ...l }) => l) };
+}
+
+/** Sofa bands as typed: "1-3 50, 4-5 70, 6+ 90" (compartments, then RM). null = not readable. */
+export function parseSofaBands(text: string): SofaBracket[] | null {
+  const out: SofaBracket[] = [];
+  for (const part of text.split(",").map((x) => x.trim()).filter(Boolean)) {
+    const m = /^(\d{1,2})(?:(\+)|-(\d{1,2}))?\s+(\d+(?:\.\d{1,2})?)$/.exec(part);
+    if (!m) return null;
+    const min = Number(m[1]);
+    const max = m[2] ? null : Number(m[3] ?? m[1]);
+    if (min < 1 || (max != null && max < min)) return null;
+    out.push({ min, max, amount: Number(m[4]) });
+  }
+  return out;
+}
+export const formatSofaBands = (bands: readonly SofaBracket[]) =>
+  bands.map((b) => `${b.min}${b.max == null ? "+" : b.max === b.min ? "" : `-${b.max}`} ${b.amount}`).join(", ");
+
+/** Outstation as typed: "Seremban 40, Rawang 22.50" (a zone or town, then RM). null = not readable. */
+export function parseOutstation(text: string): Outstation[] | null {
+  const out: Outstation[] = [];
+  for (const part of text.split(",").map((x) => x.trim()).filter(Boolean)) {
+    const m = /^(.*\S)\s+(\d+(?:\.\d{1,2})?)$/.exec(part);
+    if (!m || !word(m[1])) return null;
+    out.push({ zone: m[1], amount: Number(m[2]) });
+  }
+  return out;
+}
+export const formatOutstation = (rules: readonly Outstation[]) => rules.map((r) => `${r.zone} ${r.amount}`).join(", ");
+
+/** The DO page: one delivery order's goods, priced alone. */
+export const deliveryCost = (card: RateCard, facts: DeliveryFacts) => deliveryCharge(card, facts).total;
+
+/**
+ * One delivery order's goods as charge facts, priced alone. Follows Houzs backend/src/scm/lib/threepl-do-charge.ts:12-26
+ * and set-count.ts:64-79 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs — one drop, one
+ * customer; items leave sofas out; sets = max(bed frames, mattresses) + sofas; sofa compartments are not read from
+ * the goods (Houzs passes none, so sofa bands price only in the calculator).
+ */
+export function deliveryFacts(
+  lines: ReadonlyArray<{ sku: string; qty: number }>, zone: string | null = null, address: string | null = null,
+): DeliveryFacts {
+  let items = 0, frames = 0, mattresses = 0, sofas = 0;
+  for (const l of lines) {
+    if (lineKind(l.sku) !== "core") continue; // accessories and service lines are not goods on the lorry
+    const qty = whole(l.qty);
+    const cat = lineCategory(l.sku);
+    if (cat === "sofa") { sofas += qty; continue; }
+    items += qty;
+    if (cat === "bedframe") frames += qty;
+    else if (cat === "mattress") mattresses += qty;
+  }
+  return { items, sets: Math.max(frames, mattresses) + sofas, drops: 1, customers: 1, zone, address };
+}
+
+const dateOrNull = isoDate.nullable();
+export const fleetHealthInput = z.object({
+  vehicleId: uuid,
+  puspakomDue: dateOrNull,
+  roadTaxDue: dateOrNull,
+  insuranceDue: dateOrNull,
+  serviceDue: dateOrNull,
+});
+export const deliveryZoneInput = z.object({
+  id: uuid.nullish(),
+  name: z.string().trim().min(1).max(60),
+  postcodes: z
+    .array(z.string().trim())
+    .max(200)
+    .refine((xs) => xs.every((x) => postcodeRange(x) !== null), { message: "Write each range as 47, 46-47, 58200-58299 or 58200." }),
+});
+const money = z.number().min(0).max(99_999_999);
+export const rateCardInput = z.object({
+  id: uuid.nullish(),
+  partnerId: uuid,
+  zoneId: uuid.nullable(),
+  basis: z.enum(["item", "set", "order", "customer", "trip"]),
+  firstUnit: money,
+  secondUnit: money,
+  furtherUnit: money,
+  minCharge: money.default(0),
+  overageCap: z.number().int().min(1).max(999).nullable().default(null),
+  overageEach: money.default(0),
+  sofaBrackets: z
+    .array(z.object({ min: z.number().int().min(1).max(99), max: z.number().int().min(1).max(99).nullable(), amount: money }))
+    .max(20)
+    .refine((bs) => bs.every((b) => b.max == null || b.min <= b.max), { message: "A band's lowest compartments must not be above its highest." })
+    .default([]),
+  serviceCharge: money.default(0),
+  pickupCharge: money.default(0),
+  disposalCharge: money.default(0),
+  outstation: z.array(z.object({ zone: z.string().trim().min(1).max(60), amount: money })).max(50).default([]),
+  chargeCap: money.nullable().default(null),
+  rounding: z.enum(["none", "10sen", "rm"]).default("none"),
 });

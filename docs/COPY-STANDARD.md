@@ -3765,7 +3765,8 @@ button exists anywhere on this surface**: the SYSTEM issues the document
 ~~The Delivery module carries TWO navigation destinations under the module word **Delivery**:
 **Monitor** (`?tab=delivery`) and **Delivery Orders** (the formal-document register).~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): the
 Delivery module carries **Monitor**, **Delivery Orders** and the four Carres-lorry pages **Fleet Day**,
-**Live Map**, **Lorry Capacity** and **Crew Leave** (see "Carres lorries words" below). The DO
+**Live Map**, **Lorry Capacity** and **Crew Leave**, and (0725, the same decision) **Fleet**, **Fleet
+Health**, **Delivery Zones** and **Rate Cards** (see "Carres lorries words" below). The DO
 object page is a door on a number, never navigation. **The Edit Delivery page is retired (owner
 ruling 2026-09-13)**: every arrangement write lives inside the Monitor row's expanded panels.
 `Delivery Work` remains banned; a formal DO remains a Delivery Order and its number remains a
@@ -4132,6 +4133,14 @@ pages say (`apps/web/src/pages/operation/fleet.ts`, `FL`).
 | Live Map | `Lorry` · `Last seen` · `Position` · `Open map` · `No position yet` · `Over 30 minutes old` |
 | Lorry Capacity | `Month` · `Working days` (Mon–Sat) · `Trips` · `Utilisation` · `Stops` · `Stops per trip` · `Revenue` · `Revenue per trip` |
 | Crew Leave | `Crew` · `From` · `To` · `Reason` · `Add leave` · `Remove` · `No crew leave recorded.` |
+| Delivery sidebar children (0725, same decision; Jess was not part of it) | `Fleet` · `Fleet Health` · `Delivery Zones` · `Rate Cards` |
+| Fleet (0725) | `Lorries` · `Crew` · `Plate` · `Capacity` · `Type` · `Name` · `Role` · `Phone` · `Status` · `Active` · `Inactive` · `Add lorry` · `Add crew` · `Edit` · `Save` · `Cancel` · `Deactivate` · `Activate` · `Carres Lorries has no crew yet. Add a driver or helper.` |
+| Fleet Health (0725) | `Lorry` · `PUSPAKOM` · `Road tax` · `Insurance` · `Service` · `Overdue` · `Due soon` · `OK` · `Not recorded` · `Save` |
+| Delivery Zones (0725) | `Zone` · `Postcode ranges` (hint `47, 46-47, 58200-58299`) · `Add zone` · `Remove` · `No delivery zone yet.` · `Which zone is this postcode?` · `Postcode` · `Zone {name}` · `No zone` · `Not in the address list` |
+| Rate Cards (0725) | `Logistics company` · `Zone` · `Every other zone` · `Per` · `Item` · `Delivery order` · `1st` · `2nd` · `Each further` · `Minimum` · `Add rate` · `This Logistics company has no rate card yet.` — never Carrier, 3PL or Partner |
+| DO page (0725) | `Rate card cost` — `RM {amount} · Zone {name}` or `No rate card for this Logistics company and zone` |
+| Rate Cards, Houzs charge rules (0725, Weisiang's ruling 2026-10-22: clear Carres rules, implement Houzs) | `Per`: `Item` · `Set` · `Delivery order` · `Customer` · `Trip` · `Outstation` (hint `Seremban 40, Rawang 22.50`) · `Write outstation as Seremban 40, Rawang 22.50.` · `Charge cap` · `Rounding`: `No rounding` · `Nearest 10 sen` · `Nearest RM` · `Calculator` · `Sets` · `Sofa compartments` (hint `3, 5`) · `Address` · `Total` · charge lines `Outstation {zone}` · `Charge cap` · `Rounding (nearest RM)` · `Rounding (nearest 10 sen)` · `Cap` · `Each over cap` · `Sofa bands` (hint `1-3 50, 4+ 80`) · `Write sofa bands as 1-3 50, 4-5 70, 6+ 90.` · `Service` · `Pickup` · `Disposal` · charge lines `{n} item(s)` / `{n} set(s)` / `{n} delivery order(s)` / `{n} customer(s)` / `{n} trip(s)` · `{n} over {cap}` · `Sofa {n} compartments` · `Service x{n}` · `Pickup x{n}` · `Disposal x{n}` · `Minimum` |
+| Rate Cards → Reconciliation (0725, same ruling; Houzs DeliveryRateCards Reconciliation tab) | `Reconciliation` · `From` · `To` · `Delivery Order` · `Date` · `Logistics company` · `Bill` · `Zone` · `Items` · `Sets` · `Rate card cost` · `Billed` · `Difference` · `Status` · `Match` · `Mismatch` · `No rate card` · `No delivery order on a Logistics bill in these dates.` · `Service, pickup and disposal are not counted from the goods.` · `Only operation or Finance see delivery charges.` — Houzs' `Expected` / `Delta` / `3PL` are not used |
 | Empty and failed states | `Carres Lorries is not set up. Add its Vehicles and Drivers in Settings, Logistics.` · `Carres Lorries has no lorry yet. Add one in Settings, Logistics, Carres Lorries, Vehicles.` · `This page could not be loaded. Try again.` |
 
 ## The Work Logistics card and external link words — owner rulings 2026-09-24 · model and link page BUILT · the card is NOT MOUNTED on any screen
