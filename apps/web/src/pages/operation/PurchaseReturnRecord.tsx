@@ -63,7 +63,7 @@ const CHANNELS = [
   { value: "print", label: "Print" },
 ];
 
-type Dialog = null | "send" | "pickup" | "pdf" | "receipt";
+type Dialog = null | "send" | "pickup" | "pdf" | "receipt" | "cancel";
 
 function refusal(error: unknown): string {
   if (error instanceof ApiError) return error.message || "Not saved · Try again";
@@ -103,6 +103,10 @@ export function PurchaseReturnPanel({ pr, today = appTodayIso() }: { pr: Purchas
   // §9.6: `Record supplier receipt` stays offered while any Unit has no
   // supplier receipt; the door (0614) refuses a Unit Stock has not picked up.
   const receivable = pr.units.some((u) => u.stock_item_id && !u.supplier_received_date);
+  // 0713 (YH 2026-10-26): a claimless return nothing has left on can be
+  // cancelled; a cancelled one offers no further step.
+  const cancelled = Boolean(pr.cancelled_at);
+  const cancellable = !cancelled && !pr.supplier_claim_id && pr.units.every((u) => !u.actual_pickup_date);
 
   return <div className="flex min-w-0 flex-col gap-4" data-testid={`purchase-return-panel-${pr.pr_no}`}>
     {current && <Block title="Current action">
@@ -117,7 +121,16 @@ export function PurchaseReturnPanel({ pr, today = appTodayIso() }: { pr: Purchas
       </div>
     </Block>}
 
-    <Block title="Purchase return" headerSlot={<Button variant="neutral" onClick={() => setDialog("pdf")} data-testid="purchase-return-open-pdf">Open PDF</Button>}>
+    {cancelled && <Block title="Cancelled">
+      <p className="text-body text-kit-slate-12" data-testid="purchase-return-cancelled">
+        {`${fmtDate(pr.cancelled_at!)} · ${pr.cancelled_by_name ?? "Staff identity not recorded"} · ${pr.cancel_reason ?? ABSENT}`}
+      </p>
+    </Block>}
+
+    <Block title="Purchase return" headerSlot={<div className="flex flex-wrap gap-2">
+      {cancellable && <Button variant="neutral" onClick={() => setDialog("cancel")} data-testid="purchase-return-cancel">{CANCEL_RETURN}</Button>}
+      <Button variant="neutral" onClick={() => setDialog("pdf")} data-testid="purchase-return-open-pdf">Open PDF</Button>
+    </div>}>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Fact idPrefix="pr-fact" own={false} framed label="Supplier Claim No" value={pr.supplier_claim_id && pr.claim_no
           ? <Link className="text-kit-blue-11 hover:underline" to={`/operation?tab=claims&claim=${encodeURIComponent(pr.supplier_claim_id)}`}>{pr.claim_no}</Link>
@@ -129,14 +142,14 @@ export function PurchaseReturnPanel({ pr, today = appTodayIso() }: { pr: Purchas
       </div>
     </Block>
 
-    <Block title="Sending" headerSlot={!done ? <Button variant="neutral" onClick={() => setDialog("send")} data-testid="purchase-return-send">{RETURN_DOCUMENT_SENT}</Button> : undefined}>
+    <Block title="Sending" headerSlot={!done && !cancelled ? <Button variant="neutral" onClick={() => setDialog("send")} data-testid="purchase-return-send">{RETURN_DOCUMENT_SENT}</Button> : undefined}>
       <div className="space-y-1 text-body text-kit-slate-12" data-testid="purchase-return-send-state">
         {send.sent ? pr.sends.map((s) => <p key={s.id}>{`Return document sent · ${PURCHASE_RETURN_CHANNEL_WORD[s.channel] ?? s.channel} · ${fmtDate(s.sent_at)} · ${s.recipient} · ${s.sent_by_name ?? "Staff identity not recorded"}`}</p>)
           : <p className="text-kit-slate-11">Sending not confirmed</p>}
       </div>
     </Block>
 
-    <Block title="Pickup" headerSlot={!done || receivable ? <div className="flex flex-wrap gap-2">
+    <Block title="Pickup" headerSlot={!cancelled && (!done || receivable) ? <div className="flex flex-wrap gap-2">
       {!done && <Button variant="neutral" onClick={() => setDialog("pickup")} data-testid="purchase-return-pickup">Confirmed Pickup</Button>}
       {receivable && <Button variant="neutral" onClick={() => setDialog("receipt")} data-testid="purchase-return-supplier-receipt">{RECORD_SUPPLIER_RECEIPT}</Button>}
     </div> : undefined}>
@@ -157,6 +170,7 @@ export function PurchaseReturnPanel({ pr, today = appTodayIso() }: { pr: Purchas
     <PickupDialog pr={pr} open={dialog === "pickup"} onClose={() => setDialog(null)} />
     {dialog === "receipt" && <ReceiptDialog pr={pr} today={today} onClose={() => setDialog(null)} />}
     <PdfSheet pr={pr} open={dialog === "pdf"} onClose={() => setDialog(null)} />
+    {dialog === "cancel" && <CancelDialog pr={pr} onClose={() => setDialog(null)} />}
   </div>;
 }
 
@@ -167,6 +181,7 @@ function HistorySection({ pr }: { pr: PurchaseReturnDetail }) {
     ...pr.confirmations.map((c) => ({ title: "Confirmed Pickup", date: c.recorded_at, actor: c.recorded_by_name, detail: `${fmtDate(c.confirmed_pickup_date)} · ${c.evidence}` })),
     ...(pr.receipts ?? []).map((r) => ({ title: "Supplier receipt recorded", date: r.recorded_at, actor: r.recorded_by_name,
       detail: [fmtDate(r.received_on), ...r.unit_ids, r.files ? `Evidence ${r.files}` : null, r.confirmed_by && r.confirmed_at ? `${r.confirmed_by} · ${fmtDate(r.confirmed_at, { time: true })}` : null].filter(Boolean).join(" · ") })),
+    { title: "Cancelled", date: pr.cancelled_at ?? null, actor: pr.cancelled_by_name ?? null, detail: pr.cancel_reason ?? null },
   ].filter((e) => e.date).sort((a, b) => a.date!.localeCompare(b.date!)), [pr]);
   return <Block title="History">
     {events.map((event, index) => <div key={`${event.title}-${event.date}-${index}`} className="flex flex-col gap-1 py-2">
@@ -175,13 +190,14 @@ function HistorySection({ pr }: { pr: PurchaseReturnDetail }) {
   </Block>;
 }
 
-function DoorDialog({ open, onClose, title, pending, error, canSave, onSave, children }: {
+function DoorDialog({ open, onClose, title, pending, error, canSave, onSave, children, saveWord = title, keepWord = "Cancel" }: {
   open: boolean; onClose: () => void; title: string; pending: boolean; error: unknown; canSave: boolean; onSave: () => void; children: ReactNode;
+  saveWord?: string; keepWord?: string;
 }) {
   return <Modal open={open} onOpenChange={(v) => { if (!v) onClose(); }} title={title}
     footer={<div className="flex justify-end gap-2 [&_button]:min-h-[40px] sm:[&_button]:min-h-0">
-      <Button variant="neutral" onClick={onClose} disabled={pending}>Cancel</Button>
-      <Button variant="primary" disabled={!canSave} loading={pending} onClick={onSave}>{title}</Button>
+      <Button variant="neutral" onClick={onClose} disabled={pending}>{keepWord}</Button>
+      <Button variant="primary" disabled={!canSave} loading={pending} onClick={onSave}>{saveWord}</Button>
     </div>}>
     <div className="grid gap-3">
       {error ? <p role="alert" className="rounded-control border border-kit-red-9 bg-kit-red-3 px-3 py-2 text-body text-kit-red-11">{refusal(error)}</p> : null}
@@ -203,6 +219,24 @@ function SendDialog({ pr, open, onClose }: { pr: PurchaseReturnDetail; open: boo
     <Select id="pr-send-channel" label="Channel" value={channel} onValueChange={setChannel} options={CHANNELS} />
     <Input id="pr-send-recipient" label="Recipient" value={recipient} onChange={(e) => setRecipient(e.target.value)} />
     <Textarea id="pr-send-note" label="Note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
+  </DoorDialog>;
+}
+
+export const CANCEL_RETURN = "Cancel return";
+
+/** `Cancel return` (0713, YH 2026-10-26): a claimless return whose Unit was
+ *  sold before the supplier came. The Units go back to free stock for another
+ *  return; who cancelled and why is kept.
+ *  Follows Houzs PurchaseReturnDetailV2.tsx:361-369,480 (confirm before cancel,
+ *  offered unless completed or cancelled) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
+function CancelDialog({ pr, onClose }: { pr: PurchaseReturnDetail; onClose: () => void }) {
+  const door = usePurchaseReturnWrite(`/api/operation/purchase-returns/${encodeURIComponent(pr.id)}/cancel`);
+  const [reason, setReason] = useState("");
+  return <DoorDialog open onClose={onClose} title="Cancel this return?" saveWord={CANCEL_RETURN} keepWord="Keep return"
+    pending={door.isPending} error={door.error} canSave={reason.trim().length > 0}
+    onSave={() => door.mutate({ reason: reason.trim() }, { onSuccess: onClose })}>
+    <p className="text-body text-kit-slate-11">{`${purchaseReturnNo(pr.pr_no)}: its Units go back to stock and the supplier no longer collects them.`}</p>
+    <Textarea id="pr-cancel-reason" label="Reason" rows={2} maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} />
   </DoorDialog>;
 }
 

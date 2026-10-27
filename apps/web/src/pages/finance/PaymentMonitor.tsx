@@ -49,6 +49,7 @@ import { requestedDeliveryText } from "@/pages/operation/sales-order-columns";
 import { DATE_TO_BE_CONFIRMED_FULL } from "@/pages/operation/sales-order-guidance";
 import InvoiceCalendar, { type CalendarEntryKind } from "./InvoiceCalendar";
 import PaymentCollectionWorkspace from "./PaymentCollectionWorkspace";
+import NewSalesInvoiceDialog from "./NewSalesInvoiceDialog";
 import InvoiceBackdateRequests from "./InvoiceBackdateRequests";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { useDeliveryDays, useOfficeDays, usePersonOwnerCalendars } from "@/lib/deadline-queries";
@@ -668,6 +669,9 @@ export default function PaymentMonitor() {
                     <button type="button" className="underline underline-offset-2" onClick={leaveScope}>Show all</button>
                   </span>}
                 </span>}
+                /* Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office staff
+                   open a Sales Invoice by hand, part invoices allowed (Houzs way). */
+                toolbarEnd={<NewSalesInvoiceDialog />}
                 emptyMessage={orderScope !== null
                   ? `SO-${orderScope} needs no payment right now. Its money is in Payment Records.`
                   : picked === ALL_UNPAID

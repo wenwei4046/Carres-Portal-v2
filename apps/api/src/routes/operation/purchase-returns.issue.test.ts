@@ -147,8 +147,63 @@ describe("Issue Purchase Return", () => {
     expect(await res.json()).toMatchObject({ code: "address_missing", message: "Add the address of Hooka" });
   });
 
+  // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): `New Purchase Return`
+  // with no claim — the same door, given the supplier. Overturns Jess's
+  // "only after an approved claim" (§9.6); Jess was not part of it.
+  it("with no claim: reads the supplier's Units in stock and issues through the same door", async () => {
+    const sb = client({ rpc: { purchase_return_supplier_units: { data: [{ stock_item_id: UNIT, unit_code: "U1-000-002", sku: "SOF-1", po_no: "PO-2", warehouse_id: "w", pickup_location: "Carres Klang", seen: "t", refusal: null }] } } });
+    const read = await call(sb, "/operation/purchase-returns/issue-source?supplier=55555555-5555-4555-8555-000000000001");
+    expect(read.status).toBe(200);
+    const { source } = (await read.json()) as { source: Record<string, unknown> & { units: Array<Record<string, unknown>> } };
+    expect(source).toMatchObject({ claim_id: null, claim_no: null, supplier_id: "55555555-5555-4555-8555-000000000001", return_to: "Lot 9, Muar" });
+    expect(source.units[0]).toMatchObject({ unit_code: "U1-000-002", item: "Kaya" });
+    const res = await call(sb, "/operation/purchase-returns", { method: "POST", body: { supplier_id: "55555555-5555-4555-8555-000000000001", units: [{ stock_item_id: UNIT, seen: "t" }] } });
+    expect(res.status).toBe(201);
+    expect(sb.rpc.mock.calls.find(([name]) => name === "purchasing_issue_purchase_return")?.[1]).toEqual({
+      p_claim_id: null,
+      p_units: [{ stock_item_id: UNIT, seen: "t", pickup_location: null, category: "Sofa", item: "Kaya", item_spec: "3 seater" }],
+      p_confirmed_pickup_date: null,
+      p_supplier_id: "55555555-5555-4555-8555-000000000001",
+    });
+  });
+
+  it("names a claim or a supplier, not both and not neither", async () => {
+    const both = await call(client(), "/operation/purchase-returns", { method: "POST", body: { claim_id: CLAIM, supplier_id: CLAIM, units: [{ stock_item_id: UNIT, seen: "t" }] } });
+    expect(both.status).toBe(422);
+    const neither = await call(client(), "/operation/purchase-returns", { method: "POST", body: { units: [{ stock_item_id: UNIT, seen: "t" }] } });
+    expect(neither.status).toBe(422);
+  });
+
   it("is internal only", async () => {
     const res = await call(client(), "/operation/purchase-returns", { method: "POST", role: "dealer", body: { claim_id: CLAIM, units: [{ stock_item_id: UNIT, seen: "t" }] } });
+    expect(res.status).toBe(403);
+  });
+});
+
+describe("Cancel return (0713, YH 2026-10-26)", () => {
+  it("calls the cancel door with the trimmed reason", async () => {
+    const sb = client({ rpc: { purchasing_cancel_purchase_return: { data: PR } } });
+    const res = await call(sb, `/operation/purchase-returns/${PR}/cancel`, { method: "POST", body: { reason: "  Unit sold to a customer " } });
+    expect(res.status).toBe(200);
+    expect(sb.rpc.mock.calls.find(([n]) => n === "purchasing_cancel_purchase_return")?.[1]).toEqual({ p_return_id: PR, p_reason: "Unit sold to a customer" });
+  });
+
+  it("refuses a blank reason before reaching the door", async () => {
+    const sb = client();
+    const res = await call(sb, `/operation/purchase-returns/${PR}/cancel`, { method: "POST", body: { reason: "  " } });
+    expect(res.status).toBe(422);
+    expect(sb.rpc.mock.calls.some(([n]) => n === "purchasing_cancel_purchase_return")).toBe(false);
+  });
+
+  it("answers the door's refusal for a collected return in its own words", async () => {
+    const sb = client({ rpc: { purchasing_cancel_purchase_return: { error: { code: "23514", message: "The supplier has collected goods on PR-1. It cannot be cancelled", details: "already_collected" } } } });
+    const res = await call(sb, `/operation/purchase-returns/${PR}/cancel`, { method: "POST", body: { reason: "x" } });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "already_collected", message: "The supplier has collected goods on PR-1. It cannot be cancelled" });
+  });
+
+  it("is operation or principal only", async () => {
+    const res = await call(client(), `/operation/purchase-returns/${PR}/cancel`, { method: "POST", body: { reason: "x" }, role: "dealer" });
     expect(res.status).toBe(403);
   });
 });

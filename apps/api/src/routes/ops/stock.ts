@@ -36,7 +36,9 @@ import {
   unitAvailability,
   unitLifecycleOutcome,
   canonicalUnitIdFrom,
+  stockCardLines,
 } from "@carres/shared";
+import { z } from "zod";
 import {
   buildIssueEnglish,
   unitCountAgainAction,
@@ -594,7 +596,8 @@ opsStockRouter.get("/supplier-returns", requireOperationOrPrincipal, async (c) =
   const { data: docs, error: docErr } = await sb
     .from("purchase_returns")
     .select("id, pr_no, pr_doc_date, confirmed_pickup_date, supplier_id")
-    .in("id", open);
+    .in("id", open)
+    .is("cancelled_at", null);
   if (docErr) throw mapErr(docErr);
   const supplierIds = [...new Set((docs ?? []).map((d) => d.supplier_id as string))];
   const { data: suppliers, error: supErr } = supplierIds.length
@@ -1446,6 +1449,7 @@ function nextMonth(period: string): string {
 function mapErr(error: { code?: string; message?: string }): HTTPException {
   if (error.code === "42501") return new HTTPException(403, { message: error.message ?? "Forbidden" });
   if (error.code === "22023") return new HTTPException(400, { message: error.message ?? "Invalid" });
+  if (error.code === "23505") return new HTTPException(409, { message: error.message ?? "Already exists" });
   // 0366 — P0001 is how EVERY governed door on this router says no: the unit is
   // not free, it is not in repair, a bulk record cannot carry one customer's
   // promise, that Site does not exist, a total is derived and never written.
@@ -1461,5 +1465,124 @@ function mapErr(error: { code?: string; message?: string }): HTTPException {
   }
   return new HTTPException(500, { message: error.message ?? "ops_stock RPC failed" });
 }
+
+// =====================================================================
+// HOUZS-WAY WAREHOUSE VIEWS — Weisiang's decision (Mr Lim, WhatsApp
+// 2026-10-22): "just clear Carress rules and Implement Houzs inside". Jess was
+// not part of this decision. Racks and Bins per Site (0718), and a Stock Card
+// per item replayed from the existing Unit lineage. Still ONE ledger: a Bin is
+// a column on the Unit and the Stock Card is read from `stock_unit_events`.
+// =====================================================================
+
+/** GET /bins?site=<warehouseId> — every Bin at a Site with the Units in it now. */
+// Follows Houzs backend/src/scm/routes/warehouse.ts:429-432 (Racks per warehouse)
+// per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+opsStockRouter.get("/bins", requireOperationOrPrincipal, async (c) => {
+  const site = c.req.query("site");
+  if (!site) throw new HTTPException(400, { message: "Choose a Site" });
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const [binsR, unitsR] = await Promise.all([
+    sb.from("warehouse_bins").select("id, rack, bin").eq("warehouse_id", site).order("rack").order("bin"),
+    // ponytail: a Unit that left the Site keeps its old bin_id; only Units
+    // still on hand at this Site are counted, so a stale bin never shows.
+    sb.from("ops_stock_items")
+      .select("unit_code, sku, status, needs_repair, hold_reason, bin_id")
+      .eq("warehouse_id", site)
+      .not("bin_id", "is", null),
+  ]);
+  if (binsR.error) throw mapErr(binsR.error);
+  if (unitsR.error) throw mapErr(unitsR.error);
+  const inBin = new Map<string, Array<{ unitCode: string; sku: string; availability: string }>>();
+  for (const u of (unitsR.data ?? []) as Array<Record<string, unknown>>) {
+    const availability = unitAvailability({
+      status: u.status as string,
+      needsRepair: Boolean(u.needs_repair),
+      holdReason: (u.hold_reason as string | null) ?? null,
+    });
+    if (availability === "ended" || availability === "incoming" || availability === "in_transit") continue;
+    const list = inBin.get(u.bin_id as string) ?? [];
+    list.push({ unitCode: u.unit_code as string, sku: u.sku as string, availability });
+    inBin.set(u.bin_id as string, list);
+  }
+  return c.json({
+    bins: ((binsR.data ?? []) as Array<{ id: string; rack: string; bin: string }>).map((b) => ({
+      ...b,
+      units: inBin.get(b.id) ?? [],
+    })),
+  });
+});
+
+const binAddInput = z.object({
+  siteId: z.string().uuid(),
+  rack: z.string().trim().min(1, "give a rack"),
+  bin: z.string().trim().min(1, "give a bin"),
+});
+
+/** POST /bins — add a Bin on a Rack at a Site (Warehouse Settings people). */
+opsStockRouter.post("/bins", requireOperationOrPrincipal, async (c) => {
+  const body = await parseBody(c, binAddInput);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("warehouse_bin_add", {
+    p_warehouse_id: body.siteId,
+    p_rack: body.rack,
+    p_bin: body.bin,
+  });
+  if (error) throw mapErr(error);
+  return c.json({ id: data as string });
+});
+
+const unitBinInput = z.object({ binId: z.string().uuid().nullable() });
+
+/** POST /register/:unitCode/bin — put a Unit in a Bin, or take it out (null). */
+opsStockRouter.post("/register/:unitCode/bin", requireOperationOrPrincipal, async (c) => {
+  const body = await parseBody(c, unitBinInput);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.rpc("stock_unit_set_bin", {
+    p_unit_code: canonicalUnitIdFrom(c.req.param("unitCode")) ?? c.req.param("unitCode"),
+    p_bin_id: body.binId,
+  });
+  if (error) throw mapErr(error);
+  return c.json({ ok: true });
+});
+
+/** GET /stock-card?sku=&site= — one item's Stock Card from the Unit lineage. */
+// Follows Houzs frontend/src/pages/scm-v2/StockCard.tsx:2-4 (per-SKU ledger,
+// optional warehouse scope) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+opsStockRouter.get("/stock-card", requireOperationOrPrincipal, async (c) => {
+  const sku = c.req.query("sku");
+  if (!sku) throw new HTTPException(400, { message: "Choose an item" });
+  const site = c.req.query("site") || null;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data: unitRows, error } = await sb
+    .from("stock_unit_register_v")
+    .select("id, unit_code, warehouse_id, qty, identity_scope")
+    .eq("sku", sku);
+  if (error) throw mapErr(error);
+  const units = ((unitRows ?? []) as Array<Record<string, unknown>>).map((u) => ({
+    id: u.id as string,
+    unitCode: u.identity_scope === "quantity" ? null : (u.unit_code as string),
+    qty: (u.qty as number | null) ?? 1,
+    siteId: (u.warehouse_id as string | null) ?? null,
+  }));
+  if (units.length === 0) return c.json({ sku, lines: [] });
+  // ponytail: one `in` list of every Unit of the item; page it when an item
+  // passes a few hundred Units.
+  const { data: evRows, error: evErr } = await sb
+    .from("stock_unit_events")
+    .select("unit_id, seq, event, from_value, to_value, event_at")
+    .in("unit_id", units.map((u) => u.id))
+    .in("event", ["unit_born", "status_changed", "site_changed"])
+    .order("seq", { ascending: true });
+  if (evErr) throw mapErr(evErr);
+  const events = ((evRows ?? []) as Array<Record<string, unknown>>).map((e) => ({
+    unitId: e.unit_id as string,
+    seq: Number(e.seq),
+    event: e.event as string,
+    fromValue: (e.from_value as string | null) ?? null,
+    toValue: (e.to_value as string | null) ?? null,
+    eventAt: e.event_at as string,
+  }));
+  return c.json({ sku, lines: stockCardLines(units, events, site) });
+});
 
 export default opsStockRouter;

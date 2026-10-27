@@ -251,6 +251,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
       from: isoDay(c.req.query("from")),
       to: isoDay(c.req.query("to")),
       cancelled: c.req.query("cancelled") === "1" ? true : null,
+      consignment: c.req.query("consignment") === "1" ? true : null,
       q: c.req.query("q") ?? null,
     };
 
@@ -330,7 +331,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
         readByIds<Record<string, unknown>>(scanPoIds, (ids) =>
           sb
             .from("purchase_orders")
-            .select("id, version, supplier_id, suppliers(name)")
+            .select("id, version, supplier_id, is_consignment, suppliers(name)")
             .in("id", ids),
         ),
         // Only the fields the ONE reply arithmetic reads
@@ -361,6 +362,10 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
       supplierByPo.set(p.id as string, sup?.name ?? null);
       versionByPo.set(p.id as string, (p.version as number | null) ?? 1);
     }
+    /* `Consignment goods` — the Consignment Receive entry, Houzs way (Weisiang's
+       decision, Mr Lim, WhatsApp 2026-10-22; Jess was not part of it). Not a
+       second receipt page: the same GRN records, narrowed to Consignment Orders. */
+    const consignmentPo = new Set(poRows.filter((p) => p.is_consignment === true).map((p) => p.id as string));
     const promisesByPo = new Map<string, PoDatePromise[]>();
     for (const row of promiseRows) {
       const pid = row.po_id as string;
@@ -566,6 +571,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
               : []) as ReceivingExtraLine[],
           ) > 0,
         cancelled: r.status === "voided",
+        consignment: consignmentPo.has(r.po_id),
         // The Search box's own promise: GRN, PO, supplier or DO number.
         searchText: [
           r.grn_no ?? "",

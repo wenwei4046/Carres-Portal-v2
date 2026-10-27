@@ -792,6 +792,25 @@ describe("OperationReceiving — the formal GRN Register", () => {
     );
   });
 
+  /* Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): Consignment Receive, Houzs way, is the same Receiving narrowed to Consignment Orders. */
+  it("Consignment goods is a rail row and an active condition", async () => {
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    const rail = within(screen.getByTestId("receiving-list-filters"));
+    fireEvent.click(rail.getByTestId("rail-consignment"));
+    await waitFor(() => expect(screen.getAllByText("Consignment goods").length).toBe(2));
+  });
+
+  // Follows Houzs frontend/src/components/Sidebar.tsx:552 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+  it("the Purchase Consignment Receive page is the same register locked to Consignment Orders, with no way to unlock it", async () => {
+    renderWithProviders(<OperationReceiving consignmentPage />);
+    await waitFor(() => expect(h.registerAsks.at(-1)).toMatchObject({ consignment: true }));
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    const rail = within(screen.getByTestId("receiving-list-filters"));
+    expect(rail.queryByTestId("rail-consignment")).toBeNull();
+    expect(screen.queryByText("Consignment goods")).toBeNull();
+  });
+
   it("Cancelled GRNs is the last ROW, and the default listing holds valid and cancelled alike", async () => {
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: "Filters" }));

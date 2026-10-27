@@ -48,6 +48,7 @@ import {
   Headset,
   ClipboardX,
   Factory,
+  Handshake,
   MapPin,
   Gauge,
   type LucideIcon,
@@ -92,6 +93,7 @@ export type PortalBadge = "orders" | "procurement" | "service-notes";
 export type PortalSection =
   | "Workspace"
   | "Sales"
+  | "Consignment"
   | "Purchasing"
   | "Showroom"
   | "Delivery"
@@ -119,6 +121,7 @@ export type PortalSection =
 export const SECTION_ORDER: ReadonlyArray<PortalSection> = [
   "Workspace",
   "Sales",
+  "Consignment",
   "Purchasing",
   "Showroom",
   "Delivery",
@@ -197,6 +200,11 @@ export const PORTAL_MODULES: ReadonlyArray<PortalModule> = [
    * `Subscription` (`Outright Sales` until the 2026-10-08 template). It is a NAVIGATION ruling: no contract, transaction,
    * permission or calculation is merged by the shared parent. */
   { section: "Sales", label: "Sales Orders", icon: ReceiptText, mIcon: "receipt_long" },
+  /* CONSIGNMENT — Houzs placement (Weisiang's ruling, WhatsApp 2026-10-22):
+   * Houzs draws its own `Consignment` group right after `Sales Order`
+   * (Houzs-ERP frontend/src/components/Sidebar.tsx:535-546). Customer side
+   * only here; the supplier-side rows stay under Purchasing. */
+  { section: "Consignment", label: "Consignment", icon: Handshake, mIcon: "handshake" },
   { section: "Purchasing", label: "Purchasing", icon: ShoppingCart, mIcon: "shopping_cart", landingKey: PURCHASING_LANDING_KEY, handleOnly: true },
   { section: "Showroom", label: "Showroom", icon: Store, mIcon: "storefront" },
   /* THE FOUR-PAGE MAP (CARD-2026-09-04-delivery-01): Monitor → Delivery
@@ -461,6 +469,11 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         section: "Purchasing",
         pageGroup: "purchasing-buy",
       },
+      /* PO Amendments · Cancellation Requests (0717) — Weisiang's decision
+       * (Mr Lim, WhatsApp 2026-10-22; Jess was not part of this decision):
+       * a PO change or cancellation waits for approval, the Houzs way. */
+      { key: "po-amendments", label: "PO Amendments", icon: BadgeCheck, section: "Purchasing", pageGroup: "purchasing-buy" },
+      { key: "po-cancellation-requests", label: "Cancellation Requests", icon: ClipboardX, section: "Purchasing", pageGroup: "purchasing-buy" },
 
       /* RECEIVE — one page today, and it still earns its own drawer: the
        * receipt is its own step in the operator's day, and the drawer is where
@@ -486,6 +499,10 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "dealer-showroom", label: "Dealer", icon: Store, soon: true, section: "Showroom" },
       { key: "display-requests", label: "Display Requests", icon: Store, soon: true, section: "Purchasing", pageGroup: "purchasing-showroom" },
       { key: "consignment-orders", label: "Consignment Orders", icon: ArrowDownLeft, soon: true, section: "Purchasing", pageGroup: "purchasing-showroom" },
+      /* Follows Houzs frontend/src/components/Sidebar.tsx:552 per Weisiang's
+       * ruling (2026-10-22): clear Carres rules, implement Houzs. Overturns
+       * "no Consignment Receipts page" above; still ONE receipt engine. */
+      { key: "consignment-receives", label: "Purchase Consignment Receive", icon: PackageCheck, section: "Purchasing", pageGroup: "purchasing-showroom" },
       { key: "consignment-returns", label: "Consignment Returns", icon: Undo2, section: "Purchasing", pageGroup: "purchasing-showroom" },
 
       // Delivery (T11, Jess 2026-07-27) — **the ONE new menu item in the whole
@@ -516,6 +533,29 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         activeFor: ["path:/operation/delivery-orders"],
         section: "Delivery",
       },
+      /* 0716 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office staff
+       * record Delivery Returns and mark DOs Delivered by load scan, the Houzs
+       * way. Overturns Jess's "exactly two children" (Delivery MASTER §8); Jess
+       * was not part of this decision. */
+      { key: "delivery-returns", label: "Delivery Returns", icon: Undo2, tab: "delivery-returns", section: "Delivery" },
+      { key: "load-scan", label: "Load Scan", icon: PackageCheck, tab: "load-scan", section: "Delivery" },
+      /* 0719 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office staff send
+       * goods to customers on consignment and take unsold goods back, Houzs way.
+       * Overturns Jess's Purchasing MASTER consignment rules and the Consignment
+       * Note ban; Jess was not part of this decision. Customer side only — the
+       * supplier-side Consignment Orders / Returns stay under Purchasing. They
+       * draw in their own Consignment module, the Houzs placement. */
+      { key: "customer-consignment-orders", label: "Customer Consignment Orders", icon: FileText, tab: "customer-consignment-orders", section: "Consignment" },
+      { key: "consignment-notes", label: "Consignment Notes", icon: FileText, tab: "consignment-notes", section: "Consignment" },
+      { key: "customer-consignment-returns", label: "Customer Consignment Returns", icon: Undo2, tab: "customer-consignment-returns", section: "Consignment" },
+      /* 0723 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office staff plan
+       * delivery dates and trips with a time slot per stop, the Houzs way.
+       * Overturns Jess's "exactly two children" and "no Trips, Regions or
+       * Schedule destination" (Delivery MASTER §8); Jess was not part of this decision. */
+      { key: "delivery-planning", label: "Delivery Planning", icon: CalendarDays, tab: "delivery-planning", section: "Delivery" },
+      { key: "dp-orders", label: "DP Orders", icon: ClipboardList, tab: "dp-orders", section: "Delivery" },
+      { key: "auto-schedule", label: "Auto-schedule", icon: CalendarClock, tab: "auto-schedule", section: "Delivery" },
+      { key: "trips", label: "Trips", icon: Truck, tab: "trips", section: "Delivery" },
       /* CARRES' OWN LORRIES (0724) — Weisiang's decision (Mr Lim, WhatsApp
        * 2026-10-22): Houzs Fleet Day, Live Map, Lorry Capacity and Crew
        * Leave. Jess was not part of this decision; her "no Fleet / Trips
@@ -596,6 +636,10 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         tab: "warehouse-outbound",
         section: "Warehouse",
       },
+      // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): the Houzs-way
+      // Warehouses page (Sites · Inventory by item · Racks and Bins · Loading
+      // List · Stock Card). Jess was not part of this decision.
+      { key: "wh-warehouses", label: "Warehouses", icon: Warehouse, tab: "warehouses", section: "Warehouse" },
       /* ⭐ PAYMENTS → Monitor · Payment Records (owner ruling 2026-09-12).
        *
        * `Monitor` is the full-width collection control listing keyed on the
@@ -641,6 +685,9 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "purchasing-report", label: "Purchasing report", icon: BarChart3, section: "Reports" },
       { key: "receiving-report", label: "Receiving report", icon: BarChart3, section: "Reports" },
       { key: "delivery-report", label: "Delivery report", icon: BarChart3, section: "Reports" },
+      /* Follows Houzs frontend/src/pages/scm-v2/DeliveryReturnDetailListing.tsx:32-153
+         per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
+      { key: "delivery-return-lines", label: "Delivery return lines", icon: BarChart3, section: "Reports" },
       /* Houzs detail-listing port (row 15): one row per document line, read
          from each Register's own read. Awaits Jess's review. */
       { key: "sales-order-lines", label: "Sales order lines", icon: BarChart3, section: "Reports" },
@@ -650,6 +697,11 @@ export const PORTAL_NAV: PortalNavGroup[] = [
          unchanged, so every bookmark and deep link still lands. */
       { key: "suppliers", label: "Suppliers", icon: Truck, section: "Suppliers" },
       { key: "supplier-items", label: "Supplier items", icon: Boxes, section: "Suppliers" },
+      /* Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): the supplier bills,
+         inside Purchasing, Houzs way. Jess was not part of this decision. Chew
+         (2026-10-23): Purchasing enters a bill too, and (Q8, Chew
+         2026-10-26) saving posts it; Finance pays (0721). */
+      { key: "purchase-invoices", label: "Purchase Invoices", icon: Receipt, section: "Suppliers" },
       {
         key: "service-notes",
         label: "Service Cases",
@@ -1014,7 +1066,8 @@ export interface MenuGroup {
 export const OPERATION_MENU_GROUPS: ReadonlyArray<MenuGroup> = [
   { label: "Overview", sections: ["Workspace"] },
   { label: "Sales locations", sections: ["Showroom"] },
-  { label: "Sales", sections: ["Sales"] },
+  /* Consignment follows Sales Order, the Houzs placement (Sidebar.tsx:535). */
+  { label: "Sales", sections: ["Sales", "Consignment"] },
   { label: "Supply chain", sections: ["Purchasing", "Warehouse", "Payments", "Delivery"] },
   { label: "Service", sections: ["Customer Care", "Issue Tracker"] },
   { label: "Data", sections: ["Reports", "Suppliers", "Master Data"] },
