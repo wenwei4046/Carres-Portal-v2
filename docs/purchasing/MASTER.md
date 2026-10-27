@@ -979,8 +979,8 @@ Rules:
 - There is no Purchase Demands page. Demand is a record, not a staff destination.
 - There are no New Supplier or New SKU request pages. A blocked buy opens an in-context governed
   supplier/SKU request to Catalog/Master Data and returns to the same buy.
-- There is no Consignment Overview or Consignment Receipts page. Receiving handles purchased
-  and consignment goods; Stock Register reports supplier-owned Units.
+- There is no Consignment Overview ~~or Consignment Receipts~~ page. Receiving handles purchased
+  and consignment goods; Stock Register reports supplier-owned Units. **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): a `Purchase Consignment Receive` page in the Showroom drawer, as Houzs has (Houzs frontend/src/components/Sidebar.tsx:552). It is the same Receiving GRN register locked to Consignment Orders; still one receipt engine.**
 - Settings stays behind the global header gear. Reports use the central Reports area and Register
   export, not permanent Purchasing sidebar rows.
 
@@ -7502,14 +7502,14 @@ a third manually created document~~. **OVERTURNED 2026-10-22 by Weisiang (Mr Lim
 ownership derive the correct source-linked order and/or return, with existing facts prefilled.
 
 **Source / identity:** source-linked Display Request under §9.8 or authorised Supplier Claim replacement outcome;
-no blank order that bypasses its source. Manual arrangement entry follows §9.8. Official issue
+~~no blank order that bypasses its source.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): office staff may open a Consignment Order with no source and with prices on the lines (`New Consignment Order` on the PO register → `POST /api/operation/pos/new` with `consignment: true` → 0720 `purchasing_issue_consignment_order`, which calls the one `purchasing_issue_pos_batch` and marks the issued orders `is_consignment`), Houzs way.** Manual arrangement entry follows §9.8. Official issue
 allocates new incoming exact Unit IDs under §6.2; existing outgoing Units keep their identities.
 Preserve numbering families, old titles/versions and source links. No historical document rewrite,
 new CN allocator or application changes follow from this planning ruling.
 
 **Commercial boundary:** apply §9.8 quotation recording and Sales-confirmation rules. Missing or
-unconfirmed price does not block the agreed consignment movement. The supplier PDF is price-free:
-no supplier cost, customer selling price, price total or settlement amount. Keep commercial
+unconfirmed price does not block the agreed consignment movement. ~~The supplier PDF is price-free:
+no supplier cost, customer selling price, price total or settlement amount.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): the Consignment Order PDF shows each line's recorded Unit Price and Amount, a group TOTAL and an ORDER TOTAL, Houzs way; an ordinary Purchase Order PDF stays money-free.** Keep commercial
 versions/evidence internally; issue, send and receipt never accept unconfirmed terms or create a
 payable. Future Catalog costs do not overwrite historical terms.
 
@@ -7668,9 +7668,9 @@ scope is approved by this research.
 
 | Reference capability and inspected evidence | Carres owner/current equivalent | Disposition and dependency |
 |---|---|---|
-| 2990 supplier-side Purchase Consignment Order, linked receives/returns; `apps/api/src/routes/purchase-consignment-orders.ts` | Purchasing and Receiving; formal Carres Consignment Order not built | ADAPT source/child links and ordered/received/remaining facts; no blank Carres order creation |
+| 2990 supplier-side Purchase Consignment Order, linked receives/returns; `apps/api/src/routes/purchase-consignment-orders.ts` | Purchasing and Receiving; formal Carres Consignment Order not built | ADAPT source/child links and ordered/received/remaining facts; ~~no blank Carres order creation~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): office staff open a Consignment Order with no source, Houzs way (0720).** |
 | 2990 shared PO PDF renderer with `docTitle: PURCHASE CONSIGNMENT ORDER`; `PurchaseConsignmentOrderDetail.tsx:307–311` | Shared document kit | COPY PRINCIPLE, NOT READY for direct migration: Carres's combined incoming/outgoing layout and price exclusion differ |
-| 2990 separate supplier-side route/tables; create/edit line/cancel/delete operations | Shared Carres source-owned document/receipt capabilities | REJECT cloned business writers; sharing a PDF does not prove one common transaction engine |
+| 2990 separate supplier-side route/tables; create/edit line/cancel/delete operations | Shared Carres source-owned document/receipt capabilities | ~~REJECT cloned business writers~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): a Consignment Order is built Houzs way, but through the existing PO writer (0720 wraps `purchasing_issue_pos_batch`), not a cloned engine.** Sharing a PDF does not prove one common transaction engine |
 | 2990 receive/return remaining-quantity guards and downstream edit lock; `purchase-consignment-receives.ts:270–380` | Receiving/Stock exact Units | ADAPT prevent over-receipt/over-return and inspect downstream effects; Carres amendments preserve actual receipt history |
 | 2990 return creation books inventory OUT and cancellation reconciles it back; `purchase-consignment-returns.ts:1–65` | Stock physical handover | REJECT document-status-driven custody changes: Carres needs actual handover, not cancel-to-teleport |
 | 2990 Consignment Note sends goods to customer/showroom, `consignment-notes.ts:1–80`; outward Consignment Order uses sales tables | Delivery/Stock goods movement; supplier-owned display is not sold in Carres | ~~RELOCATE reference meaning~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): KEEP the Houzs meaning on the customer side: Consignment Note sends Carres-owned Units to a customer or dealer (§3 customer side, migration 0719)**; no evidence here that the named note auto-notifies supplier after customer success |
@@ -8631,7 +8631,7 @@ The final Carres model rejects:
 - a Purchase Demands page or a `Purchase Needs` synonym;
 - separate New Supplier/New SKU request destinations;
 - blank independent PO, Return, Repair, CO or CRTN creation;
-- separate Consignment Overview or Consignment Receipts;
+- separate Consignment Overview ~~or Consignment Receipts~~ (Purchase Consignment Receive OVERTURNED 2026-10-22, see the destinations list above);
 - `Acknowledged` after Carres has sent the PDF;
 - quiet post-send changes and silent price acceptance;
 - generic work words or relative `Today/Tomorrow` dates;

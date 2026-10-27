@@ -60,6 +60,7 @@ type PurchasingPage =
   | "po-amendments"
   | "po-cancellation-requests"
   | "receiving"
+  | "consignment-receives"
   | "claims"
   | "purchase-returns"
   | "consignment-returns"
@@ -94,6 +95,8 @@ const PAGE_WORD: Record<PurchasingPage, string> = {
   "po-amendments": "PO Amendments",
   "po-cancellation-requests": "Cancellation Requests",
   receiving: "Receiving",
+  /* The SIDEBAR's own word. Houzs Sidebar.tsx:552 (Weisiang 2026-10-22). */
+  "consignment-receives": "Purchase Consignment Receive",
   claims: "Supplier Claims",
   /* §9.6, owner-confirmed 2026-09-18. The SIDEBAR's own word, not a new one. */
   "purchase-returns": "Purchase Returns",
@@ -126,6 +129,8 @@ export default function PurchasingTabs({ right }: { right?: ReactNode } = {}) {
       ? "po-cancellation-requests"
       : tabParam === "receiving"
       ? "receiving"
+      : tabParam === "consignment-receives"
+      ? "consignment-receives"
       : tabParam === "claims"
         ? "claims"
       : tabParam === "purchase-returns"

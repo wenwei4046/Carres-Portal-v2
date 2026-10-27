@@ -698,6 +698,25 @@ describe("GET /?scope=grn — the paged GRN Register", () => {
     expect((all.facets as Record<string, unknown>).cancelled).toBe(1);
   });
 
+  it("Consignment goods narrows the same GRN records to Consignment Orders (Weisiang 2026-10-22)", async () => {
+    const other = { ...CREATED, id: "r-co", po_id: "PO-2002", grn_no: "GRN-20260906-7777" };
+    const tables = () => cardTables({
+      warehouse_receipts: { list: { data: [CREATED, other], error: null }, count: 0 },
+      purchase_orders: { list: { data: [
+        { id: "PO-1001", version: 1, supplier_id: "s1", is_consignment: false, suppliers: { name: "Ohana" } },
+        { id: "PO-2002", version: 1, supplier_id: "s1", is_consignment: true, suppliers: { name: "Ohana" } },
+      ], error: null } },
+    });
+    vi.mocked(userClient).mockReturnValue(makeSb(tables()) as never);
+    const all = await ask("");
+    expect(all.page).toMatchObject({ total: 2 });
+    expect((all.facets as Record<string, unknown>).consignment).toBe(1);
+    vi.mocked(userClient).mockReturnValue(makeSb(tables()) as never);
+    const only = await ask("&consignment=1");
+    expect(only.page).toMatchObject({ total: 1 });
+    expect((only.receipts as Array<Record<string, unknown>>).map((r) => r.po_id)).toEqual(["PO-2002"]);
+  });
+
   it("an arrival-source receipt keeps its own number and gets NO purchase order", async () => {
     const repair = {
       ...CREATED,

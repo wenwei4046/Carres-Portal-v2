@@ -110,6 +110,15 @@ describe("POST /api/operation/pos/new — a Purchase Order with no source (Weisi
     expect(line).toMatchObject({ cost: 999, cost_source: "hand_entered", commercial_treatment: "normal", expected_catalog_cost: 1200 });
   });
 
+  it("a Consignment Order goes through 0720's door with the same payload (Weisiang 2026-10-22)", async () => {
+    const { rpc } = client(ROWS, { data: { po_ids: ["PO3"] }, error: null });
+    const res = await post({ ...BODY, consignment: true });
+    expect(res.status).toBe(201);
+    const [name, args] = rpc.mock.calls[0] as unknown as [string, { p_pos: Array<Record<string, unknown>> }];
+    expect(name).toBe("purchasing_issue_consignment_order");
+    expect(args.p_pos[0]).toMatchObject({ supplier_id: SUPPLIER, destination_id: DEST, so_refs: null });
+  });
+
   it("a destination with no warehouse falls back to the own Klang warehouse", async () => {
     const { rpc } = client({ ...ROWS, purchasing_destinations: [{ id: DEST, name: "Showroom", address: "Jalan 1", warehouse_id: null, active: true }] }, { data: { po_ids: ["PO2"] }, error: null });
     await post(BODY);

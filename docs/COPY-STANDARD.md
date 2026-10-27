@@ -1243,7 +1243,7 @@ step. Purchased Carres-owned goods use the ordinary Sales Invoice; no supplier s
 Supplier PDF titles: `CONSIGNMENT ORDER` and `CONSIGNMENT RETURN`. Goods headings: `COMING IN`
 and `GOING BACK`. Placement uses COMING IN; standalone return uses GOING BACK; a same-supplier
 swap's combined Consignment Order uses both and links the return without duplicate notification.
-These instruction PDFs contain no prices or totals. Each leg retains separate actual evidence.
+~~These instruction PDFs contain no prices or totals.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): the Consignment Order PDF carries prices: each line `Unit Price RM {price} · Amount RM {amount}` (or `Unit Price not recorded`), group `TOTAL · RM {amount}`, and `ORDER TOTAL · RM {amount}`.** New screen words: `New Consignment Order` (PO register button and dialog title), `Consignment goods` (Receiving rail filter and active condition). Each leg retains separate actual evidence.
 Shared issue action: `Issue consignment order`; contextual `Issue consignment order to {supplier}`;
 result `Consignment order issued to {supplier}`. Existing source/permission controls remain.
 Exact register column copy and composition remain subject to design closure; no new component is
@@ -1300,10 +1300,10 @@ do not create a second business status, work queue or source of truth.
 | BUY pages | `SO Batch Purchase` · `Forecast Purchase` (owner 13 Oct 2026, under SO Batch Purchase) · `Manual Purchase Request` (owner rename 2026-09-23; was `Manual Purchase`) · `Purchase Orders`. **BUILT 2026-09-23** — the rail row, the page title, the create button, the register's empty/search/footer words, the object's back destination, its loading and failure sentences, the browser title and the shared review's way out all read `Manual Purchase Request`. The screen noun is the REQUEST; the purchase itself is the PO that answers it, and `MPR` was always Manual Purchase **Request**. |
 | RECEIVE pages | `Receiving` |
 | PROBLEMS pages | `Supplier Claims` · `Purchase Returns` · `Repair Orders` |
-| SHOWROOM pages | `Display Requests` · `Consignment Orders` · `Consignment Returns` |
+| SHOWROOM pages | `Display Requests` · `Consignment Orders` · `Purchase Consignment Receive` · `Consignment Returns` |
 
 Purchasing has no Home, module-specific Work, Purchase Demands, New Supplier/New SKU request,
-Consignment Overview, Consignment Receipts, Report or Settings sidebar destination. The capability
+Consignment Overview, ~~Consignment Receipts,~~ Report or Settings sidebar destination. **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): a `Purchase Consignment Receive` page in the Showroom drawer, as Houzs has (Houzs frontend/src/components/Sidebar.tsx:552). It is the same Receiving GRN register locked to Consignment Orders; still one receipt engine.** New screen word: `Purchase Consignment Receive` (sidebar row and page header). The capability
 lives in its authority home: Registers, central Work/Reports/Settings, in-context Catalog governance
 or the one Receiving engine. `purchase_demand` remains an authoritative record, not a page.
 

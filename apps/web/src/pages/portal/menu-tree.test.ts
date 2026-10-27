@@ -98,13 +98,15 @@ describe("the approved hierarchy", () => {
     expect(group("purchasing-showroom")).toEqual([
       "Display Requests",
       "Consignment Orders",
+      /* Purchase Consignment Receive — follows Houzs frontend/src/components/Sidebar.tsx:552 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
+      "Purchase Consignment Receive",
       "Consignment Returns",
     ]);
   });
 
-  it("is exactly thirteen pages", () => {
-    /* Eleven, plus PO Amendments and Cancellation Requests (0717 · Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was not part of this decision)). */
-    expect(purchasing).toHaveLength(13);
+  it("is exactly fourteen pages", () => {
+    /* Eleven, plus PO Amendments and Cancellation Requests (0717) and Purchase Consignment Receive (Houzs) · Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was not part of this decision). */
+    expect(purchasing).toHaveLength(14);
   });
 
   it("no row carries a hairline — Reports are central, not a Purchasing row", () => {
@@ -149,7 +151,7 @@ describe("the approved hierarchy", () => {
 
 /** THE ROUTE TRUTH — the Card's own minimum assertion. Words moved; no address did. */
 describe("the live destinations keep their exact current addresses", () => {
-  it("nine live pages, at their unchanged addresses", () => {
+  it("ten live pages, at their unchanged addresses", () => {
     expect(
       purchasing
         .filter((item) => !item.soon)
@@ -173,6 +175,8 @@ describe("the live destinations keep their exact current addresses", () => {
       /* §9.7 — Repair Orders opened with slice A (migration 0602): register,
          object and Create page. No other address moved. */
       ["Repair Orders", "/operation?tab=repair-orders"],
+      /* Purchase Consignment Receive — follows Houzs frontend/src/components/Sidebar.tsx:552 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
+      ["Purchase Consignment Receive", "/operation?tab=consignment-receives"],
       /* 0706 — Consignment Returns opened with its register; no other address moved. */
       ["Consignment Returns", "/operation?tab=consignment-returns"],
     ]);

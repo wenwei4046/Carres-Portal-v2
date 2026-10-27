@@ -1842,8 +1842,42 @@ operationPosRouter.get("/:id/print-data", requireOperation, async (c) => {
     return c.json(m.body, m.status);
   }
 
-  return c.json({ ...(doc as Record<string, unknown>), ...(await poPaperFacts(sb, poId, doc as PoDocumentDates)) });
+  return c.json({
+    ...(doc as Record<string, unknown>),
+    ...(await poPaperFacts(sb, poId, doc as PoDocumentDates)),
+  });
 });
+
+/**
+ * A CONSIGNMENT ORDER PRINTS ITS PRICES — Weisiang's decision (Mr Lim, WhatsApp
+ * 2026-10-22): the Houzs Purchase Consignment Order carries prices, so the
+ * Carres supplier paper does too. Overturns Jess's "the supplier PDF is
+ * price-free" (docs/purchasing/MASTER.md §9.9); Jess was not part of this
+ * decision. An ordinary PO stays money-free: this adds nothing to it.
+ * Follows Houzs frontend/src/vendor/scm/lib/purchase-order-pdf.ts:585 (the line
+ * Amount prints on the order PDF) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+ *
+ * Added beside the document, never over it: `consignment` and the Unit Price
+ * per SKU. A SKU whose lines carry two different prices prints none rather
+ * than the wrong one.
+ */
+async function consignmentPaperFacts(
+  sb: ReturnType<typeof userClient>,
+  poId: string,
+  isConsignment: boolean,
+): Promise<{ consignment?: true; line_prices?: Record<string, number | null> }> {
+  if (!isConsignment) return {};
+  const { data: lines } = await sb.from("purchase_order_lines").select("sku, cost").eq("po_id", poId);
+  const prices: Record<string, number | null> = {};
+  const mixed = new Set<string>();
+  for (const l of (lines ?? []) as Array<{ sku: string; cost: number | string | null }>) {
+    const cost = l.cost == null ? null : Number(l.cost);
+    if (!(l.sku in prices)) prices[l.sku] = cost;
+    else if (prices[l.sku] !== cost) mixed.add(l.sku);
+  }
+  for (const sku of mixed) prices[sku] = null;
+  return { consignment: true, line_prices: prices };
+}
 
 type PoDocumentDates = { issue_date?: string | null; eta_date?: string | null };
 
@@ -1867,10 +1901,11 @@ async function poPaperFacts(
   sb: ReturnType<typeof userClient>,
   poId: string,
   doc: PoDocumentDates,
-): Promise<{ delivery_working_days: number | null; delivery_method: "we_collect" | "supplier_delivers" | null }> {
-  const { data: po } = await sb.from("purchase_orders").select("supplier_id").eq("id", poId).maybeSingle();
+): Promise<{ delivery_working_days: number | null; delivery_method: "we_collect" | "supplier_delivers" | null; consignment?: true; line_prices?: Record<string, number | null> }> {
+  const { data: po } = await sb.from("purchase_orders").select("supplier_id, is_consignment").eq("id", poId).maybeSingle();
   const supplierId = (po as { supplier_id: string | null } | null)?.supplier_id ?? null;
-  if (!supplierId) return { delivery_working_days: null, delivery_method: null };
+  const consignment = await consignmentPaperFacts(sb, poId, Boolean((po as { is_consignment?: boolean } | null)?.is_consignment));
+  if (!supplierId) return { delivery_working_days: null, delivery_method: null, ...consignment };
   const [supplier, week] = await Promise.all([
     sb.from("suppliers").select("kind").eq("id", supplierId).maybeSingle(),
     sb.from("purchasing_supplier_settings").select("off_days").eq("supplier_id", supplierId).maybeSingle(),
@@ -1884,6 +1919,7 @@ async function poPaperFacts(
   return {
     delivery_working_days: days,
     delivery_method: supplier.error || !supplier.data ? null : kind === "factory_pickup" ? "we_collect" : "supplier_delivers",
+    ...consignment,
   };
 }
 
@@ -2041,7 +2077,10 @@ operationPosRouter.post("/new", requireOperation, async (c) => {
     ?? null;
   const catalogCost = new Map(((cat.data ?? []) as Array<{ sku: string; cost: number | null }>).map((r) => [r.sku, r.cost == null ? null : Number(r.cost)]));
 
-  const { data, error } = await sb.rpc("purchasing_issue_pos_batch", {
+  // A Consignment Order (Weisiang's decision, Mr Lim, WhatsApp 2026-10-22) goes
+  // through 0720's door, which calls the same authority and marks the order
+  // consignment in the same transaction — no second engine.
+  const { data, error } = await sb.rpc(input.consignment ? "purchasing_issue_consignment_order" : "purchasing_issue_pos_batch", {
     p_pos: [{
       supplier_id: input.supplierId,
       warehouse_id: warehouseId,
