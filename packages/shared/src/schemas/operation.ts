@@ -238,6 +238,28 @@ export const newPurchaseOrderInput = z.object({
 }).strict();
 export type NewPurchaseOrderInput = z.infer<typeof newPurchaseOrderInput>;
 
+/**
+ * 0728 — POST /api/operation/pos/receive-without-po. A Goods Receipt with no PO.
+ * Follows Houzs grns.ts:1408 (only the supplier and items are required) per
+ * Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+ */
+export const officeReceiveWithoutPoInput = z.object({
+  supplierId: z.string().uuid(),
+  destinationId: z.string().uuid(),
+  doNumber: z.string().min(3).max(60),
+  doFilePath: z.string().min(1).max(400),
+  goodsReceivedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  actualSiteId: z.string().uuid().optional(),
+  note: z.string().trim().max(500).optional(),
+  saveKey: z.string().uuid(),
+  lines: z.array(z.object({
+    sku: z.string().trim().min(1),
+    qty: z.number().int().min(1).max(10000),
+    price: z.number().positive().nullable().optional(),
+  }).strict()).min(1).max(100),
+}).strict();
+export type OfficeReceiveWithoutPoInput = z.infer<typeof officeReceiveWithoutPoInput>;
+
 export const setLineOpsRemarkInput = z.object({
   text: z.string().max(500),
 }).strict();
