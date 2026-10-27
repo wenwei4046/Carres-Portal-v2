@@ -63,6 +63,7 @@ import OperationDeliveryReport from "./OperationDeliveryReport";
 import { DeliveryOrderLinesReport, SalesInvoiceLinesReport, SalesOrderLinesReport } from "./DocumentLinesReport";
 // R2 (0288) — the supplier-claim queue, fourth tab of the Purchasing module.
 import OperationSupplierClaims from "./OperationSupplierClaims";
+import OperationPoChangeRequests from "./OperationPoChangeRequests";
 import OperationPurchaseReturns from "./OperationPurchaseReturns";
 import OperationRepairOrders from "./OperationRepairOrders";
 import OperationPurchasingSettings from "./OperationPurchasingSettings";
@@ -97,6 +98,7 @@ import { LEGACY_SCHEDULE_TABS } from "./warehouse-schedule-view";
 import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
 import WarehouseInbound from "./WarehouseInbound";
 import WarehouseOutboundWork from "./WarehouseOutboundWork";
+import WarehousesPage from "./WarehousesPage";
 import WarehouseUnitDetail from "./WarehouseUnitDetail";
 // K2 (0287) — Ready stock, the middle Stock tab K0 reserved.
 import OperationStockPlan from "./OperationStockPlan";
@@ -563,6 +565,11 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
                 sends back. Read-only; issuing a return is §7.4's own door and
                 moving the goods is Stock's. */}
             {tab === "purchase-returns" && <OperationPurchaseReturns />}
+            {/* 0717 · PO Amendments and Cancellation Requests — Weisiang's
+                decision (Mr Lim, WhatsApp 2026-10-22; Jess was not part of
+                this decision): PO changes wait for approval, the Houzs way. */}
+            {tab === "po-amendments" && <OperationPoChangeRequests kind="amendment" />}
+            {tab === "po-cancellation-requests" && <OperationPoChangeRequests kind="cancellation" />}
             {tab === "consignment-returns" && <OperationPurchaseReturns consignment />}
             {tab === "repair-orders" && <OperationRepairOrders />}
             {/* P1 — Purchasing → Settings: the numbers the ordering engine
@@ -664,6 +671,10 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
             )}
             {tab === "warehouse-inbound" && <WarehouseInbound />}
             {tab === "warehouse-outbound" && <WarehouseOutboundWork />}
+            {/* Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): the Houzs-way
+                Warehouses page — Sites, Inventory by item, Racks and Bins,
+                Loading List and Stock Card. Jess was not part of this decision. */}
+            {tab === "warehouses" && <WarehousesPage />}
             {/* Non-PO inbound source object. Inbound owns the register; this
                 hidden destination owns creating and reviewing one source. */}
             {tab === "arrival-source" && <ArrivalSourceWorkspace />}
