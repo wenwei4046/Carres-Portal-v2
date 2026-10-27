@@ -182,3 +182,19 @@ describe("Outright record return context", () => {
     expect(screen.getAllByRole("checkbox").every((c)=>!(c as HTMLInputElement).checked)).toBe(true);
   });
 });
+
+/* OVERTURNED 2026-10-22 by Weisiang (Mr Lim): office staff may create Sales
+   Orders (Houzs way). Jess's 2026-09-27 "no New Sales Order on the Register"
+   is kept in docs/orders/MASTER.md for history. */
+describe("New Sales Order on the Register", () => {
+  it("opens the office create page", async () => {
+    render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false,enabled:false}}})}>
+      <MemoryRouter initialEntries={["/operation/orders"]}><Routes>
+        <Route path="/operation/orders" element={<SalesOrdersOutright />} />
+        <Route path="/operation/orders/so/new" element={<p>TEST create page</p>} />
+      </Routes></MemoryRouter>
+    </QueryClientProvider>);
+    fireEvent.click(within(screen.getByTestId("outright-toolbar")).getByRole("button", {name:"New Sales Order"}));
+    expect(await screen.findByText("TEST create page")).toBeVisible();
+  });
+});

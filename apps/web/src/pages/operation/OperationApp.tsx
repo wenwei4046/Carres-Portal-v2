@@ -35,6 +35,7 @@ import OperationDashboard from "./OperationDashboard";
 import OperationOrdersControl from "./OperationOrdersControl";
 import { useOrderDealSweep } from "./components/order-deal-sweep";
 import SalesOrdersOutright from "./so-outright/SalesOrdersOutright";
+import OperationNewSalesOrder from "./OperationNewSalesOrder";
 import DeliveryOrderPage from "./DeliveryOrderPage";
 import DeliveryOrdersRegister from "./DeliveryOrdersRegister";
 import SalesOrderWorkspace from "./SalesOrderWorkspace";
@@ -487,8 +488,9 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
                 promised never changes and is never reused. */}
             <Route path="stock/unit/:unitCode" element={<WarehouseUnitDetail />} />
             {/* STAGE 1 — the workspace route the register's rows open.
-                `so/new` was the office birth door, retired 2026-09-27; static
-                `new` outranks `:orderId`. Declared before
+                `so/new` is the office create page (retired 2026-09-27,
+                reopened 2026-10-22 by Weisiang); static `new` outranks
+                `:orderId`. Declared before
                 `orders/:stage` in source for the reader; React Router ranks
                 them higher anyway. */}
             {/* The one Settings Workspace. Reached only from the Page Header
@@ -507,10 +509,11 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
             <Route path="issues" element={<OperationIssueTracker />} />
             <Route path="amendments" element={<SalesOrderAmendments />} />
             <Route path="issues/reports" element={<IssueRelatedPartyReport />} />
-            {/* The office create door is RETIRED (owner ruling 2026-09-27): a
-                Sales Order is born in the Sales Portal. A saved or pasted link
-                lands on the Register. */}
-            <Route path="orders/so/new" element={<Navigate to="/operation/orders" replace />} />
+            {/* OVERTURNED 2026-10-22 by Weisiang (Mr Lim): office staff may
+                create Sales Orders (Houzs way). The page feeds the Sales
+                Portal's own engine (POST /api/orders). Jess's 2026-09-27
+                retirement is kept for history in docs/orders/MASTER.md. */}
+            <Route path="orders/so/new" element={<OperationNewSalesOrder />} />
             <Route path="orders/so/:orderId" element={<SalesOrderWorkspace />} />
             <Route path="orders/:stage" element={<SalesOrdersOutright />} />
             {/* ⭐ THE TEMPORARY DOOR — the old control table, on its own route.
