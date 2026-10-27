@@ -216,3 +216,13 @@ describe("⭐ the Delivery calendar and the responsible person's week reach the 
     expect(photo(workFeedCalendarsOf(DEFAULT_OFFICE_CALENDAR, imported))).toBe("2026-10-21");
   });
 });
+
+// Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): an order may carry several
+// part Sales Invoices (0712). Its balance is the ORDER's, so Work asks once.
+describe("an order on two part Sales Invoices", () => {
+  it("raises one Ask customer to pay, not one per invoice", () => {
+    const a = invoice({ confirmed: "2026-10-28", kv: true });
+    const b = { ...a, id: "inv-part-2", invoice_no: "INV-2" };
+    expect(projectPaymentCollectionWork({ invoices: [a, b], ownerFor: owner, today: "2026-10-20" })).toHaveLength(1);
+  });
+});

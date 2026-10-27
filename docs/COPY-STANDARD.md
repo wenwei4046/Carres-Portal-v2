@@ -6006,6 +6006,25 @@ DEL-04 · DEL-05 · OFF-01/05, owner confirmed 9 Oct 2026). No dash is used as a
 | Work action, `Assign logistics` | line two `Choose the company that carries this delivery · due {date}` | the hard-coded `3 working days before · {date}` is retired |
 | Logistics card, first check | `{n} working days before · {date}` with `n` = the stored Contact lead (`Contact lead days`, DEL-05); at the default it reads the ruled `3 working days before`. `2 working days before` and `1 working day before` stay fixed (Workspace §5.9) | the contact day follows its one setting |
 
+## New Sales Invoice words · Weisiang's decision (Mr Lim, WhatsApp 2026-10-22) · BUILT ON BRANCH `feat/office-new-sales-invoice` (0712 not applied)
+
+Office staff open a Sales Invoice by hand, part invoices allowed (Houzs way). Overturns Jess's
+rules in payment/MASTER.md; Jess was not part of this decision. Source: `apps/web/src/pages/finance/NewSalesInvoiceDialog.tsx` `NSI_COPY`.
+
+| Surface | Exact words | Meaning |
+|---|---|---|
+| Payment Monitor toolbar button and dialog title | `New Sales Invoice` | opens the office door |
+| Dialog help line | `Pick a Sales Order or Delivery Order and the goods to invoice. You can invoice part now and the rest later.` | part invoices are allowed |
+| Find field and button | `SO No or DO No` · `Find` | a DO ticks the goods it carries; an SO ticks every line |
+| Not found | `No Sales Order or Delivery Order has that number.` | |
+| Line | `{SKU} · {price} · {n} left to invoice` · qty field `Qty` | quantity still to invoice on that line. Found by SO: every live SO line shows; a line with `0 left to invoice` shows unticked and cannot be ticked (YH Q15 option C, 2026-10-26). Found by DO: only lines with something left |
+| Refusals | `Everything on this Sales Order is already invoiced.` · `This Sales Order is already on Sales Invoice {INV No}.` · `This Sales Order is cancelled.` | the door offers nothing to create |
+| Add-ons | `Delivery and other charges go on this invoice.` | add-ons ride on the order's first office invoice |
+| Total and buttons | `Invoice total {RM amount}` · `Cancel` · `Create Sales Invoice` | |
+| Toast | `{INV No} created` | |
+| API refusals | `Pick the goods to invoice.` | 422 from `POST /api/finance/invoices/office` |
+| Print Invoice, order on more than one live Sales Invoice (YH 2026-10-26; `DownloadInvoiceButton.tsx` `PRINT_INVOICE_COPY`) | label `Sales Invoice to print` · placeholder `Pick a Sales Invoice` · option `{INV No} · {qty} × {SKU}, …` (no lines: `{INV No}`) · toast `Invoice {INV No} opened` | one live invoice prints at once, as before |
+
 ## Service Cases, the Houzs way — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22) · BUILT 0711
 
 Weisiang ruled "just clear Carress rules and Implement Houzs inside". Jess was not part of this
