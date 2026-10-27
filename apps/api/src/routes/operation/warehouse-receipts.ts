@@ -331,7 +331,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
         readByIds<Record<string, unknown>>(scanPoIds, (ids) =>
           sb
             .from("purchase_orders")
-            .select("id, version, supplier_id, is_consignment, suppliers(name)")
+            .select("id, version, supplier_id, receipt_only, is_consignment, suppliers(name)")
             .in("id", ids),
         ),
         // Only the fields the ONE reply arithmetic reads
@@ -357,10 +357,14 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
 
     const supplierByPo = new Map<string, string | null>();
     const versionByPo = new Map<string, number>();
+    const hiddenPo = new Set<string>();
     for (const p of poRows) {
       const sup = p.suppliers as { name?: string } | null;
       supplierByPo.set(p.id as string, sup?.name ?? null);
       versionByPo.set(p.id as string, (p.version as number | null) ?? 1);
+      // 0728: a PO issued only to carry a no-PO Goods Receipt is not shown
+      // (Houzs grns.ts:1408 has no PO there).
+      if (p.receipt_only === true) hiddenPo.add(p.id as string);
     }
     /* `Consignment goods` — the Consignment Receive entry, Houzs way (Weisiang's
        decision, Mr Lim, WhatsApp 2026-10-22; Jess was not part of it). Not a
@@ -544,7 +548,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
       return {
         columnFacts: {
           grnDate: { text: businessDay(r.posted_at) ?? "", date: businessDay(r.posted_at) },
-          grn: { text: number }, source: { text: source }, po: { text: documentDisplayNumber(r.po_id ?? "") },
+          grn: { text: number }, source: { text: source }, po: { text: hiddenPo.has(r.po_id) ? "" : documentDisplayNumber(r.po_id ?? "") },
           supplier: { text: supplierName ?? "" }, deliverTo: { text: r.warehouse_id ? whNames.get(r.warehouse_id) ?? "" : "" },
           actualSite: { text: actualSite }, supplierConfirmedDeliveryDate: { text: supplierDateByPo.get(r.po_id) ?? "Not confirmed", date: supplierDateByPo.get(r.po_id) ?? null },
           receivedAt: { text: r.goods_received_at ?? "", date: r.goods_received_at }, doNo: { text: r.do_number ?? "" },
@@ -582,8 +586,8 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
             goods_received_at: r.goods_received_at ?? undefined,
             submitted_at: r.submitted_at ?? undefined,
           }),
-          r.po_id,
-          documentDisplayNumber(r.po_id ?? ""),
+          hiddenPo.has(r.po_id) ? "" : r.po_id,
+          hiddenPo.has(r.po_id) ? "" : documentDisplayNumber(r.po_id ?? ""),
           r.do_number ?? "",
           supplierName ?? "",
         ].join(" "),

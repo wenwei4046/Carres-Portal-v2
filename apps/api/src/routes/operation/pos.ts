@@ -38,6 +38,7 @@ import {
   type WarehouseReceiptLine,
   claimPhotoWire,
   newPurchaseOrderInput,
+  officeReceiveWithoutPoInput,
   PURCHASING_REFUSAL_CODES,
   purchasingRefusal,
 } from "@carres/shared";
@@ -184,6 +185,9 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     if (status !== "all") q = q.eq("status", status);
     if (supplierId) q = q.eq("supplier_id", supplierId);
     if (onlyPoId) q = q.eq("id", onlyPoId);
+    // 0728: a PO issued only to carry a no-PO Goods Receipt is not shown
+    // (Houzs grns.ts:1408 has no PO there).
+    else q = q.eq("receipt_only", false);
 
     const { data, error } = await q
       .order("placed_at", { ascending: false })
@@ -2011,6 +2015,29 @@ operationPosRouter.get("/:id/source-orders", requireOperation, async (c) => {
 // The RPCs themselves are NOT dropped — they are the construction history of
 // every PO on file — but migration 0339 revokes EXECUTE from `public`, `anon`
 // and `authenticated`, so this route could not reach them even if it returned.
+
+// ----- POST /receive-without-po — a Goods Receipt with no PO (0728) -----
+// Follows Houzs-ERP backend/src/scm/routes/grns.ts:1408 per Weisiang's ruling
+// (2026-10-22): clear Carres rules, implement Houzs. YH 2026-10-27: a delivery
+// with no PO records a Goods Receipt with no PO; stock goes up when posted.
+// A thin door: `office_receive_without_po` owns every rule.
+operationPosRouter.post("/receive-without-po", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, officeReceiveWithoutPoInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const b = parsed.data;
+  const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("office_receive_without_po", {
+    p_supplier_id: b.supplierId, p_destination_id: b.destinationId,
+    p_lines: b.lines.map((l) => ({ sku: l.sku, qty: l.qty, cost: l.price ?? null })),
+    p_do_number: b.doNumber, p_do_file_path: b.doFilePath, p_note: b.note || null,
+    p_goods_received_at: b.goodsReceivedAt ?? null, p_actual_site_id: b.actualSiteId ?? null,
+    p_save_key: b.saveKey,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
+});
 
 // ----- POST /new — a Purchase Order with no source (Houzs way) -----
 //

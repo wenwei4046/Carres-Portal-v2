@@ -12,6 +12,7 @@ import {
   type WarehouseReceiptLine,
 } from "@carres/shared";
 import {
+  useCatalog,
   useOperationGrnRegister,
   fetchGrnRegisterExport,
   useOperationPos,
@@ -42,6 +43,7 @@ import ReceivingRecord from "./components/ReceivingRecord";
 import ReceivingCompactView from "./components/ReceivingCompactView";
 import CPopover from "@/components/carres/CPopover";
 import Button from "@/components/kit/Button";
+import NewGoodsReceiptModal from "./components/NewGoodsReceiptModal";
 import Tabs from "@/components/kit/Tabs";
 import Drawer from "@/components/kit/Drawer";
 import PurchasingTabs from "./PurchasingTabs";
@@ -204,6 +206,16 @@ export default function OperationReceiving({ consignmentPage = false }: { consig
     q: search,
   };
   const registerQ = useOperationGrnRegister(registerFilters);
+  /* New Goods Receipt with no PO (0728) — Follows Houzs grns.ts:1408 per
+     Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
+  const [newGrnOpen, setNewGrnOpen] = useState(false);
+  const catalogQ = useCatalog({ enabled: newGrnOpen });
+  const newGrnSkus = useMemo(() => {
+    const models = new Map((catalogQ.data?.models ?? []).map((m) => [m.id, m.name]));
+    return (catalogQ.data?.skus ?? [])
+      .filter((s) => !s.discontinuedAt)
+      .map((s) => ({ sku: s.sku, supplierId: s.supplierId, label: `${s.sku} · ${models.get(s.modelId) ?? ""} ${s.variant}`.trim() }));
+  }, [catalogQ.data]);
 
   const rows = useMemo(
     () => registerQ.data?.receipts ?? [],
@@ -1034,6 +1046,11 @@ export default function OperationReceiving({ consignmentPage = false }: { consig
                 >
                   Start Receiving
                 </button>
+                <Button icon="add" onClick={() => setNewGrnOpen(true)} data-testid="grn-new-without-po">New Goods Receipt</Button>
+                <NewGoodsReceiptModal open={newGrnOpen} onOpenChange={setNewGrnOpen}
+                  suppliers={(suppliersQ.data?.suppliers ?? []).map((s) => ({ id: s.id, name: s.name }))}
+                  destinations={posQ.data?.destinations ?? []} skus={newGrnSkus}
+                  onPosted={() => { setNewGrnOpen(false); void registerQ.refetch(); }} />
                 <CPopover label="Filters" trigger={<Button>Filters</Button>}>
                   <div data-testid="receiving-list-filters">
                     <FilterRailGroup title="Received with" icon="goods">
