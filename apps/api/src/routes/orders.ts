@@ -4384,10 +4384,15 @@ ordersRouter.get("/:id/invoice-pdf-data", async (c) => {
     });
   }
 
+  // YH 2026-10-26: an order on several part Sales Invoices (0712) prints the
+  // one picked (`?invoice=`), never another order's.
+  const picked = c.req.query("invoice");
   const { data: inv, error: invErr } = await sb
     .from("invoices")
-    .select("id, invoice_no, amount, tax_amount, issued_at, voided_at")
-    .eq("invoice_no", ord.invoice_no)
+    .select("id, invoice_no, amount, tax_amount, issued_at, voided_at, snapshot")
+    .eq("invoice_no", picked || ord.invoice_no)
+    .eq("order_id", id)
+    .eq("kind", "sales")
     .maybeSingle();
   if (invErr) throw new HTTPException(500, { message: invErr.message });
   if (!inv) throw new HTTPException(404, { message: "Invoice row missing for order" });
@@ -4403,8 +4408,11 @@ ordersRouter.get("/:id/invoice-pdf-data", async (c) => {
     .select("sku, qty, unit_price")
     .eq("order_id", id);
   if (linErr) throw new HTTPException(500, { message: linErr.message });
+  // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): an office (part)
+  // invoice (0712) prints only the goods it bills, from its own snapshot.
+  const officeLines = i.snapshot?.issued_from === "office" && Array.isArray(i.snapshot.lines) ? i.snapshot.lines : null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const lineRows = (lines ?? []) as any[];
+  const lineRows = (officeLines ?? lines ?? []) as any[];
 
   const skus: string[] = lineRows.map((l) => String(l.sku));
   const skuVariantBySku: Record<string, string> = {};
@@ -4460,6 +4468,38 @@ ordersRouter.get("/:id/invoice-pdf-data", async (c) => {
     currency: "MYR",
     received_before: receivedBeforeInvoice(await invoicePayments(sb, id), String(i.issued_at)),
   });
+});
+
+/**
+ * GET /api/orders/:id/sales-invoices — the order's live Sales Invoices, newest
+ * first, each with the goods it bills (YH 2026-10-26): when an order carries
+ * more than one (0712 part invoices), Print Invoice asks which to print.
+ */
+ordersRouter.get("/:id/sales-invoices", async (c) => {
+  const auth = c.var.auth;
+  if (!["operation", "finance", "principal", "bd"].includes(String(auth.role))) {
+    throw new HTTPException(403, { message: "Invoice PDF not available for this role" });
+  }
+  const id = c.req.param("id");
+  if (!z.string().uuid().safeParse(id).success) throw new HTTPException(404, { message: "Order not found" });
+  const { data, error } = await userClient(c.env, auth.jwt)
+    .from("invoices")
+    .select("invoice_no, amount, snapshot")
+    .eq("order_id", id)
+    .eq("kind", "sales")
+    .eq("status", "issued")
+    .is("voided_at", null)
+    .order("issued_at", { ascending: false })
+    .order("created_at", { ascending: false });
+  if (error) throw new HTTPException(500, { message: error.message });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return c.json((data ?? []).map((r: any) => ({
+    invoice_no: String(r.invoice_no),
+    amount: Number(r.amount ?? 0),
+    lines: Array.isArray(r.snapshot?.lines)
+      ? r.snapshot.lines.map((l: { sku?: unknown; qty?: unknown }) => ({ sku: String(l.sku ?? ""), qty: Number(l.qty ?? 0) }))
+      : [],
+  })));
 });
 
 /**

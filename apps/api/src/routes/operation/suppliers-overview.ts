@@ -101,7 +101,7 @@ operationSuppliersOverviewRouter.get("/", async (c) => {
   const [suppliersRes, posRes] = await Promise.all([
     sb
       .from("suppliers")
-      .select("id, name, contact, contact_email, lead_time, kind, cat_covered, portal_enabled, slug")
+      .select("id, name, contact, contact_email, lead_time, kind, cat_covered, portal_enabled, slug, terms_days")
       .order("name"),
     sb
       .from("purchase_orders")
@@ -219,6 +219,9 @@ operationSuppliersOverviewRouter.get("/", async (c) => {
       catCovered: s.cat_covered ?? [],
       portalEnabled: s.portal_enabled,
       slug: s.slug,
+      // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): purchasing edits the
+      // supplier's payment terms on this page. The same 0530 field Finance reads.
+      termsDays: (s.terms_days as number | null) ?? null,
       openPos: t.open,
       receivedPos: t.received,
       totalPos: t.total,

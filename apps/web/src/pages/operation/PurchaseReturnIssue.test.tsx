@@ -61,6 +61,15 @@ describe("Issue Purchase Return", () => {
     expect(issued).toHaveBeenCalledWith("pr1");
   });
 
+  it("with no claim, issues to the chosen supplier (Weisiang, Mr Lim, WhatsApp 2026-10-22)", () => {
+    render(<MemoryRouter><IssueForm source={SOURCE({ claim_id: null, claim_no: null, supplier_id: "s1" })} onClose={() => undefined} onIssued={() => undefined} /></MemoryRouter>);
+    expect(screen.getByTestId("purchase-return-issue-form")).toHaveTextContent("Ohana");
+    fireEvent.click(screen.getByTestId("purchase-return-issue-save"));
+    expect(mutate).toHaveBeenCalledWith("/api/operation/purchase-returns", {
+      supplier_id: "s1", units: [{ stock_item_id: "a", seen: "t-a", pickup_location: "Carres Klang" }], confirmed_pickup_date: null,
+    });
+  });
+
   it("with neither address recorded, names it and issues nothing", () => {
     render(<MemoryRouter><IssueForm source={SOURCE({ return_to: null, return_to_from: null })} onClose={() => undefined} onIssued={() => undefined} /></MemoryRouter>);
     expect(screen.getByTestId("purchase-return-no-address")).toHaveTextContent("Add the address of Ohana");

@@ -1247,3 +1247,69 @@ describe("a goods line's channel (0683, Chew ruling 2)", () => {
     expect((await call(`/bills/grn-lines/${RECEIPT_ID}`)).status).toBe(403);
   });
 });
+
+// 0721 (Chew, Finance, WhatsApp 2026-10-23, via YH): Purchasing enters a bill
+// through Finance's own door, and nothing more.
+describe("Purchasing (operation) enters a supplier bill, and cannot pay", () => {
+  const grnBill = { ...goodBill, lines: [goodBill.lines[0]] };
+
+  it("POST /bills: operation reaches the same save-draft call Finance does", async () => {
+    const sb = mockRpc({ data: BILL_ID, error: null });
+    const res = await call("/bills", { method: "POST", body: grnBill, role: "operation" });
+    expect(res.status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_bill_save_draft", expect.objectContaining({
+      p_bill_id: null, p_supplier_id: SUPPLIER_ID, p_ap_account_code: null,
+    }));
+  });
+
+  it("GET /bills/grn-candidates and grn-lines admit operation; grn-lines reads no channels for it", async () => {
+    const sb = mockRpc({ data: [{ receipt_id: RECEIPT_ID, po_line_id: PO_LINE_ID, open_qty: 2 }], error: null });
+    const lines = await call(`/bills/grn-lines/${RECEIPT_ID}`, { role: "operation" });
+    expect(lines.status).toBe(200);
+    expect(await lines.json()).toEqual({ rows: [{ receipt_id: RECEIPT_ID, po_line_id: PO_LINE_ID, open_qty: 2,
+      channels: [], department_type: null, department_id: null }] });
+    expect(sb.rpc).toHaveBeenCalledTimes(1);
+    mockRpc({ data: [], error: null });
+    expect((await call("/bills/grn-candidates", { role: "operation" })).status).toBe(200);
+  });
+
+  it("the database's refusal reaches Purchasing with its reason", async () => {
+    mockRpc({ data: null, error: { code: "42501", message: "Line 1: Purchasing bills goods received.", details: "purchasing_bills_goods_received" } });
+    const res = await call("/bills", { method: "POST", body: goodBill, role: "operation" });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: "purchasing_bills_goods_received" });
+  });
+
+  it("2026-10-26 (YH, Houzs): PUT /bills/:id and GET /accounts admit operation; the database holds it to its own draft", async () => {
+    const sb = mockRpc({ data: BILL_ID, error: null });
+    const res = await call(`/bills/${BILL_ID}`, { method: "PUT", body: grnBill, role: "operation" });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_bill_save_draft", expect.objectContaining({ p_bill_id: BILL_ID }));
+    mockRpc({ data: [], error: null });
+    expect((await call("/accounts", { role: "operation" })).status).toBe(200);
+    mockRpc({ data: null, error: { code: "42501", message: "Purchasing changes only its own draft bill.", details: "not_finance" } });
+    expect((await call(`/bills/${BILL_ID}`, { method: "PUT", body: grnBill, role: "operation" })).status).toBe(403);
+  });
+
+  it("operation cannot confirm or cancel a bill, nor touch any payment", async () => {
+    const sb = mockRpc({ data: BILL_ID, error: null });
+    const refused: Array<[string, string, unknown?]> = [
+      ["POST", `/bills/${BILL_ID}/confirm`],
+      ["POST", `/bills/${BILL_ID}/cancel`, { reason: "x" }],
+      ["GET", `/bills/${BILL_ID}`],
+      ["GET", "/bills"],
+      ["GET", "/vouchers"],
+      ["POST", "/vouchers", goodVoucher],
+      ["POST", `/vouchers/${VOUCHER_ID}/prepare`],
+      ["POST", `/vouchers/${VOUCHER_ID}/approve`],
+      ["POST", `/vouchers/${VOUCHER_ID}/advance-applications`, { billId: BILL_ID, amount: 1 }],
+      ["POST", "/credit-notes", {}],
+      ["POST", "/debit-notes", {}],
+    ];
+    for (const [method, path, body] of refused) {
+      const res = await call(path, { method, body, role: "operation" });
+      expect(`${method} ${path} ${res.status}`).toBe(`${method} ${path} 403`);
+    }
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+});

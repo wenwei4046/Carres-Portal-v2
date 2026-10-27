@@ -230,6 +230,7 @@ interface PerWarehouseStockEntry {
   sku: string;
   qty: number;
   reserved: number;
+  available: number;
   low_stock_status: LowStockStatus;
   /** T42-pass3-C1 — surfaces stock_balances.low_threshold so the warehouse UI
    *  can prefill `SetThresholdDialog` instead of opening blank (which would
@@ -307,6 +308,9 @@ operationWarehouseRouter.get("/", async (c) => {
       sku: b.sku,
       qty,
       reserved,
+      // Weisiang's decision 2026-10-22 (Houzs Inventory by SKU): the bindable
+      // count beside on hand, straight from the one availability view.
+      available: Number(b.available) || 0,
       low_stock_status: statusFor(qty),
       // T42-pass3-C1 — surface raw thresholds for SetThresholdDialog prefill.
       low_threshold: thr?.low ?? null,

@@ -14,6 +14,7 @@ import { INPUT_CLS } from "@/pages/operation/components/Modal";
 import { CategoryChip, CATEGORY_LABEL, CATEGORY_LABEL_SHORT, CodeChip } from "../components/atoms";
 import { SupplierOffersModal } from "../components/SupplierOffers";
 import { skuMargin } from "../margin";
+import { bulkDeleteSkus } from "./bulk-delete-skus";
 import NewSkuModal from "./NewSkuModal";
 import ImportSkusDialog from "./ImportSkusDialog";
 import { buildSkuExportCsv, downloadCsv } from "@/lib/sku-csv";
@@ -189,16 +190,14 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
     if (
       !confirm(
         `Permanently delete ${selected.size} SKU${selected.size === 1 ? "" : "s"}? ` +
-          `This cannot be undone. Existing orders/POs keep their line history.`,
+          `This cannot be undone. A SKU on orders, purchase orders, stock or bills is kept.`,
       )
     )
       return;
-    const ids = Array.from(selected);
-    const results = await Promise.allSettled(ids.map((id) => del.mutateAsync(id)));
-    const failed = results.filter((r) => r.status === "rejected").length;
+    // 0721: a SKU that orders, POs, stock or bills name is refused by name.
+    const codeById = new Map(visible.map((r) => [r.sku.id, r.sku.sku]));
+    await bulkDeleteSkus(Array.from(selected), (id) => codeById.get(id) ?? id, (id) => del.mutateAsync(id));
     setSelected(new Set());
-    if (failed === 0) toast.success(`Deleted ${ids.length} SKU${ids.length === 1 ? "" : "s"}`);
-    else toast.error(`${ids.length - failed} done · ${failed} failed`);
   }
 
   // Export the CURRENTLY FILTERED set (category + search), one row per SKU, in

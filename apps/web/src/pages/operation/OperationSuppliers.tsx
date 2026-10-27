@@ -1,5 +1,6 @@
 import { GOODS_ABSENCE_WORDS } from "@carres/shared";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { useState } from "react";
 import {
   MIN_JUDGED_POS,
@@ -8,7 +9,9 @@ import {
   type ScorecardRate,
   type SupplierScorecard,
 } from "@carres/shared";
-import { qk } from "@/lib/queries";
+import { qk, useSetSupplierTermsDays } from "@/lib/queries";
+import Input from "@/components/kit/Input";
+import Button from "@/components/kit/Button";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
 
@@ -53,6 +56,7 @@ type SupplierRow = {
   catCovered: string[];
   portalEnabled: boolean;
   slug: string | null;
+  termsDays: number | null;
   openPos: number;
   receivedPos: number;
   totalPos: number;
@@ -243,6 +247,8 @@ function SupplierDrawer({ supplier, onClose }: { supplier: SupplierRow; onClose:
           </button>
         </div>
 
+        <TermsDaysField supplier={supplier} />
+
         <ScorecardBlock sc={supplier.scorecard} />
 
         <div className="text-strong text-kit-slate-12 mb-2">
@@ -276,6 +282,51 @@ function SupplierDrawer({ supplier, onClose }: { supplier: SupplierRow; onClose:
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Payment terms — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): purchasing
+ * staff edit a supplier's payment terms here, Houzs way. It writes the SAME
+ * 0530 `suppliers.terms_days` that Purchasing settings and Finance's bill form
+ * read, through the same door (`purchasing_set_supplier_terms_days`); there is
+ * no second field. Jess's rule that Finance owns creditor terms is overturned;
+ * Jess was not part of this decision.
+ */
+function TermsDaysField({ supplier }: { supplier: SupplierRow }) {
+  const qc = useQueryClient();
+  const setTerms = useSetSupplierTermsDays();
+  const [draft, setDraft] = useState(supplier.termsDays == null ? "" : String(supplier.termsDays));
+  const n = draft.trim() === "" ? null : Number(draft);
+  const valid = n === null || (Number.isInteger(n) && n >= 0 && n <= 365);
+  const dirty = valid && n !== supplier.termsDays;
+  const save = () =>
+    setTerms
+      .mutateAsync({ supplierId: supplier.id, days: n })
+      .then(() => {
+        void qc.invalidateQueries({ queryKey: qk.operation.suppliersOverview() });
+        toast.success("Saved");
+      })
+      .catch((e: unknown) => toast.error(e instanceof Error ? e.message : "Not saved. Try again."));
+  return (
+    <div className="mb-5 flex items-end gap-2" data-testid="supplier-terms-days">
+      <div className="w-32">
+        <Input
+          id={`supplier-terms-days-${supplier.id}`}
+          label="Terms (days)"
+          type="number"
+          min={0}
+          max={365}
+          step={1}
+          value={draft}
+          error={valid ? undefined : "0 to 365"}
+          onChange={(e) => setDraft(e.target.value)}
+        />
+      </div>
+      <Button variant="primary" disabled={!dirty || setTerms.isPending} onClick={() => void save()}>
+        Save
+      </Button>
     </div>
   );
 }

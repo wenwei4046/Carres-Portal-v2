@@ -92,10 +92,37 @@ function twoLocationV2(): PoTemplateData {
 }
 
 describe("po-template obeys docs/pdf/PO-PDF-STANDARD.md", () => {
-  it("never mentions money — no price, no total, no RM, no currency", () => {
-    expect(CODE).not.toMatch(/unit_price|line_total|grand_total|currency|formatMoney/);
-    expect(CODE).not.toMatch(/\bRM\b/);
-    expect(CODE).not.toMatch(/fabric_surcharge/);
+  /* Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): a Consignment Order
+     prints its prices, so the template may now format money, but ONLY behind
+     `consignment`. Jess's money-free rule still holds for every ordinary PO,
+     checked on what the template draws rather than on its source. */
+  it("an ordinary PO never mentions money — no price, no total, no RM", () => {
+    expect(CODE).not.toMatch(/unit_price|line_total|grand_total|fabric_surcharge/);
+    const text = renderedText(PoTemplate({ ...twoLocationV2(), line_prices: { "B1201F-K": 500 } }));
+    expect(text).not.toMatch(/\bRM\b|Unit Price|Amount|CONSIGNMENT/);
+  });
+
+  it("a Consignment Order is titled as one and prints Unit Price, Amount and the money totals (Weisiang 2026-10-22)", () => {
+    const text = renderedText(PoTemplate({ ...twoLocationV2(), consignment: true, line_prices: { "B1201F-K": 500 } }));
+    expect(text).toContain("CONSIGNMENT ORDER");
+    expect(text).not.toContain("PURCHASE ORDER");
+    expect(text).toContain("Unit Price RM 500.00 · Amount RM 2,000.00");
+    expect(text).toContain("TOTAL · RM 1,000.00");
+    expect(text).toContain("ORDER TOTAL · RM 3,000.00");
+  });
+
+  it("a Consignment Order charges no money on Cancelled Qty (Houzs has no part-cancelled line)", () => {
+    const base = twoLocationV2();
+    const lines = base.lines.map((l, i) => (i === 0 ? { ...l, cancelled_qty: 1, received_qty: 0 } : l));
+    const text = renderedText(PoTemplate({ ...base, lines, consignment: true, line_prices: { "B1201F-K": 500 } }));
+    expect(text).toContain("Unit Price RM 500.00 · Amount RM 1,500.00");
+    expect(text).toContain("ORDER TOTAL · RM 2,500.00");
+  });
+
+  it("a Consignment Order line with no recorded price says so and prints no money total", () => {
+    const text = renderedText(PoTemplate({ ...twoLocationV2(), consignment: true, line_prices: {} }));
+    expect(text).toContain("Unit Price not recorded");
+    expect(text).not.toMatch(/\bRM\b/);
   });
 
   /**
