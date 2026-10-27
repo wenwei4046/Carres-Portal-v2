@@ -55,7 +55,7 @@ function fakeSb(opts: {
     from(table: string) {
       const rows = opts.rows?.[table] ?? [];
       const c: Record<string, unknown> = {};
-      for (const m of ["select", "eq", "in", "order", "not"]) c[m] = () => c;
+      for (const m of ["select", "eq", "in", "is", "order", "not"]) c[m] = () => c;
       c.then = (res: (v: unknown) => unknown) => res({ data: rows, error: null });
       return c;
     },

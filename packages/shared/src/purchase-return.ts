@@ -272,6 +272,10 @@ export interface PurchaseReturnListRow {
   /** Whether the return document has been sent to the supplier. */
   sent_at: string | null;
   confirmed_pickup_date: string | null;
+  /** 0713 (YH 2026-10-26): a claimless return cancelled before pickup. */
+  cancelled_at?: string | null;
+  cancelled_by_name?: string | null;
+  cancel_reason?: string | null;
   units: PurchaseReturnUnitRow[];
 }
 

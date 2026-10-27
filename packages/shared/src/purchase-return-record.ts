@@ -163,9 +163,13 @@ export interface PurchaseReturnIssueUnit {
 }
 
 export interface PurchaseReturnIssueSource {
-  /** null for a claimless Consignment Return (0706 §2). */
+  /** null = a return with no claim: `New Purchase Return` (Weisiang's decision,
+   *  Mr Lim, WhatsApp 2026-10-22, overturning Jess's "only after an approved
+   *  claim"), or a claimless Consignment Return (0706 §2, `consignment`). */
   claim_id: string | null;
-  /** 0706 §2: the supplier a claimless Consignment Return is issued to. */
+  /** 0706 §2: true when this source is for a claimless Consignment Return. */
+  consignment?: boolean;
+  /** The supplier a claimless return is issued to. */
   supplier_id?: string;
   claim_no: string | null;
   supplier_name: string | null;
@@ -324,7 +328,7 @@ export function purchaseReturnWorkItems(
     workItem({ ruleKey, ref, objectId: pr.id, action, due }, owner, today, holidays);
   const out: PurchaseReturnWorkOccurrence[] = [];
   const pickup = purchaseReturnPickupState(pr);
-  if (pickup === "Fully picked up") return out;
+  if (pickup === "Fully picked up" || pr.cancelled_at) return out;
 
   if (!purchaseReturnSendLine(pr).sent) {
     const docDate = pr.pr_doc_date ? klDate(pr.pr_doc_date) : null;
