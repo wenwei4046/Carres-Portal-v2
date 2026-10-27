@@ -39,6 +39,13 @@ Source task-title examples: Share claim · {n} pc; Ask to confirm the claim resu
 > Purchasing work must read [Purchasing UI dictionary](#purchasing-ui-dictionary) and the exact
 > per-page column lists in Purchasing MASTER §9.1–§9.4; older labels in other modules do not override it.
 
+### Fabrics panel Export / Import — Houzs Fabric Converter (Weisiang's ruling 2026-10-22; BUILT ON BRANCH #2126)
+
+Follows Houzs `frontend/src/pages/scm-v2/FabricTracking.tsx:66-129`. Buttons `Export CSV` · `Import` (principal only) ·
+toggle `{n} retired hidden` / `Showing {n} retired` · success `{n} new, {n} updated. Check the list, then press Save.` ·
+errors `No fabrics to export.` · `Could not read that file. Use a CSV or Excel file.` · `Nothing imported. {reasons}` ·
+stock columns (CSV headers, Houzs `fabric-csv.ts:42-53`) `price_sen` · `soh_sen` · `po_outstanding_sen` · `last_month_usage_sen` · `one_week_usage_sen` · `two_weeks_usage_sen` · `one_month_usage_sen` · `shortage_sen` · `reorder_point_sen` · `lead_time_days` · reasons `Line {n}: {column} "{value}" is not a number.` · reasons `Line {n}: fabric code is blank.` · `Line {n}: {column} "{value}" is not Price 1, 2 or 3.` · `Line {n}: active "{value}" is not yes or no.`
+
 ---
 
 ## Narrow contextual-panel copy — owner17Oct2026 · APPROVED TARGET / NOT BUILT
@@ -1306,6 +1313,24 @@ Purchasing has no Home, module-specific Work, Purchase Demands, New Supplier/New
 Consignment Overview, ~~Consignment Receipts,~~ Report or Settings sidebar destination. **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): a `Purchase Consignment Receive` page in the Showroom drawer, as Houzs has (Houzs frontend/src/components/Sidebar.tsx:552). It is the same Receiving GRN register locked to Consignment Orders; still one receipt engine.** New screen word: `Purchase Consignment Receive` (sidebar row and page header). The capability
 lives in its authority home: Registers, central Work/Reports/Settings, in-context Catalog governance
 or the one Receiving engine. `purchase_demand` remains an authoritative record, not a page.
+
+### Houzs-way purchasing pages — Weisiang's decision 2026-10-22
+
+Weisiang's decision (Mr Lim, Houzs owner side, WhatsApp 2026-10-22, relayed by YH 2026-10-23):
+"I think just clear Carress rules and Implement Houzs inside". Jess was not part of this decision.
+Exact visible words:
+
+| Where | Exact visible words |
+|---|---|
+| Suppliers pages (Operations sidebar) | `Purchase Invoices`, under `Supplier items` |
+| Purchase Invoices columns | `Bill No` · `Bill Date` · `Supplier` · `Supplier Invoice` · `PO` · `Due Date` · `Status` · `Total` · `Paid` · `Unpaid`; status words are Finance's `Draft` · `Confirmed` · `Cancelled` |
+| Purchase Invoices search, empty, failed, door | `Search bill, supplier or PO…` · ~~`No purchase invoice yet. Finance enters each supplier bill.`~~ `No purchase invoice yet. Enter one with New Bill or Bill from GRN.` (Chew 2026-10-23) · `Purchase invoices could not be read. Refresh to try again.` · `Open in Finance` (principal only) |
+| Purchase Invoices doors (Chew, Finance, WhatsApp 2026-10-23, via YH) | `Bill from GRN` · `+ New Bill` (Finance's own word for the same door) |
+| New Purchase Invoice form (0721) | identity `New Purchase Invoice`, back `Purchase Invoices` · cards `Who sent this bill` · `Goods received` · fields `Supplier` (`Choose who sent this bill`) · `Supplier invoice No` · `Bill date` (`The date printed on the supplier's bill.`) · `Due date` (`Bill date + {n} days, from the PO's terms`) · `Note` · button `Add GRN` · columns `GRN` · `Item` · `Qty` (`of {open}`) · `Unit price` · `Amount` · `Remove` · empty `No line yet. Add the GRN this invoice is for. Its lines come across with the PO's price.` · `Total {RM}` · `Saved as a draft bill. Finance confirms it and pays it.` · Save names the first gap (Finance's `Save: …` words, plus `Save: add a GRN`) · saved `Draft bill saved. Finance confirms it.` · the GRN window is Finance's `Convert GRN to bill` window, unchanged |
+| Purchasing bill refusals (0721) | `Only Finance changes a saved bill.` · `Only Finance chooses the payables account.` · `Line {n}: Only Finance chooses an account.` · `Line {n}: Purchasing bills goods received. Add the line from its GRN, or ask Finance to enter this bill.` |
+| Supplier drawer payment terms | `Terms (days)` · `Save` · `0 to 365` · `Saved` · `Not saved. Try again.` |
+| Catalog SKU Master bulk delete | `Delete {n}` · `Working…` · confirm `Delete {n} SKUs? A SKU on orders, purchase orders, stock or bills is kept.` · `Deleted {n} SKUs` · `Deleted {n}. Not deleted: {codes}. {reason}` |
+| SKU delete refusal (0721) | `{SKU} is on orders, purchase orders, stock or bills, so it was not deleted. Turn it off instead.` |
 
 **ADD SUPPLIER — APPROVED / LOCKED, owner ruling 2026-09-04; in-context Catalog door.** Exact
 visible words, top to bottom:

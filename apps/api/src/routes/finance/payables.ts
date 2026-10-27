@@ -26,7 +26,7 @@ import {
 } from "@carres/shared/schemas/finance-ap";
 import { apAgingQuery, apAgingReport, type ApAgingAnswer } from "@carres/shared/ap-aging";
 import { billReadInput, matchSupplier, type BillReadAnswer } from "@carres/shared/bill-reading";
-import { requireFinance } from "../../lib/auth-guards";
+import { requireFinance, requireFinanceOrPurchasing } from "../../lib/auth-guards";
 import { billReaderKey, billReaderModel, readBillWithModel } from "../../lib/finance-bill-reader";
 import { todayIsoMYT } from "../../lib/delivery-order-issue";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
@@ -61,7 +61,10 @@ import type { AppEnv } from "../../types";
  *     GET  /bills/delivery-orders?billId=  fin_bill_delivery_orders (0689) — each logistics partner's
  *                                       delivery orders a bill can still charge for
  *     GET  /bills/:id                   supplier_bill_document
- *     POST /bills                       supplier_bill_save_draft (new draft)
+ *     POST /bills                       supplier_bill_save_draft (new draft). 0721: this,
+ *                                       grn-candidates and grn-lines also admit operation
+ *                                       (Purchasing, Chew 2026-10-23); so do PUT /bills/:id (own
+ *                                       draft) and GET /accounts (YH 2026-10-26)
  *     PUT  /bills/:id                   supplier_bill_save_draft (rewrite a draft)
  *     POST /bills/:id/confirm           supplier_bill_confirm — posts the bill
  *     POST /bills/:id/cancel            supplier_bill_cancel — reverses it if confirmed
@@ -276,7 +279,8 @@ payablesRouter.post("/read-bill", requireFinance, async (c) => {
   return c.json(answer);
 });
 
-payablesRouter.get("/accounts", requireFinance, async (c) => {
+// 2026-10-26 (YH, Houzs): Purchasing picks a no-GRN line's account from this list.
+payablesRouter.get("/accounts", requireFinanceOrPurchasing, async (c) => {
   const { data, error } = await sb(c).rpc("ap_account_choices");
   if (error) return pgFail(c, error);
   return c.json({ rows: data ?? [] });
@@ -396,7 +400,9 @@ payablesRouter.get("/bills", requireFinance, async (c) => {
   return c.json({ rows: kept.rows });
 });
 
-payablesRouter.get("/bills/grn-candidates", requireFinance, async (c) => {
+// 0721 (Chew 2026-10-23): Purchasing enters a bill from goods received through
+// these three doors too. Confirm, cancel and every payment stay requireFinance.
+payablesRouter.get("/bills/grn-candidates", requireFinanceOrPurchasing, async (c) => {
   const f = supplierFilter(c);
   if (!f.ok) return badId(c, "supplier");
   const { data, error } = await sb(c).rpc("supplier_bill_grn_candidates", { p_supplier_id: f.value });
@@ -414,11 +420,16 @@ payablesRouter.get("/bills/grn-candidates", requireFinance, async (c) => {
   return c.json({ rows: rows.map((r) => ({ ...r, po_terms_days: terms.get(r.po_id) ?? null })) });
 });
 
-payablesRouter.get("/bills/grn-lines/:receiptId", requireFinance, async (c) => {
+payablesRouter.get("/bills/grn-lines/:receiptId", requireFinanceOrPurchasing, async (c) => {
   const receiptId = c.req.param("receiptId");
   if (!UUID_RE.test(receiptId)) return badId(c, "goods received note");
   const { data, error } = await sb(c).rpc("supplier_bill_grn_lines", { p_receipt_id: receiptId });
   if (error) return pgFail(c, error);
+  // 0721: Purchasing does not see the channel split (Finance's reading); saving
+  // works each goods line's department out the same way for both.
+  if (c.var.auth.role === "operation") {
+    return c.json({ rows: ((data ?? []) as object[]).map((r) => ({ ...r, channels: [], department_type: null, department_id: null })) });
+  }
   // 0683 (Chew ruling 2): where each GRN line's open quantity goes, from the
   // orders it was bought for. Saving the bill splits it the same way.
   const rows = (data ?? []) as Array<{ po_line_id?: string | null; open_qty?: number | string | null }>;
@@ -479,7 +490,7 @@ payablesRouter.put("/bills/:id/foreign-amount", requireFinance, async (c) => {
   return c.json({ id });
 });
 
-payablesRouter.post("/bills", requireFinance, async (c) => {
+payablesRouter.post("/bills", requireFinanceOrPurchasing, async (c) => {
   const body = await parseJsonBody(c, supplierBillDraftInput);
   if (!body.ok) return c.json(body.body, body.status);
   const { data, error } = await sb(c).rpc("supplier_bill_save_draft", billArgs(null, body.data));
@@ -487,7 +498,8 @@ payablesRouter.post("/bills", requireFinance, async (c) => {
   return c.json({ id: data as string }, 201);
 });
 
-payablesRouter.put("/bills/:id", requireFinance, async (c) => {
+// 2026-10-26 (YH, Houzs): Purchasing changes its OWN draft; the database refuses the rest.
+payablesRouter.put("/bills/:id", requireFinanceOrPurchasing, async (c) => {
   const id = c.req.param("id");
   if (!UUID_RE.test(id)) return badId(c, "bill");
   const body = await parseJsonBody(c, supplierBillDraftInput);

@@ -575,7 +575,7 @@ function BillLinesCard({ doc }: { doc: SupplierBillDocument }) {
 
 // ── form ────────────────────────────────────────────────────────────────────
 
-type LineDraft = {
+export type LineDraft = {
   key: string;
   warehouseReceiptId: string | null;
   poLineId: string | null;
@@ -638,7 +638,7 @@ export function billSaveGap(f: {
   return null;
 }
 
-function toInput(l: LineDraft): SupplierBillDraftInput["lines"][number] {
+export function toInput(l: LineDraft): SupplierBillDraftInput["lines"][number] {
   const q = l.qty.trim() === "" ? null : Number(l.qty);
   const p = l.unitPrice.trim() === "" ? null : Number(l.unitPrice);
   if (l.warehouseReceiptId && l.poLineId) {
@@ -1092,7 +1092,8 @@ function BillLineRow({ line, index, accounts, usualGoods, usualTransport, onChan
 
 /** The GRNs that still have goods to bill. Picking one fills the lines from
  *  the GRN — never re-keyed: open qty, the PO's price, account 5100. */
-function GrnPicker({ open, supplierId, poId, onClose, onPick }: {
+/** 0721: also Purchasing's way to add goods received to a bill. */
+export function GrnPicker({ open, supplierId, poId, onClose, onPick }: {
   open: boolean;
   supplierId: string | null;
   poId: string | null;

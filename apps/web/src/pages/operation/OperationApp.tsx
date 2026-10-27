@@ -78,6 +78,8 @@ import OperationStock from "./OperationStock";
 import OperationAllOrders from "./OperationAllOrders";
 import OperationSuppliers from "./OperationSuppliers";
 import OperationSupplierItems from "./OperationSupplierItems";
+import OperationPurchaseInvoices from "./OperationPurchaseInvoices";
+import OperationPurchaseInvoiceNew, { OperationPurchaseInvoiceEdit } from "./OperationPurchaseInvoiceNew";
 // 2026-05-20 — Phase A · AutoCount integration tabs.
 import OperationImport from "./OperationImport";
 import OperationInbox from "./OperationInbox";
@@ -209,8 +211,12 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
   const isLegacyPurchasingUrl =
     location.pathname === "/operation/purchasing" ||
     location.pathname.startsWith("/operation/purchasing/");
+  /* 0721 (Chew 2026-10-23): Purchasing enters a supplier bill on its own
+     page, Houzs's /purchase-invoices/new and /from-grn. The list stays the
+     `?tab=purchase-invoices` module. */
+  const isPurchaseInvoiceFormUrl = location.pathname.startsWith("/operation/purchase-invoices/");
   const isUrlDriven =
-    isProcurementUrl || isToOrderUrl || isOrdersUrl || isOldOrdersUrl ||
+    isProcurementUrl || isToOrderUrl || isOrdersUrl || isOldOrdersUrl || isPurchaseInvoiceFormUrl ||
     /* Edit Delivery (2026-08-24) is a real route. Its flag joined the
        GlobalTopBar suppression on day one but NOT this gate, so the URL fell
        through to the `?tab=` branch and rendered an empty main pane — found on
@@ -457,6 +463,9 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
             {/* Legacy address (owner ruling 2026-09-28): SO Batch Purchase. */}
             <Route path="purchasing/*" element={<Navigate to="/operation?tab=purchase" replace />} />
             <Route path="procurement" element={<OperationPurchaseOrders />} />
+            <Route path="purchase-invoices/new" element={<OperationPurchaseInvoiceNew />} />
+            <Route path="purchase-invoices/from-grn" element={<OperationPurchaseInvoiceNew fromGrn />} />
+            <Route path="purchase-invoices/:id/edit" element={<OperationPurchaseInvoiceEdit />} />
             <Route
               path="procurement/:slug"
               element={<TabbedProcurementShell />}
@@ -696,6 +705,9 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
                 about parties, this is about items, and the sidebar already
                 gives a module more than one page. */}
             {tab === "supplier-items" && <OperationSupplierItems />}
+            {/* Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): supplier
+                bills, read-only, inside Purchasing (0721). */}
+            {tab === "purchase-invoices" && <OperationPurchaseInvoices />}
             {/* 2026-05-20 — Phase A · AutoCount integration */}
             {tab === "ops-import" && <OperationImport />}
             {tab === "ops-inbox" && <OperationInbox />}

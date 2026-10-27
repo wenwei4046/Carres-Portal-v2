@@ -523,6 +523,8 @@ describe("catalogFabricFromRow (0202)", () => {
       active: true,
       sortOrder: 19,
       cost: null,
+      // 0721 — Houzs stock columns; absent in the row reads as 0.
+      stock: { priceSen: 0, sohSen: 0, poOutstandingSen: 0, lastMonthUsageSen: 0, oneWeekUsageSen: 0, twoWeeksUsageSen: 0, oneMonthUsageSen: 0, shortageSen: 0, reorderPointSen: 0, leadTimeDays: 0 },
     });
   });
 
