@@ -590,6 +590,10 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         tab: "warehouse-outbound",
         section: "Warehouse",
       },
+      // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): the Houzs-way
+      // Warehouses page (Sites · Inventory by item · Racks and Bins · Loading
+      // List · Stock Card). Jess was not part of this decision.
+      { key: "wh-warehouses", label: "Warehouses", icon: Warehouse, tab: "warehouses", section: "Warehouse" },
       /* ⭐ PAYMENTS → Monitor · Payment Records (owner ruling 2026-09-12).
        *
        * `Monitor` is the full-width collection control listing keyed on the

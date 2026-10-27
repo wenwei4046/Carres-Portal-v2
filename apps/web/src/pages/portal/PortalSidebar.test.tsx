@@ -1571,6 +1571,9 @@ describe("PortalSidebar — the Warehouse module's four destinations", () => {
       "Stock Transfer",
       "Stock Take",
       "Outbound",
+      // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): the Houzs-way
+      // Warehouses page joins last. Jess was not part of this decision.
+      "Warehouses",
     ]);
   });
 

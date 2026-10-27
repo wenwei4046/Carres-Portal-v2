@@ -84,9 +84,9 @@ source context; do not silently redirect pickup work to arrivals. Legacy combine
 aliases continue to resolve to the arrival view, now inside Inbound. No new route syntax is approved
 by this documentation amendment; IT adapts the existing routes when separately commissioned.
 
-**Navigation approval boundary:** the regrouping above approves placement only. It does not approve
+**Navigation approval boundary:** the regrouping above approves placement only. ~~It does not approve
 Houzs's five Inventory tabs, new calculations, a different Receiving destination, detailed Inventory
-visuals, backend copying, implementation Cards, application changes or deployment. Inventory's
+visuals, backend copying, implementation Cards, application changes or deployment.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision):** office staff get the Houzs-way Warehouses page with Sites, Inventory by item (Unit counts per item per Site), Racks and Bins, Loading List and Stock Card views (`?tab=warehouses`). Every number is a count of Units from the one register; FIFO cost is left out because Finance owns valuation. Inventory's
 complete visual sample remains subject to review. Existing backend, permission, duty and ownership
 contracts stay intact. The old five-entry runtime and earlier verification records are historical
 implementation evidence, not proof this three-entry target is built.
@@ -143,8 +143,8 @@ promise or Supplier DO never creates a receipt or GRN. Only the Receiving write 
 Goods Received Date, received quantity, condition and physical Site.
 
 Outbound keeps DO/SO, pickup date, product quantity, the Loading entry and separate Required / Loaded /
-Driver confirmed counts visible. The default includes outstanding loading, missing loading evidence
-and outstanding driver confirmation. Warehouse loading does not impersonate driver acceptance.
+Driver confirmed counts visible. ~~The default includes outstanding loading, missing loading evidence
+and outstanding driver confirmation.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision):** the Warehouses page also has a Houzs-way `Loading List`: one line per item per DO with `Qty · Loaded · To load`; a line leaves it once the warehouse has loaded it, without waiting for driver confirmation. Outbound keeps its three counts. Warehouse loading does not impersonate driver acceptance.
 Loading opens the existing exact-Unit work surface full width; product expansion has only product
 and Unit identity details. Dates and actions must be measured inside the actual shell and filter rails.
 
@@ -518,7 +518,7 @@ GRN Duty. The row never stops at `Damaged`, `Not found`, `Wrong position`, `Revi
 
 Wrong-Site comparison uses governed Sites only. It prints `Portal says {Site/holder}` and `Count
 found {actual Site}`, then checks the missing handover, wrong record, unauthorised movement or Count
-error. Carres records no NETS internal position, Zone, Rack or Bin. Product/label mismatch preserves
+error. ~~Carres records no NETS internal position, Zone, Rack or Bin.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision):** Racks and Bins are recorded per Site (0718); a Unit may name its Bin. Zone and position are still not recorded. Product/label mismatch preserves
 the permanent Unit ID, supplier label and physical-product evidence; staff never mint a second ID to
 make the records appear consistent.
 
@@ -1129,8 +1129,8 @@ full observable fact, Unit ID, recorded Site/holder, latest evidence, actual gov
 owner/avatar and action. Examples are `U-1003 was reported damaged at NETS Warehouse` / `Check the
 damage and record the result by Wed, 2 Sep`, and `U-1012 was not found in the Stock Count; Portal
 says NETS Warehouse` / `Look for U-1012 at NETS Warehouse and scan it again by Thu, 3 Sep`.
-Carres does not record a NETS internal Zone, Rack or Bin, so a fabricated location such as
-`Zone A3` is invalid.
+~~Carres does not record a NETS internal Zone, Rack or Bin, so a fabricated location such as
+`Zone A3` is invalid.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision):** a Unit may name a recorded Bin on a Rack at its own Site (0718, `Rack · Bin`); a Bin that was never set up at that Site is refused. Zone stays unrecorded, so `Zone A3` is still invalid.
 
 `Counts & Adjustments` contains scheduled counts, submitted counts, differences, recount,
 investigation, Adjustment request, Stock Adjustment Approver decision, completion and reversal in one control surface.
@@ -1662,9 +1662,9 @@ in the future, changes the operating organisation, people, Sites and permissions
 change the Unit, Receiving, Inventory, Outbound, Count, evidence or Work Engine contracts.
 
 The model never hard-codes NETS. Site, operating party, role, permission, calendar and evidence
-remain separate. Current scope rejects unproven heavy-WMS bin, rack, put-away, pick-wave, forklift
+remain separate. ~~Current scope rejects unproven heavy-WMS bin, rack, put-away, pick-wave, forklift
 and packing-station complexity. Zone, Rack or Bin may extend the same Unit model when measured need
-justifies it.
+justifies it.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision):** Rack and Bin now extend the same Unit model (0718: `warehouse_bins` per Site, `bin_id` on the Unit, a `bin_changed` lineage event); there is no second rack ledger and no quantity stored per Bin. Put-away tasks, pick-waves, forklift and packing stations stay out.
 
 ## 12 · 2990 and mature-ERP capability rulings
 
@@ -1719,8 +1719,8 @@ posting.
 
 **RULING → ADAPT + IMPROVE + REJECT.** Receiving/GRN is the one normal physical receipt door. Every
 governed Unit records `Received`, `Received with issue`, `Rejected/not delivered` or the applicable
-observable receipt result. Warehouse Add Stock, direct import into physical Stock and NETS
-Rack/Bin/Zone placement are rejected; receipt never makes a Unit Ready Stock without eligibility.
+observable receipt result. Warehouse Add Stock, direct import into physical Stock and ~~NETS
+Rack/Bin/Zone placement are rejected;~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision):** an optional Rack/Bin on the Unit is allowed after receipt, outside Receiving; Zone placement stays rejected; receipt never makes a Unit Ready Stock without eligibility.
 
 **RECOMMENDED CARRES BUSINESS FLOW →** PO, Consignment, Return, Transfer or Repair supplies expected
 Units and actual work date; NETS Warehouse opens the linked Receiving Session; the individually
@@ -2311,8 +2311,8 @@ performs both.
 **2990 / MATURE ERP LESSON →** keep governed warehouse/Site master, explicit action permissions,
 structured reasons, source documents and actor history. Mature 3PL control separates organisation,
 person, role, Site, active dates and evidence; API/offline submissions are attributable,
-idempotent and validated. Reject broad warehouse administrator access, Carres maintenance of NETS
-internal Rack/Bin/labour, shared login, direct external overwrite and future-only WMS complexity.
+idempotent and validated. Reject broad warehouse administrator access, ~~Carres maintenance of NETS
+internal Rack/Bin/labour,~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision):** Carres keeps Racks and Bins per Site (0718); NETS labour stays NETS's; shared login, direct external overwrite and future-only WMS complexity.
 
 **RULING → ADAPT + RESTRICT + FUTURE-PROOF + REJECT.** Warehouse has one Settings entry; Team has
 the only duty rota; People has employment/access truth. External people may submit only personally
@@ -2339,8 +2339,8 @@ and evidence; a sent message alone is not proof.
 
 **UI / PAGE / OBJECT PLACEMENT →** one Warehouse Settings surface and links to Team/People; no local
 settings or copied rota. External UI omits full ERP navigation, costs, payments, unrelated Sites and
-staff work. Heavy Zone/Rack/Bin/Wave/Forklift screens remain absent until measured operational need
-supports an extension of the same Unit model.
+staff work. ~~Heavy Zone/Rack/Bin/Wave/Forklift screens remain absent until measured operational need
+supports an extension of the same Unit model.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision):** the Racks and Bins view (colour fill per Bin: empty, holding goods, holding reserved goods) is built on the same Unit model; Zone, Wave and Forklift screens remain absent.
 
 **CROSS-MODULE CONNECTION →** People owns personal/effective access; Staff & Duties owns PO/GRN Duty;
 Warehouse Settings owns Site/calendar/Count/evidence/partner permission; Purchasing owns supplier/
