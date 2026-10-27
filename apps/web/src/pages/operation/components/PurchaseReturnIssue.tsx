@@ -157,7 +157,7 @@ export function IssueForm({ source, onClose, onIssued }: { source: PurchaseRetur
             return <Input key={id} id={`pr-pickup-${id}`} label={u.unit_code} value={pickup[id] ?? u.pickup_location ?? ""}
               onChange={(e) => setPickup((prev) => ({ ...prev, [id]: e.target.value }))} />;
           })}
-          <p className="text-meta text-kit-slate-11">Editing the Pickup Location moves nothing.</p>
+          <p className="text-meta text-kit-slate-11">{claimless ? "Issuing takes these Units out of stock." : "Editing the Pickup Location moves nothing."}</p>
         </div>
       </Block>
       <Block title="Return To">
