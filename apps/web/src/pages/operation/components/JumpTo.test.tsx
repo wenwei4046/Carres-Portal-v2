@@ -162,6 +162,9 @@ describe("what typing searches", () => {
     ).toEqual([
       "Purchase Orders",
       "Purchase Returns",
+      /* Follows Houzs Sidebar.tsx:552 per Weisiang's ruling (2026-10-22):
+         the consignment receive page is a live destination. */
+      "Purchase Consignment Receive",
       /* The Purchasing REPORT page under DATA → Reports (owner 2026-10-08) —
          a real page, so a real destination, named as a report. */
       "Purchasing report",
