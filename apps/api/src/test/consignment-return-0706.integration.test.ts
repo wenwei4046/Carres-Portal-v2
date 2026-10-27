@@ -85,7 +85,7 @@ describe.skipIf(!DB_URL)("Consignment Return numbering (real PostgreSQL, 0706)",
       .replace(/^begin;$/m, "").replace(/^commit;$/m, "");
     await q(migration);
     // The stock-out follow-up (Houzs purchase-consignment-returns.ts:564), applied on top of 0706.
-    await q(readFileSync(new URL("../../../../supabase/migrations/9999_purchase_consignment_stockout.sql", import.meta.url), "utf8"));
+    await q(readFileSync(new URL("../../../../supabase/migrations/0727_purchase_consignment_stockout.sql", import.meta.url), "utf8"));
     await q("set local session_replication_role = replica");
     const email = `it-0706-${RUN}@carres.test`;
     await q("insert into auth.users (id, email) values ($1, $2)", [DUTY, email]);

@@ -1,4 +1,4 @@
--- 9999 (placeholder number; renumbered before merge) · a claimless
+-- 0727 · a claimless
 -- Consignment Return takes its Units out of stock when it is created.
 --
 -- Follows Houzs backend/src/scm/routes/purchase-consignment-returns.ts:564
