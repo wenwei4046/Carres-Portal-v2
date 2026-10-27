@@ -63,6 +63,7 @@ import OperationDeliveryReport from "./OperationDeliveryReport";
 import { DeliveryOrderLinesReport, SalesInvoiceLinesReport, SalesOrderLinesReport } from "./DocumentLinesReport";
 // R2 (0288) — the supplier-claim queue, fourth tab of the Purchasing module.
 import OperationSupplierClaims from "./OperationSupplierClaims";
+import OperationPoChangeRequests from "./OperationPoChangeRequests";
 import OperationPurchaseReturns from "./OperationPurchaseReturns";
 import OperationRepairOrders from "./OperationRepairOrders";
 import OperationPurchasingSettings from "./OperationPurchasingSettings";
@@ -560,6 +561,11 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
                 sends back. Read-only; issuing a return is §7.4's own door and
                 moving the goods is Stock's. */}
             {tab === "purchase-returns" && <OperationPurchaseReturns />}
+            {/* 0717 · PO Amendments and Cancellation Requests — Weisiang's
+                decision (Mr Lim, WhatsApp 2026-10-22; Jess was not part of
+                this decision): PO changes wait for approval, the Houzs way. */}
+            {tab === "po-amendments" && <OperationPoChangeRequests kind="amendment" />}
+            {tab === "po-cancellation-requests" && <OperationPoChangeRequests kind="cancellation" />}
             {tab === "consignment-returns" && <OperationPurchaseReturns consignment />}
             {tab === "repair-orders" && <OperationRepairOrders />}
             {/* P1 — Purchasing → Settings: the numbers the ordering engine

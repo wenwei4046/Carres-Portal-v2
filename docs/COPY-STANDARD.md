@@ -1176,6 +1176,27 @@ Purchasing MASTER §9.6. `Handover`, `Handover proof`, `Units / Qty`, `Return Do
 `Return No` are superseded as labels on this register, not globally retired custody vocabulary.
 Finance is excluded from this UI. Display approval does not rename stored records or APIs.
 
+### PO Amendments and Cancellation Requests — Weisiang (Mr Lim, WhatsApp) 2026-10-22
+
+Weisiang's decision; Jess was not part of it (Purchasing MASTER, migration 0717). Sidebar and
+page words: `PO Amendments` · `Cancellation Requests`. The PO revise form and `Cancel goods not
+received` form submit with `Send for approval`. Status words: `Waiting for approval` (amendment) ·
+`Waiting for PO Duty` · `Waiting for Purchasing Approver` (cancellation levels) · `Approved` ·
+`Rejected`. Columns: `Status` · `PO No` · `Supplier` · `Change` · `Reason` · `Requested by` ·
+`Requested` · `First approval` (cancellations) · `Decided by` · `Decided` · `Decision reason`.
+Row dialog: `Approve` · `Reject` · `Back`; `Decision reason` with hint `Needed to reject.`
+Change text: `{SKU}: Qty {was} to {now}` (`, Deliver To changes`) · `{SKU}: cancel {qty}` ·
+`Whole PO`. Refusals: `You cannot decide your own request.` · `Only PO Duty or its cover gives the
+first approval.` · `The second approval must be another person.` · `This purchase order already
+has a request waiting for approval.` · `Say why this request is rejected.`
+YH (chat, 2026-10-26): the requester's own open request reads `Waiting for another approver`
+(row status, dialog, PO flag). Cancellation columns add `Supplier reply` · `Fee` · `Shipped` ·
+`Evidence` (`{n} file` / `{n} files`); values reuse the cancel form's words. Row column `Actions`
+(`Approve` · `Reject`, opening the row dialog). Dialog link `Open {PO No}`. A PO with a waiting
+request shows the request's status word on the PO list Status cell and the PO page, linked to it.
+Refusal: `Only the Purchasing Approver or another Principal gives this approval.`
+Withdraw (Houzs): dialog button `Withdraw`; status `Withdrawn`; refusal `Only the person who asked, or an approver, can withdraw this request.`
+
 ### New Purchase Return and multi-PO receiving — Weisiang (Mr Lim, WhatsApp) 2026-10-22
 
 Weisiang's decision; Jess was not part of it. New screen words:
