@@ -2030,7 +2030,7 @@ destructive reversal of the original event.
 
 **RULING → ADAPT + IMPROVE + REJECT.** The commercial owner authorises why a Unit returns, leaves
 or is repaired; Stock/Receiving/Outbound prove the actual Unit, holder, condition and handovers.
-Every returned Unit is `Check required`, never automatically Ready Stock. Case/Claim closure does
+~~Every returned Unit is `Check required`, never automatically Ready Stock.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): a Unit taken back by a Delivery Return (Delivery MASTER §7) goes straight back into stock (`free`) at the Site the office chose, the Houzs way. Other returns are unchanged. Migration 0716, NOT APPLIED.** Case/Claim closure does
 not move a Unit; original delivery/handover evidence remains append-only.
 
 **RECOMMENDED CARRES BUSINESS FLOW →** an authorised Customer/failed-Delivery Return creates dated

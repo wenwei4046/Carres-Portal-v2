@@ -53,6 +53,7 @@ import dispatchCustomerLegRouter from "./routes/operation/dispatch-customer-leg"
 import deliveryChainRouter from "./routes/operation/delivery-chain";
 import orderControlRouter from "./routes/operation/order-control";
 import deliveryOrdersRouter from "./routes/operation/delivery-orders";
+import deliveryReturnsRouter from "./routes/operation/delivery-returns";
 // 0379 — Delivery's OWN arrangement doors (owner correction 2026-08-24).
 import deliveryArrangementsRouter from "./routes/operation/delivery-arrangements";
 import paymentApprovalsRouter from "./routes/operation/payment-approvals";
@@ -238,6 +239,8 @@ api.route("/operation/orders", deliveryChainRouter);
 // 0159 P2 control overlay — GET + PUT /:id/control
 api.route("/operation/orders", orderControlRouter);
 api.route("/operation/delivery-orders", deliveryOrdersRouter);
+// 0716 — Weisiang's decision (WhatsApp 2026-10-22): Delivery Returns + Load scan.
+api.route("/operation/delivery-returns", deliveryReturnsRouter);
 api.route("/operation/delivery-arrangements", deliveryArrangementsRouter);
 api.route("/operation/delivery-arrangements", deliveryLinksRouter);
 // 0362 — the Delivery Payment Approval: raise · decide · read (owner ruling 2026-08-19)

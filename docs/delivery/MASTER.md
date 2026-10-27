@@ -663,7 +663,7 @@ reviewer and system review timestamp. Unknown external submission time stays unk
 assignment nor upload identifies the person who physically delivered the goods. The source surface
 (Workspace or Delivery Monitor) is separate from the external submission channel and follows §13.1.
 
-A successful customer delivery requires the signed DO and delivery photo. Ordered services such as
+~~A successful customer delivery requires the signed DO and delivery photo.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): office staff may mark a DO Delivered by Load Scan (scan the DO No or a Unit ID) with no signed DO and no photo, the Houzs way (Houzs `DoLoadScan.tsx`). The signed-DO door stays for when the paper is on hand. BUILT on branch `feat/delivery-returns-and-load-scan`, migration 0716 NOT APPLIED. Stock timing is unchanged: Units still become sold at Delivered.** Ordered services such as
 disposal carry their own service evidence. For a partial delivery, success evidence applies to the
 Units delivered and services actually performed; the remainder keeps its own reason, location and
 next action. A failed trip owes no successful-delivery photo or signed success document; record the
@@ -740,11 +740,11 @@ made is written to the order's history, never hidden.
 
 **Fresh Houzs Delivery Return reconciliation — authenticated read-only, 9 Oct 2026.** Delivery Returns loaded register and `HC-DR-2610-002` full object show original SO/DO, exact goods/configuration, return date, location, received/inspection state and dated activity. The object notes legacy mirroring with no stock movement while presenting received/goods-back wording. Its register couples returns to pending refunds. No inspection, cancellation, refund, edit, stock effect or proof acceptance tested; foreign customer/contact/amounts not copied.
 
-**KEEP source-linked scope, ADAPT evidence gaps, REJECT refund/restock assumptions.** Carres §7 distinguishes failed-delivery return from a customer Service remedy; one return label cannot grant a refund or decide the customer agreement. The normal failed-delivery journey remains actual visit result → exact undelivered goods and evidenced holder → linked planned Inbound → Warehouse actual receipt → Stock inspection/eligibility → authorised rebooking. A legacy mirrored document or Received label alone cannot prove each physical event. Service collection follows §1.2/Service's approved decision; Payment/Finance own any exceptional monetary consequence.
+~~**KEEP source-linked scope, ADAPT evidence gaps, REJECT refund/restock assumptions.**~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): office staff record Delivery Returns the Houzs way (Houzs `DeliveryReturnsListV2.tsx`): a Delivery Returns register and `New Delivery Return` from a delivered DO; the picked Units go straight back into stock at the chosen Site, and the return carries a Refund status (`Pending` · `Refunded` · `Not refunded`) as a status only. Finance still owns the money; no payment or credit note is posted. BUILT on branch `feat/delivery-returns-and-load-scan`, migration 0716 NOT APPLIED. The failed-delivery return below is unchanged.** Carres §7 distinguishes failed-delivery return from a customer Service remedy; one return label cannot grant a refund or decide the customer agreement. The normal failed-delivery journey remains actual visit result → exact undelivered goods and evidenced holder → linked planned Inbound → Warehouse actual receipt → Stock inspection/eligibility → authorised rebooking. A legacy mirrored document or Received label alone cannot prove each physical event. Service collection follows §1.2/Service's approved decision; Payment/Finance own any exceptional monetary consequence.
 
 Recommended acceptance / PROPOSAL where extending source visibility: show original DO/visit and exact Unit or governed quantity scope, reason, reported versus actual return date, return instruction, actual receiver and accepted inspection evidence separately. Preserve old delivery/return documents and source-history limits; no fabricated GRN or restock from a note. Partial return leaves other goods at their last evidenced holder, reserved under the existing source until its owner changes it. Cancellation after actual movement cannot undo custody. Repeated receipt/inspection submission reconciles the recorded event before retry, never adds the same goods twice. Failed reads remain unavailable, not received or inspected by default. Rebooking uses current goods/Payment/independent Finance gates and does not erase the failed attempt.
 
-Reports distinguish failed visits, reported returns, actual receipt, passed inspection, rebooking and separately approved/paid refunds. A zero amount does not close the physical/QC obligation; a financial decision does not prove goods are back. Existing source owners and approval scopes remain unchanged; no new return register, refund workflow, UI composition or production proof adopted. This inspection covers a returned-goods object, not an actual trip/visit/proof review object.
+Reports distinguish failed visits, reported returns, actual receipt, passed inspection, rebooking and separately approved/paid refunds. A zero amount does not close the physical/QC obligation; a financial decision does not prove goods are back. Existing source owners and approval scopes remain unchanged; ~~no new return register, refund workflow, UI composition or production proof adopted.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): the Delivery Returns register and its Refund status are adopted (see above); no refund money workflow and no production proof.** This inspection covers a returned-goods object, not an actual trip/visit/proof review object.
 
 ## 8 · Information architecture: Monitor and Delivery Orders
 
@@ -758,11 +758,11 @@ Delivery Orders    the formal Delivery Order register                    /operat
 Delivery Order     one formal DO, its evidence and history — a door on a number, never navigation
 ```
 
-The sidebar carries the Delivery module with exactly two children, in this order: **Monitor**
-and **Delivery Orders**. Monitor leads and is the collapsed icon's landing. **The Edit Delivery
+~~The sidebar carries the Delivery module with exactly two children, in this order: **Monitor**
+and **Delivery Orders**.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): the Delivery module has four children, in this order: Monitor · Delivery Orders · Delivery Returns · Load Scan.** Monitor leads and is the collapsed icon's landing. **The Edit Delivery
 page is retired (owner ruling 2026-09-13):** every arrangement write lives inside the Monitor
 row's expanded panels (§8.6). There is no Delivery dashboard, Fleet, Trips, Regions, Schedule,
-Exceptions, Partners, Report or Delivery Returns destination; those capabilities live inside the
+Exceptions, Partners or Report destination (~~or Delivery Returns~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): Delivery Returns and Load Scan are destinations**); those capabilities live inside the
 two destinations, the DO object, central Settings and central Reports. Sales contains **Sales
 Orders** and temporary **Old Orders** only. Central Settings retains the governed Delivery
 settings door behind the page-header gear.
