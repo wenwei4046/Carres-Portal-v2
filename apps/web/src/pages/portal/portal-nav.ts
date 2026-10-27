@@ -48,6 +48,7 @@ import {
   Headset,
   ClipboardX,
   Factory,
+  Handshake,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@carres/shared/domain";
@@ -90,6 +91,7 @@ export type PortalBadge = "orders" | "procurement" | "service-notes";
 export type PortalSection =
   | "Workspace"
   | "Sales"
+  | "Consignment"
   | "Purchasing"
   | "Showroom"
   | "Delivery"
@@ -117,6 +119,7 @@ export type PortalSection =
 export const SECTION_ORDER: ReadonlyArray<PortalSection> = [
   "Workspace",
   "Sales",
+  "Consignment",
   "Purchasing",
   "Showroom",
   "Delivery",
@@ -195,6 +198,11 @@ export const PORTAL_MODULES: ReadonlyArray<PortalModule> = [
    * `Subscription` (`Outright Sales` until the 2026-10-08 template). It is a NAVIGATION ruling: no contract, transaction,
    * permission or calculation is merged by the shared parent. */
   { section: "Sales", label: "Sales Orders", icon: ReceiptText, mIcon: "receipt_long" },
+  /* CONSIGNMENT — Houzs placement (Weisiang's ruling, WhatsApp 2026-10-22):
+   * Houzs draws its own `Consignment` group right after `Sales Order`
+   * (Houzs-ERP frontend/src/components/Sidebar.tsx:535-546). Customer side
+   * only here; the supplier-side rows stay under Purchasing. */
+  { section: "Consignment", label: "Consignment", icon: Handshake, mIcon: "handshake" },
   { section: "Purchasing", label: "Purchasing", icon: ShoppingCart, mIcon: "shopping_cart", landingKey: PURCHASING_LANDING_KEY, handleOnly: true },
   { section: "Showroom", label: "Showroom", icon: Store, mIcon: "storefront" },
   /* THE FOUR-PAGE MAP (CARD-2026-09-04-delivery-01): Monitor → Delivery
@@ -525,6 +533,15 @@ export const PORTAL_NAV: PortalNavGroup[] = [
        * was not part of this decision. */
       { key: "delivery-returns", label: "Delivery Returns", icon: Undo2, tab: "delivery-returns", section: "Delivery" },
       { key: "load-scan", label: "Load Scan", icon: PackageCheck, tab: "load-scan", section: "Delivery" },
+      /* 0719 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office staff send
+       * goods to customers on consignment and take unsold goods back, Houzs way.
+       * Overturns Jess's Purchasing MASTER consignment rules and the Consignment
+       * Note ban; Jess was not part of this decision. Customer side only — the
+       * supplier-side Consignment Orders / Returns stay under Purchasing. They
+       * draw in their own Consignment module, the Houzs placement. */
+      { key: "customer-consignment-orders", label: "Customer Consignment Orders", icon: FileText, tab: "customer-consignment-orders", section: "Consignment" },
+      { key: "consignment-notes", label: "Consignment Notes", icon: FileText, tab: "consignment-notes", section: "Consignment" },
+      { key: "customer-consignment-returns", label: "Customer Consignment Returns", icon: Undo2, tab: "customer-consignment-returns", section: "Consignment" },
       /* THE WAREHOUSE MAP IS FIVE DESTINATIONS (owner ruling 2026-09-14):
        * `Arrival Schedule · Pickup Schedule · Inbound · Inventory · Outbound`.
        *
@@ -1015,7 +1032,8 @@ export interface MenuGroup {
 export const OPERATION_MENU_GROUPS: ReadonlyArray<MenuGroup> = [
   { label: "Overview", sections: ["Workspace"] },
   { label: "Sales locations", sections: ["Showroom"] },
-  { label: "Sales", sections: ["Sales"] },
+  /* Consignment follows Sales Order, the Houzs placement (Sidebar.tsx:535). */
+  { label: "Sales", sections: ["Sales", "Consignment"] },
   { label: "Supply chain", sections: ["Purchasing", "Warehouse", "Payments", "Delivery"] },
   { label: "Service", sections: ["Customer Care", "Issue Tracker"] },
   { label: "Data", sections: ["Reports", "Suppliers", "Master Data"] },

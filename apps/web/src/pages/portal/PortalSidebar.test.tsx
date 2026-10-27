@@ -363,6 +363,7 @@ describe("a module is an expandable PARENT ROW, never a heading", () => {
       "module-showroom",
       "group-head-sales",
       "module-sales",
+      "module-consignment",
       "group-head-supply-chain",
       "module-purchasing",
       "module-warehouse",
@@ -1484,6 +1485,22 @@ describe("PortalSidebar — the menu stores no open groups", () => {
  * (`docs/delivery/MASTER.md` §7 still holds them as approved targets); they are
  * simply not NAVIGATION until they are pages.
  */
+/* Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): customer consignment
+ * sits in its own Consignment module right after Sales, the Houzs placement
+ * (Houzs-ERP Sidebar.tsx:535-546). Delivery keeps its two destinations. */
+describe("PortalSidebar — the Consignment module", () => {
+  it("carries the three customer consignment pages, in Houzs order", () => {
+    renderAt("/operation?tab=consignment-notes");
+    expect(screen.getByTestId("nav-module-consignment")).toBeInTheDocument();
+    const rows = Array.from(
+      screen
+        .getByTestId("nav-children-consignment")
+        .querySelectorAll("[data-testid^='nav-child-']"),
+    ).map((el) => el.textContent?.replace("Coming soon", "").trim());
+    expect(rows).toEqual(["Customer Consignment Orders", "Consignment Notes", "Customer Consignment Returns"]);
+  });
+});
+
 describe("PortalSidebar — the Delivery module's two destinations", () => {
   /* THE FOUR-PAGE MAP (CARD-2026-09-04-delivery-01): Monitor → Delivery
    * Orders → Delivery Order → Edit Delivery. The first two are NAVIGATION;

@@ -895,6 +895,7 @@ Useful proven capability:
 
 Capability deliberately rejected or improved:
 
+- blank PO/return/~~consignment~~ creation without a governed source; **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): on the customer side a Consignment Note and a Customer Consignment Return may be created blank (Houzs way, migration 0719). The supplier-side Consignment Order / Consignment Return are unchanged.**
 - blank return/consignment creation without a governed source; the PO part is overturned:
   **OVERTURNED 2026-10-22 by Weisiang (Mr Lim): office staff may open a PO without a source (Houzs way). Jess's earlier rule kept below for history.**
   > Jess's earlier rule: "blank PO/return/consignment creation without a governed source;"
@@ -939,6 +940,8 @@ Primary references: [Dynamics purchase requisitions](https://learn.microsoft.com
 | Display request | Sales negotiates with supplier while Purchasing places/controls order | Requisition should state purpose before external commitment | **IMPROVE** | Sales hands over the negotiated display arrangement; Operation documents the governed purchase, consignment or movement path | Select existing Stock Units where applicable; Sales supplies new goods and agreed terms; resolve missing Catalog facts before formal issue | `Display Requests` Register and internal object; no PDF preview | Showroom/Sales request; Catalog; Manual Purchase or CO; Stock location |
 | Consignment order | Supplier-owned sofas are hard to count; purchased Hooka/Ohana displays are mixed in | Mature ERP keeps supplier ownership on receipt; 2990 has documents but fragmented truth | **ADAPT + IMPROVE** | Approved display/claim swap creates CO; exact Units and supplier ownership are fixed before delivery | Issue CO, send Unit IDs, record promise, receive through the one Receiving engine | `Consignment Orders` Register; source-linked supplier instruction (§9.9) | Display Request; Stock Unit; Goods Receipt; Consignment Return |
 | Consignment return | Removal/swap may be arranged informally | Physical handover, not document issue, changes custody | **IMPROVE** | Approved remove/swap/claim/overdelivery creates return; combined swap shares one Consignment Order PDF (§9.9) | Send standalone return if needed; obtain collection date; scan and prove handover | `Consignment Returns` Register; source-linked return and handover (§9.10) | CO swap, Stock custody, supplier proof; no refund/credit on unsold consignment |
+
+**Customer side — OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): Carres-owned goods also go OUT on consignment, the Houzs way. `Customer Consignment Order` (CCO) records the customer or dealer and the Units; the `Consignment Note` (CSN, from a CCO or blank) is the delivery document that moves the Units into the customer's custody (reserved to the Note number, still Carres-owned); the CCO carries each Unit's price and its own payments, the Houzs way (YH, chat 2026-10-26, per Weisiang's ruling; Houzs consignment-orders.ts:2171-2310): a Unit sold there is marked sold against its CCO line with `Record sold` and the payment is recorded on the CCO, never on a Sales Order; a blank Note carries its own line prices and payments, as Houzs does (consignment-notes.ts:445,465, 1074-1160), so a Unit on it is sold against the Note and paid on the Note; `Customer Consignment Return` (CCR, blank allowed) brings unsold Units back into stock with no refund, because nothing was paid for them. The rows above stay the supplier-side Consignment Order / Return. BUILT on branch `feat/customer-consignment-houzs-way`, migration 0719 NOT APPLIED.**
 
 ---
 
@@ -7138,8 +7141,8 @@ this ruling does not prescribe shared accounts or replace individual actor/proxy
 
 Consignment display applies to Carres' own showrooms only. They may hold supplier-owned display
 goods or purchased Carres-owned goods, with the §7.7 display-only sales boundary unchanged.
-Dealers buy goods from Carres; their showroom locations do not receive consignment under this
-operating model. A Dealer purchase belongs to the Sales/commercial source, never an internal
+~~Dealers buy goods from Carres; their showroom locations do not receive consignment under this
+operating model.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): a dealer or a customer may hold Carres-owned goods on consignment through a Customer Consignment Order and its Consignment Note (§3 customer side). Supplier-owned display goods still stay in Carres showrooms.** A Dealer purchase belongs to the Sales/commercial source, never an internal
 Manual Purchase, Stock Transfer or supplier consignment display placement solely because its
 destination is a showroom. A company having several locations changes destination and access
 scope, not the commercial nature of the transaction. No Dealer credit or new payment/ownership
@@ -7494,8 +7497,8 @@ Workspace. Existing approvals, custody evidence, permissions and supplier-docume
 confirms the supplier-owned goods Carres requests and where they are to be delivered/collected.
 It is an instruction to obtain goods on consignment, not an outright purchase, payable or proof
 of receipt. Keep Consignment Orders and Consignment Returns as distinct, plainly named objects
-and register destinations. Do not rename them collectively Consignment Note or introduce that as
-a third manually created document. Staff still enter the Display Request once; intent and verified
+and register destinations. Do not rename them collectively Consignment Note~~ or introduce that as
+a third manually created document~~. **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): `Consignment Note` now exists as the CUSTOMER-side delivery document (§3 customer side), created from a Customer Consignment Order or blank. It never renames these supplier documents.** Staff still enter the Display Request once; intent and verified
 ownership derive the correct source-linked order and/or return, with existing facts prefilled.
 
 **Source / identity:** source-linked Display Request under §9.8 or authorised Supplier Claim replacement outcome;
@@ -7670,7 +7673,7 @@ scope is approved by this research.
 | 2990 separate supplier-side route/tables; create/edit line/cancel/delete operations | Shared Carres source-owned document/receipt capabilities | REJECT cloned business writers; sharing a PDF does not prove one common transaction engine |
 | 2990 receive/return remaining-quantity guards and downstream edit lock; `purchase-consignment-receives.ts:270–380` | Receiving/Stock exact Units | ADAPT prevent over-receipt/over-return and inspect downstream effects; Carres amendments preserve actual receipt history |
 | 2990 return creation books inventory OUT and cancellation reconciles it back; `purchase-consignment-returns.ts:1–65` | Stock physical handover | REJECT document-status-driven custody changes: Carres needs actual handover, not cancel-to-teleport |
-| 2990 Consignment Note sends goods to customer/showroom, `consignment-notes.ts:1–80`; outward Consignment Order uses sales tables | Delivery/Stock goods movement; supplier-owned display is not sold in Carres | RELOCATE reference meaning; no evidence here that the named note auto-notifies supplier after customer success |
+| 2990 Consignment Note sends goods to customer/showroom, `consignment-notes.ts:1–80`; outward Consignment Order uses sales tables | Delivery/Stock goods movement; supplier-owned display is not sold in Carres | ~~RELOCATE reference meaning~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): KEEP the Houzs meaning on the customer side: Consignment Note sends Carres-owned Units to a customer or dealer (§3 customer side, migration 0719)**; no evidence here that the named note auto-notifies supplier after customer success |
 | Odoo owner dimension and ownership-based stock moves (official consignment documentation) | Stock Unit ownership | KEEP owner separate from Site; documentation search corroborated concept, full page fetch timed out |
 | Oracle returns before/after consumption advice and invoice (official return examples) | Service, Purchasing and Finance | ADAPT need to distinguish unsold return from post-sale customer return; REJECT importing Oracle ownership/accounting policy as Carres law |
 | Dynamics supplier-owned receipt without accounting posting (official consignment process) | Receiving consignment flag and Finance bill guard | KEEP proven separation of receipt and payable; Carres successful-customer-delivery trigger remains its own law |
@@ -7886,8 +7889,8 @@ confirmed/arranged dates from the owning schedules; an unknown date is not inven
 on a calendar. Customer information and selling prices stay out of supplier consignment PDFs.
 **DOCUMENT PURPOSE AND ACKNOWLEDGEMENT — APPROVED TARGET / NOT BUILT; Jess, 2026-09-29.**
 §9.9 owns Consignment Order (obtain supplier-owned goods); §9.10 owns Consignment Return (hand
-goods back). Do not merge their names into Consignment Note or add a third manually created
-acknowledgement. Actual showroom receipt and supplier collection evidence attach to their owning
+goods back). Do not merge their names into Consignment Note ~~or add a third manually created
+acknowledgement~~. **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): the customer-side Consignment Note (§3) is a separate document; supplier acknowledgement stays on the owning actions.** Actual showroom receipt and supplier collection evidence attach to their owning
 actions. One arrangement pre-fills the correct documents; one combined swap PDF can cover the two
 instructions while receipt and handover remain independently evidenced. Detailed shared-kit
 composition still needs design closure; naming approval is not rendered-screen acceptance.
@@ -8185,7 +8188,7 @@ credit and payment remain distinct owning facts. No sale-notice matching interfa
 - Detailed register/copy recommendations and the Finance interface remain the current consolidated
   proposal. Finance's precise matching/posting contract is not proved by the existing ordinary
   bill UI. This is a real boundary to close before claiming complete cross-module readiness.
-- Current non-goals remain: fixed capacity, new Consignment Note, second inventory/task/settlement
+- Current non-goals remain: fixed capacity, ~~new Consignment Note~~ (**OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): the customer-side Consignment Note is built, §3**), second inventory/task/settlement
   ledger, automatic price acceptance, automatic ownership reversal, supplier account rollout,
   external-channel cutover, and production backfill without its own verification/authorisation.
 - A complete owner review of the remaining proposal, authoritative persistence and the outstanding
