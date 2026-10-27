@@ -1519,7 +1519,10 @@ describe("PortalSidebar — the Delivery module's two destinations", () => {
     // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office Delivery
     // Returns and Load Scan join the rail after Delivery Orders. This
     // overturns Jess's "exactly two children"; Jess was not part of it.
-    expect(rows).toEqual(["Monitor", "Delivery Orders", "Delivery Returns", "Load Scan"]);
+        // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): Delivery Planning, DP
+    // Orders, Auto-schedule and Trips join the rail after Delivery Orders. This
+    // overturns Jess's "exactly two children"; Jess was not part of it.
+    expect(rows).toEqual(["Monitor", "Delivery Orders", "Delivery Returns", "Load Scan", "Delivery Planning", "DP Orders", "Auto-schedule", "Trips"]);
   });
 
   it("Monitor opens ?tab=delivery and is the ONLY active row there", () => {
