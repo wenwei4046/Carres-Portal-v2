@@ -18,6 +18,11 @@ describe("newPurchaseOrderBody", () => {
     });
   });
 
+  it("a Consignment Order is the same body, marked consignment (Weisiang 2026-10-22)", () => {
+    expect(newPurchaseOrderBody(draft(), true)).toMatchObject({ consignment: true, lines: [{ sku: "SOFA-1" }, { sku: "BED-1", price: 450.5 }] });
+    expect(newPurchaseOrderBody(draft())).not.toHaveProperty("consignment");
+  });
+
   it("skips an empty line but needs at least one item", () => {
     expect(newPurchaseOrderBody(draft({ lines: [{ key: 1, sku: "SOFA-1", qty: "1", price: "" }, { key: 2, sku: "", qty: "1", price: "" }] }))?.lines).toHaveLength(1);
     expect(newPurchaseOrderBody(draft({ lines: [{ key: 1, sku: "", qty: "1", price: "" }] }))).toBeNull();

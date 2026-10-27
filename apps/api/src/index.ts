@@ -20,6 +20,7 @@ import principalPartnersRouter from "./routes/principal/partners";
 import operationStockRouter from "./routes/operation/stock";
 import operationOrdersFeedRouter from "./routes/operation/orders-feed";
 import operationSuppliersOverviewRouter from "./routes/operation/suppliers-overview";
+import purchaseInvoicesRouter from "./routes/operation/purchase-invoices";
 import operationBadgesRouter from "./routes/operation/badges";
 import registerLayoutsRouter from "./routes/operation/register-layouts";
 import operationDashboardRouter from "./routes/operation/dashboard";
@@ -53,6 +54,7 @@ import dispatchCustomerLegRouter from "./routes/operation/dispatch-customer-leg"
 import deliveryChainRouter from "./routes/operation/delivery-chain";
 import orderControlRouter from "./routes/operation/order-control";
 import deliveryOrdersRouter from "./routes/operation/delivery-orders";
+import deliveryReturnsRouter from "./routes/operation/delivery-returns";
 import deliveryPlanningRouter from "./routes/operation/delivery-planning";
 // 0379 — Delivery's OWN arrangement doors (owner correction 2026-08-24).
 import deliveryArrangementsRouter from "./routes/operation/delivery-arrangements";
@@ -133,6 +135,7 @@ import guaranteesRouter from "./routes/guarantees";
 import dosRouter from "./routes/storage/dos";
 // Phase A step 5 (migration 0137) — per-unit stock register.
 import opsStockRouter from "./routes/ops/stock";
+import customerConsignmentRouter from "./routes/ops/customer-consignment";
 import stockMovesRouter from "./routes/ops/stock-moves";
 import opsStockPlanRouter from "./routes/ops/stock-plan";
 import opsStockEmergencyRouter from "./routes/ops/stock-emergency";
@@ -239,6 +242,8 @@ api.route("/operation/orders", deliveryChainRouter);
 // 0159 P2 control overlay — GET + PUT /:id/control
 api.route("/operation/orders", orderControlRouter);
 api.route("/operation/delivery-orders", deliveryOrdersRouter);
+// 0716 — Weisiang's decision (WhatsApp 2026-10-22): Delivery Returns + Load scan.
+api.route("/operation/delivery-returns", deliveryReturnsRouter);
 // 0723 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): Delivery Planning, DP Orders,
 // Auto-schedule and Trips with time slots, Houzs way. Jess was not part of this decision.
 api.route("/operation/delivery-planning", deliveryPlanningRouter);
@@ -293,6 +298,7 @@ api.route("/operation/stock-alerts", stockAlertsRouter);
 api.route("/operation/stock", operationStockRouter);
 api.route("/operation/orders-feed", operationOrdersFeedRouter);
 api.route("/operation/suppliers-overview", operationSuppliersOverviewRouter);
+api.route("/operation/purchase-invoices", purchaseInvoicesRouter);
 api.route("/operation", thresholdsRouter);
 api.route("/operation/suppliers", operationSuppliersRouter);
 api.route("/operation/warehouse", operationWarehouseRouter);
@@ -350,6 +356,8 @@ api.route("/supplier/threads", supplierThreadsRouter);
 api.route("/warehouse", warehouseReceivingRouter);
 api.route("/storage/dos", dosRouter);
 api.route("/ops/stock", opsStockRouter);
+// 0719 — Weisiang's decision (WhatsApp 2026-10-22): Customer Consignment Order, Consignment Note, Customer Consignment Return.
+api.route("/ops/customer-consignment", customerConsignmentRouter);
 // 0714 — Weisiang's decision (WhatsApp 2026-10-22): Stock Adjustment, Transfer, Take.
 api.route("/ops/stock-moves", stockMovesRouter);
 // K2 (0287) — the monthly ready stock plan. Mounted BELOW /ops/stock so the

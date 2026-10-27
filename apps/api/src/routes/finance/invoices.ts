@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { collectionOutcomeInput } from "@carres/shared/payment-collection-outcome";
-import { storageHold } from "@carres/shared";
+import { salesOrderParamOf, storageHold } from "@carres/shared";
 import { storageSkuCategories } from "../../lib/sku-categories";
 import {
   GUARANTEE_ENTITLEMENTS,
@@ -487,6 +487,95 @@ financeInvoicesRouter.post("/:id/issue", async (c) => {
   return c.json(data);
 });
 
+/* ── New Sales Invoice (office) ────────────────────────────────────────────
+ * Weisiang's decision (Mr Lim, WhatsApp 2026-10-22, relayed by YH
+ * 2026-10-23): office staff open a Sales Invoice by hand from a Sales Order
+ * or a Delivery Order, part invoices included — the Houzs way. Overturns
+ * Jess's payment/MASTER.md rules (no manual Generate invoice; one live Sales
+ * Invoice per order); Jess was not part of this decision.
+ * Follows Houzs frontend/src/pages/scm-v2/SalesInvoiceFromDo.tsx:7-10 (part
+ * invoices by line and qty) per Weisiang's ruling (2026-10-22): clear Carres
+ * rules, implement Houzs.
+ *
+ *   GET  /office-offer/:ref — `ref` is an SO No or a DO No; the order's lines
+ *                             and what is left to invoice (0712), plus the
+ *                             DO's delivery groups when found by a DO.
+ *   POST /office            — { orderId, lines: [{ orderLineId, qty }] }
+ *                             through sales_invoice_office_open, which issues
+ *                             with the ONE numbering and posting authority.
+ */
+const OFFICE_ROLES = ["operation", "finance", "principal"];
+
+financeInvoicesRouter.get("/office-offer/:ref", async (c) => {
+  const auth = c.var.auth;
+  if (!OFFICE_ROLES.includes(auth.role)) {
+    throw new HTTPException(403, { message: "You cannot open invoices." });
+  }
+  const raw = c.req.param("ref").trim();
+  const sb = userClient(c.env, auth.jwt);
+  const so = salesOrderParamOf(raw);
+  let orderId: string | null = null;
+  let deliveryOrder: { do_number: string; groups: string[] | null } | null = null;
+  if (so.kind === "id") orderId = so.id;
+  else if (so.kind === "number") {
+    const { data, error } = await sb.from("orders").select("id").eq("so", so.so).maybeSingle();
+    if (error) {
+      const m = mapPgError(error);
+      return c.json(m.body, m.status);
+    }
+    orderId = (data as { id: string } | null)?.id ?? null;
+  } else if (raw !== "") {
+    const { data, error } = await sb.from("ops_delivery_orders")
+      .select("order_id, do_number, trip_groups")
+      .eq("do_number", raw.toUpperCase()).is("voided_at", null).maybeSingle();
+    if (error) {
+      const m = mapPgError(error);
+      return c.json(m.body, m.status);
+    }
+    const d = data as { order_id: string; do_number: string; trip_groups: string[] | null } | null;
+    if (d) {
+      orderId = d.order_id;
+      deliveryOrder = { do_number: d.do_number, groups: d.trip_groups };
+    }
+  }
+  if (!orderId) {
+    return c.json({ error: "not_found", code: "not_found", message: "No Sales Order or Delivery Order has that number." }, 404);
+  }
+  const { data, error } = await sb.rpc("sales_invoice_office_offer", { p_order_id: orderId });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ ...(data as Record<string, unknown>), delivery_order: deliveryOrder });
+});
+
+financeInvoicesRouter.post("/office", async (c) => {
+  const auth = c.var.auth;
+  if (!OFFICE_ROLES.includes(auth.role)) {
+    throw new HTTPException(403, { message: "You cannot open invoices." });
+  }
+  const body = (await c.req.json().catch(() => null)) as {
+    orderId?: unknown; lines?: Array<{ orderLineId?: unknown; qty?: unknown }>;
+  } | null;
+  const orderId = typeof body?.orderId === "string" ? body.orderId : "";
+  const lines = Array.isArray(body?.lines) ? body.lines : [];
+  if (!UUID_RE.test(orderId) || lines.length === 0
+      || lines.some((l) => typeof l?.orderLineId !== "string" || !Number.isInteger(l?.qty))) {
+    return c.json({ error: "invalid_body", code: "invalid_body", message: "Pick the goods to invoice." }, 422);
+  }
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb.rpc("sales_invoice_office_open", {
+    p_order_id: orderId,
+    p_lines: lines.map((l) => ({ order_line_id: l.orderLineId, qty: l.qty })),
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  const inv = (data as { invoice?: { invoice_no?: string; amount?: number | string } } | null)?.invoice;
+  return c.json({ invoiceNo: inv?.invoice_no ?? null, amount: Number(inv?.amount ?? 0) }, 201);
+});
+
 /** The document read (payment/MASTER.md §4): an issued invoice prints from
  *  its immutable SNAPSHOT — reprint is the same number and the same content,
  *  whatever the order looks like today. A voided invoice keeps its paper and
@@ -834,7 +923,7 @@ financeInvoicesRouter.get("/:id/pdf-data", requireFinance, async (c) => {
 
   const { data: invoice, error: invErr } = await sb
     .from("invoices")
-    .select("id, invoice_no, order_id, amount, tax_amount, issued_at, voided_at")
+    .select("id, invoice_no, order_id, amount, tax_amount, issued_at, voided_at, snapshot")
     .eq("id", id)
     .maybeSingle();
   if (invErr) {
@@ -902,8 +991,10 @@ financeInvoicesRouter.get("/:id/pdf-data", requireFinance, async (c) => {
     const m = mapPgError(lineErr);
     return c.json(m.body, m.status);
   }
+  // 0712: an office (part) invoice prints only the goods it bills.
+  const officeLines = inv.snapshot?.issued_from === "office" && Array.isArray(inv.snapshot.lines) ? inv.snapshot.lines : null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const lineRows = (lines ?? []) as any[];
+  const lineRows = (officeLines ?? lines ?? []) as any[];
 
   // SKU descriptions (separate query — order_lines.sku is text, not FK'd).
   const skus: string[] = lineRows.map((l) => String(l.sku));

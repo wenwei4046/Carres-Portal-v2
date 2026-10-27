@@ -18,6 +18,7 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 const mockPatchMutate = vi.fn();
 const mockUpsertOffer = vi.fn();
 const mockRemoveOffer = vi.fn();
+const mockDeleteSku = vi.fn();
 let mockRole: string | null = "principal";
 let mockOffers: Array<{
   supplierId: string;
@@ -44,6 +45,7 @@ vi.mock("@/lib/queries", () => ({
     isLoading: false,
   }),
   usePatchCatalogSku: () => ({ mutate: mockPatchMutate, isPending: false }),
+  useDeleteCatalogSku: () => ({ mutateAsync: mockDeleteSku, isPending: false }),
 }));
 
 const MODEL_MAT: ProductModelDto = {
@@ -613,5 +615,21 @@ describe("offers strip — per-seat-height sofa offers (0389)", () => {
     const strip = screen.getByTestId("opcost-offers-LUNA-3S");
     expect(strip.textContent).toContain("24″ RM 992.25");
     expect(strip.textContent).toContain("28″ RM 1039.50");
+  });
+});
+
+/* Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): purchasing bulk-deletes
+   SKUs on this door; a SKU in use is refused by the database (0721). */
+describe("bulk delete (Houzs way)", () => {
+  it("deletes the ticked SKUs, one request each", async () => {
+    mockRole = "operation";
+    mockDeleteSku.mockReset().mockResolvedValue({ ok: true });
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(<OperationSkuCostTab catalog={makeCatalog([SKU_COST_SET, SKU_COST_NULL])} />);
+    fireEvent.click(screen.getByLabelText("Select CLOUD-KING"));
+    fireEvent.click(screen.getByLabelText("Select LUNA-3S"));
+    fireEvent.click(screen.getByTestId("opcost-bulk-delete"));
+    await vi.waitFor(() => expect(mockDeleteSku).toHaveBeenCalledTimes(2));
+    expect(mockDeleteSku.mock.calls.map((c) => c[0]).sort()).toEqual(["s1", "s2"]);
   });
 });

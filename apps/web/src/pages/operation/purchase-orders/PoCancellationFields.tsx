@@ -93,6 +93,9 @@ function CancellationEditor({poId,data,refresh,onSaved,onCancel,renderProblem,on
   const signature=JSON.stringify({reason,body});let key=keys.current.get(signature);if(!key){key=crypto.randomUUID();keys.current.set(signature,key);}
   try {
    const result=await record.mutateAsync({reason,cancellation:{...body,key}});
+   /* 0717 · Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was not part of this decision):
+      `complete` is sent for two approvals; it waits in Cancellation Requests. */
+   if(result.request){onSaved();return;}
    setExpectedRequestVersion(result.cancellation.requestVersion);setCaseChoice(requestId);setDecisionReason("");
    if(result.cancellation.state==="effective"||result.cancellation.state==="exception_refused")onSaved();else await refresh();
   }catch(error){setProblem((error as {body?:{message?:string}}).body?.message??"Not confirmed · Try again");}
@@ -128,7 +131,7 @@ function CancellationEditor({poId,data,refresh,onSaved,onCancel,renderProblem,on
   <div className="flex flex-wrap gap-2">
    <Button variant="neutral" onClick={onCancel} disabled={record.isPending}>Back</Button>
    <Button variant="neutral" onClick={()=>void submit("record")} disabled={!ready||sameSaved}>Save</Button>
-   {canDecide?<><Button variant="neutral" onClick={()=>void submit("refuse_exception")} disabled={!ready||!decisionReason.trim()}>Refuse</Button><Button variant="primary" onClick={()=>void submit("approve_exception")} disabled={!ready||!decisionReason.trim()}>Approve</Button></>:<Button variant="primary" onClick={()=>void submit("complete")} disabled={!ready||!canComplete}>Cancel goods not received</Button>}
+   {canDecide?<><Button variant="neutral" onClick={()=>void submit("refuse_exception")} disabled={!ready||!decisionReason.trim()}>Refuse</Button><Button variant="primary" onClick={()=>void submit("approve_exception")} disabled={!ready||!decisionReason.trim()}>Approve</Button></>:<Button variant="primary" onClick={()=>void submit("complete")} disabled={!ready||!canComplete}>Send for approval</Button>}
   </div>
  </div>;
 }

@@ -128,6 +128,13 @@ describe("the rail's `Received with` rows — a record, never a to-do list", () 
     const only = buildGrnRegisterView(FOUND, { cancelled: true }, 0, 50);
     expect(only.pageIds).toEqual(["f4"]);
   });
+
+  it("Consignment goods counts against the other picks, like every rail row", () => {
+    const rows = [row({ id: "c1", consignment: true }), row({ id: "c2", consignment: true, supplierName: "Ohana" }), row({ id: "c3" })];
+    expect(buildGrnRegisterView(rows, {}, 0, 50).facets.consignment).toBe(2);
+    expect(buildGrnRegisterView(rows, { supplier: "Ohana" }, 0, 50).facets.consignment).toBe(1);
+    expect(buildGrnRegisterView(rows, { consignment: true }, 0, 50).pageIds).toEqual(["c1", "c2"]);
+  });
 });
 
 describe("the GRN date ladder — weeks Monday to Sunday, only days that exist", () => {

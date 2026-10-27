@@ -43,6 +43,8 @@ type TestPromise = {
   reason: string | null;
   recorded_at: string;
 };
+/* 0717 · YH 2026-10-26: open PO change requests, by kind. */
+const changeRequests: Array<{ kind: string; id: string; po_id: string; status: string; mine: boolean }> = [];
 const queryData = {
   pos: [
     {
@@ -199,6 +201,8 @@ vi.mock("../PurchasingTabs", () => ({
 }));
 
 vi.mock("@/lib/queries", () => ({
+  usePoChangeRequests: (kind: string) => ({ data: { requests: changeRequests.filter((r) => r.kind === kind) } }),
+  useDecidePoChange: () => ({ mutate: vi.fn(), isPending: false }),
   useCatalog: () => ({ data: undefined, isLoading: false, isError: false }),
   useMonthlyDemandFacts: () => ({ data: { orders: [], toBuyByLine: new Map() }, isLoading: false, isError: false, refetch }),
   useOperationPos: () => ({ data: queryData, isLoading: requiredLoading, isError: false, refetch }),
@@ -313,6 +317,7 @@ function renderPage(path: string | { pathname: string; search?: string; state?: 
 }
 
 beforeEach(() => {
+  changeRequests.splice(0);
   useRealRegisterGrid = false;
   navigate.mockReset();
   supplierDateMutate.mockReset();
@@ -367,6 +372,16 @@ describe("Purchase Orders Register", () => {
       expect(within(dialog).getAllByText(label).length).toBeGreaterThan(0);
     }
     expect(within(dialog).getByRole("button", { name: "Issue PO" })).toBeDisabled();
+  });
+
+  /* Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): a Consignment Order opens blank, with prices, the Houzs way. */
+  it("New Consignment Order opens the same form as a Consignment Order", async () => {
+    useRealRegisterGrid = true;
+    renderPage();
+    fireEvent.click(await screen.findByTestId("po-new-consignment"));
+    const dialog = await screen.findByRole("dialog", { name: "New Consignment Order" });
+    expect(within(dialog).getAllByText("Unit Price (RM)").length).toBeGreaterThan(0);
+    expect(within(dialog).getByRole("button", { name: "Issue consignment order" })).toBeDisabled();
   });
 
   /* ONE ROW MENU — owner ruling 2026-10-05: `View · Print`. */
@@ -1242,7 +1257,7 @@ describe("Purchase Order object", () => {
     fireEvent.change(screen.getByLabelText("Why"), {
       target: { value: "Send this line to Penang" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save PO V3" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send for approval" }));
     expect(reviseMutate).toHaveBeenCalledWith(
       {
         reason: "Send this line to Penang",
@@ -1295,7 +1310,7 @@ describe("Purchase Order object", () => {
     openRevise();
     fireEvent.change(screen.getByLabelText("Qty for MAT-K-001"), { target: { value: "4" } });
     fireEvent.change(screen.getByLabelText("Why"), { target: { value: "Customer quantity changed" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save PO V3" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send for approval" }));
     expect(reviseMutate).toHaveBeenCalledWith(
       {
         reason: "Customer quantity changed",
@@ -1359,6 +1374,15 @@ describe("Purchase Orders Overview", () => {
     expect(row).toHaveTextContent("3 pcs");
     expect(row).toHaveTextContent("28 Aug");
     expect(within(row).getByTestId("po-overview-status-PO-20260828-4827")).toHaveTextContent("Sending not confirmed");
+  });
+  it("a PO waiting for approval says so on the list and the PO, linked to the request (YH 2026-10-26)", () => {
+    changeRequests.push({ kind: "cancellation", id: "r9", po_id: "PO-20260828-4827", status: "first_approved", mine: false });
+    renderPage(OVERVIEW);
+    const flag = within(screen.getByTestId("po-overview-status-PO-20260828-4827")).getByTestId("po-waiting-flag-r9");
+    expect(flag).toHaveTextContent(/^Waiting for Purchasing Approver$/);
+    expect(flag).toHaveAttribute("href", "/operation?tab=po-cancellation-requests&request=r9");
+    fireEvent.click(screen.getByRole("button", { name: /^PO-260828-4827-V2$/ }));
+    expect(within(screen.getByTestId("po-object-waiting")).getByTestId("po-waiting-flag-r9")).toBeInTheDocument();
   });
   it("the PO number still opens the PO", () => {
     renderPage(OVERVIEW);

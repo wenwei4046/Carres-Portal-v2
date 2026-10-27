@@ -63,6 +63,7 @@ import OperationDeliveryReport from "./OperationDeliveryReport";
 import { DeliveryOrderLinesReport, SalesInvoiceLinesReport, SalesOrderLinesReport } from "./DocumentLinesReport";
 // R2 (0288) — the supplier-claim queue, fourth tab of the Purchasing module.
 import OperationSupplierClaims from "./OperationSupplierClaims";
+import OperationPoChangeRequests from "./OperationPoChangeRequests";
 import OperationPurchaseReturns from "./OperationPurchaseReturns";
 import OperationRepairOrders from "./OperationRepairOrders";
 import OperationPurchasingSettings from "./OperationPurchasingSettings";
@@ -77,6 +78,8 @@ import OperationStock from "./OperationStock";
 import OperationAllOrders from "./OperationAllOrders";
 import OperationSuppliers from "./OperationSuppliers";
 import OperationSupplierItems from "./OperationSupplierItems";
+import OperationPurchaseInvoices from "./OperationPurchaseInvoices";
+import OperationPurchaseInvoiceNew, { OperationPurchaseInvoiceEdit } from "./OperationPurchaseInvoiceNew";
 // 2026-05-20 — Phase A · AutoCount integration tabs.
 import OperationImport from "./OperationImport";
 import OperationInbox from "./OperationInbox";
@@ -89,6 +92,9 @@ import OperationOpsReserved from "./OperationOpsReserved";
 import OperationOpsRepair from "./OperationOpsRepair";
 import OperationOpsInventory from "./OperationOpsInventory";
 import WarehouseStockRegister from "./WarehouseStockRegister";
+import { DeliveryReturns, LoadScan } from "./DeliveryReturns";
+import { DeliveryReturnLinesReport } from "./DeliveryReturnLines";
+import { CustomerConsignmentOrders, ConsignmentNotes, CustomerConsignmentReturns } from "./CustomerConsignment";
 import { AutoSchedule, DeliveryPlanning, DpOrders, Trips } from "./DeliveryPlanning";
 import { StockAdjustments, StockTransfers, StockTakes } from "./WarehouseStockMoves";
 import WarehouseWorkspace from "./WarehouseWorkspace";
@@ -96,6 +102,7 @@ import { LEGACY_SCHEDULE_TABS } from "./warehouse-schedule-view";
 import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
 import WarehouseInbound from "./WarehouseInbound";
 import WarehouseOutboundWork from "./WarehouseOutboundWork";
+import WarehousesPage from "./WarehousesPage";
 import WarehouseUnitDetail from "./WarehouseUnitDetail";
 // K2 (0287) — Ready stock, the middle Stock tab K0 reserved.
 import OperationStockPlan from "./OperationStockPlan";
@@ -205,8 +212,12 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
   const isLegacyPurchasingUrl =
     location.pathname === "/operation/purchasing" ||
     location.pathname.startsWith("/operation/purchasing/");
+  /* 0721 (Chew 2026-10-23): Purchasing enters a supplier bill on its own
+     page, Houzs's /purchase-invoices/new and /from-grn. The list stays the
+     `?tab=purchase-invoices` module. */
+  const isPurchaseInvoiceFormUrl = location.pathname.startsWith("/operation/purchase-invoices/");
   const isUrlDriven =
-    isProcurementUrl || isToOrderUrl || isOrdersUrl || isOldOrdersUrl ||
+    isProcurementUrl || isToOrderUrl || isOrdersUrl || isOldOrdersUrl || isPurchaseInvoiceFormUrl ||
     /* Edit Delivery (2026-08-24) is a real route. Its flag joined the
        GlobalTopBar suppression on day one but NOT this gate, so the URL fell
        through to the `?tab=` branch and rendered an empty main pane — found on
@@ -453,6 +464,9 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
             {/* Legacy address (owner ruling 2026-09-28): SO Batch Purchase. */}
             <Route path="purchasing/*" element={<Navigate to="/operation?tab=purchase" replace />} />
             <Route path="procurement" element={<OperationPurchaseOrders />} />
+            <Route path="purchase-invoices/new" element={<OperationPurchaseInvoiceNew />} />
+            <Route path="purchase-invoices/from-grn" element={<OperationPurchaseInvoiceNew fromGrn />} />
+            <Route path="purchase-invoices/:id/edit" element={<OperationPurchaseInvoiceEdit />} />
             <Route
               path="procurement/:slug"
               element={<TabbedProcurementShell />}
@@ -538,12 +552,17 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
                 Purchase Order menu (TabbedProcurementShell at
                 /operation/procurement); this is tab-state driven. */}
             {tab === "receiving" && <OperationReceiving />}
+            {/* Purchase Consignment Receive — follows Houzs frontend/src/App.tsx:945 per
+                Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */}
+            {tab === "consignment-receives" && <OperationReceiving consignmentPage />}
             {/* Central Reports → Receiving & Inbound (2026-09-04 card) —
                 reachable by direct URL, like the Purchasing Report. */}
             {tab === "receiving-report" && <OperationReceivingReport />}
             {/* Central Reports → Delivery (Delivery MASTER §12, CARD 17) —
                 reachable by direct URL, like the Receiving report. */}
             {tab === "delivery-report" && <OperationDeliveryReport />}
+            {/* Follows Houzs DeliveryReturnDetailListing.tsx:32-153 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */}
+            {tab === "delivery-return-lines" && <DeliveryReturnLinesReport />}
             {tab === "sales-order-lines" && <SalesOrderLinesReport />}
             {tab === "delivery-order-lines" && <DeliveryOrderLinesReport />}
             {tab === "sales-invoice-lines" && <SalesInvoiceLinesReport />}
@@ -557,6 +576,11 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
                 sends back. Read-only; issuing a return is §7.4's own door and
                 moving the goods is Stock's. */}
             {tab === "purchase-returns" && <OperationPurchaseReturns />}
+            {/* 0717 · PO Amendments and Cancellation Requests — Weisiang's
+                decision (Mr Lim, WhatsApp 2026-10-22; Jess was not part of
+                this decision): PO changes wait for approval, the Houzs way. */}
+            {tab === "po-amendments" && <OperationPoChangeRequests kind="amendment" />}
+            {tab === "po-cancellation-requests" && <OperationPoChangeRequests kind="cancellation" />}
             {tab === "consignment-returns" && <OperationPurchaseReturns consignment />}
             {tab === "repair-orders" && <OperationRepairOrders />}
             {/* P1 — Purchasing → Settings: the numbers the ordering engine
@@ -570,6 +594,12 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
             {/* T11 — Delivery: the 3-pane module (queues · calendar · detail).
                 Read-only by design; every write stays behind the order drawer. */}
             {tab === "delivery" && <OperationDelivery />}
+            {/* 0716 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office staff
+                record Delivery Returns and mark DOs Delivered by load scan, the Houzs
+                way. Overturns Jess's Delivery MASTER §6.1/§7/§8; Jess was not part of
+                this decision. */}
+            {tab === "delivery-returns" && <DeliveryReturns />}
+            {tab === "load-scan" && <LoadScan />}
             {/* 0723 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office staff plan
                 delivery dates and trips with a time slot per stop, the Houzs way.
                 Overturns Jess's Delivery MASTER §8/§14.3/§15; Jess was not part of
@@ -642,6 +672,13 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
             {/* CARD-2026-08-20-stock-register: the Stock Register replaces the
                 On hand surface. Same `?tab=` address, new page. */}
             {tab === "stock-onhand" && <WarehouseStockRegister />}
+            {/* 0719 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): goods go out to
+                customers on consignment and unsold goods come back, Houzs way. Overturns
+                Jess's Purchasing MASTER consignment rules and the Consignment Note ban;
+                Jess was not part of this decision. */}
+            {tab === "customer-consignment-orders" && <CustomerConsignmentOrders />}
+            {tab === "consignment-notes" && <ConsignmentNotes />}
+            {tab === "customer-consignment-returns" && <CustomerConsignmentReturns />}
             {tab === "showroom" && <WarehouseStockRegister showroom />}
             {/* 0714 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office staff
                 adjust, transfer and count stock the Houzs way. Overturns Jess's Stock
@@ -660,6 +697,10 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
             )}
             {tab === "warehouse-inbound" && <WarehouseInbound />}
             {tab === "warehouse-outbound" && <WarehouseOutboundWork />}
+            {/* Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): the Houzs-way
+                Warehouses page — Sites, Inventory by item, Racks and Bins,
+                Loading List and Stock Card. Jess was not part of this decision. */}
+            {tab === "warehouses" && <WarehousesPage />}
             {/* Non-PO inbound source object. Inbound owns the register; this
                 hidden destination owns creating and reviewing one source. */}
             {tab === "arrival-source" && <ArrivalSourceWorkspace />}
@@ -673,6 +714,9 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
                 about parties, this is about items, and the sidebar already
                 gives a module more than one page. */}
             {tab === "supplier-items" && <OperationSupplierItems />}
+            {/* Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): supplier
+                bills, read-only, inside Purchasing (0721). */}
+            {tab === "purchase-invoices" && <OperationPurchaseInvoices />}
             {/* 2026-05-20 — Phase A · AutoCount integration */}
             {tab === "ops-import" && <OperationImport />}
             {tab === "ops-inbox" && <OperationInbox />}

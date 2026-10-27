@@ -373,6 +373,7 @@ export {
   // 0202 — global fabric master schemas + input/Dto types.
   fabricTierValueSchema,
   catalogFabricSchema,
+  FABRIC_STOCK_KEYS,
   catalogFabricEntryInput,
   catalogFabricsBatchSaveInput,
   catalogFabricCostInput,
@@ -565,6 +566,8 @@ export {
   ListOperationOrdersQuery,
   listPurchaseOrdersQuery,
   cancelPoInput,
+  decidePoChangeInput,
+  withdrawPoChangeInput,
   listMovementsQuery,
   confirmProceedRequestInputSchema,
   reselectPartnerInput,
@@ -3471,3 +3474,14 @@ export * from "./courier-dispatch";
 export { purchaseRequestReleaseSchema, type PurchaseRequestRelease } from "./purchase-request-context";
 
 export * from "./po-send-evidence";
+
+// Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): Houzs-way Stock Card and
+// Loading List, counted from Units. Jess was not part of this decision.
+export {
+  stockCardLines,
+  loadingListRows,
+  type StockCardUnit,
+  type StockCardEvent,
+  type StockCardLine,
+  type LoadingListRow,
+} from "./warehouse-houzs-views";
