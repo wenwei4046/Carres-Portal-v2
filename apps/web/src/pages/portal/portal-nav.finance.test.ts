@@ -141,6 +141,7 @@ describe("the Finance modules (Chew, 2026-10-03)", () => {
       "operation:purchasing-report",
       "operation:receiving-report",
       "operation:delivery-report",
+      "operation:delivery-return-lines",
       "operation:sales-order-lines",
       "operation:delivery-order-lines",
       "operation:sales-invoice-lines",

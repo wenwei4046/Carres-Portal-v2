@@ -57,7 +57,10 @@ type PurchasingPage =
   | "manual-purchase"
   | "forecast-purchase"
   | "purchase-orders"
+  | "po-amendments"
+  | "po-cancellation-requests"
   | "receiving"
+  | "consignment-receives"
   | "claims"
   | "purchase-returns"
   | "consignment-returns"
@@ -87,7 +90,13 @@ const PAGE_WORD: Record<PurchasingPage, string> = {
   /* The weekly stock suggestion (owner 13 Oct 2026). The SIDEBAR's own word. */
   "forecast-purchase": "Forecast Purchase",
   "purchase-orders": "Purchase Orders",
+  /* 0717 · Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was not
+     part of this decision). The SIDEBAR's own words. */
+  "po-amendments": "PO Amendments",
+  "po-cancellation-requests": "Cancellation Requests",
   receiving: "Receiving",
+  /* The SIDEBAR's own word. Houzs Sidebar.tsx:552 (Weisiang 2026-10-22). */
+  "consignment-receives": "Purchase Consignment Receive",
   claims: "Supplier Claims",
   /* §9.6, owner-confirmed 2026-09-18. The SIDEBAR's own word, not a new one. */
   "purchase-returns": "Purchase Returns",
@@ -114,8 +123,14 @@ export default function PurchasingTabs({ right }: { right?: ReactNode } = {}) {
       ? "manual-purchase"
       : tabParam === "forecast-purchase"
       ? "forecast-purchase"
+      : tabParam === "po-amendments"
+      ? "po-amendments"
+      : tabParam === "po-cancellation-requests"
+      ? "po-cancellation-requests"
       : tabParam === "receiving"
       ? "receiving"
+      : tabParam === "consignment-receives"
+      ? "consignment-receives"
       : tabParam === "claims"
         ? "claims"
       : tabParam === "purchase-returns"

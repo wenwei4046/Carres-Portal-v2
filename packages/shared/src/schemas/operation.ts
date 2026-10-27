@@ -229,6 +229,10 @@ export const newPurchaseOrderInput = z.object({
   etaDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   procurementPartnerId: z.string().uuid().nullable().optional(),
   note: z.string().trim().max(500).optional(),
+  /** Consignment Order (supplier-owned goods) — Weisiang's decision, Mr Lim,
+   *  WhatsApp 2026-10-22: the same blank form, issued through
+   *  `purchasing_issue_consignment_order` (0720), which marks it consignment. */
+  consignment: z.boolean().optional(),
   lines: z.array(z.object({
     sku: z.string().trim().min(1),
     qty: z.number().int().min(1).max(10000),
@@ -878,6 +882,17 @@ export const cancelPoInput = z.object({
   }).strict().optional(),
 }).strict();
 export type CancelPoInput = z.infer<typeof cancelPoInput>;
+
+/** 0717 — a decision on a PO change request (PO Amendments / Cancellation
+ *  Requests). Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was not
+ *  part of this decision). A rejection's reason is required in SQL. */
+export const decidePoChangeInput = z.object({
+  approve: z.boolean(),
+  note: z.string().trim().max(500).optional(),
+}).strict();
+export type DecidePoChangeInput = z.infer<typeof decidePoChangeInput>;
+/** 0717 — withdraw an open PO change request (the Houzs withdraw); reason optional. */
+export const withdrawPoChangeInput = z.object({ note: z.string().trim().max(500).optional() }).strict();
 
 /**
  * `reservedDrilldownQuery` — GET /api/operation/warehouse/reserved-drilldown

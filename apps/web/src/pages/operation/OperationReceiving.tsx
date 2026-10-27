@@ -118,7 +118,15 @@ export function sameSupplierPick(picked: readonly operationPoListRow[], po: oper
   return picked.every((p) => p.supplier_id === po.supplier_id);
 }
 
-export default function OperationReceiving() {
+/**
+ * `consignmentPage` — the Purchase Consignment Receive page (Showroom drawer): the SAME
+ * GRN register and receipt engine, locked to receipts of Consignment Orders.
+ * Follows Houzs frontend/src/components/Sidebar.tsx:552 and
+ * frontend/src/pages/scm-v2/PurchaseConsignmentReceives.tsx:1-16 (its own
+ * Purchase Consignment Receive list) per Weisiang's ruling (2026-10-22): clear
+ * Carres rules, implement Houzs.
+ */
+export default function OperationReceiving({ consignmentPage = false }: { consignmentPage?: boolean } = {}) {
   const [params, setParams] = useSearchParams();
   const view = params.get("view") === "differences" ? "differences" : "records";
   const sessionId = params.get("session");
@@ -146,6 +154,10 @@ export default function OperationReceiving() {
   const fromSel = params.get("from");
   const toSel = params.get("to");
   const cancelledSel = params.get("cancelled") === "1";
+  /** `Consignment goods` — the Consignment Receive entry, Houzs way: the same
+   *  Receiving, narrowed to Consignment Orders (Weisiang's decision, Mr Lim,
+   *  WhatsApp 2026-10-22; Jess was not part of it). */
+  const consignmentSel = consignmentPage || params.get("consignment") === "1";
   const [search, setSearch] = useState("");
   const [offset, setOffset] = useState(0);
   const [presentation, setPresentation] = useState("table");
@@ -171,6 +183,7 @@ export default function OperationReceiving() {
     fromSel,
     toSel,
     cancelledSel ? "1" : "",
+    consignmentSel ? "c" : "",
     search,
   ].join("|");
   useEffect(() => {
@@ -189,6 +202,7 @@ export default function OperationReceiving() {
     from: fromSel,
     to: toSel,
     cancelled: cancelledSel,
+    consignment: consignmentSel,
     q: search,
   };
   const registerQ = useOperationGrnRegister(registerFilters);
@@ -255,7 +269,7 @@ export default function OperationReceiving() {
     setParams(next, { replace: true });
   }
 
-  const RAIL_KEYS = ["category", "supplier", "site", "received", "from", "to", "cancelled"];
+  const RAIL_KEYS = ["category", "supplier", "site", "received", "from", "to", "cancelled", "consignment"];
   function clearRail() {
     const next = new URLSearchParams(params);
     for (const key of RAIL_KEYS) next.delete(key);
@@ -680,7 +694,8 @@ export default function OperationReceiving() {
     siteSel !== null ||
     receivedSel !== null ||
     dateChosen ||
-    cancelledSel;
+    cancelledSel ||
+    (consignmentSel && !consignmentPage);
 
   /**
    * ⭐ THE ACTIVE CONDITIONS LIVE IN THE TOOLBAR — owner correction 2026-09-18.
@@ -750,6 +765,9 @@ export default function OperationReceiving() {
             onClear: () => setFacet("cancelled", null),
           },
         ]
+      : []),
+    ...(consignmentSel && !consignmentPage
+      ? [{ key: "consignment", label: "Consignment goods", onClear: () => setFacet("consignment", null) }]
       : []),
   ];
 
@@ -1048,6 +1066,10 @@ export default function OperationReceiving() {
                     {view === "records" && <div className="border-t border-kit-slate-5 py-2">
                       <FilterRailRow label="Cancelled GRNs" count={facets.cancelled} active={cancelledSel}
                         onClick={() => setFacet("cancelled", cancelledSel ? null : "1")} testId="rail-cancelled" />
+                    </div>}
+                    {!consignmentPage && <div className="border-t border-kit-slate-5 py-2">
+                      <FilterRailRow label="Consignment goods" count={facets.consignment ?? 0} active={consignmentSel}
+                        onClick={() => setFacet("consignment", consignmentSel ? null : "1")} testId="rail-consignment" />
                     </div>}
                   </div>
                 </CPopover>

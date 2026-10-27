@@ -121,13 +121,17 @@ the Service lane, not guessed by Delivery.
 
 ## 2 · Current Carres operating model
 
+- **Carres also runs its own lorries (YH, 2026-10-23: "Carres has its own lorries").** They are the
+  Logistics company `Carres Lorries` (`delivery_partners.own_fleet`, migration 0724), assigned like any
+  other company; its Drivers and Vehicles in Settings feed Fleet Day, Live Map, Lorry Capacity and
+  Crew Leave (§15.3). Weisiang's decision (Mr Lim, WhatsApp 2026-10-22); Jess was not part of it.
 - **NETS Logistics is Klang Valley's current default and main Logistics.** Default
   coverage is configurable and audited, never hard-coded; other partners remain selectable, and
   partner coverage informs the operator but never hides or disables a partner.
 - Assigning a Klang Valley delivery pre-selects NETS. NETS is responsible immediately and does not
   click Accept. NETS remains responsible until it records `Cannot Deliver` with a reason and
   evidence.
-- NETS contacts the customer and arranges the delivery date and time. Operation may record those
+- ~~NETS contacts the customer and arranges the delivery date and time.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): office staff may plan a delivery date for a Logistics company's delivery (Delivery Planning, DP Orders, Auto-schedule); it is written as the planned date only, the company may still change it, and the date the company agrees wins. Carres also delivers with its own lorries; for an own-lorry delivery the office's date is the delivery date. An own lorry is the own-fleet Logistics company `Carres Lorries` (YH 2026-10-23, same model as 0724), with the lorry in `vehicle`; an arrangement with no company is not assigned yet, never an own lorry. BUILT on branch `feat/delivery-planning-houzs-way`, migration 0723 NOT APPLIED.** Operation may record those
   facts on NETS' behalf; every such record says `Recorded by {person} on behalf of NETS`.
 - Operation decides what follows a `Cannot Deliver`: keep NETS with a new date, correct the
   information, hold or cancel the arrangement, or `Change logistics`.
@@ -663,7 +667,7 @@ reviewer and system review timestamp. Unknown external submission time stays unk
 assignment nor upload identifies the person who physically delivered the goods. The source surface
 (Workspace or Delivery Monitor) is separate from the external submission channel and follows §13.1.
 
-A successful customer delivery requires the signed DO and delivery photo. Ordered services such as
+~~A successful customer delivery requires the signed DO and delivery photo.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): office staff may mark a DO Delivered by Load Scan (scan the DO No or a Unit ID) with no signed DO and no photo, the Houzs way (Houzs `DoLoadScan.tsx`). The signed-DO door stays for when the paper is on hand. BUILT on branch `feat/delivery-returns-and-load-scan`, migration 0716 NOT APPLIED. Stock timing is unchanged: Units still become sold at Delivered.** Ordered services such as
 disposal carry their own service evidence. For a partial delivery, success evidence applies to the
 Units delivered and services actually performed; the remainder keeps its own reason, location and
 next action. A failed trip owes no successful-delivery photo or signed success document; record the
@@ -740,11 +744,11 @@ made is written to the order's history, never hidden.
 
 **Fresh Houzs Delivery Return reconciliation — authenticated read-only, 9 Oct 2026.** Delivery Returns loaded register and `HC-DR-2610-002` full object show original SO/DO, exact goods/configuration, return date, location, received/inspection state and dated activity. The object notes legacy mirroring with no stock movement while presenting received/goods-back wording. Its register couples returns to pending refunds. No inspection, cancellation, refund, edit, stock effect or proof acceptance tested; foreign customer/contact/amounts not copied.
 
-**KEEP source-linked scope, ADAPT evidence gaps, REJECT refund/restock assumptions.** Carres §7 distinguishes failed-delivery return from a customer Service remedy; one return label cannot grant a refund or decide the customer agreement. The normal failed-delivery journey remains actual visit result → exact undelivered goods and evidenced holder → linked planned Inbound → Warehouse actual receipt → Stock inspection/eligibility → authorised rebooking. A legacy mirrored document or Received label alone cannot prove each physical event. Service collection follows §1.2/Service's approved decision; Payment/Finance own any exceptional monetary consequence.
+~~**KEEP source-linked scope, ADAPT evidence gaps, REJECT refund/restock assumptions.**~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): office staff record Delivery Returns the Houzs way (Houzs `DeliveryReturnsListV2.tsx`): a Delivery Returns register and `New Delivery Return` from a delivered DO; the picked Units go straight back into stock at the chosen Site, and the return carries a Refund status (`Pending` · `Refunded` · `Not refunded`) as a status only. Finance still owns the money; no payment or credit note is posted. BUILT on branch `feat/delivery-returns-and-load-scan`, migration 0716 NOT APPLIED. The failed-delivery return below is unchanged.** Carres §7 distinguishes failed-delivery return from a customer Service remedy; one return label cannot grant a refund or decide the customer agreement. The normal failed-delivery journey remains actual visit result → exact undelivered goods and evidenced holder → linked planned Inbound → Warehouse actual receipt → Stock inspection/eligibility → authorised rebooking. A legacy mirrored document or Received label alone cannot prove each physical event. Service collection follows §1.2/Service's approved decision; Payment/Finance own any exceptional monetary consequence.
 
 Recommended acceptance / PROPOSAL where extending source visibility: show original DO/visit and exact Unit or governed quantity scope, reason, reported versus actual return date, return instruction, actual receiver and accepted inspection evidence separately. Preserve old delivery/return documents and source-history limits; no fabricated GRN or restock from a note. Partial return leaves other goods at their last evidenced holder, reserved under the existing source until its owner changes it. Cancellation after actual movement cannot undo custody. Repeated receipt/inspection submission reconciles the recorded event before retry, never adds the same goods twice. Failed reads remain unavailable, not received or inspected by default. Rebooking uses current goods/Payment/independent Finance gates and does not erase the failed attempt.
 
-Reports distinguish failed visits, reported returns, actual receipt, passed inspection, rebooking and separately approved/paid refunds. A zero amount does not close the physical/QC obligation; a financial decision does not prove goods are back. Existing source owners and approval scopes remain unchanged; no new return register, refund workflow, UI composition or production proof adopted. This inspection covers a returned-goods object, not an actual trip/visit/proof review object.
+Reports distinguish failed visits, reported returns, actual receipt, passed inspection, rebooking and separately approved/paid refunds. A zero amount does not close the physical/QC obligation; a financial decision does not prove goods are back. Existing source owners and approval scopes remain unchanged; ~~no new return register, refund workflow, UI composition or production proof adopted.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): the Delivery Returns register and its Refund status are adopted (see above); no refund money workflow and no production proof.** This inspection covers a returned-goods object, not an actual trip/visit/proof review object.
 
 ## 8 · Information architecture: Monitor and Delivery Orders
 
@@ -758,11 +762,11 @@ Delivery Orders    the formal Delivery Order register                    /operat
 Delivery Order     one formal DO, its evidence and history — a door on a number, never navigation
 ```
 
-The sidebar carries the Delivery module with exactly two children, in this order: **Monitor**
-and **Delivery Orders**. Monitor leads and is the collapsed icon's landing. **The Edit Delivery
+~~The sidebar carries the Delivery module with exactly two children, in this order: **Monitor**
+and **Delivery Orders**.~~ **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): the Delivery module's children are, in this order: Monitor · Delivery Orders · Delivery Returns · Load Scan (migration 0716) · Delivery Planning · DP Orders · Auto-schedule · Trips (Houzs `DeliveryPlanning.tsx`, `DpOrders.tsx`, `AutoSchedule.tsx`, `Trips.tsx`). Delivery Planning holds the editable Regions list (state → region, deliveries a day) and the Residence rules (one note per building type). BUILT on branch `feat/delivery-planning-houzs-way`, migration 0723 NOT APPLIED.** Monitor leads and is the collapsed icon's landing. **The Edit Delivery
 page is retired (owner ruling 2026-09-13):** every arrangement write lives inside the Monitor
-row's expanded panels (§8.6). There is no Delivery dashboard, Fleet, Trips, Regions, Schedule,
-Exceptions, Partners, Report or Delivery Returns destination; those capabilities live inside the
+row's expanded panels (§8.6). There is no Delivery dashboard, ~~Fleet, Trips, Regions, Schedule,~~
+Exceptions, Partners or Report destination (**OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): Delivery Returns, Load Scan, Trips, Regions (inside Delivery Planning) and the schedule pages Delivery Planning, DP Orders and Auto-schedule are destinations; Fleet Day, Live Map, Lorry Capacity and Crew Leave (Carres' own lorries, §15.3, migration 0724) are destinations too, and (0725, the same decision) `Fleet`, `Fleet Health`, `Delivery Zones` and `Rate Cards` (§15.3).**); those capabilities live inside the
 two destinations, the DO object, central Settings and central Reports. Sales contains **Sales
 Orders** and temporary **Old Orders** only. Central Settings retains the governed Delivery
 settings door behind the page-header gear.
@@ -1858,7 +1862,9 @@ arrangement. A routine ETA change is Activity unless it creates a real breach.
 Central Delivery Settings is one `Delivery` group in the Settings Workspace, behind the
 page-header gear, on the Warehouse Settings grammar: readable rows, one `Save changes` per page,
 `Not configured` for any value nobody has recorded, actor, time, old value, new value and
-effective date on every change. It contains no roster, no owner list and no duty calculation.
+effective date on every change. ~~It contains no roster, no owner list and no duty calculation.~~
+OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): the own-fleet company's Drivers carry a role (`Driver` · `Helper`) and are the crew list
+Fleet Day proposes from; Crew Leave records their absence. Still no owner list and no duty calculation.
 
 | Section | Rows |
 |---|---|
@@ -1925,7 +1931,8 @@ Workspace owns current qualified assignment, lunch, leave, checks and monthly PO
 four Settings sections above. Sites owns transit-point identity; Staff & Duties owns staff
 assignment; Payment owns its clock and money rule. Delivery consumes those facts. Logistics
 customer contact is fixed under §5.2. Required proof cannot be disabled (§6.1). Driver and vehicle
-templates supply known trip facts, not live lorry tracking. Company schedules feed §5.3's backward
+templates supply known trip facts, ~~not live lorry tracking~~ (OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): an own-fleet lorry's
+position is recorded by a tracker or driver app and shown on Live Map, §15.3). Company schedules feed §5.3's backward
 calculation; assignment timing follows §2.1, separately from contact and booking deadlines.
 The carried-forward owner ruling permits an optional morning, afternoon, any-time or specifically
 agreed window. An empty period is not an explicit any-time agreement. No precise appointment is
@@ -1946,7 +1953,7 @@ does not rewrite an existing agreement. Until a range has been configured and ac
 never convert a period name into clock times. No initial clock boundaries are approved by this
 ruling; the hardcoded source examples above are not defaults to adopt.
 
-A date-only booking remains valid. Empty means no period recorded, not explicit any-time consent.
+A date-only booking remains valid. **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): on a Trip every stop has a time slot, the Houzs way (Houzs `Trips.tsx`): the Trips page flags a stop with `No time slot`, `Fill time slots` gives each one a slot, and a stop cannot be saved without one. A booking that is not on a trip may still be date-only. BUILT on branch `feat/delivery-planning-houzs-way`, migration 0723 NOT APPLIED.** Empty means no period recorded, not explicit any-time consent.
 Explicit any-time agreement still respects site access and working hours. ETA remains a separate
 estimate; an evidenced breach of the actual agreed range follows §5.2's Operation-owned customer
 exception. Customer messages, Monitor, Work and reporting consume that delivery's recorded
@@ -2228,7 +2235,7 @@ partner and date grouping is a derived schedule.
 
 **NOT CURRENT OPERATING TRUTH:** customer self-scheduling, Carres central customer scheduling,
 automatic partner allocation, routine multi-partner Klang Valley operation, route optimisation,
-formal lorry or dispatch run, loading manifest, ordered stops or per-trip cost. The model is
+~~formal lorry or dispatch run,~~ loading manifest, ~~ordered stops or per-trip cost~~. **OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): a Trip (one day + one own lorry or Logistics company, ordered stops, a time slot per stop) and Auto-schedule (dates proposed by region and deliveries a day, written when staff confirm) are current. The trip rides the existing arrangement row (`planned_date`, `stop_seq`, `time_slot`); no second trip model. BUILT on branch `feat/delivery-planning-houzs-way`, migration 0723 NOT APPLIED. For Carres' own lorries a lorry run (one lorry, one day), its ordered stops and its revenue per trip are current operating truth too (§15.3, migration 0724).** The model is
 partner-neutral, so Carres can later assign any partner and enable customer confirmation, Portal
 or API without replacing the DO, history or proof model. A first-class dispatch run is admitted
 only when a real vehicle-level fact exists.
@@ -2259,13 +2266,14 @@ only when a real vehicle-level fact exists.
 | Alert · Attention · Checklist · Due · Next Action · Priority, as Monitor columns | none; the three checks live in their columns |
 
 **OVERTURNED 2026-10-22 by Weisiang (Mr Lim): office staff may open a Delivery Order from SO lines (Houzs way). Jess's earlier rule kept below for history.** `New DO` leaves this list; `New Delivery Order` is the register's door.
-> Jess's earlier text: **Intentional rejects:** a New DO, Issue, Release or Approve control; a new payment exception
-door; a Delivery dashboard, Fleet, Trips, Regions, Schedule, Exceptions, Partners, Report or
-Delivery Returns destination; a copy of an arrangement; route optimisation, dispatch runs or
-loading manifests; customer self-scheduling; a second quantity, stock, duty, calendar or owner
+**Intentional rejects:** a ~~New DO,~~ Issue, Release or Approve control; a new payment exception
+door; a Delivery dashboard, ~~Fleet, Trips, Regions, Schedule,~~ Exceptions, Partners, Report or
+Delivery Returns destination; a copy of an arrangement; route optimisation, ~~dispatch runs~~ or
+loading manifests (**OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): Trips, Regions, Delivery Planning, DP Orders and Auto-schedule are built; the four own-fleet pages of §15.3 are admitted; a Trip is the dispatch run.**); customer self-scheduling; a second quantity, stock, duty, calendar or owner
 truth; `Waiting for customer reply` inferred from silence; a Loan on every order; relative dates;
 emoji, ticks, checkmarks, warning marks or progress icons inside a status fact; a generic attention
-label; a checklist column; a Delivery-local roster; an Operations Superuser fallback owner; a fake
+label; a checklist column; ~~a Delivery-local roster~~ (OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): own-fleet crew per lorry per
+day is kept, §15.3); an Operations Superuser fallback owner; a fake
 tab strip on the DO object; a separate Edit Delivery page.
 
 ### 15.1 · Approved-target gaps and measured implementation limits
@@ -2330,13 +2338,13 @@ built. The remaining recommendation on the structured company-cost reference is 
 | Receive and review evidence | Driver sends signed DO and goods/service photos; Operation uploads them to ERP and reviews them separately | Result, submission, upload and acceptance are different facts. Missing required proof stays open; service completion is not inferred from goods delivery |
 | Recover and finish | Resolve failed/remaining goods, agreed redelivery and actual returns; Warehouse receipt starts Check required | Same Unit chain. Service/Claims/Commercial owns remedies; Rental reads accepted customer receipt for its service-start witness. Outstanding services, proof and recovery work stay open at day end |
 
-**Fresh Houzs transportation comparison — read-only, 9 Oct 2026.** The Transportation hub exposes planning, DP Orders, date/time arrangement, Last Mile, capacity, crew leave and maintenance. Delivery Date Arrangement describes postcode-based date proposals and date-only writes before lorry/time scheduling; its loaded view separates pending/date-arranged populations and warns search covers loaded rows. Last Mile describes time-arranged trips, map, crew proposals and per-lorry/day packing sheets in reverse stop order. The map loaded day-order coverage separately while trip/packing sections showed no scheduled trips; main row loading at inspection was not a verified empty order population. No selection/apply/date change/crew proposal/dispatch/print/send/save was performed; no actual delivery-result/proof workflow or capacity algorithm was verified. Foreign regional rules, fleet facts and costs are not adopted.
+**Fresh Houzs transportation comparison — read-only, 9 Oct 2026.** The Transportation hub exposes planning, DP Orders, date/time arrangement, Last Mile, capacity, crew leave and maintenance. Delivery Date Arrangement describes postcode-based date proposals and date-only writes before lorry/time scheduling; its loaded view separates pending/date-arranged populations and warns search covers loaded rows. Last Mile describes time-arranged trips, map, crew proposals and per-lorry/day packing sheets in reverse stop order. The map loaded day-order coverage separately while trip/packing sections showed no scheduled trips; main row loading at inspection was not a verified empty order population. No selection/apply/date change/crew proposal/dispatch/print/send/save was performed; no actual delivery-result/proof workflow or capacity algorithm was verified. ~~Foreign regional rules, fleet facts and costs are not adopted.~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): Houzs' postcode Delivery Zones, per-lorry Fleet Health dates and per-company Rate Cards are adopted (§15.3, migration 0725). A zone never sets or agrees a customer's delivery date.
 
-**Recommendation / KEEP + ADAPT + REJECT:** adapt progressive scheduling visibility, source-linked trip/packing scope and explicit map/list population explanations only where useful. Keep Carres §5's requested versus agreed scheduled date, optional agreed time/window and separate ETA; date-only booking remains valid. Reject mandatory time arrangement for every Carres order, geography-only customer agreement, own-fleet/headcount assumptions, automatic crew authority, and map/packing output as delivery evidence. External Logistics still owns routine customer scheduling; Workspace/People supplies eligibility/cover, Warehouse owns exact physical preparation/handover, and Delivery owns trip/attempt/proof. A reference planning module never gains Stock, customer-promise, money or permission writers.
+**Recommendation / KEEP + ADAPT + REJECT:** adapt progressive scheduling visibility, source-linked trip/packing scope and explicit map/list population explanations only where useful. Keep Carres §5's requested versus agreed scheduled date, optional agreed time/window and separate ETA; date-only booking remains valid. Reject ~~mandatory time arrangement for every Carres order, geography-only customer agreement, own-fleet/headcount assumptions, automatic crew authority,~~ (**OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): a time slot for every stop on a Trip, dates proposed by region alone (Auto-schedule) and own lorries are adopted; YH 2026-10-23: Carres has its own lorries as well as Logistics companies. BUILT on branch `feat/delivery-planning-houzs-way`, migration 0723 NOT APPLIED.** Carres runs its own lorries; Fleet Day proposes the crew per lorry per day automatically (last crew, then the lorry's template driver, then the first free person; never anyone on leave or already on a lorry) and staff confirm or change it (§15.3).), and map/packing output as delivery evidence. External Logistics still owns routine customer scheduling; Workspace/People supplies eligibility/cover, Warehouse owns exact physical preparation/handover, and Delivery owns trip/attempt/proof. A reference planning module never gains Stock, customer-promise, money or permission writers.
 
 **Recommended remaining scheduling contract — PROPOSAL where new:** any schedule/capacity suggestion identifies the delivery scope, calendar, site/customer access, actual confirmed agreement, applicable configuration version and input completeness. A suggestion is neither customer consent nor booking saved; the owning arrangement write must retain actual agreement and audit before other consumers treat it as scheduled. When a source changes or a save fails, preserve attempted input, re-read current facts and show the outstanding action. A map may include requested/planned orders while a trip list contains confirmed trips; state those populations rather than assert disagreement from unequal counts. No map implies live tracking without independently evidenced tracking data.
 
-Any packing/run-sheet is a snapshot of the owning trip/DO and goods scope, not a second goods allocation, release or completion record. Changes/rebooking retain document lineage and the current versus superseded scope. Loading sequence must respect actual goods/site handling rules; reverse stop order is a reference suggestion, not adopted Carres law. Missing fleet/crew/volume data stays unknown, not zero capacity or automatic approval. Fleet/capacity planning remains conditional to an actual commissioned Carres operating need; do not invent a Warehouse daily capacity or silently extend a deadline.
+Any packing/run-sheet is a snapshot of the owning trip/DO and goods scope, not a second goods allocation, release or completion record. Changes/rebooking retain document lineage and the current versus superseded scope. Loading sequence must respect actual goods/site handling rules; reverse stop order is a reference suggestion, not adopted Carres law. Missing fleet/crew/volume data stays unknown, not zero capacity or automatic approval. ~~Fleet/capacity planning remains conditional to an actual commissioned Carres operating need;~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): Lorry Capacity is built for Carres' own lorries (§15.3). Do not invent a Warehouse daily capacity or silently extend a deadline.
 
 **Acceptance evidence owed:** date-only and appointment-required paths; optional effective period versus ETA; suggestion without customer agreement; failed/concurrent arrangement update; source-qualified crew/site access; differing map/order/trip coverage; trip amendment after packing snapshot; partial handover; RM0 with independent hold; actual full/partial/failed visit and event-bound proof review. Consumer dates, Tasks and Payment must read the owning saved facts and effective calendars. These requirements do not assert observed reference or current Carres backend behavior. Carres §3–§7 guards and §15.2 normal journey remain controlling; no UI composition, fleet rollout or build authorised.
 
@@ -2387,16 +2395,21 @@ was not decisive evidence. Current Carres source supplied the concrete reuse/gap
 
 **COMPANY-COST AUTOMATION SCOPE — OWNER-APPROVED / LOCKED 2026-09-30.** Retain the approved
 service capability and evidenced actual-company-cost workflow under Payment §9 and Delivery §11.2.
-A new structured rate/automatic company-cost calculation model is outside this convergence mission
+~~A new structured rate/automatic company-cost calculation model is outside this convergence mission
 and belongs to separate planning. Delivery does not infer rate bases, regions, price versions or
-quote exceptions from the current free-text company-charge lines. Staff continues to record and
+quote exceptions from the current free-text company-charge lines.~~ OVERTURNED 2026-10-22 by
+Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): each Logistics company (Carres
+Lorries included) has Rate Cards per Delivery Zone — per item or per delivery order, 1st / 2nd /
+each further unit and a minimum — and the DO page shows the computed `Rate card cost` (§15.3).
+The free-text company-charge lines are still not parsed. Staff continues to record and
 check actual logistics cost and its evidence. This keeps normal delivery moving without introducing
 an unapproved pricing model; revisit the separate costing mission if measured volume or repeated
 pricing disputes justify it. Actual service evidence and authorised customer billing remain in
 scope under their existing owners. This ruling defers automation, not cost recording.
 
-The other intentional exclusions in §15 remain: no lorry tracking, route optimisation, dispatch
-runs, customer self-scheduling, second roster/stock/payment truth or external rollout. Default
+The other intentional exclusions in §15 remain: ~~no lorry tracking,~~ (OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): own-fleet
+lorry positions are recorded and shown, §15.3) route optimisation, ~~dispatch runs,~~ (OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp; Jess was not part of this decision): own-fleet
+lorry runs, §15.3) customer self-scheduling, second roster/stock/payment truth or external rollout. Default
 morning/afternoon clock values remain unconfigured until evidenced setup; that is not approval to
 copy code examples. New screen wording must pass the existing COPY governance before build.
 
@@ -2419,6 +2432,68 @@ Reuse the existing kit and source writers. Implementation, tests and delivery ev
 below as they occur; takeover is not proof of completion.
 
 
+
+### 15.3 · Carres' own lorries — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22) · BUILT ON BRANCH `feat/fleet-crew-gps-capacity`, 0724 not applied
+
+Weisiang ruled "just clear Carress rules and Implement Houzs inside" (relayed by YH 2026-10-23); Jess
+was not part of this decision. YH 2026-10-23: "Carres has its own lorries"; it also delivers through
+Logistics companies (§2). Built the Houzs way (Houzs `FleetDay`, `FleetRunSheet`, `LiveMap`,
+`LorryCapacity`, `CrewLeave`):
+
+- **Carres Lorries** is a Logistics company with `own_fleet = true`. Its Vehicles (`partner_fleet`) are
+  the lorries; its Drivers (`partner_drivers`, now with `role` Driver · Helper) are the crew. Delivery
+  dates are assigned to it like any other company; the Vehicle text on the arrangement picks the lorry.
+- **Fleet Day** — per day, one row per lorry: stops, revenue, and a proposed Driver and Helper (last
+  crew of that lorry, then its template driver, then the first free person; never anyone on leave or
+  already on a lorry). Staff confirm or change it (`fleet_confirm_crew`, Operation only).
+- **Run sheet** — one printable sheet per lorry per day: crew, ordered stops, address, phone, time,
+  order revenue and a Signed column (`/print/run-sheet`).
+- **Live Map** — each lorry's last position with an Open map link. Positions are posted to
+  `POST /api/operation/fleet/positions` (tracker or driver app). No GPS vendor is connected yet.
+- **Lorry Capacity** — per month and lorry: Mon–Sat working days, trips (lorry-days with stops),
+  utilisation, stops per trip, revenue and revenue per trip.
+- **Crew Leave** — crew, from, to, reason; Fleet Day never proposes or accepts someone on leave.
+
+Not built: a GPS vendor feed, repair days, more than one trip per lorry per day, time slots and
+auto-scheduling (left to the trips and master-list work).
+
+**0725 · Fleet, Fleet Health, Delivery Zones, Rate Cards — same decision · BUILT ON BRANCH
+`feat/fleet-zones-rates-health`, 0725 not applied.** Houzs `Fleet`, `FleetHealth`, `DeliveryZones`,
+`DeliveryRateCards`:
+
+- **Fleet** — Carres Lorries' lorries (plate, capacity, type, Active · Inactive) and crew (name,
+  Driver · Helper, phone, Active · Inactive): add, edit, deactivate. The same rows and doors as Settings
+  → Logistics → Carres Lorries → Vehicles and Drivers; every other Logistics company keeps its own
+  lists there, and coverage still never hides a company.
+- **Fleet Health** — per lorry: PUSPAKOM, road tax, insurance and service due dates. `Overdue` once the
+  day has passed, `Due soon` within 30 days. Operation saves (`fleet_save_lorry_health`).
+- **Delivery Zones** — a named zone and its postcode ranges (`47` = 47000–47999, `46-47`,
+  `58200-58299`, `58200`); seeded with Houzs' 13-zone Malaysian map; the narrowest range wins. `Which
+  zone is this postcode?` answers the zone and the post town from the address list. A zone is a
+  postcode bucket for cost; 0723's Regions (state → region) stay the bucket for dates.
+- **Rate Cards** — per Logistics company per zone, or `Every other zone`: per item or per delivery
+  order, 1st, 2nd, each further unit and a minimum. The DO page's `Rate card cost` prices the DO's
+  goods for its zone. Staff still record and check the actual logistics cost (Payment §9).
+- Zones and Rate Cards are Delivery settings: written by the people named for Delivery settings, every
+  change in the settings history.
+
+- **Houzs charge rules on a card (2026-10-26, Weisiang's ruling 2026-10-22: clear Carres rules,
+  implement Houzs)** — `Per` is `Item` / `Set` / `Delivery order` / `Customer` / `Trip` (Houzs basis ×
+  aggregation); a `Cap` with `Each over cap`; `Sofa bands`; `Outstation` (zone or town → surcharge, the
+  highest that applies, once); `Service` / `Pickup` / `Disposal` rate × count; then `Minimum`, `Charge
+  cap` and `Rounding` (never over the cap). Maths in `packages/shared/src/fleet.ts` `deliveryCharge`,
+  following Houzs `backend/src/scm/lib/delivery-rate-card.ts:292-437`. A `Calculator` under the cards
+  prices any delivery (Houzs `/compute`).
+- **A delivery order is priced alone** (Houzs per-DO tally `threepl-do-charge.ts:1-26`): one drop, one
+  customer, `Item` leaves sofas out, `Set` = max(bed frames, mattresses) + sofas; sofa compartments are
+  not read from the goods (sofa bands price in the Calculator); Houzs' per-trip outstation fee is not
+  charged per DO.
+- **Reconciliation** (Rate Cards → `Reconciliation`) — each live DO on a live Logistics bill (0689):
+  `Billed` vs `Rate card cost`, `Difference`, `Match` / `Mismatch` / `No rate card`. Read by operation
+  (Houzs `scm.transportation.drivers`) and Finance readers (`delivery_rate_reconcile`).
+
+Not built (0725): Houzs' per-trip outstation fee (Houzs leaves it out of the per-DO tally); cost on
+Fleet Day trips.
 
 ## 16 · Production closure
 

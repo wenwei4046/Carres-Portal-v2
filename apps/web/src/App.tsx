@@ -24,6 +24,7 @@ import BDApp from "@/pages/bd/BDApp";
 import HrApp from "@/pages/hr/HrApp";
 import PickupEventPrintPage from "@/pages/print/PickupEventPrintPage";
 import ServiceNotePrintPage from "@/pages/print/ServiceNotePrintPage";
+import FleetRunSheetPrintPage from "@/pages/print/FleetRunSheetPrintPage";
 import { PayCancelled, PaySuccess } from "@/pages/pay/PayResult";
 
 /* `/ui` — UI-KIT's third body (card D0.5a). LAZY on purpose: it is a kit
@@ -224,6 +225,15 @@ export default function App() {
           element={
             <RequireAuth>
               <PickupEventPrintPage />
+            </RequireAuth>
+          }
+        />
+        {/* 0724 — a Carres lorry's run sheet (Weisiang's decision 2026-10-22, Houzs FleetRunSheet). */}
+        <Route
+          path="/print/run-sheet"
+          element={
+            <RequireAuth>
+              <FleetRunSheetPrintPage />
             </RequireAuth>
           }
         />

@@ -10,6 +10,8 @@ import {
   parsePoWindowKey,
   assignPickupPartnerInput,
   cancelPoInput,
+  decidePoChangeInput,
+  withdrawPoChangeInput,
   chasePoEventInput,
   listPurchaseOrdersQuery,
   normalizeSkuKey,
@@ -1844,8 +1846,42 @@ operationPosRouter.get("/:id/print-data", requireOperation, async (c) => {
     return c.json(m.body, m.status);
   }
 
-  return c.json({ ...(doc as Record<string, unknown>), ...(await poPaperFacts(sb, poId, doc as PoDocumentDates)) });
+  return c.json({
+    ...(doc as Record<string, unknown>),
+    ...(await poPaperFacts(sb, poId, doc as PoDocumentDates)),
+  });
 });
+
+/**
+ * A CONSIGNMENT ORDER PRINTS ITS PRICES — Weisiang's decision (Mr Lim, WhatsApp
+ * 2026-10-22): the Houzs Purchase Consignment Order carries prices, so the
+ * Carres supplier paper does too. Overturns Jess's "the supplier PDF is
+ * price-free" (docs/purchasing/MASTER.md §9.9); Jess was not part of this
+ * decision. An ordinary PO stays money-free: this adds nothing to it.
+ * Follows Houzs frontend/src/vendor/scm/lib/purchase-order-pdf.ts:585 (the line
+ * Amount prints on the order PDF) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+ *
+ * Added beside the document, never over it: `consignment` and the Unit Price
+ * per SKU. A SKU whose lines carry two different prices prints none rather
+ * than the wrong one.
+ */
+async function consignmentPaperFacts(
+  sb: ReturnType<typeof userClient>,
+  poId: string,
+  isConsignment: boolean,
+): Promise<{ consignment?: true; line_prices?: Record<string, number | null> }> {
+  if (!isConsignment) return {};
+  const { data: lines } = await sb.from("purchase_order_lines").select("sku, cost").eq("po_id", poId);
+  const prices: Record<string, number | null> = {};
+  const mixed = new Set<string>();
+  for (const l of (lines ?? []) as Array<{ sku: string; cost: number | string | null }>) {
+    const cost = l.cost == null ? null : Number(l.cost);
+    if (!(l.sku in prices)) prices[l.sku] = cost;
+    else if (prices[l.sku] !== cost) mixed.add(l.sku);
+  }
+  for (const sku of mixed) prices[sku] = null;
+  return { consignment: true, line_prices: prices };
+}
 
 type PoDocumentDates = { issue_date?: string | null; eta_date?: string | null };
 
@@ -1869,10 +1905,11 @@ async function poPaperFacts(
   sb: ReturnType<typeof userClient>,
   poId: string,
   doc: PoDocumentDates,
-): Promise<{ delivery_working_days: number | null; delivery_method: "we_collect" | "supplier_delivers" | null }> {
-  const { data: po } = await sb.from("purchase_orders").select("supplier_id").eq("id", poId).maybeSingle();
+): Promise<{ delivery_working_days: number | null; delivery_method: "we_collect" | "supplier_delivers" | null; consignment?: true; line_prices?: Record<string, number | null> }> {
+  const { data: po } = await sb.from("purchase_orders").select("supplier_id, is_consignment").eq("id", poId).maybeSingle();
   const supplierId = (po as { supplier_id: string | null } | null)?.supplier_id ?? null;
-  if (!supplierId) return { delivery_working_days: null, delivery_method: null };
+  const consignment = await consignmentPaperFacts(sb, poId, Boolean((po as { is_consignment?: boolean } | null)?.is_consignment));
+  if (!supplierId) return { delivery_working_days: null, delivery_method: null, ...consignment };
   const [supplier, week] = await Promise.all([
     sb.from("suppliers").select("kind").eq("id", supplierId).maybeSingle(),
     sb.from("purchasing_supplier_settings").select("off_days").eq("supplier_id", supplierId).maybeSingle(),
@@ -1886,6 +1923,7 @@ async function poPaperFacts(
   return {
     delivery_working_days: days,
     delivery_method: supplier.error || !supplier.data ? null : kind === "factory_pickup" ? "we_collect" : "supplier_delivers",
+    ...consignment,
   };
 }
 
@@ -2066,7 +2104,10 @@ operationPosRouter.post("/new", requireOperation, async (c) => {
     ?? null;
   const catalogCost = new Map(((cat.data ?? []) as Array<{ sku: string; cost: number | null }>).map((r) => [r.sku, r.cost == null ? null : Number(r.cost)]));
 
-  const { data, error } = await sb.rpc("purchasing_issue_pos_batch", {
+  // A Consignment Order (Weisiang's decision, Mr Lim, WhatsApp 2026-10-22) goes
+  // through 0720's door, which calls the same authority and marks the order
+  // consignment in the same transaction — no second engine.
+  const { data, error } = await sb.rpc(input.consignment ? "purchasing_issue_consignment_order" : "purchasing_issue_pos_batch", {
     p_pos: [{
       supplier_id: input.supplierId,
       warehouse_id: warehouseId,
@@ -2428,20 +2469,99 @@ operationPosRouter.get("/:id/cancellations/:eventId/evidence", cancellationReadG
 });
 
 // ----- POST /:id/cancel -----
+// Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was not part of this
+// decision): the act that cancels (`complete`, or a whole-PO cancel) is SENT
+// FOR APPROVAL — PO Duty, then the Purchasing Approver — and the existing
+// engine runs on the second approval (0717). Supplier facts and the exception
+// decision stay direct.
 operationPosRouter.post("/:id/cancel", requireOperation, async (c) => {
   const parsed = await parseJsonBody(c, cancelPoInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("operation_cancel_po", {
-    p_po_id: c.req.param("id"),
-    p_reason: parsed.data.reason,
-    ...(parsed.data.cancellation ? {p_cancellation:parsed.data.cancellation} : {}),
-  });
+  const cancellation = parsed.data.cancellation;
+  const queued = !cancellation || cancellation.action === "complete";
+  const { data, error } = queued
+    ? await sb.rpc("purchasing_request_po_change", {
+        p_kind: "cancellation",
+        p_po_id: c.req.param("id"),
+        p_reason: parsed.data.reason,
+        p_payload: cancellation ?? {},
+      })
+    : await sb.rpc("purchasing_record_po_cancellation", {
+        p_po_id: c.req.param("id"),
+        p_reason: parsed.data.reason,
+        p_cancellation: cancellation,
+      });
   if (error) {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
-  return c.json(parsed.data.cancellation ? { cancellation: data } : { po: data });
+  return c.json(queued ? { request: data } : { cancellation: data });
+});
+
+// ----- PO change requests (0717) -----
+// The PO Amendments register and the Cancellation Requests queue, the Houzs
+// way — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was not part of
+// this decision). Rows are read under RLS; every decision goes through
+// `purchasing_decide_po_change`, which checks who may decide and runs the
+// existing revise / cancel engine on the final approval.
+operationPosRouter.get("/change-requests", requireOperation, async (c) => {
+  const kind = c.req.query("kind");
+  if (kind !== "amendment" && kind !== "cancellation") return c.json({ message: "kind must be amendment or cancellation" }, 422);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("po_change_requests")
+    .select("id, po_id, reason, summary, payload, status, requested_by, requested_at, first_approved_by, first_approved_at, decided_by, decided_at, decision_note, purchase_orders(suppliers(name))")
+    .eq("kind", kind)
+    .order("requested_at", { ascending: false })
+    .limit(500);
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  const rows = (data ?? []) as unknown as Array<Record<string, unknown> & { payload?: unknown; purchase_orders?: { suppliers?: { name?: string } | null } | null }>;
+  const names = await resolveActorNames(sb, rows.flatMap((r) => [r.requested_by, r.first_approved_by, r.decided_by] as Array<string | null>));
+  const name = (id: unknown) => (typeof id === "string" ? names.get(id) ?? null : null);
+  return c.json({
+    // YH, chat 2026-10-26: approvers see the request in full (the supplier
+    // facts a cancellation carries), and the requester sees it is theirs.
+    requests: rows.map(({ purchase_orders, payload, ...r }) => ({
+      ...r,
+      mine: r.requested_by === c.var.auth.id,
+      supplier_facts: (payload as { supplierFacts?: unknown } | null)?.supplierFacts ?? null,
+      supplier_name: purchase_orders?.suppliers?.name ?? null,
+      requested_by_name: name(r.requested_by),
+      first_approved_by_name: name(r.first_approved_by),
+      decided_by_name: name(r.decided_by),
+    })),
+  });
+});
+
+operationPosRouter.post("/change-requests/:requestId/decide", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, decidePoChangeInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("purchasing_decide_po_change", {
+    p_id: c.req.param("requestId"),
+    p_approve: parsed.data.approve,
+    p_note: parsed.data.note ?? null,
+  });
+  if (error) return mapSupplierCallError(c, error);
+  return c.json({ request: data });
+});
+
+// Follows Houzs backend/src/scm/routes/po-amendments.ts:699-727 and
+// backend/src/scm/shared/document-cancel.ts:269-277 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+// The Houzs withdraw: the requester, or anyone who could decide it, pulls an
+// open request back (`purchasing_withdraw_po_change` checks who).
+operationPosRouter.post("/change-requests/:requestId/withdraw", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, withdrawPoChangeInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("purchasing_withdraw_po_change", {
+    p_id: c.req.param("requestId"),
+    p_note: parsed.data.note ?? null,
+  });
+  if (error) return mapSupplierCallError(c, error);
+  return c.json({ request: data });
 });
 
 // ----- POST /:id/assign-pickup-partner -----
@@ -2884,10 +3004,14 @@ operationPosRouter.post("/:id/revise", requireOperation, async (c) => {
   const parsed = await parseJsonBody(c, revisePoInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("purchasing_revise_po", {
+  // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was not part of
+  // this decision): a PO change is SENT FOR APPROVAL; the Purchasing Approver's
+  // approval runs `purchasing_revise_po` with exactly these lines (0717).
+  const { data, error } = await sb.rpc("purchasing_request_po_change", {
+    p_kind: "amendment",
     p_po_id: c.req.param("id"),
     p_reason: parsed.data.reason,
-    p_lines: parsed.data.lines.map((l) => ({
+    p_payload: parsed.data.lines.map((l) => ({
       line_id: l.lineId,
       qty: l.qty,
       destination_id: l.destinationId,
@@ -2898,7 +3022,7 @@ operationPosRouter.post("/:id/revise", requireOperation, async (c) => {
     })),
   });
   if (error) return mapSupplierCallError(c, error);
-  return c.json({ ok: true, result: data });
+  return c.json({ ok: true, request: data });
 });
 
 // ----- POST /:id/change-deliver-to -----

@@ -45,10 +45,12 @@ deliverySettingsRouter.get("/", requireOperationOrPrincipal, async (c) => {
   const [partnersR, driversR, vehiclesR, templatesR, changesR, accountsR, canR, purchasing, rules, canRulesR] =
     await Promise.all([
       sb.from("delivery_partners").select(PARTNER_SELECT).order("name"),
-      sb.from("partner_drivers").select("id, partner_id, name, phone, active").order("name"),
+      /* `*` so `role` (0724) arrives once applied and the read never fails before it. */
+      sb.from("partner_drivers").select("*").order("name"),
       sb
         .from("partner_fleet")
-        .select("id, partner_id, plate, vehicle_type, capacity, driver_name, driver_phone, active")
+        /* `*` so `velocity_device_id` (0724) arrives once applied and the read never fails before it. */
+        .select("*")
         .order("plate"),
       sb
         .from("delivery_message_templates")
@@ -246,6 +248,9 @@ deliverySettingsRouter.post("/partner/driver", requireSettingsEditor("delivery")
     p_name: d.name,
     p_phone: d.phone ?? null,
     p_active: d.active,
+    /* 0724 (Weisiang's decision 2026-10-22): driver or helper. Sent only when
+       chosen, so the five-argument door still answers before 0724. */
+    ...(d.role ? { p_role: d.role } : {}),
   });
 });
 
@@ -262,6 +267,9 @@ deliverySettingsRouter.post("/partner/vehicle", requireSettingsEditor("delivery"
     p_driver_name: d.driverName ?? null,
     p_driver_phone: d.driverPhone ?? null,
     p_active: d.active,
+    /* 0724 (YH 2026-10-26): sent only when the page sends it, so the
+       eight-argument door still answers before 0724. */
+    ...(d.velocityDeviceId !== undefined ? { p_velocity_device_id: d.velocityDeviceId } : {}),
   });
 });
 

@@ -3624,6 +3624,8 @@ export interface WarehouseStockEntry {
   sku: string;
   qty: number;
   reserved: number;
+  /** Bindable Units (`stock_sku_availability.available`) — Weisiang's decision 2026-10-22. */
+  available?: number;
   low_stock_status: LowStockStatus;
   /** T42-pass3-C1 — current `stock_balances.low_threshold`. NULL = no alert
    *  configured. Used by `SetThresholdDialog` prefill from OperationWarehouse. */
@@ -4758,6 +4760,8 @@ export interface GrnRegisterFilters {
   to: string | null;
   /** `Cancelled GRNs` — the rail's last row. */
   cancelled: boolean;
+  /** `Consignment goods` — receipts of Consignment Orders only (Weisiang 2026-10-22). */
+  consignment?: boolean;
   q: string;
 }
 export interface GrnRegisterResponse {
@@ -4774,6 +4778,8 @@ export interface GrnRegisterResponse {
     /** OVERLAPPING by construction — never added into a total. */
     receivedWith: Record<GrnReceivedWith, number>;
     cancelled: number;
+    /** Receipts of Consignment Orders in this view (Weisiang 2026-10-22). */
+    consignment?: number;
   };
   /** The expansion's item words and governed categories, per SKU on this
    *  page — the same two facts the official GRN document prints. */
@@ -4802,6 +4808,7 @@ function grnRegisterParams(filters: GrnRegisterFilters) {
   if (filters.from) params.set("from", filters.from);
   if (filters.to) params.set("to", filters.to);
   if (filters.cancelled) params.set("cancelled", "1");
+  if (filters.consignment) params.set("consignment", "1");
   if (filters.q.trim()) params.set("q", filters.q.trim());
   return params;
 }
@@ -4824,6 +4831,7 @@ export function useOperationGrnRegister(
       columns: filters.columns ?? null,
       limit: filters.limit ?? 50,
       cancelled: filters.cancelled ? "1" : null,
+      consignment: filters.consignment ? "1" : null,
     }),
     queryFn: () =>
       apiFetch<GrnRegisterResponse>(
@@ -5789,9 +5797,43 @@ export function useRevisePo(poId: string | null) {
       reason: string;
       lines: { lineId: string; qty: number; destinationId: string | null }[];
     }) =>
-      apiFetch<{ ok: true; result: { version: number } }>(
+      apiFetch<{ ok: true; request: { id: string; status: string } }>(
         `/api/operation/pos/${encodeURIComponent(poId ?? "")}/revise`,
         { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+    },
+  });
+}
+
+/** 0717 · PO Amendments register and Cancellation Requests queue — Weisiang's
+ *  decision (Mr Lim, WhatsApp 2026-10-22; Jess was not part of this decision).
+ *  A PO change waits here; the final approval runs the existing engine. */
+export type PoChangeRequestRow = {
+  id: string; po_id: string; reason: string; summary: string;
+  status: "requested" | "first_approved" | "approved" | "rejected" | "withdrawn";
+  requested_at: string; first_approved_at: string | null; decided_at: string | null; decision_note: string | null;
+  supplier_name: string | null; requested_by_name: string | null; first_approved_by_name: string | null; decided_by_name: string | null;
+  /** YH 2026-10-26: the signed-in person filed it — another approver decides. */
+  mine: boolean;
+  /** A goods cancellation's supplier facts, as sent for approval; null otherwise. */
+  supplier_facts: { supplierStatement: string; fee: string; shipped: boolean | null; evidence: string[] } | null;
+};
+export function usePoChangeRequests(kind: "amendment" | "cancellation") {
+  return useQuery({
+    queryKey: ["operation", "pos", "change-requests", kind] as const,
+    queryFn: () => apiFetch<{ requests: PoChangeRequestRow[] }>(`/api/operation/pos/change-requests?kind=${kind}`),
+  });
+}
+export function useDecidePoChange() {
+  const qc = useQueryClient();
+  return useMutation({
+    /* `withdraw` — the Houzs withdraw (requester or an approver); else a decision. */
+    mutationFn: ({ id, approve, note, withdraw }: { id: string; approve: boolean; note?: string; withdraw?: boolean }) =>
+      apiFetch<{ request: { id: string; status: string } }>(
+        `/api/operation/pos/change-requests/${encodeURIComponent(id)}/${withdraw ? "withdraw" : "decide"}`,
+        { method: "POST", body: JSON.stringify(withdraw ? (note ? { note } : {}) : { approve, ...(note ? { note } : {}) }) },
       ),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["operation", "pos"] });
@@ -7755,7 +7797,7 @@ export interface DeliverySettingsPartnerRow extends DeliveryPartnerRow {
 }
 export interface DeliverySettingsResponse {
   partners: DeliverySettingsPartnerRow[];
-  drivers: Array<{ id: string; partner_id: string; name: string; phone: string | null; active: boolean }>;
+  drivers: Array<{ id: string; partner_id: string; name: string; phone: string | null; active: boolean; role?: "driver" | "helper" | null }>;
   vehicles: Array<{
     id: string;
     partner_id: string;
@@ -7765,6 +7807,8 @@ export interface DeliverySettingsResponse {
     driver_name: string | null;
     driver_phone: string | null;
     active: boolean;
+    /** 0724 (YH 2026-10-26): the Radius Velocity device on a Carres lorry. */
+    velocity_device_id?: string | null;
   }>;
   templates: DeliveryTemplateRow[];
   changes: DeliverySettingChangeRow[];
@@ -12863,7 +12907,7 @@ export function usePoCancellations(poId:string) {
  return useQuery({queryKey:qk.poCancellations(poId),queryFn:()=>apiFetch<PoCancellationFacts>(`/api/operation/pos/${encodeURIComponent(poId)}/cancellations`),staleTime:0});
 }
 export function useRecordPoCancellation(poId:string) {
- const qc=useQueryClient();return useMutation({mutationFn:(input:import("@carres/shared").CancelPoInput)=>apiFetch<{cancellation:{requestVersion:number;state:string;poVersion:number|null}}>(`/api/operation/pos/${encodeURIComponent(poId)}/cancel`,{method:"POST",body:JSON.stringify(input)}),onSuccess:()=> {
+ const qc=useQueryClient();return useMutation({mutationFn:(input:import("@carres/shared").CancelPoInput)=>apiFetch<{cancellation:{requestVersion:number;state:string;poVersion:number|null};request?:undefined}|{request:{id:string;status:string};cancellation?:undefined}>(`/api/operation/pos/${encodeURIComponent(poId)}/cancel`,{method:"POST",body:JSON.stringify(input)}),onSuccess:()=> {
   void qc.invalidateQueries({queryKey:qk.poCancellations(poId)});
   void qc.invalidateQueries({queryKey:qk.operation.poRoot()});
   void qc.invalidateQueries({queryKey:qk.purchaseRequests()});

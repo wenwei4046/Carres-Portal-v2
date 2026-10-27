@@ -65,6 +65,7 @@ import {
   purchasingSuppliersOnly,
   type SkuImportRow,
   type SkuImportFailure,
+  FABRIC_STOCK_KEYS,
 } from "@carres/shared";
 import { mapPgError, parseJsonBody, fail } from "../lib/route-helpers";
 import { userClient } from "../lib/supabase";
@@ -499,8 +500,12 @@ catalogRouter.get("/", async (c) => {
     // 0202 — global procurement fabric master (additive, OPTIONAL). Sorted in
     // JS by (sort_order, fabric_code) to mirror the plain `.select("*")` fetch
     // and stay mock-friendly, the way the 0182 option-pools branch sorts.
+    // 0721 — stock and usage are procurement data: Houzs serves them only on
+    // its full read, gated on scm.procurement.products (fabric-tracking.ts:415-430),
+    // so here only operation + principal receive them.
     fabrics: (fabricMasterR.data ?? [])
       .map((r) => Adapters.catalogFabricFromRow(r as DB.CatalogFabricRow))
+      .map((f) => (auth.role === "operation" || auth.role === "principal" ? f : { ...f, stock: undefined }))
       .sort((a, b) =>
         a.sortOrder !== b.sortOrder
           ? a.sortOrder - b.sortOrder
@@ -907,7 +912,11 @@ catalogRouter.patch("/skus/:id", async (c) => {
 
 // Loo 2026-07-20 — Delete = the SKU is GONE for good (was a soft
 // discontinued_at stamp; Loo: "如果选择 delete，就是这个 SKU 永远消失").
-// Order/PO lines are unaffected — they store the sku as a text snapshot, no FK.
+// Order/PO lines store the sku as a text snapshot with no FK, so since 0721
+// (Weisiang's decision, Mr Lim, WhatsApp 2026-10-22: purchasing bulk-deletes
+// products Houzs way, data protected) a BEFORE DELETE trigger refuses, by name,
+// a SKU that orders, POs, stock Units or supplier bills name (P0001 sku_in_use
+// -> 422). Turning it off (discontinued_at / pos_active) is the way to retire it.
 // Soft retirement still exists as `discontinued_at` via PATCH (and the
 // compartment un-offer path keeps soft-discontinuing by design).
 //
@@ -943,15 +952,18 @@ catalogRouter.delete("/skus/:id", async (c) => {
   }
   const compartmentId = (target as { compartment_id: string | null }).compartment_id;
   const targetModelId = (target as { model_id: string | null }).model_id;
+  let unOffered: Record<string, unknown>[] = [];
   if (compartmentId) {
     principalOnly(c, SOFA_COMPARTMENT_MSG);
     if (targetModelId) {
-      const { error: offErr } = await sb
+      const { data: offRows, error: offErr } = await sb
         .from("model_sofa_compartments")
         .delete()
         .eq("model_id", targetModelId)
-        .eq("compartment_id", compartmentId);
+        .eq("compartment_id", compartmentId)
+        .select("*");
       if (offErr) return fail(c, offErr);
+      unOffered = (offRows ?? []) as Record<string, unknown>[];
     }
   }
 
@@ -961,7 +973,12 @@ catalogRouter.delete("/skus/:id", async (c) => {
     .eq("id", id)
     .select("id, model_id")
     .maybeSingle();
-  if (error) return fail(c, error);
+  if (error) {
+    // 0721: a SKU in use is refused (sku_in_use), so the SKU stays. Put its
+    // compartment offer back, or the model silently stops offering it.
+    if (unOffered.length) await sb.from("model_sofa_compartments").insert(unOffered);
+    return fail(c, error);
+  }
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "sku not found" }, 404);
   }
@@ -2604,6 +2621,10 @@ catalogRouter.put("/fabrics", async (c) => {
       sofaTier: e.sofaTier ?? "PRICE_2",
       bedframeTier: e.bedframeTier ?? "PRICE_2",
       active: e.active ?? true,
+      // 0721 — follows Houzs backend/src/scm/routes/fabric-tracking.ts:264-275 per
+      // Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+      // Absent keys stay absent so the RPC keeps the stored value.
+      ...Object.fromEntries(FABRIC_STOCK_KEYS.filter((k) => e[k] !== undefined).map((k) => [k, e[k]])),
     })),
     p_notes: parsed.data.notes ?? null,
   });
