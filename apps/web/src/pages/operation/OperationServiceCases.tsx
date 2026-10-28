@@ -20,6 +20,7 @@ import ServiceCaseModal from "./components/ServiceCaseModal";
 import ServiceCaseNumbersPanel from "./components/ServiceCaseNumbersPanel";
 import ServiceCaseWizard from "./components/ServiceCaseWizard";
 import CaseOrderLink from "./components/CaseOrderLink";
+import Button from "@/components/kit/Button";
 import Checkbox from "@/components/kit/Checkbox";
 
 /**
@@ -196,6 +197,12 @@ export default function OperationServiceCases() {
       {/* Table */}
       {listQ.isLoading ? (
         <p className="text-body text-base-500">Loading…</p>
+      ) : listQ.isError ? (
+        /* A failure sentence is never the empty sentence (COPY-STANDARD 2026-08-28). */
+        <div role="alert" className="flex flex-col items-center gap-3 rounded border border-base-200 bg-white p-12 text-center">
+          <p className="text-body text-base-700">Service Cases could not be opened</p>
+          <Button variant="neutral" onClick={() => void listQ.refetch()}>Try again</Button>
+        </div>
       ) : rows.length === 0 ? (
         <div className="rounded border border-base-200 bg-white p-12 text-center">
           <p className="text-base-700 font-medium">No cases yet.</p>
