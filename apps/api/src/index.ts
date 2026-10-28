@@ -345,7 +345,7 @@ api.route("/finance/dealer-commission", financeDealerCommissionRouter);
 api.route("/dealer-commission", dealerStatementRouter);
 // The manual journal (principal only). Before the catch-all as well.
 api.route("/finance/manual-journals", financeManualJournalsRouter);
-// Credit notes against Sales Invoices (0729). Before the catch-all as well.
+// Credit notes against Sales Invoices (0730). Before the catch-all as well.
 api.route("/finance/credit-notes", financeCreditNotesRouter);
 // The opening balances (0705). Before the catch-all as well.
 api.route("/finance/opening-balances", financeOpeningBalancesRouter);

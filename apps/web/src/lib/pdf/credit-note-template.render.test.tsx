@@ -1,5 +1,5 @@
 // @vitest-environment node
-/** The Credit Note renders as a real PDF, and a voided one says so (0729). */
+/** The Credit Note renders as a real PDF, and a voided one says so (0730). */
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { pdf } from "@react-pdf/renderer";
 import type { CreditNotePrintData } from "@carres/shared/schemas/finance-credit-note";

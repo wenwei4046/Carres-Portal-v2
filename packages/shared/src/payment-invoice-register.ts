@@ -70,7 +70,7 @@ export interface InvoiceRegisterRow {
     source_ref?: string[] | string | null;
     status: string;
     paid: number | string | null;
-    /** 0729 — the sum of the order's issued credit notes. */
+    /** 0730 — the sum of the order's issued credit notes. */
     credited?: number | string | null;
     delivery_date: string | null;
     delivery_date_tbd: boolean | null;

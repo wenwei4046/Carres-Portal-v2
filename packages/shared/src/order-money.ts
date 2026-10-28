@@ -44,7 +44,7 @@ export interface OrderMoneyInput {
   /** `ops_order_control.balance` (0165) — a hand-keyed OUTSTANDING, used only
    *  when the lines carry no prices. */
   controlBalance?: number | string | null;
-  /** `orders.credited` (0729) — the sum of the order's issued credit notes.
+  /** `orders.credited` (0730) — the sum of the order's issued credit notes.
    *  It lowers what the order is worth; it is never cash and never paid out. */
   credited?: number | string | null;
   /** Chargeable storage still owed. Storage has its own clock and its own

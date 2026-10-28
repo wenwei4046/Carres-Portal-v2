@@ -31,7 +31,7 @@ is the family's, not the Sales Order's alone. One copy, one truth.
 | **Supplier Claim pack** | supplier | *(none yet)* · `purchasing/MASTER.md` §9.5 | ❌ approved, not built |
 | **Delivery Return** | customer | *(none yet)* · `service/MASTER.md` §Document decision | ❌ approved, not built |
 | **Visual Service Note** | warehouse, logistics, supplier | *(none yet)* · `service/MASTER.md` §Document decision | ❌ approved, not built — role-specific copies reveal only what that role needs |
-| **Credit Note** | customer, finance | *(none yet)* · `service/MASTER.md` · `stock/MASTER.md` | ✅ built on branch 2026-10-28 (`credit-note-template.tsx`, migration 0729): Receipt chrome, CREDITED TO · INVOICE · REASON, `Amount Credited`, no refund wording; a voided note still prints `VOIDED`. Finance owns it; no supplier document carries the credit. Money truth stays in the ledger |
+| **Credit Note** | customer, finance | *(none yet)* · `service/MASTER.md` · `stock/MASTER.md` | ✅ built on branch 2026-10-28 (`credit-note-template.tsx`, migration 0730): Receipt chrome, CREDITED TO · INVOICE · REASON, `Amount Credited`, no refund wording; a voided note still prints `VOIDED`. Finance owns it; no supplier document carries the credit. Money truth stays in the ledger |
 | **Customer Statement** | customer | *(none yet)* · `payment/MASTER.md` §4 | ❌ **the read is BUILT, the document is not** — owner confirmed 2026-09-25 as a MISSING document to build; `GET /invoices/statement/:orderId` already derives it |
 | **Rental agreement (signed)** · **Diglant Forecast proposal** | customer / Diglant | `rental/MASTER.md` | ❌ not built. The forecast must print `Forecast proposal — Not a Purchase Order` |
 

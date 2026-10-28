@@ -1,5 +1,5 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- 0729 · A CREDIT NOTE LOWERS WHAT AN INVOICE ASKS, AND POSTS ITS OWN JOURNAL
+-- 0730 · A CREDIT NOTE LOWERS WHAT AN INVOICE ASKS, AND POSTS ITS OWN JOURNAL
 --        (ported from Houzs credit-notes.ts / the CN leg: Dr income / Cr
 --        receivables, party = the customer; YH 2026-10-28)
 --
@@ -76,13 +76,13 @@ create policy sales_credit_notes_read_internal on public.sales_credit_notes
   for select using ((select public.gl_may_read()));
 
 comment on table public.sales_credit_notes is
-  '0729: a credit note against one Sales/Storage invoice. Written only by issue_credit_note / void_credit_note. Carres does not refund: a credit lowers what the order still owes and is never paid out.';
+  '0730: a credit note against one Sales/Storage invoice. Written only by issue_credit_note / void_credit_note. Carres does not refund: a credit lowers what the order still owes and is never paid out.';
 
 -- ── 2 · what has been credited on an order ───────────────────────────────────
 alter table public.orders
   add column if not exists credited numeric(12,2) not null default 0 check (credited >= 0);
 comment on column public.orders.credited is
-  '0729: the sum of the order''s ISSUED credit notes. orderMoney subtracts it from what the order is worth. Written only by issue_credit_note / void_credit_note.';
+  '0730: the sum of the order''s ISSUED credit notes. orderMoney subtracts it from what the order is worth. Written only by issue_credit_note / void_credit_note.';
 
 -- ── 3 · issue ────────────────────────────────────────────────────────────────
 create or replace function public.issue_credit_note(

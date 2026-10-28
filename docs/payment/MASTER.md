@@ -1689,7 +1689,7 @@ separate cases per 0436; automatic close on delivery completion is Delivery-side
 stays a named next step. Closure: migration `0439` is APPLIED (tracker tail confirmed) and
 PR #1147 merged as `7b47adbf`; production converged it.
 
-### Credit Notes against a Sales Invoice — BUILT ON BRANCH 2026-10-28 (migration 0729 NOT APPLIED)
+### Credit Notes against a Sales Invoice — BUILT ON BRANCH 2026-10-28 (migration 0730 NOT APPLIED)
 
 Finance → Credit Notes issues a credit note against ONE Sales Invoice (`issue_credit_note`), posts
 `Dr` the income accounts the invoice credited, in the proportion it credited them / `Cr` receivables
