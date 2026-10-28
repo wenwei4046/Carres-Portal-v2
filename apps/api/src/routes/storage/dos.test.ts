@@ -49,6 +49,24 @@ beforeEach(() => {
 afterAll(() => _setJwksForTesting(null));
 
 describe("POST /api/storage/dos/sign-upload", () => {
+  it("signs a current-version screenshot under an internal actor-scoped prefix", async () => {
+    const sign = vi.fn(async (path: string) => ({ data: { token: "TEST-token", path }, error: null }));
+    const po = { select: () => po, eq: () => po, maybeSingle: async () => ({ data: { version: 2 }, error: null }) };
+    vi.mocked(userClient).mockReturnValue({ rpc: async () => ({ data: true, error: null }), from: () => po, storage: { from: () => ({ createSignedUploadUrl: sign }) } } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request("http://t/api/storage/dos/sign-upload", { method: "POST", headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" }, body: JSON.stringify({ po_id: "PO-TEST", po_version: 2, do_number: "V2-send", mime_type: "image/png", size_bytes: 128, kind: "send" }) }), env);
+    expect(res.status).toBe(200);
+    expect(sign.mock.calls[0][0]).toMatch(/^po-send\/PO-TEST\/V2\/11111111-1111-1111-1111-000000000001\/[0-9a-f-]+\.png$/);
+  });
+  it("a send screenshot never accepts a PDF or an absent version", async () => {
+    const jwt = await makeJwt("operation");
+    for (const extra of [{ po_version: 2, mime_type: "application/pdf" }, { mime_type: "image/png" }]) {
+      const res = await app.fetch(new Request("http://t/api/storage/dos/sign-upload", { method: "POST", headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" }, body: JSON.stringify({ po_id: "PO-TEST", do_number: "V2-send", size_bytes: 128, kind: "send", ...extra }) }), env);
+      expect(res.status).toBe(422);
+    }
+    expect(userClient).not.toHaveBeenCalled();
+  });
+
   it("returns signed upload URL for operation caller", async () => {
     const sb = {
       storage: {

@@ -190,6 +190,41 @@ describe("To buy follows the lines the view counts (found 2026-09-28)", () => {
   });
 });
 
+describe("a category SO Batch does not buy per order has no To buy (Purchasing agreed 2026-10-05)", () => {
+  const lines = [
+    { id: "m", sku: "MS12 Firmcare 10inch Queen", qty: 2, category: "mattress" },
+    { id: "p", sku: "Memory Pillow", qty: 4, category: "accessory" },
+  ];
+
+  it("Accessory prints not-applicable in every To buy cell, month rows and Total, never 0", () => {
+    const view = monthlyDemandOf({
+      ...base,
+      toBuyByLine: new Map([["m", 2], ["p", 3]]),
+      orders: [order({ id: "a", lines }), order({ id: "b", deliveryDate: null, lines })],
+      filters: { category: "Accessory" },
+    });
+    expect(view.rows.every((r) => r.toBuy === "not-applicable")).toBe(true);
+    /* The pieces are still counted: only To buy has nothing to say. */
+    expect(rowOf(view, "total")).toMatchObject({ totalQty: 8, notDelivered: 8 });
+  });
+
+  it("not applicable holds even when SO Batch could not be read", () => {
+    const view = monthlyDemandOf({ ...base, toBuyByLine: null, orders: [order({ id: "a", lines })], filters: { category: "Accessory" } });
+    expect(view.rows.every((r) => r.toBuy === "not-applicable")).toBe(true);
+  });
+
+  it("the unfiltered view and a bought category still count SO Batch's number", () => {
+    const toBuyByLine = new Map([["m", 2]]);
+    expect(rowOf(monthlyDemandOf({ ...base, toBuyByLine, orders: [order({ id: "a", lines })] }), "total").toBuy).toBe(2);
+    for (const category of ["Mattress", "Bedframe", "Sofa"] as const) {
+      const view = monthlyDemandOf({ ...base, toBuyByLine, orders: [order({ id: "a", lines })], filters: { category } });
+      expect(view.rows.every((r) => typeof r.toBuy === "number")).toBe(true);
+    }
+    expect(monthlyDemandOf({ ...base, toBuyByLine: null, orders: [order({ id: "a", lines })], filters: { category: "Mattress" } })
+      .rows.every((r) => r.toBuy === null)).toBe(true);
+  });
+});
+
 describe("the rail narrows, and nothing carries over", () => {
   const orders = [
     order({ id: "a", salesLocation: "PJ Showroom", state: "Selangor", city: "Petaling Jaya" }),

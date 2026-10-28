@@ -9,6 +9,9 @@ vi.mock("../../lib/supabase", () => ({
 }));
 
 import { userClient } from "../../lib/supabase";
+vi.mock("../../lib/sales-order-document-search", () => ({ findSalesOrderDocuments: vi.fn(async () => ({ orderIds: [] as string[], soNumbers: [] as number[] })) }));
+import { findSalesOrderDocuments } from "../../lib/sales-order-document-search";
+
 
 // The Work Completed writer (0584) observes this door from a middleware and is
 // proven in lib/sales-order-work-completion*.test.ts; here it passes through,
@@ -38,6 +41,7 @@ async function makeJwt(role: string) {
 beforeEach(() => {
   useTestJwks();
   vi.mocked(userClient).mockReset();
+  vi.mocked(findSalesOrderDocuments).mockResolvedValue({ orderIds: [], soNumbers: [] });
 });
 
 afterAll(() => _setJwksForTesting(null));
@@ -70,13 +74,37 @@ describe("GET /api/operation/orders", () => {
     const is = vi.fn().mockReturnThis();
     const order = vi.fn().mockReturnThis();
     const limit = vi.fn().mockResolvedValue({ data: rows, error: null });
-    const select = vi.fn(() => ({ in: inFn, eq, ilike, or, not, is, order, limit }));
+    const select = vi.fn((_fields?: string) => ({ in: inFn, eq, ilike, or, not, is, order, limit }));
     vi.mocked(userClient).mockReturnValue({
       from: vi.fn(() => ({ select })),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
-    return { eq, inFn, ilike, or, not, is, order, limit };
+    return { select, eq, inFn, ilike, or, not, is, order, limit };
   }
+
+  it("reads invoice, receipt allocation and amendment lineage from their source ledgers", async () => {
+    const { select, eq } = mockOrdersList([ORDER_ROW]);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request("http://t/api/operation/orders", { headers: { Authorization: `Bearer ${jwt}` } }), env);
+    expect(res.status).toBe(200);
+    const fields = String(select.mock.calls[0]?.[0]);
+    expect(fields).toContain("original_request:sales_order_revisions(revision,snapshot)");
+    expect(eq).toHaveBeenCalledWith("original_request.revision", 1);
+    expect(fields).toContain("invoice_documents:invoices(id,invoice_no)");
+    expect(fields).toContain("receipt_documents:order_payments(id,receipt_no)");
+    expect(fields).toContain("allocated_receipts:payment_allocations(order_payments(id,receipt_no))");
+    expect(fields).toContain("amendment_documents:sales_order_amendments(id)");
+  });
+
+  it("searches linked identities before the register cap, retaining normal order scope", async () => {
+    const { or } = mockOrdersList([ORDER_ROW]);
+    vi.mocked(findSalesOrderDocuments).mockResolvedValue({ orderIds: [ORDER_ROW.id], soNumbers: [4001, 4002] });
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request("http://t/api/operation/orders?stage=proceeded&search=RC-123", { headers: { Authorization: `Bearer ${jwt}` } }), env);
+    expect(res.status).toBe(200);
+    expect(or.mock.calls.some(([value]) => value.includes(`id.in.(${ORDER_ROW.id})`) && value.includes("so.in.(4001,4002)"))).toBe(true);
+    expect(findSalesOrderDocuments).toHaveBeenCalledWith(expect.anything(), "RC-123");
+  });
 
   it("returns orders for operation with default 'all' stage and 'all' channel", async () => {
     const { inFn, order, limit } = mockOrdersList([ORDER_ROW]);
@@ -215,6 +243,123 @@ describe("GET /api/operation/orders", () => {
       const body = await get();
       expect(body.orders).toHaveLength(1);
       expect(body.salesOrderTotal).toBeNull();
+    });
+  });
+
+  /* ⭐ FIND AN ORDER BY PHONE (Orders MASTER §0 Charter). The Sales Order
+     page's `Existing customer · {n} orders ›` opens this list searched by the
+     phone; before this read the server matched no phone, so the answer
+     replaced the rows with nothing. */
+  describe("phone search — the digits find the order however they were written", () => {
+    type Call = { table: string; cols: string; head: boolean; method: string; args: unknown[] };
+    const PHONE_COLS = "id, customer_phone";
+    function mockPhoneRead(opts: { phones?: Array<{ id: string; customer_phone: string | null }>; phoneError?: unknown }) {
+      const calls: Call[] = [];
+      const from = vi.fn((table: string) => {
+        let cols = "";
+        let head = false;
+        const chain: Record<string, unknown> = {};
+        chain.select = vi.fn((c: string, o?: { head?: boolean }) => {
+          cols = c;
+          head = Boolean(o?.head);
+          calls.push({ table, cols, head, method: "select", args: [c, o] });
+          return chain;
+        });
+        for (const m of ["in", "eq", "neq", "ilike", "or", "not", "is", "order", "limit", "range"])
+          chain[m] = vi.fn((...args: unknown[]) => { calls.push({ table, cols, head, method: m, args }); return chain; });
+        chain.then = (resolve: (v: unknown) => unknown) =>
+          resolve(
+            head
+              ? { count: 1, error: null, data: null }
+              : cols === PHONE_COLS
+                ? opts.phoneError
+                  ? { data: null, error: opts.phoneError }
+                  : { data: opts.phones ?? [], error: null }
+                : { data: [ORDER_ROW], error: null },
+          );
+        return chain;
+      });
+      vi.mocked(userClient).mockReturnValue({ from } as never);
+      return calls;
+    }
+    const search = async (term: string, stage = "proceeded") => {
+      const jwt = await makeJwt("operation");
+      return app.fetch(
+        new Request(`http://t/api/operation/orders?stage=${stage}&search=${encodeURIComponent(term)}`, { headers: { Authorization: `Bearer ${jwt}` } }),
+        env,
+      );
+    };
+    const listOr = (calls: Call[]) =>
+      calls.filter((c) => c.table === "orders" && !c.head && c.cols !== PHONE_COLS && c.method === "or").map((c) => String(c.args[0]));
+    const searchClause = (calls: Call[]) => listOr(calls).find((v) => v.includes("customer_name")) ?? "";
+
+    it.each([
+      ["019-00000075", "019-00000075"],
+      ["01900000075", "019-00000075"],
+      ["019 0000 0075", "019-00000075"],
+      ["(019) 0000-0075", "019-00000075"],
+      ["+60190000 0075", "019-00000075"],
+      ["+60 19-0000 0075", "019-00000075"],
+      ["0123456789", "+60123456789"],
+      ["012-345 6789", "+60 12-345 6789"],
+      ["+60123456789", "0123456789"],
+      ["0123456789", "123456789"],
+    ])("typed %s finds the order stored as %s", async (typed, stored) => {
+      const calls = mockPhoneRead({
+        phones: [
+          { id: "hit-order", customer_phone: stored },
+          { id: "other-order", customer_phone: "011-1111 2222" },
+        ],
+      });
+      const res = await search(typed);
+      expect(res.status).toBe(200);
+      const clause = searchClause(calls);
+      expect(clause).toContain("id.in.(hit-order)");
+      expect(clause).not.toContain("other-order");
+    });
+
+    it("reads the phones of the list's OWN population, through the caller's RLS client", async () => {
+      const calls = mockPhoneRead({ phones: [] });
+      await search("019-0000 0075");
+      const phoneCalls = calls.filter((c) => c.cols === PHONE_COLS).map((c) => ({ method: c.method, args: c.args }));
+      expect(phoneCalls).toContainEqual({ method: "not", args: ["status", "in", "(place,cancelled)"] });
+      expect(phoneCalls).toContainEqual({ method: "or", args: ["source_system.is.null,source_system.neq.rental"] });
+      expect(phoneCalls).toContainEqual({ method: "ilike", args: ["customer_phone", "%1%9%0%0%0%0%0%0%7%5%"] });
+      expect(phoneCalls).toContainEqual({ method: "range", args: [0, 999] });
+      /* No phone matched: no id clause, and the rest of the search is unchanged. */
+      expect(searchClause(calls)).not.toContain("id.in.");
+    });
+
+    it("leaves a NAME search exactly as it was — no phone read", async () => {
+      const calls = mockPhoneRead({ phones: [{ id: "hit-order", customer_phone: "0123456789" }] });
+      const res = await search("Tan");
+      expect(res.status).toBe(200);
+      expect(calls.some((c) => c.cols === PHONE_COLS)).toBe(false);
+      expect(searchClause(calls)).toBe("customer_name.ilike.%Tan%,source_ref.cs.{TAN},invoice_no.ilike.%TAN%,do_number.ilike.%TAN%");
+    });
+
+    it("leaves an SO-number search as it was — four digits are not a phone", async () => {
+      const calls = mockPhoneRead({ phones: [{ id: "hit-order", customer_phone: "0123454001" }] });
+      await search("4001");
+      expect(calls.some((c) => c.cols === PHONE_COLS)).toBe(false);
+      expect(searchClause(calls)).toContain("so.eq.4001");
+    });
+
+    it("fails the search when the phones cannot be read — never a silent `no order`", async () => {
+      const calls = mockPhoneRead({ phoneError: { code: "42501", message: "permission denied for table orders" } });
+      const res = await search("019-0000 0075");
+      expect(res.status).toBe(403);
+      /* The list itself was never answered with a phone-less search. */
+      expect(listOr(calls).some((v) => v.includes("customer_name"))).toBe(false);
+    });
+
+    it("keeps a bracketed phone from breaking the or() grammar", async () => {
+      const calls = mockPhoneRead({ phones: [{ id: "hit-order", customer_phone: "03-1234 5678" }] });
+      const res = await search("(03) 1234 5678");
+      expect(res.status).toBe(200);
+      const clause = searchClause(calls);
+      expect(clause.startsWith('customer_name.ilike."%(03) 1234 5678%",')).toBe(true);
+      expect(clause).toContain("id.in.(hit-order)");
     });
   });
 
@@ -378,13 +523,15 @@ describe("GET /api/operation/orders", () => {
       expect(body.orders[1]?.po_numbers).toEqual([]);
     });
 
-    it("a PO with no lines contributes nothing", async () => {
+    it("a PO with no lines retains its document number without claiming goods coverage", async () => {
       mockWithPos(
         [{ ...ORDER_ROW, so: 1206 }],
         [{ id: "PO-EMPTY", so: null, so_refs: [1206] }],
         [],
       );
-      expect((await get()).orders[0]?.po_skus).toEqual([]);
+      const body = await get();
+      expect(body.orders[0]?.po_skus).toEqual([]);
+      expect(body.orders[0]?.po_numbers).toEqual(["PO-EMPTY"]);
     });
 
     it("ONE batched query for the whole page — never one per order", async () => {
@@ -673,6 +820,11 @@ describe("GET /api/operation/orders/:id", () => {
      *  — a salesperson whose name only `salespersons` can answer. */
     appUsers?: any[];
     salespersons?: any[];
+    /** The `ops_order_control` overlay row; `controlFail` makes its read fail. */
+    control?: any;
+    controlFail?: boolean;
+    /** What `app_users` answers for the SO PIC (null = RLS hides the row). */
+    picUser?: any;
   }) {
     const fromImpl = vi.fn((table: string) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -741,6 +893,15 @@ describe("GET /api/operation/orders/:id", () => {
           chain.then = (res: (v: unknown) => unknown) =>
             res({ data: opts.productSkus ?? [], error: null });
           break;
+        case 'ops_order_control':
+          chain.maybeSingle = vi.fn(() =>
+            opts.controlFail
+              ? Promise.resolve({ data: null, error: { code: "XX000", message: "boom" } })
+              : promise(opts.control ?? null));
+          break;
+        case 'app_users':
+          chain.maybeSingle = vi.fn(() => promise(opts.picUser ?? null));
+          break;
         case 'ops_stock_items':
           chain.then = (res: (v: unknown) => unknown) =>
             res({ data: opts.freeUnits ?? [], error: null });
@@ -771,6 +932,27 @@ describe("GET /api/operation/orders/:id", () => {
       env,
     );
     expect(res.status).toBe(404);
+  });
+
+  it("names the SO PIC from assigned_staff, keeping unread and hidden apart", async () => {
+    const get = async () => {
+      const jwt = await makeJwt("operation");
+      const res = await app.fetch(new Request(`http://t/api/operation/orders/${ORDER_ID}`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }), env);
+      expect(res.status).toBe(200);
+      return (await res.json()) as { pic: unknown; picRead: string };
+    };
+    const order = { id: ORDER_ID, so: 1319, paid: 0 };
+    const pic = "22222222-2222-2222-2222-000000000001";
+    mockDetailQueries({ order, control: { assigned_staff: pic }, picUser: { id: pic, name: " Shasha " } });
+    expect(await get()).toMatchObject({ picRead: "ok", pic: { userId: pic, name: "Shasha" } });
+    mockDetailQueries({ order, control: { assigned_staff: pic }, picUser: null });
+    expect(await get()).toMatchObject({ picRead: "ok", pic: { userId: pic, name: null } });
+    mockDetailQueries({ order, control: { assigned_staff: null } });
+    expect(await get()).toMatchObject({ picRead: "ok", pic: null });
+    mockDetailQueries({ order, controlFail: true });
+    expect(await get()).toMatchObject({ picRead: "failed", pic: null });
   });
 
   it("carries saved POS payment facts without creating or inferring a transaction", async () => {

@@ -9,7 +9,8 @@ import {
   type PrincipalDealerRecentOrder,
 } from "@/lib/queries";
 import { TOAST } from "@/lib/toast-copy";
-import { MY_STATES } from "@/data/malaysia-postcodes";
+import { keepCurrent } from "@/data/malaysia-postcodes";
+import { useAddressLists } from "@/lib/settings-queries";
 import DealerStatusPill from "./DealerStatusPill";
 
 /**
@@ -55,6 +56,8 @@ export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }:
   const { data, isLoading } = usePrincipalDealer(dealerId);
   const setStatus = useDealerSetStatus(dealerId);
   const update = useUpdateDealer(dealerId);
+  // States: national file + Settings → Address lists (0722, Weisiang's decision).
+  const addressLists = useAddressLists();
 
   // 2026-05-22 (Loo) — local editor state for the four newer fields. Synced
   // from server data via the effect below; touching any input flips dirty so
@@ -225,7 +228,7 @@ export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }:
         <div className="flex justify-between items-start mb-[18px]">
           <div>
             <div className="kicker">{dealer.code ?? dealer.id.slice(0, 8)}</div>
-            <h2 className="font-display text-title leading-tight mt-1 tracking-tight font-semibold">
+            <h2 className="font-display text-strong leading-tight mt-1 tracking-tight">
               {dealer.name}
             </h2>
             <div className="text-meta text-base-600 mt-1">
@@ -244,7 +247,7 @@ export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }:
 
         <div className="flex gap-2 mb-[18px] items-center">
           <DealerStatusPill status={dealer.status} />
-          <span className="text-label text-base-500">
+          <span className="text-meta text-base-500">
             {dealer.region} · joined {dealer.joined_date ?? ""}
           </span>
         </div>
@@ -267,7 +270,7 @@ export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }:
         </div>
 
         <div className="mb-[18px]">
-          <div className="text-label uppercase tracking-wider text-base-500 font-semibold mb-2">
+          <div className="text-label uppercase tracking-[0.06em] text-base-500 mb-2">
             Recent orders
           </div>
           {recentOrders.length > 0 ? (
@@ -280,18 +283,18 @@ export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }:
                   }`}
                 >
                   <div>
-                    <div className="font-mono text-label font-semibold">
+                    <div className="font-mono text-body font-semibold">
                       SO-{o.so}
                     </div>
-                    <div className="text-label text-base-500">
+                    <div className="text-meta text-base-500">
                       {o.customerName ?? ""}
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="font-mono font-semibold">
+                    <div className="font-mono text-body tabular-nums">
                       RM {Number(o.total).toLocaleString()}
                     </div>
-                    <div className="text-label text-base-500 uppercase">
+                    <div className="text-label uppercase tracking-[0.06em] text-base-500">
                       {o.status.replace("_", " ")}
                     </div>
                   </div>
@@ -310,7 +313,7 @@ export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }:
             contact_phone) for existing dealers, and lets the principal correct
             them later. Save button disabled until something changes. */}
         <div className="mb-[18px] pt-[18px] border-t border-base-100">
-          <div className="text-label uppercase tracking-wider text-base-500 font-semibold mb-2">
+          <div className="text-label uppercase tracking-[0.06em] text-base-500 mb-2">
             {storeNoun(dealer.channel)} profile
           </div>
           <div className="grid gap-3">
@@ -336,7 +339,7 @@ export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }:
                       className="w-full px-3 py-2 border border-base-200 rounded text-body outline-none focus:border-primary bg-white"
                     >
                       <option value="">Not set</option>
-                      {MY_STATES.map((s) => (
+                      {keepCurrent(addressLists.states, draft.state).map((s) => (
                         <option key={s} value={s}>
                           {s}
                         </option>
@@ -380,7 +383,7 @@ export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }:
                     className="w-full px-3 py-2 border border-base-200 rounded text-body outline-none focus:border-primary"
                   />
                 </ProfileField>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 items-end gap-3">
                   <ProfileField label="Account number" hint="Digits only, 6 to 20.">
                     <input
                       aria-label="Account number"
@@ -448,13 +451,13 @@ export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }:
             </button>
           )}
           {dealer.status === "pending" && (
-            <div className="flex-1 text-label text-base-500 text-center p-2">
+            <div className="flex-1 text-meta text-base-500 text-center p-2">
               Awaiting approval · review in{" "}
-              <strong className="text-primary">Approvals</strong> tab
+              <strong className="text-primary font-medium">Approvals</strong> tab
             </div>
           )}
           {dealer.status === "rejected" && (
-            <div className="flex-1 text-label text-base-500 text-center p-2">
+            <div className="flex-1 text-meta text-base-500 text-center p-2">
               Application rejected.
             </div>
           )}
@@ -477,11 +480,11 @@ function ProfileField({
 }) {
   return (
     <div>
-      <div className="text-label uppercase tracking-wider text-base-500 font-semibold mb-1">
+      <div className="text-label uppercase tracking-[0.06em] text-base-500 mb-1">
         {label}
       </div>
       {hint ? (
-        <div className="text-label text-base-500 mb-1.5 leading-snug">{hint}</div>
+        <div className="text-meta text-base-500 mb-1.5 leading-snug">{hint}</div>
       ) : null}
       {children}
     </div>
@@ -500,11 +503,11 @@ function Stat({
 }) {
   return (
     <div className="bg-base-50 p-3 rounded">
-      <div className="text-label uppercase tracking-wider text-base-500 font-semibold mb-1">
+      <div className="text-label uppercase tracking-[0.06em] text-base-500 mb-1">
         {label}
       </div>
       <div
-        className={`font-mono text-strong font-semibold ${
+        className={`font-mono text-strong tabular-nums ${
           accent ? "text-primary" : "text-base-900"
         }`}
       >

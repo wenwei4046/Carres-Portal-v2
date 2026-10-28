@@ -1,0 +1,54 @@
+[
+  [
+    "table",
+    "empty",
+    "0\nTable\nCards\n\t\n\t\nSO No\n\t\nProceed Date\n\t\nSO Doc Date\n\t\nSales Location\n\t\nSalesperson\n\t\nCustomer Requested\nDelivery Date\n\t\nCustomer Delivery\nLocation\n\t\nCustomer\n\t\nItems\n\t\nPO No\n\t\nDO No\n\n\nNo sales orders yet\n0 sales orders"
+  ],
+  [
+    "table",
+    "failed",
+    "Table\nCards\n\t\n\t\nSO No\n\t\nProceed Date\n\t\nSO Doc Date\n\t\nSales Location\n\t\nSalesperson\n\t\nCustomer Requested\nDelivery Date\n\t\nCustomer Delivery\nLocation\n\t\nCustomer\n\t\nItems\n\t\nPO No\n\t\nDO No\n\n\n\nSales orders could not be loaded\n\nTry again"
+  ],
+  [
+    "table",
+    "denied",
+    "Table\nCards\n\t\n\t\nSO No\n\t\nProceed Date\n\t\nSO Doc Date\n\t\nSales Location\n\t\nSalesperson\n\t\nCustomer Requested\nDelivery Date\n\t\nCustomer Delivery\nLocation\n\t\nCustomer\n\t\nItems\n\t\nPO No\n\t\nDO No\n\n\n\nYou cannot view sales orders\n\nAsk an authorised operation user for access."
+  ],
+  [
+    "table",
+    "loading",
+    "Table\nCards\n\t\n\t\nSO No\n\t\nProceed Date\n\t\nSO Doc Date\n\t\nSales Location\n\t\nSalesperson\n\t\nCustomer Requested\nDelivery Date\n\t\nCustomer Delivery\nLocation\n\t\nCustomer\n\t\nItems\n\t\nPO No\n\t\nDO No\n\n\t\t\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\t\t\t\nLoading…"
+  ],
+  [
+    "cards",
+    "empty",
+    "0\nTable\nCards\n\t\n\t\nSO No\n\t\nProceed Date\n\t\nSO Doc Date\n\t\nSales Location\n\t\nSalesperson\n\t\nCustomer Requested\nDelivery Date\n\t\nCustomer Delivery\nLocation\n\t\nCustomer\n\t\nItems\n\t\nPO No\n\t\nDO No\n\n\nNo sales orders yet\n0 sales orders"
+  ],
+  [
+    "cards",
+    "failed",
+    "Table\nCards\n\t\n\t\nSO No\n\t\nProceed Date\n\t\nSO Doc Date\n\t\nSales Location\n\t\nSalesperson\n\t\nCustomer Requested\nDelivery Date\n\t\nCustomer Delivery\nLocation\n\t\nCustomer\n\t\nItems\n\t\nPO No\n\t\nDO No\n\n\n\nSales orders could not be loaded\n\nTry again"
+  ],
+  [
+    "cards",
+    "denied",
+    "Table\nCards\n\t\n\t\nSO No\n\t\nProceed Date\n\t\nSO Doc Date\n\t\nSales Location\n\t\nSalesperson\n\t\nCustomer Requested\nDelivery Date\n\t\nCustomer Delivery\nLocation\n\t\nCustomer\n\t\nItems\n\t\nPO No\n\t\nDO No\n\n\n\nYou cannot view sales orders\n\nAsk an authorised operation user for access."
+  ],
+  [
+    "cards",
+    "loading",
+    "Table\nCards\n\t\n\t\nSO No\n\t\nProceed Date\n\t\nSO Doc Date\n\t\nSales Location\n\t\nSalesperson\n\t\nCustomer Requested\nDelivery Date\n\t\nCustomer Delivery\nLocation\n\t\nCustomer\n\t\nItems\n\t\nPO No\n\t\nDO No\n\n\t\t\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t\t\t\t\t\t\t\t\nLoading…"
+  ],
+  [
+    "commonHeaderFilter",
+    7
+  ],
+  [
+    "noMatchClear",
+    72
+  ],
+  [
+    "zoomOverflow",
+    false
+  ]
+]

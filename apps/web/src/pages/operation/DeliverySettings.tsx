@@ -7,7 +7,7 @@
  * naming its gap while disabled, `Not configured` for a value nobody has
  * recorded, and every change listed with its actor, time, old and new value.
  *
- *   Logistics Partners   one row per partner → its object (seven sections)
+ *   Logistics   one row per partner → its object (seven sections)
  *   Delivery Rules       who contacts the customer · record-on-behalf · the
  *                        shared contact lead (read-only) · Payment's clock and
  *                        the DO gate (read-only mirrors) · proof by result
@@ -48,13 +48,14 @@ import {
 import PageShell from "@/components/kit/PageShell";
 import Button from "@/components/kit/Button";
 import Input from "@/components/kit/Input";
+import Checkbox from "@/components/kit/Checkbox";
 import Select from "@/components/kit/Select";
 import Textarea from "@/components/kit/Textarea";
 import { TemplateLibrary } from "./PaymentTemplateLibrary";
 
 /* ── THE WORDS (COPY-STANDARD, Warehouse Settings grammar + Delivery §11) ── */
 const DS = {
-  partners: "Logistics Partners",
+  partners: "Logistics",
   rules: "Delivery Rules",
   templates: "Message Templates",
   access: "Access",
@@ -69,7 +70,7 @@ const DS = {
   loadFailed: "Delivery Settings could not be loaded. Try again.",
   tryAgain: "Try again",
   loading: "Loading Delivery Settings…",
-  /* Partner details */
+  /* Company details */
   name: "Partner name",
   status: "Status",
   customerPhone: "Customer-facing number",
@@ -114,7 +115,13 @@ const DS = {
   vehicleType: "Vehicle type",
   vehicleCapacity: "Capacity",
   addDriver: "Add a driver",
+  /* 0724 (Weisiang's decision 2026-10-22): a crew member drives or helps. */
+  crewRole: "Role",
+  roleDriver: "Driver",
+  roleHelper: "Helper",
   addVehicle: "Add a vehicle",
+  /* 0724 (YH 2026-10-26): Carres lorries report positions through Radius Velocity. */
+  velocityDevice: "Velocity device",
   /* Services */
   stairCarry: "Stair carry",
   dismantling: "Dismantling",
@@ -132,14 +139,29 @@ const DS = {
   contactByOperation: "Operation",
   onBehalf: "Operation may record on the partner's behalf",
   contactLead: "Contact lead days",
+  /* DEL-04 · Delivery Rules (0673) */
+  assignBy: "Assign logistics by",
+  assignByValue: (n: number) => (n === 1 ? "1 working day before Scheduled delivery" : `${n} working days before Scheduled delivery`),
+  assignByRule:
+    "Counts Monday to Saturday, skipping the public holidays set in Settings, Warehouse, Public Holidays (the built-in Selangor list until a calendar is imported there). Uses Requested delivery until the delivery is scheduled. Assign logistics opens on the day the PO is issued.",
+  assignByRange: "Choose between 1 and 30 working days.",
+  /* DEL-10 · Delivery Rules (0678) */
+  courierDispatch: "Courier dispatch within",
+  courierDispatchValue: (n: number) =>
+    n === 1
+      ? "1 working day after Warehouse confirms the goods can be packed"
+      : `${n} working days after Warehouse confirms the goods can be packed`,
+  courierDispatchRule:
+    "Counts the dispatching Warehouse's working days, set in Settings, Warehouse. Starts when Warehouse confirms the goods are received, checked and can be packed. This is the Warehouse's dispatch target, not a customer delivery date.",
+  reason: "Reason",
   contactLeadRule: (n: number) => `${n} working days before the requested delivery date. This is the shared chase setting.`,
   paymentRule: "Payment clearance",
   paymentRuleWord:
     "Read-only mirror of Payment's clock: the Delivery Order needs Amount needed = RM 0 and no open Finance Exception.",
   doRule: "Delivery Order availability",
   doRuleWord:
-    "Read-only mirror of the DO gate: the system issues the document when the day, the window, the goods, the partner and the money all hold.",
-  proof: "Proof required",
+    "The system issues one when goods, logistics, date and money are ready.",
+  proof: "Evidence required by result",
   proofDeliveredPhoto: "Delivered · delivery photo",
   proofDeliveredSigned: "Delivered · signed Delivery Order",
   proofFailedPhoto: "Failed Delivery · photo",
@@ -167,7 +189,7 @@ function listOf(text: string): string[] {
 
 function Row({ label, htmlFor, children }: { label: string; htmlFor?: string; children: ReactNode }) {
   return (
-    <div className="grid grid-cols-[200px_minmax(0,1fr)] items-start gap-3 py-1.5">
+    <div className="grid grid-cols-1 items-start gap-1 py-1.5 md:grid-cols-[200px_minmax(0,1fr)] md:gap-3">
       {htmlFor ? (
         <label htmlFor={htmlFor} className="text-body text-kit-slate-11">
           {label}
@@ -183,7 +205,7 @@ function Row({ label, htmlFor, children }: { label: string; htmlFor?: string; ch
 function SectionCard({ title, blurb, children, testId }: { title: string; blurb?: string; children: ReactNode; testId?: string }) {
   return (
     <section className="rounded-card border border-kit-slate-5 bg-white p-5" data-testid={testId}>
-      <h2 className="text-section">{title}</h2>
+      <h2 className="text-strong text-kit-slate-12">{title}</h2>
       {blurb ? <p className="mt-1 text-body text-kit-slate-11">{blurb}</p> : null}
       <div className="mt-4 grid gap-1">{children}</div>
     </section>
@@ -209,7 +231,7 @@ function ChangesList({ changes, partnerId }: { changes: DeliverySettingChangeRow
   const rows = partnerId ? changes.filter((c) => c.partner_id === partnerId) : changes;
   return (
     <section className="rounded-card border border-kit-slate-5 bg-white p-5" data-testid="delivery-settings-history">
-      <h2 className="text-section">{DS.changes}</h2>
+      <h2 className="text-strong text-kit-slate-12">{DS.changes}</h2>
       {rows.length === 0 ? (
         <p className="mt-2 text-body text-kit-slate-11">{DS.noChanges}</p>
       ) : (
@@ -221,8 +243,8 @@ function ChangesList({ changes, partnerId }: { changes: DeliverySettingChangeRow
                 {c.actor_name ?? ""} · {fmtDate(c.changed_at, { time: true })}
               </span>
               <details className="mt-0.5">
-                <summary className="cursor-pointer text-label text-kit-slate-11">Old and new value</summary>
-                <pre className="whitespace-pre-wrap font-sans text-label text-kit-slate-11">
+                <summary className="cursor-pointer text-meta text-kit-slate-11">Old and new value</summary>
+                <pre className="whitespace-pre-wrap font-sans text-meta text-kit-slate-11">
                   {JSON.stringify(c.old_value ?? null)}
                   {"\n→ "}
                   {JSON.stringify(c.new_value ?? null)}
@@ -276,7 +298,7 @@ export default function DeliverySettings() {
   }
 }
 
-/* ── Logistics Partners — one row per partner ─────────────────────────────── */
+/* ── Logistics — one row per partner ─────────────────────────────── */
 function PartnersPage({ data }: { data: DeliverySettingsResponse }) {
   return (
     <PageShell variant="settings" title={DS.partners}>
@@ -297,12 +319,12 @@ function PartnersPage({ data }: { data: DeliverySettingsResponse }) {
                 >
                   <span className="min-w-0">
                     <span className="block text-body font-medium text-kit-slate-12">{p.name}</span>
-                    <span className="block text-label text-kit-slate-11">
+                    <span className="block text-meta text-kit-slate-11">
                       {DS.customerPhone} · {orNotConfigured(p.customer_phone)}
                       {p.kv_default ? ` · ${DS.kvDefault}` : ""}
                     </span>
                   </span>
-                  <span className={`text-label ${p.active === false ? "text-kit-slate-9" : "text-kit-green-11"}`}>
+                  <span className={`text-meta font-medium ${p.active === false ? "text-kit-slate-11" : "text-kit-green-11"}`}>
                     {p.active === false ? DS.inactive : DS.active}
                   </span>
                 </Link>
@@ -332,8 +354,8 @@ interface PartnerDraft {
   };
   handover: HandoverPoint[];
   fleet: {
-    drivers: Array<{ id: string | null; name: string; phone: string; active: boolean }>;
-    vehicles: Array<{ id: string | null; plate: string; vehicleType: string; capacity: string; driverName: string; driverPhone: string; active: boolean }>;
+    drivers: Array<{ id: string | null; name: string; phone: string; active: boolean; role: "driver" | "helper" | null }>;
+    vehicles: Array<{ id: string | null; plate: string; vehicleType: string; capacity: string; driverName: string; driverPhone: string; active: boolean; velocityDeviceId: string }>;
   };
   services: { stairCarry: boolean; dismantling: boolean; disposal: boolean; charges: string };
 }
@@ -376,7 +398,7 @@ function draftOf(p: DeliverySettingsPartnerRow, data: DeliverySettingsResponse):
     fleet: {
       drivers: data.drivers
         .filter((d) => d.partner_id === p.id)
-        .map((d) => ({ id: d.id, name: d.name, phone: d.phone ?? "", active: d.active })),
+        .map((d) => ({ id: d.id, name: d.name, phone: d.phone ?? "", active: d.active, role: d.role ?? null })),
       vehicles: data.vehicles
         .filter((v) => v.partner_id === p.id)
         .map((v) => ({
@@ -387,6 +409,7 @@ function draftOf(p: DeliverySettingsPartnerRow, data: DeliverySettingsResponse):
           driverName: v.driver_name ?? "",
           driverPhone: v.driver_phone ?? "",
           active: v.active,
+          velocityDeviceId: v.velocity_device_id ?? "",
         })),
     },
     services: {
@@ -530,7 +553,7 @@ function PartnerObject({ data, partnerId, section }: { data: DeliverySettingsRes
           if (d.id && was && same(was, d)) continue;
           await apiFetch("/api/operation/delivery-settings/partner/driver", {
             method: "POST",
-            body: JSON.stringify({ partnerId: id, driverId: d.id, name: d.name.trim(), phone: d.phone.trim() || null, active: d.active }),
+            body: JSON.stringify({ partnerId: id, driverId: d.id, name: d.name.trim(), phone: d.phone.trim() || null, active: d.active, role: d.role }),
           });
         }
         for (const v of draft.fleet.vehicles) {
@@ -547,6 +570,8 @@ function PartnerObject({ data, partnerId, section }: { data: DeliverySettingsRes
               driverName: v.driverName.trim() || null,
               driverPhone: v.driverPhone.trim() || null,
               active: v.active,
+              /* 0724: sent only when changed, so the eight-argument door still answers before 0724. */
+              ...(v.velocityDeviceId.trim() !== (was?.velocityDeviceId ?? "").trim() ? { velocityDeviceId: v.velocityDeviceId.trim() || null } : {}),
             }),
           });
         }
@@ -591,7 +616,7 @@ function PartnerObject({ data, partnerId, section }: { data: DeliverySettingsRes
     >
       <div className="mx-auto grid w-full max-w-4xl gap-5 overflow-auto p-5" data-testid="delivery-settings-partner">
         <div>
-          <Link className="text-label text-kit-blue-11" to="/operation/settings/delivery/partners">
+          <Link className="text-body font-medium text-kit-blue-11" to="/operation/settings/delivery/partners">
             ← {DS.partners}
           </Link>
           <div className="text-body text-kit-slate-11">
@@ -610,8 +635,8 @@ function PartnerObject({ data, partnerId, section }: { data: DeliverySettingsRes
               key={s.slug}
               to={`/operation/settings/delivery/partners/${encodeURIComponent(partner.id)}/${s.slug}`}
               className={({ isActive }) =>
-                `rounded-control px-2 py-1 text-label ${isActive || (s.slug === "details" && section === "details")
-                  ? "bg-kit-blue-3 font-semibold text-kit-slate-12"
+                `rounded-control px-2 py-1 text-body ${isActive || (s.slug === "details" && section === "details")
+                  ? "bg-kit-blue-3 font-medium text-kit-slate-12"
                   : "text-kit-slate-11 hover:bg-kit-slate-3"}`
               }
               end
@@ -622,7 +647,7 @@ function PartnerObject({ data, partnerId, section }: { data: DeliverySettingsRes
         </nav>
 
         {section === "details" && (
-          <SectionCard title="Partner details" testId="delivery-settings-details">
+          <SectionCard title="Company details" testId="delivery-settings-details">
             <Row label={DS.name} htmlFor="dp-name">
               {canEdit ? (
                 <Input id="dp-name" value={draft.details.name} onChange={(e) => set("details", { ...draft.details, name: e.target.value })} />
@@ -676,7 +701,7 @@ function PartnerObject({ data, partnerId, section }: { data: DeliverySettingsRes
               {canEdit ? (
                 <YesNo id="dp-kv" value={draft.coverage.kvDefault} onChange={(v) => set("coverage", { ...draft.coverage, kvDefault: v })} />
               ) : draft.coverage.kvDefault ? DS.yes : DS.no}
-              <span className="block text-label text-kit-slate-11">{KV_STATES.join(" · ")}</span>
+              <span className="block text-meta text-kit-slate-11">{KV_STATES.join(" · ")}</span>
             </Row>
           </SectionCard>
         )}
@@ -720,7 +745,7 @@ function PartnerObject({ data, partnerId, section }: { data: DeliverySettingsRes
                         set("schedule", { ...draft.schedule, regions });
                       }} />
                     ) : <span className="font-medium">{r.name}</span>}
-                    <span className="text-label text-kit-slate-11">{DS.deliveryDays}</span>
+                    <span className="text-meta text-kit-slate-11">{DS.deliveryDays}</span>
                     <WeekdayPicker value={r.deliveryDays} days={[1, 2, 3, 4, 5, 6]} disabled={!canEdit} onChange={(v) => {
                       const regions = [...draft.schedule.regions];
                       regions[i] = { ...r, deliveryDays: v };
@@ -751,7 +776,7 @@ function PartnerObject({ data, partnerId, section }: { data: DeliverySettingsRes
         )}
 
         {section === "handover" && (
-          <SectionCard title="Warehouses & handover points" testId="delivery-settings-handover">
+          <SectionCard title="Transit points" testId="delivery-settings-handover">
             <Row label={DS.partnerWarehouse}>
               {partner.operating_party_id ? "Operated site recorded" : <span className="text-kit-slate-9">{NOT_CONFIGURED}</span>}
             </Row>
@@ -801,14 +826,17 @@ function PartnerObject({ data, partnerId, section }: { data: DeliverySettingsRes
                         <Select id={`dp-driver-active-${i}`} label={DS.status} value={d.active ? "active" : "inactive"} onValueChange={(v) => {
                           const drivers = [...draft.fleet.drivers]; drivers[i] = { ...d, active: v === "active" }; set("fleet", { ...draft.fleet, drivers });
                         }} options={[{ value: "active", label: DS.active }, { value: "inactive", label: DS.inactive }]} />
+                        <Select id={`dp-driver-role-${i}`} label={DS.crewRole} value={d.role ?? "driver"} onValueChange={(v) => {
+                          const drivers = [...draft.fleet.drivers]; drivers[i] = { ...d, role: v === "helper" ? "helper" : "driver" }; set("fleet", { ...draft.fleet, drivers });
+                        }} options={[{ value: "driver", label: DS.roleDriver }, { value: "helper", label: DS.roleHelper }]} />
                       </>
                     ) : (
-                      <span>{d.name} · {orNotConfigured(d.phone)} · {d.active ? DS.active : DS.inactive}</span>
+                      <span>{d.name} · {orNotConfigured(d.phone)} · {d.role === "helper" ? DS.roleHelper : DS.roleDriver} · {d.active ? DS.active : DS.inactive}</span>
                     )}
                   </div>
                 ))}
                 {canEdit ? (
-                  <Button size="sm" data-testid="delivery-settings-add-driver" onClick={() => set("fleet", { ...draft.fleet, drivers: [...draft.fleet.drivers, { id: null, name: "", phone: "", active: true }] })}>{DS.addDriver}</Button>
+                  <Button size="sm" data-testid="delivery-settings-add-driver" onClick={() => set("fleet", { ...draft.fleet, drivers: [...draft.fleet.drivers, { id: null, name: "", phone: "", active: true, role: null }] })}>{DS.addDriver}</Button>
                 ) : draft.fleet.drivers.length === 0 ? <span className="text-kit-slate-9">{NOT_CONFIGURED}</span> : null}
               </div>
             </Row>
@@ -833,6 +861,9 @@ function PartnerObject({ data, partnerId, section }: { data: DeliverySettingsRes
                         <Input id={`dp-vphone-${i}`} label={DS.driverPhone} value={v.driverPhone} onChange={(e) => {
                           const vehicles = [...draft.fleet.vehicles]; vehicles[i] = { ...v, driverPhone: e.target.value }; set("fleet", { ...draft.fleet, vehicles });
                         }} />
+                        <Input id={`dp-vdevice-${i}`} label={DS.velocityDevice} value={v.velocityDeviceId} onChange={(e) => {
+                          const vehicles = [...draft.fleet.vehicles]; vehicles[i] = { ...v, velocityDeviceId: e.target.value }; set("fleet", { ...draft.fleet, vehicles });
+                        }} />
                         <Select id={`dp-vactive-${i}`} label={DS.status} value={v.active ? "active" : "inactive"} onValueChange={(val) => {
                           const vehicles = [...draft.fleet.vehicles]; vehicles[i] = { ...v, active: val === "active" }; set("fleet", { ...draft.fleet, vehicles });
                         }} options={[{ value: "active", label: DS.active }, { value: "inactive", label: DS.inactive }]} />
@@ -843,7 +874,7 @@ function PartnerObject({ data, partnerId, section }: { data: DeliverySettingsRes
                   </div>
                 ))}
                 {canEdit ? (
-                  <Button size="sm" data-testid="delivery-settings-add-vehicle" onClick={() => set("fleet", { ...draft.fleet, vehicles: [...draft.fleet.vehicles, { id: null, plate: "", vehicleType: "", capacity: "", driverName: "", driverPhone: "", active: true }] })}>{DS.addVehicle}</Button>
+                  <Button size="sm" data-testid="delivery-settings-add-vehicle" onClick={() => set("fleet", { ...draft.fleet, vehicles: [...draft.fleet.vehicles, { id: null, plate: "", vehicleType: "", capacity: "", driverName: "", driverPhone: "", active: true, velocityDeviceId: "" }] })}>{DS.addVehicle}</Button>
                 ) : draft.fleet.vehicles.length === 0 ? <span className="text-kit-slate-9">{NOT_CONFIGURED}</span> : null}
               </div>
             </Row>
@@ -909,16 +940,22 @@ function WeekdayPicker({ value, days, onChange, disabled }: { value: number[]; d
 }
 
 /* ── Delivery Rules ───────────────────────────────────────────────────────── */
-type RulesDraft = Record<string, { contactBy: "partner" | "operation"; onBehalf: boolean; proof: ProofRules }>;
+type RulesDraft = Record<string, { contactBy: "partner"; onBehalf: boolean; proof: ProofRules }>;
 
 function rulesDraftOf(data: DeliverySettingsResponse): RulesDraft {
   return Object.fromEntries(
     data.partners.map((p) => [
       p.id,
       {
-        contactBy: p.customer_contact_by ?? "partner",
+        contactBy: "partner",
         onBehalf: p.record_on_behalf_allowed !== false,
-        proof: (p.proof_rules as ProofRules | null) ?? DEFAULT_PROOF_RULES,
+        proof: {
+          ...DEFAULT_PROOF_RULES,
+          ...(p.proof_rules as ProofRules | null),
+          deliveredPhoto: true,
+          deliveredSignedDo: true,
+          partialSignedDo: true,
+        },
       },
     ]),
   );
@@ -930,9 +967,46 @@ function RulesPage({ data }: { data: DeliverySettingsResponse }) {
   useEffect(() => setDraft(rulesDraftOf(data)), [data]);
   const saved = useMemo(() => rulesDraftOf(data), [data]);
   const changedIds = data.partners.map((p) => p.id).filter((id) => !same(draft[id], saved[id]));
+  /* DEL-04 · `Assign logistics by` (0673) — its own Settings editor gate. */
+  const rules = data.rules ?? null;
+  const leadSaved = rules?.assignmentLeadWorkingDays ?? null;
+  const canEditLead = Boolean(rules?.stored && rules.canEdit);
+  const [lead, setLead] = useState(leadSaved != null ? String(leadSaved) : "");
+  const [leadReason, setLeadReason] = useState("");
+  useEffect(() => { setLead(leadSaved != null ? String(leadSaved) : ""); setLeadReason(""); }, [leadSaved]);
+  const leadN = Number(lead);
+  const leadDirty = canEditLead && leadSaved != null && lead.trim() !== "" && leadN !== leadSaved;
+  const leadGap = leadDirty && (!Number.isInteger(leadN) || leadN < 1 || leadN > 30) ? DS.assignByRange : null;
+  /* DEL-10 · `Courier dispatch within` (0678) — the same row, gate and record. */
+  const courierSaved = rules?.courierDispatchWorkingDays ?? null;
+  const canEditCourier = canEditLead && rules?.courierDispatchStored === true;
+  const [courier, setCourier] = useState(courierSaved != null ? String(courierSaved) : "");
+  useEffect(() => { setCourier(courierSaved != null ? String(courierSaved) : ""); }, [courierSaved]);
+  const courierN = Number(courier);
+  const courierDirty = canEditCourier && courierSaved != null && courier.trim() !== "" && courierN !== courierSaved;
+  const courierGap = courierDirty && (!Number.isInteger(courierN) || courierN < 1 || courierN > 30) ? DS.assignByRange : null;
+  const rulesGap = leadGap ?? courierGap;
+  const canSave = !rulesGap && ((data.canEdit && changedIds.length > 0) || leadDirty || courierDirty);
   const save = useMutation({
     mutationFn: async () => {
-      for (const id of changedIds) {
+      /* One Delivery Rules row: each save returns the new revision, which the
+         next save of the same row carries. */
+      let revision = rules?.revision ?? null;
+      const reason = leadReason.trim() || null;
+      if (leadDirty && revision != null) {
+        const after = await apiFetch<{ revision?: number }>("/api/operation/delivery-settings/rules/assignment-lead", {
+          method: "PUT",
+          body: JSON.stringify({ workingDays: leadN, revision, reason }),
+        });
+        revision = typeof after?.revision === "number" ? after.revision : revision;
+      }
+      if (courierDirty && revision != null) {
+        await apiFetch("/api/operation/delivery-settings/rules/courier-dispatch", {
+          method: "PUT",
+          body: JSON.stringify({ workingDays: courierN, revision, reason }),
+        });
+      }
+      for (const id of data.canEdit ? changedIds : []) {
         const r = draft[id]!;
         await apiFetch("/api/operation/delivery-settings/partner/rules", {
           method: "PUT",
@@ -945,6 +1019,7 @@ function RulesPage({ data }: { data: DeliverySettingsResponse }) {
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: DELIVERY_SETTINGS_QUERY_KEY });
       void qc.invalidateQueries({ queryKey: ["operation", "partners"] });
+      void qc.invalidateQueries({ queryKey: ["settings", "deadlines", "delivery-leads"] });
     },
   });
   const canEdit = data.canEdit;
@@ -955,13 +1030,39 @@ function RulesPage({ data }: { data: DeliverySettingsResponse }) {
       variant="settings"
       title={DS.rules}
       titleRight={
-        <Button variant="primary" data-testid="delivery-settings-save" disabled={!canEdit || changedIds.length === 0} loading={save.isPending} onClick={() => save.mutate()}>
-          {DS.saveChanges}
+        <Button variant="primary" data-testid="delivery-settings-save" disabled={!canSave} loading={save.isPending} onClick={() => save.mutate()}>
+          {rulesGap ? `${DS.saveChanges}: ${rulesGap}` : DS.saveChanges}
         </Button>
       }
     >
       <div className="mx-auto grid w-full max-w-4xl gap-5 overflow-auto p-5" data-testid="delivery-settings-rules">
-        {!canEdit && <p className="text-meta text-kit-slate-11" data-testid="delivery-settings-read-only">{DS.readOnly}</p>}
+        {!canEdit && !canEditLead && <p className="text-meta text-kit-slate-11" data-testid="delivery-settings-read-only">{DS.readOnly}</p>}
+        <SectionCard title={DS.assignBy} blurb={DS.assignByRule} testId="delivery-settings-assign-by">
+          <Row label={DS.assignBy} htmlFor="rule-assign-by">
+            {canEditLead ? (
+              <Input id="rule-assign-by" type="number" min={1} max={30}
+                value={lead} onChange={(e) => setLead(e.target.value)} />
+            ) : leadSaved != null ? DS.assignByValue(leadSaved) : <span className="text-kit-slate-9">{NOT_CONFIGURED}</span>}
+          </Row>
+          {leadDirty && (
+            <Row label={DS.reason} htmlFor="rule-assign-by-reason">
+              <Input id="rule-assign-by-reason" value={leadReason} maxLength={500} onChange={(e) => setLeadReason(e.target.value)} />
+            </Row>
+          )}
+        </SectionCard>
+        <SectionCard title={DS.courierDispatch} blurb={DS.courierDispatchRule} testId="delivery-settings-courier-dispatch">
+          <Row label={DS.courierDispatch} htmlFor="rule-courier-dispatch">
+            {canEditCourier ? (
+              <Input id="rule-courier-dispatch" type="number" min={1} max={30}
+                value={courier} onChange={(e) => setCourier(e.target.value)} />
+            ) : courierSaved != null ? DS.courierDispatchValue(courierSaved) : <span className="text-kit-slate-9">{NOT_CONFIGURED}</span>}
+          </Row>
+          {courierDirty && !leadDirty && (
+            <Row label={DS.reason} htmlFor="rule-courier-dispatch-reason">
+              <Input id="rule-courier-dispatch-reason" value={leadReason} maxLength={500} onChange={(e) => setLeadReason(e.target.value)} />
+            </Row>
+          )}
+        </SectionCard>
         <SectionCard title="Shared rules, read here and owned elsewhere" testId="delivery-settings-rule-mirrors">
           <Row label={DS.contactLead}>
             {data.contactLeadWorkingDays != null ? DS.contactLeadRule(data.contactLeadWorkingDays) : <span className="text-kit-slate-9">{NOT_CONFIGURED}</span>}
@@ -976,11 +1077,11 @@ function RulesPage({ data }: { data: DeliverySettingsResponse }) {
           const supported = [services.stairCarry && DS.stairCarry, services.dismantling && DS.dismantling, services.disposal && DS.disposal].filter(Boolean).join(" · ");
           return (
             <SectionCard key={p.id} title={p.name} testId={`delivery-settings-rules-${p.id}`}>
-              <Row label={DS.contactBy} htmlFor={`rule-contact-${p.id}`}>
-                {canEdit ? (
-                  <Select id={`rule-contact-${p.id}`} value={r.contactBy} onValueChange={(v) => setRule(p.id, { contactBy: v as "partner" | "operation" })}
-                    options={[{ value: "partner", label: DS.contactByPartner }, { value: "operation", label: DS.contactByOperation }]} />
-                ) : r.contactBy === "partner" ? DS.contactByPartner : DS.contactByOperation}
+              <Row label={DS.contactBy}>
+                <div className="grid gap-1">
+                  <span>Logistics contacts the customer</span>
+                  <span className="text-meta text-kit-slate-11">Carres contacts the customer only for: a known delay · another date requested · customer refused · wrong phone number</span>
+                </div>
               </Row>
               <Row label={DS.onBehalf} htmlFor={`rule-behalf-${p.id}`}>
                 {canEdit ? <YesNo id={`rule-behalf-${p.id}`} value={r.onBehalf} onChange={(v) => setRule(p.id, { onBehalf: v })} /> : r.onBehalf ? DS.yes : DS.no}
@@ -993,10 +1094,11 @@ function RulesPage({ data }: { data: DeliverySettingsResponse }) {
                     ["failedPhoto", DS.proofFailedPhoto],
                     ["partialSignedDo", DS.proofPartialSigned],
                   ] as const).map(([key, label]) => (
-                    <label key={key} className="inline-flex items-center gap-2 text-body">
-                      <input type="checkbox" checked={r.proof[key]} disabled={!canEdit} onChange={(e) => setRule(p.id, { proof: { ...r.proof, [key]: e.target.checked } })} />
-                      {label}
-                    </label>
+                    key === "failedPhoto" ? (
+                      <Checkbox key={key} id={`rule-proof-${p.id}-${key}`} label={label}
+                        checked={r.proof[key]} disabled={!canEdit}
+                        onCheckedChange={(checked) => setRule(p.id, { proof: { ...r.proof, [key]: checked } })} />
+                    ) : <p key={key} className="text-body">{label}</p>
                   ))}
                 </div>
               </Row>
@@ -1004,7 +1106,7 @@ function RulesPage({ data }: { data: DeliverySettingsResponse }) {
             </SectionCard>
           );
         })}
-        <ChangesList changes={data.changes.filter((c) => c.what === "partner_rules")} />
+        <ChangesList changes={data.changes.filter((c) => c.what === "partner_rules" || c.what === "assignment_lead" || c.what === "courier_dispatch_lead")} />
       </div>
     </PageShell>
   );

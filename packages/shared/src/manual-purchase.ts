@@ -281,7 +281,6 @@ export const MANUAL_PURCHASE_WORDS = {
    *  nothing to say*, and the read's own loading and failure states keep their
    *  separate words — an unread cell never claims a PO does not exist. */
   poNone: "No PO yet",
-  notOrderedYet: "Not ordered yet",
   /** THE TWO WORK ACTION SENTENCES (Card 08 §3.4) — no number, no person's
    *  name, no UUID. The Work row's context line distinguishes the purchase
    *  through its business facts (`manualPurchaseWorkContext`). */
@@ -399,27 +398,23 @@ export function manualPurchaseOrderByLine(dateLabel: string): string {
 /**
  * THE MISSING-SETTINGS FACTS (Card 06 §3.4) — the governed two lines, fact
  * then act, spelt once for the create form, the object and the rail's setup
- * lens. No production or transit number means no proposed Delivery Date and
- * no Order By; the engine never substitutes zero or a browser date.
+ * lens. No production number means no proposed Delivery Date and no Order
+ * By; the engine never substitutes zero or a browser date. (The supplier
+ * transit leg and its missing-number words were removed by owner ruling
+ * 2026-09-29.)
  */
 export function manualPurchaseLeadDayFacts(gap: {
-  kind: "production" | "transit";
+  kind: "production";
   supplierName: string | null;
   /** The Catalog category word, already capitalised by the caller's one
    *  label arithmetic (`categoryLabel`). Production only. */
   categoryLabel?: string | null;
 }): { wrong: string; todo: string } {
   const supplier = (gap.supplierName ?? "").trim() || "the supplier";
-  if (gap.kind === "production") {
-    const category = (gap.categoryLabel ?? "").trim() || "the category";
-    return {
-      wrong: "Production days are not set",
-      todo: `Add production days for ${supplier} · ${category} in Settings`,
-    };
-  }
+  const category = (gap.categoryLabel ?? "").trim() || "the category";
   return {
-    wrong: "Transit days are not set",
-    todo: `Add transit days for ${supplier} in Settings`,
+    wrong: "Production days are not set",
+    todo: `Add production days for ${supplier} · ${category} in Settings`,
   };
 }
 
@@ -737,9 +732,8 @@ export function stillNeededOf(qty: number, free: number, alreadyOnPo: number): n
  *   PURPOSE        the six governed purposes (compact dropdown).
  *   PRODUCT        the Catalog categories (compact dropdown).
  *   SUPPLIER       actual names, alphabetical (compact dropdown).
- *   SETUP TO FIX   `Supplier not set` · `Production days not set` ·
- *                  `Transit days not set` — only while an affected request
- *                  exists.
+ *   SETUP TO FIX   `Supplier not set` · `Production days not set` — only
+ *                  while an affected request exists.
  *
  * ⛔ `WORK TO DO` and `TO ORDER / All not ordered` are RETIRED from this page.
  * Central Work keeps its action identities; the Register's three groups say
@@ -764,7 +758,6 @@ export const MANUAL_PURCHASE_RAIL = {
     rows: [
       { key: "supplier_not_set", word: "Supplier not set" },
       { key: "production_days_not_set", word: "Production days not set" },
-      { key: "transit_days_not_set", word: "Transit days not set" },
     ],
   },
 } as const;
@@ -914,7 +907,6 @@ export interface ManualPurchaseRailFacts {
   timing: ManualPurchaseTimingState | null;
   supplierGap: boolean;
   productionDaysMissing: boolean;
-  transitDaysMissing: boolean;
 }
 
 export function manualPurchaseRailFacts(
@@ -929,7 +921,6 @@ export function manualPurchaseRailFacts(
     lineOrderBys: readonly (string | null | undefined)[];
     supplierGap: boolean;
     productionDaysMissing: boolean;
-    transitDaysMissing: boolean;
   }[],
   todayIso: string | null,
 ): ManualPurchaseRailFacts[] {
@@ -953,7 +944,6 @@ export function manualPurchaseRailFacts(
       timing: buying ? manualPurchaseTimingOf(orderBy, todayIso) : null,
       supplierGap: r.supplierGap,
       productionDaysMissing: r.productionDaysMissing,
-      transitDaysMissing: r.transitDaysMissing,
     };
   });
 }
@@ -966,8 +956,6 @@ function hasSetup(f: ManualPurchaseRailFacts, key: ManualPurchaseSetupKey): bool
       return f.supplierGap;
     case "production_days_not_set":
       return f.productionDaysMissing;
-    case "transit_days_not_set":
-      return f.transitDaysMissing;
   }
 }
 
@@ -1370,31 +1358,9 @@ export interface ManualPurchaseWorkInput {
   remainingQty: number;
   /** The request's earliest server-derived Order By, or null. */
   orderBy: string | null;
-  /**
-   * Any linked PO at all (real lineage, Card 04 §3.4).
-   *
-   * ⚠️ READ, BUT NO LONGER A REASON TO RAISE WORK — see `posAllSent`.
-   */
+  /** Linked PO lineage; numbering is not completion of sending work. */
   hasPos: boolean;
-  /**
-   * Every linked PO's CURRENT version has confirmed-sent evidence
-   * (`po_sends.kind = 'confirmed_sent'` at `coalesce(version, 1)`).
-   *
-   * ⛔ THIS NO LONGER OPENS `Issue PO` — owner ruling 2026-09-11.
-   *
-   * Card 06 §7 kept the issue action open on a FULLY ORDERED request whose
-   * purchase orders carried no confirmed-sent row. Measured on production
-   * 2026-09-11: 62 purchase orders exist and 3 carry that evidence, so the
-   * rule raised a `Issue PO` task against 59 documents that had already been
-   * issued — and whose only fault was that nobody ticked a confirmation.
-   *
-   * An existing numbered PO IS an existing commitment, evidence or not.
-   * Copying a PO into WhatsApp is not proof of sending, and the absence of
-   * proof is not a reason to issue a second purchase order or to invent a
-   * confirmation chore. The field stays because the evidence itself is real,
-   * is preserved, and is worth showing on the document; it simply may not
-   * manufacture work.
-   */
+  /** Every linked CURRENT version has confirmed-sent evidence. */
   posAllSent: boolean;
 }
 
@@ -1433,9 +1399,11 @@ export function manualPurchaseWorkItems(
   todayIso: string,
   opts: WorkingDayOptions = {},
 ): WorkItem[] {
+  /* The stored Office calendar when the caller passes it (`officeWorkingDayOptions`);
+     the owner default Monday–Friday otherwise. */
   const officeOpts: WorkingDayOptions = {
     ...opts,
-    offDays: PURCHASING_OFFICE_OFF_DAYS,
+    offDays: opts.offDays ?? PURCHASING_OFFICE_OFF_DAYS,
   };
   const today = todayIso.slice(0, 10);
   const late = (dueIso: string | null): number =>
@@ -1468,25 +1436,24 @@ export function manualPurchaseWorkItems(
       workingDaysLate: late(input.orderBy),
     });
   }
-  /* ⭐ APPROVED REMAINING DEMAND, AND NOTHING ELSE (owner ruling 2026-09-11).
-     Refused / fully-cancelled / ordered / arrived requests carry no issuance
-     work: there is nothing left to buy, and an absent send confirmation is
-     not a reason to say there is. */
-  const issueOpen = input.status === "ready_to_order" && input.remainingQty > 0;
+  const needsPurchase = input.status === "ready_to_order" && input.remainingQty > 0;
+  const needsSending = ["ready_to_order", "ordered", "arrived"].includes(input.status)
+    && input.hasPos && !input.posAllSent;
+  const issueOpen = needsPurchase || needsSending;
   if (issueOpen) {
     const resolution = ctx.poDutyResolution;
     const legacy = ctx.poDuty
       ? { userId: ctx.poDuty.userId, name: ctx.poDuty.name }
       : null;
-    const normalOwner = resolution?.normalOwner ?? legacy;
+    const normalOwner = resolution ? resolution.normalOwner : legacy;
     const activeCover = resolution?.activeCover ?? null;
-    const actingPerson = resolution?.actingPerson ?? legacy;
+    const actingPerson = resolution ? resolution.actingPerson : legacy;
     items.push({
       ruleKey: "manual_purchase.issue_po",
       module: "purchasing",
       soRef: input.context,
       orderId: input.requestId,
-      action: MANUAL_PURCHASE_WORDS.workIssuePo,
+      action: needsPurchase ? MANUAL_PURCHASE_WORDS.workIssuePo : "Confirm PO sent to supplier",
       ownerRule: "po_duty",
       ownerDutyKey: "po_duty",
       normalOwner,

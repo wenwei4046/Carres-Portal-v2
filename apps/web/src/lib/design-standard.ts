@@ -63,7 +63,7 @@ export const COLOR = {
   // a soft tint, never bare coloured text).
   green: { text: "#3B6D11", fill: "#EAF3DE", use: "ready / paid / on-time" },
   amber: { text: "#854F0B", fill: "#FAEEDA", use: "waiting / chasing" },
-  red:   { text: "#A32D2D", fill: "#FCEBEB", use: "problem / No PO / overdue / alert" },
+  red:   { text: "#A32D2D", fill: "#FCEBEB", use: "problem / No PO / late / alert" },
 
   // Hairline. ⚠️ STALE: the retired "v4 §9" said 0.5px; UI-KIT 2026-07-27
   // §4.3 is "1px only", in exactly two colours (`slate-5` · `slate-6`).
@@ -89,7 +89,7 @@ export const COLOR = {
 export const CHIP = {
   ready:   { meaning: "ready / paid / on-time",      text: "#3B6D11", fill: "#EAF3DE", pillClass: "pill-confirmed" },
   waiting: { meaning: "waiting / chasing",           text: "#854F0B", fill: "#FAEEDA", pillClass: "pill-warning" },
-  overdue: { meaning: "problem / No PO / overdue",   text: "#A32D2D", fill: "#FCEBEB", pillClass: "pill-overdue" },
+  overdue: { meaning: "problem / No PO / late",      text: "#A32D2D", fill: "#FCEBEB", pillClass: "pill-overdue" },
 } as const;
 
 /** Selection. ⚠️ STALE: UI-KIT 2026-07-27 §3.3 gives blue BOTH jobs —

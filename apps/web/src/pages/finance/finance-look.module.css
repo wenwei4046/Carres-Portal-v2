@@ -1,0 +1,107 @@
+/* ⭐ FINANCE LOOK for Finance's statements (Chew 2026-10-13; docs/finance/MASTER.md
+   §4.2, a Finance exception to the one kit). Profit and Loss, Balance Sheet and
+   Cash Flow print through StatementTable, which draws the kit DataTable; this
+   wrapper gives that table the look the Finance grids get from
+   `look="finance"` (DataGrid.module.css `.rootLookFinance`), with the same
+   values. The colours are set here, once, for every statement. The General
+   Ledger's kit table wears the same wrapper (Chew 2026-10-14). */
+.statement {
+  --fin-head-bg: #E8EEFC;
+  --fin-head-ink: #1E3A8A;
+  --fin-col-line: #E5E7EB;
+  --fin-sub-bg: #F6F7F9;
+  --fin-total-rule: #6B7280;
+  --fin-select-edge: #374151;
+  display: flex;
+  min-height: 0;
+  flex: 1 1 0%;
+  flex-direction: column;
+}
+
+/* The table fills its box with ONE column (Chew 2026-10-14): the page sets
+   --fin-table-width to the sum of its column widths and marks the wrapper
+   data-fin-fill; the fill column (width auto) takes what the others leave and
+   never drops below its own width. A narrow screen scrolls it sideways. When
+   the person has dragged the fill column, it keeps that width: no mark, the
+   table is as wide as its columns and the frame hugs it. */
+.statement > [data-kit="data-table"] {
+  width: fit-content;
+  max-width: 100%;
+}
+.statement > [data-kit="data-table"] > table {
+  width: var(--fin-table-width, 100%);
+}
+.statement[data-fin-fill] > [data-kit="data-table"] {
+  width: auto;
+}
+.statement[data-fin-fill] > [data-kit="data-table"] > table {
+  width: 100%;
+  min-width: var(--fin-table-width, 0);
+}
+
+/* Drag a header edge to resize (Chew 2026-10-14): a faint line on the edge
+   while the header is hovered, the dark edge colour on the edge itself. */
+.statement thead th:hover > [data-kit="table-resize"] {
+  background: color-mix(in srgb, var(--fin-select-edge) 25%, transparent);
+}
+.statement thead th > [data-kit="table-resize"]:hover,
+.statement thead th > [data-kit="table-resize"]:focus-visible {
+  background: var(--fin-select-edge);
+}
+
+/* The header band: light blue, dark blue words, 600. */
+.statement thead th {
+  background: var(--fin-head-bg);
+  color: var(--fin-head-ink);
+  font-weight: 600;
+}
+
+/* A hairline between columns. */
+.statement th,
+.statement td {
+  border-right: 1px solid var(--fin-col-line);
+}
+.statement th:last-child,
+.statement td:last-child {
+  border-right: 0;
+}
+
+/* Subtotals: each section's band, and a heading line inside a section
+   (its cell content carries data-fin-tone="subtotal"). */
+.statement tr[data-kit="data-group"] > td,
+.statement tr[data-kit="data-row"]:has([data-fin-tone="subtotal"]) > td {
+  background: var(--fin-sub-bg);
+  font-weight: 600;
+}
+
+/* A line carried in (the General Ledger's Brought forward): light grey. */
+.statement tr[data-kit="data-row"]:has([data-fin-tone="brought"]) > td {
+  background: var(--fin-sub-bg);
+}
+
+/* An account's Total line inside the table (the General Ledger): light grey,
+   600, with the heavy rule above, as the bottom line. */
+.statement tr[data-kit="data-row"]:has([data-fin-tone="total"]) > td {
+  background: var(--fin-sub-bg);
+  font-weight: 600;
+  border-top: 2px solid var(--fin-total-rule);
+}
+
+/* The total: the statement's bottom line, with a heavy rule above. */
+.statement tr[data-kit="data-totals"] > td {
+  background: var(--fin-sub-bg);
+  font-weight: 600;
+  border-top: 2px solid var(--fin-total-rule);
+}
+
+/* The last row keeps its line, as on the Finance grids (Chew 2026-10-14). */
+.statement tbody > tr:last-child > td {
+  border-bottom: 1px solid var(--fin-col-line);
+}
+
+/* Rows 40 high, as on the Finance grids (Chew 2026-10-14). */
+.statement tbody > tr > td {
+  height: 40px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}

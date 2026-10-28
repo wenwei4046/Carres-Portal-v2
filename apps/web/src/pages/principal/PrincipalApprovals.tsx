@@ -55,8 +55,8 @@ export default function PrincipalApprovals() {
         {(["pending", "approved", "rejected", "all"] as Filter[]).map((f) => {
           const isActive = filter === f;
           const cls = isActive
-            ? "px-3.5 py-1.5 text-meta rounded-sm capitalize bg-white font-semibold text-base-900 cursor-pointer border-0"
-            : "px-3.5 py-1.5 text-meta rounded-sm capitalize text-base-600 font-medium cursor-pointer bg-transparent border-0";
+            ? "px-3.5 py-1.5 text-body rounded-sm capitalize bg-white font-medium text-base-900 cursor-pointer border-0"
+            : "px-3.5 py-1.5 text-body rounded-sm capitalize text-base-600 cursor-pointer bg-transparent border-0";
           return (
             <button key={f} type="button" onClick={() => setFilter(f)} className={cls}>
               {f}

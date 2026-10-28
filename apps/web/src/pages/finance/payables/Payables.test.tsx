@@ -48,6 +48,14 @@ const suppliers = { rows: [
   { id: SUP, name: "Lumen Sofa Works", kind: "supplier" },
   { id: LANDLORD, name: "Bayview Properties", kind: "other_creditor" },
 ] };
+// 0636: Finance's own bank details — the supplier has one, the landlord none.
+const supplierFinance = { rows: [
+  { supplier_id: SUP, name: "Lumen Sofa Works", kind: "supplier", tax_no: null, registration_no: null,
+    bank_name: "Maybank", bank_account_no: "514012345678", bank_account_holder: "Lumen Sofa Works Sdn Bhd",
+    updated_at: "2026-10-03T03:15:00Z", updated_by_name: "Chew" },
+  { supplier_id: LANDLORD, name: "Bayview Properties", kind: "other_creditor", tax_no: null, registration_no: null,
+    bank_name: null, bank_account_no: null, bank_account_holder: null, updated_at: null, updated_by_name: null },
+] };
 const accounts = { rows: [
   { code: "1110", name: "Cash in hand", kind: "ASSET", parent_code: "1100", is_control: false, control_for: null,
     for_bill_line: false, for_voucher_line: false, for_ap: false, for_pay_from: true },
@@ -127,6 +135,7 @@ beforeEach(() => {
   api.fail.clear();
   api.routes = {
     [`${B}/suppliers`]: suppliers,
+    [`${B}/supplier-finance`]: supplierFinance,
     [`${B}/accounts`]: accounts,
     [MONEY]: moneyAccounts,
     // AutoCount-shaped roles: the form names the usual accounts from these.
@@ -148,10 +157,12 @@ beforeEach(() => {
     [`${B}/bills/grn-lines/${GRN}`]: { rows: [
       { receipt_id: GRN, grn_no: "GRN-A1", po_id: "PO-3001", supplier_id: SUP, supplier_name: "Lumen Sofa Works",
         po_line_id: POL1, sku: "SOFA-3S", received_qty: "1", billed_qty: "0", open_qty: "1", po_unit_cost: "520.00",
-        commercial_treatment: null, department_type: "SHOWROOM", department_id: OUTLET },
+        commercial_treatment: null, department_type: "SHOWROOM", department_id: OUTLET,
+        channels: [{ department_type: "SHOWROOM", department_id: OUTLET, qty: 1 }] },
       { receipt_id: GRN, grn_no: "GRN-A1", po_id: "PO-3001", supplier_id: SUP, supplier_name: "Lumen Sofa Works",
         po_line_id: POL2, sku: "STOOL-1", received_qty: "2", billed_qty: "0", open_qty: "2", po_unit_cost: "250.00",
-        commercial_treatment: null },
+        commercial_treatment: null, department_type: null, department_id: null,
+        channels: [{ department_type: "SHOWROOM", department_id: OUTLET, qty: 1 }, { department_type: "STOCK", department_id: null, qty: 1 }] },
     ] },
     [`${B}/bill-outstanding`]: { rows: [
       { bill_id: BILL1, bill_no: "BILL-4XK2", supplier_id: SUP, supplier_name: "Lumen Sofa Works",
@@ -175,9 +186,21 @@ beforeEach(() => {
         applied_total: "200.00", money_back_total: "0.00", advance_open: "300.00" },
     ] },
     [`${B}/vouchers`]: { rows: [] },
+    // 0681: no supplier debit note unless a test adds one.
+    [`${B}/debit-notes`]: { rows: [] },
+    [`${B}/opening-bill-outstanding`]: { rows: [] },
   };
   localStorage.clear();
 });
+
+// 0681: a confirmed supplier debit note, RM 100.00 of it already on a voucher.
+const DN = "abababab-abab-4bab-8bab-abababababab";
+const debitNoteRow = {
+  id: DN, note_no: "PDN-20261005-3381", status: "confirmed", supplier_id: SUP, supplier_name: "Lumen Sofa Works",
+  supplier_kind: "supplier", supplier_note_no: "LSW-DN-4", note_date: "2026-10-05", due_date: "2026-11-04",
+  ap_account_code: "2110", total_amount: "180.00", paid_total: "0.00", held_total: "100.00", debit_open: "180.00",
+  file_count: 0, created_at: "2026-10-05T02:00:00Z",
+};
 
 function show(at: string) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -201,34 +224,63 @@ describe("Bills register", () => {
     show("/finance/bills");
     await screen.findByText("BILL-4XK2");
     expect(screen.getByText("Draft, no number yet")).toBeInTheDocument();
+    // Seven columns at first (Chew 2026-10-14): Price Check waits in Columns.
+    const heads = () => [...document.querySelectorAll<HTMLElement>("thead th")].map((th) => th.title).filter(Boolean);
+    expect(heads()).toEqual(["Bill No", "Bill Date", "Supplier", "Due Date", "Status", "Total", "Unpaid"]);
+    expect(screen.queryByText("1 line differs from PO")).not.toBeInTheDocument();
+    (fireEvent.click(screen.getByRole("button", { name: "Page tools" })), fireEvent.click(screen.getByRole("menuitem", { name: "Columns" })));
+    for (const held of ["Creditor Type", "Supplier Invoice", "GRN", "Files"]) {
+      expect(screen.getByRole("checkbox", { name: held })).not.toBeChecked();
+    }
+    fireEvent.click(screen.getByRole("checkbox", { name: "Price Check" }));
     expect(screen.getByText("1 line differs from PO")).toBeInTheDocument();
     expect(screen.getByText("Not confirmed")).toBeInTheDocument();
     expect(screen.queryByText("confirmed")).not.toBeInTheDocument();
     expect(screen.getByTestId("bills-summary")).toHaveTextContent("2 bills · RM 1,025.00 unpaid");
     expect(screen.getByTestId("new-bill")).toHaveTextContent("+ New Bill");
-    expect(within(screen.getByTestId("payables-switch")).getByRole("link", { name: "Payment Vouchers" }))
-      .toHaveAttribute("href", "/finance/payment-vouchers");
   });
 
-  it("the switch is one segmented control: the current view is the white chip, the other two are links", async () => {
-    show("/finance/bills");
-    const bar = await screen.findByTestId("payables-switch");
-    expect(bar.tagName).toBe("NAV");
-    expect(bar).toHaveAttribute("aria-label", "Payables");
-    expect(bar).toHaveClass("bg-base-100", "rounded-full");
-    const current = within(bar).getByText("Bills");
-    expect(current).toHaveAttribute("aria-current", "page");
-    expect(current.tagName).toBe("SPAN");
-    expect(current).toHaveClass("bg-white", "text-base-900", "px-3");
-    const links = within(bar).getAllByRole("link");
-    expect(links.map((a) => a.getAttribute("href"))).toEqual(["/finance/payment-vouchers", "/finance/ap-outstanding"]);
-    for (const a of links) expect(a).toHaveClass("text-base-500", "px-3");
-  });
+  /* Chew 2026-10-05: the menu is the one way between Bills, Payment Vouchers
+     and Unpaid by Supplier, so no page repeats it with a switch of its own. */
+  it.each([
+    ["/finance/bills", () => screen.findByText("BILL-4XK2")],
+    // The toolbar that held the switch, drawn with its New button.
+    ["/finance/payment-vouchers", () => screen.findByTestId("new-voucher")],
+    ["/finance/ap-outstanding", () => screen.findByText("Lumen Sofa Works")],
+  ] as const)("%s carries no switch to the other payables pages", async (at, loaded) => {
+      show(at);
+      await loaded();
+      expect(screen.queryByTestId("payables-switch")).not.toBeInTheDocument();
+      expect(screen.queryByRole("navigation", { name: "Payables" })).not.toBeInTheDocument();
+      const elsewhere = ["/finance/bills", "/finance/payment-vouchers", "/finance/ap-outstanding"].filter((p) => p !== at);
+      for (const href of elsewhere) expect(document.querySelector(`a[href="${href}"]`)).toBeNull();
+    });
 
   it("says a failed read failed — never an empty register", async () => {
     api.fail.add(`${B}/bills`);
     show("/finance/bills");
     expect(await screen.findByRole("alert")).toHaveTextContent("Bills could not be loaded");
+  });
+});
+
+/* 0691 (Chew 2026-10-12, 「A 可以」): a creditor reads with its code first. */
+describe("Creditor codes in the pickers (0691)", () => {
+  beforeEach(() => {
+    api.routes[`${B}/suppliers`] = { rows: [
+      { id: SUP, name: "Lumen Sofa Works", kind: "supplier", code: "400-L001" },
+      { id: LANDLORD, name: "Bayview Properties", kind: "other_creditor", code: "405-B001" },
+    ] };
+  });
+
+  it("the bill form's supplier picker reads the code first", async () => {
+    show("/finance/bills/new");
+    expect(await screen.findByRole("option", { name: "400-L001 Lumen Sofa Works" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "405-B001 Bayview Properties" })).toBeInTheDocument();
+  });
+
+  it("the payment voucher's supplier picker reads the code first", async () => {
+    show("/finance/payment-vouchers/new");
+    expect(await screen.findByRole("option", { name: "400-L001 Lumen Sofa Works · Supplier" })).toBeInTheDocument();
   });
 });
 
@@ -242,6 +294,33 @@ describe("Payment vouchers register", () => {
       advance_open: null }] };
     show("/finance/payment-vouchers");
     expect(await screen.findByRole("link", { name: "PV-9M3Q" })).toHaveClass("text-kit-blue-11");
+  });
+
+  /* Chew 2026-10-14 (「A」): eight columns fit a 1440 screen with the menu open; the rest wait in Columns. */
+  it("shows eight columns at first; the rest wait in Columns", async () => {
+    show("/finance/payment-vouchers");
+    await screen.findByTestId("new-voucher");
+    const heads = () => [...document.querySelectorAll<HTMLElement>("thead th")].map((th) => th.title).filter(Boolean);
+    await waitFor(() => expect(heads()).toEqual(["Voucher No", "Voucher Date", "Payee", "Purpose", "Code", "Paid From", "Status", "Amount"]));
+    (fireEvent.click(screen.getByRole("button", { name: "Page tools" })), fireEvent.click(screen.getByRole("menuitem", { name: "Columns" })));
+    for (const held of ["Supplier", "Bills and Debit Notes Paid", "Method", "Advance", "Prepared By", "Checked By", "Approved By", "Files"]) {
+      expect(screen.getByRole("checkbox", { name: held })).not.toBeChecked();
+    }
+  });
+
+  it("the account paid from shows its code and its name in two cells (Finance look, 2026-10-13)", async () => {
+    api.routes[`${B}/vouchers`] = { rows: [{ id: PV, voucher_no: "PV-9M3Q", status: "approved", purpose: "SUPPLIER_BILLS",
+      supplier_id: SUP, supplier_name: "Lumen Sofa Works", payee_name: "Lumen Sofa Works", voucher_date: "2026-09-11",
+      amount: "1225.00", pay_method: "BANK_TRANSFER", pay_reference: null, pay_from_account_code: "1120",
+      pay_from_name: "Bank", bill_nos: "BILL-4XK2", line_count: 0, prepared_by_name: "Aina", checked_by_name: "Boon",
+      approved_by_name: "Dina", file_count: 0, created_at: "2026-09-11T01:00:00Z", advance_amount: "0.00",
+      advance_open: null }] };
+    show("/finance/payment-vouchers");
+    const link = await screen.findByRole("link", { name: "PV-9M3Q" });
+    const voucher = link.closest("tr")!;
+    expect(within(voucher).getByRole("cell", { name: "1120" })).toBeInTheDocument();
+    expect(within(voucher).getByRole("cell", { name: "Bank" })).toBeInTheDocument();
+    expect(within(voucher).queryByText("1120 Bank")).not.toBeInTheDocument();
   });
 
   it("sorts Advance by the amount, with No advance last either way", async () => {
@@ -260,12 +339,29 @@ describe("Payment vouchers register", () => {
     show("/finance/payment-vouchers");
     await screen.findByRole("link", { name: "PV-NINE" });
     const order = () => screen.getAllByRole("link").map((l) => l.textContent).filter((t) => t?.startsWith("PV-"));
+    // Advance waits in Columns at first (Chew 2026-10-14).
+    expect(screen.queryByRole("button", { name: /^Advance/ })).not.toBeInTheDocument();
+    (fireEvent.click(screen.getByRole("button", { name: "Page tools" })), fireEvent.click(screen.getByRole("menuitem", { name: "Columns" })));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Advance" }));
     const sortAdvance = () => fireEvent.click(screen.getAllByRole("button", { name: /^Advance/ })[0]!);
 
     sortAdvance();
     expect(order()).toEqual(["PV-NINE", "PV-FIVE", "PV-NONE"]);
     sortAdvance();
     expect(order()).toEqual(["PV-FIVE", "PV-NINE", "PV-NONE"]);
+  });
+
+  /* 0666 (Chew 2026-10-09): a dealer's commission draft waits for Finance to pick the bank. */
+  it("a draft the system raised says its bank is not chosen yet", async () => {
+    api.routes[`${B}/vouchers`] = { rows: [{ id: PV, voucher_no: null, status: "draft", purpose: "DIRECT",
+      supplier_id: null, supplier_name: null, payee_name: "Ace Furniture", voucher_date: "2026-10-15",
+      amount: "337.50", pay_method: "BANK_TRANSFER", pay_reference: null, pay_from_account_code: null,
+      pay_from_name: null, bill_nos: null, line_count: 1, prepared_by_name: null, checked_by_name: null,
+      approved_by_name: null, file_count: 0, created_at: "2026-10-01T01:00:00Z", advance_amount: "0.00",
+      advance_open: null }] };
+    show("/finance/payment-vouchers");
+    expect(await screen.findByText("Not chosen yet")).toBeInTheDocument();
+    expect(screen.queryByText(/null/)).not.toBeInTheDocument();
   });
 });
 
@@ -276,8 +372,9 @@ describe("Bill form — Convert GRN to bill", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Use this GRN" }));
 
     await waitFor(() => expect(screen.getByLabelText("Line 1 qty")).toHaveValue("1"));
-    // The usual accounts are named from the chart's roles, never a number the page knows.
-    await waitFor(() => expect(screen.getByLabelText("Line 1 account").querySelector("option")).toHaveTextContent("610-0000 PURCHASES (usual)"));
+    // The usual accounts are named from the chart's roles, never a number the page knows;
+    // a goods line's usual account is its item group's (0659), which differs line by line.
+    await waitFor(() => expect(screen.getByLabelText("Line 1 account").querySelector("option")).toHaveTextContent("The item group's account (usual)"));
     expect(screen.getByLabelText("Payables account").querySelector("option")).toHaveTextContent("400-0000 TRADE CREDITORS (usual)");
     expect(screen.getByLabelText("Line 1 unit price")).toHaveValue("520.00");
     expect(screen.getByLabelText("Line 2 qty")).toHaveValue("2");
@@ -291,9 +388,13 @@ describe("Bill form — Convert GRN to bill", () => {
     expect(screen.getByTestId("bill-form-total")).toHaveTextContent("RM 1,025.00");
 
     fireEvent.change(screen.getByLabelText("Supplier invoice No"), { target: { value: "LSW-901" } });
-    // Line 1 took its department from the PO's sales order (DEPT-6); line 2 is picked.
-    expect(screen.getByLabelText("Line 1 department")).toHaveValue(`SHOWROOM:${OUTLET}`);
-    await pickDept("Line 2 department", "OFFICE");
+    // 0683 (Chew ruling 2): a goods line's channel comes from its orders, shown, never picked.
+    expect(screen.queryByLabelText("Line 1 department")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("line-1-channel")).toHaveTextContent("Bangsar showroom"));
+    // Line 2 was bought for a showroom order and for stock: split when saved.
+    expect(screen.getByTestId("line-2-channel")).toHaveTextContent("Bangsar showroom: 1");
+    expect(screen.getByTestId("line-2-channel")).toHaveTextContent("Not yet in a channel: 1");
+    expect(screen.getByTestId("line-2-channel")).toHaveTextContent("Split when saved");
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(writes()).toHaveLength(1));
@@ -303,8 +404,8 @@ describe("Bill form — Convert GRN to bill", () => {
       supplierId: SUP,
       supplierInvoiceNo: "LSW-901",
       lines: [
-        { warehouseReceiptId: GRN, poLineId: POL1, qty: 1, unitPrice: 525, departmentType: "SHOWROOM", departmentId: OUTLET },
-        { warehouseReceiptId: GRN, poLineId: POL2, qty: 2, unitPrice: 250, departmentType: "OFFICE", departmentId: null },
+        { warehouseReceiptId: GRN, poLineId: POL1, qty: 1, unitPrice: 525, departmentType: null, departmentId: null },
+        { warehouseReceiptId: GRN, poLineId: POL2, qty: 2, unitPrice: 250, departmentType: null, departmentId: null },
       ],
     });
     // The database computes a GRN line's amount; the page never sends one.
@@ -413,6 +514,106 @@ describe("Bill form — Convert GRN to bill", () => {
     expect(row.textContent).not.toMatch(/[—–]/);
   });
 
+  function rentBill(over: Record<string, unknown>) {
+    return {
+      bill: { id: BILL1, bill_no: "BILL-4XK2", status: "confirmed", supplier_id: SUP, supplier_name: "Lumen Sofa Works",
+        supplier_kind: "supplier", supplier_invoice_no: "LSW-US-77", bill_date: "2026-09-10", due_date: null, po_id: null,
+        ap_account_code: "2110", ap_account_name: "Trade payables", total_amount: "5268.75", narration: null,
+        cancel_reason: null, created_at: "2026-09-10T01:00:00Z", created_by_name: "Aina", confirmed_at: null,
+        confirmed_by_name: null, cancelled_at: null, cancelled_by_name: null, entry_no: "JE-1", reversal_entry_no: null },
+      lines: [], payments: [], files: [], events: [], paid_total: "0.00", allocated_total: "0.00", unpaid: "5268.75",
+      left_to_pay: "5268.75", advance_open: null, go_live_on: "2026-09-10",
+      can: { edit: false, confirm: false, cancel: false, add_file: true, apply_advance: false, take_advance_off: false },
+      ...over,
+    };
+  }
+
+  it("0682: records the currency a supplier invoiced in, its amount and rate; a record only", async () => {
+    api.routes[`${B}/bills/${BILL1}`] = rentBill({ foreign_amount: null });
+    show(`/finance/bills/${BILL1}`);
+    expect(await screen.findByTestId("bill-foreign-amount")).toHaveTextContent("None");
+    fireEvent.click(screen.getByTestId("record-foreign-amount"));
+    const form = await screen.findByTestId("foreign-amount-form");
+    expect(screen.getByRole("button", { name: "Save: type the currency" })).toBeDisabled();
+    fireEvent.change(within(form).getByLabelText("Currency"), { target: { value: "usd" } });
+    fireEvent.change(within(form).getByLabelText("Amount on the supplier's invoice"), { target: { value: "1250" } });
+    fireEvent.change(within(form).getByLabelText(/^Rate/), { target: { value: "4.215" } });
+    expect(form).toHaveTextContent("RM 5,268.75 at this rate. The bill is RM 5,268.75.");
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(writes()).toEqual([
+      { url: `${B}/bills/${BILL1}/foreign-amount`, method: "PUT", body: { currency: "USD", foreignAmount: 1250, rate: 4.215 } },
+    ]));
+  });
+
+  it("0682: shows what is recorded, and removes it", async () => {
+    api.routes[`${B}/bills/${BILL1}`] = rentBill({
+      foreign_amount: { currency: "USD", foreign_amount: "1250.00", rate: "4.215000", set_at: "2026-10-10T01:00:00Z" },
+    });
+    show(`/finance/bills/${BILL1}`);
+    expect(await screen.findByTestId("bill-foreign-amount")).toHaveTextContent("USD 1,250.00 at 4.215 · RM 5,268.75 at this rate");
+    fireEvent.click(screen.getByRole("button", { name: "Change" }));
+    await screen.findByTestId("foreign-amount-form");
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(writes()).toEqual([
+      { url: `${B}/bills/${BILL1}/foreign-amount`, method: "PUT", body: { currency: null } },
+    ]));
+  });
+
+  it("a confirmed bill with something unpaid offers New Payment Voucher as the kit's primary button", async () => {
+    api.routes[`${B}/bills/${BILL1}`] = rentBill({ foreign_amount: null });
+    api.routes[`${B}/bills/${BILL1}/notes-to-follow-up`] = { rows: [] };
+    show(`/finance/bills/${BILL1}`);
+    const pay = await screen.findByTestId("pay-bill");
+    expect(pay.tagName).toBe("BUTTON");
+    expect(pay).toHaveTextContent("New Payment Voucher");
+    expect(screen.queryByRole("link", { name: "New Payment Voucher" })).toBeNull();
+  });
+
+  it("0682: refuses ringgit as a foreign currency before saving", async () => {
+    api.routes[`${B}/bills/${BILL1}`] = rentBill({ foreign_amount: null });
+    show(`/finance/bills/${BILL1}`);
+    fireEvent.click(await screen.findByTestId("record-foreign-amount"));
+    const form = await screen.findByTestId("foreign-amount-form");
+    fireEvent.change(within(form).getByLabelText("Currency"), { target: { value: "MYR" } });
+    fireEvent.change(within(form).getByLabelText("Amount on the supplier's invoice"), { target: { value: "10" } });
+    fireEvent.change(within(form).getByLabelText(/^Rate/), { target: { value: "1" } });
+    expect(screen.getByRole("button", { name: "Save: a bill in ringgit has no foreign currency" })).toBeDisabled();
+  });
+
+  it("0659: a reopened draft sends a goods line nobody chose an account for back empty, and keeps a chosen one", async () => {
+    api.routes[`${B}/bills/${BILL1}`] = {
+      bill: { id: BILL1, bill_no: null, status: "draft", supplier_id: SUP, supplier_name: "Lumen Sofa Works",
+        supplier_kind: "supplier", supplier_invoice_no: "LSW-901", bill_date: "2026-09-10", due_date: null, po_id: "PO-3001",
+        ap_account_code: "2110", ap_account_name: "Trade payables", total_amount: "1020.00", narration: null,
+        cancel_reason: null, created_at: "2026-09-10T01:00:00Z", created_by_name: "Aina", confirmed_at: null,
+        confirmed_by_name: null, cancelled_at: null, cancelled_by_name: null, entry_no: null, reversal_entry_no: null },
+      lines: [
+        { line_no: 1, warehouse_receipt_id: GRN, po_line_id: POL1, grn_no: "GRN-A1", grn_po_id: "PO-3001", sku: "SOFA-1",
+          description: "SOFA-1", account_code: "610-0030", account_name: "PURCHASE - SOFA", account_chosen: false, qty: "1.00",
+          unit_price: "520.00", amount: "520.00", po_unit_cost: "520.00", price_diff: "0.00", department_type: "OFFICE", department_id: null },
+        { line_no: 2, warehouse_receipt_id: GRN, po_line_id: POL2, grn_no: "GRN-A1", grn_po_id: "PO-3001", sku: "SOFA-2",
+          description: "SOFA-2", account_code: "5100", account_name: "Cost of goods sold", account_chosen: true, qty: "2.00",
+          unit_price: "250.00", amount: "500.00", po_unit_cost: "250.00", price_diff: "0.00", department_type: "OFFICE", department_id: null },
+      ],
+      payments: [], files: [], events: [], paid_total: "0.00", allocated_total: "0.00", unpaid: null, left_to_pay: null,
+      advance_open: null, go_live_on: "2026-09-10",
+      can: { edit: true, confirm: true, cancel: true, add_file: false, apply_advance: false, take_advance_off: false },
+    };
+    show(`/finance/bills/${BILL1}/edit`);
+    await waitFor(() => expect(screen.getByLabelText("Supplier invoice No")).toHaveValue("LSW-901"));
+    await waitFor(() => expect(screen.getByLabelText("Line 2 account")).toHaveValue("5100"));
+    expect(screen.getByLabelText("Line 1 account")).toHaveValue("");
+    expect(screen.getByLabelText("Line 1 account").querySelector("option")).toHaveTextContent("The item group's account (usual)");
+    // 0683: a saved goods line shows the channel it went to; nobody picks it.
+    expect(screen.getByTestId("line-1-channel")).toHaveTextContent("Office");
+    expect(screen.queryByLabelText("Line 1 department")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0]!.body).toMatchObject({
+      lines: [{ poLineId: POL1, accountCode: null }, { poLineId: POL2, accountCode: "5100" }],
+    });
+  });
+
   it("leaves the due date empty when no terms are set (0530)", async () => {
     show("/finance/bills/new");
     await screen.findByRole("option", { name: "Lumen Sofa Works" });
@@ -437,6 +638,128 @@ describe("Bill form — Convert GRN to bill", () => {
       supplierId: LANDLORD, billDate: "2026-08-15",
       lines: [{ accountCode: "6500", description: "August rent", amount: 3000, qty: null, unitPrice: null }],
     });
+  });
+});
+
+/* 0689 (Chew ruling 5): a logistics company's bill names the delivery orders it
+   is for; each becomes a transport line in its order's channel. Names invented. */
+describe("Bill form — Add delivery orders", () => {
+  const LORRY = "12121212-1212-4212-8212-121212121212";
+  const PARTNER = "14141414-1414-4414-8414-141414141414";
+  const DO1 = "13131313-1313-4313-8313-131313131311";
+  const DO2 = "13131313-1313-4313-8313-131313131312";
+  const DO3 = "13131313-1313-4313-8313-131313131313";
+
+  beforeEach(() => {
+    api.routes[`${B}/suppliers`] = { rows: [...suppliers.rows, { id: LORRY, name: "Swift Haulage", kind: "other_creditor" }] };
+    const chart = api.routes["/api/finance/ledger/accounts"] as { accounts: unknown[]; roles: Record<string, string> };
+    api.routes["/api/finance/ledger/accounts"] = {
+      ...chart,
+      accounts: [...chart.accounts, { code: "900-T002", name: "LORRY HIRE", kind: "EXPENSE", parent_code: null,
+        is_control: false, control_for: null, is_active: true, is_header: false, sort_order: 0 }],
+      roles: { ...chart.roles, DELIVERY_TRANSPORT: "900-T002" },
+    };
+    api.routes[`${B}/bills/delivery-orders`] = { rows: [{ partner_id: PARTNER, name: "Swift Haulage", delivery_orders: [
+      { id: DO1, do_no: "DO-7001", delivery_date: "2026-10-08", order_id: "o1", so: 5101,
+        department_type: "SHOWROOM", department_id: OUTLET },
+      { id: DO2, do_no: "DO-7002", delivery_date: "2026-10-09", order_id: "o2", so: 5102,
+        department_type: "SUBSCRIPTION", department_id: null },
+      { id: DO3, do_no: "DO-7003", delivery_date: null, order_id: "o3", so: null,
+        department_type: null, department_id: null },
+    ] }] };
+  });
+
+  it("splits the bill's total over the ticked delivery orders, each in its order's channel, and saves the DO link", async () => {
+    show(`/finance/bills/new?supplier=${LORRY}`);
+    await waitFor(() => expect(screen.getByLabelText("Supplier")).toHaveValue(LORRY));
+    fireEvent.change(screen.getByLabelText("Supplier invoice No"), { target: { value: "SH-0921" } });
+
+    fireEvent.click(screen.getByTestId("add-delivery-orders"));
+    const modal = await screen.findByRole("dialog");
+    fireEvent.change(await within(modal).findByLabelText("Logistics company"), { target: { value: PARTNER } });
+    const add = within(modal).getByTestId("add-delivery-order-lines");
+    expect(add).toHaveTextContent("Add: tick a delivery order");
+    expect(add).toBeDisabled();
+
+    fireEvent.click(within(modal).getByRole("checkbox", { name: "Charge DO-7001" }));
+    fireEvent.click(within(modal).getByRole("checkbox", { name: "Charge DO-7002" }));
+    expect(add).toHaveTextContent("Add: type each amount, or split the total");
+    // RM 100.01 over two: the first takes the odd sen, so the parts add up to the total.
+    fireEvent.change(within(modal).getByLabelText("Total on the bill"), { target: { value: "100.01" } });
+    fireEvent.click(within(modal).getByRole("button", { name: "Split equally" }));
+    expect(within(modal).getByLabelText("DO-7001 amount")).toHaveValue("50.01");
+    expect(within(modal).getByLabelText("DO-7002 amount")).toHaveValue("50");
+    expect(add).toHaveTextContent("Add 2 lines");
+    fireEvent.click(add);
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    expect(screen.getByTestId("line-1-source")).toHaveTextContent("DO-7001");
+    expect(screen.getByTestId("line-2-source")).toHaveTextContent("DO-7002");
+    expect(screen.getByLabelText("Line 1 description")).toHaveValue("Transport · DO-7001 · SO-5101");
+    // The channel is the order's, shown and never picked.
+    await waitFor(() => expect(screen.getByTestId("line-1-channel")).toHaveTextContent("Bangsar showroom"));
+    expect(screen.getByTestId("line-2-channel")).toHaveTextContent("Subscription");
+    expect(screen.queryByLabelText("Line 1 department")).not.toBeInTheDocument();
+    // One amount per delivery order: no qty or unit price to type.
+    expect(screen.queryByLabelText("Line 1 qty")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Line 1 unit price")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByLabelText("Line 1 account").querySelector("option")).toHaveTextContent("900-T002 LORRY HIRE (usual)"));
+    expect(screen.getByTestId("bill-form-total")).toHaveTextContent("RM 100.01");
+
+    // A delivery order on the bill is not offered again.
+    fireEvent.click(screen.getByTestId("add-delivery-orders"));
+    const again = await screen.findByRole("dialog");
+    fireEvent.change(await within(again).findByLabelText("Logistics company"), { target: { value: PARTNER } });
+    const offered = within(again).getByTestId("delivery-order-candidates");
+    expect(offered).toHaveTextContent("DO-7003");
+    expect(offered).not.toHaveTextContent("DO-7001");
+    expect(offered).not.toHaveTextContent("DO-7002");
+    fireEvent.click(within(again).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0]!.body).toMatchObject({
+      supplierId: LORRY,
+      supplierInvoiceNo: "SH-0921",
+      lines: [
+        { deliveryOrderId: DO1, accountCode: null, description: "Transport · DO-7001 · SO-5101", amount: 50.01,
+          qty: null, unitPrice: null, departmentType: null, departmentId: null },
+        { deliveryOrderId: DO2, accountCode: null, description: "Transport · DO-7002 · SO-5102", amount: 50,
+          qty: null, unitPrice: null, departmentType: null, departmentId: null },
+      ],
+    });
+  });
+
+  it("says so when no delivery order is waiting to be billed", async () => {
+    api.routes[`${B}/bills/delivery-orders`] = { rows: [] };
+    show(`/finance/bills/new?supplier=${LORRY}`);
+    await waitFor(() => expect(screen.getByLabelText("Supplier")).toHaveValue(LORRY));
+    fireEvent.click(screen.getByTestId("add-delivery-orders"));
+    expect(await within(await screen.findByRole("dialog")).findByText("No delivery order is waiting to be billed."))
+      .toBeInTheDocument();
+  });
+
+  it("a saved transport line shows its DO No on the bill", async () => {
+    api.routes[`${B}/bills/${BILL1}`] = {
+      bill: { id: BILL1, bill_no: "BILL-4XK2", status: "confirmed", supplier_id: LORRY, supplier_name: "Swift Haulage",
+        supplier_kind: "other_creditor", supplier_invoice_no: "SH-0921", bill_date: "2026-10-10", due_date: null, po_id: null,
+        ap_account_code: "405-0000", ap_account_name: "OTHER CREDITORS", total_amount: "50.01", narration: null,
+        cancel_reason: null, created_at: "2026-10-10T01:00:00Z", created_by_name: "Aina", confirmed_at: null,
+        confirmed_by_name: null, cancelled_at: null, cancelled_by_name: null, entry_no: "JE-1", reversal_entry_no: null },
+      lines: [{ line_no: 1, warehouse_receipt_id: null, po_line_id: null, grn_no: null, grn_po_id: null, sku: null,
+        description: "Transport · DO-7001 · SO-5101", account_code: "900-T002", account_name: "LORRY HIRE", qty: null,
+        unit_price: null, amount: "50.01", po_unit_cost: null, price_diff: null, department_type: "SHOWROOM",
+        department_id: OUTLET, delivery_order_id: DO1, do_no: "DO-7001" }],
+      payments: [], files: [], events: [], paid_total: "0.00", allocated_total: "0.00", unpaid: "50.01",
+      left_to_pay: "50.01", advance_open: null, go_live_on: "2026-09-10", foreign_amount: null,
+      can: { edit: false, confirm: false, cancel: false, add_file: true, apply_advance: false, take_advance_off: false },
+    };
+    api.routes[`${B}/bills/${BILL1}/notes-to-follow-up`] = { rows: [] };
+    show(`/finance/bills/${BILL1}`);
+    const row = within(await screen.findByTestId("bill-lines")).getAllByRole("row")[1]!;
+    expect(row).toHaveTextContent("DO-7001");
+    expect(row).not.toHaveTextContent("Not from a GRN");
   });
 });
 
@@ -472,6 +795,51 @@ describe("Payment voucher form", () => {
     });
     expect(w.body).not.toHaveProperty("amount");
     expect(w.body).toMatchObject({ advanceAmount: 0 });
+  });
+
+  it("0681: pays a supplier debit note beside a bill, at most what no voucher holds yet", async () => {
+    api.routes[`${B}/debit-notes`] = { rows: [debitNoteRow] };
+    show(`/finance/payment-vouchers/new?supplier=${SUP}`);
+    fireEvent.click(await screen.findByLabelText("Pay BILL-8PZ7"));
+    const picks = await screen.findByTestId("voucher-debit-note-picks");
+    expect(picks).toHaveTextContent("PDN-20261005-3381");
+    expect(picks).toHaveTextContent("LSW-DN-4");
+    fireEvent.click(within(picks).getByLabelText("Pay PDN-20261005-3381"));
+    // RM 180.00, RM 100.00 already on another voucher: RM 80.00 can still be paid.
+    expect(within(picks).getByLabelText("Amount for PDN-20261005-3381")).toHaveValue("80");
+    expect(screen.getByTestId("voucher-form-total")).toHaveTextContent("RM 280.00");
+    fireEvent.change(screen.getByLabelText("Paid from"), { target: { value: "1120" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0]!.body).toMatchObject({
+      allocations: [{ billId: BILL2, amount: 200 }, { debitNoteId: DN, amount: 80 }],
+    });
+  });
+
+  it("0705: pays an opening bill beside a bill, at most what no voucher holds yet", async () => {
+    const OB = "99999999-9999-4999-8999-999999999991";
+    api.routes[`${B}/opening-bill-outstanding`] = { rows: [{
+      item_id: OB, doc_no: "LSW-OLD-77", supplier_id: SUP, supplier_name: "Lumen Sofa Works", doc_date: "2026-07-01",
+      due_date: "2026-08-01", total_amount: "500.00", paid_total: "0.00", balance_owing: "500.00", ap_account_code: "2100",
+      allocated_total: "150.00", unallocated: "350.00" }] };
+    show(`/finance/payment-vouchers/new?supplier=${SUP}`);
+    const picks = await screen.findByTestId("voucher-opening-bill-picks");
+    expect(picks).toHaveTextContent("LSW-OLD-77");
+    fireEvent.click(within(picks).getByLabelText("Pay opening bill LSW-OLD-77"));
+    expect(within(picks).getByLabelText("Amount for opening bill LSW-OLD-77")).toHaveValue("350");
+    expect(screen.getByTestId("voucher-form-total")).toHaveTextContent("RM 350.00");
+    fireEvent.change(screen.getByLabelText("Paid from"), { target: { value: "1120" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0]!.body).toMatchObject({ allocations: [{ openingItemId: OB, amount: 350 }] });
+  });
+
+  it("0681: a debit note sent from its page arrives ticked", async () => {
+    api.routes[`${B}/debit-notes`] = { rows: [debitNoteRow] };
+    show(`/finance/payment-vouchers/new?supplier=${SUP}&debitNote=${DN}`);
+    const picks = await screen.findByTestId("voucher-debit-note-picks");
+    expect(within(picks).getByLabelText("Pay PDN-20261005-3381")).toBeChecked();
+    await waitFor(() => expect(within(picks).getByLabelText("Amount for PDN-20261005-3381")).toHaveValue("80"));
   });
 
   it("a disabled Save names the first thing still missing, top to bottom", async () => {
@@ -556,9 +924,49 @@ describe("Payment voucher form", () => {
       payMethod: "CASH", allocations: [], lines: [{ accountCode: "6500", amount: 150 }],
     });
   });
+
+  it("0645: a voucher made from a payment request starts from what was asked, and answers it once saved", async () => {
+    const REQ = "abababab-0000-4000-8000-000000000001";
+    api.routes[`/api/finance/payment-requests/${REQ}`] = {
+      request: { id: REQ, request_no: "PRQ261003-4821", status: "submitted", requested_by: "u", requested_by_name: "Aina",
+        payee_name: "Bayview Properties", amount: "3500.00", pay_by: null, purpose: "October rent, PJ showroom", note: null,
+        bank_name: "Maybank", bank_account_no: "514012345678", bank_account_holder: "Bayview Properties Sdn Bhd",
+        bill_no: "BV-1007", bill_date: "2026-10-01", return_note: null, decided_at: null, decided_by_name: null,
+        created_at: "2026-10-03T02:00:00Z", updated_at: "2026-10-03T02:00:00Z", file_count: 1, voucher: null, bill: null },
+      files: [], events: [], finance: true, can: { edit: false, withdraw: false, add_file: true, return: true, answer: true },
+    };
+    show(`/finance/payment-vouchers/new?request=${REQ}`);
+    await waitFor(() => expect(screen.getByLabelText("Payee")).toHaveValue("Bayview Properties"));
+    expect(screen.getByLabelText("Purpose")).toHaveValue("DIRECT");
+    expect(screen.getByLabelText("Line 1 description")).toHaveValue("October rent, PJ showroom");
+    expect(screen.getByLabelText("Line 1 amount")).toHaveValue("3500.00");
+    expect(screen.getByLabelText("Note")).toHaveValue("Payment request PRQ261003-4821 · October rent, PJ showroom · pay to Maybank 514012345678 Bayview Properties Sdn Bhd");
+    fireEvent.change(screen.getByLabelText("Line 1 account"), { target: { value: "6500" } });
+    await pickDept("Line 1 department", "OFFICE");
+    fireEvent.change(screen.getByLabelText("Paid from"), { target: { value: "1120" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(writes()).toHaveLength(2));
+    expect(writes()[1]).toMatchObject({ url: `/api/finance/payment-requests/${REQ}/answer`, method: "POST",
+      body: { voucherId: "33333333-3333-4333-8333-333333333333" } });
+  });
 });
 
 describe("Payment voucher detail", () => {
+  it("0681: lists the debit notes it pays beside the bills", async () => {
+    api.routes[`${B}/vouchers/${PV}`] = {
+      ...voucherDoc({ status: "draft", can: {} }),
+      debit_notes: [{ debit_note_id: DN, note_no: "PDN-20261005-3381", supplier_note_no: "LSW-DN-4", note_date: "2026-10-05",
+        due_date: null, note_total: "180.00", ap_account_code: "2110", amount_applied: "80.00" }],
+    };
+    show(`/finance/payment-vouchers/${PV}`);
+    const table = await screen.findByTestId("voucher-debit-notes");
+    expect(table).toHaveTextContent("PDN-20261005-3381");
+    expect(table).toHaveTextContent("LSW-DN-4");
+    expect(table).toHaveTextContent("No due date");
+    expect(table).toHaveTextContent("RM 80.00");
+    expect(within(table).getByRole("link", { name: "PDN-20261005-3381" })).toHaveAttribute("href", `/finance/debit-notes/${DN}`);
+  });
+
   it("offers exactly the step the database allows — Approve payment — and posts it", async () => {
     api.routes[`${B}/vouchers/${PV}`] = voucherDoc({ status: "checked", can: { approve: true, reject: true } });
     show(`/finance/payment-vouchers/${PV}`);
@@ -599,6 +1007,52 @@ describe("Payment voucher detail", () => {
     fireEvent.click(go);
     await waitFor(() => expect(writes()).toHaveLength(1));
     expect(writes()[0]).toMatchObject({ url: `${B}/vouchers/${PV}/cancel`, body: { reason: "Paid twice" } });
+  });
+
+  /* 0636 (Chew 2026-10-03): where the money goes, from Finance's own supplier details. */
+  it("a voucher still to be paid shows where the money goes", async () => {
+    api.routes[`${B}/vouchers/${PV}`] = voucherDoc({ status: "checked", can: { approve: true } });
+    show(`/finance/payment-vouchers/${PV}`);
+    expect(await screen.findByTestId("voucher-pay-to")).toHaveTextContent("Maybank · 514012345678 · Lumen Sofa Works Sdn Bhd");
+  });
+
+  it("an approved voucher no longer shows today's bank details", async () => {
+    api.routes[`${B}/vouchers/${PV}`] = voucherDoc({ status: "approved", can: {} });
+    show(`/finance/payment-vouchers/${PV}`);
+    await screen.findByTestId("voucher-amount");
+    expect(screen.queryByTestId("voucher-pay-to")).not.toBeInTheDocument();
+  });
+
+  it("a draft with no bank yet says so (0666)", async () => {
+    const doc = voucherDoc({ status: "draft", can: { edit: true } });
+    api.routes[`${B}/vouchers/${PV}`] = { ...doc,
+      voucher: { ...doc.voucher, pay_from_account_code: null, pay_from_name: null },
+      events: [{ action: "month_close", note: "Dealer commission September 2026", at: "2026-10-01T01:00:00Z", actor_name: null }] };
+    show(`/finance/payment-vouchers/${PV}`);
+    await screen.findByTestId("voucher-amount");
+    expect(screen.getByText("Not chosen yet")).toBeInTheDocument();
+    // The month close raised it: its history names no one.
+    expect(screen.getByText(/^Raised by the month close · .* · Dealer commission September 2026$/)).toBeInTheDocument();
+    expect(screen.queryByText(/Name not available/)).not.toBeInTheDocument();
+  });
+
+  it("a failed read of the bank details says so, never 'no account'", async () => {
+    api.fail.add(`${B}/supplier-finance`);
+    api.routes[`${B}/vouchers/${PV}`] = voucherDoc({ status: "prepared", can: {} });
+    show(`/finance/payment-vouchers/${PV}`);
+    expect(await screen.findByText("Bank details could not be loaded")).toBeInTheDocument();
+  });
+});
+
+describe("Payment voucher form · pay to (0636)", () => {
+  it("names the supplier's bank account once the supplier is chosen", async () => {
+    show("/finance/payment-vouchers/new");
+    const supplier = await screen.findByLabelText("Supplier");
+    await screen.findByRole("option", { name: /Lumen Sofa Works/ });
+    fireEvent.change(supplier, { target: { value: SUP } });
+    expect(await screen.findByTestId("voucher-form-pay-to")).toHaveTextContent("Pay to Maybank · 514012345678 · Lumen Sofa Works Sdn Bhd");
+    fireEvent.change(supplier, { target: { value: LANDLORD } });
+    expect(await screen.findByTestId("voucher-form-pay-to")).toHaveTextContent("No bank account on file");
   });
 });
 
@@ -747,13 +1201,115 @@ describe("Supplier advance (0484–0485)", () => {
     expect(writes()[0]).toMatchObject({ url: `${B}/vouchers/${PV}/advance-applications`,
       body: { billId: BILL1, amount: 300 } });
   });
+
+  it("0642: the bill lists a credit note knocked off it, linked to the credit note where it is taken off", async () => {
+    const NOTE = "22222222-2222-4222-8222-222222222222";
+    api.routes[`${B}/bills/${BILL1}`] = {
+      bill: { id: BILL1, bill_no: "BILL-4XK2", status: "confirmed", supplier_id: SUP, supplier_name: "Lumen Sofa Works",
+        supplier_kind: "supplier", supplier_invoice_no: "LSW-901", bill_date: "2026-09-10", due_date: null, po_id: null,
+        ap_account_code: "2110", ap_account_name: "Trade payables", total_amount: "1025.00", narration: null,
+        cancel_reason: null, created_at: "2026-09-10T01:00:00Z", created_by_name: "Aina", confirmed_at: null,
+        confirmed_by_name: null, cancelled_at: null, cancelled_by_name: null, entry_no: "JE-2", reversal_entry_no: null },
+      lines: [],
+      payments: [{ kind: "credit_note", application_id: APP, voucher_id: NOTE, voucher_no: "SCN-20260920-4821", status: "applied",
+        voucher_date: "2026-09-20", applied_on: "2026-09-20", amount_applied: "100.00" }],
+      files: [], events: [], paid_total: "100.00", allocated_total: "100.00", unpaid: "925.00", left_to_pay: "925.00",
+      advance_open: "0.00", go_live_on: "2026-09-10",
+      can: { edit: false, confirm: false, cancel: false, add_file: false, apply_advance: false, take_advance_off: true },
+    };
+    show(`/finance/bills/${BILL1}`);
+    const row = await screen.findByTestId(`bill-credit-note-${NOTE}`);
+    expect(row).toHaveTextContent("Credit note SCN-20260920-4821 · Applied · Sun, 20 Sep · RM 100.00");
+    expect(within(row).getByRole("link", { name: "SCN-20260920-4821" })).toHaveAttribute("href", `/finance/credit-notes/${NOTE}`);
+    expect(within(row).queryByRole("button")).not.toBeInTheDocument();
+  });
 });
 
 describe("Unpaid by Supplier", () => {
+  /** Five columns show at first (Finance look, 2026-10-13); the rest are shown through Columns. */
+  const heads = () => [...document.querySelectorAll<HTMLElement>("thead th")].map((th) => th.title).filter(Boolean);
+  const showColumn = (label: string) => {
+    if (!screen.queryByRole("checkbox", { name: label })) (fireEvent.click(screen.getByRole("button", { name: "Page tools" })), fireEvent.click(screen.getByRole("menuitem", { name: "Columns" })));
+    fireEvent.click(screen.getByRole("checkbox", { name: label }));
+  };
+
+  it("shows five columns at first; the rest wait in Columns", async () => {
+    show("/finance/ap-outstanding");
+    await screen.findByText("Lumen Sofa Works");
+    expect(heads()).toEqual(["Supplier", "Unpaid Bills", "Unpaid", "Advance Left", "Unpaid After Advance and Credit"]);
+    (fireEvent.click(screen.getByRole("button", { name: "Page tools" })), fireEvent.click(screen.getByRole("menuitem", { name: "Columns" })));
+    for (const held of ["Creditor Type", "Billed", "Paid", "Debit Notes Unpaid", "Credit Left",
+      "On a Voucher, Not Approved", "Not on a Voucher", "Oldest Unpaid Bill"]) {
+      expect(screen.getByRole("checkbox", { name: held })).not.toBeChecked();
+    }
+  });
+
+  it("a supplier with nothing open shows only with Show all suppliers", async () => {
+    const owed = (api.routes[`${B}/outstanding`] as { rows: Array<Record<string, unknown>> }).rows[0]!;
+    api.routes[`${B}/outstanding`] = { rows: [owed, { ...owed, supplier_id: "33333333-3333-4333-8333-333333333333",
+      supplier_name: "Quiet Timber", billed_total: "500.00", paid_total: "500.00", allocated_total: "0.00",
+      balance_owing: "0.00", uncommitted: "0.00", open_bills: 0, oldest_unpaid_bill_date: null,
+      advance_open: "0.00", credit_open: "0.00", debit_open: "0.00", net_owing: "0.00" }] };
+    show("/finance/ap-outstanding");
+    await screen.findByText("Lumen Sofa Works");
+    expect(screen.queryByText("Quiet Timber")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Show all suppliers" }));
+    const quiet = (await screen.findByText("Quiet Timber")).closest("tr")!;
+    // Nothing open: every zero, and the zero Unpaid Bills count, is a blank cell.
+    expect(quiet).not.toHaveTextContent("RM");
+    expect(within(quiet).queryByText("0")).not.toBeInTheDocument();
+  });
+
+  it("0642: a credit note not knocked off yet is Credit Left, and comes off what is owed", async () => {
+    const NOTE = "22222222-2222-4222-8222-222222222222";
+    const owed = (api.routes[`${B}/outstanding`] as { rows: Array<Record<string, unknown>> }).rows[0]!;
+    api.routes[`${B}/outstanding`] = { rows: [{ ...owed, credit_open: "150.00", net_owing: "775.00" }] };
+    api.routes[`${B}/credit-notes`] = { rows: [
+      { id: NOTE, note_no: "SCN-20260920-4821", status: "confirmed", supplier_id: SUP, supplier_name: "Lumen Sofa Works",
+        supplier_kind: "supplier", supplier_note_no: "LSW-CN-7", note_date: "2026-09-20", ap_account_code: "2110",
+        total_amount: "350.00", applied_total: "200.00", credit_open: "150.00", file_count: 0, created_at: "2026-09-20T02:00:00Z" },
+    ] };
+    show("/finance/ap-outstanding");
+    await screen.findByText("Lumen Sofa Works");
+    expect(screen.getByText("RM 775.00")).toBeInTheDocument();
+    // Credit Left waits in Columns until it is asked for.
+    expect(heads()).not.toContain("Credit Left");
+    expect(screen.queryByText("RM 150.00")).not.toBeInTheDocument();
+    showColumn("Credit Left");
+    expect(heads()).toContain("Credit Left");
+    expect(screen.getByText("RM 150.00")).toBeInTheDocument();
+    fireEvent.click(screen.getAllByTitle("Show unpaid bills")[0]!);
+    expect(await screen.findByTestId(`ap-outstanding-credits-${SUP}`))
+      .toHaveTextContent("SCN-20260920-4821 · Sun, 20 Sep · RM 150.00 left of RM 350.00");
+  });
+
+  it("0681: a debit note not paid yet is Debit Notes Unpaid, added to Unpaid, and listed under the supplier", async () => {
+    const owed = (api.routes[`${B}/outstanding`] as { rows: Array<Record<string, unknown>> }).rows[0]!;
+    api.routes[`${B}/outstanding`] = { rows: [{ ...owed, debit_open: "180.00", net_owing: "1105.00" }] };
+    api.routes[`${B}/debit-notes`] = { rows: [debitNoteRow] };
+    show("/finance/ap-outstanding");
+    await screen.findByText("Lumen Sofa Works");
+    // Debit Notes Unpaid waits in Columns until it is asked for.
+    expect(heads()).not.toContain("Debit Notes Unpaid");
+    expect(screen.queryByText("RM 180.00")).not.toBeInTheDocument();
+    showColumn("Debit Notes Unpaid");
+    expect(heads()).toContain("Debit Notes Unpaid");
+    expect(screen.getByText("RM 180.00")).toBeInTheDocument();
+    // Unpaid is the bills' RM 1,225.00 and the debit note's RM 180.00.
+    expect(screen.getByTestId("ap-outstanding-summary")).toHaveTextContent("1 supplier · RM 1,405.00 unpaid");
+    expect(screen.getByText("RM 1,105.00")).toBeInTheDocument();
+    fireEvent.click(screen.getAllByTitle("Show unpaid bills")[0]!);
+    expect(await screen.findByTestId(`supplier-debits-${SUP}`))
+      .toHaveTextContent("PDN-20261005-3381 · LSW-DN-4 · Mon, 5 Oct · due Wed, 4 Nov · RM 180.00 unpaid");
+  });
+
   it("shows what is owed per supplier, and what already sits on a voucher", async () => {
     show("/finance/ap-outstanding");
     await screen.findByText("Lumen Sofa Works");
-    expect(screen.getByText("RM 1,025.00")).toBeInTheDocument(); // on a voucher, not approved
+    // On a voucher, not approved: shown through Columns.
+    expect(screen.queryByText("RM 1,025.00")).not.toBeInTheDocument();
+    showColumn("On a Voucher, Not Approved");
+    expect(screen.getByText("RM 1,025.00")).toBeInTheDocument();
     expect(screen.getByTestId("ap-outstanding-summary")).toHaveTextContent("1 supplier · RM 1,225.00 unpaid");
     // 0484: the advance left and what is owed after it, both from the database.
     expect(screen.getByText("RM 300.00")).toBeInTheDocument();

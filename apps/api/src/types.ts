@@ -2,6 +2,9 @@ import type { Role } from "@carres/shared/domain";
 
 export type Bindings = {
   DEPLOY_SHA?: string;
+  RESEND_API_KEY?: string;
+  PO_EMAIL_FROM?: string;
+  PO_EMAIL_ENABLED?: string;
   SUPABASE_URL: string;
   SUPABASE_ANON_KEY: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
@@ -16,6 +19,10 @@ export type Bindings = {
   STRIPE_WEBHOOK_SECRET?: string;
   // Where Checkout lands after paying (wrangler.toml [vars]).
   PUBLIC_WEB_URL?: string;
+  // 0724 Radius Velocity lorry positions (YH 2026-10-26). Secrets, set with
+  // `wrangler secret put`; either unset => the 5-minute poll does nothing.
+  VELOCITY_REFRESH_TOKEN?: string;
+  VELOCITY_CUSTOMER_ID?: string;
   // IT Support (routes/it-support.ts) — the Houzs IT Hub's origin and Carres'
   // own key there. Worker secrets (`wrangler secret put`); either unset =>
   // the route answers 501. Never reach the browser bundle.

@@ -33,6 +33,7 @@
 // it in ListPageShell would draw a second page chrome inside one card.
 import { isLivePayment, type OrderPaymentRow } from "@carres/shared";
 import { fmtMoney } from "@carres/shared";
+import Icon from "@/components/kit/Icon";
 import FieldFrame from "@/components/kit/FieldFrame";
 import { CONTROL_BASE, CONTROL_BORDER } from "@/components/kit/field-recipe";
 import Loading from "@/components/kit/Loading";
@@ -73,7 +74,6 @@ export default function PaymentLedger({ orderId, saved }: {
        small heading is the in-card label rank, 13/600 — the same as
        `Emergency contact` and `Billing`. */
     <div className="text-body" data-testid="so-payment-saved">
-      <p className="font-semibold text-kit-slate-11">Payment details recorded at sale</p>
       <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <FieldFrame id="so-payment-method" label="Method">
           <div id="so-payment-method" className={CAPTURE_FIELD} data-testid="money-instalment">
@@ -87,7 +87,7 @@ export default function PaymentLedger({ orderId, saved }: {
           <div id="so-payment-slip" className={CAPTURE_FIELD}>
             {saved.slip ? (
               <button type="button" onClick={() => void viewSlip({ receipt_url: saved.slip! })}
-                className="text-body font-medium text-kit-blue-11 underline-offset-2 hover:underline">View slip</button>
+                className="inline-flex items-center gap-1.5 text-body font-medium text-kit-blue-11 underline-offset-2 hover:underline"><Icon name="attach" size={16} />Slip</button>
             ) : "Not recorded"}
           </div>
         </FieldFrame>
@@ -177,9 +177,9 @@ export default function PaymentLedger({ orderId, saved }: {
                       <button
                         type="button"
                         onClick={() => void viewSlip(p)}
-                        className="font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+                        className="inline-flex items-center gap-1.5 font-medium text-kit-blue-11 underline-offset-2 hover:underline"
                       >
-                        View slip
+                        <Icon name="attach" size={16} />Slip
                       </button>
                     ) : (
                       "Slip not recorded"

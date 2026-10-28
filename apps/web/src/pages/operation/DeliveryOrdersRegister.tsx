@@ -27,8 +27,9 @@
  * at most one primary queue; finished work leaves the queue and stays in the
  * status views.
  *
- * There is still NO create button: the SYSTEM issues a DO when a trip's
- * requirements are met (orders MASTER §8) — no Release, no Approve, no Issue.
+ * `New Delivery Order` (OVERTURNED 2026-10-22 by Weisiang, Mr Lim): office
+ * staff may open a DO from SO lines, the Houzs way. The SYSTEM still issues a
+ * DO when a trip's requirements are met; still no Release, Approve or Issue.
  */
 import { useCallback, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -50,9 +51,12 @@ import {
   type DataGridColumn,
   type DataGridContextMenuItem,
 } from "@/components/register/DataGrid";
+import { documentRowMenu } from "@/components/register/row-menu";
+import { printDeliveryOrder } from "./record-print";
 import Select from "@/components/kit/Select";
 import ModuleHeader from "./components/ModuleHeader";
 import DeliveryResultAction from "./components/DeliveryResultAction";
+import NewDeliveryOrderDialog from "./components/NewDeliveryOrderDialog";
 import {
   DeliveryProofUploadButton,
   DriverSubmissionViewer,
@@ -298,7 +302,7 @@ function CountButton({
       type="button"
       data-testid={testId}
       title={title}
-      className="inline-flex h-[22px] items-center gap-1 rounded-control border border-kit-slate-6 bg-white px-1.5 text-label font-medium text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
+      className="inline-flex h-[22px] items-center gap-1 rounded-control border border-kit-slate-6 bg-white px-1.5 text-meta font-medium text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
       onClick={(event) => {
         event.stopPropagation();
         onClick();
@@ -306,7 +310,7 @@ function CountButton({
     >
       <Glyph size={12} strokeWidth={1.75} aria-hidden />
       <span>{label}</span>
-      <span className="tabular-nums font-semibold">{count}</span>
+      <span className="tabular-nums">{count}</span>
     </button>
   );
 }
@@ -371,7 +375,7 @@ function DriverSubmissionCell({
           </>
         )}
       </span>
-      <span className="block truncate text-label font-normal">
+      <span className="block truncate text-meta">
         {!row.intermediateLeg || row.signedDoPresent ? <SignedDeliveryDocumentLink doNumber={row.doNumber} present={row.signedDoPresent} /> : null}
       </span>
     </span>
@@ -432,7 +436,7 @@ function QueueAction({
     <button
       type="button"
       data-testid={queue === "check_proof" ? "do-queue-check-proof" : "do-queue-open-delivery-order"}
-      className="inline-flex h-7 max-w-full items-center gap-1.5 rounded-control border border-kit-slate-6 bg-white px-2 text-label font-medium text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
+      className="inline-flex h-7 max-w-full items-center gap-1.5 rounded-control border border-kit-slate-6 bg-white px-2 text-body font-medium text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
       onClick={(event) => {
         event.stopPropagation();
         onOpenDeliveryOrder(row);
@@ -686,7 +690,7 @@ export default function DeliveryOrdersRegister() {
               <StatusPill tone={STATUS_TONE[r.status.kind]}>{r.status.label}</StatusPill>
               {detail ? (
                 <span
-                  className="block truncate text-label font-normal text-base-600"
+                  className="block truncate text-meta text-base-600"
                   title={detail}
                   data-testid="do-status-detail"
                 >
@@ -886,7 +890,10 @@ export default function DeliveryOrdersRegister() {
             {
               key: "queue_action",
               label: DO_QUEUE_LABEL[filters.queue],
-              width: 210,
+              /* Content decides the width: the longest door,
+                 `Upload signed Delivery Order` at the button's 13 / 500,
+                 fits whole (it was cut at 210). */
+              width: 250,
               chooserGroup: "Delivery",
               /* A door states nothing, so it carries no funnel: the walk found
                  one offering a single `(blank)` option, whose only possible
@@ -910,19 +917,31 @@ export default function DeliveryOrdersRegister() {
     [navigate, openDeliveryOrder, openSalesOrder, filters.queue],
   );
 
+  /* ONE ROW MENU (owner ruling 2026-10-05): `View · Print`, then this
+     register's own doors after the divider. Print is the DO page's own flow —
+     a reprint carries the same number and records no delivery result. */
   const contextMenu = useCallback(
-    (r: DoRegisterRow): DataGridContextMenuItem[] => [
-      { label: "View", onClick: () => openDeliveryOrder(r) },
-      {
-        label: "Open SO-" + r.so,
-        onClick: () => navigate(`/operation/orders/so/${encodeURIComponent(r.orderId)}`),
-      },
-      {
-        label: "Open Order Route",
-        onClick: () =>
-          navigate(`/operation/orders/so/${encodeURIComponent(r.orderId)}?route=1`),
-      },
-    ],
+    (r: DoRegisterRow): DataGridContextMenuItem[] =>
+      documentRowMenu({
+        view: () => openDeliveryOrder(r),
+        print: () =>
+          void printDeliveryOrder(r.orderId, r.doNumber).catch((e: unknown) => {
+            toast.error(
+              e instanceof ApiError ? e.message : `Delivery Order ${r.doNumber} PDF failed`,
+            );
+          }),
+        more: [
+          {
+            label: "Open SO-" + r.so,
+            onClick: () => navigate(`/operation/orders/so/${encodeURIComponent(r.orderId)}`),
+          },
+          {
+            label: "Open Order Route",
+            onClick: () =>
+              navigate(`/operation/orders/so/${encodeURIComponent(r.orderId)}?route=1`),
+          },
+        ],
+      }),
     [navigate, openDeliveryOrder],
   );
 
@@ -1011,7 +1030,7 @@ export default function DeliveryOrdersRegister() {
               ) : null}
               <button
                 type="button"
-                className="rounded-md border border-base-200 bg-white px-3 py-1.5 text-meta font-medium text-base-700 hover:bg-base-50"
+                className="rounded-md border border-base-200 bg-white px-3 py-1.5 text-body font-medium text-base-700 hover:bg-base-50"
                 onClick={() => void refetch()}
               >
                 {DOR_COPY.tryAgain}
@@ -1091,6 +1110,7 @@ export default function DeliveryOrdersRegister() {
                 setSearchParams(next, { replace: false });
               }}
               toolbarStart={!filterRailOpen ? showFiltersButton : undefined}
+              toolbarEnd={<NewDeliveryOrderDialog />}
               statusSummary={(filtered) => {
                 /* Narrowed-versus-total stays explicit against the WHOLE
                    register (REGISTER STATUS FOOTER law) — a rail pick is a

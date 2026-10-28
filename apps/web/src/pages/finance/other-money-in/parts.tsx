@@ -17,6 +17,14 @@ import { FieldError } from "@/components/kit/FieldFrame";
 import type { DepartmentType } from "@carres/shared";
 import { decodeDepartment, encodeDepartment, useDepartments } from "../department";
 
+/** An issued invoice still owed: where its `Record receipt` goes, from the
+ *  invoice page and from its row menu alike (Chew 2026-10-21). Null when
+ *  there is nothing to receive. */
+export function invoiceReceiptDoor(r: { invoice_id: string; party_id: string; status: string; outstanding: number | null }): string | null {
+  return r.status === "issued" && (r.outstanding ?? 0) > 0
+    ? `/finance/other-receipts?receipt=new&party=${r.party_id}&invoice=${r.invoice_id}` : null;
+}
+
 export function accountLabel(a: Pick<MoneyInAccountOption, "code" | "name">): string {
   return `${a.code} · ${a.name}`;
 }

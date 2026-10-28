@@ -19,7 +19,7 @@ import {
   recheckStockInput,
   reselectPartnerInput,
   deliveryQueueLeads,
-  myHolidaySet,
+  deliveryWorkingDayOptions,
   resolveBookingBrief,
   resolveCurrentCustomerCommitment,
   resolveUnitAllocation,
@@ -38,19 +38,23 @@ import {
   type SalesOrderChangeSide,
   stockMatchKey,
 } from "@carres/shared";
+import { findSalesOrderDocuments } from "../../lib/sales-order-document-search";
+import { findOrdersByPhone, phoneSearchDigits } from "../../lib/sales-order-phone-search";
 import { readFreeStock } from "../../lib/purchase-demand-read";
 // renderDoPdf moved to apps/web/src/lib/pdf/render.ts (Workers WASM ban).
 import type { DoTemplateData } from "../../lib/pdf/types";
 import { loadBookingContext } from "../../lib/booking-context";
+import { readDeliveryCalendar } from "../../lib/delivery-calendar";
 import { drawDeliveryOrderNumber } from "../../lib/delivery-order-issue";
 import { requireOperation, requireOperationOrPrincipal } from "../../lib/auth-guards";
-import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { mapPgError, parseJsonBody, refusalMessage } from "../../lib/route-helpers";
 import { storageBlock } from "../../lib/storage-gate";
 import { userClient } from "../../lib/supabase";
 import { todayIsoMYT } from "../../lib/today";
 
 import { skuCategories, storageSkuCategories } from "../../lib/sku-categories";
 import { chunk } from "../../lib/purchase-demand-read";
+import { outrightOrderFacts, type OutrightOrderFacts, type OutrightOrderInput } from "../../lib/outright-order-facts";
 import {
   completionOfOrder,
   type CompletionOrderRow,
@@ -113,7 +117,7 @@ function mapPipelineV2Error(error: { code?: string; message?: string; details?: 
       body: {
         error: "rule_violation",
         code: error.details ?? "invalid_param",
-        message: error.message ?? "rule violation",
+        message: refusalMessage(error) ?? "rule violation",
       },
     };
   }
@@ -192,12 +196,36 @@ async function resolveSkuLabels(
    so what every other caller receives is unchanged. */
 const SALES_ORDER_REGISTER_EXCLUDED_STATUSES = "(place,cancelled)";
 const SALES_ORDER_REGISTER_NOT_RENTAL = "source_system.is.null,source_system.neq.rental";
-function salesOrderRegisterPopulation<
+export function salesOrderRegisterPopulation<
   Q extends { not(column: string, operator: string, value: string): Q; or(filters: string): Q },
 >(q: Q): Q {
   return q
     .not("status", "in", SALES_ORDER_REGISTER_EXCLUDED_STATUSES)
     .or(SALES_ORDER_REGISTER_NOT_RENTAL);
+}
+
+/** One page of the Sales Orders Register's paged read — the same size the
+ *  one-answer read has always stopped at, so a page spends no more of the
+ *  Worker's subrequest budget on its enrichment than that read already does. */
+const REGISTER_PAGE = 500;
+/* `<placed_at as PostgREST printed it>|<order id>`. Only digits, `T`, `:`,
+   `.`, `+`, `-`, `Z` and a uuid may pass, so a cursor can never carry a
+   filter into the or() it is spliced into. */
+const REGISTER_PAGE_CURSOR =
+  /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}(?::?\d{2}){0,2})?)\|([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+function registerPageCursorOf(raw: string): { placedAt: string; id: string } | null {
+  const m = REGISTER_PAGE_CURSOR.exec(raw);
+  return m ? { placedAt: m[1]!, id: m[2]! } : null;
+}
+/** The cursor after a page: its last row, or `null` when the page was short. */
+function registerPageCursorAfter(page: ReadonlyArray<{ id?: string; placed_at?: string | null }>): string | null {
+  if (page.length < REGISTER_PAGE) return null;
+  const last = page[page.length - 1];
+  const cursor = last?.placed_at && last.id ? `${last.placed_at}|${last.id}` : null;
+  /* A row whose own facts would not make a valid cursor cannot be paged past;
+     failing loudly beats a list that silently stops at it. */
+  if (!cursor || !registerPageCursorOf(cursor)) throw new Error("register page cursor unreadable");
+  return cursor;
 }
 
 operationOrdersRouter.get("/", requireOperation, async (c) => {
@@ -219,6 +247,36 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
   const onlyOrderId = c.req.query("orderId") ?? null;
   if (onlyOrderId !== null && !/^[0-9a-f-]{36}$/i.test(onlyOrderId)) {
     return c.json({ error: "invalid_query", code: "invalid_param", message: "orderId must be an order id" }, 422);
+  }
+  /* ⭐ `count=only` — HOW MANY ROWS THIS LIST WOULD ANSWER, AND NOTHING ELSE
+     (SO BUILD-1c, 2026-10-06). The Sales Order page's `Existing customer ·
+     {n} orders ›` opens this list searched by the phone, so `n` is counted
+     HERE: the same `listScope`, the same search clauses, the same caller's
+     RLS — one head-only exact count instead of the rows (Law D: the number
+     and the door can never count two different sets). */
+  const countParam = c.req.query("count") ?? null;
+  if (countParam !== null && countParam !== "only") {
+    return c.json({ error: "invalid_query", code: "invalid_param", message: "count must be only" }, 422);
+  }
+  const countOnly = countParam === "only";
+  /* ⭐ `paged=1` — THE REGISTER'S WHOLE POPULATION, ONE PAGE AT A TIME (SO A3-3,
+     2026-10-06, Orders MASTER §0.0 "Register, filters, reports and exports").
+     The same scope, search and caller as the one-answer read below, read in
+     pages of REGISTER_PAGE ordered by `placed_at` desc, then `id` desc — a
+     unique tiebreaker, so orders sharing one `placed_at` can never fall
+     between two pages. `after` is the last row of the previous page (its
+     `nextCursor`): a keyset, so an order placed or cancelled while the pages
+     load moves no other order. Without `paged` nothing below changes — every
+     other caller keeps its newest-500 answer. */
+  const pagedParam = c.req.query("paged") ?? null;
+  if (pagedParam !== null && pagedParam !== "1") {
+    return c.json({ error: "invalid_query", code: "invalid_param", message: "paged must be 1" }, 422);
+  }
+  const paged = pagedParam === "1";
+  const afterParam = c.req.query("after") ?? null;
+  const after = afterParam === null ? null : registerPageCursorOf(afterParam);
+  if (afterParam !== null && (!paged || after === null)) {
+    return c.json({ error: "invalid_query", code: "invalid_param", message: "after must be the nextCursor of a paged read" }, 422);
   }
 
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -317,33 +375,50 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
       // of. Voided DOs are NOT filtered here - the delivery register does not
       // filter them either, and this column must not start counting differently
       // from the surface it links to.
-      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_email, customer_billing, customer_billing_same, customer_emergency, customer_address_line1, customer_address_line2, customer_address_city, customer_address_state, customer_address_postcode, building_type:entry_data->fields->>building_type, customer_race, customer_gender, customer_birthday, delivery_floor, delivery_has_lift, delivery_stair_items, channel, placed_at, proceeded_at, delivery_date, delivery_date_tbd, proceed_date, source_system, source_ref, ops_assigned_logistic, delivery_partner_id, delivery_stops, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, do_file_path, do_uploaded_at, invoice_no, invoiced_at, payment_method, installment_months, dispatched_at, delivered_at, outlet_id, salesperson_id, dealer_id, paid, dealers(name), outlets(name), salespersons(name), delivery_partners!orders_delivery_partner_id_fkey(id, name), order_lines(id, sku, qty, unit_price, attrs, source_po), order_addons(addon_key, qty, unit_price), ops_delivery_orders(do_number), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at, purchase_orders(placed_at)), order_finance_exceptions(status), order_delivery_payment_approvals(status), ops_sofa_loans(status, item_id, loan_note_no, ops_stock_items(unit_code, identity_scope)), order_annotations(content, tag, created_at), ops_order_control(customer_request, action_for_logistic, carres_remark, warehouse_remark, logistic_eta, balance, payment_status, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_paid, storage_collected_at, storage_waiver_status, called_customer, line_etas, line_stock_status, assigned_staff, booking_stage, confirmed_date, confirmed_time_slot, delivery_photos, booking_groups, delay_decision, delay_decision_eta, delay_decision_at, delay_detected_at, delay_detected_eta)",
+      //
+      // 2026-10-06 (Hold delivery, Delivery MASTER §3) - `reason` joins
+      // `order_finance_exceptions(status)`: Monitor's `Payment` cell prints
+      // `Finance hold · {reason}` under `Hold delivery` for Operation. One more
+      // column on the SAME embed; internal readers only (0355's read policy).
+      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_email, customer_billing, customer_billing_same, customer_emergency, customer_address_line1, customer_address_line2, customer_address_city, customer_address_state, customer_address_postcode, building_type:entry_data->fields->>building_type, customer_race, customer_gender, customer_birthday, delivery_floor, delivery_has_lift, delivery_stair_items, channel, placed_at, proceeded_at, delivery_date, delivery_date_tbd, proceed_date, source_system, source_ref, ops_assigned_logistic, delivery_partner_id, delivery_stops, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, do_file_path, do_uploaded_at, invoice_no, invoiced_at, payment_method, installment_months, dispatched_at, delivered_at, outlet_id, salesperson_id, dealer_id, paid, original_request:sales_order_revisions(revision,snapshot), dealers(name), outlets(name), salespersons(name), delivery_partners!orders_delivery_partner_id_fkey(id, name), order_lines(id, sku, qty, unit_price, attrs, source_po), order_addons(addon_key, qty, unit_price), ops_delivery_orders(do_number), invoice_documents:invoices(id,invoice_no), receipt_documents:order_payments(id,receipt_no), allocated_receipts:payment_allocations(order_payments(id,receipt_no)), amendment_documents:sales_order_amendments(id), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at, purchase_orders(placed_at)), order_finance_exceptions(status, reason), order_delivery_payment_approvals(status), ops_sofa_loans(status, item_id, loan_note_no, ops_stock_items(unit_code, identity_scope)), order_annotations(content, tag, created_at), ops_order_control(line_received, customer_request, action_for_logistic, carres_remark, warehouse_remark, logistic_eta, balance, payment_status, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_paid, storage_collected_at, storage_waiver_status, called_customer, line_etas, line_stock_status, assigned_staff, booking_stage, confirmed_date, confirmed_time_slot, delivery_photos, booking_groups, delay_decision, delay_decision_eta, delay_decision_at, delay_detected_at, delay_detected_eta)",
     )
-    ;
+    .eq("original_request.revision", 1);
 
-  if (stage === "proceeded") {
-    // The Sales Orders Register's population — the ONE predicate its total
-    // below is counted with (salesOrderRegisterPopulation).
-    q = salesOrderRegisterPopulation(q);
-  } else {
-    // Pipeline v2 (C3): include `status='place'` rows so the FE kanban can
-    // render the "Placed" column. proceed_order + delivered preserved as
-    // before; existing M2 tests still pass.
-    q = q.in("status", ["place", "proceed_order", "delivered"]);
-    if (stage === "placed") {
-      // 'placed' is a synthetic stage derived from `status='place'` (pre-push
-      // orders may have NULL operation_stage or 'placed' depending on whether
-      // they were seeded post-0024). Filter on status, not stage.
-      q = q.eq("status", "place");
-    } else if (stage !== "all") {
-      q = q.eq("operation_stage", stage);
+  /* The list's scope — stage, the one order, channel — applied by ONE
+     function, so the phone read below asks exactly the population the rows
+     come from and can never drift from it. */
+  const listScope = <Q,>(query: Q): Q => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let s = query as any;
+    if (stage === "proceeded") {
+      // The Sales Orders Register's population — the ONE predicate its total
+      // below is counted with (salesOrderRegisterPopulation).
+      s = salesOrderRegisterPopulation(s);
+    } else {
+      // Pipeline v2 (C3): include `status='place'` rows so the FE kanban can
+      // render the "Placed" column. proceed_order + delivered preserved as
+      // before; existing M2 tests still pass.
+      s = s.in("status", ["place", "proceed_order", "delivered"]);
+      if (stage === "placed") {
+        // 'placed' is a synthetic stage derived from `status='place'` (pre-push
+        // orders may have NULL operation_stage or 'placed' depending on whether
+        // they were seeded post-0024). Filter on status, not stage.
+        s = s.eq("status", "place");
+      } else if (stage !== "all") {
+        s = s.eq("operation_stage", stage);
+      }
     }
-  }
-  // Public 'channel' enum kept as 'dealers'|'showrooms' per spec §18.3 (Loo-facing wording).
-  // Internally maps to outlet_id IS [NOT] NULL — schema column is outlet_id, not showroom_id.
-  if (onlyOrderId) q = q.eq("id", onlyOrderId);
-  if (channel === "dealers") q = q.is("outlet_id", null);
-  if (channel === "showrooms") q = q.not("outlet_id", "is", null);
+    // Public 'channel' enum kept as 'dealers'|'showrooms' per spec §18.3 (Loo-facing wording).
+    // Internally maps to outlet_id IS [NOT] NULL — schema column is outlet_id, not showroom_id.
+    if (onlyOrderId) s = s.eq("id", onlyOrderId);
+    if (channel === "dealers") s = s.is("outlet_id", null);
+    if (channel === "showrooms") s = s.not("outlet_id", "is", null);
+    return s as Q;
+  };
+  q = listScope(q);
+  /* The search's one or() filter — built once, applied to the rows below and,
+     for `count=only`, to the count. */
+  let searchFilter: string | null = null;
   if (search) {
     // Match customer name (ILIKE), the SO number (digits or displayed SO- prefix), AND
     // each imported invoice number. A combined Ref is tokenised into
@@ -351,19 +426,89 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
     // any single invoice — e.g. "CR0854" — find the combined order too (alias).
     // The ref term is sanitised to invoice chars [A-Z0-9/-] so it can't break
     // the PostgREST or()/cs.{} grammar.
-    const clauses = [`customer_name.ilike.%${search}%`];
+    //
+    // The name term is the operator's own text. A `,` `(` `)` `"` or `\` in it
+    // would end the or() value early — `(03) 1234 5678` failed the whole search
+    // — so such a term is double-quoted (PostgREST's reserved-character rule);
+    // a plain name rides exactly as before.
+    const nameTerm = /[,()"\\]/.test(search)
+      ? `"%${search.replace(/[\\"]/g, (ch) => `\\${ch}`)}%"`
+      : `%${search}%`;
+    const clauses = [`customer_name.ilike.${nameTerm}`];
     const refTerm = search.toUpperCase().replace(/[^A-Z0-9/-]/g, "");
     if (refTerm) clauses.push(`source_ref.cs.{${refTerm}}`);
+    if (refTerm) {
+      clauses.push(`invoice_no.ilike.%${refTerm}%`, `do_number.ilike.%${refTerm}%`);
+      try {
+        const linked = await findSalesOrderDocuments(sb, refTerm);
+        if (linked.orderIds.length) clauses.push(`id.in.(${linked.orderIds.join(",")})`);
+        if (linked.soNumbers.length) clauses.push(`so.in.(${linked.soNumbers.join(",")})`);
+      } catch (documentError) {
+        const mapped = mapPgError(documentError as { code?: string; message?: string });
+        return c.json(mapped.body, mapped.status);
+      }
+    }
+    /* A PHONE typed any way — `019-0000 0075`, `(019) 00000075`,
+       `+6019 00000075` — finds the orders whose phone carries those digits.
+       The read is the caller's RLS over the list's own scope; the Worker
+       decides the match on digits (sales-order-phone-search.ts). A failed
+       read fails the search, exactly like the document read above: an
+       unread phone is not "no order". */
+    const phoneDigits = phoneSearchDigits(search);
+    if (phoneDigits) {
+      try {
+        const phoneOrderIds = await findOrdersByPhone(
+          (pattern, from, to) =>
+            listScope(sb.from("orders").select("id, customer_phone"))
+              .ilike("customer_phone", pattern)
+              .order("id", { ascending: true })
+              .range(from, to),
+          phoneDigits,
+        );
+        if (phoneOrderIds.length) clauses.push(`id.in.(${phoneOrderIds.join(",")})`);
+      } catch (phoneError) {
+        const mapped = mapPgError(phoneError as { code?: string; message?: string });
+        return c.json(mapped.body, mapped.status);
+      }
+    }
+
     const soTerm = /^(?:SO[-\s]?)?(\d+)$/i.exec(search.trim());
     const asInt = soTerm ? Number(soTerm[1]) : NaN;
     if (Number.isSafeInteger(asInt)) clauses.push(`so.eq.${asInt}`);
-    q = q.or(clauses.join(","));
+    searchFilter = clauses.join(",");
+    q = q.or(searchFilter);
   }
 
-  // STAGE 1 FIX 1 — the 200-row trap removed; the agreed cap is 500. Server
-  // search (`?search=`, above) is what makes the cap safe: a match beyond the
-  // first page is FOUND by asking, never scrolled for.
-  q = q.order("placed_at", { ascending: false }).limit(500);
+  if (countOnly) {
+    let countQ = listScope(sb.from("orders").select("id", { count: "exact", head: true }));
+    if (searchFilter) countQ = countQ.or(searchFilter);
+    const { count, error: countError } = await countQ;
+    if (countError) {
+      const m = mapPgError(countError);
+      return c.json(m.body, m.status);
+    }
+    /* No number is never answered as zero — the page then shows no count. */
+    if (typeof count !== "number") {
+      return c.json({ error: "count_unavailable", code: "count_unavailable", message: "Sales orders could not be counted." }, 500);
+    }
+    return c.json({ count });
+  }
+
+  if (paged) {
+    /* The keyset: strictly after the previous page's last row in
+       (placed_at desc, id desc). Both values were validated by
+       `registerPageCursorOf`, and the timestamp is quoted for the or() grammar. */
+    if (after) {
+      q = q.or(`placed_at.lt."${after.placedAt}",and(placed_at.eq."${after.placedAt}",id.lt.${after.id})`);
+    }
+    q = q.order("placed_at", { ascending: false }).order("id", { ascending: false }).limit(REGISTER_PAGE);
+  } else {
+    // STAGE 1 FIX 1 — the 200-row trap removed; the agreed cap is 500. Server
+    // search (`?search=`, above) is what makes the cap safe: a match beyond the
+    // first page is FOUND by asking, never scrolled for. (The Sales Orders
+    // Register no longer reads this answer — it pages, above.)
+    q = q.order("placed_at", { ascending: false }).limit(500);
+  }
 
   /* ⭐ THE REGISTER'S TOTAL IS A COUNT, NEVER THE ROWS IT HAPPENED TO LOAD
      (Listing Standard follow-up, 2026-09-17). `{n} of {m} sales orders` needs
@@ -390,7 +535,9 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
   if (channel === "dealers") totalQ = totalQ.is("outlet_id", null);
   if (channel === "showrooms") totalQ = totalQ.not("outlet_id", "is", null);
 
-  const [{ data, error }, totalRes] = await Promise.all([q, totalQ]);
+  /* A paged read counts once, on its first page; a later page's caller
+     already holds the total, so it spends no second count. */
+  const [{ data, error }, totalRes] = await Promise.all([q, after ? Promise.resolve(null) : totalQ]);
   const salesOrderTotal =
     totalRes && !totalRes.error && typeof totalRes.count === "number" ? totalRes.count : null;
   if (error) {
@@ -477,7 +624,7 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
   const poNumbersBySo = new Map<number, Set<string>>();
   /* DELIVERY MONITOR (2026-09-11) — one entry per purchase order serving this
      sales order, carrying only RECORDED dates. `plannedIso` is our own
-     production-plus-transit prediction, `originalIso` the immutable date the
+     production-days prediction, `originalIso` the immutable date the
      supplier was given, `reply` the latest recorded supplier answer. The
      browser decides what that means; this route never says "delayed". */
   const poArrivalsBySo = new Map<number, OrderPoArrival[]>();
@@ -488,7 +635,7 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
       .from("purchase_orders")
       // DELIVERY MONITOR (2026-09-11) — the ARRIVAL facts the delivery work
       // list needs, and no derived word: the PO's own status, OUR
-      // production-plus-transit prediction (`eta_date` — `expectedArrivalOf`'s
+      // production-days prediction (`eta_date` — `expectedArrivalOf`'s
       // persisted result) and the immutable original the supplier was actually
       // given (`official_delivery_date`, 0428). The latest supplier REPLY is
       // read below. Nothing is CLASSIFIED here: the states and their words
@@ -587,6 +734,14 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
           official_delivery_date?: string | null;
         };
         const skus = skusByPo.get(po.id) ?? [];
+        // Document lineage does not disappear when goods metadata is missing.
+        const documentSources = new Set<number>(po.so_refs ?? []);
+        if (typeof po.so === "number") documentSources.add(po.so);
+        for (const so of documentSources) {
+          const numbers = poNumbersBySo.get(so) ?? new Set<string>();
+          numbers.add(po.id);
+          poNumbersBySo.set(so, numbers);
+        }
         if (skus.length === 0) continue;
         // ONE purchase order may serve several sales orders (the consolidated
         // PO is the normal case here), so every SO it names gets the same set.
@@ -732,7 +887,9 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
       allocated_units: allocatedUnitsByOrder.get(o.id ?? "") ?? [],
       incoming_units: incomingByOrder.get(o.id ?? "") ?? [],
     })),
-    salesOrderTotal,
+    ...(after ? {} : { salesOrderTotal }),
+    /* A full page may have more behind it; a short page is the last. */
+    ...(paged ? { nextCursor: registerPageCursorAfter(orders as Array<{ id?: string; placed_at?: string | null }>) } : {}),
   });
 });
 
@@ -815,7 +972,7 @@ operationOrdersRouter.get("/register-facts", requireOperation, async (c) => {
       sb
         .from("orders")
         .select(
-          "id, so, status, paid, delivery_date, order_lines(sku, qty, unit_price), order_addons(qty, unit_price), ops_order_control(balance, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_collected_at, storage_waiver_status, extension_original_date)",
+          "id, so, status, paid, delivery_date, delivery_partner_id, ops_assigned_logistic, order_lines(id, sku, qty, unit_price), order_addons(qty, unit_price), ops_order_control(balance, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_collected_at, storage_waiver_status, extension_original_date, assigned_staff, booking_stage, confirmed_date, confirmed_time_slot)",
         ),
     )
       .order("id", { ascending: true })
@@ -827,6 +984,7 @@ operationOrdersRouter.get("/register-facts", requireOperation, async (c) => {
   }
   const ids = orders.map((o) => o.id);
   const idBySoRef = new Map(orders.map((o) => [`SO-${o.so}`, o.id]));
+  const soRefById = new Map(orders.map((o) => [o.id, `SO-${o.so}`]));
 
   /* Every row of a batched `.in()` read, paged so no cap hides a row. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -882,7 +1040,17 @@ operationOrdersRouter.get("/register-facts", requireOperation, async (c) => {
     : new Map<string, string>();
   const asOf = todayIsoMYT();
 
-  const facts: Record<string, { obligations: "outstanding" | "none" | null; cases: "open" | "closed" | "none" | null }> = {};
+  /* The Outright list's owner facts (PIC, Supplier DO, GRN, delivery day,
+     loading, location, Finance hold) — each owner read separately, each with
+     its own failure flag, so an unread fact is never printed as unrecorded. */
+  const owned = await outrightOrderFacts(
+    sb,
+    orders as unknown as OutrightOrderInput[],
+    reserved,
+    (orderId) => soRefById.get(orderId) ?? "",
+  );
+
+  const facts: Record<string, { obligations: "outstanding" | "none" | null; cases: "open" | "closed" | "none" | null; stock?: Record<string, string>; owned?: OutrightOrderFacts }> = {};
   for (const o of orders) {
     const obligations = completionReadable
       ? completionOfOrder({
@@ -911,9 +1079,17 @@ operationOrdersRouter.get("/register-facts", requireOperation, async (c) => {
               ? "closed"
               : null;
     }
-    facts[o.id] = { obligations, cases: caseFact };
+    const stock: Record<string, string> = {};
+    const required = new Map<string, number>();
+    for (const line of o.order_lines ?? []) required.set(line.sku, (required.get(line.sku) ?? 0) + Number(line.qty));
+    for (const sku of required.keys()) {
+      // Associated Units alone cannot prove this exact line's latest posted receipt.
+      // Keep the display unknown until Stock supplies that source-linked projection.
+      stock[sku] = "unknown";
+    }
+    facts[o.id] = { obligations, cases: caseFact, stock, owned: owned.facts[o.id] };
   }
-  return c.json({ facts, failed: { obligations: !completionReadable, cases: cases === null } });
+  return c.json({ facts, failed: { obligations: !completionReadable, cases: cases === null, ...owned.failed } });
 });
 
 operationOrdersRouter.get("/monthly-demand", requireOperation, async (c) => {
@@ -1000,6 +1176,65 @@ operationOrdersRouter.get("/monthly-demand", requireOperation, async (c) => {
   });
 });
 
+/* ⭐ AMENDMENTS QUEUE — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess
+   was not part of this decision): every Sales Order amendment waits for an
+   approver, the Houzs way (Houzs `Amendments.tsx` + `GET /so-amendments`). This
+   overturns Orders MASTER "Staff amendments and Sales Approver" items 1-2.
+   Submission already writes nothing on the order and the Principal's decide
+   door already applies or rejects it (0564); this read is the approver's list
+   of every amendment across orders. Waiting first, newest first within a
+   status. A draft was never submitted, so it is not in the queue. Must sit
+   above `/:id`, which would otherwise swallow the word.
+   Waiting rows are read on their own, unlimited (one live amendment per order,
+   0334 `amendments_one_live_per_order`), so an old waiting one is never cut
+   off by the history cap.
+   Follows Houzs backend/src/scm/routes/so-amendments.ts:305 (`GET /`, one list
+   across orders) and frontend/src/pages/scm-v2/Amendments.tsx:2-3 (waiting
+   first, newest first) per Weisiang's ruling (2026-10-22): clear Carres rules,
+   implement Houzs.
+   ponytail: decided history is the newest 1000 only; page it when it outgrows that. */
+const AMENDMENT_WAITING = ["submitted", "issued", "accepted"];
+const AMENDMENT_DECIDED = ["applied", "rejected", "withdrawn"];
+operationOrdersRouter.get("/amendments", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const cols = "id, order_id, status, reason, submitted_by, submitted_at, decided_by, decided_at, decision_note, customer_agreement_kind, orders(so, customer_name)";
+  const [waitingRes, decidedRes] = await Promise.all([
+    sb.from("sales_order_amendments").select(cols).in("status", AMENDMENT_WAITING)
+      .order("submitted_at", { ascending: false }),
+    sb.from("sales_order_amendments").select(cols).in("status", AMENDMENT_DECIDED)
+      .order("submitted_at", { ascending: false }).limit(1000),
+  ]);
+  const error = waitingRes.error ?? decidedRes.error;
+  if (error) {
+    const m = mapPipelineV2Error(error);
+    return c.json(m.body, m.status);
+  }
+  type Row = {
+    id: string; order_id: string; status: string; reason: string | null;
+    submitted_by: string | null; submitted_at: string; decided_by: string | null; decided_at: string | null;
+    decision_note: string | null; customer_agreement_kind: string | null;
+    orders?: { so?: number | null; customer_name?: string | null } | null;
+  };
+  const waitingFirst = [...(waitingRes.data ?? []), ...(decidedRes.data ?? [])] as Row[];
+  const names = await resolveActorNames(sb, waitingFirst.flatMap((r) => [r.submitted_by, r.decided_by]));
+  return c.json({
+    amendments: waitingFirst.map((r) => ({
+      id: r.id,
+      orderId: r.order_id,
+      so: r.orders?.so ?? null,
+      customerName: r.orders?.customer_name ?? null,
+      status: AMENDMENT_WAITING.includes(r.status) ? "waiting" : r.status,
+      reason: r.reason,
+      submittedBy: (r.submitted_by && names.get(r.submitted_by)) || null,
+      submittedAt: r.submitted_at,
+      decidedBy: (r.decided_by && names.get(r.decided_by)) || null,
+      decidedAt: r.decided_at,
+      decisionNote: r.decision_note,
+      agreementRecorded: r.customer_agreement_kind != null,
+    })),
+  });
+});
+
 operationOrdersRouter.get("/:id", requireOperation, async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -1068,7 +1303,7 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
     // payload is a field a Save could try to write.
     sb
       .from("ops_order_control")
-      .select("delivery_photos")
+      .select("delivery_photos, assigned_staff")
       .eq("order_id", id)
       .maybeSingle(),
   ]);
@@ -1076,6 +1311,18 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
   if (addonsRes.error) { const m = mapPgError(addonsRes.error); return c.json(m.body, m.status); }
   if (historyRes.error) { const m = mapPgError(historyRes.error); return c.json(m.body, m.status); }
   if (threadsRes.error) { const m = mapPgError(threadsRes.error); return c.json(m.body, m.status); }
+
+  const assignedStaff = controlRes.error
+    ? undefined
+    : ((controlRes.data as { assigned_staff?: string | null } | null)?.assigned_staff ?? null);
+  let picOf: { picRead: "ok" | "failed"; pic: { userId: string; name: string | null } | null } =
+    assignedStaff === undefined ? { picRead: "failed", pic: null } : { picRead: "ok", pic: null };
+  if (assignedStaff) {
+    const who = await sb.from("app_users").select("id, name").eq("id", assignedStaff).maybeSingle();
+    picOf = who.error
+      ? { picRead: "failed", pic: null }
+      : { picRead: "ok", pic: { userId: assignedStaff, name: ((who.data as { name?: string | null } | null)?.name ?? "").trim() || null } };
+  }
 
   const rawLines = linesRes.data ?? [];
   const addons = addonsRes.data ?? [];
@@ -1313,6 +1560,12 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
     /* An absent overlay row is UNKNOWN, not "no photo": the Route says
        `No delivery photo yet` only on an explicit empty ledger. */
     control: controlRes.error ? null : (controlRes.data ?? null),
+    /* The SO PIC — `ops_order_control.assigned_staff` (Workspace MASTER
+       2026-09-17: a separate source fact from today's work owner), named
+       from People under the caller's token. `picRead: "failed"` = not read;
+       `name: null` = a PIC this caller may not see (operation reads only
+       operation colleagues). */
+    ...picOf,
   });
 });
 
@@ -2000,7 +2253,7 @@ operationOrdersRouter.get("/:id/booking-brief", requireOperation, async (c) => {
     (v): v is string => !!v,
   );
 
-  const [unitsRes, partnersRes, settingsRes] = await Promise.all([
+  const [unitsRes, partnersRes, settingsRes, deliveryCalendar] = await Promise.all([
     sb
       .from("ops_stock_items")
       .select(
@@ -2016,6 +2269,7 @@ operationOrdersRouter.get("/:id/booking-brief", requireOperation, async (c) => {
       .from("purchasing_settings")
       .select("logistics_call_working_days")
       .maybeSingle(),
+    readDeliveryCalendar(sb),
   ]);
   for (const r of [unitsRes, partnersRes, settingsRes]) {
     if (r.error) {
@@ -2057,9 +2311,9 @@ operationOrdersRouter.get("/:id/booking-brief", requireOperation, async (c) => {
     units,
   });
 
-  // Mon–Sat delivery week + the Malaysian public holidays, the same calendar
-  // every other delivery clock in the portal counts on.
-  const opts = { holidays: myHolidaySet(), offDays: [0] };
+  // The Delivery calendar — Mon–Sat + the stored Selangor holidays (else the
+  // built-in list) — the same one every other delivery clock counts on.
+  const opts = deliveryWorkingDayOptions(deliveryCalendar.calendar);
   const callDays = (
     settingsRes.data as { logistics_call_working_days?: number } | null
   )?.logistics_call_working_days;

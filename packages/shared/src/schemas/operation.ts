@@ -1,3 +1,4 @@
+import { poSendEvidencePathSchema } from "../po-send-evidence";
 import { PO_DELAY_REASONS } from "../po-workspace";
 import { z } from 'zod';
 
@@ -134,9 +135,28 @@ export const confirmPoSentInput = z.object({
    * is refused, not believed.
    */
   poVersion: z.number().int().positive(),
+  evidencePath: poSendEvidencePathSchema.optional(),
   note: z.string().trim().max(300).optional(),
-}).strict();
+}).strict().refine(value => !value.evidencePath || value.channel === "whatsapp", { path: ["evidencePath"], message: "WhatsApp screenshot" });
 export type ConfirmPoSentInput = z.infer<typeof confirmPoSentInput>;
+
+/** Human-confirmed supplier email: one selected supplier, independent rendered PO PDFs. */
+export const supplierPoEmailInput = z.object({
+  supplierId: z.string().uuid(),
+  recipient: z.string().trim().email().max(200),
+  subject: z.string().trim().min(1).max(200),
+  message: z.string().max(20_000),
+  attemptId: z.string().uuid(),
+  resend: z.boolean().default(false),
+  documents: z.array(z.object({
+    id: z.string().min(1).max(100),
+    version: z.number().int().positive(),
+    filename: z.string().min(1).max(200),
+    content: z.string().min(1).max(7_000_000),
+  }).strict()).min(1).max(25),
+}).strict();
+export type SupplierPoEmailInput = z.infer<typeof supplierPoEmailInput>;
+
 
 /**
  * PO Revisions (0364, Jess 2026-08-18) — POST /api/operation/pos/:id/revise →
@@ -154,7 +174,19 @@ export const revisePoInput = z.object({
       lineId: z.string().uuid(),
       qty: z.number().int().min(1),
       destinationId: z.string().uuid().nullable(),
-    }).strict(),
+      expectedPoVersion: z.number().int().positive().optional(),
+      /** Existing sources only. Qty is the new source total on this line;
+       * recipients describe only the added quantity, never a new approval. */
+      requestSources: z.array(z.object({
+        demandId: z.string().uuid(), qty: z.number().int().positive(),
+        requestVersion: z.number().int().positive(), approvalVersion: z.number().int().positive(),
+        approvalToken: z.string().regex(/^[a-f0-9]{32}$/),
+        recipients: z.array(z.object({ recipientId: z.string().uuid(), qty: z.number().int().positive() }).strict()),
+      }).strict()).min(1).optional(),
+    }).strict().superRefine((line,ctx) => {
+      if ((line.requestSources != null) !== (line.expectedPoVersion != null)) ctx.addIssue({ code:"custom", message:"Source changes require the exact PO version" });
+      if (line.requestSources && (new Set(line.requestSources.map(source => source.demandId)).size !== line.requestSources.length || line.requestSources.reduce((total,source) => total+source.qty,0) !== line.qty)) ctx.addIssue({ code:"custom", message:"Sources must describe the whole line exactly once" });
+    }),
   ).min(1),
 }).strict();
 export type RevisePoInput = z.infer<typeof revisePoInput>;
@@ -164,16 +196,6 @@ export const setMessageTemplateInput = z.object({
   text: z.string().max(2000),
 }).strict();
 export type SetMessageTemplateInput = z.infer<typeof setMessageTemplateInput>;
-
-/**
- * Where each LINE goes (Jess, 2026-08-02) — the three per-line write doors
- * (0311). Purchasing's only per-line job is the destination; the ops remark
- * is its own internal note and never prints.
- */
-export const setLineDestinationInput = z.object({
-  destinationId: z.string().uuid(),
-}).strict();
-export type SetLineDestinationInput = z.infer<typeof setLineDestinationInput>;
 
 /**
  * `Change Deliver To` (Purchasing MASTER §5.4, Jess 2026-09-22 · build
@@ -193,6 +215,54 @@ export const changePoDeliverToInput = z.object({
   unitCodes: z.array(z.string().min(1)).max(500).optional(),
 }).strict();
 export type ChangePoDeliverToInput = z.infer<typeof changePoDeliverToInput>;
+
+/**
+ * `New Purchase Order` — POST /api/operation/pos/new → `purchasing_issue_pos_batch`.
+ * Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office staff open a PO
+ * with no source, the Houzs way (supplier, Deliver To, goods, dates). A blank
+ * `price` takes the Catalog price on the server; an entered one is sent as
+ * hand-entered and the engine's commercial gate decides it.
+ */
+export const newPurchaseOrderInput = z.object({
+  supplierId: z.string().uuid(),
+  destinationId: z.string().uuid(),
+  etaDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  procurementPartnerId: z.string().uuid().nullable().optional(),
+  note: z.string().trim().max(500).optional(),
+  /** Consignment Order (supplier-owned goods) — Weisiang's decision, Mr Lim,
+   *  WhatsApp 2026-10-22: the same blank form, issued through
+   *  `purchasing_issue_consignment_order` (0720), which marks it consignment. */
+  consignment: z.boolean().optional(),
+  lines: z.array(z.object({
+    sku: z.string().trim().min(1),
+    qty: z.number().int().min(1).max(10000),
+    // Positive only: a price of 0 is Free of Charge, which needs a reason this form does not collect.
+    price: z.number().positive().nullable().optional(),
+  }).strict()).min(1).max(100),
+}).strict();
+export type NewPurchaseOrderInput = z.infer<typeof newPurchaseOrderInput>;
+
+/**
+ * 0728 — POST /api/operation/pos/receive-without-po. A Goods Receipt with no PO.
+ * Follows Houzs grns.ts:1408 (only the supplier and items are required) per
+ * Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+ */
+export const officeReceiveWithoutPoInput = z.object({
+  supplierId: z.string().uuid(),
+  destinationId: z.string().uuid(),
+  doNumber: z.string().min(3).max(60),
+  doFilePath: z.string().min(1).max(400),
+  goodsReceivedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  actualSiteId: z.string().uuid().optional(),
+  note: z.string().trim().max(500).optional(),
+  saveKey: z.string().uuid(),
+  lines: z.array(z.object({
+    sku: z.string().trim().min(1),
+    qty: z.number().int().min(1).max(10000),
+    price: z.number().positive().nullable().optional(),
+  }).strict()).min(1).max(100),
+}).strict();
+export type OfficeReceiveWithoutPoInput = z.infer<typeof officeReceiveWithoutPoInput>;
 
 export const setLineOpsRemarkInput = z.object({
   text: z.string().max(500),
@@ -800,9 +870,29 @@ export type ResumeDispatchInput = z.infer<typeof resumeDispatchInput>;
  * required for the audit trail (mirrors abandonOrderInput shape).
  */
 export const cancelPoInput = z.object({
-  reason: z.string().min(1),
+  reason: z.string().trim().min(1).max(500),
+  cancellation: z.object({
+    action:z.enum(["record","complete","approve_exception","refuse_exception"]),
+    key:z.string().uuid(),requestId:z.string().uuid(),expectedRequestVersion:z.number().int().nonnegative(),expectedPoVersion:z.number().int().positive(),
+    decisionReason:z.string().max(500),
+    supplierFacts:z.object({supplierStatement:z.enum(["awaiting","agreed","unable_to_supply","disagreed"]),fee:z.enum(["yes","no","not_confirmed"]),shipped:z.boolean().nullable(),evidence:z.array(z.string().trim().min(1).max(2000)).max(20)}).strict(),
+    lines:z.array(z.object({lineId:z.string().uuid(),qty:z.number().int().positive(),receivedQty:z.number().int().nonnegative(),unitIds:z.array(z.string().uuid()),
+      sources:z.array(z.object({demandId:z.string().uuid(),qty:z.number().int().positive(),recipients:z.array(z.object({recipientId:z.string().uuid(),qty:z.number().int().positive()}).strict())}).strict()).min(1),
+    }).strict()).min(1),
+  }).strict().optional(),
 }).strict();
 export type CancelPoInput = z.infer<typeof cancelPoInput>;
+
+/** 0717 — a decision on a PO change request (PO Amendments / Cancellation
+ *  Requests). Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was not
+ *  part of this decision). A rejection's reason is required in SQL. */
+export const decidePoChangeInput = z.object({
+  approve: z.boolean(),
+  note: z.string().trim().max(500).optional(),
+}).strict();
+export type DecidePoChangeInput = z.infer<typeof decidePoChangeInput>;
+/** 0717 — withdraw an open PO change request (the Houzs withdraw); reason optional. */
+export const withdrawPoChangeInput = z.object({ note: z.string().trim().max(500).optional() }).strict();
 
 /**
  * `reservedDrilldownQuery` — GET /api/operation/warehouse/reserved-drilldown

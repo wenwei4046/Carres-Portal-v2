@@ -1,5 +1,6 @@
 import { Navigate, NavLink, useParams } from "react-router-dom";
 import { PROCUREMENT_TAB_SLUGS, type ProcurementTabSlug } from "@carres/shared";
+import { SEGMENT, SEGMENT_OFF, SEGMENT_ON, SEGMENTED_TRACK } from "@/components/kit/Tabs";
 import PurchasingTabs from "../PurchasingTabs";
 import ProcurementTabContent from "./ProcurementTabContent";
 
@@ -93,14 +94,16 @@ export default function TabbedProcurementShell() {
       <PurchasingTabs />
 
       {/* Channel tab strip. Card 4B removed the "+ New PO" button that used to
-          sit at the right of this row; the strip is now navigation only. */}
-      <div
-        className="shrink-0 px-9 border-b border-base-200 bg-white flex items-center gap-4"
-        role="tablist"
-        aria-label="Procurement channel"
-        data-testid="procurement-tab-strip"
-      >
-        <div className="flex gap-1">
+          sit at the right of this row; the strip is now navigation only. The
+          tabs are the kit segmented control (01 §3); on a narrow page the
+          track wraps to a second line instead of running off the screen. */}
+      <div className="shrink-0 px-9 py-2 border-b border-base-200 bg-white flex items-center gap-4">
+        <div
+          className={`${SEGMENTED_TRACK} max-w-full flex-wrap`}
+          role="tablist"
+          aria-label="Procurement channel"
+          data-testid="procurement-tab-strip"
+        >
           {PROCUREMENT_TAB_SLUGS.map((slug) => (
             <NavLink
               key={slug}
@@ -108,15 +111,7 @@ export default function TabbedProcurementShell() {
               role="tab"
               aria-selected={slug === rawSlug}
               data-testid={`procurement-tab-link-${slug}`}
-              className={({ isActive }) =>
-                [
-                  "relative px-4 py-3 text-body font-body transition-colors whitespace-nowrap",
-                  "border-b-2 -mb-px",
-                  isActive
-                    ? "border-accent text-base-900 font-semibold"
-                    : "border-transparent text-base-600 font-medium hover:text-base-900",
-                ].join(" ")
-              }
+              className={({ isActive }) => `${SEGMENT} ${isActive ? SEGMENT_ON : SEGMENT_OFF}`}
             >
               {TAB_LABELS[slug]}
             </NavLink>

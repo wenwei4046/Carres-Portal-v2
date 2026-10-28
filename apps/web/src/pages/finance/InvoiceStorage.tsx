@@ -86,22 +86,22 @@ export default function InvoiceStorage({ orderId, canAct, correctionInFlight = f
           onDone={() => { setExtending(null);
             void qc.invalidateQueries({ queryKey: ["finance", "storage-cases", orderId] }); }} />)}
         {(casesQ.data?.unreconciledLegacy ?? 0) > 0 &&
-          <p className="text-label font-normal text-base-500"
+          <p className="text-meta text-base-500"
             data-testid="storage-unreconciled-legacy">
             This order also carries {rm(casesQ.data!.unreconciledLegacy!)} of storage fee from
             the old records, which no Storage Invoice covers. Collect it, or set the storage
             fee to 0 in the order, so the two do not disagree.</p>}
-        {correctionInFlight && <p className="text-label font-normal text-base-500"
+        {correctionInFlight && <p className="text-meta text-base-500"
           data-testid="storage-correction-note">
           A Storage Invoice correction is in progress. The replacement is a draft and asks
           for nothing until it is issued. Issue it so the money is asked again.</p>}
         {cases.length === 0 && !casesQ.isLoading &&
-          <p className="text-label font-normal text-kit-slate-11">
+          <p className="text-meta text-kit-slate-11">
             No storage case. Storage begins only when the goods are ready AND the customer
             delays the delivery.</p>}
         {requests.length > 0 && <div data-testid="later-delivery-requests">
-          <p className="font-semibold">What the customer asked for</p>
-          {requests.map((r) => <p key={r.id} className="text-label font-normal">
+          <p className="font-medium">What the customer asked for</p>
+          {requests.map((r) => <p key={r.id} className="text-meta">
             {fmtDate(r.requested_date)} · {REASON_WORD[r.reason_key] ?? r.reason_key}
             {r.reason_detail ? `: ${r.reason_detail}` : ""}
             {r.free_storage_requested ? " · asked for free storage" : ""}
@@ -154,7 +154,7 @@ function CaseCard({ storageCase: c, canAct, extending, onExtend, onDone }: {
     onError: (e: Error) => toast.error(`The Storage Invoice was not created: ${e.message}`),
   });
   return <div className="rounded-card border border-base-200 p-3" data-testid={`storage-case-${c.product_group}`}>
-    <p className="font-semibold">{GROUP_WORD[c.product_group]}{c.status === "closed" ? " · Closed" : ""}</p>
+    <p className="text-strong">{GROUP_WORD[c.product_group]}{c.status === "closed" ? " · Closed" : ""}</p>
     <p>Storage started {fmtDate(c.storage_start)} · today is day {charge.dayOfStorage}</p>
     <p>Free until {fmtDate(charge.freeUntilIso)}
       {c.approved_free_until && c.approved_free_until >= charge.freeUntilIso
@@ -239,7 +239,7 @@ function StorageChecks({ storageCase: c, canAct }: {
     record.mutate(`${ATTACHMENTS_BUCKET}/${path}`);
   }
   return <div className="mt-2" data-testid={`storage-checks-${c.product_group}`}>
-    <p className="text-label font-normal">
+    <p className="text-meta">
       {last ? `Last checked ${fmtDate(last)}. ` : "Never checked. "}
       {due.due
         ? `A check was due ${fmtDate(due.dueIso)}.`
@@ -249,28 +249,28 @@ function StorageChecks({ storageCase: c, canAct }: {
       <button className="btn-secondary mt-1"
         onClick={() => setChecking(true)}>Check the stored furniture</button>}
     {checking && <div className="mt-2 space-y-2" data-testid="storage-check-form">
-      <label className="block"><span className="text-label">Day it was checked</span>
+      <label className="block"><span className="text-meta text-kit-slate-11">Day it was checked</span>
         <input type="date" value={on} max={appTodayIso()} onChange={(e) => setOn(e.target.value)}
           aria-label="Day it was checked"
           className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body" /></label>
-      <label className="block"><span className="text-label">Where it is stored</span>
+      <label className="block"><span className="text-meta text-kit-slate-11">Where it is stored</span>
         <input value={location} onChange={(e) => setLocation(e.target.value)}
           aria-label="Where it is stored"
           className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body" /></label>
-      <label className="block"><span className="text-label">How it is packed</span>
+      <label className="block"><span className="text-meta text-kit-slate-11">How it is packed</span>
         <input value={packaging} onChange={(e) => setPackaging(e.target.value)}
           aria-label="How it is packed"
           className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body" /></label>
-      <label className="block"><span className="text-label">What condition it is in</span>
+      <label className="block"><span className="text-meta text-kit-slate-11">What condition it is in</span>
         <input value={note} onChange={(e) => setNote(e.target.value)}
           aria-label="What condition it is in"
           className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body" /></label>
-      <label className="block"><span className="text-label">Photo</span>
+      <label className="block"><span className="text-meta text-kit-slate-11">Photo</span>
         <input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)}
           aria-label="Photo" className="mt-0.5 block w-full text-meta" />
-        <span className="text-label font-normal">
+        <span className="text-meta">
           {file ? file.name : "A check nobody can see is not a check."}</span></label>
-      <p className="text-label font-normal">
+      <p className="text-meta">
         If anything is damaged, open a Service Case. This record is not one.</p>
       <div className="flex gap-2">
         <button className="btn-primary"
@@ -281,7 +281,7 @@ function StorageChecks({ storageCase: c, canAct }: {
       </div>
     </div>}
     {checks.length > 0 && <div className="mt-1">
-      {checks.map((k) => <p key={k.id} className="text-label font-normal">
+      {checks.map((k) => <p key={k.id} className="text-meta">
         {fmtDate(k.inspected_on)} · {k.location} · {k.condition_note}
       </p>)}
     </div>}
@@ -342,25 +342,25 @@ function StartForm({ orderId, onDone, onBack }: {
     onError: (e: Error) => toast.error(`Storage was not started: ${e.message}`),
   });
   return <div className="rounded-card border border-base-200 p-3 space-y-2" data-testid="storage-start-form">
-    <label className="block"><span className="text-label">Goods</span>
+    <label className="block"><span className="text-meta text-kit-slate-11">Goods</span>
       <select value={group} onChange={(e) => setGroup(e.target.value as StorageCaseRow["product_group"])}
         aria-label="Goods" className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body">
         <option value="mattress_bedframe">Mattress / Bedframe</option>
         <option value="sofa">Sofa</option>
       </select></label>
-    <label className="block"><span className="text-label">Goods were ready on</span>
+    <label className="block"><span className="text-meta text-kit-slate-11">Goods were ready on</span>
       <input type="date" value={readiness} onChange={(e) => setReadiness(e.target.value)}
         aria-label="Goods were ready on"
         className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body" /></label>
-    <label className="block"><span className="text-label">Customer delayed on</span>
+    <label className="block"><span className="text-meta text-kit-slate-11">Customer delayed on</span>
       <input type="date" value={delay} onChange={(e) => setDelay(e.target.value)}
         aria-label="Customer delayed on"
         className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body" /></label>
-    <label className="block"><span className="text-label">What happened</span>
+    <label className="block"><span className="text-meta text-kit-slate-11">What happened</span>
       <input value={note} onChange={(e) => setNote(e.target.value)}
         aria-label="What happened" placeholder="Customer asked to hold the delivery"
         className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body" /></label>
-    <p className="text-label font-normal">
+    <p className="text-meta">
       Storage starts on the LATER of the two dates. The system works it out.</p>
     <div className="flex gap-2">
       <button className="btn-primary" disabled={!readiness || !delay || !note.trim() || start.isPending}
@@ -398,17 +398,17 @@ function ExtraFreeForm({ caseId, onDone, onBack }: {
     approve.mutate(`${ATTACHMENTS_BUCKET}/${path}`);
   }
   return <div className="mt-2 rounded-card border border-base-200 p-3 space-y-2" data-testid="storage-extra-free-form">
-    <label className="block"><span className="text-label">Free until</span>
+    <label className="block"><span className="text-meta text-kit-slate-11">Free until</span>
       <input type="date" value={until} onChange={(e) => setUntil(e.target.value)}
         aria-label="Free until"
         className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body" /></label>
-    <label className="block"><span className="text-label">Reason</span>
+    <label className="block"><span className="text-meta text-kit-slate-11">Reason</span>
       <input value={reason} onChange={(e) => setReason(e.target.value)}
         aria-label="Reason" className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body" /></label>
-    <label className="block"><span className="text-label">Customer's written request</span>
+    <label className="block"><span className="text-meta text-kit-slate-11">Customer's written request</span>
       <input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)}
         aria-label="Customer's written request" className="mt-0.5 block w-full text-meta" />
-      <span className="text-label font-normal">
+      <span className="text-meta">
         {file ? file.name : "No written request means no free storage. A phone call is not enough."}</span></label>
     <div className="flex gap-2">
       <button className="btn-primary" disabled={!until || !reason.trim() || !file || saving || approve.isPending}
@@ -483,35 +483,35 @@ function LaterDateForm({ orderId, onDone, onBack }: {
   }
   return <div className="mt-2 rounded-card border border-base-200 p-3 space-y-2"
     data-testid="storage-later-date-form">
-    <p className="font-semibold">This records what the customer asked for. It does not change the delivery date.</p>
-    <label className="block"><span className="text-label">The date the customer asked for</span>
+    <p className="font-medium">This records what the customer asked for. It does not change the delivery date.</p>
+    <label className="block"><span className="text-meta text-kit-slate-11">The date the customer asked for</span>
       <input type="date" value={date} min={appTodayIso()} onChange={(e) => setDate(e.target.value)}
         aria-label="The date the customer asked for"
         className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body" /></label>
-    <label className="block"><span className="text-label">Reason</span>
+    <label className="block"><span className="text-meta text-kit-slate-11">Reason</span>
       <select value={reasonKey} onChange={(e) => setReasonKey(e.target.value)}
         aria-label="Reason"
         className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body">
         {CUSTOMER_REASONS.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
       </select></label>
-    <label className="block"><span className="text-label">Anything to add (optional)</span>
+    <label className="block"><span className="text-meta text-kit-slate-11">Anything to add (optional)</span>
       <input value={detail} onChange={(e) => setDetail(e.target.value)}
         aria-label="Anything to add"
         className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body" /></label>
-    <label className="flex items-start gap-2 text-label font-normal">
+    <label className="flex items-start gap-2 text-meta">
       <input type="checkbox" checked={acknowledged}
         onChange={(e) => setAcknowledged(e.target.checked)}
         aria-label="The customer acknowledged the storage terms" />
       <span>The customer acknowledged the storage terms.</span></label>
-    <label className="flex items-start gap-2 text-label font-normal">
+    <label className="flex items-start gap-2 text-meta">
       <input type="checkbox" checked={freeRequested}
         onChange={(e) => setFreeRequested(e.target.checked)}
         aria-label="The customer asked for free storage" />
       <span>The customer asked for free storage.</span></label>
-    <label className="block"><span className="text-label">What the customer sent</span>
+    <label className="block"><span className="text-meta text-kit-slate-11">What the customer sent</span>
       <input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)}
         aria-label="What the customer sent" className="mt-0.5 block w-full text-meta" />
-      <span className="text-label font-normal">
+      <span className="text-meta">
         {file ? file.name : "A telephone call cannot change the date or obtain free storage."}</span></label>
     <div className="flex gap-2">
       <button className="btn-primary"

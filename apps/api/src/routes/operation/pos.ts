@@ -1,10 +1,17 @@
 import { Hono, type Context } from "hono";
+import { bodyLimit } from "hono/body-limit";
+import { preparePoEmailAttempt, recordPoEmailOutcome, readPoEmailAttempts } from "../../lib/po-email-attempts";
+import { sendSupplierPoEmail } from "../../lib/supplier-email";
+import { purchasingActorMayIssue } from "../../lib/purchasing-po-authority";
 import { arrivalConfirmationWorkCompletion, poSentWorkCompletion, supplierReplyWorkCompletion } from "../../lib/purchasing-work-completion";
 import { resolveActorNames } from "../../lib/actor-names";
 import {
   arrivalFromReadyDate,
+  parsePoWindowKey,
   assignPickupPartnerInput,
   cancelPoInput,
+  decidePoChangeInput,
+  withdrawPoChangeInput,
   chasePoEventInput,
   listPurchaseOrdersQuery,
   normalizeSkuKey,
@@ -16,10 +23,12 @@ import {
   recordSupplierAnswersInput,
   recordArrivalConfirmationInput,
   confirmPoSentInput,
+  poSendEvidenceNote,
+  readPoSendEvidence,
+  supplierPoEmailInput,
   recordSendInput,
   revisePoInput,
   setMessageTemplateInput,
-  setLineDestinationInput,
   setLineOpsRemarkInput,
   changePoDeliverToInput,
   warehouseReceiptTotals,
@@ -28,13 +37,19 @@ import {
   type PoReportResponse,
   type WarehouseReceiptLine,
   claimPhotoWire,
+  newPurchaseOrderInput,
+  officeReceiveWithoutPoInput,
+  PURCHASING_REFUSAL_CODES,
+  purchasingRefusal,
 } from "@carres/shared";
 // renderPoPdf moved to apps/web/src/lib/pdf/render.ts (Workers WASM ban).
 import { requireOperation } from "../../lib/auth-guards";
-import { chunk } from "../../lib/purchase-demand-read";
+import { chunk, todayIso } from "../../lib/purchase-demand-read";
 import { supplierPoFactsOf, type SupplierFactRows } from "../../lib/supplier-card-facts";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
-import { userClient } from "../../lib/supabase";
+import { adminClient, userClient } from "../../lib/supabase";
+import { cancellationFinanceHandoff } from "../../lib/po-cancellation-finance-handoff";
+import { skuCategories } from "../../lib/sku-categories";
 import { setTermsDaysInput } from "@carres/shared/schemas/finance-ap";
 import type { AppEnv } from "../../types";
 import { rpcWithArrivalTime } from "../../lib/receiving-time";
@@ -170,6 +185,9 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     if (status !== "all") q = q.eq("status", status);
     if (supplierId) q = q.eq("supplier_id", supplierId);
     if (onlyPoId) q = q.eq("id", onlyPoId);
+    // 0728: a PO issued only to carry a no-PO Goods Receipt is not shown
+    // (Houzs grns.ts:1408 has no PO there).
+    else q = q.eq("receipt_only", false);
 
     const { data, error } = await q
       .order("placed_at", { ascending: false })
@@ -229,7 +247,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       poIds,
       (ids) => sb
         .from("po_line_sources")
-        .select("id, po_id, po_line_id, order_id, order_line_id, so, qty")
+        .select("id, po_id, po_line_id, order_id, order_line_id, so, qty, purchase_demand_id")
         .in("po_id", ids)
         .order("id"),
     );
@@ -257,11 +275,11 @@ operationPosRouter.get("/", requireOperation, async (c) => {
 
   const demandIds = [
     ...new Set(
-      pos.flatMap((po) =>
+      [...poSourcesByLine.values()].flat().map(s => s.purchase_demand_id).filter((id): id is string => typeof id === "string").concat(pos.flatMap((po) =>
         ((po.purchase_order_lines as Array<Record<string, unknown>> | null) ?? [])
           .map((line) => line.demand_id)
           .filter((id): id is string => typeof id === "string" && id.length > 0),
-      ),
+      )),
     ),
   ];
   const demandById = new Map<string, { requestId: string | null; purpose: string | null }>();
@@ -302,13 +320,14 @@ operationPosRouter.get("/", requireOperation, async (c) => {
      Identity stays the request UUID and the business facts (Proceed Date,
      purpose) still travel, so detailed source lines can tell two purchases
      apart. */
+  const modernRequestIds = new Set<string>();
   const requestFactsById = new Map<string, { proceedDate: string | null; reqNo: string | null }>();
   if (requestIds.length > 0) {
     const requestResult = await readEveryChunked<Record<string, unknown>, string>(
       requestIds,
       (ids) => sb
         .from("purchase_requests")
-        .select("id, created_at, req_no")
+        .select("id, created_at, req_no, request_version, proceed_date")
         .in("id", ids)
         .order("id"),
     );
@@ -317,16 +336,49 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       return c.json(m.body, m.status);
     }
     for (const request of requestResult.data) {
+      if (Number(request.request_version ?? 0)>0) modernRequestIds.add(String(request.id));
       requestFactsById.set(request.id as string, {
         proceedDate:
-          typeof request.created_at === "string"
-            ? request.created_at.slice(0, 10)
-            : null,
+          typeof request.proceed_date === "string"
+            ? request.proceed_date.slice(0, 10)
+            : Number(request.request_version ?? 0) > 0
+              ? null
+              : typeof request.created_at === "string"
+                ? request.created_at.slice(0, 10)
+                : null,
         reqNo:
           typeof request.req_no === "string" && request.req_no.trim() !== ""
             ? request.req_no.trim()
             : null,
       });
+    }
+  }
+  // Context cancellation is authoritative by immutable PO events. Version1
+  // cannot have an effective cancellation (completion always mints Version2+).
+  // Do not advertise an exceptional action merely because its source exists.
+  const release = modernRequestIds.size ? await sb.rpc("purchasing_request_context_release") : null;
+  const cancellationReleased=release?.error==null && release?.data?.version===1 && release?.data?.requestFlow===true && release?.data?.cancellation===true;
+  for(const po of pos) po.contextual_cancellation_available=cancellationReleased&&(linesByPo.get(String(po.id))??[]).some(line=>[line.demand_id,...(poSourcesByLine.get(String(line.id))??[]).map(source=>source.purchase_demand_id)].some(id=>modernRequestIds.has(demandById.get(String(id))?.requestId??"")));
+  const cancellationCandidates=pos.filter(po => Number(po.version ?? 1)>1 && (linesByPo.get(String(po.id))??[]).some(line => {
+    const ids=[line.demand_id,...(poSourcesByLine.get(String(line.id))??[]).map(source=>source.purchase_demand_id)];
+    return ids.some(id=>modernRequestIds.has(demandById.get(String(id))?.requestId??""));
+  }));
+  if(cancellationCandidates.length) {
+    const result=await sb.rpc("purchasing_po_cancellations",{p_po_ids:cancellationCandidates.map(po=>po.id)});
+    if(result.error || !Array.isArray(result.data)) return c.json({error:"cancellation_source_unavailable"},503);
+    const factsByPo=new Map(result.data.map((row:any)=>[row.poId,row.facts]));
+    for(const po of cancellationCandidates) {
+      const facts=factsByPo.get(po.id) as {lines:Array<{lineId:string;orderedQty:number;receivedQty:number;cancelledQty:number;pendingQty:number}>;events:Array<{kind:string;applied_po_version:number;id:string}>}|undefined;
+      if(facts && (!Array.isArray(facts.lines)||!Array.isArray(facts.events))) return c.json({error:"cancellation_source_unavailable"},503);
+      for(const line of linesByPo.get(String(po.id))??[]) {
+        const observed=facts?.lines.find(value=>value.lineId===line.id);
+        if(facts && (!observed || observed.orderedQty!==line.qty || observed.receivedQty!==line.received_qty || !Number.isInteger(observed.cancelledQty) || observed.cancelledQty<0 || observed.cancelledQty>Number(line.qty)-Number(line.received_qty))) return c.json({error:"cancellation_scope_changed"},503);
+        line.cancelled_qty=observed?.cancelledQty??0;
+        line.pending_qty=observed?.pendingQty??Number(line.qty)-Number(line.received_qty);
+      }
+      const effective=facts?.events.filter(event=>event.kind==="effective"&&event.applied_po_version===po.version)??[];
+      po.cancellation_version=effective.length?po.version:null;
+      po.cancellation_event_id=effective[0]?.id??null;
     }
   }
   const tomorrowAboutByPo = new Map<string, string | null>();
@@ -551,6 +603,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     const lines = (row.purchase_order_lines as Array<Record<string, unknown>> | null) ?? [];
     for (const l of lines) skuSet.add(l.sku as string);
   }
+  const catalogCategories = await skuCategories(sb, [...skuSet]);
   const modelBySku = new Map<string, { model_name: string | null; size: string | null }>();
   if (skuSet.size > 0) {
     const skuResult = await readEveryChunked<Record<string, unknown>, string>(
@@ -774,21 +827,15 @@ operationPosRouter.get("/", requireOperation, async (c) => {
        the source UUID, never by the label (Card 08 §3.5). A legacy line
        whose demand has no request header keeps one label-only source. */
     const manualSources = lines.flatMap((line) => {
-      const demandId = line.demand_id;
-      if (typeof demandId !== "string") return [];
-      const demand = demandById.get(demandId);
-      if (!demand) return [];
-      const facts = demand.requestId ? requestFactsById.get(demand.requestId) : null;
-      return [{
-        kind: "manual_purchase" as const,
-        /* The stored MPR number where the request has one; the governed label
-           where it has none. Never a UUID, never an invented number. */
-        reference: facts?.reqNo ?? "Manual Purchase Request",
-        req_no: facts?.reqNo ?? null,
-        request_id: demand.requestId,
-        purpose: demand.purpose,
-        proceed_date: facts?.proceedDate ?? null,
-      }];
+      const attributed = (poSourcesByLine.get(line.id as string) ?? []).filter(s => typeof s.purchase_demand_id === "string");
+      const ids = attributed.length ? attributed.map(s => s.purchase_demand_id as string) : typeof line.demand_id === "string" ? [line.demand_id] : [];
+      return ids.flatMap(demandId => {
+        const demand = demandById.get(demandId);
+        if (!demand) return [];
+        const facts = demand.requestId ? requestFactsById.get(demand.requestId) : null;
+        return [{ kind: "manual_purchase" as const, reference: facts?.reqNo ?? "Manual Purchase Request", req_no: facts?.reqNo ?? null,
+          request_id: demand.requestId, purpose: demand.purpose, proceed_date: facts?.proceedDate ?? null }];
+      });
     });
     const sources = [...(salesSourcesByPo.get(row.id as string) ?? []), ...manualSources]
       .filter(
@@ -814,7 +861,9 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       sends: sendsByPo.get(row.id as string) ?? [],
       grns: grnsByPo.get(row.id as string) ?? [],
       purchase_order_lines: lines.map((l) => {
-        const salesLineSources = poSourcesByLine.get(l.id as string) ?? [];
+        const allLineSources = poSourcesByLine.get(l.id as string) ?? [];
+        const salesLineSources = allLineSources.filter(source => source.order_id != null);
+        const requestLineSources = allLineSources.filter(source => typeof source.purchase_demand_id === "string");
         const salesAllocated = salesLineSources.reduce(
           (sum, source) => sum + Number(source.qty ?? 0),
           0,
@@ -831,7 +880,13 @@ operationPosRouter.get("/", requireOperation, async (c) => {
               reference: `SO-${Number(source.so)}`,
               qty: Number(source.qty ?? 0),
             }]),
-            ...(demand ? [{
+            ...requestLineSources.map(source => {
+              const requestDemand = demandById.get(source.purchase_demand_id as string);
+              const facts = requestDemand?.requestId ? requestFactsById.get(requestDemand.requestId) : null;
+              return { kind: "manual_purchase" as const, reference: facts?.reqNo ?? "Manual Purchase Request", req_no: facts?.reqNo ?? null,
+                qty: Number(source.qty), request_id: requestDemand?.requestId ?? null, purpose: requestDemand?.purpose ?? null, proceed_date: facts?.proceedDate ?? null };
+            }),
+            ...(demand && !requestLineSources.length ? [{
               kind: "manual_purchase" as const,
               reference: manualFacts?.reqNo ?? "Manual Purchase Request",
               req_no: manualFacts?.reqNo ?? null,
@@ -844,6 +899,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
             }] : []),
           ],
           balance_answer_about_qty: balanceAboutByLine.get(l.id as string) ?? null,
+          category: catalogCategories.get(l.sku as string) ?? null,
           model_name: modelBySku.get(l.sku as string)?.model_name ?? null,
           size: modelBySku.get(l.sku as string)?.size ?? null,
           so_rows: soRowsOf(row, l.sku as string, Number(l.qty ?? 0)),
@@ -1540,16 +1596,173 @@ operationPosRouter.get("/:id/units", requireOperation, async (c) => {
 // 2026-05-12 (Loo): browser renders @react-pdf locally (Workers WASM ban —
 // see render.ts note in apps/web/src/lib/pdf/).
 // Resume the existing document's send step without issuing another PO.
+function supplierEmailConfigured(c: Context<AppEnv>): boolean {
+  return c.env.PO_EMAIL_ENABLED === "true" && Boolean(c.env.RESEND_API_KEY && c.env.PO_EMAIL_FROM);
+}
+
+operationPosRouter.get("/email-capability", requireOperation, c => c.json({ configured: supplierEmailConfigured(c) }));
+
+operationPosRouter.get("/:id/email-attempts", requireOperation, async c => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const visible = await sb.from("purchase_orders").select("id").eq("id", c.req.param("id")).maybeSingle();
+  if (visible.error) { const m = mapPgError(visible.error); return c.json(m.body, m.status); }
+  if (!visible.data) return c.json({ code: "not_found" }, 404);
+  const read = await readPoEmailAttempts(c.env, visible.data.id);
+  if (read.error) return c.json({ code: "email_history_unavailable" }, 503);
+  const attempts = (read.data ?? []).flatMap(row => {
+    const evidence = row.po_email_attempts as unknown as { id: string; outcome: string; provider_id: string | null; recipient: string };
+    return [{ id: evidence.id, status: evidence.outcome === "failed" ? "failed" : evidence.outcome === "dispatched" ? "dispatched" : "unknown",
+      providerId: evidence.provider_id ?? undefined, recipient: evidence.recipient,
+      documents: [{ id: row.po_id, version: row.po_version }] }];
+  });
+  return c.json({ attempts });
+});
+
+operationPosRouter.post("/supplier-email", requireOperation,
+  bodyLimit({ maxSize: 30 * 1024 * 1024 }), async (c) => {
+  if (!supplierEmailConfigured(c)) return c.json({ code: "email_not_configured", message: "Not available" }, 503);
+  const parsed = await parseJsonBody(c, supplierPoEmailInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const input = parsed.data;
+  const ids = input.documents.map(document => document.id);
+  if (new Set(ids).size !== ids.length) return c.json({ code: "duplicate_po" }, 422);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const permission = await purchasingActorMayIssue(sb, c.var.auth.id);
+  if (permission.error) { const m = mapPgError(permission.error); return c.json(m.body, m.status); }
+  if (!permission.mayIssue) return c.json({ code: "forbidden" }, 403);
+  const [poRead, supplierRead, sendRead] = await Promise.all([
+    sb.from("purchase_orders").select("id, supplier_id, version, status").in("id", ids),
+    sb.from("suppliers").select("contact_email").eq("id", input.supplierId).maybeSingle(),
+    sb.from("po_sends").select("po_id, po_version, recipient, channel, note").in("po_id", ids).eq("kind", "confirmed_sent"),
+  ]);
+  const readError = poRead.error ?? supplierRead.error ?? sendRead.error;
+  if (readError) { const m = mapPgError(readError); return c.json(m.body, m.status); }
+  if (supplierRead.data?.contact_email?.trim() !== input.recipient) return c.json({ code: "recipient_changed", message: "Check Suppliers" }, 409);
+  const pos = new Map((poRead.data ?? []).map(po => [po.id, po]));
+  for (const document of input.documents) {
+    const po = pos.get(document.id);
+    if (!po || po.supplier_id !== input.supplierId || po.status === "cancelled") return c.json({ code: "invalid_po_document" }, 422);
+    if ((po.version ?? 1) !== document.version) return c.json({ code: "stale_po_version", message: "Purchase order changed" }, 409);
+    const expectedFilename = `${document.id.replace(/[^a-zA-Z0-9._-]/g, "_")}-V${document.version}.pdf`;
+    if (document.filename !== expectedFilename) return c.json({ code: "invalid_po_document" }, 422);
+  }
+  const attempt = `po-email/${input.attemptId}`;
+  const history = sendRead.data ?? [];
+  const alreadySent = input.documents.filter(document => history.some(row => row.po_id === document.id && row.po_version === document.version));
+  const differentlySent = alreadySent.filter(document => !history.some(row => row.po_id === document.id && row.po_version === document.version && typeof row.note === "string" && row.note.includes(attempt)));
+  if (differentlySent.length && !input.resend) return c.json({ code: "already_sent", message: "PO sent to supplier", pos: differentlySent.map(document => document.id) }, 409);
+  // The mandatory listing comes from the server-validated document set, never a second UI selection.
+  const listing = input.documents.map(document => `${document.id} · V${document.version}`).join("\n");
+  const reservation = await preparePoEmailAttempt(c.env, c.var.auth.id, input);
+  if (reservation.error) {
+    // No provider call without a durable reservation. Existing/uncertain attempts
+    // remain blocked even when this request cannot recover their result.
+    return c.json({ code: "email_unknown", status: "unknown" }, 502);
+  }
+  const reserved = reservation.data as { created: boolean; status: string; providerId?: string };
+  if (reserved?.created !== true && (reserved?.created !== false || reserved.status !== "dispatched" || !reserved.providerId))
+    return c.json({ code: "email_unknown", status: "unknown" }, 502);
+  const result = !reserved.created && reserved.providerId
+    ? { status: "dispatched" as const, providerId: reserved.providerId }
+    : await sendSupplierPoEmail({ apiKey: c.env.RESEND_API_KEY, from: c.env.PO_EMAIL_FROM }, {
+    recipient: input.recipient, subject: input.subject, message: `${input.message}\n\n${listing}`,
+    attachments: input.documents.map(({ filename, content }) => ({ filename, content })), attemptKey: attempt,
+  });
+  if (reserved.created) {
+    const saved = await recordPoEmailOutcome(c.env, input.attemptId,
+      result.status === "invalid_payload" || result.status === "not_configured" ? "failed" : result.status,
+      result.status === "dispatched" ? result.providerId : undefined);
+    if (saved.error) return c.json({ code: "email_unknown", status: "unknown" }, 502);
+  }
+  if (result.status !== "dispatched") return c.json({ code: `email_${result.status}`, status: result.status }, result.status === "invalid_payload" ? 422 : 502);
+  // Reuse the one existing evidence/Work-completion door. No second po_sends writer.
+  const internal = new Hono<AppEnv>();
+  internal.use("*", async (child, next) => { child.set("auth", c.var.auth); await next(); });
+  internal.route("/", operationPosRouter);
+  const results = [];
+  for (const document of input.documents) {
+    const recorded = history.some(row => row.po_id === document.id && row.po_version === document.version && typeof row.note === "string" && row.note.includes(attempt));
+    if (recorded) { results.push({ id: document.id, version: document.version, recorded: true }); continue; }
+    try {
+      const response = await internal.request(`/${encodeURIComponent(document.id)}/confirm-sent`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channel: "email", recipient: input.recipient, poVersion: document.version,
+          note: `Email dispatch ${result.providerId}; ${attempt}` }),
+      }, c.env);
+      results.push({ id: document.id, version: document.version, recorded: response.ok });
+    } catch {
+      results.push({ id: document.id, version: document.version, recorded: false });
+    }
+  }
+  // A failed evidence write never becomes "not sent": retry must reuse this same attempt/PDF set.
+  return c.json({ status: "dispatched", providerId: result.providerId, documents: results });
+});
+
+// Use Work's exact round projection; no second admission/window arithmetic.
+operationPosRouter.get("/issued-round", requireOperation, async (c) => {
+  const key = c.req.query("window");
+  if (!key || !parsePoWindowKey(key)) return c.json({ code: "invalid_param" }, 422);
+  const { poWindowSendFacts } = await import("./work");
+  const facts = await poWindowSendFacts(c, key);
+  return c.json({ poIds: facts.poIds });
+});
+
+// Today means issued SO Batch POs on the governed Malaysia date, across clock rounds.
+operationPosRouter.get("/issued-today", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const today = todayIso();
+  const start = new Date(`${today}T00:00:00+08:00`);
+  const end = new Date(start.getTime() + 86_400_000);
+  const rows: Array<Record<string, unknown>> = [];
+  for (let from = 0; ; from += REGISTER_PAGE_SIZE) {
+    const result = await sb.from("purchase_orders")
+      .select("id, supplier_id, destination_id, version, placed_at")
+      .eq("purpose", "customer_sales").neq("status", "cancelled")
+      .gte("placed_at", start.toISOString()).lt("placed_at", end.toISOString())
+      .order("id").range(from, from + REGISTER_PAGE_SIZE - 1);
+    if (result.error) { const m = mapPgError(result.error); return c.json(m.body, m.status); }
+    const page = (result.data ?? []) as Array<Record<string, unknown>>;
+    rows.push(...page);
+    if (page.length < REGISTER_PAGE_SIZE) break;
+  }
+  if (!rows.length) return c.json({ today, pos: [] });
+  const [suppliers, destinations] = await Promise.all([
+    readEveryChunked<Record<string, unknown>, string>(rows.map(po => String(po.supplier_id)), ids =>
+      sb.from("suppliers").select("id, name, whatsapp_group_url, po_send_channel, contact_email, contact").in("id", ids)),
+    readEveryChunked<Record<string, unknown>, string>(rows.map(po => String(po.destination_id)), ids =>
+      sb.from("purchasing_destinations").select("id, name").in("id", ids)),
+  ]);
+  const lookupError = suppliers.error ?? destinations.error;
+  if (lookupError) { const m = mapPgError(lookupError); return c.json(m.body, m.status); }
+  const supplierById = new Map(suppliers.data.map(row => [row.id, row]));
+  const destinationById = new Map(destinations.data.map(row => [row.id, row]));
+  return c.json({ today, pos: rows.map(po => {
+    const supplier = supplierById.get(po.supplier_id);
+    return {
+      id: po.id, supplierId: po.supplier_id, supplierName: supplier?.name ?? null,
+      destinationId: po.destination_id, destination: destinationById.get(po.destination_id)?.name ?? null,
+      version: po.version, placedAt: po.placed_at,
+      whatsappGroupUrl: supplier?.whatsapp_group_url ?? null, contactEmail: supplier?.contact_email ?? null,
+      poSendChannel: supplier?.po_send_channel ?? null, contact: supplier?.contact ?? null,
+    };
+  }) });
+});
+
 operationPosRouter.get("/:id/issue-context", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data: po, error } = await sb.from("purchase_orders")
-    .select("id, supplier_id, destination_id, status")
+    .select("id, supplier_id, destination_id, status, version")
     .eq("id", c.req.param("id")).maybeSingle();
   if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
   if (!po) return c.json({ message: "PO not found" }, 404);
-  if (po.status === "cancelled") return c.json({ message: "Cancelled POs cannot be printed" }, 422);
+  if (po.status === "cancelled") {
+    if(Number(po.version??1)<2) return c.json({ message: "Cancelled POs cannot be printed" },422);
+    const facts=await sb.rpc("purchasing_po_cancellation_facts",{p_po_id:po.id});
+    if(facts.error) return c.json({error:"cancellation_source_unavailable"},503);
+    if(!facts.data?.events?.some((event:any)=>event.kind==="effective"&&event.applied_po_version===po.version)) return c.json({message:"Cancelled POs cannot be printed"},422);
+  }
   const [supplier, destination] = await Promise.all([
-    sb.from("suppliers").select("name, whatsapp_group_url, contact_email, contact")
+    sb.from("suppliers").select("name, whatsapp_group_url, po_send_channel, contact_email, contact")
       .eq("id", po.supplier_id).maybeSingle(),
     sb.from("purchasing_destinations").select("name")
       .eq("id", po.destination_id).maybeSingle(),
@@ -1564,6 +1777,7 @@ operationPosRouter.get("/:id/issue-context", requireOperation, async (c) => {
     destination: destination.data?.name ?? null,
     whatsappGroupUrl: supplier.data?.whatsapp_group_url ?? null,
     contactEmail: supplier.data?.contact_email ?? null,
+    poSendChannel: supplier.data?.po_send_channel ?? null,
     contact: supplier.data?.contact ?? null,
   });
 });
@@ -1632,8 +1846,42 @@ operationPosRouter.get("/:id/print-data", requireOperation, async (c) => {
     return c.json(m.body, m.status);
   }
 
-  return c.json({ ...(doc as Record<string, unknown>), ...(await poPaperFacts(sb, poId, doc as PoDocumentDates)) });
+  return c.json({
+    ...(doc as Record<string, unknown>),
+    ...(await poPaperFacts(sb, poId, doc as PoDocumentDates)),
+  });
 });
+
+/**
+ * A CONSIGNMENT ORDER PRINTS ITS PRICES — Weisiang's decision (Mr Lim, WhatsApp
+ * 2026-10-22): the Houzs Purchase Consignment Order carries prices, so the
+ * Carres supplier paper does too. Overturns Jess's "the supplier PDF is
+ * price-free" (docs/purchasing/MASTER.md §9.9); Jess was not part of this
+ * decision. An ordinary PO stays money-free: this adds nothing to it.
+ * Follows Houzs frontend/src/vendor/scm/lib/purchase-order-pdf.ts:585 (the line
+ * Amount prints on the order PDF) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+ *
+ * Added beside the document, never over it: `consignment` and the Unit Price
+ * per SKU. A SKU whose lines carry two different prices prints none rather
+ * than the wrong one.
+ */
+async function consignmentPaperFacts(
+  sb: ReturnType<typeof userClient>,
+  poId: string,
+  isConsignment: boolean,
+): Promise<{ consignment?: true; line_prices?: Record<string, number | null> }> {
+  if (!isConsignment) return {};
+  const { data: lines } = await sb.from("purchase_order_lines").select("sku, cost").eq("po_id", poId);
+  const prices: Record<string, number | null> = {};
+  const mixed = new Set<string>();
+  for (const l of (lines ?? []) as Array<{ sku: string; cost: number | string | null }>) {
+    const cost = l.cost == null ? null : Number(l.cost);
+    if (!(l.sku in prices)) prices[l.sku] = cost;
+    else if (prices[l.sku] !== cost) mixed.add(l.sku);
+  }
+  for (const sku of mixed) prices[sku] = null;
+  return { consignment: true, line_prices: prices };
+}
 
 type PoDocumentDates = { issue_date?: string | null; eta_date?: string | null };
 
@@ -1657,23 +1905,25 @@ async function poPaperFacts(
   sb: ReturnType<typeof userClient>,
   poId: string,
   doc: PoDocumentDates,
-): Promise<{ delivery_working_days: number | null; delivery_method: "we_collect" | "supplier_delivers" | null }> {
-  const { data: po } = await sb.from("purchase_orders").select("supplier_id").eq("id", poId).maybeSingle();
+): Promise<{ delivery_working_days: number | null; delivery_method: "we_collect" | "supplier_delivers" | null; consignment?: true; line_prices?: Record<string, number | null> }> {
+  const { data: po } = await sb.from("purchase_orders").select("supplier_id, is_consignment").eq("id", poId).maybeSingle();
   const supplierId = (po as { supplier_id: string | null } | null)?.supplier_id ?? null;
-  if (!supplierId) return { delivery_working_days: null, delivery_method: null };
+  const consignment = await consignmentPaperFacts(sb, poId, Boolean((po as { is_consignment?: boolean } | null)?.is_consignment));
+  if (!supplierId) return { delivery_working_days: null, delivery_method: null, ...consignment };
   const [supplier, week] = await Promise.all([
     sb.from("suppliers").select("kind").eq("id", supplierId).maybeSingle(),
     sb.from("purchasing_supplier_settings").select("off_days").eq("supplier_id", supplierId).maybeSingle(),
   ]);
   const offDays = ((week.data as { off_days: number[] | null } | null)?.off_days ?? []).map(Number);
   const days = poDeliveryWorkingDays(
-    { suppliers: [{ id: supplierId, name: "", categories: [], offDays: offDays.length > 0 ? offDays : null, transitDays: null }] },
+    { suppliers: [{ id: supplierId, name: "", categories: [], offDays: offDays.length > 0 ? offDays : null }] },
     { supplierId, poDateIso: doc.issue_date, deliveryDateIso: doc.eta_date },
   );
   const kind = (supplier.data as { kind: string | null } | null)?.kind ?? null;
   return {
     delivery_working_days: days,
     delivery_method: supplier.error || !supplier.data ? null : kind === "factory_pickup" ? "we_collect" : "supplier_delivers",
+    ...consignment,
   };
 }
 
@@ -1765,6 +2015,137 @@ operationPosRouter.get("/:id/source-orders", requireOperation, async (c) => {
 // The RPCs themselves are NOT dropped — they are the construction history of
 // every PO on file — but migration 0339 revokes EXECUTE from `public`, `anon`
 // and `authenticated`, so this route could not reach them even if it returned.
+
+// ----- POST /receive-without-po — a Goods Receipt with no PO (0728) -----
+// Follows Houzs-ERP backend/src/scm/routes/grns.ts:1408 per Weisiang's ruling
+// (2026-10-22): clear Carres rules, implement Houzs. YH 2026-10-27: a delivery
+// with no PO records a Goods Receipt with no PO; stock goes up when posted.
+// A thin door: `office_receive_without_po` owns every rule.
+operationPosRouter.post("/receive-without-po", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, officeReceiveWithoutPoInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const b = parsed.data;
+  const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("office_receive_without_po", {
+    p_supplier_id: b.supplierId, p_destination_id: b.destinationId,
+    p_lines: b.lines.map((l) => ({ sku: l.sku, qty: l.qty, cost: l.price ?? null })),
+    p_do_number: b.doNumber, p_do_file_path: b.doFilePath, p_note: b.note || null,
+    p_goods_received_at: b.goodsReceivedAt ?? null, p_actual_site_id: b.actualSiteId ?? null,
+    p_save_key: b.saveKey,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
+});
+
+// ----- POST /new — a Purchase Order with no source (Houzs way) -----
+//
+// Follows Houzs-ERP backend/src/scm/routes/mfg-purchase-orders.ts:1014
+// (createMfgPurchaseOrderHandler: supplier + Purchase Location + lines, no
+// source SO) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+//
+// Weisiang's decision (Mr Lim, WhatsApp 2026-10-22, relayed by YH 2026-10-23):
+// "just clear Carress rules and Implement Houzs inside, as long as they can
+// open SO PO DO". Office staff open a PO by naming the supplier, Deliver To,
+// goods and dates. This overturns Jess's "No blank independent PO" rule
+// (docs/purchasing/MASTER.md); Jess was not part of the decision.
+//
+// It is NOT a second creation authority. The one authority stays
+// `purchasing_issue_pos_batch`, which already accepts a line with no demand,
+// no Sales Order lineage and no request: its actor gate, supplier-truth check,
+// commercial gate, Deliver To check, number draw and Unit ID birth all apply
+// unchanged. The retired `POST /` and `POST /batch` stay retired.
+operationPosRouter.post("/new", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, newPurchaseOrderInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const input = parsed.data;
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  // The warehouse the goods land in: the Deliver To's own warehouse, else the
+  // own Klang warehouse — the same choice Manual Purchase makes.
+  const [dest, wh, cat, sup, collection] = await Promise.all([
+    sb.from("purchasing_destinations").select("id, name, address, warehouse_id, warehouses(address)").eq("id", input.destinationId).maybeSingle(),
+    sb.from("warehouses").select("id, name").eq("kind", "own"),
+    sb.from("product_skus").select("sku, cost").in("sku", [...new Set(input.lines.map((l) => l.sku))]),
+    sb.from("suppliers").select("kind, name").eq("id", input.supplierId).maybeSingle(),
+    sb.from("purchasing_supplier_settings").select("fixed_destination_id, collected_by_partner_id").eq("supplier_id", input.supplierId).maybeSingle(),
+  ]);
+  const readError = dest.error ?? wh.error ?? cat.error ?? sup.error ?? collection.error;
+  if (readError) {
+    const m = mapPgError(readError);
+    return c.json(m.body, m.status);
+  }
+  const refuse = (status: 422, code: string, facts?: Parameters<typeof purchasingRefusal>[1]) => {
+    const r = purchasingRefusal(code, facts);
+    return c.json({ error: code, code, message: r.wrong, action: r.todo }, status);
+  };
+  // Same pre-checks as Manual Purchase, before a PO number is spent: a Deliver To
+  // with no address (the PO paper refuses it later), and a factory-pickup
+  // supplier's collection partner and fixed Deliver To from its settings.
+  const destRow = dest.data as { name: string | null; address: string | null; warehouse_id: string | null; warehouses: { address?: string | null } | { address?: string | null }[] | null } | null;
+  if (destRow) {
+    const whAddr = Array.isArray(destRow.warehouses) ? destRow.warehouses[0]?.address : destRow.warehouses?.address;
+    const address = destRow.warehouse_id != null ? whAddr ?? null : destRow.address;
+    if (typeof address !== "string" || address.trim() === "") {
+      return refuse(422, "destination_address_missing", { destination: destRow.name ?? null });
+    }
+  }
+  const supRow = sup.data as { kind: string | null; name: string | null } | null;
+  const setting = collection.data as { fixed_destination_id: string | null; collected_by_partner_id: string | null } | null;
+  const pickup = supRow?.kind === "factory_pickup";
+  const partnerId = pickup ? (input.procurementPartnerId ?? setting?.collected_by_partner_id ?? null) : (input.procurementPartnerId ?? null);
+  if (pickup && setting?.fixed_destination_id && setting.fixed_destination_id !== input.destinationId) {
+    return refuse(422, "supplier_collection_destination_mismatch", { supplier: supRow?.name ?? null, destination: null });
+  }
+  const own = (wh.data ?? []) as Array<{ id: string; name: string | null }>;
+  const warehouseId = destRow?.warehouse_id
+    ?? (own.find((w) => /klang|klg/i.test(w.name ?? "")) ?? own[0])?.id
+    ?? null;
+  const catalogCost = new Map(((cat.data ?? []) as Array<{ sku: string; cost: number | null }>).map((r) => [r.sku, r.cost == null ? null : Number(r.cost)]));
+
+  // A Consignment Order (Weisiang's decision, Mr Lim, WhatsApp 2026-10-22) goes
+  // through 0720's door, which calls the same authority and marks the order
+  // consignment in the same transaction — no second engine.
+  const { data, error } = await sb.rpc(input.consignment ? "purchasing_issue_consignment_order" : "purchasing_issue_pos_batch", {
+    p_pos: [{
+      supplier_id: input.supplierId,
+      warehouse_id: warehouseId,
+      destination_id: input.destinationId,
+      // Houzs: a typed PO Delivery Date; a blank one defaults to today (MYT)
+      // (Houzs-ERP backend/src/scm/routes/mfg-purchase-orders.ts:1027).
+      eta_date: input.etaDate ?? todayIso(),
+      procurement_partner_id: partnerId,
+      so_refs: null,
+      purpose: null,
+      note: input.note || null,
+      lines: input.lines.map((l) => {
+        const listed = catalogCost.get(l.sku) ?? null;
+        const catalog = listed != null && Number.isFinite(listed) && listed > 0 ? listed : null;
+        // Blank price: the Catalog price, or an honest absence (0573) when there is none.
+        if (l.price == null) {
+          return { sku: l.sku, qty: l.qty, cost: catalog, cost_source: catalog == null ? null : "catalog",
+            commercial_treatment: catalog == null ? null : "normal", commercial_reason: null, expected_catalog_cost: catalog };
+        }
+        const same = catalog != null && l.price === catalog;
+        return { sku: l.sku, qty: l.qty, cost: l.price, cost_source: same ? "catalog" : "hand_entered",
+          commercial_treatment: "normal", commercial_reason: null, expected_catalog_cost: catalog };
+      }),
+    }],
+  });
+  if (error) {
+    const detail = String((error as { details?: string }).details ?? "").trim();
+    if ((PURCHASING_REFUSAL_CODES as readonly string[]).includes(detail)) {
+      const r = purchasingRefusal(detail);
+      const status = detail === "not_po_duty" ? 403 : detail === "supplier_price_changed" ? 409 : 422;
+      return c.json({ error: detail, code: detail, message: r.wrong, action: r.todo }, status);
+    }
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  const poId = ((data as { po_ids?: string[] } | null)?.po_ids ?? [])[0] ?? null;
+  return c.json({ poId }, 201);
+});
 
 // ----- POST /:id/receive — RETIRED 2026-08-03 (Card C1, Jess) -----
 //
@@ -2050,20 +2431,137 @@ async function autoReserveReceivedToSourceOrder(
   }
 }
 
+const cancellationReadGuard: typeof requireOperation = async(c,next)=> {
+  // Finance consumes only this money-free owning cancellation record. This
+  // does not open other Operation routes or grant settlement/PO write rights.
+  if(c.var.auth.role === "finance") return next();
+  return requireOperation(c,next);
+};
+operationPosRouter.get("/:id/cancellations", cancellationReadGuard, async(c)=> {
+  const sb=userClient(c.env,c.var.auth.jwt);
+  const {data,error}=await sb.rpc("purchasing_po_cancellation_facts",{p_po_id:c.req.param("id")});
+  if(error){const mapped=mapPgError(error);return c.json(mapped.body,mapped.status);}
+  return c.json({...data,financeConnection:{state:"not_connected",message:"Finance connection pending"},financeHandoffUrl:`/api/operation/pos/${encodeURIComponent(c.req.param("id"))}/cancellations/finance-handoff`});
+});
+
+operationPosRouter.get("/:id/cancellations/finance-handoff", cancellationReadGuard, async(c)=> {
+  const {data,error}=await userClient(c.env,c.var.auth.jwt).rpc("purchasing_po_cancellation_facts",{p_po_id:c.req.param("id")});
+  if(error){const mapped=mapPgError(error);return c.json(mapped.body,mapped.status);}
+  try { return c.json(cancellationFinanceHandoff(c.req.param("id"),data)); }
+  catch { return c.json({message:"Cancellation handoff could not be read"},502); }
+});
+
+// Finance receives access to ONE ledger-referenced cancellation attachment,
+// never arbitrary bucket paths, a bucket list or a Storage policy expansion.
+operationPosRouter.get("/:id/cancellations/:eventId/evidence", cancellationReadGuard, async(c)=> {
+  const poId=c.req.param("id");const path=c.req.query("path")??"";
+  const {data,error}=await userClient(c.env,c.var.auth.jwt).rpc("purchasing_po_cancellation_facts",{p_po_id:poId});
+  if(error){const mapped=mapPgError(error);return c.json(mapped.body,mapped.status);}
+  let handoff;
+  try {handoff=cancellationFinanceHandoff(poId,data);}catch{return c.json({message:"Cancellation handoff could not be read"},502);}
+  const item=handoff.items.find(row=>row.id===c.req.param("eventId"));
+  if(!path.startsWith(`${poId}/`)||path.split("/").some(part=>part===".."||part===".")||!item?.evidence.some(file=>file.path===path)) {
+    return c.json({message:"Cancellation evidence not found"},404);
+  }
+  const signed=await adminClient(c.env).storage.from("delivery-orders").createSignedUrl(path,300);
+  if(signed.error||!signed.data?.signedUrl)return c.json({message:"Cancellation evidence could not be read"},502);
+  return c.json({url:signed.data.signedUrl,expiresIn:300});
+});
+
 // ----- POST /:id/cancel -----
+// Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was not part of this
+// decision): the act that cancels (`complete`, or a whole-PO cancel) is SENT
+// FOR APPROVAL — PO Duty, then the Purchasing Approver — and the existing
+// engine runs on the second approval (0717). Supplier facts and the exception
+// decision stay direct.
 operationPosRouter.post("/:id/cancel", requireOperation, async (c) => {
   const parsed = await parseJsonBody(c, cancelPoInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("operation_cancel_po", {
-    p_po_id: c.req.param("id"),
-    p_reason: parsed.data.reason,
-  });
+  const cancellation = parsed.data.cancellation;
+  const queued = !cancellation || cancellation.action === "complete";
+  const { data, error } = queued
+    ? await sb.rpc("purchasing_request_po_change", {
+        p_kind: "cancellation",
+        p_po_id: c.req.param("id"),
+        p_reason: parsed.data.reason,
+        p_payload: cancellation ?? {},
+      })
+    : await sb.rpc("purchasing_record_po_cancellation", {
+        p_po_id: c.req.param("id"),
+        p_reason: parsed.data.reason,
+        p_cancellation: cancellation,
+      });
   if (error) {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
-  return c.json({ po: data });
+  return c.json(queued ? { request: data } : { cancellation: data });
+});
+
+// ----- PO change requests (0717) -----
+// The PO Amendments register and the Cancellation Requests queue, the Houzs
+// way — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was not part of
+// this decision). Rows are read under RLS; every decision goes through
+// `purchasing_decide_po_change`, which checks who may decide and runs the
+// existing revise / cancel engine on the final approval.
+operationPosRouter.get("/change-requests", requireOperation, async (c) => {
+  const kind = c.req.query("kind");
+  if (kind !== "amendment" && kind !== "cancellation") return c.json({ message: "kind must be amendment or cancellation" }, 422);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("po_change_requests")
+    .select("id, po_id, reason, summary, payload, status, requested_by, requested_at, first_approved_by, first_approved_at, decided_by, decided_at, decision_note, purchase_orders(suppliers(name))")
+    .eq("kind", kind)
+    .order("requested_at", { ascending: false })
+    .limit(500);
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  const rows = (data ?? []) as unknown as Array<Record<string, unknown> & { payload?: unknown; purchase_orders?: { suppliers?: { name?: string } | null } | null }>;
+  const names = await resolveActorNames(sb, rows.flatMap((r) => [r.requested_by, r.first_approved_by, r.decided_by] as Array<string | null>));
+  const name = (id: unknown) => (typeof id === "string" ? names.get(id) ?? null : null);
+  return c.json({
+    // YH, chat 2026-10-26: approvers see the request in full (the supplier
+    // facts a cancellation carries), and the requester sees it is theirs.
+    requests: rows.map(({ purchase_orders, payload, ...r }) => ({
+      ...r,
+      mine: r.requested_by === c.var.auth.id,
+      supplier_facts: (payload as { supplierFacts?: unknown } | null)?.supplierFacts ?? null,
+      supplier_name: purchase_orders?.suppliers?.name ?? null,
+      requested_by_name: name(r.requested_by),
+      first_approved_by_name: name(r.first_approved_by),
+      decided_by_name: name(r.decided_by),
+    })),
+  });
+});
+
+operationPosRouter.post("/change-requests/:requestId/decide", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, decidePoChangeInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("purchasing_decide_po_change", {
+    p_id: c.req.param("requestId"),
+    p_approve: parsed.data.approve,
+    p_note: parsed.data.note ?? null,
+  });
+  if (error) return mapSupplierCallError(c, error);
+  return c.json({ request: data });
+});
+
+// Follows Houzs backend/src/scm/routes/po-amendments.ts:699-727 and
+// backend/src/scm/shared/document-cancel.ts:269-277 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+// The Houzs withdraw: the requester, or anyone who could decide it, pulls an
+// open request back (`purchasing_withdraw_po_change` checks who).
+operationPosRouter.post("/change-requests/:requestId/withdraw", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, withdrawPoChangeInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("purchasing_withdraw_po_change", {
+    p_id: c.req.param("requestId"),
+    p_note: parsed.data.note ?? null,
+  });
+  if (error) return mapSupplierCallError(c, error);
+  return c.json({ request: data });
 });
 
 // ----- POST /:id/assign-pickup-partner -----
@@ -2322,42 +2820,14 @@ operationPosRouter.post("/:id/ready-date", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
 
   // Slice 1 (Loo, 2026-08-06): a ready date the factory gives MOVES the
-  // expected arrival — new arrival = ready date + transit working days on the
-  // OFFICE week, computed with `arrivalFromReadyDate`, the ONE spelling of
-  // that leg (the same function `expectedArrivalOf` calls — Law D; a plpgsql
-  // copy is exactly the second spelling the register bug came from). No
-  // transit number → null → the RPC keeps the old arrival rather than
-  // guessing one (P1). Both lookups fail-SOFT to null: the ready date must
-  // still record even when the settings read hiccups.
+  // expected arrival, through `arrivalFromReadyDate` — the ONE spelling (Law D).
+  // The supplier transit leg was removed by owner ruling 2026-09-29, so the new
+  // arrival is the ready date itself.
   const poId = c.req.param("id");
-  let newEta: string | null = null;
-  try {
-    const [poRow, transitRow] = await Promise.all([
-      sb.from("purchase_orders").select("supplier_id").eq("id", poId).maybeSingle(),
-      sb
-        .from("purchasing_supplier_settings")
-        .select("supplier_id, transit_days"),
-    ]);
-    const supplierId = (poRow?.data as { supplier_id?: string } | null)?.supplier_id;
-    if (supplierId) {
-      const suppliers = ((transitRow?.data ?? []) as Array<{
-        supplier_id: string;
-        transit_days: number | null;
-      }>).map((r) => ({
-        id: r.supplier_id,
-        name: "",
-        categories: [] as const,
-        offDays: null,
-        transitDays: r.transit_days ?? null,
-      }));
-      newEta = arrivalFromReadyDate(
-        { suppliers },
-        { supplierId, readyDateIso: parsed.data.newDate },
-      );
-    }
-  } catch {
-    newEta = null;
-  }
+  const newEta = arrivalFromReadyDate(
+    { suppliers: [] },
+    { supplierId: null, readyDateIso: parsed.data.newDate },
+  );
 
   const { data, error } = await sb.rpc("purchasing_record_ready_date", {
     p_po_id: poId,
@@ -2380,6 +2850,28 @@ operationPosRouter.post("/:id/ready-date", requireOperation, async (c) => {
 // Every row carries what makes it evidence: the kind (an OPEN completes
 // nothing), the exact version, the recipient, the channel, the time, and WHO —
 // the actual actor, the month's duty holder and the dated cover in force.
+// PUR-16 reads the actual stored setting and exact installed writer capability.
+operationPosRouter.get("/send-evidence-policy", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const result = await sb.rpc("purchasing_po_send_evidence_policy");
+  if (result.error || typeof result.data?.required !== "boolean" || result.data?.available !== true) {
+    return c.json({ code: "po_send_evidence_unavailable", message: "Evidence could not be loaded", action: "Try again" }, 503);
+  }
+  return c.json(result.data);
+});
+
+operationPosRouter.get("/:id/send-evidence", requireOperation, async (c) => {
+  const poId = c.req.param("id"), path = c.req.query("path");
+  if (!path) return c.json({ code: "invalid_param" }, 422);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const rows = await sb.from("po_sends").select("note, po_version, sent_by").eq("po_id", poId).eq("kind", "confirmed_sent").eq("channel", "whatsapp");
+  if (rows.error) return c.json({ code: "po_send_evidence_unavailable" }, 503);
+  if (!(rows.data ?? []).some(row => readPoSendEvidence(row.note)?.path === path && path.startsWith(`po-send/${poId}/V${row.po_version}/${row.sent_by}/`))) return c.json({ code: "not_found" }, 404);
+  const signed = await sb.storage.from("delivery-orders").createSignedUrl(path, 300);
+  if (signed.error || !signed.data?.signedUrl) return c.json({ code: "po_send_evidence_unavailable" }, 503);
+  return c.json({ url: signed.data.signedUrl });
+});
+
 operationPosRouter.get("/:id/sends", requireOperation, async (c) => {
   const poId = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -2473,13 +2965,16 @@ operationPosRouter.post("/:id/confirm-sent", requireOperation, poSentWorkComplet
     p_expected_version: parsed.data.poVersion,
     p_channel: parsed.data.channel,
     p_recipient: parsed.data.recipient,
-    p_note: parsed.data.note ?? null,
+    p_note: parsed.data.evidencePath ? poSendEvidenceNote(parsed.data.evidencePath, parsed.data.note) : parsed.data.note ?? null,
   });
   if (error) {
     /* THE ONE ERROR THE OPERATOR CAN ACT ON, in the approved two-line form
        (`docs/purchasing/MASTER.md` §8.3): the FACT, then the FIX. Everything
        else falls through to the shared supplier-call mapping. */
     const details = String((error as { details?: string }).details ?? "");
+    if (details === "po_send_screenshot_required" || details === "po_send_screenshot_invalid") {
+      return c.json({ code: details, message: "WhatsApp screenshot is missing", action: "Upload WhatsApp screenshot" }, 422);
+    }
     if (details === "stale_po_version" || /stale_po_version/.test(error.message ?? "")) {
       return c.json(
         {
@@ -2509,17 +3004,25 @@ operationPosRouter.post("/:id/revise", requireOperation, async (c) => {
   const parsed = await parseJsonBody(c, revisePoInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("purchasing_revise_po", {
+  // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was not part of
+  // this decision): a PO change is SENT FOR APPROVAL; the Purchasing Approver's
+  // approval runs `purchasing_revise_po` with exactly these lines (0717).
+  const { data, error } = await sb.rpc("purchasing_request_po_change", {
+    p_kind: "amendment",
     p_po_id: c.req.param("id"),
     p_reason: parsed.data.reason,
-    p_lines: parsed.data.lines.map((l) => ({
+    p_payload: parsed.data.lines.map((l) => ({
       line_id: l.lineId,
       qty: l.qty,
       destination_id: l.destinationId,
+      ...(l.requestSources ? { expected_po_version:l.expectedPoVersion, request_sources:l.requestSources.map(source => ({
+        demand_id:source.demandId, qty:source.qty, request_version:source.requestVersion,
+        approval_version:source.approvalVersion, approval_token:source.approvalToken, recipients:source.recipients,
+      })) } : {}),
     })),
   });
   if (error) return mapSupplierCallError(c, error);
-  return c.json({ ok: true, result: data });
+  return c.json({ ok: true, request: data });
 });
 
 // ----- POST /:id/change-deliver-to -----
@@ -2571,24 +3074,11 @@ operationPosRouter.put("/message-template", requireOperation, async (c) => {
   return c.json({ ok: true, result: data });
 });
 
-// ----- POST /lines/:lineId/destination · /ops-remark -----
-// Where each LINE goes (Jess, 2026-08-02 — 0311). Purchasing's only per-line
-// job: ten to Klang, one to AL. A whole line moves here; a PART of a line
-// moves through /:id/change-deliver-to (0610), which carries its Units and
-// Sales Order lineage and mints the next version. The ops
-// remark is internal and, by 0311's own sanity check, can never print.
-operationPosRouter.post("/lines/:lineId/destination", requireOperation, async (c) => {
-  const parsed = await parseJsonBody(c, setLineDestinationInput);
-  if (!parsed.ok) return c.json(parsed.body, parsed.status);
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("purchasing_set_line_destination", {
-    p_line_id: c.req.param("lineId"),
-    p_destination_id: parsed.data.destinationId,
-  });
-  if (error) return mapSupplierCallError(c, error);
-  return c.json({ ok: true, result: data });
-});
-
+// ----- POST /lines/:lineId/ops-remark -----
+// The ops remark is internal and, by 0311's own sanity check, can never print.
+// A line's Deliver To moves only through /:id/change-deliver-to (0610), which
+// carries its Units and Sales Order lineage and mints the next version; the
+// unversioned 0311 line-destination door is revoked (0627).
 operationPosRouter.post("/lines/:lineId/ops-remark", requireOperation, async (c) => {
   const parsed = await parseJsonBody(c, setLineOpsRemarkInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { APP_ROLES } from "@carres/shared";
 import { signTestJwt, useTestJwks } from "../test/jwt";
 import app from "../index";
 import { _setJwksForTesting } from "../middleware/auth";
@@ -70,6 +71,31 @@ describe("GET /api/auth/me", () => {
       partnerId: null,
       outletId: null,
     });
+  });
+
+  it.each(APP_ROLES)("returns the existing %s role unchanged", async (role) => {
+    const jwt = await makeJwt({
+      sub: "11111111-1111-1111-1111-000000000098",
+      email: "TEST-existing-role@carres.test",
+      app_metadata: { role },
+    });
+    const res = await app.fetch(new Request("http://t/api/auth/me", {
+      headers: { Authorization: `Bearer ${jwt}` },
+    }), env);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ role });
+  });
+
+  it("Warehouse identity read does not admit Warehouse to Operation", async () => {
+    const jwt = await makeJwt({
+      sub: "11111111-1111-1111-1111-000000000098",
+      email: "TEST-warehouse@carres.test",
+      app_metadata: { role: "warehouse", warehouse_id: "11111111-1111-1111-1111-000000000097" },
+    });
+    const res = await app.fetch(new Request("http://t/api/operation/pos", {
+      headers: { Authorization: `Bearer ${jwt}` },
+    }), env);
+    expect(res.status).toBe(403);
   });
 
   it("401 when JWT has invalid role in app_metadata", async () => {

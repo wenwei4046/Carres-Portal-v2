@@ -133,9 +133,10 @@ describe("Supplier Claims register — the confirmed twelve columns (§9.5, 2026
     expect(screen.queryByTestId("claim-inspector")).not.toBeInTheDocument();
   });
   it("keeps GRN in its own column and Items on two lines; a Catalog-silent SKU says so", () => {
-    claimsQuery.mockReturnValue({ data: { claims: [row({ warehouse_receipt_id: "r1", grn_no: "GRN-20260907-1" }), row({ id: "c9", claim_no: "SC-9", product_description: null, product_variant: null, sku: "SMOKE King" })] }, isLoading: false });
+    claimsQuery.mockReturnValue({ data: { claims: [row({ warehouse_receipt_id: "r1", grn_no: "GRN-20260907-1001" }), row({ id: "c9", claim_no: "SC-9", product_description: null, product_variant: null, sku: "SMOKE King" })] }, isLoading: false });
     show();
-    expect(screen.getAllByRole("link", { name: "PO-2050" })[0]!.closest("td")).not.toBe(screen.getByRole("link", { name: "GRN-20260907-1" }).closest("td"));
+    expect(screen.getAllByRole("link", { name: "PO-2050" })[0]!.closest("td")).not.toBe(screen.getByRole("link", { name: "GRN-260907-1001" }).closest("td"));
+    expect(screen.getByRole("link", { name: "GRN-260907-1001" })).toHaveAttribute("href", "/operation?tab=receiving&session=r1");
     expect(screen.getByText("Carres Cloud").closest("td")).toBe(screen.getAllByText("King")[0]!.closest("td"));
     expect(screen.getByText("Recorded SKU").closest("td")).toHaveTextContent("SMOKE King");
   });
@@ -163,7 +164,8 @@ describe("Supplier Claims register — the confirmed twelve columns (§9.5, 2026
   it("uses selection for Export only", () => {
     show();
     fireEvent.click(screen.getAllByRole("checkbox", { name: "Select row" })[0]!);
-    expect(screen.getByRole("button", { name: /Export Excel.*1/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Page tools" }));
+    expect(screen.getByRole("menuitem", { name: /Export Excel.*1/ })).toBeInTheDocument();
   });
 });
 
@@ -187,7 +189,7 @@ describe("the claim record — where the supplier reply is recorded (§9.5, 2026
     claimsQuery.mockReturnValue({ data: { claims: [row({ requested_action: "replace", requested_at: "2026-09-28T02:00:00Z", sent: true })] }, isLoading: false });
     recordQuery.mockReturnValue({ data: RECORD({ sends: [{ id: "s1", version: 1, recipient: "Ohana Mr Lee", channel: "whatsapp", note: null, sent_at: "2026-09-28T03:00:00Z", sent_by_name: "Shasha" }] }), isLoading: false });
     const view = show("/operation?tab=claims&claim=c1");
-    expect(screen.getByTestId("claim-reply-state")).toHaveTextContent("Reply overdue · Wed, 30 Sep");
+    expect(screen.getByTestId("claim-reply-state")).toHaveTextContent("Reply expected Wed, 30 Sep · passed");
     expect(screen.getByTestId("claim-send-line")).toHaveTextContent("Claim sent · WhatsApp · Ohana Mr Lee");
     expect(screen.getByTestId("claim-primary")).toHaveTextContent("Record supplier reply");
     view.unmount();
@@ -248,7 +250,7 @@ describe("the claim record — where the supplier reply is recorded (§9.5, 2026
     show("/operation?tab=claims&po=PO-other&claim=c2");
     expect(screen.getByTestId("object-identity")).toHaveTextContent("SC-1002");
     expect(screen.queryByTestId("claim-record-reply")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("link", { name: "Supplier Claims" }));
+    fireEvent.click(screen.getByRole("link", { name: "Back to Supplier Claims" }));
     await waitFor(() => expect(screen.queryByTestId("claim-object")).not.toBeInTheDocument());
     expect(screen.getByTestId("claims-rail-source")).toHaveTextContent("PO: PO-other");
   });

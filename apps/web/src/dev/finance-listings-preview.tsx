@@ -7,8 +7,24 @@
  * and every API read answered by a local fixture. A separate vite entry — it
  * cannot reach production, and nothing leaves the browser.
  *
- * `?page=` ar · bills · payment-vouchers · ap-outstanding · other-debtors ·
- * other-debtor-parties · other-receipts · journal · trial-balance · reports.
+ * `?page=` ar · bills · bill-new (0689: Add delivery orders) · payment-vouchers · ap-outstanding · suppliers ·
+ * other-debtors · other-debtor-parties · other-receipts · daily-bank ·
+ * journal · general-ledger · trial-balance · reports · profit-and-loss ·
+ * balance-sheet · cash-flow · ap-aging · ar-aging (0686) · credit-notes · credit-note ·
+ * credit-note-new · debit-notes · debit-note · debit-note-new ·
+ * voucher-pays-debit-note (0681) · forecast (last month, so the actual is a whole month) ·
+ * posting-accounts · item-groups (long lists under their tables, 0657–0659) ·
+ * card-payout-banks (a table since 2026-10-13) · money-accounts (0692: Chart of accounts with its money accounts; those out of use hidden until asked for) ·
+ * opening-balances (0705: a draft whose supplier's open bills do not tally,
+ * a Unit and an order not found; `&role=principal` shows Post) ·
+ * dealer-commission · dealer-statement (one made-up dealer, 0664; pick it on
+ * the Statement view) · notes-to-follow-up · note-to-follow-up (0676).
+ * Row menu and preview (Chew 2026-10-21): right-click a row for its menu;
+ * double-click BILL-2609-0012 (bills), PV-2609-0031 (payment-vouchers),
+ * ODI-2609-0007 (other-debtors), ORC-2609-0014 (other-receipts), a credit or
+ * debit note, or any Journal or General Ledger line for its preview. Every
+ * ledger entry answers with the same two invented lines.
+ * `?role=principal` draws the area titles, to see an area fold.
  * Every listing carries at least one 60+ character party name so wrapping and
  * truncation are visible. Fixture evidence is not production evidence.
  */
@@ -19,6 +35,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { appTodayIso } from "@/lib/fmt-date";
 import FinanceApp from "@/pages/finance/FinanceApp";
+import { PAYMENT_CHOICES as DC_CHOICES, STATEMENT as DC_STATEMENT, source as dcSource } from "./dealer-commission-fixture";
 import "@/index.css";
 
 const params = new URLSearchParams(window.location.search);
@@ -98,6 +115,18 @@ const BILLS = [
     total_amount: "9760.00", paid_total: "0.00", unpaid: "9760.00", price_flags: 1, file_count: 2, created_at: at(-18) },
 ];
 
+// 0689: a logistics company's delivery orders a bill can still charge for.
+const DELIVERY_PARTNERS = { rows: [
+  { partner_id: "lp-1", name: "Pos Laju Malaysia Berhad", delivery_orders: [
+    { id: "do-1", do_no: "DO-071026-4410", delivery_date: soon(-5), order_id: "o-1", so: 1401,
+      department_type: "SHOWROOM", department_id: "out-1" },
+    { id: "do-2", do_no: "DO-081026-4417", delivery_date: soon(-4), order_id: "o-2", so: 1402,
+      department_type: "DEALER", department_id: "dl-1" },
+    { id: "do-3", do_no: "DO-091026-4423", delivery_date: soon(-3), order_id: "o-3", so: 1403,
+      department_type: "SUBSCRIPTION", department_id: null },
+  ] },
+] };
+
 const VOUCHERS = [
   { id: "v-1", voucher_no: "PV-2609-0031", status: "approved", purpose: "SUPPLIER_BILLS", supplier_id: "s-1",
     supplier_name: LONG_SUPPLIER, payee_name: LONG_SUPPLIER, voucher_date: soon(-3), amount: "5000.00",
@@ -135,7 +164,7 @@ const OUTSTANDING = [
   { supplier_id: "s-1", supplier_name: LONG_SUPPLIER, bills_confirmed: 4, billed_total: "48210.00", allocated_total: "30000.00",
     paid_total: "25000.00", balance_owing: "23210.00", uncommitted: "18210.00", oldest_confirmed_bill_date: soon(-50),
     go_live_on: GO_LIVE, supplier_kind: "supplier", open_bills: 2, oldest_unpaid_bill_date: soon(-9),
-    advance_open: "0.00", net_owing: "23210.00" },
+    advance_open: "0.00", credit_open: "650.00", net_owing: "22560.00" },
   { supplier_id: "s-5", supplier_name: "Dorsettloft", bills_confirmed: 2, billed_total: "15760.00", allocated_total: "9760.00",
     paid_total: "6000.00", balance_owing: "9760.00", uncommitted: "0.00", oldest_confirmed_bill_date: soon(-40),
     go_live_on: GO_LIVE, supplier_kind: "supplier", open_bills: 1, oldest_unpaid_bill_date: soon(-18),
@@ -241,18 +270,33 @@ const ACCOUNTS = [
   ["3000", "Share Capital", "EQUITY"], ["4000", "Sales — Furniture", "INCOME"], ["4100", "Other Income", "INCOME"],
   ["5000", "Cost of Goods Sold", "EXPENSE"], ["6100", "Utilities", "EXPENSE"],
 ] as const;
+// The Trial Balance as production's chart prints it, headings with their
+// subtotals (0579), so the Finance look's subtotal rows show. Invented amounts.
+const TB_ACCOUNTS: Array<[string, string, string, string, number, number, number]> = [
+  ["300-0000", "TRADE DEBTORS", "ASSET", "0000", 2, 0, 13928],
+  ["1120", "BANK - CURRENT ACCOUNT (TEST ONLY)", "ASSET", "310-0000", 4, 3399, 0],
+  ["310-2000", "HONG LEONG BANK", "ASSET", "310-0000", 5, 3726.57, 0],
+  ["310-3000", "RHB BANK", "ASSET", "310-0000", 6, 0, 1],
+  ["315-9000", "CARD - MACHINE NOT KNOWN", "ASSET", "0000", 7, 5716, 0],
+  ["320-0000", "CASH IN HAND", "ASSET", "0000", 8, 2400, 0],
+  ["400-0000", "TRADE CREDITORS", "LIABILITY", "2000", 11, 40, 0],
+  ["410-0063", "ACCRUALS - EXPENSE FOR A VERY LONG NAMED SUPPLIER OF SHOWROOM UTILITIES", "LIABILITY", "2000", 12, 0, 1686],
+  ["150-0000", "RETAINED EARNING", "EQUITY", "3000", 21, 333.43, 0],
+];
 const TB = {
   status: "ok", go_live_on: GO_LIVE, as_of: TODAY,
-  accounts: [
-    ["1000", 85, 0], ["1010", 3850, 5000], ["1200", 4100, 2000], ["1300", 12480, 0],
-    ["2100", 5000, 12480], ["2150", 0, 1288.4], ["4000", 0, 4100], ["4100", 0, 85], ["6100", 1288.4, 0], ["3000", 0, 1850],
-  ].map(([code, dr, cr]) => {
-    const a = ACCOUNTS.find((x) => x[0] === code)!;
-    const debitNatural = a[2] === "ASSET" || a[2] === "EXPENSE";
-    return { account_code: a[0], account_name: a[1], kind: a[2], is_control: code === "1200" || code === "2100", is_active: true,
-      total_debit: dr, total_credit: cr, natural_balance: debitNatural ? Number(dr) - Number(cr) : Number(cr) - Number(dr) };
-  }),
-  total_debit: 26803.4, total_credit: 26803.4, difference: 0, balances: true,
+  accounts: TB_ACCOUNTS.map(([code, name, kind, header, pos, dr, cr]) => ({
+    account_code: code, account_name: name, kind, is_control: code === "300-0000" || code === "400-0000", is_active: true,
+    total_debit: dr, total_credit: cr, natural_balance: kind === "ASSET" ? dr - cr : cr - dr,
+    header_code: header, chart_position: pos,
+  })),
+  headings: [
+    { code: "0000", name: "ASSETS", kind: "ASSET", depth: 1, parent_code: null, chart_position: 1, debit: 15241.57, credit: 13929 },
+    { code: "310-0000", name: "CASH AT BANK", kind: "ASSET", depth: 2, parent_code: "0000", chart_position: 3, debit: 7125.57, credit: 1 },
+    { code: "2000", name: "LIABILITIES", kind: "LIABILITY", depth: 1, parent_code: null, chart_position: 10, debit: 40, credit: 1686 },
+    { code: "3000", name: "EQUITY", kind: "EQUITY", depth: 1, parent_code: null, chart_position: 20, debit: 333.43, credit: 0 },
+  ],
+  total_debit: 15615, total_credit: 15615, difference: 0, balances: true,
 };
 
 function plRows(from: string, to: string) {
@@ -273,25 +317,703 @@ function bsRows(asOf: string) {
   const common = { report_status: "OK", go_live_on: GO_LIVE, as_of: asOf, equation_balances: true, equation_difference: 0 };
   const rows = [
     { row_kind: "ACCOUNT", section: "ASSET", header_code: "1", header_name: "Current assets", account_code: "1010", account_name: "Maybank Current Account", amount: -1150 },
-    { row_kind: "ACCOUNT", section: "ASSET", header_code: "1", header_name: "Current assets", account_code: "1200", account_name: "Trade Receivables — Customers", amount: 2100 },
+    { row_kind: "ACCOUNT", section: "ASSET", header_code: "1", header_name: "Current assets", account_code: "1200", account_name: "Trade Receivables — Customers", amount: 2100, reclassified: -300, reclassified_for: "CUSTOMER" },
     { row_kind: "ACCOUNT", section: "ASSET", header_code: "1", header_name: "Current assets", account_code: "1300", account_name: "Inventory — Finished Goods Held at Carres Klang Warehouse and Showrooms", amount: 12480 },
     { row_kind: "ACCOUNT", section: "ASSET", header_code: "1", header_name: "Current assets", account_code: "1000", account_name: "Petty Cash", amount: 85 },
     { row_kind: "HEADER_SUBTOTAL", section: "ASSET", header_code: "1", header_name: "Current assets", amount: 13515 },
     { row_kind: "SECTION_TOTAL", section: "ASSET", amount: 13515 },
     { row_kind: "ACCOUNT", section: "LIABILITY", header_code: "2", header_name: "Current liabilities", account_code: "2100", account_name: "Trade Payables — Suppliers", amount: 7480 },
     { row_kind: "ACCOUNT", section: "LIABILITY", header_code: "2", header_name: "Current liabilities", account_code: "2150", account_name: "Other Payables", amount: 1288.4 },
-    { row_kind: "HEADER_SUBTOTAL", section: "LIABILITY", header_code: "2", header_name: "Current liabilities", amount: 8768.4 },
-    { row_kind: "SECTION_TOTAL", section: "LIABILITY", amount: 8768.4 },
-    { row_kind: "ACCOUNT", section: "EQUITY", header_code: "3", header_name: "Equity", account_code: "3000", account_name: "Share Capital", amount: 1850 },
-    { row_kind: "HEADER_SUBTOTAL", section: "EQUITY", header_code: "3", header_name: "Equity", amount: 1850 },
+    { row_kind: "ACCOUNT", section: "LIABILITY", header_code: "2", header_name: "Current liabilities", account_code: "2200", account_name: "Customer Deposits Held", amount: 300, reclassified: 300, reclassified_for: "CUSTOMER" },
+    { row_kind: "HEADER_SUBTOTAL", section: "LIABILITY", header_code: "2", header_name: "Current liabilities", amount: 9068.4 },
+    { row_kind: "SECTION_TOTAL", section: "LIABILITY", amount: 9068.4 },
+    { row_kind: "ACCOUNT", section: "EQUITY", header_code: "3", header_name: "Equity", account_code: "3000", account_name: "Share Capital", amount: 1550 },
+    { row_kind: "HEADER_SUBTOTAL", section: "EQUITY", header_code: "3", header_name: "Equity", amount: 1550 },
     { row_kind: "DERIVED", section: "EQUITY", amount: 2896.6 },
-    { row_kind: "SECTION_TOTAL", section: "EQUITY", amount: 4746.6 },
+    { row_kind: "SECTION_TOTAL", section: "EQUITY", amount: 4446.6 },
     { row_kind: "EQUATION", section: "CHECK", amount: 0 },
   ];
   return { rows: rows.map((r, i) => ({ ...common, ordinal: i + 1, ...r })) };
 }
 
+// ── Report drill (Chew 2026-10-21): one account's entries; 1200 moves RM 300 of deposits to 2200 ──
+function reportDrill(account: string, from: string, to: string) {
+  const l = (entryNo: string, docNo: string, description: string, debit: number, credit: number, party: string | null) => ({
+    entryDate: to, entryNo, sourceType: "SALES_INVOICE", docNo, description, debit, credit, balance: 0,
+    partyType: party ? "CUSTOMER" : null, partyName: party });
+  const base = { status: "OK", go_live_on: GO_LIVE, from, to, account };
+  if (account === "2200") return { ...base, block: null };
+  const lines = account === "1200"
+    ? [l("JE-2610-0041", "INV-20261012-0007", "Sofa set, invoiced", 2100, 0, "Tan Mei Ling"),
+       l("JE-2610-0052", "OR-20261015-0003", "Deposit for order SO-2610-0019", 0, 300, "Lim Kok Wai")]
+    : [l("JE-2610-0060", "JV-20261016-0001", "Month entries", 100, 0, null)];
+  return { ...base, block: { code: account, name: account, kind: "ASSET", opening: 0, lines, totalDebit: 0, totalCredit: 0, closing: 0 } };
+}
+
+// ── Payables → Suppliers: Finance's own tax and bank details (0636) ─────────
+const SUPPLIER_FINANCE = [
+  { supplier_id: "s-1", name: LONG_SUPPLIER, kind: "factory_pickup", tax_no: "C 2001234567", registration_no: "201901012345",
+    bank_name: "Maybank", bank_account_no: "514012345678", bank_account_holder: "Ohana Furniture Manufacturing Industries (M) Sdn Bhd",
+    updated_at: at(-2), updated_by_name: "Chew" },
+  { supplier_id: "s-2", name: "Lumen Sofa Works", kind: "factory_pickup", tax_no: null, registration_no: null,
+    bank_name: "Public Bank", bank_account_no: "3123456789", bank_account_holder: "Lumen Sofa Works Sdn Bhd",
+    updated_at: at(-30), updated_by_name: null },
+  { supplier_id: "s-3", name: "Bayview Properties", kind: "other_creditor", tax_no: null, registration_no: null,
+    bank_name: null, bank_account_no: null, bank_account_holder: null, updated_at: null, updated_by_name: null },
+];
+
+// ── Bank & Cards → Daily Bank (0637): every money account on one day ────────
+const bankLine = (entry: number, source_type: string, source_doc_no: string, party: [string, string] | null,
+  description: string | null, received: number, paid: number) => ({
+  entry_no: `JE-${TODAY.slice(2, 4)}${TODAY.slice(5, 7)}-${String(entry).padStart(4, "0")}`, source_type, source_doc_no,
+  description, party_type: party?.[0] ?? null, party_name: party?.[1] ?? null, received, paid,
+});
+const money = (account_code: string, name: string, money_kind: string, brought_forward: number,
+  lines: ReturnType<typeof bankLine>[] = [], pending_vouchers: Array<Record<string, unknown>> = []) => ({
+  account_code, name, money_kind, is_active: true, brought_forward,
+  received: lines.reduce((s, l) => s + l.received, 0), paid: lines.reduce((s, l) => s + l.paid, 0),
+  pending: pending_vouchers.reduce((s, v) => s + Number(v.amount), 0), pending_vouchers, lines,
+});
+const DAILY_BANK = (day: string) => ({
+  day, go_live_on: GO_LIVE,
+  accounts: [
+    money("1110", "Cash in hand", "CASH", 1250, [
+      bankLine(41, "CUSTOMER_PAYMENT", "OR-2610-0031", ["CUSTOMER", LONG_CUSTOMER], "Deposit for SO-1405", 300, 0),
+      bankLine(42, "OTHER_RECEIPT", "ORC-2610-0004", ["OTHER", LONG_PARTY], "Hall rental refund", 80, 0),
+    ]),
+    money("1121", "Public Bank", "BANK", 48210.55, [
+      bankLine(43, "CUSTOMER_PAYMENT", "OR-2610-0032", ["CUSTOMER", "NURUL AIN BINTI ISMAIL"], null, 6400, 0),
+      bankLine(44, "PAYMENT_VOUCHER", "PV-2610-0011", ["SUPPLIER", LONG_SUPPLIER], "Bills for September", 0, 12850),
+    ], [
+      { voucher_id: "v-1", voucher_no: "PV-2610-0012", supplier_id: "s-1", payee_name: LONG_SUPPLIER, voucher_date: soon(-1),
+        purpose: "SUPPLIER_BILLS", narration: null, amount: 7200 },
+      { voucher_id: "v-2", voucher_no: "PV-2610-0013", supplier_id: null, payee_name: "Tenaga Nasional Berhad", voucher_date: TODAY,
+        purpose: "DIRECT", narration: "Electricity September, PJ Showroom", amount: 2400 },
+    ]),
+    money("1122", "Maybank", "BANK", 15000),
+    money("1123", "Hong Leong", "BANK", -1200),
+    money("1131", "GHL", "HOLDING", 3580, [
+      bankLine(45, "CUSTOMER_PAYMENT", "OR-2610-0033", ["CUSTOMER", "LIM KUAN YANG"], "Card, 6 months instalment", 2150, 0),
+      bankLine(46, "CARD_PAYOUT", "MM-20261002-0002", null, "Card settlement GHL 2 Oct 2026", 0, 3580),
+    ]),
+    money("1132", "AhaPay", "HOLDING", 0, [bankLine(47, "CUSTOMER_PAYMENT", "OR-2610-0034", ["CUSTOMER", "SITI AMINAH"], null, 899, 0)]),
+    money("1133", "Online", "HOLDING", 0),
+  ],
+});
+
+// ── Reports → Cash Flow (0638): the period's cash and bank money ────────────
+const CASH_FLOW = (from: string, to: string) => ({
+  from, to, go_live_on: GO_LIVE,
+  accounts: [
+    { account_code: "1110", name: "Cash in hand", money_kind: "CASH", is_active: true, opening: 1250, receipts: 2380, payments: 2000 },
+    { account_code: "1121", name: "Public Bank", money_kind: "BANK", is_active: true, opening: 48210.55, receipts: 61497.5, payments: 38850 },
+    { account_code: "1122", name: "Maybank", money_kind: "BANK", is_active: true, opening: 15000, receipts: 0, payments: 0 },
+  ],
+  rows: [
+    { side: "IN", account_code: "1210", name: "Trade receivables", kind: "ASSET", money_kind: null, amount: 55300 },
+    { side: "IN", account_code: "1131", name: "GHL", kind: "ASSET", money_kind: "HOLDING", amount: 6197.5 },
+    { side: "IN", account_code: "4900", name: "Other income", kind: "INCOME", money_kind: null, amount: 380 },
+    { side: "IN", account_code: "1110", name: "Cash in hand", kind: "ASSET", money_kind: "CASH", amount: 2000 },
+    { side: "OUT", account_code: "2110", name: "Trade payables", kind: "LIABILITY", money_kind: null, amount: 31250 },
+    { side: "OUT", account_code: "6100", name: "Staff cost and commission", kind: "EXPENSE", money_kind: null, amount: 4200 },
+    { side: "OUT", account_code: "6800", name: "Electricity and water, PJ Showroom and Carres Klang warehouse", kind: "EXPENSE", money_kind: null, amount: 3400 },
+    { side: "OUT", account_code: "1121", name: "Public Bank", kind: "ASSET", money_kind: "BANK", amount: 2000 },
+  ],
+  card: { taken: 8350, waiting: 2152.5 },
+});
+
+// ── Ledger → General Ledger (0639): gl_account_ledger's rows per account ────
+const glRow = (code: string, name: string, kind: string, over: Record<string, unknown>) => ({
+  row_kind: "LINE", account_code: code, account_name: name, kind, entry_date: soon(-2), entry_no: null,
+  source_type: null, source_doc_no: null, narration: null, memo: null, debit: null, credit: null, running_balance: 0, ...over,
+});
+const glBlock = (code: string, name: string, kind: string, opening: number,
+  lines: Array<[string, string, string, string | null, number, number]>) => {
+  const debitSide = kind === "ASSET" || kind === "EXPENSE";
+  let bal = opening;
+  const rows = [glRow(code, name, kind, { row_kind: "OPENING", entry_date: null, running_balance: opening })];
+  for (const [entry, source, doc, memo, dr, cr] of lines) {
+    bal = Math.round((bal + (debitSide ? dr - cr : cr - dr)) * 100) / 100;
+    rows.push(glRow(code, name, kind, { entry_no: entry, source_type: source, source_doc_no: doc, memo, narration: "Posted",
+      debit: dr, credit: cr, running_balance: bal }));
+  }
+  rows.push(glRow(code, name, kind, { row_kind: "CLOSING", entry_date: null, running_balance: bal }));
+  return { account_code: code, rows };
+};
+const GENERAL_LEDGER = (from: string, to: string) => ({
+  status: "OK", go_live_on: GO_LIVE, from, to,
+  accounts: [
+    glBlock("1121", "Public Bank", "ASSET", 48210.55, [
+      ["JE-2610-0043", "CUSTOMER_PAYMENT", "OR-2610-0032", null, 6400, 0],
+      ["JE-2610-0044", "PAYMENT_VOUCHER", "PV-2610-0011", "Bills for September, Ohana Furniture Manufacturing Industries", 0, 12850],
+      ["JE-2610-0046", "CARD_PAYOUT", "MM-20261002-0002", null, 3500.5, 0],
+    ]),
+    glBlock("2110", "Trade payables", "LIABILITY", 31250, [
+      ["JE-2610-0040", "SUPPLIER_BILL", "BILL-2610-0007", null, 0, 7200],
+      ["JE-2610-0044", "PAYMENT_VOUCHER", "PV-2610-0011", null, 12850, 0],
+    ]),
+    glBlock("6800", "Electricity and water", "EXPENSE", 0, [["JE-2610-0047", "PAYMENT_VOUCHER", "PV-2610-0013", "Electricity September, PJ Showroom", 2400, 0]]),
+  ],
+});
+
+// ── Payables → Notes to follow up (0676) ────────────────────────────────────
+const noteRow = (over: Record<string, unknown>) => ({
+  id: "nf-1", supplier_id: "s-1", supplier_name: LONG_SUPPLIER, kind: "CREDIT", reason: "PRICE",
+  amount: "150.00", settled: "0.00", left: "150.00", status: "waiting", remark: "Billed RM 100.00 a unit, the PO says RM 25.00",
+  noted_on: soon(-3), next_follow_up_on: null, last_contact: null,
+  bill_id: "b-1", bill_no: "SB-20261006-1822", supplier_invoice_no: "OH-INV-8812", bill_status: "confirmed",
+  line_no: 1, line_item: "Queen bedframe, walnut", line_qty: "2.00", line_unit_price: "100.00", po_unit_cost: "25.00",
+  grn_no: "GRN-20261002-4410", po_id: "PO-2054", purchase_return_id: null, pr_no: null,
+  closed_at: null, closed_by_name: null, close_reason: null, created_at: at(-3), created_by_name: "Aina", ...over,
+});
+const NOTES = {
+  today: TODAY,
+  rows: [
+    noteRow({}),
+    noteRow({ id: "nf-2", supplier_name: "Nice Future", reason: "RETURN", bill_id: null, bill_no: null, line_no: null,
+      line_item: null, line_qty: null, line_unit_price: null, po_unit_cost: null, remark: null, pr_no: "PR-20261005-0012",
+      amount: "60.00", left: "60.00", next_follow_up_on: soon(-1), created_by_name: null,
+      last_contact: { contacted_on: soon(-4), said: "The supplier will send the credit note after they receive the goods back" } }),
+    noteRow({ id: "nf-3", supplier_name: "Dorsettloft", amount: "320.00", settled: "120.00", left: "200.00", status: "part",
+      bill_no: "SB-20260928-5926", line_no: 3, next_follow_up_on: soon(5),
+      last_contact: { contacted_on: soon(-2), said: "Part credited; the rest next month" } }),
+    noteRow({ id: "nf-4", supplier_name: "Hooka", kind: "DEBIT", reason: "OTHER", bill_id: null, bill_no: null, line_no: null,
+      remark: "Transport charge they will bill", amount: "30.00", left: "30.00", next_follow_up_on: soon(12) }),
+    noteRow({ id: "nf-5", supplier_name: "Nice Future", amount: "80.00", settled: "80.00", left: "0.00", status: "settled",
+      bill_no: "SB-20260915-0412", line_no: 2, next_follow_up_on: null }),
+    noteRow({ id: "nf-6", supplier_name: "Hooka", kind: "DEBIT", reason: "PRICE", amount: "45.00", left: "45.00",
+      status: "closed", close_reason: "Supplier kept the lower price", bill_no: "SB-20260910-7731", line_no: 1 }),
+  ],
+};
+const NOTE_DOC = {
+  today: TODAY,
+  followup: noteRow({ next_follow_up_on: soon(4), settled: "50.00", left: "100.00", status: "part",
+    last_contact: { contacted_on: soon(-1), said: "Credit note for the difference next week" } }),
+  contacts: [
+    { id: "c-2", contacted_on: soon(-1), said: "Credit note for the difference next week", created_at: at(-1), created_by_name: "Aina" },
+    { id: "c-1", contacted_on: soon(-3), said: "Sent the PO and the bill to the supplier's account manager", created_at: at(-3), created_by_name: "Aina" },
+  ],
+  settlements: [
+    { id: "st-1", credit_note_id: "cn-1", note_no: "SCN-20261001-4821", supplier_note_no: "OH-CN-2210", note_date: soon(-2),
+      note_status: "confirmed", amount: "50.00", counts: true, created_at: at(-2), created_by_name: "Aina",
+      taken_off_at: null, taken_off_by_name: null, take_off_reason: null },
+  ],
+};
+
+// ── Payables → Credit Notes (0642) ──────────────────────────────────────────
+const CREDIT_NOTES = [
+  { id: "cn-1", note_no: "SCN-20261001-4821", status: "confirmed", supplier_id: "s-1", supplier_name: LONG_SUPPLIER,
+    supplier_kind: "supplier", supplier_note_no: "OH-CN-2210", note_date: soon(-2), ap_account_code: "2110",
+    total_amount: "1650.00", applied_total: "1000.00", credit_open: "650.00", file_count: 1, created_at: at(-2) },
+  { id: "cn-2", note_no: "SCN-20260924-1187", status: "confirmed", supplier_id: "s-5", supplier_name: "Dorsettloft",
+    supplier_kind: "supplier", supplier_note_no: "DL-CN-31", note_date: soon(-9), ap_account_code: "2110",
+    total_amount: "420.00", applied_total: "420.00", credit_open: "0.00", file_count: 0, created_at: at(-9) },
+  { id: "cn-3", note_no: null, status: "draft", supplier_id: "s-3", supplier_name: "Nice Future",
+    supplier_kind: "supplier", supplier_note_no: "NF-RB-0930", note_date: soon(-1), ap_account_code: "2110",
+    total_amount: "300.00", applied_total: null, credit_open: null, file_count: 0, created_at: at(-1) },
+  { id: "cn-4", note_no: "SCN-20260912-0954", status: "cancelled", supplier_id: "s-2", supplier_name: "Hooka",
+    supplier_kind: "supplier", supplier_note_no: "HK-CN-4", note_date: soon(-21), ap_account_code: "2110",
+    total_amount: "90.00", applied_total: null, credit_open: null, file_count: 0, created_at: at(-21) },
+];
+const CREDIT_NOTE = {
+  note: { id: "cn-1", note_no: "SCN-20261001-4821", status: "confirmed", supplier_id: "s-1", supplier_name: LONG_SUPPLIER,
+    supplier_kind: "supplier", supplier_note_no: "OH-CN-2210", note_date: soon(-2), ap_account_code: "2110",
+    ap_account_name: "Trade payables", total_amount: "1650.00", narration: "Two sofas returned damaged, and the September volume rebate",
+    cancel_reason: null, created_at: at(-2), created_by_name: "Chew", confirmed_at: at(-2), confirmed_by_name: "Chew",
+    cancelled_at: null, cancelled_by_name: null, entry_no: "JE-2610-0051", reversal_entry_no: null },
+  lines: [
+    { line_no: 1, account_code: "5100", account_name: "Cost of goods sold", description: "Two 3 seater sofas returned, damaged in transit",
+      amount: "1400.00", department_type: "OFFICE", department_id: null },
+    { line_no: 2, account_code: "4900", account_name: "Other income", description: "September volume rebate",
+      amount: "250.00", department_type: "SUBSCRIPTION", department_id: null },
+  ],
+  applications: [
+    { application_id: "ca-1", bill_id: "b-1", bill_no: "BILL-2609-0012", supplier_invoice_no: "OH-INV-88231", bill_date: soon(-9),
+      amount: "1000.00", status: "applied", created_at: at(-1), applied_on: soon(-1), created_by_name: "Chew", cancelled_at: null, cancel_reason: null },
+  ],
+  files: [{ id: "f-1", file_name: "OH-CN-2210.pdf", mime_type: "application/pdf", size_bytes: 182000,
+    storage_path: "SUPPLIER_CREDIT_NOTE/cn-1/OH-CN-2210.pdf", uploaded_at: at(-2), uploaded_by_name: "Chew" }],
+  events: [
+    { action: "created", note: null, at: at(-2), actor_name: "Chew" },
+    { action: "confirmed", note: "SCN-20261001-4821", at: at(-2), actor_name: "Chew" },
+    { action: "credit_applied", note: "BILL-2609-0012 · RM 1,000.00", at: at(-1), actor_name: "Chew" },
+  ],
+  applied_total: "1000.00", credit_open: "650.00", go_live_on: GO_LIVE,
+  can: { edit: false, confirm: false, cancel: false, add_file: true, apply: true, take_off: true },
+};
+// ── Payables → Debit Notes (0681) ───────────────────────────────────────────
+const DEBIT_NOTES = [
+  { id: "dn-1", note_no: "PDN-20261005-3381", status: "confirmed", supplier_id: "s-1", supplier_name: LONG_SUPPLIER,
+    supplier_kind: "supplier", supplier_note_no: "OH-DN-118", note_date: soon(-5), due_date: soon(25), ap_account_code: "2110",
+    total_amount: "780.00", paid_total: "500.00", held_total: "500.00", debit_open: "280.00", file_count: 1, created_at: at(-5) },
+  { id: "dn-2", note_no: "PDN-20260929-0417", status: "confirmed", supplier_id: "s-5", supplier_name: "Dorsettloft",
+    supplier_kind: "supplier", supplier_note_no: "DL-DN-7", note_date: soon(-11), due_date: null, ap_account_code: "2110",
+    total_amount: "60.00", paid_total: "60.00", held_total: "60.00", debit_open: "0.00", file_count: 0, created_at: at(-11) },
+  { id: "dn-3", note_no: null, status: "draft", supplier_id: "s-3", supplier_name: "Nice Future",
+    supplier_kind: "supplier", supplier_note_no: "NF-DN-1002", note_date: soon(-1), due_date: soon(29), ap_account_code: "2110",
+    total_amount: "150.00", paid_total: null, held_total: null, debit_open: null, file_count: 0, created_at: at(-1) },
+];
+const DEBIT_NOTE = {
+  note: { id: "dn-1", note_no: "PDN-20261005-3381", status: "confirmed", supplier_id: "s-1", supplier_name: LONG_SUPPLIER,
+    supplier_kind: "supplier", supplier_note_no: "OH-DN-118", note_date: soon(-5), due_date: soon(25), ap_account_code: "2110",
+    ap_account_name: "Trade payables", total_amount: "780.00", narration: "Price raised on the October sofas, and the delivery charge",
+    cancel_reason: null, created_at: at(-5), created_by_name: "Chew", confirmed_at: at(-5), confirmed_by_name: "Chew",
+    cancelled_at: null, cancelled_by_name: null, entry_no: "JE-2610-0062", reversal_entry_no: null },
+  lines: [
+    { line_no: 1, account_code: "5100", account_name: "Cost of goods sold", description: "Two 3 seater sofas billed RM 300.00 below the new price",
+      amount: "600.00", department_type: "OFFICE", department_id: null },
+    { line_no: 2, account_code: "5100", account_name: "Cost of goods sold", description: "Delivery to the showroom",
+      amount: "180.00", department_type: "OFFICE", department_id: null },
+  ],
+  payments: [
+    { voucher_id: "pv-1", voucher_no: "PV-20261007-2210", voucher_status: "approved", voucher_date: soon(-3),
+      amount_applied: "500.00", created_at: at(-3) },
+  ],
+  files: [{ id: "f-2", file_name: "OH-DN-118.pdf", mime_type: "application/pdf", size_bytes: 120000,
+    storage_path: "SUPPLIER_DEBIT_NOTE/dn-1/OH-DN-118.pdf", uploaded_at: at(-5), uploaded_by_name: "Chew" }],
+  events: [
+    { action: "created", note: null, at: at(-5), actor_name: "Chew" },
+    { action: "confirmed", note: "PDN-20261005-3381", at: at(-5), actor_name: "Chew" },
+  ],
+  paid_total: "500.00", held_total: "500.00", debit_open: "280.00", go_live_on: GO_LIVE,
+  can: { edit: false, confirm: false, cancel: false, add_file: true },
+};
+const AP_ACCOUNT_CHOICES = [
+  { code: "2110", name: "Trade payables", kind: "LIABILITY", parent_code: "2100", is_control: true, control_for: "SUPPLIER",
+    for_bill_line: false, for_voucher_line: false, for_ap: true, for_pay_from: false, for_credit_line: false },
+  { code: "2120", name: "Other payables", kind: "LIABILITY", parent_code: "2100", is_control: true, control_for: "SUPPLIER",
+    for_bill_line: false, for_voucher_line: false, for_ap: true, for_pay_from: false, for_credit_line: false },
+  { code: "4900", name: "Other income", kind: "INCOME", parent_code: "4000", is_control: false, control_for: null,
+    for_bill_line: false, for_voucher_line: false, for_ap: false, for_pay_from: false, for_credit_line: true },
+  { code: "5100", name: "Cost of goods sold", kind: "EXPENSE", parent_code: "5000", is_control: false, control_for: null,
+    for_bill_line: true, for_voucher_line: true, for_ap: false, for_pay_from: false, for_credit_line: true },
+  { code: "6500", name: "Bank charges", kind: "EXPENSE", parent_code: "6000", is_control: false, control_for: null,
+    for_bill_line: true, for_voucher_line: true, for_ap: false, for_pay_from: false, for_credit_line: true },
+];
+const BILL_OUTSTANDING = [
+  { bill_id: "b-1", bill_no: "BILL-2609-0012", supplier_id: "s-1", supplier_name: LONG_SUPPLIER, supplier_invoice_no: "OH-INV-88231",
+    bill_date: soon(-9), due_date: soon(21), po_id: null, total_amount: "18250.00", paid_total: "1000.00", balance_owing: "17250.00",
+    go_live_on: GO_LIVE, ap_account_code: "2110", allocated_total: "1000.00", unallocated: "17250.00", supplier_kind: "supplier" },
+  { bill_id: "b-2", bill_no: "BILL-2608-0007", supplier_id: "s-1", supplier_name: LONG_SUPPLIER, supplier_invoice_no: "OH-INV-87001",
+    bill_date: soon(-40), due_date: soon(-10), po_id: null, total_amount: "15000.00", paid_total: "2000.00", balance_owing: "13000.00",
+    go_live_on: GO_LIVE, ap_account_code: "2110", allocated_total: "2000.00", unallocated: "13000.00", supplier_kind: "supplier" },
+];
+
+// ── Reports → Stock value (0643): provisional, at a month end ───────────────
+const STOCK_UNITS = [
+  ...Array.from({ length: 14 }, (_, i) => ({ unit_code: `U2-${String(100 + i)}-001`, sku: i % 2 ? "MAT-QUEEN-PLUSH" : "SOFA-3S-OSLO-GREY",
+    bucket: "warehouse", status: i % 3 ? "free" : "reserved", site_name: "Carres Klang", cost: i % 5 === 0 ? null : 480 + i * 35 })),
+  ...Array.from({ length: 6 }, (_, i) => ({ unit_code: `U2-${String(200 + i)}-001`, sku: "SOFA-L-HARBOUR-OATMEAL",
+    bucket: "showroom", status: "free", site_name: "PJ Showroom", cost: i < 4 ? null : 2150 })),
+  { unit_code: "U2-300-001", sku: "BED-KING-WALNUT", bucket: "transit", status: "reserved", site_name: "AL Sungai Buloh", cost: 1290 },
+  { unit_code: "U2-301-001", sku: "SOFA-3S-OSLO-GREY", bucket: "transit", status: "transferred", site_name: "Carres Klang", cost: 515 },
+  { unit_code: "U2-400-001", sku: "SOFA-2S-DUNE-SAND", bucket: "repair", status: "transferred", site_name: "Carres Klang", cost: 990 },
+].map((u, i) => ({
+  id: `su-${i}`, unit_code: u.unit_code, sku: u.sku, qty: 1, scope: "unit", status: u.status, bucket: u.bucket,
+  site_name: u.site_name, holder_name: null, po_no: u.cost === null ? null : `PO2609${String(10 + i)}-4827`,
+  unit_cost: u.cost === null ? null : u.cost.toFixed(2), value: u.cost === null ? null : u.cost.toFixed(2),
+}));
+const STOCK_VALUE = (monthEnd: string) => ({
+  month_end: monthEnd, cut_at: `${monthEnd}T16:00:00Z`, today: TODAY, provisional: true, units: STOCK_UNITS,
+  left_out: { consignment_units: 3, consignment_qty: 3 },
+});
+
+// ── Reports → Collection (0644): deposit and balance per salesperson ────────
+const SALESPEOPLE = [["s1", "NUR AISYAH BINTI KAMARUL ZAMAN"], ["s2", "Boon Keat"], ["s3", "Priya Raman"]] as const;
+const COLLECTION_ORDERS = Array.from({ length: 18 }, (_, i) => {
+  const [sid, sname] = SALESPEOPLE[i % 3]!;
+  const value = 1800 + (i * 377) % 4200;
+  const depositShare = [0.3, 0.5, 0.2, 0.6, 0.45, 1][i % 6]!;
+  const delivered = i % 4 === 0 || i % 5 === 0;
+  const deposit = Math.round(value * depositShare);
+  return {
+    id: `co-${i}`, so: 1500 + i, placed_on: soon(-25 + i), status: delivered ? "delivered" : "proceed_order",
+    customer_name: i === 2 ? LONG_CUSTOMER : ["LIM KUAN YANG", "SITI AMINAH", "WONG MEI LING"][i % 3]!,
+    salesperson_id: i === 17 ? null : sid, salesperson_name: i === 17 ? null : sname, channel: "showroom", dealer_name: "PJ Showroom",
+    order_value: value.toFixed(2), deposit: deposit.toFixed(2),
+    balance_paid: delivered ? Math.round((value - deposit) * (i % 2 ? 1 : 0.4)).toFixed(2) : "0.00",
+    invoice_no: delivered ? `INV-2609-${String(100 + i)}` : null, billed: delivered ? value.toFixed(2) : null,
+    issued_at: delivered ? soon(-3) : null, delivered,
+  };
+});
+
+// ── Payables → Payment Requests (0645): staff ask Finance to pay ────────────
+const PRQ_ROW = (i: number, over: Record<string, unknown>) => ({
+  id: `prq-${i}`, request_no: `PRQ2610${String(10 + i).padStart(2, "0")}-${4821 + i}`, status: "submitted",
+  requested_by: `u-${i % 3}`, requested_by_name: ["NUR AISYAH BINTI KAMARUL ZAMAN", "Boon Keat", "Priya Raman"][i % 3],
+  payee_name: ["Bayview Properties", "Persatuan Penduduk Taman Bukit Indah Kota Damansara", "Quickfix Plumbing", "Tenaga Nasional Berhad"][i % 4],
+  amount: (350 + i * 415).toFixed(2), pay_by: soon(3 + i), purpose: ["October rent, PJ showroom", "Booth at the Kota Damansara fair",
+    "Pipe repair, Klang warehouse", "Electricity, September"][i % 4],
+  note: null, bank_name: "Maybank", bank_account_no: "514012345678", bank_account_holder: "Bayview Properties Sdn Bhd",
+  bill_no: `BV-${1000 + i}`, bill_date: soon(-2 - i), return_note: null, decided_at: null, decided_by_name: null,
+  created_at: at(-i), updated_at: at(-i), file_count: 1, voucher: null, bill: null, ...over,
+});
+const PAYMENT_REQUESTS = [
+  PRQ_ROW(0, {}),
+  PRQ_ROW(1, {}),
+  PRQ_ROW(2, { status: "answered", voucher: { id: "v-1", voucher_no: "PV261002-1187", status: "checked", voucher_date: soon(-1) } }),
+  PRQ_ROW(3, { status: "answered", bill: { id: "b-1", bill_no: "BILL-2609-0016", status: "confirmed", total: "2400.00", paid: "0.00" } }),
+  PRQ_ROW(4, { status: "returned", return_note: "Attach the official invoice, not the quotation", decided_by_name: "Chew" }),
+  PRQ_ROW(5, { status: "answered", voucher: { id: "v-2", voucher_no: "PV260928-0954", status: "approved", voucher_date: soon(-5) } }),
+];
+const PAYMENT_REQUEST_DOC = {
+  request: PAYMENT_REQUESTS[0],
+  files: [{ id: "pf-1", file_name: "BV-1000 October rent.pdf", mime_type: "application/pdf", size_bytes: 182000,
+    storage_path: "prq-0/f.pdf", uploaded_at: at(0), uploaded_by_name: "NUR AISYAH BINTI KAMARUL ZAMAN" }],
+  events: [
+    { action: "submitted", note: null, at: at(0), actor_name: "NUR AISYAH BINTI KAMARUL ZAMAN" },
+    { action: "file_added", note: "BV-1000 October rent.pdf", at: at(0), actor_name: "NUR AISYAH BINTI KAMARUL ZAMAN" },
+  ],
+  finance: true,
+  can: { edit: false, withdraw: false, add_file: true, return: true, answer: true },
+};
+const REQUEST_GRANTS = [
+  { user_id: "u-0", name: "NUR AISYAH BINTI KAMARUL ZAMAN", role: "operation", allowed: true, granted_at: at(-30), granted_by_name: "Jess" },
+  { user_id: "u-1", name: "Boon Keat", role: "operation", allowed: true, granted_at: at(-12), granted_by_name: "Jess" },
+  { user_id: "u-2", name: "Priya Raman", role: "operation", allowed: false, granted_at: null, granted_by_name: null },
+  // 0687: HR and BD staff beside Operation.
+  { user_id: "u-3", name: "Hana Yusof", role: "hr", allowed: true, granted_at: at(-1), granted_by_name: "Chew" },
+  { user_id: "u-4", name: "Bala Krishnan", role: "bd", allowed: false, granted_at: null, granted_by_name: null },
+];
+
+// ── Reports → AP Aging (0640): owed to suppliers on a day ───────────────────
+const AP_AGING = (asAt: string) => ({
+  as_at: asAt, go_live_on: GO_LIVE,
+  controls: [{ account_code: "2110", name: "Trade payables", balance: 44350 }, { account_code: "2120", name: "Other payables", balance: 2400 }],
+  suppliers: [
+    { supplier_id: "s-1", name: LONG_SUPPLIER, kind: "factory_pickup", balance: 31250, bills: [
+      { bill_id: "b-1", bill_no: "BILL-2609-0012", supplier_invoice_no: "OH-INV-88231", bill_date: soon(-9), due_date: soon(21), total: 18250, open: 18250 },
+      { bill_id: "b-2", bill_no: "BILL-2608-0007", supplier_invoice_no: "OH-INV-87001", bill_date: soon(-40), due_date: soon(-10), total: 15000, open: 13000 },
+    ] },
+    { supplier_id: "s-2", name: "Lumen Sofa Works", kind: "factory_pickup", balance: 13100, bills: [
+      { bill_id: "b-3", bill_no: "BILL-2606-0002", supplier_invoice_no: "LS-31", bill_date: soon(-110), due_date: null, total: 9800, open: 9800 },
+      { bill_id: "b-4", bill_no: "BILL-2609-0015", supplier_invoice_no: "LS-77", bill_date: soon(-3), due_date: soon(27), total: 4000, open: 4000 },
+    ] },
+    { supplier_id: "s-3", name: "Tenaga Nasional Berhad", kind: "other_creditor", balance: 2400, bills: [
+      { bill_id: "b-5", bill_no: "BILL-2609-0016", supplier_invoice_no: "TNB-0930", bill_date: soon(-2), due_date: soon(12), total: 2400, open: 2400 },
+    ] },
+  ],
+});
+
+// ── Reports → AR Aging (0686): owed by customers and other debtors on a day ──
+const AR_AGING = (asAt: string) => ({
+  as_at: asAt, go_live_on: GO_LIVE,
+  controls: [
+    { account_code: "300-1000", name: "SHOWROOM DEBTORS", balance: 4114 },
+    { account_code: "300-2001", name: "TEST DEALER", balance: 2450 },
+    { account_code: "305-0000", name: "OTHER DEBTOR", balance: 1800 },
+  ],
+  debtors: [
+    { party_type: "CUSTOMER", party_id: "c-1", name: LONG_CUSTOMER, kind: "customer", balance: 3314, invoices: [
+      { invoice_id: "ci-1", invoice_no: "INV-0001", kind: "sales", order_id: "o-1", so: 1401, invoice_date: soon(-2),
+        due_date: null, total: 2629, open: 1314, department_type: "SHOWROOM", department_id: null },
+      { invoice_id: "ci-2", invoice_no: "INV-0002", kind: "storage", order_id: "o-1", so: 1401, invoice_date: soon(-35),
+        due_date: null, total: 2000, open: 2000, department_type: "SHOWROOM", department_id: null },
+    ] },
+    { party_type: "CUSTOMER", party_id: "c-2", name: "NURUL AIN BINTI ISMAIL", kind: "customer", balance: 800, invoices: [
+      { invoice_id: "ci-3", invoice_no: "INV-0003", kind: "sales", order_id: "o-2", so: 1402, invoice_date: soon(-70),
+        due_date: null, total: 2400, open: 1600, department_type: "SHOWROOM", department_id: null },
+    ] },
+    { party_type: "CUSTOMER", party_id: "c-3", name: "LIM KUAN YANG", kind: "customer", balance: 2950, invoices: [
+      { invoice_id: "ci-4", invoice_no: "INV-0004", kind: "sales", order_id: "o-3", so: 1403, invoice_date: soon(-130),
+        due_date: null, total: 2950, open: 2950, department_type: "DEALER", department_id: "d-1" },
+    ] },
+    // 0690: a deposit on a dealer order not invoiced yet names the order's channel.
+    { party_type: "CUSTOMER", party_id: "c-4", name: "WONG MEI LING", kind: "customer", balance: -500, invoices: [],
+      channels: [{ department_type: "DEALER", department_id: "dl-1", amount: -500 }] },
+    { party_type: "OTHER", party_id: "p-1", name: LONG_PARTY, kind: "company", balance: 1800, invoices: [
+      { invoice_id: "oi-1", invoice_no: "ARI-0001", kind: "other", order_id: null, so: null, invoice_date: soon(-20),
+        due_date: soon(10), total: 2000, open: 1800, department_type: null, department_id: null },
+    ] },
+  ],
+  before_go_live: { count: 1, amount: 2499 },
+});
+
+// ── Forecast (0646): a plan on the live chart's accounts, and that month's
+// Profit and Loss in the statement's own rows. Figures are invented.
+const FORECAST_ACCOUNTS = ([
+  ["4100", "Furniture sales", "income"], ["4200", "Rental income", "income"], ["4300", "Delivery income", "income"],
+  ["4400", "Storage fee income", "income"], ["4900", "Other income", "income"],
+  ["5100", "Cost of goods sold", "cost"], ["5200", "Inbound freight and duty", "cost"],
+  ["6100", "Staff cost and commission", "expense"], ["6200", "Rent and utilities", "expense"],
+  ["6300", "Outbound delivery and transport", "expense"], ["6400", "Service and warranty cost", "expense"],
+  ["6500", "Bank and payment charges", "expense"], ["6900", "Office, marketing and general", "expense"],
+] as const).map(([code, name, block]) => ({ code, name, kind: block === "income" ? "INCOME" : "EXPENSE", active: true, block }));
+const FORECAST_PLAN = {
+  "4100": { amount: 180000 }, "4200": { amount: 12000 }, "4300": { amount: 6000 }, "4400": { amount: 1500 },
+  "5100": { share: 5500 }, "5200": { share: 400 },
+  "6100": { amount: 28000 }, "6200": { amount: 15000 }, "6300": { share: 300 }, "6400": { share: 100 }, "6500": { share: 150 }, "6900": { amount: 6000 },
+};
+const monthBefore = (ym: string) => {
+  const [y, m] = ym.split("-").map(Number) as [number, number];
+  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
+};
+const FORECAST = (month: string) => ({
+  month, accounts: FORECAST_ACCOUNTS, lines: FORECAST_PLAN, updated_at: at(-2), updated_by_name: "Chew",
+  previous: { month: monthBefore(month), lines: FORECAST_PLAN }, planned_months: [monthBefore(month), month],
+});
+function forecastPl(from: string, to: string) {
+  const common = { report_status: "OK", go_live_on: GO_LIVE, period_from: from, period_to: to };
+  const actual: Record<string, number> = {
+    "4100": 171250, "4200": 11400, "4300": 6350, "4400": 1180, "4900": 420,
+    "5100": 96800, "5200": 7950, "6100": 29400, "6200": 15000, "6300": 6120, "6400": 1250, "6500": 2960, "6900": 4880,
+  };
+  const head = (b: string) => (b === "income" ? ["4000", "Income"] : b === "cost" ? ["5000", "Cost of sales"] : ["6000", "Operating expenses"]);
+  const rows: Record<string, unknown>[] = [];
+  let income = 0;
+  let expense = 0;
+  for (const section of ["INCOME", "EXPENSE"] as const) {
+    for (const block of section === "INCOME" ? ["income"] : ["cost", "expense"]) {
+      const [hc, hn] = head(block);
+      let sub = 0;
+      for (const a of FORECAST_ACCOUNTS.filter((x) => x.block === block)) {
+        rows.push({ row_kind: "ACCOUNT", section, header_code: hc, header_name: hn, account_code: a.code, account_name: a.name, amount: actual[a.code] });
+        sub += actual[a.code]!;
+      }
+      rows.push({ row_kind: "HEADER_SUBTOTAL", section, header_code: hc, header_name: hn, amount: sub });
+      if (section === "INCOME") income += sub; else expense += sub;
+    }
+    rows.push({ row_kind: "SECTION_TOTAL", section, amount: section === "INCOME" ? income : expense });
+  }
+  rows.push({ row_kind: "NET", section: "NET", amount: income - expense });
+  return { rows: rows.map((r, i) => ({ ...common, ordinal: i + 1, ...r })) };
+}
+
+// ── Finance Settings → Posting accounts (0657, 0658) and Item groups (0659) ──
+// Long lists on purpose: the page must keep its table in sight below them.
+const ACCOUNT_NAME: Record<string, string> = {
+  "500-0000": "SALES", "500-2000": "SUBSCRIPTION", "500-3000": "SERVICE CHARGES", "500-4000": "STORAGE CHARGES",
+  "500-5000": "GUARANTEE - 15 YEARS", "510-0000": "RETURN INWARDS", "580-0000": "ADDITIONAL INCOME",
+  "604-0000": "COST OF SERVICE", "610-0000": "PURCHASES", "610-0020": "PURCHASE - MATTRESS", "610-0030": "PURCHASE - SOFA",
+  "610-0040": "PURCHASE - BEDFRAME", "610-0050": "PURCHASE - MATTRESS PROTECTOR", "610-0070": "PURCHASE - PILLOW",
+  "612-0000": "PURCHASES RETURN", "902-0000": "BANK CHARGES",
+  "900-C007": "COMMISSION - DEALER", "410-0061": "ACCRUALS - COMMISSION DEALER", "900-C008": "RENOVATION REBATE",
+  "410-0064": "ACCRUALS - RENOVATION REBATE", "900-C009": "KPI ALLOWANCE", "410-0065": "ACCRUALS - KPI ALLOWANCE",
+  "300-1000": "SHOWROOM DEBTORS", "300-2000": "DEALER DEBTORS", "300-3000": "SUBSCRIPTION DEBTORS",
+  "400-0000": "TRADE CREDITORS", "405-0000": "OTHERS CREDITORS",
+  "440-0000": "DEPOSIT RECEIVED", "330-0000": "STOCK", "150-0000": "RETAINED EARNING", "160-0000": "OPENING BALANCE",
+  "310-2000": "HONG LEONG BANK", "320-0000": "CASH IN HAND", "315-5000": "STRIPE", "315-9000": "CARD - MACHINE NOT KNOWN",
+};
+const named = (code: string | null) => (code ? ACCOUNT_NAME[code] ?? null : null);
+const itemGroup = (id: string, name: string, p: string | null, s: string | null, products: number, categories: string[] = []) => ({
+  id, name, active: true, categories, products,
+  purchaseAccount: p, purchaseName: named(p), salesAccount: s, salesName: named(s),
+  salesReturnAccount: "510-0000", salesReturnName: named("510-0000"),
+  purchaseReturnAccount: "612-0000", purchaseReturnName: named("612-0000"),
+});
+const ITEM_GROUP_ROWS = [
+  itemGroup("g-bed", "BEDFRAME", "610-0040", "500-0000", 11, ["bedframe"]),
+  itemGroup("g-cur", "CURTAIN", null, null, 0),
+  itemGroup("g-grt", "GUARANTEE", "604-0000", "500-5000", 1, ["guarantee"]),
+  itemGroup("g-mat", "MATTRESS", "610-0020", "500-0000", 17, ["mattress"]),
+  itemGroup("g-mp", "MATTRESS PROTECTOR", "610-0050", "500-0000", 1),
+  itemGroup("g-oth", "OTHERS", "610-0000", "500-0000", 0, ["accessory"]),
+  itemGroup("g-pil", "PILLOW", "610-0070", "500-0000", 3),
+  itemGroup("g-svc", "SERVICE", "604-0000", "500-3000", 1, ["service"]),
+  itemGroup("g-sofa", "SOFA", "610-0030", "500-0000", 23, ["sofa"]),
+];
+const products = (n: number, category: string, groupId: string, stem: string) =>
+  Array.from({ length: n }, (_, i) => ({
+    modelId: `${groupId}-${i}`, name: i === 0 ? `${stem} ${LONG_PARTY.slice(0, 44)}` : `${stem} ${100 + i}`,
+    category, skus: 1 + (i % 6), groupId, placed: false, discontinued: false,
+  }));
+const ITEM_GROUPS = {
+  groups: ITEM_GROUP_ROWS,
+  products: [
+    ...products(11, "bedframe", "g-bed", "Bedframe"),
+    ...products(17, "mattress", "g-mat", "Mattress"),
+    ...products(23, "sofa", "g-sofa", "Sofa"),
+    { modelId: "p-mp", name: "Mattress Protector", category: "accessory", skus: 3, groupId: "g-mp", placed: true, discontinued: false },
+    { modelId: "p-pil", name: "Memory Foam Pillow", category: "accessory", skus: 1, groupId: "g-pil", placed: true, discontinued: false },
+    { modelId: "p-grt", name: "Mattress Guarantee", category: "guarantee", skus: 1, groupId: "g-grt", placed: false, discontinued: false },
+  ],
+  unbound: [
+    { id: 1, invoiceNo: "INV-2026-001388", so: 1388, issuedAt: soon(-2), groupId: null, skus: ["OLD-SOFA-3S"],
+      amount: "1890.00", accountCode: "500-0000", accountName: "SALES" },
+  ],
+  changes: [
+    { id: "2", what: "PRODUCT", groupId: "g-pil", groupName: "PILLOW", modelName: "Memory Foam Pillow", fromGroupName: "OTHERS",
+      fromCode: null, fromName: null, toCode: null, toName: null, fromText: null, toText: null, changedAt: at(-1), changedBy: "Chew" },
+    { id: "1", what: "ADDED", groupId: "g-cur", groupName: "CURTAIN", modelName: null, fromGroupName: null,
+      fromCode: null, fromName: null, toCode: null, toName: null, fromText: null, toText: "CURTAIN", changedAt: at(-2), changedBy: "Chew" },
+  ],
+};
+const posting = (type: string, key: string, account: string, name: string | null = null) => ({
+  type, key, name, active: type === "ADDON" ? true : null, accountCode: account, accountName: named(account), changedAt: null, changedBy: null,
+});
+const POSTINGS = {
+  income: [
+    posting("GOODS", "*", "500-0000"), posting("GOODS", "rental", "500-2000"), posting("STORAGE", "*", "500-4000"),
+    ...["Additional delivery fee", "Cross-category delivery fee", "Delivery fee", "Dispose old bed frame", "Dispose old mattress",
+      "Dispose old sofa (big size)", "Dispose old sofa (small size)", "Stair carry"].map((n, i) => posting("ADDON", `a${i}`, "500-3000", n)),
+  ],
+  roles: [
+    ["COST_OF_GOODS_SOLD", true, "610-0000"], ["BANK_AND_PAYMENT_CHARGES", true, "902-0000"], ["OTHER_INCOME", true, "580-0000"],
+    ["DEALER_COMMISSION", true, "900-C007"], ["DEALER_COMMISSION_ACCRUED", true, "410-0061"], ["RENOVATION_REBATE", true, "900-C008"],
+    ["RENOVATION_REBATE_ACCRUED", true, "410-0064"], ["KPI_ALLOWANCE", true, "900-C009"], ["KPI_ALLOWANCE_ACCRUED", true, "410-0065"],
+    ["SHOWROOM_DEBTORS", false, "300-1000"], ["DEALER_DEBTORS_HEADING", false, "300-2000"], ["SUBSCRIPTION_DEBTORS", false, "300-3000"],
+    ["TRADE_PAYABLE", false, "400-0000"], ["OTHER_PAYABLE", false, "405-0000"], ["CUSTOMER_DEPOSITS_HELD", false, "440-0000"],
+    ["STOCK", false, "330-0000"], ["RETAINED_EARNINGS", false, "150-0000"], ["OPENING_BALANCE_EQUITY", false, "160-0000"],
+  ].map(([role, changeable, code]) => ({ role, changeable, accountCode: code, accountName: named(code as string), changedAt: null, changedBy: null })),
+  changes: Array.from({ length: 30 }, (_, i) => ({
+    id: String(30 - i), what: "ROLE", key: "OTHER_INCOME", name: null, fromCode: i % 2 ? "580-0000" : "500-0000",
+    fromName: named(i % 2 ? "580-0000" : "500-0000"), toCode: i % 2 ? "500-0000" : "580-0000",
+    toName: named(i % 2 ? "500-0000" : "580-0000"), changedAt: at(-i), changedBy: "Chew",
+  })),
+  payments: [],
+};
+const PAYMENT_METHODS = {
+  methods: [
+    { method: "bank", label: "Bank transfer", account_code: "310-2000", account_name: named("310-2000"), active: true, sort: 1 },
+    { method: "cash", label: "Cash", account_code: "320-0000", account_name: named("320-0000"), active: true, sort: 2 },
+  ],
+  money_accounts: [{ code: "310-2000", name: named("310-2000") }, { code: "320-0000", name: named("320-0000") }],
+  system_rows: [{ method: "card", source_channel: "*", account_code: "315-9000" }, { method: "online", source_channel: "stripe_checkout", account_code: "315-5000" }],
+};
+
+// 0691: Finance's AutoCount-style codes, as the API adds them. Invented.
+const CODE_OF: Record<string, string> = {
+  "s-1": "400-O001", "s-2": "400-L001", "s-3": "405-B001", "s-4": "405-T001", "s-5": "400-D001", "s-6": "405-P001",
+};
+const PARTY_CODES = ["305-P001", "305-I001", "305-A001", "305-A002"];
+// Finance Settings → Chart of accounts, its money accounts: two old test accounts out of use, hidden until asked for.
+const MONEY_ACCOUNT_ROWS = [
+  { code: "1120", name: "BANK - CURRENT ACCOUNT (TEST ONLY)", money_kind: "BANK", is_active: false },
+  { code: "1121", name: "Public Bank", money_kind: "BANK", is_active: false },
+  { code: "310-1000", name: "ALLIANCE BANK", money_kind: "BANK", is_active: true },
+  { code: "310-2000", name: "HONG LEONG BANK", money_kind: "BANK", is_active: true },
+  { code: "310-4000", name: "MAYBANK", money_kind: "BANK", is_active: true },
+  { code: "315-1000", name: "MERCHANT - PBB", money_kind: "HOLDING", is_active: true },
+  { code: "315-5000", name: "STRIPE", money_kind: "HOLDING", is_active: true },
+  { code: "315-9000", name: "CARD - MACHINE NOT KNOWN", money_kind: "HOLDING", is_active: true },
+  { code: "320-0000", name: "CASH IN HAND", money_kind: "CASH", is_active: true },
+];
+
+// 0692: Chart of accounts in its CURRENT ASSETS section, the money accounts marked on it. Invented.
+const SETTINGS_CHART = [
+  ["0000", "ASSETS", null, true, null, null],
+  ["300-0000", "TRADE DEBTORS", "0000", false, "CURRENT ASSETS", "SDC"],
+  ["310-0000", "CASH AT BANK", "0000", true, "CURRENT ASSETS", null],
+  ["315-0000", "CARD & ONLINE CLEARING", "0000", true, "CURRENT ASSETS", null],
+  ...MONEY_ACCOUNT_ROWS.map((m) => [m.code, m.name, m.money_kind === "HOLDING" ? "315-0000" : "310-0000", false, null,
+    m.money_kind === "BANK" ? "SBK" : m.money_kind === "CASH" ? "SCH" : "HLD"]),
+  ["330-0000", "STOCK", "0000", false, "CURRENT ASSETS", "SBS"],
+].map(([code, name, parent_code, is_header, section, special]) => ({
+  code, name, kind: "ASSET", parent_code, is_control: false, control_for: null, is_active: true, is_header,
+  sort_order: 0, section, special,
+}));
+
+// ── Row menu and preview (Chew 2026-10-21): the documents a double-click reads ──
+const BILL_DOC = {
+  bill: { ...BILLS[0]!, ap_account_name: "Trade Payables — Suppliers", narration: null, cancel_reason: null,
+    created_by_name: "Shasha", confirmed_at: at(-9), confirmed_by_name: "Chew", cancelled_at: null, cancelled_by_name: null,
+    entry_no: ENTRIES[2]!.entry_no, reversal_entry_no: null },
+  lines: [
+    { line_no: 1, account_code: "5100", account_name: "Cost of goods sold", description: "Ohana 3 seater sofa, grey fabric", sku: "SOFA-3S",
+      qty: "4", unit_price: "2995.00", amount: "11980.00", warehouse_receipt_id: null, grn_no: "GRN-20260903-1184", grn_po_id: null,
+      po_line_id: null, po_unit_cost: null, price_diff: null },
+    { line_no: 2, account_code: "6500", account_name: "Transport", description: "Lorry from Muar", sku: null,
+      qty: null, unit_price: null, amount: "500.00", warehouse_receipt_id: null, grn_no: null, grn_po_id: null,
+      po_line_id: null, po_unit_cost: null, price_diff: null },
+  ],
+  payments: [], files: [], events: [], paid_total: "5000.00", allocated_total: "5000.00", unpaid: "7480.00",
+  left_to_pay: "7480.00", advance_open: "0.00", go_live_on: GO_LIVE,
+  can: { edit: false, confirm: false, cancel: false, add_file: false, apply_advance: false },
+};
+const VOUCHER_DOC = {
+  voucher: { ...VOUCHERS[0]!, supplier_kind: "supplier", ap_account_code: "2100", ap_account_name: "Trade Payables — Suppliers",
+    narration: "First payment on the September sofas", created_by_name: "Shasha", prepared_at: at(-4), checked_at: at(-4),
+    approved_at: at(-3), rejected_at: null, rejected_by_name: null, reject_reason: null, cancelled_at: null,
+    cancelled_by_name: null, cancel_reason: null, entry_no: ENTRIES[3]!.entry_no, reversal_entry_no: null },
+  lines: [],
+  allocations: [{ bill_id: "b-1", bill_no: "BILL-2609-0012", supplier_invoice_no: "OH-INV-88231", bill_date: soon(-9),
+    due_date: soon(21), bill_total: "12480.00", ap_account_code: "2100", amount_applied: "5000.00" }],
+  files: [], events: [], advance: null, go_live_on: GO_LIVE, you_prepared: false,
+  can: { edit: false, prepare: false, check: false, approve: false, reject: false, cancel: false, add_file: false,
+    apply_advance: false, take_advance_off: false, money_back: false, cancel_money_back: false },
+};
+const DEBTOR_INVOICE_DETAIL = {
+  invoice: { ...DEBTOR_INVOICES[0]!, debtor_account_code: "1240", entry_no: ENTRIES[4]!.entry_no, reversal_entry_no: null,
+    created_by_name: "Shasha", issued_by_name: "Chew", cancelled_by_name: null },
+  lines: [
+    { line_no: 1, account_code: "4900", account_name: "Other income", description: "Event space sublet", amount: 2000, department_type: "OFFICE", department_id: null },
+    { line_no: 2, account_code: "4900", account_name: "Other income", description: "Cleaning after the event", amount: 400, department_type: "OFFICE", department_id: null },
+  ],
+  receipts: [{ receipt_id: RECEIPTS[0]!.receipt_id, receipt_no: RECEIPTS[0]!.receipt_no, receipt_date: RECEIPTS[0]!.receipt_date, amount: 1200, status: "posted" }],
+};
+const RECEIPT_DETAIL = {
+  receipt: { ...RECEIPTS[0]!, entry_no: ENTRIES[4]!.entry_no, reversal_entry_no: null, voided_by_name: null },
+  lines: [],
+  allocations: [{ invoice_id: DEBTOR_INVOICES[0]!.invoice_id, invoice_no: DEBTOR_INVOICES[0]!.invoice_no, invoice_date: DEBTOR_INVOICES[0]!.invoice_date,
+    invoice_total: 2400, amount: 1200 }],
+};
+/** Any entry number: the Journal's row, with two invented lines that balance. */
+function entryDetail(no: string) {
+  const e = ENTRIES.find((x) => x.entry_no === no) ?? { ...ENTRIES[0]!, entry_no: no };
+  const amount = Number(e.total_debit);
+  return { entry: e, related: [], lines: [
+    { line_no: 1, account_code: "5100", account_name: "Cost of goods sold", debit: amount, credit: 0, party_type: null, party_id: null, party_name: null, memo: e.narration },
+    { line_no: 2, account_code: "2100", account_name: "Trade Payables — Suppliers", debit: 0, credit: amount, party_type: "SUPPLIER", party_id: "s-1", party_name: LONG_SUPPLIER, memo: null },
+  ] };
+}
+
+// 0705: Opening balances, a draft. One supplier's open bills do not tally
+// with its total (the remark shows the difference); one Unit and one order
+// are not found, so Post names that first.
+const OPENING = {
+  status: "draft", go_live_on: GO_LIVE, entry_date: soon(-61), books_closed_through: null, entry: null,
+  posted_at: null, posted_by_name: null, updated_at: at(-1), updated_by_name: "Chew", last_reversed: null,
+  may_post: ROLE === "principal",
+  accounts: [
+    { code: "310-2000", name: "HONG LEONG BANK", kind: "ASSET", special: "SBK", debit: "48210.55", credit: "0.00", eligible: true },
+    { code: "320-0000", name: "CASH IN HAND", kind: "ASSET", special: "SCH", debit: "1200.00", credit: "0.00", eligible: true },
+    { code: "100-0000", name: "CAPITAL", kind: "EQUITY", special: null, debit: "0.00", credit: "100000.00", eligible: true },
+    { code: "150-0000", name: "RETAINED EARNING", kind: "EQUITY", special: "SRE", debit: "0.00", credit: "0.00", eligible: true },
+    { code: "500-0000", name: "SALES", kind: "INCOME", special: null, debit: "0.00", credit: "312400.00", eligible: true },
+    { code: "610-0001", name: "PURCHASES MATTRESS", kind: "EXPENSE", special: null, debit: "201330.00", credit: "0.00", eligible: true },
+    { code: "900-R001", name: "RENTAL OF PREMISES", kind: "EXPENSE", special: null, debit: "36000.00", credit: "0.00", eligible: true },
+  ],
+  parties: [
+    { id: "op-1", party_type: "SUPPLIER", party_id: "s-1", name: LONG_SUPPLIER, account_code: "400-0000", account_name: "TRADE CREDITORS",
+      total: "12480.00", items_total: "12600.00", difference: "-120.00",
+      items: [{ id: "oi-1", doc_no: "OH-INV-88010", doc_date: soon(-120), due_date: soon(-90), amount: "4600.00" },
+        { id: "oi-2", doc_no: "OH-INV-88102", doc_date: soon(-80), due_date: soon(-50), amount: "8000.00" }] },
+    { id: "op-2", party_type: "SUPPLIER", party_id: "s-2", name: "Hooka", account_code: "400-0000", account_name: "TRADE CREDITORS",
+      total: "3890.50", items_total: "3890.50", difference: "0.00",
+      items: [{ id: "oi-3", doc_no: "HK-2077", doc_date: soon(-70), due_date: soon(-40), amount: "3890.50" }] },
+    { id: "op-3", party_type: "CUSTOMER", party_id: "c-1", name: LONG_CUSTOMER, account_code: "300-1000", account_name: "SHOWROOM DEBTORS",
+      total: "2400.00", items_total: "2400.00", difference: "0.00",
+      items: [{ id: "oi-4", doc_no: "IV-2608-0091", doc_date: soon(-95), due_date: soon(-65), amount: "2400.00" }] },
+    { id: "op-4", party_type: "OTHER", party_id: "fp-1", name: LONG_PARTY, account_code: "305-0000", account_name: "OTHER DEBTOR",
+      total: "800.00", items_total: "0.00", difference: "800.00", items: [] },
+  ],
+  stock: [
+    { unit_code: "U-OLD-0999", unit_id: null, found: false, sku: null, qty: null, unit_cost: "120.00", value: null },
+    { unit_code: "U-2609-0001", unit_id: "u-1", found: true, sku: "mattress:M1401F-K", qty: 1, unit_cost: "1850.00", value: "1850.00" },
+    { unit_code: "U-2609-0002", unit_id: "u-2", found: true, sku: "sofa:S220-3S-GREY", qty: 1, unit_cost: "2390.00", value: "2390.00" },
+  ],
+  deposits: [
+    { id: "od-1", order_ref: "SO-1401", customer_ref: LONG_CUSTOMER, order_id: "o-1401", found: true, so: 1401, customer_name: LONG_CUSTOMER,
+      delivered_at: null, account_code: "300-1000", amount: "1500.00" },
+    { id: "od-2", order_ref: "SO-1402", customer_ref: "Nurul", order_id: "o-1402", found: true, so: 1402, customer_name: "NURUL AIN BINTI ISMAIL",
+      delivered_at: null, account_code: "300-1000", amount: "800.00" },
+    { id: "od-3", order_ref: "SO-9999", customer_ref: null, order_id: null, found: false, so: null, customer_name: null,
+      delivered_at: null, account_code: null, amount: "250.00" },
+  ],
+  totals: { debit: "293380.55", credit: "430970.50", lines: 15 },
+  choices: {
+    customers: [{ id: "c-1", name: LONG_CUSTOMER, phone: "0123456789" }, { id: "c-2", name: "LIM KUAN YANG", phone: "0198765432" }],
+    other_debtors: [{ id: "fp-1", name: LONG_PARTY }],
+    suppliers: [{ id: "s-1", name: LONG_SUPPLIER }, { id: "s-2", name: "Hooka" }, { id: "s-3", name: "Nice Future" }],
+    debtor_accounts: [{ code: "300-1000", name: "SHOWROOM DEBTORS", control_for: "CUSTOMER" },
+      { code: "300-3000", name: "SUBSCRIPTION DEBTORS", control_for: "CUSTOMER" }, { code: "305-0000", name: "OTHER DEBTOR", control_for: "OTHER" }],
+    supplier_accounts: [{ code: "400-0000", name: "TRADE CREDITORS", control_for: "SUPPLIER" }, { code: "405-0000", name: "OTHERS CREDITORS", control_for: "SUPPLIER" }],
+    default_accounts: { CUSTOMER: "300-1000", OTHER: "305-0000", SUPPLIER: "400-0000" },
+  },
+};
+
 const realFetch = window.fetch.bind(window);
+
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
   if (!url.includes("/api/") && !url.includes("127.0.0.1:88") && !url.includes("localhost:88")) return realFetch(input, init);
@@ -299,32 +1021,113 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
   if (init?.method && init.method !== "GET") return json({ message: "Local preview does not save records." }, 405);
   const q = new URL(url, window.location.origin).searchParams;
+  if (url.includes("/api/finance/opening-balances/state")) return json({ status: "draft", entry_date: null, entry_no: null });
+  if (url.includes("/api/finance/opening-balances")) return json(OPENING);
+  if (new URL(url, window.location.origin).pathname === "/api/finance/ledger/money-accounts") return json(MONEY_ACCOUNT_ROWS);
+  // 0541: the card payout banks, as production has them. Invented.
+  if (new URL(url, window.location.origin).pathname === "/api/finance/ledger/money-accounts/card-routes")
+    return json([
+      { holding_code: "315-9000", channel: "dealer", bank_code: "310-1000" },
+      { holding_code: "315-9000", channel: "showroom", bank_code: "310-2000" },
+      { holding_code: "315-5000", channel: "dealer", bank_code: "310-4000" },
+      { holding_code: "315-5000", channel: "showroom", bank_code: "310-2000" },
+    ]);
   if (url.includes("/api/finance/invoices/register")) return json({ rows: INVOICES, total: INVOICES.length });
   if (url.includes("/api/finance/payments/register")) return json({ rows: [], total: 0 });
+  // 0687: `?role=hr` or `?role=bd` previews an allowed HR or BD person, who sees only their own requests.
+  if (url.includes("/api/finance/payment-requests/me")) {
+    return json(ROLE === "hr" || ROLE === "bd"
+      ? { may_request: true, finance: false, boss: false, may_grant: false }
+      : { may_request: true, finance: true, boss: true, may_grant: true });
+  }
+  if (url.includes("/api/finance/payment-requests/grants")) return json({ rows: REQUEST_GRANTS });
+  if (url.includes("/api/finance/payment-requests/prq-")) return json(PAYMENT_REQUEST_DOC);
+  if (url.includes("/api/finance/payment-requests")) return json({ rows: PAYMENT_REQUESTS });
+  {
+    // Row menu and preview (Chew 2026-10-21): one document of each kind.
+    const path = new URL(url, window.location.origin).pathname;
+    const bill = BILLS.find((b) => path === `/api/finance/payables/bills/${b.id}`);
+    if (bill) return json({ ...BILL_DOC, bill: { ...BILL_DOC.bill, ...bill, entry_no: bill.status === "draft" ? null : BILL_DOC.bill.entry_no } });
+    const voucher = VOUCHERS.find((v) => path === `/api/finance/payables/vouchers/${v.id}`);
+    if (voucher) return json({ ...VOUCHER_DOC, voucher: { ...VOUCHER_DOC.voucher, ...voucher } });
+    if (path === `/api/finance/other-money-in/invoices/${DEBTOR_INVOICES[0]!.invoice_id}`) return json(DEBTOR_INVOICE_DETAIL);
+    if (path === `/api/finance/other-money-in/receipts/${RECEIPTS[0]!.receipt_id}`) return json(RECEIPT_DETAIL);
+    if (path.startsWith("/api/finance/ledger/entries/")) return json(entryDetail(decodeURIComponent(path.split("/").pop() ?? "")));
+  }
+  if (url.includes("/api/finance/payables/bills/delivery-orders")) return json(DELIVERY_PARTNERS);
   if (url.includes("/api/finance/payables/bills")) return json({ rows: BILLS });
   if (url.includes("/api/finance/payables/vouchers")) return json({ rows: VOUCHERS });
   if (url.includes("/api/finance/payables/outstanding")) return json({ rows: OUTSTANDING });
-  if (url.includes("/api/finance/payables/bill-outstanding")) return json({ rows: [] });
+  if (url.includes("/api/finance/payables/bill-outstanding")) return json({ rows: BILL_OUTSTANDING });
+  if (url.includes("/api/finance/payables/notes-to-follow-up/owed"))
+    return json({ credit_count: 2, credit_left: "350.00", debit_count: 1, debit_left: "30.00" });
+  if (url.includes("/api/finance/payables/notes-to-follow-up/nf-")) return json(NOTE_DOC);
+  if (url.includes("/api/finance/payables/notes-to-follow-up")) return json(NOTES);
+  if (url.includes("/api/finance/payables/credit-notes/cn-1/notes-to-follow-up"))
+    return json({ settled: "50.00", left_to_settle: "1600.00", settlements: [], owed: NOTES.rows.slice(0, 1) });
+  if (url.includes("/api/finance/payables/credit-notes/cn-1")) return json(CREDIT_NOTE);
+  if (url.includes("/api/finance/payables/credit-notes")) return json({ rows: CREDIT_NOTES });
+  if (url.includes("/api/finance/payables/debit-notes/dn-1/notes-to-follow-up"))
+    return json({ settled: "0.00", left_to_settle: "780.00", settlements: [], owed: [] });
+  if (url.includes("/api/finance/payables/debit-notes/dn-1")) return json(DEBIT_NOTE);
+  if (url.includes("/api/finance/payables/debit-notes")) return json({ rows: DEBIT_NOTES });
+  if (url.includes("/api/finance/payables/accounts")) return json({ rows: AP_ACCOUNT_CHOICES });
+  if (url.includes("/api/finance/ledger/departments"))
+    return json({ rows: [{ department_type: "SHOWROOM", department_id: "out-1", name: "Bangsar showroom" },
+      { department_type: "DEALER", department_id: "dl-1", name: "Ace Furniture" },
+      { department_type: "SUBSCRIPTION", department_id: null, name: "Subscription" },
+      { department_type: "OFFICE", department_id: null, name: "Office" }] });
   if (url.includes("/api/finance/payables/suppliers"))
-    return json({ rows: OUTSTANDING.map((o) => ({ id: o.supplier_id, name: o.supplier_name, kind: o.supplier_kind })) });
+    return json({ rows: OUTSTANDING.map((o) => ({ id: o.supplier_id, name: o.supplier_name, kind: o.supplier_kind, code: CODE_OF[o.supplier_id] ?? null })) });
+  if (url.includes("/api/finance/payables/supplier-finance")) return json({ rows: SUPPLIER_FINANCE.map((r) => ({ ...r, code: CODE_OF[r.supplier_id] ?? null })) });
+  if (url.includes("/api/finance/payables/aging")) {
+    const a = AP_AGING(q.get("asAt") ?? TODAY);
+    return json({ ...a, suppliers: a.suppliers.map((x) => ({ ...x, code: CODE_OF[x.supplier_id] ?? null })) });
+  }
+  if (url.includes("/api/finance/ledger/ar-aging")) return json(AR_AGING(q.get("asAt") ?? TODAY));
   if (url.includes("/api/finance/payables/")) return json({ rows: [] });
-  if (url.includes("/api/finance/other-money-in/parties")) return json(PARTIES);
+  if (url.includes("/api/finance/ledger/daily-bank")) return json(DAILY_BANK(q.get("day") ?? TODAY));
+  if (url.includes("/api/finance/ledger/cash-flow")) return json(CASH_FLOW(q.get("from") ?? TODAY, q.get("to") ?? TODAY));
+  if (url.includes("/api/finance/ledger/general-ledger")) return json(GENERAL_LEDGER(q.get("from") ?? TODAY, q.get("to") ?? TODAY));
+  if (url.includes("/api/finance/ledger/stock-value")) return json(STOCK_VALUE(q.get("monthEnd") ?? TODAY));
+  if (url.includes("/api/finance/ledger/collection"))
+    return json({ from: q.get("from") ?? TODAY, to: q.get("to") ?? TODAY, orders: COLLECTION_ORDERS });
+  if (url.includes("/api/finance/other-money-in/parties")) return json(PARTIES.map((x, i) => ({ ...x, code: PARTY_CODES[i] ?? null })));
   if (url.includes("/api/finance/other-money-in/invoices")) return json(DEBTOR_INVOICES);
   if (url.includes("/api/finance/other-money-in/receipts")) return json(RECEIPTS);
   if (url.includes("/api/finance/other-money-in/me")) return json({ mayCancel: true });
   if (url.includes("/api/finance/other-money-in/accounts")) return json([]);
-  if (url.includes("/api/finance/ledger/entries/")) return json({ entry: ENTRIES[0], lines: [], related: [] });
   if (url.includes("/api/finance/ledger/entries")) return json({ rows: ENTRIES, total: ENTRIES.length });
+  if (url.includes("/api/finance/ledger/item-groups")) return json(ITEM_GROUPS);
+  if (url.includes("/api/finance/ledger/posting-accounts")) return json(POSTINGS);
+  if (url.includes("/api/finance/payment-settings/methods")) return json(PAYMENT_METHODS);
+  if (url.includes("/api/finance/dealer-commission/statement/")) return json(DC_STATEMENT);
+  if (url.includes("/api/finance/dealer-commission/payment-choices")) return json(DC_CHOICES);
+  if (url.includes("/api/finance/dealer-commission/rules")) return json({ today: TODAY, rules: [], dealers: [], models: [], categories: [] });
+  if (url.includes("/api/finance/dealer-commission")) return json(dcSource(q.get("month") ?? TODAY.slice(0, 7)));
+  if (url.includes("/api/finance/ledger/accounts") && PAGE === "money-accounts")
+    return json({ go_live_on: GO_LIVE, accounts: SETTINGS_CHART, roles: { MONEY_ACCOUNTS_HEADING: "310-0000", CLEARING_ACCOUNTS_HEADING: "315-0000" },
+      money_accounts: MONEY_ACCOUNT_ROWS.map((m) => m.code), system_accounts: [], rule_headings: [],
+      sections: [{ section: "CURRENT ASSETS", kind: "ASSET", sort_order: 50 }] });
   if (url.includes("/api/finance/ledger/accounts"))
     return json({ go_live_on: GO_LIVE, accounts: ACCOUNTS.map(([code, name, kind]) => ({ code, name, kind, parent_code: null,
       is_control: code === "1200" || code === "2100", control_for: null, is_active: true, is_header: false })) });
   if (url.includes("/api/finance/ledger/trial-balance")) return json({ ...TB, as_of: q.get("asOf") ?? TODAY });
-  if (url.includes("/api/finance/ledger/profit-and-loss")) return json(plRows(q.get("from") ?? "", q.get("to") ?? ""));
+  if (url.includes("/api/finance/ledger/forecast")) return json(FORECAST(q.get("month") ?? TODAY.slice(0, 7)));
+  if (url.includes("/api/finance/ledger/profit-and-loss")) {
+    return json((PAGE.startsWith("forecast") ? forecastPl : plRows)(q.get("from") ?? "", q.get("to") ?? ""));
+  }
+  if (url.includes("/api/finance/ledger/report-drill")) return json(reportDrill(q.get("account") ?? "", q.get("from") ?? GO_LIVE, q.get("to") ?? TODAY));
   if (url.includes("/api/finance/ledger/balance-sheet")) return json(bsRows(q.get("asOf") ?? ""));
   if (url.includes("/api/finance/payment-settings"))
     return json({ bank_accounts: [], manual_methods: [], storage_rules: [], collection_timing: [], setting_changes: [],
       online_provider: { name: "Stripe", configured: false } });
   if (url.includes("/api/finance/payment-storage")) return json({ cases: [], requests: [] });
+  // 0704: a person's saved layouts, one invented for Bills.
+  if (url.includes("/api/operation/register-layouts"))
+    return json(url.includes("finance_bills")
+      ? { layouts: [{ id: "l-1", name: "Month end", layout: { order: [], hidden: [], widths: {}, sort: null }, is_default: false, updated_at: TODAY }], limit: 10 }
+      : { layouts: [], limit: 10 });
   if (url.includes("/rest/")) return json([]);
   return json({}, 404);
 };
@@ -332,14 +1135,47 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
 const ROUTES: Record<string, string> = {
   ar: "/finance/ar",
   bills: "/finance/bills",
+  "bill-new": "/finance/bills/new?supplier=s-6",
   "payment-vouchers": "/finance/payment-vouchers",
   "ap-outstanding": "/finance/ap-outstanding",
+  suppliers: "/finance/suppliers",
+  "daily-bank": "/finance/daily-bank",
   "other-debtors": "/finance/other-debtors",
   "other-debtor-parties": "/finance/other-debtors?view=parties",
   "other-receipts": "/finance/other-receipts",
   journal: "/finance/ledger",
+  "opening-balances": "/finance/ledger/opening-balances",
   "trial-balance": "/finance/ledger/trial-balance",
+  // The old address, to see it open the Profit and Loss.
   reports: "/finance/reports",
+  "profit-and-loss": "/finance/reports/profit-and-loss",
+  "balance-sheet": "/finance/reports/balance-sheet",
+  "cash-flow": "/finance/reports/cash-flow",
+  "general-ledger": "/finance/ledger/general-ledger",
+  "ap-aging": "/finance/reports/ap-aging",
+  "ar-aging": "/finance/reports/ar-aging",
+  "credit-notes": "/finance/credit-notes",
+  "credit-note": "/finance/credit-notes/cn-1",
+  "credit-note-new": "/finance/credit-notes/new",
+  "debit-notes": "/finance/debit-notes",
+  "debit-note": "/finance/debit-notes/dn-1",
+  "debit-note-new": "/finance/debit-notes/new",
+  "voucher-pays-debit-note": "/finance/payment-vouchers/new?supplier=s-1&debitNote=dn-1",
+  "notes-to-follow-up": "/finance/notes-to-follow-up",
+  "note-to-follow-up": "/finance/notes-to-follow-up/nf-1",
+  "stock-value": "/finance/reports/stock-value",
+  collection: "/finance/reports/collection",
+  "payment-requests": "/finance/payment-requests",
+  "payment-request": "/finance/payment-requests/prq-0",
+  "payment-request-new": "/finance/payment-requests/new",
+  "request-access": "/finance/settings?tab=requests",
+  "posting-accounts": "/finance/settings?tab=posting",
+  "card-payout-banks": "/finance/settings?tab=card",
+  "money-accounts": "/finance/settings",
+  "item-groups": "/finance/settings?tab=groups",
+  "dealer-commission": "/finance/reports/dealer-commission",
+  "dealer-statement": "/finance/reports/dealer-commission?view=statement",
+  forecast: `/finance/reports/forecast?month=${monthBefore(TODAY.slice(0, 7))}`,
 };
 window.history.replaceState(null, "", ROUTES[PAGE] ?? ROUTES.ar);
 

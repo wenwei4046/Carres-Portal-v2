@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useLocation } from "react-router-dom";
 import {
   groupSelectionsIntoDocuments,
   soBatchPurchaseResponseSchema,
@@ -15,6 +15,9 @@ import { fmtDate } from "@/lib/fmt-date";
 import Button from "@/components/kit/Button";
 import SoBatchRegister from "./so-batch/SoBatchRegister";
 import SoBatchIssueWorkspace from "./so-batch/SoBatchIssueWorkspace";
+import PoSupplierResultPanel, { useVisiblePoResults } from "./so-batch/PoSupplierResultPanel";
+import { readPoSupplierPreparation } from "./so-batch/PoSupplierBundle";
+import type { IssuedPo } from "./components/PoIssueEvidence";
 
 /**
  * SO BATCH PURCHASE — the orchestrator, and nothing else
@@ -44,6 +47,8 @@ const QUERY_KEY = ["so-batch-purchase"] as const;
 
 export default function OperationToOrder() {
   const queryClient = useQueryClient();
+  const location = useLocation();
+  const restoredPos = Array.isArray(location.state?.soBatchIssuedPos) ? location.state.soBatchIssuedPos as IssuedPo[] : [];
   const [searchParams, setSearchParams] = useSearchParams();
   const scopeSo = searchParams.get("so");
   /* ⭐ THE PO WINDOW SCOPE (Purchasing §5.6.1). Work's window card opens this
@@ -52,6 +57,13 @@ export default function OperationToOrder() {
   const scopeWindow = searchParams.get("window");
   const windowParts = scopeWindow ? parsePoWindowKey(scopeWindow) : null;
   const [selections, setSelections] = useState<SoBatchSelection[] | null>(null);
+  const [issuedPos, setIssuedPos] = useState<IssuedPo[]>(restoredPos);
+  const [resultsOpen, setResultsOpen] = useState(restoredPos.length > 0);
+  const [resultPreparation, setResultPreparation] = useState(() => readPoSupplierPreparation(location.state?.soBatchPreparation));
+  const [resultRoundWindow, setResultRoundWindow] = useState<string | undefined>(resultPreparation?.roundWindow ?? (windowParts ? scopeWindow! : undefined));
+  const visiblePoResults = useVisiblePoResults(pos => {
+    setIssuedPos(pos); setResultPreparation(undefined); setResultRoundWindow(undefined); setResultsOpen(true);
+  }, () => setResultsOpen(false));
 
   /**
    * THE PAYLOAD IS PARSED, NOT TRUSTED.
@@ -74,6 +86,8 @@ export default function OperationToOrder() {
     },
   });
 
+  // Every scoped response retains the complete rail projection from the same server read.
+  const railData = q.data ?? queryClient.getQueryData<SoBatchPurchaseResponse>([...QUERY_KEY, null]);
   const data = q.data;
 
   const documents = useMemo(() => {
@@ -138,10 +152,13 @@ export default function OperationToOrder() {
     <>
       {issuing && (
         <SoBatchIssueWorkspace
+          supplierBundle
+          roundWindow={windowParts ? scopeWindow! : undefined}
           documents={documents}
           destinations={data.destinations}
           onBack={backToBuying}
           onDone={finish}
+          onIssued={pos => { setIssuedPos(pos); setResultPreparation(undefined); setResultRoundWindow(windowParts ? scopeWindow! : undefined); setResultsOpen(true); finish(); }}
         />
       )}
       <SoBatchRegister
@@ -158,8 +175,23 @@ export default function OperationToOrder() {
             setSearchParams(next, { replace: true });
           },
         } : undefined}
+        roundNavigation={{
+          rounds: railData?.poRounds ?? [],
+          selected: searchParams.get("time") ?? (windowParts ? windowParts.time : null),
+          onSelect: key => {
+            const next = new URLSearchParams(searchParams);
+            next.delete("window");
+            if (searchParams.get("time") === key) next.delete("time");
+            else next.set("time", key);
+            setSearchParams(next, { replace: true });
+          },
+        }}
         onIssue={setSelections}
+        onOpenPurchaseOrders={poIds => { if (!visiblePoResults.isPending) visiblePoResults.mutate(poIds); }}
+        purchaseOrdersLoading={visiblePoResults.isPending}
       />
+      {resultsOpen && <PoSupplierResultPanel open onOpenChange={setResultsOpen} pos={issuedPos}
+        roundWindow={resultRoundWindow} initialPreparation={resultPreparation} onChanged={finish} />}
     </>
   );
 }

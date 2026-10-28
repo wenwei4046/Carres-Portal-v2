@@ -53,12 +53,10 @@
  *     Headings use `.t-*`. (kit scope)
  *   RULE E — inline `#F7F4EE`: the KPI fill exists ONLY as `.kpi-box` in
  *     index.css. (all web src)
- *   RULE F — row heights: `h-[Npx]` outside {36 panel/KV, 40 list, 52
- *     product-line}; content truncates, the row never grows. (kit scope)
- *     `01-design-tokens.md §7` rules the portal's table row **40**. The old
- *     comment here said 44 — it never matched this file's own code, which has
- *     allowed 36/40/52 throughout. Comment corrected 2026-08-03; no behaviour
- *     changed and the baseline did not move.
+ *   RULE F — row heights: `h-[Npx]` outside the current kit's rows (01 §3–§5,
+ *     v12 11 Oct 2026): 32 item sub-header and buttons · 36 toolbar and
+ *     panel/KV · 40 table header · 44 item row and table footer · 52 product
+ *     line · 54 list row. (kit scope)
  *   RULE G — hand-rolled section chrome: a literal `section-band` class in JSX
  *     outside components/SectionPanel.tsx — render <SectionBand>. (all web src)
  *
@@ -81,7 +79,9 @@ const HEX_RE = /#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b/g;
 const HEX_ALLOW = [/(^|\/)index\.css$/, /design-standard/, /\/lib\/pdf\//, /\/pages\/print\//];
 // Pages that HAVE adopted the shell and must keep it (grows as pages migrate).
 const MUST_USE_SHELL = ["pages/operation/OperationOrdersControl.tsx"];
-const SHELL_IMPORT_RE = /from\s+["']@\/components\/(ListPageShell|PageHeader)["']/;
+// PageHeader stays accepted for the pages that already use it; it is retired, and
+// components/retired-components.test.ts blocks any NEW importer (UI MASTER §0).
+const SHELL_IMPORT_RE = /from\s+["']@\/components\/(ListPageShell|PageHeader|kit\/PageShell)["']/;
 const OPT_OUT_RE = /design-standard:\s*not-a-list-page/;
 const LIST_MARKER_RE = /<table[\s>]|<DataGrid[\s/>]/;
 
@@ -187,7 +187,7 @@ for (const f of MUST_USE_SHELL) {
   if (!files.includes(p)) continue;
   const src = readFileSync(join(ROOT, p), "utf8");
   if (!SHELL_IMPORT_RE.test(src)) {
-    errors.push(`RULE B · shell removed — ${p} must import ListPageShell/PageHeader (docs/UI-KIT.md §A9).`);
+    errors.push(`RULE B · shell removed — ${p} must keep its page shell (ListPageShell or kit PageShell; UI MASTER §0).`);
   }
 }
 for (const f of files) {
@@ -197,7 +197,7 @@ for (const f of files) {
   if (LIST_MARKER_RE.test(src) && !SHELL_IMPORT_RE.test(src) && !OPT_OUT_RE.test(src)) {
     errors.push(
       `RULE B · new List page without shell — ${f} renders a table/DataGrid but does not use ` +
-        `ListPageShell/PageHeader. Adopt the shell (docs/UI-KIT.md §A9) or add ` +
+        `a page shell. Use ListPageShell or kit PageShell (UI MASTER §0) or add ` +
         `\`// design-standard: not-a-list-page\` with a reason.`,
     );
   }
@@ -350,17 +350,16 @@ for (const f of files) {
     }
   }
 
-  // RULE F — row heights (SIZING LAW): panel/KV 36 · list 40 · Items
-  // product-line 52 (thumbnail + 2 lines, the ONE exemption). 44/56 deleted.
+  // RULE F — row heights, the current kit (01 §3–§5, v12 11 Oct 2026).
   {
     let m;
     const hRe = /\bh-\[(\d+)px\]/g;
-    const ROW_HEIGHTS = new Set([36, 40, 52]);
+    const ROW_HEIGHTS = new Set([32, 36, 40, 44, 52, 54]);
     while ((m = hRe.exec(src))) {
       const n = Number(m[1]);
       if (!ROW_HEIGHTS.has(n)) {
         errors.push(
-          `RULE F · row height — ${f}:${lineOf(src, m.index)} h-[${n}px]; rows are 36 panel/KV · 40 list · 52 product-line only — table law, docs/UI-KIT.md §7 (row height is written there by card D0.5c).`,
+          `RULE F · row height — ${f}:${lineOf(src, m.index)} h-[${n}px]; rows are 32 · 36 · 40 · 44 · 52 · 54 only — docs/01-design-tokens.md §3–§5.`,
         );
       }
     }

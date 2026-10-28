@@ -192,9 +192,16 @@ describe("Warehouse Outbound — the unified Register", () => {
   it("keeps a fully loaded but unconfirmed pickup visible without calling it Done", async () => {
     stubApi({ events: deliveryWarehouseScheduleEvents(unitInput({unitId: "U1-260-019", unitHandedOverAt: "2026-09-04T10:00:00Z", unitHasEvidence: true})) });
     mountOutbound();
-    const row = await screen.findByTestId("wo-row-DO-2609-019");
-    expect(row).toHaveTextContent("Driver confirmed 0");
-    expect(row).toHaveTextContent("Loaded, not confirmed by NETS Delivery");
+    await screen.findByTestId("wo-row-DO-2609-019");
+    /* Loaded 1 · Driver confirmed 0 — three columns, and the Loading cell
+       never prints Done while the driver has not confirmed. */
+    expect(screen.getByTestId("wo-count-loaded-DO-2609-019")).toHaveTextContent("1");
+    expect(screen.getByTestId("wo-count-driverConfirmed-DO-2609-019")).toHaveTextContent("0");
+    expect(screen.queryByTestId("wo-loading-done-DO-2609-019")).toBeNull();
+    expect(screen.getByTestId("wo-ship-date-DO-2609-019")).toHaveTextContent("Fri, 4 Sep");
+    /* The difference prints where the row's details live. */
+    fireEvent.click(screen.getByTestId("wo-row-toggle-DO-2609-019"));
+    expect(screen.getByTestId("wo-exception-DO-2609-019")).toHaveTextContent("Loaded, not confirmed by NETS Delivery");
     fireEvent.click(screen.getByTestId("wo-open-loading-DO-2609-019"));
     expect(screen.getByTestId("wo-unit-reason-U1-260-019")).toHaveTextContent("Loaded · Awaiting driver confirmation");
     expect(screen.queryByRole("button", { name: /confirm.*driver/i })).toBeNull();
@@ -214,23 +221,36 @@ describe("Warehouse Outbound — the unified Register", () => {
     expect(within(rail).getByTestId("wo-view-loaded")).toBeInTheDocument();
     // One Site today — the group never renders as a dead one-option control.
     expect(within(rail).queryByText("SITE")).toBeNull();
-    // The column headers speak the shared row grammar.
-    expect(screen.getByText(/Scheduled handover Fri/)).toBeInTheDocument();
-    expect(screen.getByText("Document")).toBeInTheDocument();
+    // The owner's eleven heads, in order (2026-09-25); the composite
+    // Document / Units cells are retired.
+    const HEADS = [
+      "Scheduled handover", "Ship Date", "DO No", "SO No", "Pickup By",
+      "Delivery Location", "Item", "Required", "Loaded", "Driver confirmed",
+    ];
+    for (const name of HEADS) expect(screen.getByRole("button", { name })).toBeInTheDocument();
+    const headers = screen
+      .getAllByRole("button")
+      .map((b) => b.getAttribute("aria-label") ?? b.textContent?.trim() ?? "")
+      .filter((t) => HEADS.includes(t));
+    expect(headers).toEqual(HEADS);
+    expect(screen.queryByRole("button", { name: "Document" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Units" })).toBeNull();
+    expect(screen.getByTestId("wo-date-DO-2609-019")).toHaveTextContent("Fri, 4 Sep");
+    expect(screen.getByTestId("wo-date-DO-2609-019")).toHaveTextContent("Time not provided");
+    expect(screen.getByTestId("wo-pickup-by-DO-2609-019")).toHaveTextContent("NETS Delivery");
+    expect(screen.getByTestId("wo-delivery-location-DO-2609-019")).toHaveTextContent("Petaling Jaya");
+    expect(screen.getByTestId("wo-item-DO-2609-019")).toHaveTextContent("Jager Sofa (Grey)");
     expect(screen.getByTestId("wo-open-loading-DO-2609-019")).toBeInTheDocument();
-    const row = screen.getByTestId("wo-row-DO-2609-019");
-    expect(within(row).getByTestId("wo-driver-DO-2609-019")).toHaveTextContent(
+    // Required / Loaded / Driver confirmed stay three numbers in three cells.
+    expect(screen.getByTestId("wo-count-required-DO-2609-019")).toHaveTextContent("2");
+    expect(screen.getByTestId("wo-count-loaded-DO-2609-019")).toHaveTextContent("0");
+    expect(screen.getByTestId("wo-count-driverConfirmed-DO-2609-019")).toHaveTextContent("0");
+    // The two evidence records and the driver line live in the arrangement's
+    // own work surface.
+    fireEvent.click(screen.getByTestId("wo-open-loading-DO-2609-019"));
+    expect(screen.getByTestId("wo-driver-DO-2609-019")).toHaveTextContent(
       "Waiting for NETS Delivery to assign a driver",
     );
-    // Required / Loaded / Driver confirmed stay three numbers.
-    expect(within(row).getByTestId("outbound-tally-DO-2609-019")).toHaveTextContent(
-      "Required 2 · Loaded 0",
-    );
-    expect(within(row).getByTestId("outbound-tally-DO-2609-019")).toHaveTextContent(
-      "Driver confirmed 0",
-    );
-    // The two evidence records live in the arrangement's own detail.
-    fireEvent.click(screen.getByTestId("wo-open-loading-DO-2609-019"));
     expect(screen.getByTestId("wo-loaded-DO-2609-019")).toHaveTextContent(
       "Warehouse loaded nothing yet",
     );
@@ -252,9 +272,30 @@ describe("Warehouse Outbound — the unified Register", () => {
       ],
     });
     mountOutbound("/operation?tab=warehouse-outbound&do=DO-2609-019&loading=do-19:Carres%20Klang%20Warehouse");
-    const row = await screen.findByTestId("wo-row-DO-2609-019");
-    expect(within(row).getByTestId("wo-driver-DO-2609-019")).toHaveTextContent("Ahmad Rahman");
+    await screen.findByTestId("wo-row-DO-2609-019");
+    expect(screen.getByTestId("wo-driver-DO-2609-019")).toHaveTextContent("Ahmad Rahman");
     expect(screen.getByText("Vehicle VBM 1234")).toBeInTheDocument();
+  });
+
+  it("Loading prints Done only when every required Unit is loaded AND driver-confirmed", async () => {
+    stubApi({
+      events: deliveryWarehouseScheduleEvents(
+        unitInput({
+          unitId: "U1-260-019",
+          unitHandedOverAt: "2026-09-04T10:00:00+08:00",
+          unitDriverConfirmedAt: "2026-09-04T10:30:00+08:00",
+          actualCollectionAt: "2026-09-04T10:30:00+08:00",
+          unitHasEvidence: true,
+          hasCollectionEvidence: true,
+        }),
+      ),
+    });
+    mountOutbound("/operation?tab=warehouse-outbound&view=all");
+    await screen.findByTestId("wo-row-DO-2609-019");
+    expect(screen.getByTestId("wo-count-loaded-DO-2609-019")).toHaveTextContent("1");
+    expect(screen.getByTestId("wo-count-driverConfirmed-DO-2609-019")).toHaveTextContent("1");
+    expect(screen.getByTestId("wo-loading-done-DO-2609-019")).toHaveTextContent("Done");
+    expect(screen.queryByTestId("wo-open-loading-DO-2609-019")).toBeNull();
   });
 
   it("a Schedule deep link opens its exact arrangement already unfolded, with derived per-Unit reasons", async () => {

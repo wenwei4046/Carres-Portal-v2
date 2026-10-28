@@ -76,23 +76,24 @@ describe("AR · Receivables", () => {
     expect(api.urls.some((u) => u.includes("ar-aging"))).toBe(false);
   });
 
-  it("Record receipt opens the drawer with the order's own receipts", async () => {
+  it("a row carries no button: no Record receipt column (Chew 2026-10-21)", async () => {
     show();
     await screen.findByText("Dahlia Suria");
-    fireEvent.click(screen.getByTestId("ar-record-o1"));
+    expect(screen.queryByRole("button", { name: "Record receipt" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: /Record receipt/ })).not.toBeInTheDocument();
+  });
+
+  it("a double-click opens the drawer with the order's own receipts and its Record receipt door", async () => {
+    show();
+    fireEvent.doubleClick(await screen.findByText("Dahlia Suria"));
     const drawer = await screen.findByTestId("ar-drawer");
     expect(within(drawer).getByTestId("ar-drawer-outstanding")).toHaveTextContent("RM 4,970.00");
     expect(within(drawer).getByText("RC-100926-0001")).toBeInTheDocument();
     expect(within(drawer).getByRole("link", { name: "Open invoice" })).toHaveAttribute("href", "/finance/invoices?invoice=i1");
     expect(within(drawer).queryByRole("button", { name: /Issue invoice/i })).not.toBeInTheDocument();
     expect(api.urls.some((u) => u.startsWith("/api/finance/payments?"))).toBe(false);
-  });
-
-  it("the row's Record receipt button opens the drawer with the receipt form already showing", async () => {
-    show();
-    await screen.findByText("Dahlia Suria");
-    fireEvent.click(screen.getByTestId("ar-record-o1"));
-    const drawer = await screen.findByTestId("ar-drawer");
+    expect(within(drawer).queryByRole("button", { name: "Confirm" })).not.toBeInTheDocument();
+    fireEvent.click(within(drawer).getByRole("button", { name: "Record receipt" }));
     expect(within(drawer).getByLabelText("Amount")).toHaveValue("4970");
     expect(within(drawer).getByRole("button", { name: "Confirm" })).toBeInTheDocument();
   });
@@ -165,5 +166,36 @@ describe("the empty list says WHY it is empty", () => {
     expect(await screen.findByText("No order owing money matches these filters")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Clear filters" })).toHaveLength(1);
     expect(screen.queryByText("No customer owes money.")).not.toBeInTheDocument();
+  });
+});
+
+/* Row menu (Chew 2026-10-21, Finance MASTER §4.2): an order owing money is not
+   a Finance document, so a double-click still opens its drawer; the right-click
+   menu is that same View, then Record receipt (the row itself carries no button). */
+describe("AR · Receivables row menu", () => {
+  const menuWords = () => Array.from(screen.getByRole("menu", { name: "Row actions" }).children)
+    .map((el) => (el.getAttribute("role") === "separator" ? "─" : el.textContent ?? ""));
+
+  it("is View, then Record receipt after one divider", async () => {
+    show();
+    fireEvent.contextMenu(await screen.findByText("Dahlia Suria"));
+    expect(menuWords()).toEqual(["View", "─", "Record receipt"]);
+  });
+
+  it("View opens the order's drawer without the receipt form", async () => {
+    show();
+    fireEvent.contextMenu(await screen.findByText("Dahlia Suria"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "View" }));
+    const drawer = await screen.findByTestId("ar-drawer");
+    expect(within(drawer).queryByRole("button", { name: "Confirm" })).not.toBeInTheDocument();
+  });
+
+  it("Record receipt opens the drawer with the receipt form already showing", async () => {
+    show();
+    fireEvent.contextMenu(await screen.findByText("Dahlia Suria"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Record receipt" }));
+    const drawer = await screen.findByTestId("ar-drawer");
+    expect(within(drawer).getByLabelText("Amount")).toHaveValue("4970");
+    expect(within(drawer).getByRole("button", { name: "Confirm" })).toBeInTheDocument();
   });
 });

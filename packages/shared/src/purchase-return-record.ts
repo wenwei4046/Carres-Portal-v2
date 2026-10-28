@@ -24,7 +24,7 @@ import { carresExecutionLabel, customerResolutionLabel } from "./supplier-claim"
 import { klDateOfIso } from "./supplier-claim-record";
 import type { PurchaseReturnListRow } from "./purchase-return";
 import { purchaseReturnCollectedQty, purchaseReturnQty } from "./purchase-return";
-import { PURCHASING_OFFICE_OFF_DAYS } from "./purchasing-supplier-calls";
+import { purchasingOfficeDays, type PurchasingOfficeDays } from "./purchasing-supplier-calls";
 import { myHolidaySet } from "./my-holidays";
 import { addWorkingDays, countWorkingDays, subtractWorkingDays, type IsoDate } from "./working-days";
 import type { WorkItem } from "./work-engine";
@@ -75,6 +75,10 @@ export function supplierClaimLegacyWords(c: { carres_execution?: string | null; 
 export const RECORD_WHAT_CARRES_DOES_NEXT = "Record what Carres does next";
 export const WHAT_CARRES_DOES_NOT_RECORDED = "What Carres does · Not recorded";
 export const ISSUE_PURCHASE_RETURN = "Issue Purchase Return";
+/** 0706 §2 (Houzs way, Weisiang 2026-10-22): the claimless door's verb. */
+export const ISSUE_CONSIGNMENT_RETURN = "Issue Consignment Return";
+/** 0706 §2: the Consignment Returns register's create button. */
+export const NEW_CONSIGNMENT_RETURN = "New Consignment Return";
 export const RETURN_DOCUMENT_SENT = "Return document sent to supplier";
 export const NO_RETURN_WAS_ISSUED = "No return was issued.";
 
@@ -159,7 +163,14 @@ export interface PurchaseReturnIssueUnit {
 }
 
 export interface PurchaseReturnIssueSource {
-  claim_id: string;
+  /** null = a return with no claim: `New Purchase Return` (Weisiang's decision,
+   *  Mr Lim, WhatsApp 2026-10-22, overturning Jess's "only after an approved
+   *  claim"), or a claimless Consignment Return (0706 §2, `consignment`). */
+  claim_id: string | null;
+  /** 0706 §2: true when this source is for a claimless Consignment Return. */
+  consignment?: boolean;
+  /** The supplier a claimless return is issued to. */
+  supplier_id?: string;
   claim_no: string | null;
   supplier_name: string | null;
   /** Return To as the door resolves it (owner ruling 2026-09-29): the
@@ -207,6 +218,8 @@ export function purchaseReturnIssueMissing(source: PurchaseReturnIssueSource, pi
 export interface PurchaseReturnPrintData {
   /** null while issuing: the preview is the document it WILL be. */
   pr_no: string | null;
+  /** 0706: prints CONSIGNMENT RETURN over GOING BACK goods. */
+  is_consignment?: boolean;
   pr_doc_date: string;
   supplier: { name: string; contact: string | null };
   return_to: string | null;
@@ -241,7 +254,8 @@ export interface PurchaseReturnWorkOccurrence {
   requiredResult: string;
 }
 
-const office = (holidays: ReadonlySet<string>) => ({ offDays: PURCHASING_OFFICE_OFF_DAYS, holidays });
+/** The stored Office calendar (weekdays + holidays) — `purchasingOfficeDays`. */
+const office = (holidays: PurchasingOfficeDays) => purchasingOfficeDays(holidays);
 
 function klDate(iso: string): IsoDate {
   return new Date(new Date(iso).getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -251,7 +265,7 @@ function workItem(
   input: { ruleKey: PurchaseReturnWorkRule; ref: string; objectId: string; action: string; due: IsoDate | null },
   owner: WorkspaceDutyResolution | null,
   today: IsoDate,
-  holidays: ReadonlySet<string>,
+  holidays: PurchasingOfficeDays,
 ): WorkItem {
   const late = input.due && input.due < today ? countWorkingDays(input.due, today, office(holidays)) : 0;
   return {
@@ -283,7 +297,7 @@ export function purchaseReturnIssueWork(
   claim: PurchaseReturnPendingIssue,
   owner: WorkspaceDutyResolution | null,
   today: IsoDate,
-  holidays: ReadonlySet<string> = myHolidaySet(),
+  holidays: PurchasingOfficeDays = myHolidaySet(),
 ): PurchaseReturnWorkOccurrence {
   const supplier = claim.supplier_name ?? "the supplier";
   const decided = claim.carres_execution_at ? klDate(claim.carres_execution_at) : null;
@@ -306,7 +320,7 @@ export function purchaseReturnWorkItems(
   pr: PurchaseReturnDetail,
   owner: WorkspaceDutyResolution | null,
   today: IsoDate,
-  holidays: ReadonlySet<string> = myHolidaySet(),
+  holidays: PurchasingOfficeDays = myHolidaySet(),
 ): PurchaseReturnWorkOccurrence[] {
   const supplier = pr.supplier_name ?? "the supplier";
   const ref = pr.pr_no ?? "Not issued";
@@ -314,7 +328,7 @@ export function purchaseReturnWorkItems(
     workItem({ ruleKey, ref, objectId: pr.id, action, due }, owner, today, holidays);
   const out: PurchaseReturnWorkOccurrence[] = [];
   const pickup = purchaseReturnPickupState(pr);
-  if (pickup === "Fully picked up") return out;
+  if (pickup === "Fully picked up" || pr.cancelled_at) return out;
 
   if (!purchaseReturnSendLine(pr).sent) {
     const docDate = pr.pr_doc_date ? klDate(pr.pr_doc_date) : null;
@@ -343,7 +357,7 @@ export function purchaseReturnWorkItems(
     if (today > date && pickup === "Not picked up") {
       out.push({
         item: make(PURCHASE_RETURN_WORK_RULE.pickupMissed, "Follow up supplier", date),
-        problem: "Pickup missed",
+        problem: "Pickup date passed",
         requiredResult: "The goods are picked up, or a new pickup date is confirmed",
       });
     }
@@ -362,7 +376,8 @@ export function projectPurchaseReturnWork(input: {
   poDuty: WorkspaceDutyResolution | null;
   today: IsoDate;
   observedAt?: string;
-  holidays?: ReadonlySet<string>;
+  /** The stored Office calendar (`officeWorkingDayOptions`) or a holiday set. */
+  holidays?: PurchasingOfficeDays;
 }): OperationWorkItem[] {
   const holidays = input.holidays ?? myHolidaySet();
   const observed = input.observedAt ? { observedAt: input.observedAt } : {};

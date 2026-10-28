@@ -29,18 +29,18 @@ import {
   CHANGE_LOGISTICS_REASONS,
   DELIVERY_TIME_SLOTS,
   isLogisticsChange,
-  isSundayIso,
   laterThanRequested,
-  myHolidaySet,
   parseEmergencyContact,
   unitIdOf,
   type DeliveryWorkStatusTone,
   type InformationReceivedFrom,
 } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
+import { useDeliveryDays } from "@/lib/deadline-queries";
 import { apiFetch, ApiError } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { displayCustomerName } from "@/lib/customer-name";
+import { CardEditorButtons } from "@/components/kit/CompactModuleCard";
 import Panel from "@/components/kit/Panel";
 import Button from "@/components/kit/Button";
 import DatePicker from "@/components/kit/DatePicker";
@@ -49,6 +49,7 @@ import Input from "@/components/kit/Input";
 import Textarea from "@/components/kit/Textarea";
 import {
   useDeliveryPartners,
+  useDeliverySettings,
   useDeliveryArrangements,
   useRecordCannotDeliver,
   useSalesOrderExpansion,
@@ -84,7 +85,7 @@ const CONNECT_AT_PANEL = "22px";
 function Fact({ label, value, problem = false }: { label: string; value: ReactNode; problem?: boolean }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-0.5">
-      <span className="shrink-0 text-label text-kit-slate-11">{label}</span>
+      <span className="shrink-0 text-meta text-kit-slate-11">{label}</span>
       <span className={`min-w-0 text-right text-body ${problem ? "text-kit-amber-11" : "text-kit-slate-12"}`}>
         {value}
       </span>
@@ -155,9 +156,9 @@ function ReplyProofField({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-label text-kit-slate-11">{MONITOR_COPY.whatsappProof}</span>
+      <span className="text-meta text-kit-slate-11">{MONITOR_COPY.whatsappProof}</span>
       <div className="flex items-center gap-2">
-        <label className="inline-flex cursor-pointer items-center rounded-control border border-kit-slate-6 bg-white px-2 py-1 text-label font-medium text-kit-slate-12 hover:bg-kit-slate-3">
+        <label className="inline-flex cursor-pointer items-center rounded-control border border-kit-slate-6 bg-white px-2 py-1 text-body font-medium text-kit-slate-12 hover:bg-kit-slate-3">
           {busy ? "…" : path ? MONITOR_COPY.replaceReply : MONITOR_COPY.uploadReply}
           <input
             id={id}
@@ -173,9 +174,9 @@ function ReplyProofField({
             }}
           />
         </label>
-        {path ? <span className="text-label text-kit-green-11">{MONITOR_COPY.replyAttached}</span> : null}
+        {path ? <span className="text-meta text-kit-green-11">{MONITOR_COPY.replyAttached}</span> : null}
       </div>
-      {error ? <span className="text-label text-kit-red-11">{error}</span> : null}
+      {error ? <span className="text-meta text-kit-red-11">{error}</span> : null}
     </div>
   );
 }
@@ -188,6 +189,7 @@ export function DeliveryDatesEdit({
   card,
   onDone,
   layout = "stack",
+  compact = false,
 }: {
   card: DeliveryMonitorCard;
   onDone: () => void;
@@ -195,6 +197,7 @@ export function DeliveryDatesEdit({
    *  same fields and the same save, three per row, 36px buttons. The
    *  Requested date is on the Route already, so the card repeats no fact. */
   layout?: "stack" | "grid";
+  compact?: boolean;
 }) {
   const row = card.scope;
   const arrangement = row.arrangement;
@@ -202,19 +205,21 @@ export function DeliveryDatesEdit({
   const partner = card.logisticsPartnerName;
   const save = useSaveDeliveryArrangement(card.orderId, leg);
   const proof = useReplyProofUpload(card.orderId, leg);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [date, setDate] = useState<string | null>(card.confirmedDate);
   const [time, setTime] = useState<string | undefined>(card.confirmedTime ?? undefined);
   const [from, setFrom] = useState<InformationReceivedFrom | undefined>(
-    partner ? "partner" : "customer",
+    compact ? undefined : partner ? "partner" : "customer",
   );
   const [proofPath, setProofPath] = useState<string | null>(arrangement?.reply_proof_path ?? null);
-  const holidays = useMemo(() => myHolidaySet(), []);
+  /* THE Delivery calendar: Sunday + its holidays (stored Selangor, else built-in). */
+  const deliveryDays = useDeliveryDays();
 
   const requestedIso = row.customerDeliveryIso;
   const later = laterThanRequested(date, requestedIso);
   const needsReply = later && !proofPath;
-  const dayRefused = date && (isSundayIso(date) || holidays.has(date)) ? MONITOR_COPY.notDeliveryDay : undefined;
-  const canSave = Boolean(date) && !needsReply && !dayRefused && !save.isPending && !proof.busy;
+  const dayRefused = date && deliveryDays.refusal(date) ? MONITOR_COPY.notDeliveryDay : undefined;
+  const canSave = Boolean(date) && (!compact || Boolean(from)) && !needsReply && !dayRefused && !save.isPending && !proof.busy;
 
   const fromOptions = [
     ...(partner ? [{ value: "partner", label: partner }] : []),
@@ -229,7 +234,7 @@ export function DeliveryDatesEdit({
         partnerId: card.logisticsPartnerId,
         confirmedDate: date,
         confirmedTime: time ?? null,
-        expectedArrival: arrangement?.expected_arrival ?? null,
+        expectedArrival: arrangement?.expected_arrival?.slice(0, 5) ?? null,
         logisticsNote: arrangement?.logistics_note ?? null,
         replyProofPath: proofPath,
         driverName: arrangement?.driver_name ?? null,
@@ -240,7 +245,9 @@ export function DeliveryDatesEdit({
       toast.success(MONITOR_COPY.deliveryConfirmedDone(fmtDate(date), time ?? null));
       onDone();
     } catch (err) {
-      toast.error(err instanceof ApiError || err instanceof Error ? err.message : MONITOR_COPY.uploadFailed);
+      const message = err instanceof Error ? err.message : MONITOR_COPY.uploadFailed;
+      setSaveError(message);
+      toast.error(message);
     }
   };
 
@@ -249,6 +256,7 @@ export function DeliveryDatesEdit({
       className="flex flex-col gap-3"
       data-layout={layout}
       data-testid="delivery-brief-dates-edit"
+      data-compact={compact || undefined}
       onSubmit={(e) => {
         e.preventDefault();
         void submit();
@@ -257,7 +265,7 @@ export function DeliveryDatesEdit({
       {layout === "stack" ? (
         <Fact label={MONITOR_COPY.customerRequested} value={requestedDeliveryText({ iso: requestedIso, tbd: row.customerDateTbd })} />
       ) : null}
-      <div className={layout === "grid" ? "grid grid-cols-3 gap-3" : "flex flex-col gap-3"}>
+      <div data-compact-fields={compact || undefined} className={layout === "grid" && !compact ? "grid grid-cols-3 gap-3" : "flex flex-col gap-3"}>
       <DatePicker
         id={`delivery-brief-date-${card.scopeId}`}
         label={MONITOR_COPY.confirmedDateField}
@@ -276,7 +284,9 @@ export function DeliveryDatesEdit({
       <Select
         id={`delivery-brief-from-${card.scopeId}`}
         label={MONITOR_COPY.informationReceivedFrom}
-        value={from}
+        required={compact}
+        placeholder={MONITOR_COPY.pickOne}
+        value={from ?? ""}
         onValueChange={(v) => setFrom(v as InformationReceivedFrom)}
         options={fromOptions}
       />
@@ -292,7 +302,7 @@ export function DeliveryDatesEdit({
         }}
       />
       </div>
-      <div className="flex items-center gap-2">
+      {compact ? <CardEditorButtons onSave={() => void submit()} onCancel={onDone} error={saveError} disabled={!canSave} /> : <div className="flex items-center gap-2">
         <Button
           variant="primary"
           size={layout === "grid" ? "touch" : "sm"}
@@ -305,7 +315,7 @@ export function DeliveryDatesEdit({
         <Button size={layout === "grid" ? "touch" : "sm"} type="button" onClick={onDone} data-testid="delivery-brief-cancel-dates">
           {MONITOR_COPY.cancel}
         </Button>
-      </div>
+      </div>}
     </form>
   );
 }
@@ -317,30 +327,59 @@ export function LogisticsDetailsEdit({
   card,
   onDone,
   linkUrl = null,
+  compact = false,
 }: {
   card: DeliveryMonitorCard;
   onDone: () => void;
   linkUrl?: string | null;
+  compact?: boolean;
 }) {
   const row = card.scope;
   const arrangement = row.arrangement;
   const leg = card.leg ?? 0;
   const partnersQ = useDeliveryPartners();
+  const fleetQ = useDeliverySettings();
   const partners = useMemo(() => partnersQ.data?.partners ?? [], [partnersQ.data]);
   const save = useSaveDeliveryArrangement(card.orderId, leg);
   const cannot = useRecordCannotDeliver(card.orderId, leg);
   const proof = useReplyProofUpload(card.orderId, leg);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [partnerId, setPartnerId] = useState<string | undefined>(
     card.logisticsPartnerId ?? defaultPartnerFor([row], partners) ?? undefined,
   );
   const [reason, setReason] = useState<string | undefined>(undefined);
   const [driver, setDriver] = useState(arrangement?.driver_name ?? "");
   const [vehicle, setVehicle] = useState(arrangement?.vehicle ?? "");
+  const [eta, setEta] = useState(arrangement?.expected_arrival?.slice(0, 5) ?? "");
   const [condo, setCondo] = useState(arrangement?.condo_registration ?? "");
   const [proofPath, setProofPath] = useState<string | null>(arrangement?.reply_proof_path ?? null);
   const [cannotOpen, setCannotOpen] = useState(false);
   const [cannotReason, setCannotReason] = useState<string | undefined>(undefined);
   const [cannotNote, setCannotNote] = useState("");
+
+  // Fleet templates supply today's known facts. Existing recorded values remain
+  // readable when a template is renamed/retired; changing company clears them.
+  const fleetOptions = (values: string[], recorded: string) => {
+    const names = [...new Set(values)].sort((a, b) => a.localeCompare(b));
+    return [
+      { value: "__not_recorded__", label: "Not recorded" },
+      ...names.map((name) => ({ value: name, label: name })),
+      ...(recorded && !names.includes(recorded) ? [{ value: recorded, label: recorded, disabled: true }] : []),
+    ];
+  };
+  const driverOptions = fleetOptions(
+    (fleetQ.data?.drivers ?? []).filter((d) => d.partner_id === partnerId && d.active).map((d) => d.name), driver,
+  );
+  const vehicleOptions = fleetOptions(
+    (fleetQ.data?.vehicles ?? []).filter((v) => v.partner_id === partnerId && v.active).map((v) => v.plate), vehicle,
+  );
+  const pickPartner = (next: string) => {
+    if (next !== partnerId) {
+      setDriver("");
+      setVehicle("");
+    }
+    setPartnerId(next);
+  };
 
   const chosen = partners.find((p) => p.id === partnerId) ?? null;
   const changing = isLogisticsChange(card.logisticsPartnerId, partnerId ?? null);
@@ -387,7 +426,7 @@ export function LogisticsDetailsEdit({
         partnerId: partnerId ?? null,
         confirmedDate: card.confirmedDate,
         confirmedTime: card.confirmedTime,
-        expectedArrival: arrangement?.expected_arrival ?? null,
+        expectedArrival: eta || null,
         logisticsNote: arrangement?.logistics_note ?? null,
         replyProofPath: proofPath,
         driverName: trim(driver) || null,
@@ -398,7 +437,9 @@ export function LogisticsDetailsEdit({
       toast.success(`${chosen?.name ?? MONITOR_COPY.partner} assigned`);
       onDone();
     } catch (err) {
-      toast.error(err instanceof ApiError || err instanceof Error ? err.message : MONITOR_COPY.uploadFailed);
+      const message = err instanceof Error ? err.message : MONITOR_COPY.uploadFailed;
+      setSaveError(message);
+      toast.error(message);
     }
   };
 
@@ -421,6 +462,7 @@ export function LogisticsDetailsEdit({
     <form
       className="flex flex-col gap-3"
       data-testid="delivery-brief-logistics-edit"
+      data-compact={compact || undefined}
       onSubmit={(e) => {
         e.preventDefault();
         void submit();
@@ -428,9 +470,9 @@ export function LogisticsDetailsEdit({
     >
       <Select
         id={`delivery-brief-partner-${card.scopeId}`}
-        label={MONITOR_COPY.partner}
+        label={compact && !card.logisticsPartnerId ? MONITOR_COPY.assignLogistics : MONITOR_COPY.partner}
         value={partnerId}
-        onValueChange={setPartnerId}
+        onValueChange={pickPartner}
         placeholder={MONITOR_COPY.pickOne}
         options={partners.map((p) => ({ value: p.id, label: p.name }))}
         required
@@ -446,31 +488,45 @@ export function LogisticsDetailsEdit({
           required
         />
       ) : null}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <Input
+      <div className={compact ? "grid grid-cols-2 gap-3" : "grid grid-cols-1 gap-3 md:grid-cols-2"}>
+        <Select
           id={`delivery-brief-driver-${card.scopeId}`}
           label={MONITOR_COPY.driverName}
-          value={driver}
-          onChange={(e) => setDriver(e.target.value)}
+          value={driver || "__not_recorded__"}
+          options={driverOptions}
+          disabled={!fleetQ.data}
+          hint={fleetQ.isError ? "Not available" : undefined}
+          onValueChange={(value) => setDriver(value === "__not_recorded__" ? "" : value)}
         />
-        <Input
+        <Select
           id={`delivery-brief-vehicle-${card.scopeId}`}
           label={MONITOR_COPY.vehiclePlate}
-          value={vehicle}
-          onChange={(e) => setVehicle(e.target.value)}
+          value={vehicle || "__not_recorded__"}
+          options={vehicleOptions}
+          disabled={!fleetQ.data}
+          hint={fleetQ.isError ? "Not available" : undefined}
+          onValueChange={(value) => setVehicle(value === "__not_recorded__" ? "" : value)}
         />
       </div>
+      <Input
+        id={`delivery-brief-eta-${card.scopeId}`}
+        label={MONITOR_COPY.eta}
+        type="time"
+        value={eta}
+        onChange={(e) => setEta(e.target.value)}
+      />
       {needsCondo ? (
         <Textarea
           id={`delivery-brief-condo-${card.scopeId}`}
           label={MONITOR_COPY.condoRegistration}
-          hint={MONITOR_COPY.condoRegistrationHint}
+          rows={compact ? 2 : 3}
+          hint={compact ? undefined : MONITOR_COPY.condoRegistrationHint}
           value={condo}
           onChange={(e) => setCondo(e.target.value)}
         />
       ) : null}
       {/* The chase — prepared words, never confirmation (Card 05). */}
-      <div className="flex flex-col gap-1 rounded-control border border-kit-slate-5 bg-kit-slate-3 p-2" data-testid="delivery-brief-chase">
+      {!compact ? <div className="flex flex-col gap-1 rounded-control border border-kit-slate-5 bg-kit-slate-3 p-2" data-testid="delivery-brief-chase">
         <pre className="whitespace-pre-wrap font-sans text-body text-kit-slate-12" data-testid="delivery-brief-chase-message">
           {chaseMessage}
         </pre>
@@ -480,7 +536,7 @@ export function LogisticsDetailsEdit({
           </Button>
           {chosen?.whatsapp_group_url ? (
             <a
-              className="text-label text-blue-700 underline-offset-2 hover:underline"
+              className="text-meta text-blue-700 underline-offset-2 hover:underline"
               href={chosen.whatsapp_group_url}
               target="_blank"
               rel="noreferrer"
@@ -488,10 +544,10 @@ export function LogisticsDetailsEdit({
               {MONITOR_COPY.openGroup}
             </a>
           ) : (
-            <span className="text-label text-kit-slate-9">{MONITOR_COPY.groupNotSet}</span>
+            <span className="text-meta text-kit-slate-11">{MONITOR_COPY.groupNotSet}</span>
           )}
         </div>
-        <span className="text-label text-kit-slate-11">{MONITOR_COPY.sentIsNotConfirmed}</span>
+        <span className="text-meta text-kit-slate-11">{MONITOR_COPY.sentIsNotConfirmed}</span>
         <ReplyProofField
           id={`delivery-brief-logistics-proof-${card.scopeId}`}
           path={proofPath}
@@ -503,15 +559,15 @@ export function LogisticsDetailsEdit({
             });
           }}
         />
-      </div>
-      <div className="flex items-center gap-2">
+      </div> : <ReplyProofField id={`delivery-brief-logistics-proof-${card.scopeId}`} path={proofPath} busy={proof.busy} error={proof.error} onFile={file => { void proof.upload(file).then(path => { if (path) setProofPath(path); }); }} />}
+      {compact ? <CardEditorButtons onSave={() => void submit()} onCancel={onDone} error={saveError} disabled={!canSave} /> : <div className="flex items-center gap-2">
         <Button variant="primary" size="sm" type="submit" disabled={!canSave} data-testid="delivery-brief-save-logistics">
           {card.logisticsPartnerId ? MONITOR_COPY.changeLogistics : MONITOR_COPY.assignLogistics}
         </Button>
         <Button size="sm" type="button" onClick={onDone} data-testid="delivery-brief-cancel-logistics">
           {MONITOR_COPY.cancel}
         </Button>
-      </div>
+      </div>}
       {card.logisticsPartnerId && card.logisticsPartnerName ? (
         <div className="border-t border-kit-slate-5 pt-2">
           {!cannotOpen ? (
@@ -696,7 +752,7 @@ export function ItemsServicesStockPanel({
             <thead className="sr-only border-b border-base-200 bg-base-50 xl:not-sr-only xl:table-header-group">
               <tr className="divide-x divide-base-200">
                 {BRIEF_COLUMNS.map((c) => (
-                  <th key={c.key} scope="col" className="px-2 py-1.5 text-label font-semibold uppercase text-base-500">
+                  <th key={c.key} scope="col" className="px-2 py-1.5 text-meta font-medium text-base-500">
                     {c.label}
                   </th>
                 ))}
@@ -708,14 +764,14 @@ export function ItemsServicesStockPanel({
                   <td className="min-w-0 break-words px-2 py-1.5">{line.item}</td>
                   <td className="px-2 py-1.5 tabular-nums">{line.qty}</td>
                   <td className="col-span-2 min-w-0 break-words px-2 py-1.5">
-                    <span className="block text-label text-kit-slate-11 xl:hidden">{MONITOR_COPY.source}</span>
+                    <span className="block text-meta text-kit-slate-11 xl:hidden">{MONITOR_COPY.source}</span>
                     {!line.units?.length ? (
                       absentWord(DW.notAllocated)
                     ) : (
                       line.units.map((u) => (
                         <span key={u.unit} className="block">
                           <span className="block font-mono">{u.unit}</span>
-                          <span className="block text-label">
+                          <span className="block text-meta">
                             {u.po ? (
                               <button
                                 type="button"
@@ -733,11 +789,11 @@ export function ItemsServicesStockPanel({
                     )}
                   </td>
                   <td className={`col-span-2 min-w-0 break-words px-2 py-1.5 ${STATUS_TONE_TEXT[line.statusTone]}`}>
-                    <span className="block text-label text-kit-slate-11 xl:hidden">{MONITOR_COPY.status}</span>
+                    <span className="block text-meta text-kit-slate-11 xl:hidden">{MONITOR_COPY.status}</span>
                     {line.status ?? absentWord(DW.notRecorded)}
                   </td>
                   <td className="col-span-2 min-w-0 break-words px-2 py-1.5">
-                    <span className="block text-label text-kit-slate-11 xl:hidden">{MONITOR_COPY.location}</span>
+                    <span className="block text-meta text-kit-slate-11 xl:hidden">{MONITOR_COPY.location}</span>
                     {line.location ?? absentWord(DW.notRecorded)}
                   </td>
                 </tr>
@@ -917,8 +973,11 @@ export default function DeliveryBrief({
         <LogisticsDetailsEdit card={card} onDone={() => setEditingLogistics(false)} />
       ) : (
         <div data-testid="delivery-brief-logistics">
-          {card.confirmedDate && (!trim(arrangement?.driver_name) || !trim(arrangement?.vehicle) || !pickup.length || !trim(arrangement?.expected_arrival)) ?
-            <p className="mb-2 text-body text-kit-amber-11">{MONITOR_COPY.logisticsIncomplete}</p> : null}
+          {/* `Driver and vehicle not recorded` names the missing facts (owner
+              ruling 2026-09-25, replacing the vague retired word). The
+              ETA and the time are optional and never make this line. */}
+          {card.confirmedDate && (!trim(arrangement?.driver_name) || !trim(arrangement?.vehicle)) ?
+            <p className="mb-2 text-body text-kit-amber-11">{MONITOR_COPY.driverVehicleMissing}</p> : null}
           <Fact
             label={MONITOR_COPY.partner}
             value={partner ?? <span className="text-kit-amber-11">{MONITOR_COPY.noLogistics}</span>}

@@ -1281,6 +1281,7 @@ describe("P15 · the Source a typed demand may carry", () => {
       spare_parts: "Spare Parts",
     });
     expect(demandPurposeLabelOf("ready_stock")).toBe("Ready Stock");
+    expect(demandPurposeLabelOf("general_purchase")).toBe("General Purchase");
     expect(demandPurposeLabelOf("subsidiary_purchase")).toBe("Subsidiary Purchase");
     expect(demandPurposeLabelOf("office")).toBe("Office");
     expect(demandPurposeLabelOf("warranty")).toBe("Warranty");
@@ -1427,7 +1428,7 @@ describe("P18 · proceedWaitedDays", () => {
 
 describe("P18 · the label", () => {
   it("is the four-place live spelling, and not the STATE word `Proceed`", () => {
-    expect(TO_ORDER_WORDS.proceedDate).toBe("Proceed date");
+    expect(TO_ORDER_WORDS.proceedDate).toBe("Planned production start");
     // COPY-STANDARD owns bare `Proceed` as an ORDER STATE (customer confirmed,
     // ready for PO). The date is a different fact and may not wear its word.
     expect(TO_ORDER_WORDS.proceedDate).not.toBe("Proceed");

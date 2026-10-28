@@ -79,7 +79,7 @@ export default function ReorderStockCard() {
 
       <div className="px-4 py-1">
         <div
-          className="grid items-center gap-3 py-1.5 text-label font-semibold uppercase tracking-[0.03em] text-base-400"
+          className="grid items-center gap-3 py-1.5 text-meta font-medium text-base-500"
           style={{ gridTemplateColumns: "1fr 64px 64px 84px 132px 28px" }}
         >
           <span>Item</span>
@@ -128,7 +128,7 @@ function ReorderRow({
           {row.sku}
         </div>
         {row.kind ? (
-          <div className="text-label text-base-500">
+          <div className="text-meta text-base-500">
             {/* `kind` IS the governed word now (`accShort`), so the old
                 M.P → "Protector" translation table is gone — one word, one
                 place. */}
@@ -253,13 +253,13 @@ function PointEditor({ row, onDone }: { row: OpsReorderRow; onDone: () => void }
       </button>
       {save.isError ? (
         <span
-          className="text-label text-danger"
+          className="text-meta text-danger"
           data-testid={`reorder-error-${row.sku}`}
         >
           Not saved
         </span>
       ) : (
-        <span className="text-label text-base-400">0 = off</span>
+        <span className="text-meta text-base-500">0 = off</span>
       )}
     </div>
   );

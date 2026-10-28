@@ -112,6 +112,8 @@ export interface OtherDebtorPartyRow {
   party_id: string;
   name: string;
   kind: FinancePartyKind;
+  /** 0691: Finance's AutoCount-style code, like 305-A001. Absent before 0691. */
+  code?: string | null;
   registration_no: string | null;
   phone: string | null;
   email: string | null;

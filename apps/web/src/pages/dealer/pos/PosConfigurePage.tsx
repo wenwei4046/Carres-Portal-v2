@@ -692,10 +692,10 @@ export default function PosConfigurePage({
       {wizardTopbar && (
         <div className="cfg-wizardbar">
           <ConfigureTopbarBrand ctx={wizardTopbar} onBack={onClose} />
-          <div className="cfg-wizardbar__mobile-main pos-mobile-topbar__main hidden">
+          <div className="cfg-wizardbar__mobile-main pos-mobile-topbar__main pos-tablet-topbar__main hidden">
             <button
               type="button"
-              className="pos-mobile-topbar__icon"
+              className="pos-mobile-topbar__icon pos-tablet-topbar__icon"
               aria-label="Categories unavailable while configuring"
               disabled
             >
@@ -703,18 +703,18 @@ export default function PosConfigurePage({
             </button>
             <button
               type="button"
-              className="pos-wordmark pos-mobile-topbar__wordmark"
+              className="pos-wordmark pos-mobile-topbar__wordmark pos-tablet-topbar__wordmark"
               onClick={onClose}
               aria-label="Back to catalog"
             >
               CARRES
             </button>
-            <span className="pos-topbar__crumb pos-mobile-topbar__context">
+            <span className="pos-topbar__crumb pos-mobile-topbar__context pos-tablet-topbar__context">
               POS · {wizardTopbar.contextLabel}
             </span>
             <button
               type="button"
-              className="pos-mobile-topbar__avatar"
+              className="pos-mobile-topbar__avatar pos-tablet-topbar__avatar"
               aria-label="Staff profile unavailable while configuring"
               disabled
             >
@@ -724,19 +724,21 @@ export default function PosConfigurePage({
             </button>
           </div>
           <nav
-            className="cfg-wizardbar__mobile-steps pos-mobile-topbar__steps hidden"
+            className="cfg-wizardbar__mobile-steps pos-mobile-topbar__steps pos-tablet-topbar__steps hidden"
             aria-label="Order steps"
           >
             {PHONE_WIZARD_STEPS.map((label, index) => (
               <button
                 key={label}
                 type="button"
-                className={`pos-mobile-topbar__step ${index === 0 ? "is-active" : ""}`}
+                className={`pos-mobile-topbar__step pos-tablet-topbar__step ${index === 0 ? "is-active" : ""}`}
                 aria-current={index === 0 ? "step" : undefined}
                 disabled={index !== 0}
               >
-                <span className="pos-mobile-topbar__step-pill">
-                  <span className="pos-mobile-topbar__step-number">{index + 1}</span>
+                <span className="pos-mobile-topbar__step-pill pos-tablet-topbar__step-pill">
+                  <span className="pos-mobile-topbar__step-number pos-tablet-topbar__step-number">
+                    {index + 1}
+                  </span>
                   {label}
                 </span>
               </button>

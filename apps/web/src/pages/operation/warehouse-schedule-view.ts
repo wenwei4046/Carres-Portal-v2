@@ -329,7 +329,7 @@ export function exceptionLinesOf(card: WarehouseScheduleCard): ExceptionLine[] {
   const out: ExceptionLine[] = [];
 
   if (card.overdue) {
-    out.push({ key: "overdue", text: "Overdue", tone: "warning" });
+    out.push({ key: "overdue", text: "Late", tone: "warning" });
   }
 
   const damaged = card.lines.reduce((n, l) => n + (l.damagedQty ?? 0), 0);

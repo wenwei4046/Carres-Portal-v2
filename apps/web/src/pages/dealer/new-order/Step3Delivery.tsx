@@ -112,18 +112,20 @@ export default function Step3Delivery({ draft, onChange, catalog, minLeadDays }:
           </p>
         </div>
 
-        {/* Phase 11.1 (Loo) — Proceed date = the day production should START.
+        {/* Phase 11.1 (Loo) — the day production should START. Named
+            `Planned production start` since the owner ruling of 2026-10-06
+            (two dates, two names: `Proceed Date` is the actual hand-off).
             Picked deliberately so we don't pull stock too early for a far-out
             delivery. Bounded today..deliveryDate. Hidden value when TBD. */}
         <div className="mt-3.5">
-          <Field label="Proceed date · production start *">
+          <Field label="Planned production start *">
             <CalendarDateField
               value={d.proceedDate}
               onChange={(iso) => setD({ proceedDate: iso, asap: false })}
               minIso={todayIso}
               maxIso={d.date || undefined}
               todayIso={todayIso}
-              ariaLabel="Pick proceed date"
+              ariaLabel="Pick planned production start"
               footNote={
                 d.date ? (
                   <>

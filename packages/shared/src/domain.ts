@@ -245,6 +245,24 @@ export interface CatalogFabric {
   sortOrder: number;
   /** 0226 — operation's recorded buying add-on (RM); null = not recorded. */
   cost: number | null;
+  /** 0721 — Houzs stock columns; absent for roles outside operation/principal. */
+  stock?: FabricStock;
+}
+
+/** 0721 — follows Houzs backend/src/scm/routes/fabric-tracking.ts:264-275 per
+ *  Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. Plain
+ *  stored integers (sen / days), typed in or imported; nothing computes them. */
+export interface FabricStock {
+  priceSen: number;
+  sohSen: number;
+  poOutstandingSen: number;
+  lastMonthUsageSen: number;
+  oneWeekUsageSen: number;
+  twoWeeksUsageSen: number;
+  oneMonthUsageSen: number;
+  shortageSen: number;
+  reorderPointSen: number;
+  leadTimeDays: number;
 }
 
 /**

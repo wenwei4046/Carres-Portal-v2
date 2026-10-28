@@ -102,3 +102,13 @@ describe("service configuration — POS parity without losing saved attrs", () =
     expect(resizeService(row, 2)).toEqual({ qty: 2 });
   });
 });
+
+
+describe("structured service quantity presentation", () => {
+  it("prints a repeated size quantity once and preserves mixed-size counts", () => {
+    expect(servicesWords([addon({ addon_key: "dispose-mattress", qty: 2, attrs: { sizes: ["King", "King"], size: "King ×2" } })], nameOfAddon)).toBe("Dispose old mattress · King ×2");
+    expect(servicesWords([addon({ addon_key: "dispose-mattress", qty: 3, attrs: { sizes: ["King", "King", "Queen"], size: "King ×2 + Queen" } })], nameOfAddon)).toBe("Dispose old mattress · King ×2 + Queen");
+    expect(servicesWords([addon({ addon_key: "dispose-mattress", qty: 2, attrs: { size: "King ×2" } })], nameOfAddon)).toBe("Dispose old mattress · King ×2");
+    expect(servicesWords([addon({ addon_key: "dispose-mattress", qty: 2, attrs: { size: "King" } })], nameOfAddon)).toBe("Dispose old mattress · King ×2");
+  });
+});

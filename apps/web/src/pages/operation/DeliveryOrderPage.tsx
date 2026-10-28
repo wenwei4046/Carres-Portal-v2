@@ -10,6 +10,7 @@ import {
   signedDeliveryDocumentOf,
   deliveryReasonLabel,
   deliveryScopeSentence,
+  financeHoldLineOf,
   orderDeliveryGroups,
   type DeliveryGroupKey,
   type OrderActionTone,
@@ -26,10 +27,14 @@ import { useDeliveryOrder, useDeliveryPhotos } from "@/lib/queries";
 import { personInitials, avatarColor } from "@/lib/staff-avatar";
 import SalesOrderTabs from "./SalesOrderTabs";
 import { useOpenWorkSet, type WorkRow } from "./use-open-work";
+import { printDeliveryOrder } from "./record-print";
 import WarehouseHandoverBlock from "./components/WarehouseHandoverBlock";
 import DeliveryResultAction from "./components/DeliveryResultAction";
 import DeliveryEvidencePanel from "./components/DeliveryEvidencePanel";
 import { NO_PROOF_REVIEW, proofReviewOf } from "./delivery-orders-register";
+import { deliveryCost, deliveryFacts, rateCardFor, zoneForPostcode } from "@carres/shared/fleet";
+import { rm } from "@/lib/format-currency";
+import { FL, usePricing } from "./fleet";
 
 /**
  * THE DELIVERY ORDER OBJECT PAGE — read-only facts + doors
@@ -74,10 +79,10 @@ const STATUS_TONE: Record<string, OrderActionTone> = {
 function Fact({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
-      <span className="text-label font-semibold uppercase tracking-wide text-base-500">
+      <span className="text-label uppercase tracking-[0.06em] text-base-500">
         {label}
       </span>
-      <span className="min-w-0 text-body text-base-900">{children}</span>
+      <span className="min-w-0 text-body font-medium text-base-900">{children}</span>
     </div>
   );
 }
@@ -123,6 +128,8 @@ export default function DeliveryOrderPage() {
   const { doId = "" } = useParams();
   const navigate = useNavigate();
   const { data, isLoading, isError, error } = useDeliveryOrder(doId || null);
+  /* 0725 — Rate Cards (Weisiang's decision 2026-10-22, Houzs way; Jess was not part of this decision). */
+  const pricing = usePricing();
 
   const d = data?.deliveryOrder;
   const order = d?.orders;
@@ -212,13 +219,7 @@ export default function DeliveryOrderPage() {
   const openPdf = async () => {
     if (!d || !order) return;
     try {
-      const payload = await apiFetch<DoTemplateData>(
-        `/api/operation/orders/${order.id}/print-do-data?do_number=${encodeURIComponent(d.do_number)}`,
-      );
-      const blob = await renderDoPdf(payload);
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      await printDeliveryOrder(order.id, d.do_number);
     } catch (e) {
       toast.error(
         e instanceof ApiError ? e.message : `Delivery Order ${d.do_number} PDF failed`,
@@ -247,7 +248,7 @@ export default function DeliveryOrderPage() {
         ) : null}
         <button
           type="button"
-          className="rounded-md border border-base-200 bg-white px-3 py-1.5 text-meta font-medium text-base-700 hover:bg-base-50"
+          className="rounded-md border border-base-200 bg-white px-3 py-1.5 text-body font-medium text-base-700 hover:bg-base-50"
           onClick={() => navigate("/operation?tab=delivery")}
         >
           Back to Delivery
@@ -372,7 +373,7 @@ export default function DeliveryOrderPage() {
               type="button"
               data-testid="do-print"
               onClick={() => void openPdf()}
-              className="inline-flex h-7 items-center gap-1.5 rounded-md border border-base-300 bg-white px-2.5 text-meta font-medium text-base-700 hover:bg-base-50"
+              className="inline-flex h-7 items-center gap-1.5 rounded-md border border-base-300 bg-white px-2.5 text-body font-medium text-base-700 hover:bg-base-50"
               title="Reprint carries the same number. The paper the customer signed stays reproducible"
             >
               <Printer size={14} /> Print
@@ -415,6 +416,20 @@ export default function DeliveryOrderPage() {
                 {arrangementPartner?.name || d.logistics_partner || (
                   <Absence>Logistics not assigned when this document was issued</Absence>
                 )}
+              </Fact>
+              {/* 0725 — the cost the Logistics company's rate card computes for this
+                  trip's zone and goods (Weisiang's decision 2026-10-22, Houzs way). */}
+              <Fact label={FL.rateCardCost}>
+                {(() => {
+                  const partnerId = arrangement?.partner_id;
+                  if (!partnerId || !pricing.data) return <Absence>{FL.noRateCard}</Absence>;
+                  const zone = zoneForPostcode(order.customer_address, pricing.data.zones);
+                  const card = rateCardFor(pricing.data.rates, partnerId, zone?.id ?? null);
+                  if (!card) return <Absence>{FL.noRateCard}</Absence>;
+                  // Priced alone, Houzs per-DO tally (threepl-do-charge.ts:12-26) per Weisiang's ruling (2026-10-22).
+                  const facts = deliveryFacts(tripLines, zone?.name ?? null, order.customer_address ?? null);
+                  return `${rm(deliveryCost(card, facts))} · ${zone ? `${FL.zone} ${zone.name}` : FL.noZone}`;
+                })()}
               </Fact>
               <Fact label="Delivery appointment">
                 {arrangement?.confirmed_date || d.delivery_date ? (
@@ -461,7 +476,7 @@ export default function DeliveryOrderPage() {
             </div>
 
             <div className="mt-4 border-t border-base-200 pt-3">
-              <span className="text-label font-semibold uppercase tracking-wide text-base-500">Goods on this trip</span>
+              <span className="text-label uppercase tracking-[0.06em] text-base-500">Goods on this trip</span>
               {tripLines.length === 0 ? (
                 <p className="mt-1">
                   <Absence>No goods lines on this trip. The Sales Order carries the order's goods.</Absence>
@@ -474,18 +489,18 @@ export default function DeliveryOrderPage() {
                         <span className="block truncate text-body font-medium text-base-900">
                           {data?.lineDescriptions[l.sku] ?? l.sku}
                         </span>
-                        <span className="block truncate font-mono text-label text-base-600">{l.sku}</span>
+                        <span className="block truncate font-mono text-meta text-base-500">{l.sku}</span>
                       </span>
                       <span className="shrink-0 text-body tabular-nums text-base-700">× {l.qty}</span>
                     </li>
                   ))}
                 </ul>
               )}
-              {scopeSentence ? <p className="mt-2 text-label text-base-600">{scopeSentence}</p> : null}
+              {scopeSentence ? <p className="mt-2 text-meta text-base-500">{scopeSentence}</p> : null}
             </div>
 
             <div className="mt-4 border-t border-base-200 pt-3" data-testid="do-document">
-              <span className="text-label font-semibold uppercase tracking-wide text-base-500">The document</span>
+              <span className="text-label uppercase tracking-[0.06em] text-base-500">The document</span>
               {documentBlob.url ? (
                 <iframe
                   title={`${d.do_number} document`}
@@ -516,7 +531,7 @@ export default function DeliveryOrderPage() {
                       Delivery on {fmtDate(a.recorded_at)} · {resultWord(a.result)}
                       {a.reason_key ? `: ${deliveryReasonLabel(a.reason_key)}` : ""}
                     </span>
-                    <span className="text-label text-base-600">
+                    <span className="text-meta text-base-500">
                       {a.where_goods ? `Goods: ${whereWord[a.where_goods] ?? a.where_goods}` : "Recorded"}
                       {a.note ? ` · ${a.note}` : ""}
                     </span>
@@ -541,23 +556,23 @@ export default function DeliveryOrderPage() {
                       {e.kind === "handed_over" && e.counterparty ? ` to ${e.counterparty}` : ""}
                       {e.kind === "handed_over" && e.receiver_name ? ` · received by ${e.receiver_name}` : ""}
                     </span>
-                    <span className="text-label text-base-600">
+                    <span className="text-meta text-base-500">
                       {e.recorded_by_name || "Recorded"} · {DUTY_LABEL[e.duty] ?? e.duty}
                       {e.company ? ` · ${e.company}` : ""} · {fmtDate(e.recorded_at)}
                       {e.vehicle ? ` · Vehicle: ${e.vehicle}` : ""}
                     </span>
                     {e.goods && e.goods.length > 0 ? (
-                      <span className="text-label text-base-600">
+                      <span className="text-meta text-base-500">
                         Goods: {e.goods.map((g) => `${g.sku} × ${g.qty}`).join(" · ")}
                       </span>
                     ) : null}
-                    {e.note ? <span className="text-label text-base-600">{e.note}</span> : null}
+                    {e.note ? <span className="text-meta text-base-500">{e.note}</span> : null}
                     {e.proofUrl ? (
                       <a
                         href={e.proofUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-label font-medium text-blue-700 underline-offset-2 hover:underline"
+                        className="text-body font-medium text-blue-700 underline-offset-2 hover:underline"
                       >
                         Open handover proof →
                       </a>
@@ -598,7 +613,7 @@ export default function DeliveryOrderPage() {
                   const unit = Array.isArray(l.ops_stock_items) ? l.ops_stock_items[0] : l.ops_stock_items;
                   const unitId = unitIdOf({ unitCode: unit?.unit_code ?? null, identityScope: unit?.identity_scope ?? null });
                   return (
-                    <li key={l.id} className="text-label text-base-600">
+                    <li key={l.id} className="text-meta text-base-500">
                       {l.status === "on_loan"
                         ? `Loan ${unitId ?? l.loan_note_no ?? "item"} · collect back on delivery day · on loan since ${l.loaned_at ? fmtDate(l.loaned_at) : "the delivery"}`
                         : `${l.loan_note_no ?? "Loan"}${unitId ? ` ${unitId}` : ""} · Returned ${l.returned_at ? fmtDate(l.returned_at) : ""}`}
@@ -621,7 +636,7 @@ export default function DeliveryOrderPage() {
                       {resultWord(a.result)}
                       {a.reason_key ? `: ${deliveryReasonLabel(a.reason_key)}` : ""}
                     </span>
-                    <span className="text-label text-base-600">
+                    <span className="text-meta text-base-500">
                       {fmtDate(a.recorded_at)}
                       {a.where_goods ? ` · Goods: ${whereWord[a.where_goods] ?? a.where_goods}` : ""}
                     </span>
@@ -629,14 +644,16 @@ export default function DeliveryOrderPage() {
                 ))}
                 {openFinance.map((e) => (
                   <li key={e.id} className="flex flex-col">
-                    <span className="text-body text-base-900">Finance is holding this delivery: {e.reason}</span>
-                    <span className="text-label text-base-600">{e.opened_at ? fmtDate(e.opened_at) : "Open"}</span>
+                    {/* COPY (Card 16, re-worded 2026-09-25): `Hold delivery · Finance hold · {reason}`,
+                        one line per open exception, through the shared spelling. */}
+                    <span className="text-body text-base-900">Hold delivery · {financeHoldLineOf([e])}</span>
+                    <span className="text-meta text-base-500">{e.opened_at ? fmtDate(e.opened_at) : "Open"}</span>
                   </li>
                 ))}
                 {pendingApprovals.map((a) => (
                   <li key={a.id} className="flex flex-col">
                     <span className="text-body text-base-900">Payment approval requested: {a.request_reason}</span>
-                    <span className="text-label text-base-600">{a.requested_at ? fmtDate(a.requested_at) : "Requested"}</span>
+                    <span className="text-meta text-base-500">{a.requested_at ? fmtDate(a.requested_at) : "Requested"}</span>
                   </li>
                 ))}
                 {d.voided_at ? (
@@ -647,7 +664,7 @@ export default function DeliveryOrderPage() {
                         ? "the order was cancelled"
                         : "the trip was rescheduled; a new delivery order carries the new date"}
                     </span>
-                    <span className="text-label text-base-600">{fmtDate(d.voided_at)}</span>
+                    <span className="text-meta text-base-500">{fmtDate(d.voided_at)}</span>
                   </li>
                 ) : null}
                 {actionLines.map((i: WorkRow) => (
@@ -655,21 +672,21 @@ export default function DeliveryOrderPage() {
                     {i.ownerId ? (
                       <span
                         aria-hidden="true"
-                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold"
+                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-label font-bold"
                         style={{ backgroundColor: avatarColor(i.ownerId).bg, color: avatarColor(i.ownerId).fg }}
                         title={i.ownerName ?? undefined}
                       >
                         {personInitials(i.ownerName, "")}
                       </span>
                     ) : (
-                      <span className="shrink-0 rounded-full border border-base-200 px-1.5 text-[9px] font-semibold text-base-500">
+                      <span className="shrink-0 rounded-full border border-base-200 px-1.5 text-meta font-medium text-base-500">
                         {i.ownerDuty ?? i.ownerName ?? "No owner yet"}
                       </span>
                     )}
                     <span className="min-w-0">
-                      <span className="block truncate text-body font-semibold text-base-900">{i.action}</span>
+                      <span className="block truncate text-body font-medium text-base-900">{i.action}</span>
                       <span
-                        className={`block truncate text-label font-normal ${i.workingDaysLate > 0 ? "text-danger" : "text-base-600"}`}
+                        className={`block truncate text-meta ${i.workingDaysLate > 0 ? "text-danger" : "text-base-500"}`}
                       >
                         {i.workingDaysLate > 0 && i.dueIso
                           ? `Late: was due ${fmtDate(i.dueIso)}`
@@ -690,7 +707,7 @@ export default function DeliveryOrderPage() {
               {historyEntries.map((h, i) => (
                 <li key={`${h.at}-${i}`} className="flex flex-col">
                   <span className="text-body text-base-900">{h.text}</span>
-                  <span className="text-label text-base-600">
+                  <span className="text-meta text-base-500">
                     {fmtDate(h.at)}
                     {h.meta ? ` · ${h.meta}` : ""}
                   </span>

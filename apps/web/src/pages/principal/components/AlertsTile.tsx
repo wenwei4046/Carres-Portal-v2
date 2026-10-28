@@ -21,7 +21,7 @@ export default function AlertsTile({ alerts, setTab }: Props) {
 
   return (
     <div className="bg-white border border-base-200 rounded-md">
-      <div className="px-[18px] py-3.5 border-b border-base-100 font-display text-strong font-semibold">
+      <div className="px-[18px] py-3.5 border-b border-base-100 font-display text-strong">
         Alerts
       </div>
       {isEmpty ? (
@@ -37,7 +37,7 @@ export default function AlertsTile({ alerts, setTab }: Props) {
             >
               <div className="w-1.5 h-1.5 rounded-full bg-primary" />
               <div className="flex-1 text-meta">{s.name}</div>
-              <div className="font-mono text-label text-base-600">
+              <div className="font-mono text-meta text-base-600">
                 {s.available} left &middot; {s.incoming} incoming
               </div>
             </div>
@@ -52,7 +52,7 @@ export default function AlertsTile({ alerts, setTab }: Props) {
               <div className="flex-1 text-meta">
                 {suspended_dealers} dealer{suspended_dealers > 1 ? "s" : ""} suspended
               </div>
-              <div className="text-label text-base-500">Review &rarr;</div>
+              <div className="text-meta text-base-500">Review &rarr;</div>
             </button>
           )}
         </div>

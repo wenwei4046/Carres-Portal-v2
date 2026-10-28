@@ -223,6 +223,13 @@ export type PoTemplateData = {
   delivery_working_days?: number | null;
   /** `Delivery Method` — collection supplier → `we_collect`. Absent → no row. */
   delivery_method?: "we_collect" | "supplier_delivers" | null;
+  /** A Consignment Order (`purchase_orders.is_consignment`) prints `CONSIGNMENT
+   *  ORDER` and its Unit Prices — Weisiang's decision (Mr Lim, WhatsApp
+   *  2026-10-22), overturning Jess's price-free consignment paper; Jess was not
+   *  part of it. Added by the print route; an ordinary PO never carries these. */
+  consignment?: boolean;
+  /** Unit Price by SKU; null = not recorded (or two prices on one SKU). */
+  line_prices?: Record<string, number | null> | null;
   /** PO-level sales-order refs, from the document authority (0383). */
   so_refs?: number[] | null;
   /**
@@ -235,6 +242,10 @@ export type PoTemplateData = {
     sku: string;
     description: string;
     qty: number;
+    cancelled_qty?:number;
+    received_qty?:number;
+    pending_qty?:number;
+    cancelled_unit_codes?:string[];
     unit: string;
     /** Effective governed destination for this goods line. Older document
      * payloads may omit it, in which case the PO-level destination applies. */

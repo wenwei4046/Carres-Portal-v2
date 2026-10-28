@@ -21,7 +21,7 @@ import {
 } from "@carres/shared";
 import { useAuth } from "@/lib/auth";
 import { appTodayIso } from "@/lib/fmt-date";
-import OperationWork from "@/pages/operation/OperationWork";
+import WorkspaceTasks from "@/pages/operation/tasks/WorkspaceTasks";
 import PreviewFrame from "./preview-frame";
 import "@/index.css";
 
@@ -82,7 +82,7 @@ const FEED: OperationWorkResponse = {
   generatedOn: TODAY,
   closureReceipt: null,
   staff: [{ userId: ME, name: "Shasha", email: "sha@carres.co" }],
-  sources: (["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"] as const).map((key) => ({
+  sources: (["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker", "workspace"] as const).map((key) => ({
     key, state: "healthy" as const, observedAt: `${TODAY}T01:00:00.000Z`, lastSuccessfulAt: `${TODAY}T01:00:00.000Z`, errorLabel: null,
   })),
   items,
@@ -108,7 +108,7 @@ createRoot(document.getElementById("root")!).render(
       <MemoryRouter initialEntries={[start]}>
         <PreviewFrame label="Work · Repair Order items (fixture Repair Orders, real projector)">
           <div className="flex h-full flex-col">
-            <OperationWork />
+            <WorkspaceTasks />
           </div>
         </PreviewFrame>
       </MemoryRouter>

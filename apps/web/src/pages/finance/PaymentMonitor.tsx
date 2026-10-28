@@ -14,15 +14,14 @@ import {
   type PaymentMonitorRow,
   type PaymentWeekDay,
 } from "@carres/shared/payment-monitor";
-import type { CollectionTimingRule } from "@carres/shared/collection-clock";
+import { collectionTimingRulesOf, type CollectionTimingRule } from "@carres/shared/collection-clock";
 import type { OperationWorkItem } from "@carres/shared/operation-work";
-import { myHolidayName, myHolidaySet } from "@carres/shared/my-holidays";
 import { inOrderScope, orderScopeOf } from "@carres/shared/payment-register-scope";
 import {
-  ASSIGN_IN_SALES_ORDERS,
-  ASSIGN_IN_SALES_ORDERS_HREF,
   COLLECTION_NOT_ASSIGNED as NOT_ASSIGNED,
-  NOBODY_ASSIGNED_TO_ORDER as NOBODY_ASSIGNED,
+  MANAGER_ASSIGNS_IN_STAFF_DUTIES,
+  MANAGER_ASSIGNS_IN_STAFF_DUTIES_HREF,
+  NOBODY_ASSIGNED_TO_ORDER,
 } from "@carres/shared/payment-collection-owner";
 import { ChevronLeft, ChevronRight, PanelLeftOpen } from "lucide-react";
 import ListPageShell from "@/components/ListPageShell";
@@ -35,6 +34,7 @@ import {
   useOperationWork,
   usePaymentSettings,
   usePaymentStorageCases,
+  useSalesOrderIdByNumber,
   type operationOrderListRow,
 } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
@@ -49,7 +49,10 @@ import { requestedDeliveryText } from "@/pages/operation/sales-order-columns";
 import { DATE_TO_BE_CONFIRMED_FULL } from "@/pages/operation/sales-order-guidance";
 import InvoiceCalendar, { type CalendarEntryKind } from "./InvoiceCalendar";
 import PaymentCollectionWorkspace from "./PaymentCollectionWorkspace";
+import NewSalesInvoiceDialog from "./NewSalesInvoiceDialog";
+import InvoiceBackdateRequests from "./InvoiceBackdateRequests";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
+import { useDeliveryDays, useOfficeDays, usePersonOwnerCalendars } from "@/lib/deadline-queries";
 
 /**
  * PAYMENT MONITOR — the full-width collection control listing (owner ruling
@@ -162,13 +165,14 @@ type MonitorRow = PaymentMonitorRow & {
 function OwnerChip({ owner }: { owner: OperationWorkItem["owner"] }) {
   const person = owner.acting;
   if (!person?.userId) {
-    /* ⭐ 0504 (owner instruction 2026-09-16 — the stale `Nobody holds Delivery
-       Duty.` hint is cleared): the collection owner is the individual the Sales
-       Order was dealt to, so an unresolved owner means nobody is assigned to
-       THIS order. The word stays short on the fixed row; the full sentence and
-       the one door that fixes it are the link's own name. */
-    return <Link to={ASSIGN_IN_SALES_ORDERS_HREF} className="shrink-0 font-semibold text-kit-red-11 underline underline-offset-2"
-      aria-label={`${NOBODY_ASSIGNED} ${ASSIGN_IN_SALES_ORDERS}`} title={`${NOBODY_ASSIGNED} ${ASSIGN_IN_SALES_ORDERS}`}
+    /* ⭐ 0504 + owner ruling 2026-09-26: the collection owner is the individual
+       the Sales Order was dealt to, so an unresolved owner is a system error a
+       manager fixes. The word stays short on the fixed row (`Not assigned`);
+       the link's own name is the two governed lines in the sheet's one-line
+       spelling, and it opens Settings → Staff & Duties. */
+    const named = joinLines(NOBODY_ASSIGNED_TO_ORDER, MANAGER_ASSIGNS_IN_STAFF_DUTIES);
+    return <Link to={MANAGER_ASSIGNS_IN_STAFF_DUTIES_HREF} className="shrink-0 text-kit-red-11 underline underline-offset-2"
+      aria-label={named} title={named}
       onClick={(event) => event.stopPropagation()}
       data-testid="monitor-owner-unassigned">{NOT_ASSIGNED}</Link>;
   }
@@ -176,7 +180,7 @@ function OwnerChip({ owner }: { owner: OperationWorkItem["owner"] }) {
   const label = personLabel(person.name, "");
   const title = `Assigned to ${label}`;
   return <span
-    className="inline-grid h-5 w-5 shrink-0 place-items-center rounded-full text-label font-semibold"
+    className="inline-grid h-5 w-5 shrink-0 place-items-center rounded-full text-label font-bold"
     style={{ background: colors.bg, color: colors.fg }}
     title={title}
     role="img"
@@ -218,8 +222,16 @@ export default function PaymentMonitor() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const today = appTodayIso();
-  const holidays = useMemo(() => myHolidaySet(), []);
-  const opts = useMemo(() => ({ holidays }), [holidays]);
+  /* ⭐ THE TWO CALENDARS (9 Oct 2026). The payment FACTS (due · ask) and
+     Items & Stock count on THE Delivery calendar (Monday–Saturday + the
+     stored Selangor holidays). The plan's days are the stored Office
+     calendar's; each row's ACTION day steps back on the responsible person's
+     own working days (Office weekdays when none are recorded). */
+  const officeDays = useOfficeDays();
+  const holidays = officeDays.holidays;
+  const deliveryDays = useDeliveryDays();
+  const deliveryHolidays = deliveryDays.holidays;
+  const opts = deliveryDays.opts;
   const isPhone = useIsPhone();
 
   /* ── The rail-collapse memory ─────────────────────────────────────────── */
@@ -241,7 +253,7 @@ export default function PaymentMonitor() {
   /* ⭐ THE PICKED DAY (owner ruling 2026-09-16). Absent = the plan day —
      today when Operation works today, else the next working day. A reader
      without the Work feed has no plan, so its landing is every unpaid order. */
-  const planDay = paymentPlanDay(today, holidays);
+  const planDay = paymentPlanDay(today, holidays, officeDays.offDays);
   const rawDay = params.get("day");
   // A door that names one order (`?order=`) opens on every day — the order
   // is the question, not the plan.
@@ -298,8 +310,8 @@ export default function PaymentMonitor() {
 
   /* ── The rows, through the one shared derivation ──────────────────────── */
   const invoices = useMemo(() => invoicesQ.data ?? [], [invoicesQ.data]);
-  const timingRules = useMemo<CollectionTimingRule[]>(() => (settingsQ.data?.collection_timing ?? [])
-    .map((r) => ({ askDaysBefore: r.ask_days_before, deadlineDaysBefore: r.deadline_days_before, effectiveFrom: r.effective_from })),
+  const timingRules = useMemo<CollectionTimingRule[]>(
+    () => collectionTimingRulesOf(settingsQ.data?.collection_timing ?? []),
     [settingsQ.data]);
   const promisedByOrder = useMemo(() => {
     const map = new Map<string, string>();
@@ -309,6 +321,20 @@ export default function PaymentMonitor() {
     }
     return map;
   }, [invoices]);
+  /* The responsible person per order — the Work feed's own resolved actor
+     (today's cover, else the normal owner) on the order's payment items. */
+  const actorByOrder = useMemo(() => {
+    const orderOfInvoice = new Map(invoices.map((r) => [r.id, r.order_id] as const));
+    const m = new Map<string, string>();
+    for (const item of workQ.data?.items ?? []) {
+      if (item.module !== "payment") continue;
+      const orderId = orderOfInvoice.get(item.object.id);
+      const person = item.owner.acting?.userId ?? item.owner.normal?.userId ?? null;
+      if (orderId && person && !m.has(orderId)) m.set(orderId, person);
+    }
+    return m;
+  }, [invoices, workQ.data]);
+  const ownerOf = usePersonOwnerCalendars([...actorByOrder.values()]);
   const allRows = useMemo(() => paymentMonitorRows({
     invoices,
     cases: casesQ.data?.cases ?? [],
@@ -317,11 +343,18 @@ export default function PaymentMonitor() {
     opts,
     timingRules,
     promisedByOrder,
-  }), [invoices, casesQ.data, requestsQ.data, today, opts, timingRules, promisedByOrder]);
+    owner: officeDays.owner,
+    ownerFor: (orderId) => (actorByOrder.has(orderId) ? ownerOf(actorByOrder.get(orderId)) : null),
+  }), [invoices, casesQ.data, requestsQ.data, today, opts, timingRules, promisedByOrder, officeDays.owner, actorByOrder, ownerOf]);
   const scopedRows = useMemo(
     () => allRows.filter((r) => inOrderScope(r.door, orderScope)),
     [allRows, orderScope],
   );
+  // 0707 — a backdated payment can wait on an order with no Monitor row (no
+  // invoice yet, or nothing owed). The scoped order still shows its waiting
+  // requests so the Payment Approver has a place to decide them.
+  const unlistedScope = canReadWork && orderScope !== null && scopedRows.length === 0 ? orderScope : null;
+  const unlistedOrderQ = useSalesOrderIdByNumber(unlistedScope);
   const workItems = workQ.data?.items;
   // The owner rides ON the row: the shared DataGrid renders a cell from its
   // row data, and a column accessor that read outer state would show the
@@ -330,8 +363,9 @@ export default function PaymentMonitor() {
   // owners — nothing scheduled here.
   const plan = useMemo(() => paymentWeekPlan({
     items: (workItems ?? []).filter((i) => i.module === "payment"),
-    rows: scopedRows, todayIso: today, weekOfIso: weekOf, holidays, holidayName: myHolidayName,
-  }), [workItems, scopedRows, today, weekOf, holidays]);
+    rows: scopedRows, todayIso: today, weekOfIso: weekOf, holidays, holidayName: officeDays.holidayName,
+    offDays: officeDays.offDays,
+  }), [workItems, scopedRows, today, weekOf, holidays, officeDays]);
   const pickedDay = picked === ALL_UNPAID ? null : (plan.days.find((d) => d.iso === picked) ?? null);
   const orderById = useMemo(
     () => new Map((canReadWork ? ordersQ.data?.orders ?? [] : []).map((o) => [o.id, o] as const)),
@@ -346,7 +380,7 @@ export default function PaymentMonitor() {
      its readiness is every line's, through Delivery's own arithmetic. */
   const goodsOf = (r: PaymentMonitorRow, order: operationOrderListRow) => monitorGoodsOf({
     o: order, lines: order.order_lines ?? [], leg: null,
-    requestedIso: r.delivery.requested.iso, todayIso: today, holidays, addonNameByKey,
+    requestedIso: r.delivery.requested.iso, todayIso: today, holidays: deliveryHolidays, addonNameByKey,
   });
   const stockOf = (r: PaymentMonitorRow, order: operationOrderListRow): MonitorStock => {
     const delivered = order.status === "delivered" || !!r.door.orders?.delivered_at;
@@ -453,8 +487,8 @@ export default function PaymentMonitor() {
       accessor: (r) => {
         const action = timingActionText(r);
         return <span className="block min-w-0" data-testid={`monitor-timing-${r.so ?? r.orderId}`}>
-          <span className={`block truncate font-semibold ${r.timing.late ? "text-kit-red-11" : "text-kit-slate-12"}`} title={r.timing.fact}>{r.timing.fact}</span>
-          {action && <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-label font-normal text-kit-slate-11">
+          <span className={`block truncate ${r.timing.late ? "text-kit-red-11" : "text-kit-slate-12"}`} title={r.timing.fact}>{r.timing.fact}</span>
+          {action && <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-meta text-kit-slate-11">
             {r.work && <OwnerChip owner={r.work.owner} />}
             <span className="truncate" title={action}>{action}</span>
           </span>}
@@ -528,7 +562,7 @@ export default function PaymentMonitor() {
               data-testid="payment-monitor-previous-week" onClick={() => moveWeek(-1)}>
               <ChevronLeft size={15} aria-hidden />
             </button>
-            <span className="min-w-0 flex-1 break-words text-center text-body font-semibold text-kit-slate-12"
+            <span className="min-w-0 flex-1 break-words text-center text-body font-medium text-kit-slate-12"
               data-testid="payment-monitor-week-label" aria-label={weekLabel}>
               {/* Each date stays whole: the break falls between the two days,
                   never inside `Fri, 18 Sep`. */}
@@ -598,18 +632,19 @@ export default function PaymentMonitor() {
             : !isPhone
               ? <aside className="flex w-11 shrink-0 flex-col items-center gap-2 border-r border-kit-slate-5 bg-white py-2">
                   {showFiltersButton}
-                  <span className="text-label text-kit-slate-11 [writing-mode:vertical-rl]">Show filters</span>
+                  <span className="text-meta text-kit-slate-11 [writing-mode:vertical-rl]">Show filters</span>
                 </aside>
               : null}
           <div className="flex min-w-0 min-h-0 flex-1 flex-col">
             {!railVisible && <div data-testid="payment-monitor-day-collapsed"
               className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-kit-slate-5 bg-white px-3 py-1.5">
-              {pickedHeading && <span className="text-body font-semibold text-kit-slate-12">{pickedHeading}</span>}
+              {pickedHeading && <span className="text-body font-medium text-kit-slate-12">{pickedHeading}</span>}
               {pickedWords.map((line) => <span key={line} className="text-body text-kit-slate-12">{line}</span>)}
             </div>}
             {/* The governed Register shell; the Finance frame above it is a fixed
                 viewport, so the sheet scrolls INSIDE the page and an opened row
                 never pushes the listing or its footer off screen. */}
+            {unlistedScope !== null && unlistedOrderQ.data && <InvoiceBackdateRequests orderId={unlistedOrderQ.data.id} />}
             <ListPageShell register className="min-h-0 flex-1" testId="payment-monitor-work-list">
               <DataGrid rows={listRows} columns={columns} rowKey={(r) => r.orderId}
                 storageKey="carres.payment.monitor.v2" appearance="reference" exportName="Payment Monitor"
@@ -634,6 +669,9 @@ export default function PaymentMonitor() {
                     <button type="button" className="underline underline-offset-2" onClick={leaveScope}>Show all</button>
                   </span>}
                 </span>}
+                /* Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office staff
+                   open a Sales Invoice by hand, part invoices allowed (Houzs way). */
+                toolbarEnd={<NewSalesInvoiceDialog />}
                 emptyMessage={orderScope !== null
                   ? `SO-${orderScope} needs no payment right now. Its money is in Payment Records.`
                   : picked === ALL_UNPAID
@@ -645,7 +683,7 @@ export default function PaymentMonitor() {
                   fitExpansionToViewport: true,
                   revealExpandedKey: revealKey,
                   renderExpansion: (r) => <PaymentWorkspaceBelow row={r} invoices={invoices} timingRules={timingRules}
-                    today={today} holidays={holidays} addonNameByKey={addonNameByKey} stockAbsence={stockAbsence}
+                    today={today} holidays={deliveryHolidays} addonNameByKey={addonNameByKey} stockAbsence={stockAbsence}
                     focusSection={reveal?.key === r.orderId ? reveal.section : null} onClose={close} />,
                 }}
                 statusSummary={(visible) => {
@@ -684,8 +722,8 @@ function DayCard({ day, active, words, onPick }: {
     ].join(" ")}>
     {active && <span aria-hidden className="absolute left-0 top-1 bottom-1 w-0.5 bg-kit-blue-9" />}
     <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-      <span className="font-semibold text-kit-slate-12">{fmtDate(day.iso)}</span>
-      {day.isToday && <span className="rounded-full border border-kit-blue-9 px-1.5 text-label font-semibold text-kit-blue-11"
+      <span className="font-medium text-kit-slate-12">{fmtDate(day.iso)}</span>
+      {day.isToday && <span className="rounded-full border border-kit-blue-9 px-1.5 text-meta font-medium text-kit-blue-11"
         data-testid="payment-monitor-today">Today</span>}
     </span>
     {day.holiday !== null && <span className="break-words text-meta text-kit-slate-11">
@@ -699,7 +737,7 @@ function DayCard({ day, active, words, onPick }: {
 /** The reference line under the SO number — cut to fit, the whole value a
  *  click or a keypress away (owner ruling 2026-09-16). */
 function TwoLinesRef({ text }: { text: string }) {
-  return <span className="block text-label text-kit-slate-11"><TwoLines reveal line1={text} /></span>;
+  return <span className="block text-meta text-c-secondary"><TwoLines reveal secondary line1={text} /></span>;
 }
 
 const RISK_RANK: Record<PaymentMonitorRow["timing"]["kind"], number> = {

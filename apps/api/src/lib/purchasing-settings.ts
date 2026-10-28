@@ -109,17 +109,25 @@ export async function loadPurchasingSettings(
   sb: SupabaseClient,
 ): Promise<LoadedPurchasingSettings> {
   const numbers = await loadPurchasingNumbers(sb);
+  // An unavailable optional matcher setting must not invent a priority or
+  // prevent ordinary purchasing. The matcher itself refuses a missing value.
+  let readyStockPriority: "customer_delivery" | "proceed_date" | null = null;
+  try {
+    const result = await sb.from("purchasing_settings").select("ready_stock_priority").eq("id", 1).maybeSingle();
+    const value = result.data?.ready_stock_priority;
+    if (!result.error && (value === "customer_delivery" || value === "proceed_date")) readyStockPriority = value;
+  } catch { /* The unavailable value is exposed as null. */ }
 
   const [skusR, suppliersR, prodR, weekR, changesR, destinationsR, partnersR] = await Promise.all([
     sb
       .from("product_skus")
       .select("supplier_id, product_models!inner(category)")
       .not("supplier_id", "is", null),
-    sb.from("suppliers").select("id, name, kind, cat_covered, terms_days, address, return_address"),
+    sb.from("suppliers").select("id, name, kind, cat_covered, terms_days, address, return_address, whatsapp_group_url, po_send_channel, contact_email"),
     sb.from("purchasing_production_days").select("supplier_id, category, working_days"),
     sb
       .from("purchasing_supplier_settings")
-      .select("supplier_id, off_days, transit_days, fixed_destination_id, collected_by_partner_id"),
+      .select("supplier_id, off_days, fixed_destination_id, collected_by_partner_id"),
     sb
       .from("purchasing_setting_changes")
       .select("setting_key, supplier_id, category, old_value, new_value, changed_at, changed_by")
@@ -162,7 +170,6 @@ export async function loadPurchasingSettings(
     }
   }
 
-  const transitBySupplier = new Map<string, number>();
   const offDaysBySupplier = new Map<string, number[]>();
   const collectionBySupplier = new Map<
     string,
@@ -173,12 +180,6 @@ export async function loadPurchasingSettings(
       row.supplier_id as string,
       ((row.off_days as number[] | null) ?? []).map(Number),
     );
-    // The eighth number. NULL stays null rather than becoming a 0 or a 1 —
-    // "nobody has set it" and "it takes no time" are different facts, and only
-    // the first one may withhold an arrival date.
-    if (row.transit_days != null) {
-      transitBySupplier.set(row.supplier_id as string, Number(row.transit_days));
-    }
     collectionBySupplier.set(row.supplier_id as string, {
       destinationId: (row.fixed_destination_id as string | null) ?? null,
       partnerId: (row.collected_by_partner_id as string | null) ?? null,
@@ -187,7 +188,7 @@ export async function loadPurchasingSettings(
 
   const nameById = new Map<string, string>();
   const termsById = new Map<string, number | null>();
-  const addressById = new Map<string, { address: string | null; returnAddress: string | null }>();
+  const addressById = new Map<string, { address: string | null; returnAddress: string | null; whatsappGroupUrl: string | null; contactEmail: string | null; poSendChannel: string | null }>();
   const factoryPickupSupplierIds: string[] = [];
   /* 0477 — Finance's other creditors (a landlord, an advertiser) share the
      table. They make nothing, so they never get a Settings row, even if a
@@ -199,6 +200,9 @@ export async function loadPurchasingSettings(
     addressById.set(row.id as string, {
       address: (row.address as string | null) ?? null,
       returnAddress: (row.return_address as string | null) ?? null,
+      whatsappGroupUrl: (row.whatsapp_group_url as string | null) ?? null,
+      contactEmail: (row.contact_email as string | null) ?? null,
+      poSendChannel: (row.po_send_channel as string | null) ?? null,
     });
     if (row.kind === "factory_pickup") factoryPickupSupplierIds.push(row.id as string);
     if (isOtherCreditor(row)) otherCreditorIds.add(row.id as string);
@@ -211,10 +215,12 @@ export async function loadPurchasingSettings(
       name: nameById.get(id) ?? "",
       categories: [...cats].sort(),
       offDays: offDaysBySupplier.get(id) ?? null,
-      transitDays: transitBySupplier.get(id) ?? null,
       termsDays: termsById.get(id) ?? null,
       address: addressById.get(id)?.address ?? null,
       returnAddress: addressById.get(id)?.returnAddress ?? null,
+      whatsappGroupUrl: addressById.get(id)?.whatsappGroupUrl ?? null,
+      contactEmail: addressById.get(id)?.contactEmail ?? null,
+      poSendChannel: addressById.get(id)?.poSendChannel ?? null,
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
@@ -303,6 +309,7 @@ export async function loadPurchasingSettings(
 
   return {
     ...numbers,
+    readyStockPriority,
     suppliers,
     productionDays,
     destinations,
@@ -359,4 +366,25 @@ export async function loadPoWindows(sb: SupabaseClient): Promise<LoadedPoWindows
     poDays: (row.po_days ?? []).map(Number),
     cutoffBySupplier,
   };
+}
+
+/** Contextual request/recipient and manual sending settings; absence is unknown. */
+export async function loadPurchaseRequestSettings(sb: SupabaseClient): Promise<{
+  normalCalendarDays: number;
+  serviceCalendarDays: number;
+  manualWhatsappScreenshotRequired: boolean;
+}> {
+  const { data, error } = await sb.from("purchasing_settings")
+    .select("purchase_request_normal_days, purchase_request_service_days, po_manual_whatsapp_screenshot_required")
+    .eq("id", 1).maybeSingle();
+  if (error || !data) throw new Error("purchase_request_settings_unavailable");
+  const normal = data.purchase_request_normal_days;
+  const service = data.purchase_request_service_days;
+  if (typeof normal !== "number" || !Number.isInteger(normal) || normal < 0 ||
+      typeof service !== "number" || !Number.isInteger(service) || service < 0 ||
+      typeof data.po_manual_whatsapp_screenshot_required !== "boolean") {
+    throw new Error("purchase_request_settings_unavailable");
+  }
+  return { normalCalendarDays: normal, serviceCalendarDays: service,
+    manualWhatsappScreenshotRequired: data.po_manual_whatsapp_screenshot_required };
 }

@@ -14,6 +14,12 @@ becomes true, and disappears BY ITSELF when its completion becomes true. Staff n
 create an action, never tick one off, never decide what is next, and never read an SOP
 to find out — every action explains itself on screen at the moment it is needed.
 
+**One bounded exception, owner 2026-10-14.** An employee may add an INTERNAL TASK for a colleague
+with `+ Task` (Workspace MASTER "Employee-created internal tasks"). It is not an action of this
+standard: no rule raises it, it stands for no module's obligation, and its `Mark done` closes only
+itself. It approves nothing, sends nothing and posts nothing. Every action a module owns still
+appears and disappears by itself.
+
 **No paper.** There is no printed SOP, no wall chart, no training deck. If a staff member
 needs a document to use the portal, the portal is wrong. (Jess, 2026-07-27.)
 
@@ -171,7 +177,12 @@ Calendar**, correct all along.
 **`packages/shared/working-days.ts` is still the ONE engine — no module writes its own** —
 but it now has to be TOLD which calendar. Until it is, a caller that passes nothing is
 counting on whichever week the engine defaults to, and that is a silent answer, not a chosen
-one.
+one. The three calendars it is told from (9 Oct 2026): **Office** →
+`packages/shared/src/office-calendar.ts` (Settings → Office, weekdays + Kuala Lumpur holidays; SQL
+`_office_is_working_day`); **Warehouse** → the Site's own calendar, `warehouseOperatesOn` /
+`warehouseDaysLate` (Settings → Warehouse); **Delivery** →
+`packages/shared/src/delivery-working-calendar.ts` (Monday–Saturday + the Selangor holidays Warehouse
+Settings stores, else the built-in list).
 
 **Saturday's delivery capacity is RECORDED, not built.** `Landed = 1 · Condo = 0.5` is a
 capacity weight, and nothing in the portal reads a building type for any purpose today

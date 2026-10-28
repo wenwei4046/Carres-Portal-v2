@@ -58,9 +58,9 @@ const ANSWER_WORD: Record<AnswerKind, string> = {
 
 const control = "h-8 rounded-control border border-kit-slate-5 bg-white px-2 text-meta";
 const cell = "px-2 py-0 align-middle";
-const head = "h-9 px-2 text-left text-label font-semibold text-kit-slate-11";
+const head = "h-9 px-2 text-left text-meta font-medium text-kit-slate-11";
 /** The read table's heads may wrap (`Supplier Confirmed Delivery Date` at 112px). */
-const readHead = "px-2 py-1.5 text-left align-bottom text-label font-semibold leading-tight text-kit-slate-11";
+const readHead = "px-2 py-1.5 text-left align-bottom text-meta font-medium leading-tight text-kit-slate-11";
 
 export function stillToDeliver(line: { qty: number; receivedQty: number }): number {
   return Math.max(0, Number(line.qty) - Number(line.receivedQty));
@@ -80,7 +80,7 @@ function AnswerCell({ answer, previousDate, officialDate }: { answer: PoLineSupp
   return (
     <span className="flex flex-col leading-4">
       <span className="tabular-nums">{answer.batches.map((b) => batchWord(b, answer.batches.length)).join(" · ")}</span>
-      {changedFrom ? <span className="text-label text-kit-slate-11">Supplier changed from {fmtDate(changedFrom)}</span> : null}
+      {changedFrom ? <span className="text-meta text-kit-slate-11">Supplier changed from {fmtDate(changedFrom)}</span> : null}
     </span>
   );
 }
@@ -250,7 +250,7 @@ export default function SupplierReplySection({
     <span className="flex flex-col leading-4">
       <span>{l.item}{l.itemDetail ? <span className="text-kit-slate-11"> · {l.itemDetail}</span> : null}</span>
       {l.unitIds.length ? (
-        <span className="font-mono text-label text-kit-slate-11" data-testid={`po-answer-units-${l.id}`}>{l.unitIds.join(" · ")}</span>
+        <span className="font-mono text-meta text-kit-slate-11" data-testid={`po-answer-units-${l.id}`}>{l.unitIds.join(" · ")}</span>
       ) : null}
     </span>
   );
@@ -260,12 +260,12 @@ export default function SupplierReplySection({
     return (
       <div className="border-t border-kit-slate-4 pt-3" data-testid="po-supplier-reply">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="text-label font-semibold text-kit-slate-11">Supplier reply</div>
+          <div className="text-strong text-kit-slate-12">Supplier reply</div>
           <div className="text-meta text-kit-slate-11">PO Delivery Date · {officialDeliveryDate ? fmtDate(officialDeliveryDate) : "Not recorded"}</div>
           <div className="flex-1" />
           {canRecord ? (
             <button type="button" onClick={open} data-testid="po-supplier-reply-record"
-              className="h-8 rounded-control border border-kit-slate-5 bg-white px-3 text-meta font-medium text-kit-slate-12 hover:bg-kit-slate-3">
+              className="h-8 rounded-control border border-kit-slate-5 bg-white px-3 text-body font-medium text-kit-slate-12 hover:bg-kit-slate-3">
               Record supplier answer
             </button>
           ) : null}
@@ -292,7 +292,7 @@ export default function SupplierReplySection({
                     <td className={`${cell} text-right tabular-nums`}>{l.qty}</td>
                     <td className={`${cell} text-right tabular-nums`} data-testid={`po-answer-still-${l.id}`}>{stillToDeliver(l) === 0 ? <span className="text-kit-slate-11">All received</span> : stillToDeliver(l)}</td>
                     <td className={cell} data-testid={`po-answer-date-${l.id}`}><AnswerCell answer={a} previousDate={a?.previousDate ?? null} officialDate={officialDeliveryDate} /></td>
-                    <td className={cell}>{a ? <span className="flex flex-col leading-4"><span>{fmtDate(a.recordedAt)}{a.recordedByName ? ` · ${a.recordedByName}` : ""}</span>{a.evidence ? <button type="button" className="text-left text-label text-kit-blue-11 hover:underline" onClick={() => void openFile(a.evidence!)}>Evidence</button> : null}</span> : <span className="text-kit-slate-11">None recorded yet</span>}</td>
+                    <td className={cell}>{a ? <span className="flex flex-col leading-4"><span>{fmtDate(a.recordedAt)}{a.recordedByName ? ` · ${a.recordedByName}` : ""}</span>{a.evidence ? <button type="button" className="text-left text-meta text-kit-blue-11 hover:underline" onClick={() => void openFile(a.evidence!)}>Evidence</button> : null}</span> : <span className="text-kit-slate-11">None recorded yet</span>}</td>
                   </tr>
                 );
               })}
@@ -326,7 +326,7 @@ export default function SupplierReplySection({
   return (
     <div className="border-t border-kit-slate-4 pt-3" data-testid="po-supplier-reply">
       <div className="flex flex-wrap items-center gap-3">
-        <div className="text-label font-semibold text-kit-slate-11">Record supplier answer</div>
+        <div className="text-strong text-kit-slate-12">Record supplier answer</div>
         <label className="flex items-center gap-1.5 text-meta">
           <input type="checkbox" checked={doReceived} onChange={(e) => setDoReceived(e.target.checked)} data-testid="po-answer-do-received" />
           Supplier DO received
@@ -338,9 +338,9 @@ export default function SupplierReplySection({
           </>
         ) : null}
         <div className="flex-1" />
-        <button type="button" onClick={cancel} className="h-8 rounded-control border border-kit-slate-5 bg-white px-3 text-meta font-medium text-kit-slate-12 hover:bg-kit-slate-3" data-testid="po-answer-cancel">Cancel</button>
+        <button type="button" onClick={cancel} className="h-8 rounded-control border border-kit-slate-5 bg-white px-3 text-body font-medium text-kit-slate-12 hover:bg-kit-slate-3" data-testid="po-answer-cancel">Cancel</button>
         <button type="button" disabled={!ready} onClick={save} data-testid="po-answer-save"
-          className="h-8 rounded-control bg-kit-blue-9 px-3 text-meta font-semibold text-white disabled:bg-kit-slate-5 disabled:text-kit-slate-11">
+          className="h-8 rounded-control bg-kit-blue-9 px-3 text-body font-semibold text-white disabled:bg-kit-slate-5 disabled:text-kit-slate-11">
           {record.isPending ? "Saving…" : gap ? `Save: ${gap}` : "Save"}
         </button>
       </div>
@@ -419,26 +419,26 @@ export default function SupplierReplySection({
       </div>
       <div className="mt-2 flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1">
-          <span className="text-label text-kit-slate-11">Evidence</span>
+          <span className="text-meta text-kit-slate-11">Evidence</span>
           <SupplierAnswerEvidenceUploadField poId={poId} poVersion={version} entries={evidence} onChange={setEvidence} ariaLabel="Evidence" testId="po-answer-evidence" />
         </label>
         <div className="flex-1" />
         <label className="flex flex-col gap-1">
-          <span className="text-label text-kit-slate-11">Channel</span>
+          <span className="text-meta text-kit-slate-11">Channel</span>
           <select value={channel} onChange={(e) => setChannel(e.target.value as Channel)} className={control} aria-label="Channel">
             <option value="whatsapp">WhatsApp</option><option value="email">Email</option><option value="phone">Phone</option><option value="in_person">In person</option>
           </select>
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-label text-kit-slate-11">Recipient</span>
+          <span className="text-meta text-kit-slate-11">Recipient</span>
           <input value={recipient} onChange={(e) => setRecipient(e.target.value)} className={control} aria-label="Recipient" />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-label text-kit-slate-11">Answered by</span>
+          <span className="text-meta text-kit-slate-11">Answered by</span>
           <input value={reportedBy} onChange={(e) => setReportedBy(e.target.value)} placeholder={`Who at ${supplierName}`} className={control} aria-label="Answered by" data-testid="po-answer-reported-by" />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-label text-kit-slate-11">Answered by supplier on</span>
+          <span className="text-meta text-kit-slate-11">Answered by supplier on</span>
           <input type="datetime-local" value={reportedAt} onChange={(e) => setReportedAt(e.target.value)} className={control} aria-label="Answered by supplier on" data-testid="po-answer-reported-at" />
         </label>
       </div>
@@ -449,7 +449,7 @@ export default function SupplierReplySection({
             <option value="">Choose answer</option>
             {(Object.keys(ANSWER_WORD) as AnswerKind[]).map((k) => <option key={k} value={k}>{ANSWER_WORD[k]}</option>)}
           </select>
-          <button type="button" onClick={applyBulk} disabled={!bulk} className="h-8 rounded-control border border-kit-slate-5 bg-white px-3 text-meta font-medium disabled:text-kit-slate-11" data-testid="po-answer-bulk-apply">Apply</button>
+          <button type="button" onClick={applyBulk} disabled={!bulk} className="h-8 rounded-control border border-kit-slate-5 bg-white px-3 text-body font-medium disabled:text-kit-slate-11" data-testid="po-answer-bulk-apply">Apply</button>
         </div>
       ) : null}
       {problem ? <div className="mt-2 text-meta text-kit-red-11" data-testid="po-answer-problem">{problem}</div> : null}

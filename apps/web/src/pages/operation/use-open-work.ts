@@ -6,6 +6,7 @@
  */
 import { useMemo } from "react";
 import type {
+  OperationWorkCompleted,
   OperationWorkItem,
   OperationWorkModule,
   OperationWorkSourceHealth,
@@ -35,6 +36,9 @@ export interface WorkRow extends Omit<WorkItem, "module"> {
 
 export interface OpenWorkSet {
   items: WorkRow[];
+  /** Finished occurrences of the same read (the recent window), newest facts
+   *  the owning modules recorded. Empty when the read carries none. */
+  completed: readonly OperationWorkCompleted[];
   generatedOn: string;
   /** My focus window (MASTER §5.1): `generatedOn` through my focus day. */
   myFocus: WorkFocus | null;
@@ -60,6 +64,8 @@ export interface OpenWorkSet {
   error: boolean;
   retry: () => void;
 }
+
+const NO_COMPLETED: readonly OperationWorkCompleted[] = [];
 
 function toWorkRow(item: OperationWorkItem, generatedOn: string): WorkRow {
   const dueIso = item.timing.actionOn;
@@ -146,6 +152,7 @@ export function useOpenWorkSet(): OpenWorkSet {
   }, [generatedOn, items, myUserId]);
   return {
     items,
+    completed: query.data?.completed ?? NO_COMPLETED,
     generatedOn,
     myFocus,
     myUserId,

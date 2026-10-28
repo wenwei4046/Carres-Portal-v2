@@ -16,7 +16,7 @@ export function paymentVoucherPrint(doc: PaymentVoucherDocument): PaymentVoucher
     voucher_date: v.voucher_date,
     payee: v.payee_name,
     supplier: v.supplier_name,
-    pay_from: `${v.pay_from_account_code} ${v.pay_from_name ?? ""}`.trim(),
+    pay_from: v.pay_from_account_code ? `${v.pay_from_account_code} ${v.pay_from_name ?? ""}`.trim() : "",
     pay_method: word(PAY_METHOD_WORD, v.pay_method),
     reference: v.pay_reference,
     narration: v.narration,

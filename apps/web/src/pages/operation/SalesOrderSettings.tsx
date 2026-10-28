@@ -40,6 +40,8 @@
  * Orders tab, a portal-navigation item, a Work Toolbar button or a `…` item.
  */
 import OrderEntryPage from "./OrderEntryPage";
+import { useSettingsChanges } from "@/lib/settings-queries";
+import { ChangeList } from "./settings-core/parts";
 
 /** Where the option lists that are NOT ours are actually maintained. Naming
  *  the owner is what stops the next chat rebuilding an editor for it here. */
@@ -51,7 +53,19 @@ const ELSEWHERE: Array<{ what: string; owner: string }> = [
   { what: "Logistics companies", owner: "Delivery" },
 ];
 
+const ENTRY_FIELD: Record<string, string> = { payment_methods: "Payment methods", form_fields: "Order Entry fields" };
+
+/** A config value in plain words: lists and field sets are counted, never dumped as data. */
+function entryValue(field: string, v: unknown): string {
+  if (v == null) return "Not set";
+  if (Array.isArray(v)) return `${v.length} ${field === "payment_methods" ? "methods" : "items"}`;
+  if (typeof v === "object") return `${Object.keys(v as object).length} fields`;
+  return String(v);
+}
+
 export default function SalesOrderSettings() {
+  /* SET-01: every saved Order Entry change keeps who · when · old → new (0674). */
+  const changes = useSettingsChanges("sales_orders");
   return (
     <div className="max-w-[1040px] px-9 py-8 pb-14" data-testid="sales-order-settings">
       <div className="mb-5">
@@ -78,6 +92,16 @@ export default function SalesOrderSettings() {
             </li>
           ))}
         </ul>
+      </div>
+
+      <div className="mt-6">
+        <ChangeList
+          changes={changes.data ?? []}
+          testId="sales-order-settings-changes"
+          labelOf={() => "Order Entry"}
+          fieldLabel={(f) => ENTRY_FIELD[f] ?? f}
+          valueOf={entryValue}
+        />
       </div>
 
       <p className="mt-8 text-meta text-base-500">

@@ -103,17 +103,17 @@ function ScoreRow({
       } ${row.kind === "store" ? "bg-base-50" : ""}`}
     >
       <div className="w-[168px] shrink-0 min-w-0 flex items-baseline gap-1.5">
-        <span className="text-strong font-medium truncate">{row.name}</span>
-        {row.staffCode && <span className="text-meta text-base-400 t-num">{row.staffCode}</span>}
+        <span className="text-body font-medium truncate">{row.name}</span>
+        {row.staffCode && <span className="text-meta text-base-500 t-num">{row.staffCode}</span>}
       </div>
       <Bar row={row} />
       <div className="w-[200px] shrink-0 text-right text-body t-num">
-        <span className="font-semibold">{fmt(kpiKey, row.actual)}</span>
+        <span>{fmt(kpiKey, row.actual)}</span>
         {row.target !== null && (
           <span className="text-base-500"> of {fmt(kpiKey, row.target)}</span>
         )}
       </div>
-      <div className="w-[52px] shrink-0 text-right text-strong font-semibold t-num">
+      <div className="w-[52px] shrink-0 text-right text-strong t-num">
         {row.pct === null ? null : `${row.pct}%`}
       </div>
       <div className="w-[86px] shrink-0 text-right">
@@ -197,7 +197,7 @@ function TargetDialog({
       >
         <div className="px-6 pt-5 pb-4 border-b border-base-100">
           <div className="kicker text-label">HR · Performance</div>
-          <h2 className="font-display text-title mt-1 tracking-[-0.02em] font-semibold">
+          <h2 className="font-display text-strong mt-1 tracking-[-0.02em]">
             {edit.targetId ? "Edit target" : "Set a target"}
           </h2>
           <div className="text-meta text-base-600 mt-1 leading-relaxed">
@@ -207,7 +207,7 @@ function TargetDialog({
           </div>
         </div>
         <div className="p-6 grid gap-3">
-          <label className="text-meta font-semibold text-base-700">
+          <label className="text-meta text-base-700">
             Monthly target {metric.unit === "rm" ? "(RM)" : "(quantity)"}
             <input
               autoFocus
@@ -217,7 +217,7 @@ function TargetDialog({
               className={`${fieldCls} mt-1 font-normal t-num`}
             />
           </label>
-          <label className="text-meta font-semibold text-base-700">
+          <label className="text-meta text-base-700">
             Applies from
             <input
               type="date"
@@ -352,7 +352,7 @@ function ManagerCard({ source }: { source: KpiSource }) {
 
         {!ready && (
           <p className="text-meta text-base-500 border-t border-base-200 pt-2">
-            Until a store has an owner this stays <b>Off</b> rather than showing a
+            Until a store has an owner this stays <b className="font-medium">Off</b> rather than showing a
             manager RM 0 while their store sold something.
           </p>
         )}
@@ -555,7 +555,7 @@ export default function HrPerformanceTab({
                   {["Who", "Kind", "Monthly target", "From", "Set by"].map((h, i) => (
                     <th
                       key={h}
-                      className={`text-label uppercase tracking-[0.05em] text-base-500 font-medium px-2.5 py-2 border-b border-base-200 whitespace-nowrap ${
+                      className={`text-meta font-medium text-base-500 px-2.5 py-2 border-b border-base-200 whitespace-nowrap ${
                         i === 2 ? "text-right" : "text-left"
                       }`}
                     >
@@ -570,7 +570,7 @@ export default function HrPerformanceTab({
                     <td className="px-2.5 h-11 text-body">
                       {t.subjectName ?? ""}
                       {t.staffCode && (
-                        <span className="text-meta text-base-400 t-num"> {t.staffCode}</span>
+                        <span className="text-meta text-base-500 t-num"> {t.staffCode}</span>
                       )}
                     </td>
                     <td className="px-2.5 h-11 text-body text-base-500">
@@ -593,7 +593,7 @@ export default function HrPerformanceTab({
           A target is never edited in place. Changing it writes a new row from a date
           you choose, so last month keeps the number it was actually judged on. A
           person's own target wins over their store's; with no personal target the
-          store's is <b>not</b> split across heads, the person simply reads “no target”.
+          store's is <b className="font-medium">not</b> split across heads, the person simply reads “no target”.
         </p>
       </SectionCard>
 

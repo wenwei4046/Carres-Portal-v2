@@ -82,6 +82,16 @@ describe("workLifecycleOf — the state is derived, never stored", () => {
   });
 });
 
+describe("workReplyDueOn — the stored Office calendar", () => {
+  it("skips a holiday the Office recorded", () => {
+    // Thu 17 Sep recorded as an Office holiday → Fri 18.
+    expect(workReplyDueOn("2026-09-16", undefined, { holidays: new Set(["2026-09-17"]), offDays: [0, 6] })).toBe("2026-09-18");
+  });
+  it("never lands on a Saturday or Sunday — the 0584 door refuses them whatever the calendar says", () => {
+    expect(workReplyDueOn("2026-09-18", undefined, { holidays: new Set<string>(), offDays: [0] })).toBe("2026-09-21");
+  });
+});
+
 describe("workReplyDueOn — Malaysian working days", () => {
   it("one working day after Tue 15 Sep skips Malaysia Day to Thu 17 Sep", () => {
     expect(workReplyDueOn("2026-09-15")).toBe("2026-09-17");

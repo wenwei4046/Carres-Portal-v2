@@ -14,6 +14,14 @@
 
 ---
 
+**SYSTEM-WIDE DOCUMENT NUMBER DISPLAY — owner24Oct2026, APPROVED TARGET / NOT VERIFIED BUILT.**
+COPY-STANDARD's current numbering section owns the new shared separator shape: prefix directly
+followed by the governed date, then one hyphen before the serial (`DO261024-0001`). Preserve old
+sheet references, saved identities, issued files, source links, supplier references and Unit IDs.
+UI template examples do not authorise allocator/privacy/prefix changes or renumbering historical
+records. Module numbering authorities continue to own allocation; implementation and production
+adoption remain separately evidenced.
+
 # §0 · Why this document exists — the lesson in one page
 
 Nine engineering-debt items were found by reading Orders V1 end to end and measuring
@@ -80,11 +88,26 @@ identities and write no completion. Module filter rails do not copy those action
 `WORK TO DO` panel; SO Batch Purchase is the ruled example. The complete contract is
 [`purchasing/MASTER.md` §2.3 and §7](purchasing/MASTER.md) and its approved design record.
 
+**WAREHOUSE-CONFIRMED RECEIVING — OWNER-APPROVED TARGET / NOT BUILT, Jess 2026-10-04.**
+The authorised, individually identified Warehouse operator confirms the actual receipt at its
+permitted Site/source. Receiving validates source, identities, quantities, condition and required
+evidence, posts once and automatically creates the GRN; Stock projects the accepted consequences
+with its existing holds, reservations and eligibility rules. Operation retains direct receiving
+and handles differences; normal Warehouse receipts need no second Operation approval. Operation
+also checks missing arrivals and owns all supplier communication and follow-up. Warehouse only
+performs physical receipt/checks and reports evidence/differences; it never chases suppliers.
+Inbound/Calendar placement does not transfer that responsibility. Invalid
+scope remains an unposted report; supplier declarations alone never create stock. Warehouse gets
+no direct Inventory writer, amendment/void, adjustment approval or Finance authority. The complete
+receipt contract is Purchasing §7.3, mirrored by Stock §7. Approval is business target truth, not
+proof of implementation or permission for external NETS cutover.
+
 ---
 
 **SHOWROOM DOCUMENT PURPOSE — APPROVED TARGET / NOT BUILT, Jess 2026-09-29.**
-Purchasing exposes Display Requests, Consignment Orders, Consignment Returns and Consignment Sale
-Notices. Staff record one arrangement; the system pre-fills the order to obtain supplier-owned
+Purchasing exposes Display Requests, Consignment Orders and Consignment Returns. Supplier-owned
+display is not sold; no supplier sale notice is required (Jess, 2026-10-02). Staff record one
+arrangement; the system pre-fills the order to obtain supplier-owned
 goods and/or return to hand goods back. Keep these names and roles distinct. Do not merge them
 into Consignment Note or add another manual acknowledgement document. A same-supplier swap sends
 one combined instruction while receipt and return retain separate actual evidence. Receiving owns
@@ -140,9 +163,11 @@ authoritative business rule and current roster:
 ```
 missing customer commitment       → responsible salesperson
 issue PO / confirm supplier date  → current PO Duty
-receive goods                     → current GRN Duty
+confirm physical warehouse receipt → authorised Warehouse individual (2026-10-04 target)
+receipt exceptions / direct receipt → GRN Duty ownership / authorised Operation capability
+missing arrival / supplier chasing → current PO Duty (Operation)
 order/customer/delivery follow-up → Work assignment, initially Sales Order PIC
-collect customer balance          → Work assignment, initially Sales Order PIC
+collect customer balance          → Payment responsibility ledger, else effective personal SO PIC, else unassigned; Work applies recorded cover
 ```
 
 The rule resolves automatically. Staff do not assign routine work order by order. **People** owns
@@ -296,6 +321,92 @@ no canonical module MASTER; that is a current authority gap, not permission for 
 invent Catalog truth.** Receiving and Supplier Claim remain responsibilities governed inside the
 Purchasing MASTER until an approved re-ruling gives either a separate MASTER.
 
+**System-wide documentation ownership — controller reconciliation, 9 Oct 2026.** A missing chat is not a missing business owner. The controller maintains uncovered cross-module scope in these existing architecture sections and the existing blueprint audit, without creating another MASTER or declaring full approval. Reports uses the existing `Carres-Business-Blueprint-RESTART-2026-10-07/23-REPORTS-PLACEMENT-DECISION.md`: central Reports plus contextual module summaries is approved; metric definitions, access, schedules, history coverage and exact composition remain unverified/proposed. Dashboard consumes those definitions and Workspace obligations, never a second metric calculation. Company legal identity comes from the owner-provided 9 Oct letterhead and `Carres Settings List.md` Company field breakdown; registered address does not replace Warehouse/Showroom delivery locations. Bank instructions remain Payment-owned; Office and duty calendars remain Workspace-owned. Finance, People/HR and Guarantee retain their own MASTERs and cannot be declared fully covered by Payment, Staff or Service notifications. Notifications/email, mailbox/announcement administration, change history, health and integration controls remain individually scoped research/verification items in the existing audit: Houzs capability is neither Carres approval nor build proof. Subscription and optional Assistant/Agent/Venture work remain deferred. Notification receipt, original-document edit, repository publication and production acceptance are four separate facts.
+
+### System controls — evidence and ownership reconciliation, 9 Oct 2026
+
+This is source reconciliation in the existing architecture, not new capability or permission approval. Existing audit records retain verification gaps.
+
+| Control | Inspected source / ownership | Limits and remaining verification |
+|---|---|---|
+| Change history | `apps/api/src/routes/principal/audit.ts` reads audit_log with principal gate, role filter and bounded 1–500 rows; PrincipalAudit.tsx consumes it | Code inspection only; not production/RLS acceptance, universal old/new/effective-date history or complete audit coverage. Read-only does not permit history editing/deletion. |
+| System Health | Shared stock-health helpers and Operation StockHealthPanel; Stock owns inventory facts | File presence is not passed tests or system-wide health. Database/jobs/integration/ledger health and recovery permissions need separate evidence. |
+| AutoCount | Shared autocount-import schema and existing autocount-import-contract document | Excel import contract is not bidirectional live sync. Verify source identity, duplicates, failures, permissions and reconciliation; Houzs controls are reference only. |
+| Notifications / Email | Module event obligations and Customer Service source; Houzs research in existing worklist | Recipient/channel/provider/trigger/delivery evidence are separate; configured toggle is not successful delivery. No new event, address or send authority inferred. |
+| Mailboxes / Announcements | Houzs registry/access/provisioning research only | ERP registry is not external provisioning. Carres owner, access, retention and publication lifecycle remain verification gaps; no provision/invite/send authority. |
+| Shared Settings | Owning MASTERs; Workspace people/duties/calendars; personal Appearance current kit | Central view does not move source ownership. Verify editor scope, saved history and effective treatment. Payment-specific compulsory reasons must not silently govern every Company field. |
+
+### Houzs system-control adaptation — review draft, 9 October 2026
+
+The existing worklist's observed controls are mapped below into this owning architecture rather than left solely in a reference list. All ADD entries are PROPOSAL / NOT APPROVED / NOT BUILT by this pass. KEEP means preserve an existing source boundary, not passed production acceptance. Never copy Houzs values, document numbering, grants, secrets or enabled channels.
+
+| Control | Carres disposition and owning boundary | Concrete remaining scope |
+|---|---|---|
+| Team, Directory, invitations, Departments, Titles and Org Chart | KEEP People/account ownership; adaptation now recorded in HR MASTER §2 | Organisation/invitation lifecycle, scoped counts and shared identity; saves/delivery/enforcement unverified. |
+| Roles / title / action matrices | KEEP ERP Law F/F.1 and HR §2; ADD reviewable matrix and section-specific Settings delegation proposal | Page access, action rights, approver qualification and config rights separately readable; no blanket settings.manage or title-to-money grant. |
+| Company / Branding | KEEP owner-provided Company identity, Support Team contact and Payment-owned bank instructions | ADD app/print asset and company-versus-support grouping proposal; validate existing editors and document consumers. Warehouse addresses/calendars remain Stock-owned. |
+| Mailboxes | ADD registry/ownership/access proposal; source owner and policy remain unresolved | Address registration is not external provisioning. Personal/department scopes, disabled owners/orphans, reassignment, retention and direct-read enforcement require review; no addresses imported. |
+| Announcements and Documents registry | ADD publication/type/attachment-policy proposal in system architecture | Define authorised publisher, audience, lifecycle and numbering owner before build. Preserve Carres existing per-document number pools; Houzs ANN attachment rule cannot govern all Carres documents. |
+| Email / notifications | ADD event/channel/recipient configuration proposal; each event writer owns its trigger | Master/channel controls, masked provider setup, invitation/reset/operational-event evidence and failure handling must be reviewed separately. No test message, provider or event activated. |
+| Connection and AutoCount Sync | KEEP Purchasing §14 integration boundary; ADD observability/configuration proposal | Identify actual Carres endpoint, direction and source; masked credentials, connection test, scheduled vs manual scope, checkpoints, failure/duplicate/line-match handling and governed retries. Import schema does not prove live sync. |
+| Activity Log | ADD source-owned execution-history proposal | Job identity, trigger, attempt, time, outcome/error and checkpoint separate from document audit; retry permission and idempotency need evidence. |
+| Change Log | KEEP existing principal audit reader; ADD complete before/after/effective-time coverage proposal | Actor vs system, source object, limited-result coverage and restricted sensitive detail. Earlier detail timeout superseded by the read-only PO detail observation below; audit completeness and controlled-save enforcement remain unverified. No edit/delete of history. |
+| System Health | KEEP Stock integrity source; ADD system observability proposal | Database/storage/jobs/integration/auth/ledger signals retain their own owners, timestamp and failure/unknown states. Recovery is separately governed; summary green does not prove all processes passed. |
+| Assistant / Agent Console / Venture Feed | DEFERRED optional proposals; not an Outright dependency | No run, resume, connection, spend or send commissioned. Queue/retry/agent-control patterns are references only; no claim of Carres business need or full research. |
+
+Acceptance for any later commissioned control includes authorised and denied reads/writes, persistence, effective treatment, source re-read, failure/partial outcomes and audit. This mapping closes documentation placement only; it neither completes those tests nor approves system-control UI/build. Existing `26-BLUEPRINT-AUDIT-BACKLOG.md` remains the sole audit backlog.
+
+**Fresh Change Log detail reconciliation — 9 October 2026.** Read-only authenticated `https://erp.houzscentury.com/change-log` now expanded existing PO `HC-PO-2610-166`. It visibly separates Created from Changed, records actor, MYT timestamp and `via web`, and shows field old/new values; the sampled change moves `deliveryDate` from 20 October to 16 October. Creation contains empty-to-value fields, raw source identifiers and an unformatted numeric Total. The loaded seven-day register explicitly warns counts are floors because one read is limited, and shows only 400 of 491 document groups. This supersedes the earlier detail timeout, not the untested audit-completeness claim. No record was changed for this inspection.
+
+**Carres recommendation / not new approved law:** preserve operation type, source object/version, actual actor/system identity, channel and recorded timestamp; present source-owned field labels, identity resolution, dates and money units without guessing from raw keys or numbers. Missing prior value, unavailable lookup and protected value must remain distinguishable. Recorded change time is not business-effective date, approval or supplier acceptance. Audit readers must disclose truncation/coverage at both event and document level; narrowed filters cannot silently turn a lower bound into a verified total. Source objects and their existing approval/history remain authoritative. Acceptance requires a controlled permitted/denied source change, canonical old/new reconciliation, actor versus helper/system, source version, redaction, effective treatment, bounded-result coverage and unavailable-detail behavior. The sampled historical detail proves rendered capability only; no such write or permission test was performed.
+
+### Document and message-template disposition — 9 October 2026
+
+**Blueprint reconciliation / recommended delivery checks.** Read Payment's current “Messages and template library”, the existing Settings inventory's Payment/Delivery/Documents sections and its bounded live observations. This is a source-purpose index inside the existing architecture, not another template library, new document policy or proof that missing wording is configured.
+
+| Purpose family | Owning contract | Saved configuration versus actual result |
+|---|---|---|
+| Customer goods collection, reminders/promises and payment links | Payment's named active/default/version library; protected source amount/account/date/partner fields and existing source-based bank routing | Payment lists Standard bank transfer, Gentle reminder, Payment should have been received, Customer promised to pay, Standard payment link and New link after expiry. Latest recorded live inventory shows six of eight Payment purposes empty, two reminders present; this is evidence of configuration gaps, not authority to invent missing approved wording. Link creation/send is not successful payment |
+| Full/partial payment receipt and closing Sales Invoice | Payment's Payment received / Partial payment received purposes and atomic posting/document source | Successful payment posting proves money and receipt; full goods balance closes into its Sales Invoice under current law. Separate sent-message proof retains exact rendered content and source/template version; template saved or WhatsApp opened is not sent, read or settled |
+| Customer/logistics delivery communication | Delivery's purpose-owned library and exact arrangement/visit/source facts; Customer Service owns enquiry replies | Latest recorded inventory shows eleven Delivery purposes empty. Preserve each configured purpose identity rather than copying Payment text or inventing eleven message types. Routine logistics contact and Operations exception boundaries remain unchanged; approved wording/channel rollout still require owning review |
+| Supplier PO/Claim/Return/Repair/Consignment instructions | Purchasing's exact document/version/recipient and owning send evidence; physical results stay Receiving/Stock/Delivery-owned | One applicable supplier instruction per governed scope, including combined same-supplier consignment swap rule. Sending is not supplier acceptance, receipt, return or money application; old issued PDFs and actual sent versions remain traceable |
+| Issue Monthly Report / secure reply | Issue §§12.8/12.10 purpose, approved snapshot, recipient/evidence privacy and reviewed external reply | Approved, Sent, Delivered, Opened, Replied and Recovered remain different results; report correction/addendum preserves old content. No generic scheduled send from central Reports placement |
+| Announcement / general document registry | Proposed system-control lifecycle above and each admitted document owner | Houzs attachment/numbering patterns are reference only. No universal ANN attachment policy, shared new number family or foreign wording; publication does not change business law |
+
+For each commissioned purpose, delivery must bind the exact existing purpose key, authorised template version/default, required/protected merge facts, channel and source document version. Preview missing-data and inactive/no-default failures explicitly; retain drafted input on failure. Actual sent content is immutable history even after the template is edited/retired. A retry must reconcile a known attempt and cannot duplicate business posting; ordinary external handoff records only the evidence it actually obtains. These checks extend review coverage, not provider integration or new sender rights.
+
+Acceptance remains source-specific: old sent version unchanged after template edit, missing mandatory content blocked at the owning action, source values not editable as prose, wrong/inactive recipient refused where governed, failed send retained, duplicate attempt reconciled, privacy enforced and business completion unchanged by template/save/open events. Missing template affects the route requiring that purpose; it does not make every unrelated order unusable. No messages, test emails, files or foreign values were sent/copied by this pass.
+
+### Recommended system-control lifecycle — Houzs adaptation, review draft
+
+**PROPOSAL / NOT APPROVED / NOT BUILT.** The comparison above identifies capabilities; this contract explains their proposed Carres lifecycle. Sources are the existing worklist's authenticated Team/Settings observations and its new read-only Mail Center/Announcements observations. Source-owned approved laws prevail. No new navigation, UI composition, role, email address, approval power or production action is authorised.
+
+**Current → problem → recommendation:** configuration controls and registry rows are documented, but a row or enabled switch alone cannot tell an operator whether the intended business effect occurred. Adapt Houzs's separated registry, execution history and recipient evidence into explicit Carres source contracts. The trade-off is more lifecycle/audit data and reconciliation, in exchange for fewer false completion claims. Reject this addition wherever the existing owning workflow already proves the same effect; connect that workflow instead of duplicating it.
+
+| Capability | Recommended Carres normal journey and ownership | Exceptions, completion and downstream evidence |
+|---|---|---|
+| Company identity and assets | Authorised source editor maintains confirmed legal/company/support facts and separately applicable app/print assets; document owners read the relevant version when generating a document | Validate required values and asset failures; issued/signed documents retain their snapshots. Saving Company details does not update bank instructions, Warehouse addresses or historical PDFs. Complete when the source is re-read and the relevant consumer uses it; no new mandatory reason for every field is implied |
+| Mailbox registry and email handling | Proposed system communication registry links a stable address, personal/department scope, owner and eligible members to People identities. External provisioning remains outside registry creation. If email handling is commissioned, the authorised recipient reads company-scoped incoming messages and source-linked handoffs | Separate unassigned address, orphaned owner, unavailable provider, empty inbox and failed sync. Draft/send/archive/restore and shared access require their own admitted rights. Retain sender, source message identity, actual executor and outcome. Provider acceptance is not customer receipt; a mailbox row is not access or a working inbox. Customer Service retains enquiry/reply/handoff ownership; no parallel enquiry queue |
+| Announcements and SOP communication | Proposed publisher drafts content, chooses a governed type and explicit audience, validates applicable attachment rules, obtains any required source-owned approval and publishes a retained version. Acknowledgement, when required, records the actual recipient and version read | Publication, acknowledgement and policy effectiveness are distinct. Define audience snapshot versus future-member treatment, expiry, amendment/void and reminder rules before activation. A reminder records its own delivery attempt; no silent escalation or imported Houzs 48-hour threshold. A notice cannot change Payment, Delivery, HR or permission law merely by being published. Document identity follows the Carres owning number pool |
+| Notifications and email channels | Each source event owns its predicate, stable event/object identity and qualified recipients; a proposed shared delivery adapter owns provider/channel configuration and attempt outcomes | Distinguish disabled channel, unsupported trigger, suppressed event, queued attempt, provider acceptance and failure. Retries must not repeat business posting or falsely complete Tasks. Configuration/test delivery and actual business-event delivery are separate evidence. Provider secrets stay masked; historical attempts retain the configuration version used |
+| Connection/import/sync | Identify external system, permitted direction and source owner; validate/preview incoming identities and line matches, then apply only through existing module writers. Proposed execution history records each admitted run/checkpoint | Connection success is not import success. Invalid/duplicate/partial records, interrupted runs and uncertain acknowledgements remain visible. Resume or retry must reconcile completed effects before repeating a write; no automatic business reissue, wider credentials or bidirectional sync inferred from an Excel schema |
+| Change Log and Activity Log | Read business/configuration history by source object and actor separately from execution runs/attempts. Proposed audit records before/after, recorded time and effective treatment where applicable | Unknown actor, bounded coverage, unavailable detail and failed query remain explicit. Retain actual helper/system actor; history is not editable. Authorised and denied direct-detail access, sensitive-field protection and reconciliation with a controlled source change must be proven |
+| System Health | Proposed summary reads time-stamped signals from their actual database/storage/job/auth/integration/Stock/Finance owners and links to the affected source evidence | Empty, stale, unavailable and failed checks cannot become healthy zero. Recovery requires the source's qualified action and its own result; viewing health grants no retry/repair/approval power. No system-wide pass is inferred from a green inventory panel |
+
+**Daily journey and handoffs:** qualified staff first review actionable failures, missing owners and source obligations relevant to their role; ordinary work stays in the existing Tasks projection. During work, source-linked communication and retries retain their actual result. At close, unresolved work remains with its original deadline and qualified owner/cover; export/history are permission-scoped readouts, not a second ledger or completion writer. Reports reads these same source counts and states; sensitive content and credentials do not become general exports.
+
+**Acceptance for this recommended lifecycle:** for each commissioned capability, prove allowed and denied direct access, persisted canonical re-read, current versus future effective treatment, relevant downstream consumption, duplicate/concurrent/partial-failure behavior and retained actor/history. In addition prove an orphaned mailbox does not inherit access, an announcement revision does not erase earlier acknowledgement, a suppressed/failed message does not complete business work, and a resumed integration does not duplicate source effects. These are acceptance requirements, not executed tests. System communications ownership/qualifications and unresolved audience/retention policy remain review decisions; they do not reopen existing module approvals or block an unrelated Outright route.
+
+Unread routes, missing filename matches and browser failures do not prove absence of data/features. A release blocker must identify the exact affected Outright step and evidence; reference-system feature gaps do not automatically block first-order use.
+
+**Customer communication boundary — Blueprint consolidated 2026-10-06.**
+[`customer-service/MASTER.md`](customer-service/MASTER.md) owns customer-enquiry answer and
+handover rules, the approved first-response coverage and the connected staff-workspace target.
+Communication includes pre-purchase contacts and links source records without fabricating an SO
+or Case. Workspace projects its admitted source obligations; business outcomes remain with the
+owners above. That MASTER distinguishes approved boundaries from proposed full enquiry lifecycle
+and discovery placement. It authorises neither a second inbox nor channel activation.
+
 Workspace is deliberately absent from this business-record ownership table. Dashboard and Work are
 cross-module projections and own no business outcome. `docs/workspace/MASTER.md` is the single
 Workspace authority. Its Staff & Duties, Shared Duty Resolver, one cross-module Work boundary and
@@ -307,6 +418,39 @@ that Dashboard or every module projection is built.
 ---
 
 # §2.1 · Naming and navigation
+
+## Company, showroom location and channel boundary — OWNER-APPROVED, Jess 2026-10-02
+
+A company may have multiple showroom locations. A showroom is the actual operating location,
+not a separate company and not the login itself. A Portal entry identifies its company,
+showroom location and actual recorder; a location-scoped login uses that authorised location.
+Do not grant all-company or all-location visibility merely because a person can enter work at
+one showroom. Existing individual actor, authorised scope and proxy-recording rules remain.
+
+Carres' own showrooms and Dealer showrooms are different business channels. Carres-owned
+showrooms may hold purchased Carres stock or supplier-owned consignment display goods under
+Purchasing's display rules. Dealers buy from Carres; Dealer showrooms do not use consignment.
+Multiple locations do not turn a Dealer purchase into an internal Stock Transfer or a
+consignment placement. Location alone never determines Unit ownership.
+
+Showroom and Operation continue the same source request, retaining company, location, actor
+and connected documents without re-entry. **Showroom is an approved unified business entry,
+with Carres-owned showroom and Dealer showroom scopes (Jess, 2026-10-02).** Each company may
+have multiple locations; the signed-in actor sees only authorised company/location scope.
+Both scopes use the same product/action/evidence request grammar, two-working-day substantive
+first response and source-linked progress communication (Purchasing §9.8; Service §1.1).
+The common entry does not replace existing customer-order sales channels or merge Purchasing,
+Service, Delivery, Stock and commercial write ownership. Final unapproved screen wording,
+external access mechanics, Dealer-company purchase transaction model, Dealer credit, the whole
+pending Blueprint and application implementation are not approved by this placement ruling.
+
+**Carres-owned Showroom → Ready Stock — APPROVED TARGET / NOT BUILT, Jess 2026-10-02.**
+Showroom staff have a Ready Stock page to find eligible Warehouse stock for urgent customer
+Sales Orders. It is another entry into Stock's shared eligible-Unit view, not another stock
+register, inventory balance or reservation engine. Stock MASTER §12.3 owns eligibility and the
+Sales-owned exact-Unit reservation; warehouse stock presence alone does not prove availability.
+This ruling grants the Carres-owned showroom entry only; it does not grant Dealer visibility
+of HQ inventory or add a Warehouse top-level Ready Stock destination.
 
 **A page is named after the operator's primary responsibility.** Usually that is a business
 object; sometimes it is an accepted ERP operation (`Receiving`); cross-cutting system pages
@@ -341,14 +485,13 @@ SUPPLY CHAIN
 │   └── SHOWROOM
 │       ├── Display Requests
 │       ├── Consignment Orders
-│       ├── Consignment Returns
-│       └── Consignment Sale Notices
+│       └── Consignment Returns
 ├── Warehouse
-│   ├── Arrival Schedule
-│   ├── Pickup Schedule
 │   ├── Inbound
+│   │   └── Arrival Schedule (view)
 │   ├── Inventory
 │   └── Outbound
+│       └── Pickup Schedule (view)
 └── Delivery
 
 FINANCE
@@ -373,6 +516,13 @@ This is the **ERP Shell V1 destination grammar**, owner-approved 2026-08-13. A m
 a second settings home. `Old Orders` is a temporary cutover door and is not part of permanent IA.
 The right Quick Rail is governed by `ui/MASTER.md`; it never adds duplicate module destinations or
 business truth.
+
+**Warehouse navigation amendment — owner-approved 2026-10-22 / NOT BUILT.** Three primary
+entries only: Inbound, Inventory and Outbound. Arrival Schedule is an Inbound view; Pickup Schedule
+is an Outbound view. The two directional schedules and their full working-week content remain;
+existing bookmarks and Calendar/Work/source links retain exact source/date/Site context. This
+supersedes five peer destinations, not the business/work ownership or global Calendar. Stock MASTER
+§2 owns the complete placement and acceptance boundary. This is design approval, not build or release.
 
 **Warehouse placement — owner ruling 2026-09-01.** Inventory is the one current Unit Register.
 Ready Stock is a saved eligible-Unit view shared with Sales, not a destination or second pool;
@@ -490,6 +640,45 @@ either place — neither is money, so neither is 0175-locked and the API leaves 
 column from the selling grid on 2026-07-06 (*"not needed for now"*, `9f21582e`) and nothing has
 reopened it. The alignment is therefore asymmetric ON ONE COLUMN by explicit decision.
 
+**Catalog coverage reconciliation — 9 Oct; existing authority only.** Catalog maintenance covers model/SKU identity and variants, category and exact-Unit versus quantity identity, applicable model choices, supplier/item-code mapping, selling prices and purchasing cost, selling availability, and the existing New SKU/import/export doors. This is a coverage checklist inside the current authority, not approval of every schema field or editable setting. Supplier contacts, supplier calendars and destinations remain Purchasing-owned. Order promises and historical document snapshots remain Orders-owned; Catalog changes do not authorise rewriting signed or issued records. Scheduled supplier-price maintenance follows its source contract; schedule/effective treatment and availability transitions still require verification. Existing API/role gates above remain controlling, including the explicit selling-grid cost exception. No duplicate Catalog editor or bulk-delete permission is granted. There is no separate Catalog MASTER; the complete lifecycle/settings/acceptance review draft below now fills that documentation scope in this existing authority. Proposal approval, unresolved effective-policy decisions and runtime acceptance remain open rather than inferred from field coverage.
+
+### Houzs Catalog capability adaptation — authenticated evidence, 9 Oct 2026
+
+**Observed reference, not Carres approval or saved-behavior proof:** Houzs Products exposes SKU Master, Modular, Maintenance, Combo Pricing, Variants, Fabric Converter and Categories. SKU Master shows code/category/size/two price fields/barcode/volume/status, import/export/new/edit-price doors and a no-supplier-binding attention filter. Modular renders model/category/status/SKU counts and a warning that search covers only loaded rows. Maintenance renders option pools, surcharges, an effective date and Edit/History. Variants describes per-SKU activation/price overrides; Combo Pricing describes module-set pricing, effective-dated append-only history and universal customer applicability. Only rendered content was inspected; no create/import/export/save/price change or price calculation was tested. Later bounded Fabric Converter/Categories and loaded Combo rule observations follow below; selected variant and combo edit forms remain unread.
+
+**Recommendation / PROPOSAL:** adapt the capability separation using the one Catalog authority: model and variant identity, allowed options, supplier-binding attention, effective pricing and traceable history. An incomplete lookup must report its coverage rather than claim the product is absent. A missing supplier or economic value is missing data, never zero or an invented supplier. Carres's principal-only selling-price gates, permitted cost gates and exact-Unit/quantity identity remain controlling; a reference tab cannot widen them. Keep variant availability separate from supplier availability and physical stock. Any option/surcharge/combo/fabric conversion must declare its inputs, compatible model/SKUs, applicable customer/channel, effective version and rounding under an approved source contract before adoption. Do not adopt Houzs's universal B2C deal policy, foreign prices, categories or volumes.
+
+**Cross-module effect:** Sales reads the applicable saved product/price configuration into its governed agreement; Purchasing reads supplier and buying facts; Receiving/Stock consume the stored identity mode; Delivery reads actual goods/handling facts; Payment retains its own amount/document laws. Product configuration does not reserve stock, generate Unit IDs, issue a PO or amend a signed SO by itself. Preserve prior agreement/document snapshots on maintenance and retirement. Acceptance must show old versus new effective versions, incompatible/missing option rejection, incomplete-search coverage, supplier-binding gaps, permitted/denied price edits and downstream identity consistency. Existing equivalent functions should be connected, not rebuilt.
+
+**Fresh Fabric/Category/Combo reconciliation — authenticated read-only, 9 Oct 2026.** Fabric Converter loaded company-scoped code/series/description, supplier-code gaps, separate Sofa/Bedframe tier and active/retired coverage. It describes supplying the Maintenance fabric pool and POS choices. Categories loaded cover-image/sort and edit/delete/reorder capabilities. Combo Pricing loaded composition/fabric-tier/effective-date/active rules, dimension/default price gaps, History/Edit composition/Soft-delete and supplier-anchored auto-derived cost descriptions. No create/edit/import/export/delete/price calculation tested; selected editor/variant forms remain uninspected. Foreign values, fabric codes, categories and cost-selection formulas are not copied.
+
+**Recommended Catalog contract / PROPOSAL:** one saved fabric identity and supplier mapping feeds permitted product options; sofa and bedframe compatibility/tier rules are explicit rather than inferred from names. Staff first select the correct model and compatible fabric, see the effective authorised price rule and missing configuration, then save through the same Catalog source. Adding a selectable colour does not prove supplier availability, price approval or stock. Keep visual category cover/sort separate from governed Purchasing production categories, Guarantee coverage and stored Unit/quantity mode; changing display order/image cannot change those business meanings.
+
+For a proposed combo, retain exact component SKU/variant quantities, compatible configuration/tier/dimension, channel/customer applicability, price source/effective version and missing-rule behavior. Preview the rule and its component consequences; qualified price editing follows existing Principal gates. Missing dimension/default price is unknown, never free or automatic fallback. Reject copying Houzs's highest-supplier-set derived cost or universal B2C eligibility: Carres buying cost and Finance valuation need their own approved lineage, not a price-like reference label. Shared components cannot be consumed twice across combos or individually allocated goods.
+
+Retiring a fabric/category/combo hides it only under an approved admission policy while old SO/PO/Unit/document configuration and price snapshots remain readable. Imports need existing source-owned preview/row outcomes and duplicate/conflict treatment; no generic bulk-delete permission from a visible button. Acceptance: incompatible fabric is refused; a missing supplier/price explains its exact gap; separate sofa/bedframe tiers do not leak into each other; future/retired rules preserve historical agreements; a category presentation change does not alter policy/production/stock identity; repeated save creates no duplicate composition or implicit inventory movement. These are review requirements, not passed server/runtime checks.
+
+### Catalog lifecycle and delivery checklist — consolidated review draft, 9 Oct 2026
+
+This complete workflow coverage uses the existing Catalog architecture as its authority. Existing approved write boundaries above are law; the proposed validation/retirement/import handling below remains **PROPOSAL / NOT LAW** where no owning ruling exists. No new MASTER or Catalog chat is needed to read this draft.
+
+| Step / situation | Actor, record and result | Source / approval boundary |
+|---|---|---|
+| Find the product | Read shared model/SKU identity, actual category, options, sell state, supplier code and permitted economic fields; show load failure separately from an empty result | One Catalog bundle; `OperationCatalogPage.tsx`, `ProductMaintenancePage.tsx`, `catalog-tabs.ts` inspected as code, not production acceptance |
+| Add a model / variant | Use existing model/New SKU doors; validate actual category and options before creating identity; no guessed category from text | Current schema/model route evidence; exact duplicate/model option policy still proposed; new entry does not grant pricing rights |
+| Price or cost | Principal changes selling/PWP/size prices; Operation or Principal records cost; supplier/code use existing internal gates | Existing approved architecture; `catalog.ts` create/patch price-cost gates inspected. Missing cost or supplier blocks the governed PO writer, not fabricated defaults |
+| Share product choices | Sales entry reads applicable model/SKU choices; Purchasing reads supplier/cost; Stock reads exact-Unit/quantity mode | `schemas/catalog.ts`; approved shared ownership. A field's presence is not blanket permission or approval of a new option |
+| Review and save | Validate authorised fields; preserve failed input and show source errors; reload canonical values after a successful write | Existing owning gates preserved; baseline/conflict/duplicate-save and history guarantees require verification, not an invented atomicity claim |
+| Import / generate / export | Use existing authorised doors and priced-versus-unpriced gates; proposed preview separates valid, duplicate, rejected and skipped rows and states partial results | `catalog.ts` import/generation routes and tab evidence; preview, rollback and all-or-nothing semantics not approved merely by route existence |
+| Retire or restore | Distinguish sell visibility (`posActive`), soft retirement (`discontinuedAt`) and physical deletion; preserve old order/stock/document references | Current model DELETE soft-retires; current SKU DELETE physically deletes and may remove a compartment offer/model. Actual dependency/RLS/concurrency acceptance unverified; no bulk-delete approval inferred |
+| Supplier future price | Keep Catalog ownership; expose source/effective date/current-versus-future value under an approved schedule contract | Purchasing §12.1 assigns ownership; exact schedule, version and existing-order applicability remain open |
+| Help / correction | Correct the owning identity/configuration with qualified permissions; do not repair Stock quantities, SO promises or Payment amounts from Catalog | Cross-module owners unchanged; missing policy or source record stays explicit |
+| Completion / handoff | Saved and re-read permitted Catalog record is the product-maintenance result; Sales/PO creation, stock availability and delivery are separately proven | UI save does not mean purchasing/delivery readiness or complete Catalog acceptance |
+
+**Settings coverage:** product/model/category and stock identity; permitted option pools; supplier-item mapping; selling/PWP/size prices and buying cost; fabric/combo/add-on/promotion source configuration where already owned; sell/retirement state; import/export permissions and future supplier prices. Delivery's logistics coverage and operating calendars, Guarantee terms, Purchasing supplier contacts and Workspace personnel remain source-owned links, even if a legacy Catalog tab presents their data. Personal columns/filters are personal preferences, not company business configuration.
+
+**Acceptance evidence owed:** authorised-role create/edit and denied pricing; duplicate SKU identity; exact-Unit/quantity downstream consistency; no unsupported option on an order; unavailable cost/supplier PO refusal; import per-row outcomes; retirement with existing references; stale save and permission errors; issued documents unchanged; successful source re-read. Existing tests were not run by this document pass. These checks form the complete delivery boundary, not a claim they passed. Remaining business decisions are destructive/bulk deletion, navigation consolidation, and exact future-price/retirement/effective-policy scope where no approved source is found. They are separate from engineer-owned verification and do not reopen already approved price roles.
+
 🟡 **Bulk delete is the one gap deliberately left open.** Every other difference Jess named is
 closed, but permanently destroying catalog rows was never asked for by name, and *align* is not a
 yes to it. It needs its own ruling.
@@ -541,9 +730,10 @@ each supplier call the things they sell us?"*, derived from the catalog and neve
 > will be.**
 
 > ### 🔴 WHAT LEAVES THE CUSTOMER ORDER IN V2
-> V1's Orders module writes eleven kinds of record across five modules. **Four move out:**
-> receiving a line (D2, already removed) · reserving and releasing stock · editing carrier
-> configuration (D5) · recording a payment. **Each becomes a LINK.**
+> V1's Orders module writes eleven kinds of record across five modules. **Three move out:**
+> receiving a line (D2, already removed) · editing carrier configuration (D5) · recording a
+> payment. **Each becomes a LINK.** Exact-Unit reservation/release remains the Sales Order promise
+> under §3.5; Stock validates eligibility and reflects that binding, with no second editor.
 >
 > **What STAYS, and why it is not arbitrary:** the delivery BOOKING and the money GATE stay
 > with the order, because **both are promises to the customer, and the customer's promise is
@@ -579,8 +769,7 @@ each supplier call the things they sell us?"*, derived from the catalog and neve
 
 **ACTIONS**
 - Issue/revise a purchase order · ask the supplier for an actual date · ask about a dated late
-  delivery or balance · govern supplier claims/returns/repairs · issue consignment orders/returns/
-  sale notices · cancel an outstanding demand · set the engine numbers.
+  delivery or balance · govern supplier claims/returns/repairs · issue consignment orders/returns · cancel an outstanding demand · set the engine numbers.
 
 **SUMMARISES** — the customer's promised date and the customer's name (to know what is urgent
 and who is waiting) · free stock (to suggest, never to consume).
@@ -907,7 +1096,7 @@ These are engines. They have no page, they own no record, and every module calls
 |---|---|
 | Orders writes a receive | **Receiving.** Orders links. *(Already true — D2)* |
 | Orders reads "is it bought?" from an importer's column | **Purchasing**, through the purchase order. *(Already true — D1)* |
-| Orders reserves and releases stock units | **Stock.** Orders links |
+| Orders reserves and releases stock units | **Sales Order** owns the exact-Unit promise; Stock validates eligibility and reflects the binding (§3.5) |
 | Orders edits carrier configuration | **Delivery.** Orders links |
 | Orders records a payment into a ledger nothing reads | **Money In**, and the two stores become one |
 | Three functions answer "what category?" | **Catalog.** One answer, everyone asks |

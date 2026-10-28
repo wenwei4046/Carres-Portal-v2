@@ -106,10 +106,10 @@ export default function PrincipalAudit() {
           <button
             key={r}
             onClick={() => setRoleFilter(r)}
-            className={`px-3.5 py-1.5 text-meta rounded cursor-pointer capitalize ${
+            className={`px-3.5 py-1.5 text-body rounded cursor-pointer capitalize ${
               roleFilter === r
-                ? "bg-white text-base-900 font-semibold"
-                : "text-base-600 font-medium"
+                ? "bg-white text-base-900 font-medium"
+                : "text-base-600"
             }`}
           >
             {r}
@@ -133,12 +133,12 @@ export default function PrincipalAudit() {
             <RoleChip role={e.role ?? "system"} />
             <div className="min-w-0">
               <div className="text-base-900">{displayAction(e.action)}</div>
-              <div className="text-label text-base-500 mt-0.5">
+              <div className="text-meta text-base-500 mt-0.5">
                 {e.actor ?? ""}
                 {displayRef(e.ref) ? ` · ${displayRef(e.ref)}` : ""}
               </div>
             </div>
-            <div className="font-mono text-label text-base-400 whitespace-nowrap">
+            <div className="font-mono text-meta text-base-500 whitespace-nowrap">
               {formatTs(e.occurredAt)}
             </div>
           </div>
@@ -146,7 +146,7 @@ export default function PrincipalAudit() {
       </div>
 
       {rows.length > 0 && (
-        <div className="text-label text-base-500 mt-3 text-right">
+        <div className="text-meta text-base-500 mt-3 text-right">
           {rows.length} entries (latest first, max 500).
         </div>
       )}
@@ -158,7 +158,7 @@ function RoleChip({ role }: { role: string }) {
   const color = ROLE_COLORS[role] ?? "#5a5a5a";
   return (
     <span
-      className="inline-block px-2.5 py-[2px] rounded bg-base-100 text-label font-semibold uppercase tracking-[0.05em]"
+      className="inline-block px-2.5 py-[2px] rounded bg-base-100 text-label uppercase tracking-[0.06em]"
       style={{ color }}
     >
       {role}

@@ -89,7 +89,7 @@ export default function CustomerStatement({ orderId, onClose }: {
         <h2 className="text-strong mb-2">Statement</h2>
         <p>{s.customer.name ?? "Customer name not recorded"}</p>
         <p>{s.customer.phone ?? "Phone not recorded"}</p>
-        <p className="text-label font-normal">
+        <p className="text-meta">
           {s.matched_on === "phone" ? "Every Sales Order with this phone number."
             : s.matched_on === "name" ? "Every Sales Order under this name. No phone number is recorded."
             : "This Sales Order only. Neither a phone number nor a name is recorded."}
@@ -99,7 +99,7 @@ export default function CustomerStatement({ orderId, onClose }: {
 
       {s.orders.map((o) => <SectionCard key={o.order_id}><div className="p-4 text-body">
         <h2 className="text-strong mb-2">{o.so != null ? `SO-${o.so}` : "SO not available"}</h2>
-        <p className="font-semibold">
+        <p className="font-medium">
           {o.known
             ? `Amount still needed: ${rm(o.still_needed ?? 0)}`
             : "Amount still needed: value not recorded"}

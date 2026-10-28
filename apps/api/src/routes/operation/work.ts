@@ -1,10 +1,13 @@
+import { loadCaseRemedyWork } from "../../lib/service-case-remedy-work";
 import { Hono, type Context } from "hono";
 import { sellableOf } from "./stock";
 import { HTTPException } from "hono/http-exception";
 import {
   countWorkingDays,
+  poDocumentNumberOf,
   myHolidaySet,
   operationWorkItemFromProjection,
+  OPERATION_WORK_INCLUDE_WORKSPACE,
   projectIssueActionWork,
   operationWorkResponseSchema,
   poSupplierDeliveryDateOf,
@@ -37,8 +40,20 @@ import {
   type WorkOwnerRule,
   type WorkspaceDutyResolution,
   type WorkingDayOptions,
-  WAREHOUSE_OFF_DAYS,
   PURCHASING_OFFICE_OFF_DAYS,
+  DEFAULT_OFFICE_CALENDAR,
+  DEFAULT_DELIVERY_CALENDAR,
+  deliveryHolidaySet,
+  deliveryWorkingDayOptions,
+  type DeliveryCalendar,
+  deliveryQueueLeads,
+  isOutstation,
+  officeOwnerCalendar,
+  officeWorkingDayOptions,
+  personOwnerCalendar,
+  warehouseReceivingDaysLate,
+  type OfficeCalendar,
+  type OwnerCalendar,
   orderActionLines,
   poWindowWorkFromSoBatch,
   type PoWindowSupplierDoors,
@@ -47,6 +62,12 @@ import {
   type SoBatchPurchaseResponse,
 } from "@carres/shared";
 import { collectionOwnerResolution, type CollectionOwnerContextRow } from "@carres/shared";
+import {
+  assignedLogisticsIdOf,
+  customerLegDeliveryOf,
+  type CustomerLegArrangementRead,
+  type CustomerLegDocumentRead,
+} from "@carres/shared";
 import {
   WORK_CHANNELS,
   WORK_CONTACT_KINDS,
@@ -64,7 +85,13 @@ import {
 } from "@carres/shared";
 import { z } from "zod";
 import { requireOperation } from "../../lib/auth-guards";
+import { loadInternalTaskWork } from "../../lib/internal-task-work";
 import { loadPurchasingSettings } from "../../lib/purchasing-settings";
+import { readOfficeCalendar } from "../../lib/office-calendar";
+import { DEFAULT_DELIVERY_RULES, readDeliveryRules } from "../../lib/delivery-rules";
+import { readWarehouseReceivingSettings } from "../../lib/warehouse-receiving-calendar";
+import { readDeliveryCalendar } from "../../lib/delivery-calendar";
+import { readPersonWorkDays } from "../../lib/person-work-days";
 import { chunk } from "../../lib/purchase-demand-read";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -83,15 +110,19 @@ import { loadRepairOrderWork } from "../../lib/repair-order-work";
 import { loadSupplierClaimWork } from "../../lib/supplier-claim-work";
 import { loadPurchaseReturnWork } from "../../lib/purchase-return-work";
 import {
+  invoiceArrivalDayWord,
   invoiceNeeded,
   invoicePaymentTiming,
+  orderCollectionClockStartIso,
   soRemaining,
   type InvoiceRegisterPage,
   type InvoiceRegisterRow,
 } from "@carres/shared/payment-invoice-register";
 import {
   collectionTimingFor,
+  collectionTimingRulesOf,
   type CollectionTimingRule,
+  type CollectionTimingRuleRow,
 } from "@carres/shared/collection-clock";
 import {
   latestOutcomeOf,
@@ -110,6 +141,93 @@ export interface OperationWorkStaff {
   userId: string;
   name: string | null;
   email: string;
+}
+
+/**
+ * ⭐ THE CALENDARS THE FEED COUNTS ON — read ONCE per request (9 Oct 2026).
+ *
+ *   office    Settings → Office (`readOfficeCalendar`): the working weekdays
+ *             and holidays every OFFICE deadline counts on — when Operation
+ *             and Purchasing must act, and how many working days it is late.
+ *   owner     the Office calendar as the payment clock's action owner when no
+ *             person is resolved; `ownerOf(userId)` is the RESPONSIBLE
+ *             PERSON's calendar — their recorded working week (People/HR,
+ *             0678), Office weekdays when none is recorded, with the Office
+ *             holidays (`personOwnerCalendar`). It decides only WHEN staff
+ *             act, never a payment fact.
+ *   delivery  the Delivery calendar (`readDeliveryCalendar`): Monday–Saturday
+ *             with the Selangor holidays Warehouse Settings stores for the
+ *             dispatching Site, else the built-in list. The FACTS Delivery
+ *             owns (Logistics checks, `Assign logistics by`, deliver/photo)
+ *             and the payment-due fact. Not the Office calendar (Settings List
+ *             OFF-01: supplier, warehouse and logistics calendars are separate).
+ *
+ * A caller that read nothing gets the owner-confirmed defaults.
+ */
+export interface WorkFeedCalendars {
+  office: WorkingDayOptions;
+  owner: OwnerCalendar;
+  delivery: WorkingDayOptions;
+  /** The responsible person's calendar (`personOwnerCalendar`). */
+  ownerOf: (userId: string | null | undefined) => OwnerCalendar;
+}
+
+export function workFeedCalendarsOf(
+  cal: OfficeCalendar = DEFAULT_OFFICE_CALENDAR,
+  delivery: DeliveryCalendar = DEFAULT_DELIVERY_CALENDAR,
+  /** Each person's recorded working week (`readPersonWorkDays`). */
+  personWorkDays: ReadonlyMap<string, readonly number[]> = new Map(),
+): WorkFeedCalendars {
+  const officeOwner = officeOwnerCalendar(cal);
+  return {
+    office: officeWorkingDayOptions(cal),
+    owner: officeOwner,
+    delivery: deliveryWorkingDayOptions(delivery),
+    ownerOf: (userId) => (userId ? personOwnerCalendar(cal, personWorkDays.get(userId) ?? null) : officeOwner),
+  };
+}
+
+/** The person whose working days an order's collection action follows: the
+ *  resolved actor (today's cover when covered), else the normal owner. */
+function collectionActorOf(resolution: WorkspaceDutyResolution | null | undefined): string | null {
+  return resolution?.actingPerson?.userId ?? resolution?.normalOwner?.userId ?? null;
+}
+
+/** Settings → Office for this request, as the caller (RLS). Never throws: an
+ *  unreadable calendar — or a request with no database at all — answers the
+ *  owner defaults (`readOfficeCalendar`'s own fail-safe). */
+export async function officeCalendarOf(c: Context<AppEnv>): Promise<OfficeCalendar> {
+  try {
+    return (await readOfficeCalendar(userClient(c.env, c.var.auth.jwt))).calendar;
+  } catch {
+    return DEFAULT_OFFICE_CALENDAR;
+  }
+}
+
+/** The Delivery calendar for this request, as the caller (RLS). Never throws:
+ *  an unreadable Warehouse calendar answers the built-in list. */
+async function deliveryCalendarFor(c: Context<AppEnv>): Promise<DeliveryCalendar> {
+  try {
+    return (await readDeliveryCalendar(userClient(c.env, c.var.auth.jwt))).calendar;
+  } catch {
+    return DEFAULT_DELIVERY_CALENDAR;
+  }
+}
+
+/** Delivery Rules for this request; never throws (default 3). */
+async function deliveryRulesOf(c: Context<AppEnv>) {
+  try {
+    return await readDeliveryRules(userClient(c.env, c.var.auth.jwt));
+  } catch {
+    return DEFAULT_DELIVERY_RULES;
+  }
+}
+
+/** The Office holidays as the set the Purchasing engines take. */
+function holidaySetOf(opts: WorkingDayOptions): ReadonlySet<string> {
+  const h = opts.holidays;
+  if (!h) return myHolidaySet();
+  return h instanceof Set ? h : new Set(h as readonly string[]);
 }
 
 interface SalesOrderModuleRow {
@@ -225,11 +343,29 @@ export function projectSalesOrdersFromModuleFacts(input: {
   /** §6.1 (0489) — the proof reviews and attempt evidence per document
    *  number, read once. Absent ⇒ no review work is composed. */
   proofFacts?: ProofFactsByDo | null;
-  /** Delivery's arrangement per order (leg 0) — THE booking fact (owner
-   *  decision 2026-09-25, Workspace §5.9 gap 6). Absent ⇒ the legacy booking
-   *  signal (a caller that has not read Delivery, e.g. an older test). */
-  arrangements?: ReadonlyMap<string, { confirmedDate: string | null; partnerId?: string | null }> | null;
+  /** Delivery's arrangements per order, every leg — the SAME arrangement
+   *  facts Monitor reads (owner decision 2026-09-25, Workspace §5.9 gaps 6
+   *  and 9). Absent ⇒ the legacy booking signal alone (a caller that has not
+   *  read Delivery, e.g. an older test). */
+  arrangements?: ReadonlyMap<string, ReadonlyArray<CustomerLegArrangementRead>> | null;
+  /** The order's LIVE Delivery Orders — the document's day outranks the
+   *  arrangement in the one delivery-day reader. */
+  deliveryOrders?: ReadonlyMap<string, ReadonlyArray<CustomerLegDocumentRead>> | null;
+  /** The Office and Delivery calendars (`workFeedCalendarsOf`). Absent ⇒ the
+   *  owner-confirmed defaults. */
+  calendars?: WorkFeedCalendars;
+  /** The stored Delivery leads: `assign` (DEL-04, Delivery Rules) and
+   *  `chase` (DEL-05, the Contact lead). */
+  queueLeads?: DeliveryQueueLeads;
+  /** `delivery_partners.kv_default` per company id — the outstation fact
+   *  (`isOutstation`). A company not in the map is never guessed outstation. */
+  kvDefaultByPartner?: ReadonlyMap<string, boolean>;
+  /** Each order's collection clock start (`orderCollectionClockStartIso`) —
+   *  the rule in force on it is the one the order's payment deadline runs
+   *  under. Absent ⇒ today. */
+  clockStartByOrder?: ReadonlyMap<string, string>;
 }): OperationWorkItem[] {
+  const calendars = input.calendars ?? workFeedCalendarsOf();
   const availableBySku = Object.fromEntries(
     input.stock.map((row) => [row.sku, row.available]),
   );
@@ -248,13 +384,32 @@ export function projectSalesOrdersFromModuleFacts(input: {
           0,
         )
       : null;
-    /* ONE booking truth: Delivery's arrangement when the feed read it —
-       a Scheduled date there IS the booking; no legacy `booking_stage`. */
-    const arrangement = input.arrangements ? input.arrangements.get(row.id) ?? null : undefined;
+    /* ⭐ ONE DELIVERY-DAY READER (Delivery MASTER §15.1, Workspace §5.9 gap
+       9): the customer leg's live document, then Delivery's arrangement, then
+       a CONFIRMED legacy booking — `customerLegDeliveryOf`, the answer Monitor
+       and the rail Calendar read. A Scheduled day there IS the booking. */
+    const delivery = input.arrangements
+      ? customerLegDeliveryOf({
+          documents: input.deliveryOrders?.get(row.id) ?? [],
+          arrangements: input.arrangements.get(row.id) ?? [],
+          booking: {
+            stage: (control?.booking_stage ?? null) as "none" | "provisional" | "confirmed" | null,
+            confirmedDate: control?.confirmed_date ?? null,
+          },
+        })
+      : null;
     const booking =
-      arrangement === undefined
+      delivery === null
         ? { stage: control?.booking_stage ?? null, confirmedDate: control?.confirmed_date ?? null }
-        : { stage: arrangement?.confirmedDate ? "confirmed" : null, confirmedDate: arrangement?.confirmedDate ?? null };
+        : { stage: delivery.iso ? "confirmed" : null, confirmedDate: delivery.iso };
+    /* ⭐ ONE ASSIGNMENT READER: Delivery's arrangement for the customer leg
+       wins, the order row's columns are the fallback — Monitor's own rule, so
+       `Assign logistics` and `Call {company}` cannot disagree with it. */
+    const partnerId = assignedLogisticsIdOf({
+      arrangementPartnerId: delivery?.arrangement?.partnerId,
+      orderPartnerId: row.delivery_partner_id,
+      triagePartnerId: row.ops_assigned_logistic,
+    });
     const hold = storageHold({
       storageFrom: control?.storage_from ?? null,
       override: control?.storage_fee_override ?? null,
@@ -289,7 +444,7 @@ export function projectSalesOrdersFromModuleFacts(input: {
          its leg-0 record names is assigned, as the Order Route reads it —
          the order row's legacy columns alone raised `Assign logistics` on an
          order the Route showed as assigned (SO-1333, 2026-09-28). */
-      logisticsAssigned: Boolean(arrangement?.partnerId || row.delivery_partner_id || row.ops_assigned_logistic),
+      logisticsAssigned: partnerId !== null,
       bookingStage: booking.stage,
       confirmedDate: booking.confirmedDate,
       deliveryOrderNumber: row.do_number,
@@ -343,12 +498,25 @@ export function projectSalesOrdersFromModuleFacts(input: {
           (loan) => loan.status === "on_loan",
         ),
         ...proofReviewFlagsOf(row, control, input.proofFacts ?? null),
+        /* 0486 · 0672 — the rule in force on the day this order's clock
+           started, and the outstation pair for an outstation company. */
+        collectionTiming: collectionTimingFor(input.timingRules, input.clockStartByOrder?.get(row.id) ?? input.today),
+        outstation: partnerId !== null && input.kvDefaultByPartner?.has(partnerId) === true
+          ? isOutstation({ kv_default: input.kvDefaultByPartner.get(partnerId) })
+          : false,
       },
       customer: row.customer_name,
-      logistics:
-        input.partnerNameById?.get(row.delivery_partner_id ?? row.ops_assigned_logistic ?? "") ?? null,
+      logistics: partnerId ? input.partnerNameById?.get(partnerId) ?? null : null,
       deliveryOrderNumber: row.do_number ?? null,
       today: input.today,
+      workingDays: calendars.delivery,
+      queueLeads: input.queueLeads,
+      /* The payment action (`collect` · `issue_delivery_order`) steps back on
+         the responsible person's working days; its FACT stays on Delivery. */
+      calendars: {
+        ...calendars,
+        owner: calendars.ownerOf(collectionActorOf(input.collectionOwnerFor?.(row.id) ?? null)),
+      },
     });
   });
 }
@@ -359,6 +527,8 @@ interface ManualPurchaseRegisterSource {
     /** `MPR250924-4827` (0546); absent on an older API. */
     req_no?: string | null;
     purpose: string;
+    request_version?: number | null;
+    request_context?: unknown;
     destination_id: string | null;
     why: string | null;
     approval_required: boolean;
@@ -374,12 +544,16 @@ interface ManualPurchaseRegisterSource {
   }>;
   lines: Array<{
     request_id: string;
+    context_read_available?: boolean;
+    context_admission_current?: boolean;
+    context_to_buy?: number;
     qty: number;
     approved_qty: number | null;
     issued_qty: number;
     cancelled_at: string | null;
     po_id: string | null;
     po_ids?: string[];
+    active_po_ids?: string[];
     received?: boolean;
     supplier_id: string | null;
     order_by: string | null;
@@ -411,7 +585,8 @@ interface PurchaseOrderWorkSource {
   supplier_id: string;
   status: "open" | "received" | "cancelled";
   version?: number | null;
-  /** OUR predicted arrival (production + transit) — the advance check's one
+  official_delivery_date?: string | null;
+  /** OUR predicted arrival (production days) — the advance check's one
    *  anchor. Already selected by the internal `/pos` read. */
   eta_date?: string | null;
   expected_ready_date?: string | null;
@@ -426,7 +601,24 @@ interface PurchaseOrderWorkSource {
     duty_name?: string | null;
     acting_name?: string | null;
   }>;
-  purchase_order_lines: Array<{ id?: string; qty: number; received_qty: number }>;
+  purchase_order_lines: Array<{ id?: string; qty: number; received_qty: number; cancelled_qty?:number }>;
+  cancellation_version?:number|null;
+  cancellation_event_id?:string|null;
+}
+
+export function projectPurchaseOrderCancellationSendWork(input:{pos:readonly PurchaseOrderWorkSource[];suppliers:readonly {id:string;name:string|null}[];poDuty:WorkspaceDutyResolution|null;today:string}):OperationWorkItem[] {
+ return input.pos.flatMap(po=> {
+  const version=po.version??1;
+  if(po.cancellation_version!==version || !po.cancellation_event_id || (po.sends??[]).some(send=>send.kind==="confirmed_sent"&&send.po_version===version)) return [];
+  const owner=input.poDuty;const supplier=input.suppliers.find(row=>row.id===po.supplier_id)?.name??"Supplier";
+  const item:WorkItem={ruleKey:"purchasing.cancellation_send",module:"purchasing",orderId:po.id,soRef:po.id,
+   action:`Send ${poDocumentNumberOf(po.id,version)} to ${supplier}`,ownerRule:"po_duty",ownerDutyKey:"po_duty",normalOwner:owner?.normalOwner??null,activeCover:owner?.activeCover??null,actingPerson:owner?.actingPerson??null,
+   ownerState:owner?.state??"not_assigned",ownerName:owner?.actingPerson?.name??null,ownerUserId:owner?.actingPerson?.userId??null,...(owner?.actingPerson?{}:{ownerDuty:"PO Duty"}),tone:"info",locked:false,broken:false,dueIso:null,workingDaysLate:0};
+  return [operationWorkItemFromProjection(item,{object:{kind:"purchase_order",id:po.id,label:po.id},problem:"Sending not confirmed",recipient:supplier,
+   requiredResult:"Current PO version marked as sent",destination:`/operation?tab=purchase-orders&po=${encodeURIComponent(po.id)}`,today:input.today,
+   occurrenceKey:`cancellation:${po.cancellation_event_id}:${version}`,sourceVersion:`${po.id}:${version}:${po.cancellation_event_id}`,
+   interaction:{mode:"embedded",actionKey:"purchasing.confirm_po_sent",componentKey:"purchasing.po_issue_evidence",capability:"POST /api/operation/pos/:id/confirm-sent",inputContract:"ConfirmPoSentInput",evidenceContract:"po_sends confirmed_sent for the rendered version",idempotencyKey:"po_id + po_version",staleVersion:"ConfirmPoSentInput.poVersion",staleRefusal:"stale_po_version",successReceipt:"PO sent to supplier",fallbackDestination:`/operation?tab=purchase-orders&po=${encodeURIComponent(po.id)}`}})];
+ });
 }
 
 export function projectPurchaseOrderReplyWork(input: {
@@ -434,22 +626,39 @@ export function projectPurchaseOrderReplyWork(input: {
   suppliers: readonly { id: string; name: string | null }[];
   poDuty: WorkspaceDutyResolution | null;
   today: string;
+  /** The stored Office calendar (`officeWorkingDayOptions`); default Mon–Fri. */
+  office?: WorkingDayOptions;
 }): OperationWorkItem[] {
   const supplierById = new Map(input.suppliers.map((row) => [row.id, row.name]));
-  const holidays = myHolidaySet();
+  const holidays = input.office ? holidaySetOf(input.office) : myHolidaySet();
+  const offDays = input.office?.offDays ?? PURCHASING_OFFICE_OFF_DAYS;
   return input.pos.flatMap((po) => {
     const version = po.version ?? 1;
     const supplierName = supplierById.get(po.supplier_id) || "Supplier";
+    // Reuse the register/day-before arrival authority, including per-line and
+    // split answers. An absent supplier reply does not erase a passed PO date.
+    const expectedArrivals = poExpectedArrivalsOf({
+      version,
+      officialDeliveryDate: po.official_delivery_date ?? null,
+      etaDate: po.eta_date ?? null,
+      promises: po.promises ?? [],
+      lines: po.purchase_order_lines.map((line, index) => ({
+        id: line.id ?? `${po.id}#${index}`,
+        qty: Number(line.qty), receivedQty: Number(line.received_qty),cancelledQty:line.cancelled_qty,
+      })),
+    }).map((arrival) => arrival.arrival);
     const items = purchaseOrderReplyWorkItems({
       id: po.id,
       supplierName,
       status: po.status,
       version,
       supplierDate: poSupplierDeliveryDateOf(po.promises, version),
+      expectedArrivals,
       expectedReadyDate: po.expected_ready_date ?? null,
       lines: po.purchase_order_lines.map((line) => ({
         qty: line.qty,
         receivedQty: line.received_qty,
+        cancelledQty:line.cancelled_qty,
       })),
       sends: (po.sends ?? []).map((send) => ({
         kind: send.kind,
@@ -461,7 +670,7 @@ export function projectPurchaseOrderReplyWork(input: {
         dutyName: send.duty_name,
         actingName: send.acting_name,
       })),
-    }, input.poDuty, input.today, holidays);
+    }, input.poDuty, input.today, holidays, offDays);
     /* A PO the supplier has not answered since it was sent is NOT work
        (owner ruling 2026-09-24, Purchasing MASTER §5.7 / §9.3) — the shared
        builder emits only the passed-date follow-up; the day-before check is
@@ -491,9 +700,12 @@ export function projectPurchaseOrderArrivalCheckWork(input: {
   suppliers: readonly { id: string; name: string | null }[];
   poDuty: WorkspaceDutyResolution | null;
   today: string;
+  /** The stored Office calendar (`officeWorkingDayOptions`); default Mon–Fri. */
+  office?: WorkingDayOptions;
 }): OperationWorkItem[] {
   const supplierById = new Map(input.suppliers.map((row) => [row.id, row.name]));
-  const holidays = myHolidaySet();
+  const holidays = input.office ? holidaySetOf(input.office) : myHolidaySet();
+  const offDays = input.office?.offDays ?? PURCHASING_OFFICE_OFF_DAYS;
   return input.pos.flatMap((po) => {
     const supplierName = supplierById.get(po.supplier_id) || "Supplier";
     /* Owner ruling 2026-09-24 / 2026-09-25 (Purchasing MASTER §5.7): the check
@@ -540,7 +752,7 @@ export function projectPurchaseOrderArrivalCheckWork(input: {
         lines: batchLines,
         poNo: po.id,
         channel,
-      }, input.poDuty, input.today, holidays);
+      }, input.poDuty, input.today, holidays, offDays);
       return items.map((item) => operationWorkItemFromProjection(item, {
         object: { kind: "purchase_order", id: po.id, label: po.id },
         /* The card's own date badge and party line carry the date and the
@@ -569,9 +781,9 @@ export function projectPurchaseOrderArrivalCheckWork(input: {
  * marked `PO sent to supplier`. The per-Sales-Order `issue_po` and the
  * retired `confirm_ready_date` never reach Work (see `loadOperationWork`).
  *
- * A received PO needs no sending — the goods are already in — so it counts
- * as issued and done. Unreadable window settings are a Purchasing source
- * failure, never an empty buying day.
+ * Goods receipt does not confirm that the current PO version was sent.
+ * Unreadable window settings are a Purchasing source failure, never an
+ * empty buying day.
  */
 /** The window model over the SO Batch read — the feed, the probe and the
  *  completion facts all run THIS, so "which POs a window issued" has one
@@ -598,9 +810,12 @@ export function projectPoWindowWork(input: {
   poDuty: WorkspaceDutyResolution | null;
   today: string;
   now: string;
+  /** The stored Office calendar (`officeWorkingDayOptions`); default Mon–Fri. */
+  office?: WorkingDayOptions;
 }): OperationWorkItem[] {
   const windows = poWindowsOf(input.read, input.suppliers);
-  const holidays = myHolidaySet();
+  const holidays = input.office ? holidaySetOf(input.office) : myHolidaySet();
+  const offDays = input.office?.offDays ?? PURCHASING_OFFICE_OFF_DAYS;
   const owner = input.poDuty;
   const now = Date.parse(input.now);
   return windows.map((w: PoWindowWork) => {
@@ -626,7 +841,7 @@ export function projectPoWindowWork(input: {
       broken: false,
       dueIso: w.date,
       workingDaysLate: input.today > w.date
-        ? countWorkingDays(w.date, input.today, { offDays: PURCHASING_OFFICE_OFF_DAYS, holidays })
+        ? countWorkingDays(w.date, input.today, { offDays, holidays })
         : 0,
     };
     return operationWorkItemFromProjection(item, {
@@ -674,12 +889,29 @@ export function projectPaymentCollectionWork(input: {
    *  runs under is the rule in force on its issue day — a snapshot by
    *  construction. Absent ⇒ the ruled default (3 · 2). */
   timingRules?: readonly CollectionTimingRule[] | null;
+  /** The calendars: the payment-due FACT counts on `delivery`; the action
+   *  day steps back on the responsible person's calendar (`ownerCalendarFor`,
+   *  else `owner`); lateness is counted on `office`. Absent ⇒ the defaults. */
+  calendars?: WorkFeedCalendars;
+  /** The responsible person's calendar for this order's collection action
+   *  (their working days, Office weekdays when none are recorded). Absent ⇒
+   *  the Office calendar. Never consulted for the payment facts. */
+  ownerCalendarFor?: (orderId: string) => OwnerCalendar;
 }): OperationWorkItem[] {
-  const holidays = myHolidaySet();
+  const calendars = input.calendars ?? workFeedCalendarsOf();
+  // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): an order may carry
+  // several part Sales Invoices (0712). The balance is the ORDER's, so the
+  // customer is asked once per order, on its first issued Sales Invoice.
+  const askedOrders = new Set<string>();
   return input.invoices.flatMap((invoice) => {
     if (invoice.status !== "issued" || !invoice.orders) return [];
+    if (invoice.kind === "sales") {
+      if (askedOrders.has(invoice.order_id)) return [];
+      askedOrders.add(invoice.order_id);
+    }
     const timingRule = collectionTimingFor(input.timingRules, invoice.issued_at?.slice(0, 10) ?? input.today);
-    const { timing, clock } = invoicePaymentTiming(invoice, input.today, { holidays }, undefined, timingRule);
+    const ownerCalendar = input.ownerCalendarFor?.(invoice.order_id) ?? calendars.owner;
+    const { timing, clock } = invoicePaymentTiming(invoice, input.today, calendars.delivery, undefined, timingRule, ownerCalendar);
     const money = invoiceNeeded(invoice);
     const owing = money.known && money.outstanding > 0;
     const latest = latestOutcomeOf(input.outcomes, invoice.order_id);
@@ -714,8 +946,10 @@ export function projectPaymentCollectionWork(input: {
       locked: false,
       broken: false,
       dueIso,
+      /* The due is the OWNER's day (Office calendar), so lateness counts the
+         Office working days after it — never the Mon–Sat fact week. */
       workingDaysLate: late && dueIso
-        ? countWorkingDays(dueIso, input.today, { holidays })
+        ? countWorkingDays(dueIso, input.today, calendars.office)
         : 0,
     };
     return [operationWorkItemFromProjection(workItem, {
@@ -725,7 +959,7 @@ export function projectPaymentCollectionWork(input: {
         label: invoice.invoice_no ?? `SO-${invoice.orders.so} invoice`,
       },
       problem: broken
-        ? "Customer promise was missed"
+        ? "Customer's promised payment date passed"
         : timing.kind === "late" ? "Customer payment should have been received" : "Customer balance due",
       recipient: invoice.orders.customer_name,
       requiredResult: `Outstanding balance reduced from RM ${money.outstanding.toFixed(2)} to RM 0`,
@@ -753,8 +987,11 @@ export function projectStorageInvoiceWork(input: {
    *  (owner ruling 2026-09-13). Absent or unassigned ⇒ the Delivery Duty
    *  word stands; never the PIC. */
   ownerFor: (orderId: string) => WorkspaceDutyResolution | null;
+  calendars?: WorkFeedCalendars;
+  /** The responsible person's calendar (see `projectPaymentCollectionWork`). */
+  ownerCalendarFor?: (orderId: string) => OwnerCalendar;
 }): OperationWorkItem[] {
-  const holidays = myHolidaySet();
+  const calendars = input.calendars ?? workFeedCalendarsOf();
   const seen = new Set<string>();
   return input.invoices.flatMap((invoice) => {
     if (invoice.kind === "sales" || invoice.status !== "issued" || !invoice.orders) return [];
@@ -763,7 +1000,8 @@ export function projectStorageInvoiceWork(input: {
     if (!money.known || money.storageOwing <= 0 || money.outstanding <= 0) return [];
     seen.add(invoice.order_id);
     const timingRule = collectionTimingFor(input.timingRules, invoice.issued_at?.slice(0, 10) ?? input.today);
-    const { clock } = invoicePaymentTiming(invoice, input.today, { holidays }, undefined, timingRule);
+    const ownerCalendar = input.ownerCalendarFor?.(invoice.order_id) ?? calendars.owner;
+    const { clock } = invoicePaymentTiming(invoice, input.today, calendars.delivery, undefined, timingRule, ownerCalendar);
     const dueIso = clock.actionDueIso;
     const late = !!clock.dueIso && input.today > clock.dueIso;
     const owner = input.ownerFor(invoice.order_id);
@@ -786,7 +1024,7 @@ export function projectStorageInvoiceWork(input: {
       locked: false,
       broken: false,
       dueIso,
-      workingDaysLate: late && dueIso ? countWorkingDays(dueIso, input.today, { holidays }) : 0,
+      workingDaysLate: late && dueIso ? countWorkingDays(dueIso, input.today, calendars.office) : 0,
     };
     return [operationWorkItemFromProjection(workItem, {
       object: { kind: "invoice", id: invoice.id, label: invoice.invoice_no ?? `SO-${invoice.orders.so} storage invoice` },
@@ -869,6 +1107,77 @@ export function projectOverpaymentReviewWork(input: {
   });
 }
 
+/** 0707 — a payment whose paid date is more than 14 days back waits as a
+ *  request; the Payment Approver approves or refuses it. One item per waiting
+ *  request. Nothing in it counts until it is approved. */
+export interface BackdatedPaymentRequestRow {
+  id: string;
+  order_id: string;
+  amount: number;
+  paid_on: string;
+  requested_at: string;
+  requested_by: string;
+  orders: { so: number | null; customer_name: string | null } | null;
+}
+
+export function projectBackdatedPaymentWork(input: {
+  requests: readonly BackdatedPaymentRequestRow[];
+  approver: WorkspaceDutyResolution | null;
+  today: string;
+}): OperationWorkItem[] {
+  return input.requests.map((request) => {
+    /* Houzs (so-payment-backdate-requests.ts:79, :332): nobody decides their
+       own request, "Another admin has to". When the acting Payment Approver
+       keyed it, the item is not theirs: it waits for a principal. */
+    const selfKeyed = input.approver?.actingPerson?.userId === request.requested_by;
+    const owner = selfKeyed ? null : input.approver;
+    const amount = `RM ${Number(request.amount).toFixed(2)}`;
+    const paidOn = invoiceArrivalDayWord(request.paid_on);
+    const soRef = request.orders?.so != null ? `SO-${request.orders.so}` : "SO";
+    const workItem: WorkItem = {
+      ruleKey: "payment.approve_backdated_payment",
+      module: "payment",
+      soRef,
+      orderId: request.order_id,
+      action: `Approve ${amount} paid on ${paidOn}`,
+      ownerRule: "payment_approver_duty",
+      ownerDutyKey: "payment_approver",
+      normalOwner: owner?.normalOwner ?? null,
+      activeCover: owner?.activeCover ?? null,
+      actingPerson: owner?.actingPerson ?? null,
+      ownerState: owner?.state ?? "not_assigned",
+      ownerName: owner?.actingPerson?.name ?? null,
+      ownerUserId: owner?.actingPerson?.userId ?? null,
+      ...(owner?.actingPerson ? {} : { ownerDuty: selfKeyed ? "Principal" : "Payment Approver" }),
+      tone: "warning",
+      locked: false,
+      broken: false,
+      // Due the day it was asked; no rule gives it a longer clock.
+      dueIso: request.requested_at.slice(0, 10),
+      workingDaysLate: 0,
+    };
+    return operationWorkItemFromProjection(workItem, {
+      object: { kind: "payment_backdate_request", id: request.id, label: soRef },
+      problem: "Paid date is more than 14 days ago",
+      recipient: request.orders?.customer_name ?? null,
+      requiredResult: "Approve or refuse recorded",
+      // The Monitor's order scope is the SO number; it lists the order's
+      // waiting requests even when the order has no invoice row yet.
+      destination: request.orders?.so != null ? `/finance/monitor?order=${request.orders.so}` : "/finance/monitor",
+      today: input.today,
+    });
+  });
+}
+
+async function readBackdatedPaymentRequests(c: Context<AppEnv>): Promise<BackdatedPaymentRequestRow[]> {
+  const { data, error } = await userClient(c.env, c.var.auth.jwt)
+    .from("payment_backdate_requests")
+    .select("id,order_id,amount,paid_on,requested_at,requested_by,orders(so,customer_name)")
+    .eq("status", "waiting");
+  if (error) throw new Error("Backdated payment requests could not be read");
+  return (data ?? []) as unknown as BackdatedPaymentRequestRow[];
+}
+
 export function receivingWorkSourceFromModuleFacts(data: {
   receipts: Array<{
     id: string;
@@ -877,21 +1186,11 @@ export function receivingWorkSourceFromModuleFacts(data: {
     status: string;
     goods_received_at?: string;
     submitted_at: string;
+    /** The Site that physically received, else the PO's Warehouse. */
+    actual_site_id?: string | null;
+    warehouse_id?: string | null;
   }>;
-  pos: Array<{
-    id: string;
-    status: string;
-    supplier_id: string | null;
-    eta_date: string | null;
-    version?: number | null;
-    official_delivery_date?: string | null;
-    promises?: unknown[];
-    sends?: Array<{ kind?: string | null; po_version?: number | null }>;
-    purchase_order_lines?: Array<{ id?: string; qty: number; received_qty: number }>;
-  }>;
-  suppliers: Array<{ id: string; name: string | null }>;
 }): ReceivingWorkSource {
-  const supplier = new Map(data.suppliers.map((row) => [row.id, row.name]));
   return {
     submitted: data.receipts
       .filter((row) => row.status === "submitted")
@@ -901,43 +1200,14 @@ export function receivingWorkSourceFromModuleFacts(data: {
         supplier_name: row.supplier_name,
         goods_received_at: row.goods_received_at,
         submitted_at: row.submitted_at,
+        site_id: row.actual_site_id ?? row.warehouse_id ?? null,
       })),
-    arrivalsDue: data.pos
-      .filter((row) => row.status === "open")
-      /* Purchasing §9.4 / Blueprint segment 2 (2026-09-25): a PO the supplier
-         never received cannot arrive. Only a PO whose CURRENT version is marked
-         `PO sent to supplier` derives an arrival; outstanding quantity alone
-         never makes a row. */
-      .filter((row) => (row.sends ?? []).some((send) => send.kind === "confirmed_sent" && (send.po_version ?? 1) === (row.version ?? 1)))
-      .map((row) => {
-        const lines = (row.purchase_order_lines ?? []).map((line, i) => ({
-          id: line.id ?? `${row.id}#${i}`, qty: Number(line.qty), receivedQty: Number(line.received_qty),
-        }));
-        /* The EARLIEST expected arrival (per line / batch) — the same ladder
-           the day-before check and the Register read — never the planning
-           estimate alone. */
-        const arrivals = poExpectedArrivalsOf({
-          version: row.version ?? 1,
-          officialDeliveryDate: row.official_delivery_date ?? null,
-          etaDate: row.eta_date,
-          promises: (row.promises ?? []) as never,
-          lines,
-        });
-        return {
-          po_id: row.id,
-          supplier_name: row.supplier_id
-            ? (supplier.get(row.supplier_id) ?? null)
-            : null,
-          eta_date: arrivals.map((a) => a.arrival).sort()[0] ?? row.eta_date,
-          pending_qty: lines.reduce((total, line) => total + Math.max(0, line.qty - line.receivedQty), 0),
-        };
-      }),
   };
 }
 
 export function manualPurchaseWorkInputsFromRegister(
   data: ManualPurchaseRegisterSource,
-): Array<ManualPurchaseWorkInput & { recipient: string | null }> {
+): Array<ManualPurchaseWorkInput & { recipient: string | null; poIds: string[]; unsentPoId: string | null; continueInPoId: string | null }> {
   const destination = new Map(data.destinations.map((row) => [row.id, row.name]));
   const supplier = new Map(data.suppliers.map((row) => [row.id, row.name]));
   const user = new Map(data.users.map((row) => [row.id, row.name]));
@@ -946,7 +1216,11 @@ export function manualPurchaseWorkInputsFromRegister(
   return data.requests.map((request) => {
     const lines = data.lines.filter((line) => line.request_id === request.id);
     const live = lines.filter((line) => line.cancelled_at === null);
-    const poIds = [...new Set(live.flatMap((line) => line.po_ids ?? (line.po_id ? [line.po_id] : [])))];
+    const contextual = Number(request.request_version ?? 0) > 0 || request.request_context != null;
+    if (contextual && request.approved_at != null && (live.length === 0 || live.some(line => line.context_read_available !== true || !Number.isInteger(line.context_to_buy)))) {
+      throw new Error("Manual Purchase coverage could not be loaded");
+    }
+    const poIds = [...new Set(live.flatMap((line) => line.active_po_ids ?? line.po_ids ?? (line.po_id ? [line.po_id] : [])))];
     const supplierNames = live.map((line) =>
       line.supplier_id ? (supplier.get(line.supplier_id) ?? "") : "",
     );
@@ -986,17 +1260,13 @@ export function manualPurchaseWorkInputsFromRegister(
           received: line.received ?? false,
         })),
       }).kind,
-      remainingQty: live.reduce(
-        (total, line) =>
-          total +
-          manualPurchaseLineRemainingOf({
-            qty: line.qty,
-            approvedQty: line.approved_qty,
-            issuedQty: line.issued_qty,
-          }),
-        0,
-      ),
+      remainingQty: contextual ? live.reduce((total,line) => total + (line.context_to_buy ?? 0),0) : live.reduce(
+        (total,line) => total + manualPurchaseLineRemainingOf({ qty: line.qty, approvedQty: line.approved_qty, issuedQty: line.issued_qty }), 0),
       orderBy: manualPurchaseOrderByOf(live.map((line) => line.order_by)),
+      poIds,
+      unsentPoId: poIds.find((id) => sent.get(id) !== true) ?? null,
+      continueInPoId: contextual && request.purpose === "ready_stock" && live.some(line => line.context_admission_current === false)
+        ? live.filter(line => (line.context_to_buy ?? 0) > 0).flatMap(line => line.active_po_ids ?? line.po_ids ?? (line.po_id ? [line.po_id] : []))[0] ?? null : null,
       hasPos: poIds.length > 0,
       posAllSent: poIds.length > 0 && poIds.every((id) => sent.get(id) === true),
       recipient: manualPurchaseSupplierSummary(supplierNames),
@@ -1036,6 +1306,9 @@ const ORDER_RESULT: Record<string, string> = {
   ask_delivery_date: "Customer Delivery exists or Not yet is recorded",
 };
 
+/** The Delivery acts spoken as `Call {logistics}` (`order-action-words.ts`). */
+const CALLS_LOGISTICS: ReadonlySet<string> = new Set(["confirm_delivery_date", "arrange_new_delivery_date"]);
+
 export function projectSalesOrderWork(input: {
   open: readonly OrderOpenAction[];
   context: OrderWorkContext;
@@ -1044,15 +1317,20 @@ export function projectSalesOrderWork(input: {
   logistics?: string | null;
   deliveryOrderNumber?: string | null;
   today: string;
+  /** The Delivery week facts count on (`WorkFeedCalendars.delivery`). */
   workingDays?: WorkingDayOptions;
   queueLeads?: DeliveryQueueLeads;
+  /** The Office calendar for Office dues and the payment clock's owner. */
+  calendars?: WorkFeedCalendars;
 }): OperationWorkItem[] {
+  const calendars = input.calendars ?? workFeedCalendarsOf();
   return workItemsForOrder(
     input.open,
     input.context,
     input.today,
-    input.workingDays,
+    input.workingDays ?? calendars.delivery,
     input.queueLeads,
+    { office: calendars.office, owner: calendars.owner },
   ).map((item) => {
     const deliveryOwned = item.module === "delivery";
     const deliveryOrder = input.deliveryOrderNumber ?? null;
@@ -1088,10 +1366,14 @@ export function projectSalesOrderWork(input: {
             label: `SO-${input.context.so}`,
           },
       problem: ORDER_PROBLEM[item.ruleKey] ?? "Action required",
-      recipient:
-        item.ruleKey === "ask_delivery_date" ||
-        item.ruleKey === "confirm_delivery_date" ||
-        item.ruleKey === "collect"
+      /* The party is the one the act names. A Delivery act that reads
+         `Call {logistics}` asks the Logistics Partner, never the customer
+         (ACTION-FLOW Law 4 rung 2); with no partner recorded it names nobody. */
+      recipient: deliveryOwned && CALLS_LOGISTICS.has(item.ruleKey)
+        ? input.logistics ?? null
+        : item.ruleKey === "ask_delivery_date" ||
+            item.ruleKey === "confirm_delivery_date" ||
+            item.ruleKey === "collect"
           ? input.customer
           : null,
       requiredResult:
@@ -1118,11 +1400,15 @@ export function projectSalesOrderWork(input: {
 }
 
 export function projectManualPurchaseWork(input: {
-  requests: readonly (ManualPurchaseWorkInput & { recipient?: string | null })[];
+  requests: readonly (ManualPurchaseWorkInput & { recipient?: string | null; unsentPoId?: string | null; continueInPoId?: string | null })[];
   approver: { userId: string; name: string | null } | null;
   poDuty: WorkspaceDutyResolution | null;
   today: string;
+  /** The stored Office calendar (`officeWorkingDayOptions`); default Mon–Fri
+   *  with the built-in holidays. */
+  office?: WorkingDayOptions;
 }): OperationWorkItem[] {
+  const office = input.office ?? workFeedCalendarsOf().office;
   return input.requests.flatMap((request) =>
     manualPurchaseWorkItems(
       request,
@@ -1132,9 +1418,10 @@ export function projectManualPurchaseWork(input: {
         poDutyResolution: input.poDuty,
       },
       input.today,
+      office,
     ).map((item) => {
       const approval = item.ruleKey === "manual_purchase.approve";
-      return operationWorkItemFromProjection(item, {
+      return operationWorkItemFromProjection(!approval && request.continueInPoId ? { ...item, action: "Revise quantity or Deliver To" } : item, {
         object: {
           kind: "manual_purchase",
           id: request.requestId,
@@ -1143,21 +1430,19 @@ export function projectManualPurchaseWork(input: {
              Ready Stock · Ohana · Ohana` and overflowed the panel's button. */
           label: request.reference ?? request.context,
         },
-        problem: approval ? "Approval required" : "Purchase order required",
+        problem: approval ? "Approval required"
+          : request.remainingQty > 0 ? "Purchase order required" : "Sending not confirmed",
         recipient: request.recipient ?? null,
-        /* ⭐ THE ISSUE ACTION'S RESULT IS AN ISSUED PO (owner ruling
-           2026-09-11). It read "Current PO version sent to supplier" while
-           the rule kept the action open on a fully ordered request with no
-           confirmed-sent row — a confirmation chore. That rule is gone
-           (`manualPurchaseWorkItems`), so the result is the act itself. */
         requiredResult: approval
           ? "Purchase decision recorded"
-          : "Purchase order issued",
-        /* ⭐ THE APPROVER LANDS ON THE APPROVAL SECTION, not at the top of a
-           six-section object they then have to scroll (owner ruling
-           2026-09-11). `Issue PO` has no such section — its act is the
-           Register's selected action — so it opens the object plainly. */
-        destination: `/operation?tab=manual-purchase&mp=${encodeURIComponent(request.requestId)}${approval ? "&section=approval" : ""}`,
+          : request.continueInPoId ? ORDER_RESULT.issue_po : "Current PO version marked as sent",
+        // Approval opens its decision; uncovered demand opens the request.
+        // Sending opens the first existing unsent PO, never a second buy.
+        destination: !approval && request.continueInPoId
+          ? `/operation/procurement?po=${encodeURIComponent(request.continueInPoId)}`
+          : !approval && request.remainingQty === 0 && request.unsentPoId
+          ? `/operation/procurement?po=${encodeURIComponent(request.unsentPoId)}`
+          : `/operation?tab=manual-purchase&mp=${encodeURIComponent(request.requestId)}${approval ? "&section=approval" : ""}`,
         today: input.today,
       });
     }),
@@ -1168,7 +1453,8 @@ export function projectReceivingWork(input: {
   source: ReceivingWorkSource;
   duty: WorkspaceDutyResolution | null;
   today: string;
-  workingDaysLate: (dueIso: string) => number;
+  /** Counted on the receiving Site's own calendar; the row names the Site. */
+  workingDaysLate: (dueIso: string, row?: ReceivingWorkSource["submitted"][number]) => number;
 }): OperationWorkItem[] {
   const acting = input.duty?.actingPerson ?? null;
   const projected = receivingWorkItems(
@@ -1179,7 +1465,6 @@ export function projectReceivingWork(input: {
   );
   const supplierByPo = new Map<string, string | null>([
     ...input.source.submitted.map((row) => [row.po_id, row.supplier_name] as const),
-    ...input.source.arrivalsDue.map((row) => [row.po_id, row.supplier_name] as const),
   ]);
   return projected.map((item) => {
     const workItem: WorkItem = {
@@ -1207,18 +1492,14 @@ export function projectReceivingWork(input: {
     return operationWorkItemFromProjection(workItem, {
       object: {
         kind: "receiving",
-        id: item.receiptId ?? item.poId,
+        id: item.receiptId,
         label: item.poId,
       },
-      /* A submitted Warehouse count means goods ARRIVED. A passed supplier
-         date with nothing counted means only that the date passed — the card
-         never claims an arrival nobody recorded (Blueprint segment 2). */
-      problem: item.receiptId ? "Goods arrived · GRN not posted" : "Supplier date passed · nothing received yet",
+      // Only an actual submitted physical report reaches this projection.
+      problem: "Goods arrived · GRN not posted",
       recipient: supplier,
       requiredResult: "GRN posted",
-      destination: item.receiptId
-        ? `/operation?tab=receiving&session=${encodeURIComponent(item.receiptId)}`
-        : `/operation?tab=receiving&po=${encodeURIComponent(item.poId)}`,
+      destination: `/operation?tab=receiving&session=${encodeURIComponent(item.receiptId)}`,
       today: input.today,
     });
   });
@@ -1233,17 +1514,26 @@ export function projectReceivingWork(input: {
  */
 async function readCollectionTimingRules(c: Context<AppEnv>): Promise<CollectionTimingRule[]> {
   const sb = userClient(c.env, c.var.auth.jwt);
+  // `*`: the 0672 outstation columns ride when installed; a row read before
+  // 0672 maps to the outstation defaults (`collectionTimingRulesOf`).
   const { data, error } = await sb
     .from("payment_collection_timing_rules")
-    .select("ask_days_before,deadline_days_before,effective_from")
+    .select("*")
     .order("effective_from", { ascending: false });
   if (error) throw new Error("Workspace collection-timing source could not be read");
-  return ((data ?? []) as Array<{ ask_days_before: number; deadline_days_before: number; effective_from: string }>)
-    .map((r) => ({
-      askDaysBefore: r.ask_days_before,
-      deadlineDaysBefore: r.deadline_days_before,
-      effectiveFrom: r.effective_from,
-    }));
+  return collectionTimingRulesOf((data ?? []) as CollectionTimingRuleRow[]);
+}
+
+/** `delivery_partners.kv_default` per company — the outstation fact. A read
+ *  failure yields an EMPTY map: no company is then guessed outstation, and
+ *  the ordinary pair stands (never a false earlier deadline). */
+async function readPartnerKvDefaults(c: Context<AppEnv>): Promise<Map<string, boolean>> {
+  const { data, error } = await userClient(c.env, c.var.auth.jwt)
+    .from("delivery_partners")
+    .select("id, kv_default");
+  if (error) return new Map();
+  return new Map(((data ?? []) as Array<{ id: string; kv_default: boolean | null }>)
+    .map((r) => [r.id, r.kv_default === true]));
 }
 
 /** The one response boundary. Module loaders remain responsible for producing
@@ -1263,6 +1553,7 @@ const WORK_SOURCE_LABEL: Record<OperationWorkSourceKey, string> = {
   delivery: "Delivery",
   payment: "Payment",
   issue_tracker: "Issue Tracker",
+  workspace: "Staff tasks",
 };
 
 export async function loadWorkSource(
@@ -1323,7 +1614,7 @@ export function composeOperationWorkResponse(
   });
 }
 
-function dutyResolution(
+export function dutyResolution(
   payload: Record<string, unknown>,
   key: string,
   today: string,
@@ -1341,20 +1632,26 @@ function dutyResolution(
     };
   };
   const normalOwner = person("normal_user_id", "normal_user_name");
-  const acting = person("actor_user_id", "acting_user_name") ??
-    person("acting_user_id", "acting_user_name") ??
-    normalOwner;
+  const acting = (raw.source === "system_assignment" || raw.source === "not_assigned")
+    ? person("actor_user_id", "acting_user_name")
+    : person("actor_user_id", "acting_user_name") ?? person("acting_user_id", "acting_user_name") ?? normalOwner;
   const activeCover = raw.is_cover === true
     ? person("acting_user_id", "acting_user_name")
     : null;
+  /* A system-assigned actor arrives as an id without a name. When that id is
+     the normal holder (or today's cover) the person is already named there —
+     use it, so a task never reads `Name not recorded` for Shasha. */
+  const actingNamed = acting && acting.name == null
+    ? { ...acting, name: [normalOwner, activeCover].find((p) => p?.userId === acting.userId)?.name ?? null }
+    : acting;
   return {
     dutyKey: key,
     onDate: today,
     normalOwner,
     buddy: activeCover,
     activeCover,
-    actingPerson: acting,
-    state: normalOwner ? (activeCover ? "covered" : "primary") : "not_assigned",
+    actingPerson: actingNamed,
+    state: actingNamed ? (activeCover ? "covered" : "primary") : "not_assigned",
     assignmentId: null,
   };
 }
@@ -1510,25 +1807,57 @@ async function readProofFacts(c: Context<AppEnv>): Promise<ProofFactsByDo> {
   return { reviews, evidenceAt };
 }
 
-/** Delivery's arrangement (leg 0) per feed order — the Scheduled date is the
- *  booking (Delivery MASTER §5). Read for the feed's own orders only, 100 at a
- *  time. A failed read fails the Delivery facts loudly rather than silently
- *  falling back to the legacy booking. */
+/** Delivery's arrangements (every leg) per feed order — the same rows
+ *  Monitor reads; the customer leg's Scheduled date is the booking (Delivery
+ *  MASTER §5). Read for the feed's own orders only, 100 at a time. A failed
+ *  read fails the Delivery facts loudly rather than silently falling back to
+ *  the legacy booking. */
 async function readArrangements(
   c: Context<AppEnv>,
   orderIds: readonly string[],
-): Promise<Map<string, { confirmedDate: string | null; partnerId: string | null }>> {
+): Promise<Map<string, CustomerLegArrangementRead[]>> {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const out = new Map<string, { confirmedDate: string | null; partnerId: string | null }>();
+  const out = new Map<string, CustomerLegArrangementRead[]>();
   for (const batch of chunk([...orderIds], 100)) {
     const { data, error } = await sb
       .from("ops_delivery_arrangements")
-      .select("order_id, confirmed_date, partner_id")
-      .eq("leg", 0)
+      .select("order_id, leg, confirmed_date, confirmed_time, partner_id")
       .in("order_id", batch);
     if (error) throw new Error("Workspace delivery-arrangement source could not be read");
-    for (const row of (data ?? []) as Array<{ order_id: string; confirmed_date: string | null; partner_id: string | null }>) {
-      out.set(row.order_id, { confirmedDate: row.confirmed_date, partnerId: row.partner_id });
+    for (const row of (data ?? []) as Array<{
+      order_id: string; leg: number | null; confirmed_date: string | null; confirmed_time: string | null; partner_id: string | null;
+    }>) {
+      out.set(row.order_id, [
+        ...(out.get(row.order_id) ?? []),
+        { leg: row.leg, confirmedDate: row.confirmed_date, confirmedTime: row.confirmed_time, partnerId: row.partner_id },
+      ]);
+    }
+  }
+  return out;
+}
+
+/** The feed orders' LIVE Delivery Orders — the document's own day is the
+ *  first answer of the one delivery-day reader, as on Monitor. */
+async function readDeliveryOrderDays(
+  c: Context<AppEnv>,
+  orderIds: readonly string[],
+): Promise<Map<string, CustomerLegDocumentRead[]>> {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const out = new Map<string, CustomerLegDocumentRead[]>();
+  for (const batch of chunk([...orderIds], 100)) {
+    const { data, error } = await sb
+      .from("ops_delivery_orders")
+      .select("order_id, leg, delivery_date, time_slot, issued_at")
+      .is("voided_at", null)
+      .in("order_id", batch);
+    if (error) throw new Error("Workspace delivery-order source could not be read");
+    for (const row of (data ?? []) as Array<{
+      order_id: string; leg: number | null; delivery_date: string | null; time_slot: string | null; issued_at: string | null;
+    }>) {
+      out.set(row.order_id, [
+        ...(out.get(row.order_id) ?? []),
+        { leg: row.leg, deliveryDate: row.delivery_date, timeSlot: row.time_slot, issuedAt: row.issued_at },
+      ]);
     }
   }
   return out;
@@ -1612,7 +1941,8 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   internal.route("/purchase/demands", purchaseDemandsRouter);
 
   const [orders, stock, manual, receipts, pos, suppliers, duties, staff, purchasingSettings,
-         invoices, outcomes, refunds, issueSource, timingRules, proofFacts] =
+         invoices, outcomes, refunds, issueSource, timingRules, proofFacts,
+         officeStored, deliveryRules, kvDefaultByPartner, deliveryStored] =
     await Promise.all([
       readInternal<{ orders: SalesOrderModuleRow[] }>(internal, "/orders", c),
       readInternal<{ skus: Array<{ sku: string; available: number }> }>(internal, "/stock", c),
@@ -1625,12 +1955,12 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
         "/warehouse-receipts?status=submitted",
         c,
       ),
-      readInternal<{ pos: Parameters<typeof receivingWorkSourceFromModuleFacts>[0]["pos"] }>(
+      readInternal<{ pos: PurchaseOrderArrivalSource[] }>(
         internal,
         "/pos?status=all",
         c,
       ),
-      readInternal<{ suppliers: Parameters<typeof receivingWorkSourceFromModuleFacts>[0]["suppliers"] }>(
+      readInternal<{ suppliers: Array<{ id: string; name: string | null }> }>(
         internal,
         "/suppliers",
         c,
@@ -1648,8 +1978,28 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
       readInternal<{ actions: Parameters<typeof projectIssueActionWork>[0]["actions"] }>(internal, "/issues/work-source", c),
       readCollectionTimingRules(c),
       readProofFacts(c),
+      /* ⭐ Settings → Office, read ONCE for the whole feed; fails safe to the
+         owner defaults (Monday–Friday, the built-in holidays). */
+      officeCalendarOf(c),
+      /* DEL-04 · Delivery Rules (`Assign logistics by`), fails safe to 3. */
+      deliveryRulesOf(c),
+      readPartnerKvDefaults(c),
+      /* ⭐ The Delivery calendar (Monday–Saturday + the stored Selangor
+         holidays, else the built-in list), read ONCE for the whole feed. */
+      deliveryCalendarFor(c),
     ]);
-  const arrangements = await readArrangements(c, orders.orders.map((row) => row.id));
+  const calendars = workFeedCalendarsOf(officeStored, deliveryStored);
+  /* The two stored Delivery leads (DEL-04 assignment · DEL-05 contact), one
+     helper so the Orders list, the Delivery board and Work read them alike. */
+  const queueLeads = deliveryQueueLeads({
+    logisticsCallWorkingDays: purchasingSettings.logisticsCallWorkingDays,
+    assignmentLeadWorkingDays: deliveryRules.assignmentLeadWorkingDays,
+  });
+  const orderIds = orders.orders.map((row) => row.id);
+  const [arrangements, deliveryOrders] = await Promise.all([
+    readArrangements(c, orderIds),
+    readDeliveryOrderDays(c, orderIds),
+  ]);
   const today = manual.todayIso ?? todayIsoMYT();
   const poDuty = dutyResolution(duties, "po_duty", today);
   const grnDuty = dutyResolution(duties, "grn_duty", today);
@@ -1682,8 +2032,13 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   // answers the same stable owner for every later pass.
   const actionable = new Set<string>();
   const probe = (orderId: string) => { actionable.add(orderId); return null; };
-  projectPaymentCollectionWork({ invoices, ownerFor: probe, today, outcomes, timingRules });
-  projectStorageInvoiceWork({ invoices, today, timingRules, ownerFor: probe });
+  projectPaymentCollectionWork({ invoices, ownerFor: probe, today, outcomes, timingRules, calendars });
+  projectStorageInvoiceWork({ invoices, today, timingRules, ownerFor: probe, calendars });
+  // Each order's collection clock start (the Monitor's own door rule).
+  const invoicesByOrder = new Map<string, InvoiceRegisterRow[]>();
+  for (const inv of invoices) invoicesByOrder.set(inv.order_id, [...(invoicesByOrder.get(inv.order_id) ?? []), inv]);
+  const clockStartByOrder = new Map(orders.orders.map((row) =>
+    [row.id, orderCollectionClockStartIso(invoicesByOrder.get(row.id) ?? [], row.id, today)]));
   const orderFacts = {
     orders: orders.orders,
     stock: stock.skus,
@@ -1696,6 +2051,11 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
     timingRules,
     proofFacts,
     arrangements,
+    deliveryOrders,
+    calendars,
+    queueLeads,
+    kvDefaultByPartner,
+    clockStartByOrder,
   };
   // Owner ruling 2026-09-17 — routine Delivery work is the order's responsible
   // Operation person. A probe pass per order learns which orders carry a
@@ -1708,8 +2068,19 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   const ownerRows = await establishAndReadCollectionOwners(c, [...actionable], deliveryOwned, today);
   const collectionOwnerFor = (orderId: string) =>
     collectionOwnerResolution(ownerRows.get(orderId) ?? null, today);
+  /* ⭐ The responsible person's own working week (People/HR, 0678) — the
+     collection ACTION day steps back on it (Office weekdays when none is
+     recorded). The probe above admitted orders on the Office calendar; the
+     payment FACTS never read a person calendar. */
+  const personWorkDays = await readPersonWorkDays(
+    userClient(c.env, c.var.auth.jwt),
+    [...ownerRows.values()].flatMap((row) => [row.acting_user_id, row.normal_user_id]),
+  );
+  const ownerCalendars = workFeedCalendarsOf(officeStored, deliveryStored, personWorkDays);
+  const ownerCalendarFor = (orderId: string) => ownerCalendars.ownerOf(collectionActorOf(collectionOwnerFor(orderId)));
   const orderItems = projectSalesOrdersFromModuleFacts({
     ...orderFacts,
+    calendars: ownerCalendars,
     collectionOwnerFor,
     responsibleOperationFor: collectionOwnerFor,
   });
@@ -1720,34 +2091,45 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
       : null,
     poDuty,
     today,
+    office: calendars.office,
   });
   const receivingSource = receivingWorkSourceFromModuleFacts({
     receipts: receipts.receipts,
-    pos: pos.pos,
-    suppliers: suppliers.suppliers,
   });
-  const holidays = myHolidaySet();
+  /* GRN lateness counts on the RECEIVING Site's own calendar (Warehouse-
+     owned hours, special dates, holiday policy) — never the Office one. A
+     Site with nothing readable or a day nobody configured falls back,
+     explicitly, to the governed Warehouse week: Sunday off + the Selangor
+     public holidays (the stored Warehouse calendar the Delivery calendar
+     reads, else the built-in list). */
+  const receivingSettings = await readWarehouseReceivingSettings(
+    userClient(c.env, c.var.auth.jwt),
+    receivingSource.submitted.map((row) => row.site_id ?? "").filter(Boolean),
+  );
+  const warehouseFallbackHolidays = deliveryHolidaySet(deliveryStored);
   const receivingItems = projectReceivingWork({
     source: receivingSource,
     duty: grnDuty,
     today,
-    workingDaysLate: (dueIso) =>
-      countWorkingDays(dueIso, today, { holidays, offDays: WAREHOUSE_OFF_DAYS }),
+    workingDaysLate: (dueIso, row) =>
+      warehouseReceivingDaysLate(dueIso, today, row?.site_id ? receivingSettings.get(row.site_id) ?? null : null, warehouseFallbackHolidays),
   });
   const purchaseOrderItems = projectPurchaseOrderReplyWork({
     pos: pos.pos as PurchaseOrderWorkSource[],
     suppliers: suppliers.suppliers,
     poDuty,
     today,
+    office: calendars.office,
   });
   const arrivalCheckItems = projectPurchaseOrderArrivalCheckWork({
     pos: pos.pos as PurchaseOrderArrivalSource[],
     suppliers: suppliers.suppliers,
     poDuty,
     today,
+    office: calendars.office,
   });
-  const paymentItems = projectPaymentCollectionWork({ invoices, ownerFor: collectionOwnerFor, today, outcomes, timingRules });
-  const storageInvoiceItems = projectStorageInvoiceWork({ invoices, today, timingRules, ownerFor: collectionOwnerFor });
+  const paymentItems = projectPaymentCollectionWork({ invoices, ownerFor: collectionOwnerFor, today, outcomes, timingRules, calendars, ownerCalendarFor });
+  const storageInvoiceItems = projectStorageInvoiceWork({ invoices, today, timingRules, ownerFor: collectionOwnerFor, calendars, ownerCalendarFor });
   const overpaymentItems = projectOverpaymentReviewWork({
     invoices, refunds, approver: paymentApprover, today,
   });
@@ -1765,7 +2147,10 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   });
   // Repair Orders (Purchasing §9.7 · §10): their own projection, read inside
   // the Purchasing source so a failed read fails that source's health.
-  const repairOrderWork = () => loadRepairOrderWork(c, { poDuty, today, observedAt });
+  /* The three Purchasing loaders count on the stored Office calendar — its
+     weekdays AND its holidays (`purchasingOfficeDays`). */
+  const officeHolidays = calendars.office;
+  const repairOrderWork = () => loadRepairOrderWork(c, { poDuty, today, observedAt, holidays: officeHolidays });
   const sourceResults = await Promise.all([
     loadWorkSource("orders", observedAt, async () =>
       orderItems.filter((item) =>
@@ -1778,7 +2163,9 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
         !PURCHASING_WINDOW_OWNED.has(item.ruleKey))),
     loadWorkSource("purchasing", observedAt, async () => [
       ...manualItems,
+      ...(await loadCaseRemedyWork(c,today,calendars.office)),
       ...purchaseOrderItems,
+      ...projectPurchaseOrderCancellationSendWork({pos:pos.pos as PurchaseOrderWorkSource[],suppliers:suppliers.suppliers,poDuty,today}),
       ...arrivalCheckItems,
       ...projectPoWindowWork({
         read: await readInternal<SoBatchPurchaseResponse>(internal, "/purchase/demands", c),
@@ -1786,10 +2173,11 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
         poDuty,
         today,
         now: observedAt,
+        office: calendars.office,
       }),
       ...(await repairOrderWork()),
-      ...(await loadSupplierClaimWork(c, { poDuty, approver: dutyResolution(duties, "purchasing_approver", today), today, observedAt })),
-      ...(await loadPurchaseReturnWork(c, { poDuty, today, observedAt })),
+      ...(await loadSupplierClaimWork(c, { poDuty, approver: dutyResolution(duties, "purchasing_approver", today), today, observedAt, holidays: officeHolidays })),
+      ...(await loadPurchaseReturnWork(c, { poDuty, today, observedAt, holidays: officeHolidays })),
     ]),
     loadWorkSource("receiving", observedAt, async () => receivingItems),
     loadWorkSource("delivery", observedAt, async () =>
@@ -1798,8 +2186,13 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
       ...paymentItems,
       ...storageInvoiceItems,
       ...overpaymentItems,
+      ...projectBackdatedPaymentWork({
+        requests: await readBackdatedPaymentRequests(c), approver: paymentApprover, today,
+      }),
     ]),
     loadWorkSource("issue_tracker", observedAt, async () => issueItems),
+    /* Tasks one employee adds for another (Workspace MASTER, Jess 2026-10-14). */
+    loadWorkSource("workspace", observedAt, () => loadInternalTaskWork(c, { today, observedAt })),
   ]);
   return composeOperationWorkResponse(
     sourceResults,
@@ -2058,11 +2451,16 @@ export async function probeOrderWork(
   if (!order) return null;
   const sb = userClient(c.env, c.var.auth.jwt);
   const skus = [...new Set((order.order_lines ?? []).map((line) => line.sku).filter(Boolean))];
-  const [stock, settings] = await Promise.all([
+  /* The same calendars and leads the feed counts with, so a probe's dues
+     match the feed's (they decide WHEN, never WHETHER). */
+  const [stock, settings, officeStored, deliveryRules, deliveryStored] = await Promise.all([
     skus.length === 0
       ? Promise.resolve({ data: [] as Array<{ sku: string; sellable: number | null }>, error: null })
       : sb.from("stock_sku_availability").select("sku, sellable").in("sku", skus),
     loadPurchasingSettings(sb),
+    officeCalendarOf(c),
+    deliveryRulesOf(c),
+    deliveryCalendarFor(c),
   ]);
   if (stock.error) throw new Error(`stock read failed: ${stock.error.message}`);
   const bySku = new Map<string, Array<{ sellable: number | null }>>();
@@ -2076,6 +2474,11 @@ export async function probeOrderWork(
     dutyResolutions: {},
     today: todayIsoMYT(),
     safetyDays: settings.orderByBufferDays,
+    calendars: workFeedCalendarsOf(officeStored, deliveryStored),
+    queueLeads: deliveryQueueLeads({
+      logisticsCallWorkingDays: settings.logisticsCallWorkingDays,
+      assignmentLeadWorkingDays: deliveryRules.assignmentLeadWorkingDays,
+    }),
   });
   const { currentId } = await readWorkLedger(c, ledger, items.map((item) => item.id));
   return items.map((item) => ({ ...item, id: currentId.get(item.id) ?? item.id }));
@@ -2106,9 +2509,11 @@ export async function probePurchaseOrderWork(
   const po = pos.find((row) => row.id === poId);
   if (!po) return null;
   const today = todayIsoMYT();
+  const office = workFeedCalendarsOf(await officeCalendarOf(c)).office;
   const items = [
-    ...projectPurchaseOrderReplyWork({ pos: [po], suppliers: [], poDuty: null, today }),
-    ...projectPurchaseOrderArrivalCheckWork({ pos: [po as PurchaseOrderArrivalSource], suppliers: [], poDuty: null, today }),
+    ...projectPurchaseOrderReplyWork({ pos: [po], suppliers: [], poDuty: null, today, office }),
+    ...projectPurchaseOrderCancellationSendWork({pos:[po],suppliers:[],poDuty:null,today}),
+    ...projectPurchaseOrderArrivalCheckWork({ pos: [po as PurchaseOrderArrivalSource], suppliers: [], poDuty: null, today, office }),
   ];
   const { currentId } = await readWorkLedger(c, ledger, items.map((item) => item.id));
   return items.map((item) => ({ ...item, id: currentId.get(item.id) ?? item.id }));
@@ -2140,10 +2545,11 @@ export async function probePoWindowWork(
   windowKey: string,
   ledger: WorkLedger = supabaseWorkLedger,
 ): Promise<OperationWorkItem[] | null> {
-  const source = await readPoWindowSource(c);
+  const [source, officeStored] = await Promise.all([readPoWindowSource(c), officeCalendarOf(c)]);
   const now = new Date().toISOString();
-  const items = projectPoWindowWork({ ...source, poDuty: null, today: todayIsoMYT(), now })
-    .filter((item) => item.object.id === windowKey);
+  const items = projectPoWindowWork({
+    ...source, poDuty: null, today: todayIsoMYT(), now, office: workFeedCalendarsOf(officeStored).office,
+  }).filter((item) => item.object.id === windowKey);
   const { currentId } = await readWorkLedger(c, ledger, items.map((item) => item.id));
   return items.map((item) => ({ ...item, id: currentId.get(item.id) ?? item.id }));
 }
@@ -2169,6 +2575,39 @@ export async function poWindowKeysServing(c: Context<AppEnv>, poId: string): Pro
   return poWindowsOf(source.read, source.suppliers)
     .filter((w) => w.pos.some((po) => po.poId === poId))
     .map((w) => w.key);
+}
+
+async function readManualPurchaseWorkSource(c: Context<AppEnv>) {
+  const internal = new Hono<AppEnv>();
+  internal.use("*", async (child, next) => {
+    child.set("auth", c.var.auth);
+    await next();
+  });
+  internal.route("/manual-purchase", manualPurchaseRouter);
+  return manualPurchaseWorkInputsFromRegister(
+    await readInternal<ManualPurchaseRegisterSource>(internal, "/manual-purchase", c),
+  );
+}
+
+export async function probeManualPurchaseWork(
+  c: Context<AppEnv>, requestId: string, ledger: WorkLedger = supabaseWorkLedger,
+): Promise<OperationWorkItem[] | null> {
+  const [source, officeStored] = await Promise.all([readManualPurchaseWorkSource(c), officeCalendarOf(c)]);
+  const requests = source.filter((r) => r.requestId === requestId);
+  const items = projectManualPurchaseWork({
+    requests, approver: null, poDuty: null, today: todayIsoMYT(), office: workFeedCalendarsOf(officeStored).office,
+  });
+  const { currentId } = await readWorkLedger(c, ledger, items.map((item) => item.id));
+  return items.map((item) => ({ ...item, id: currentId.get(item.id) ?? item.id }));
+}
+
+export async function manualPurchaseSendFacts(c: Context<AppEnv>, requestId: string) {
+  const request = (await readManualPurchaseWorkSource(c)).find((r) => r.requestId === requestId);
+  return { poIds: request?.poIds ?? [], demandLeft: request?.remainingQty ?? 0, allSent: request?.posAllSent ?? false };
+}
+
+export async function manualPurchaseRequestsServing(c: Context<AppEnv>, poId: string): Promise<string[]> {
+  return (await readManualPurchaseWorkSource(c)).filter((r) => r.poIds.includes(poId)).map((r) => r.requestId);
 }
 
 /**
@@ -2205,6 +2644,24 @@ ledger: WorkLedger = supabaseWorkLedger,
   };
 };
 
+/**
+ * The response a reader can parse. A page loaded before `workspace` joined the
+ * feed checks the response strictly and knows six sources, so it is given the
+ * six it knows and none of the new module's work; a reader that asks with
+ * `?include=workspace` is given everything.
+ */
+export function workResponseFor(response: OperationWorkResponse, include: string | undefined): unknown {
+  if (include === OPERATION_WORK_INCLUDE_WORKSPACE) return response;
+  const sources = response.sources.filter((source) => source.key !== "workspace");
+  return {
+    ...response,
+    complete: sources.every((source) => source.state === "healthy"),
+    items: response.items.filter((item) => item.module !== "workspace"),
+    sources,
+    ...(response.completed ? { completed: response.completed.filter((done) => done.module !== "workspace") } : {}),
+  };
+}
+
 export function createOperationWorkRouter(
   loader: (c: Context<AppEnv>) => Promise<OperationWorkResponse> = loadOperationWork,
   ledger: WorkLedger = supabaseWorkLedger,
@@ -2213,7 +2670,8 @@ export function createOperationWorkRouter(
 
   const readWithLifecycle = (c: Context<AppEnv>) => readOperationWorkWithLedger(c, loader, ledger);
 
-  router.get("/", requireOperation, async (c) => c.json((await readWithLifecycle(c)).response));
+  router.get("/", requireOperation, async (c) =>
+    c.json(workResponseFor((await readWithLifecycle(c)).response, c.req.query("include"))));
 
   const door = (kind: "request_sent" | "reply_received") => async (c: Context<AppEnv>) => {
     const occurrenceId = c.req.param("occurrenceId") ?? "";
@@ -2241,8 +2699,10 @@ export function createOperationWorkRouter(
     };
     let id: string;
     try {
+      /* The reply day counts on the stored Office calendar (Settings → Office). */
+      const office = kind === "request_sent" ? workFeedCalendarsOf(await officeCalendarOf(c)).office : null;
       id = kind === "request_sent"
-        ? await ledger.recordRequestSent(c, { ...write, replyDueOn: workReplyDueOn(response.generatedOn, item.ruleKey) })
+        ? await ledger.recordRequestSent(c, { ...write, replyDueOn: workReplyDueOn(response.generatedOn, item.ruleKey, office ?? undefined) })
         : await ledger.recordReplyReceived(c, write);
     } catch (e) {
       if (e instanceof WorkLedgerRefusal) {

@@ -76,10 +76,26 @@ export function purchasingRefusal(
   const dest = some(facts.destination, "that place");
 
   switch (code) {
-    // ── WHO MAY ACT (0379) ────────────────────────────────────────────────
+    case "service_remedy_approval_required":
+      return { wrong: "The Case remedy has no current approval.", todo: "Open the linked Service Case and ask its approver to review the exact remedy and goods." };
+    case "service_scope_changed":
+      return { wrong: "The Case or requested goods changed after approval.", todo: "Open the linked Service Case and send the changed remedy for approval." };
+    case "service_evidence_required":
+      return { wrong: "The approved Case evidence is missing.", todo: "Open the linked Service Case and restore its evidence before arranging the goods." };
+    case "service_units_changed":
+    case "service_units_required":
+      return { wrong: "The affected Case Units are missing or changed.", todo: "Open the linked Service Case and check the affected Units before sending the remedy for approval." };
+    case "not_service_case_approver":
+      return { wrong: "Only the Service Case Approver may decide this remedy.", todo: "Ask the assigned Service Case Approver to review it in the linked Case." };
+    case "payer_acceptance_required":
+      return { wrong: "The charged remedy has no recorded payer acceptance.", todo: "Open the linked Service Case and record who accepted the charge, the date and its evidence." };
+
+    // ── WHO MAY ACT (0627 · owner ruling 2026-09-29) ──────────────────────
+    /* Every active Operation person may issue; PO Duty is the normal owner,
+       not the permission. The code keeps its wire spelling. */
     case "not_po_duty":
       return {
-        wrong: "You do not hold PO duty today.",
+        wrong: "Only Operation staff may issue a purchase order.",
         todo: `Ask ${some(facts.actor, "today's PO duty holder")} to issue this purchase order.`,
       };
     case "no_po_duty_holder":
@@ -245,6 +261,18 @@ export function purchasingRefusal(
       return {
         wrong: `${dest} is closed.`,
         todo: "Choose another Deliver To place, then issue again.",
+      };
+    /* 0443 · Catalog has not answered for a SKU, so no Unit ID can be born
+       with the PO. COPY-STANDARD `Stock identity`. */
+    case "sku_not_in_catalog":
+      return {
+        wrong: `${sku} is not in the Catalog.`,
+        todo: `Add ${sku} to the SKU catalog.`,
+      };
+    case "catalog_identity_mode_missing":
+      return {
+        wrong: `${sku} has no Stock identity.`,
+        todo: `Set the Stock identity of ${sku} to Unit ID or Quantity in Catalog.`,
       };
     case "destination_address_missing":
       return {
@@ -506,6 +534,35 @@ export function purchasingRefusal(
         wrong: "No purchase order was created.",
         todo: "Nothing was sent. Tell IT, then issue again.",
       };
+    /* ── FORECAST PURCHASE (owner ruling 2026-10-14, A; MASTER §9.14) ─────────
+       The page asks through the Manual Purchase Request door and the issue door
+       rechecks a forecast request. Each refusal says what changed and the one
+       act that follows. */
+    case "forecast_changed":
+      return {
+        wrong: `The forecast for ${sku} changed while this was open.`,
+        todo: "Nothing was sent. Check the list, then review again.",
+      };
+    case "forecast_not_stock_item":
+      return {
+        wrong: `${sku} is not on the Forecast Purchase list.`,
+        todo: "Raise it in Manual Purchase Request, or send this request back.",
+      };
+    case "forecast_no_deliver_to":
+      return {
+        wrong: "No default Deliver To is set.",
+        todo: "Set one in Purchasing Settings, then send again.",
+      };
+    case "forecast_coverage_changed":
+      return {
+        wrong: `The forecast now suggests ${facts.toBuy ?? 0} of ${sku}, not ${facts.qty ?? "the approved quantity"}.`,
+        todo: "Nothing was issued. Send the request back for changes, or withdraw it.",
+      };
+    case "forecast_request_changed":
+      return {
+        wrong: `${sku} was added after Forecast Purchase asked for this request.`,
+        todo: "Nothing was issued. Send the request back for a new approval.",
+      };
     default:
       return {
         wrong: "The Portal refused this purchase order.",
@@ -563,6 +620,8 @@ export const PURCHASING_REFUSAL_CODES = [
   "unknown_destination",
   "inactive_destination",
   "destination_address_missing",
+  "sku_not_in_catalog",
+  "catalog_identity_mode_missing",
   "unknown_demand",
   "unknown_build",
   "duplicate_demand",
@@ -575,6 +634,11 @@ export const PURCHASING_REFUSAL_CODES = [
   "request_ordered",
   "request_closed",
   "nothing_to_issue",
+  "forecast_changed",
+  "forecast_not_stock_item",
+  "forecast_no_deliver_to",
+  "forecast_coverage_changed",
+  "forecast_request_changed",
   "blocked_delivery_date",
   "production_days_required",
   "unresolved_supplier",

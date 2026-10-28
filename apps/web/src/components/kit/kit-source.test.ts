@@ -95,9 +95,13 @@ describe("components/kit source rules", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("imports lucide-react in exactly ONE file — one meaning, one glyph (§5)", () => {
+  /* v4 (01 §3, 9 Oct 2026): icons are Material Symbols Rounded drawn by the one
+   * `MIcon`. `Icon` keeps the meaning IDs and draws through it, so no kit file
+   * loads a second icon system. */
+  it("draws every icon through ONE adapter — Icon via MIcon, no lucide-react in the kit (§5)", () => {
     const importers = FILES.filter((f) => read(f).includes('from "lucide-react"'));
-    expect(importers).toEqual(["Icon.tsx"]);
+    expect(importers).toEqual([]);
+    expect(read("Icon.tsx")).toContain('from "@/components/carres/MIcon"');
   });
 
   it("every calendar is react-day-picker — §11's engine, two governed skins", () => {

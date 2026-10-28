@@ -142,7 +142,8 @@ describe("Payment Records — the listing", () => {
     expect(screen.getByText("2 selected")).toBeInTheDocument();
     expect(screen.getByRole("table")).toBe(table);
     expect(screen.getByRole("button", { name: "Print 2 receipts" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Export Excel (2)" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Page tools" }));
+    expect(screen.getByRole("menuitem", { name: "Export Excel (2)" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Export.*receipt/i })).not.toBeInTheDocument();
   });
   it("shows a failed source with recovery rather than a zero total", () => {
@@ -156,7 +157,8 @@ describe("Payment Records — the listing", () => {
   it("keeps the VOIDED mark when exporting an original receipt amount", async () => {
     show();
     fireEvent.click(screen.getAllByRole("checkbox", { name: "Select row" })[1]);
-    fireEvent.click(screen.getByRole("button", { name: "Export Excel (1)" }));
+    fireEvent.click(screen.getByRole("button", { name: "Page tools" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Export Excel (1)" }));
     await waitFor(() => expect(state.sheet).toHaveBeenCalled());
     expect(state.sheet.mock.calls[0][0]).toEqual([
       expect.objectContaining({ "Receipt No": "RC-060926-0002 · VOIDED", "Amount received": "100" }),

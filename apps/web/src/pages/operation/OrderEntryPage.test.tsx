@@ -36,6 +36,19 @@ function savedPayload(): SetOrderEntryConfigInput {
 }
 
 describe("OrderEntryPage", () => {
+  it("someone not named for Sales Orders reads the config and cannot change it (TEAM-02)", () => {
+    vi.mocked(useOrderEntryConfig).mockReturnValue({
+      data: { entryConfig: EMPTY_CONFIG, canEdit: false },
+      isLoading: false,
+      isError: false,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    render(<OrderEntryPage />);
+    expect(screen.getByTestId("order-entry-read-only")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit Credit / Debit" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Add payment method" })).toBeDisabled();
+  });
+
   it("prefills the 4 default methods (incl. cash) + the required Bank information on credit when config is empty", () => {
     render(<OrderEntryPage />);
 

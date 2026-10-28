@@ -31,3 +31,14 @@
   .canvas [data-testid="selection-bar"] { flex-wrap: wrap; }
   .canvas [data-testid="selection-bar"] > span:first-child { flex-basis: 100%; white-space: normal; }
 }
+
+/* The shared row recipe is desktop32/touch40. The grid's canvas-based
+   checkbox hit area and wrap padding must not enlarge every desktop row. */
+@media (min-width: 768px) {
+  .page [data-row-height="32"] [data-testid^="so-batch-row-"] > td {
+    padding-block: 0;
+  }
+  .page [data-row-height="32"] [data-testid^="so-batch-row-"] > td > label {
+    height: 32px;
+  }
+}

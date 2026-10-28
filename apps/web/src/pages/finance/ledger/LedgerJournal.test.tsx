@@ -81,9 +81,13 @@ describe("Journal", () => {
     expect(screen.getByTestId("journal-destination-header")).toBeInTheDocument();
     expect(await screen.findByText("JE-202609-0003")).toBeInTheDocument();
     const table = screen.getByRole("table");
-    for (const label of ["Entry No", "Date", "Source", "Document", "Narration", "Amount", "Reversal"]) {
+    for (const label of ["Entry No", "Date", "Source", "Document", "Narration", "Amount"]) {
       expect(within(table).getAllByText(label).length).toBeGreaterThan(0);
     }
+    // Reversal waits in Columns at first (Chew 2026-10-14).
+    expect(within(table).queryByText("Reversal")).not.toBeInTheDocument();
+    (fireEvent.click(screen.getByRole("button", { name: "Page tools" })), fireEvent.click(screen.getByRole("menuitem", { name: "Columns" })));
+    expect(screen.getByRole("checkbox", { name: "Reversal" })).not.toBeChecked();
     expect(screen.getByText("Sales invoice")).toBeInTheDocument();
     expect(screen.getByText("Supplier bill reversal")).toBeInTheDocument();
     // A key the words do not know yet, and a payment posted under its row id.
@@ -97,6 +101,8 @@ describe("Journal", () => {
   it("links each half of a reversed pair to the other", async () => {
     show();
     await screen.findByText("JE-202609-0003");
+    (fireEvent.click(screen.getByRole("button", { name: "Page tools" })), fireEvent.click(screen.getByRole("menuitem", { name: "Columns" })));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Reversal" }));
     expect(screen.getByText("Reversed by")).toBeInTheDocument();
     expect(screen.getByText("Reverses")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("link", { name: "JE-202609-0005" }));
@@ -130,7 +136,7 @@ describe("Journal", () => {
     expect(api.fetch).toHaveBeenCalledWith("/api/finance/ledger/entries/JE-202609-0003");
     // The register itself is not read to open one entry.
     expect(api.fetch.mock.calls.some(([u]) => String(u).startsWith("/api/finance/ledger/entries?"))).toBe(false);
-    fireEvent.click(screen.getByRole("link", { name: "Journal" }));
+    fireEvent.click(screen.getByRole("link", { name: "Back to Journal" }));
     expect(screen.getByTestId("where")).toHaveTextContent(/^\/finance\/ledger$/);
   });
 
@@ -252,6 +258,22 @@ describe("one account's running balance", () => {
     const amount = screen.getByRole("columnheader", { name: /Amount/ });
     fireEvent.click(within(amount).getByRole("button", { name: "Amount" }));
     await waitFor(() => expect(screen.queryByRole("columnheader", { name: "Running balance" })).not.toBeInTheDocument());
+  });
+
+  it("hides the balance while the rows are grouped", async () => {
+    window.localStorage.setItem("carres.finance.journal.v3", JSON.stringify({ groupBy: ["source"] }));
+    try {
+      api.fetch.mockImplementation((u: string) => withLedger(u));
+      show("/finance/ledger?account=1210");
+      await screen.findByRole("columnheader", { name: /Amount/ });
+      // The balances have been read; only then does their absence mean anything.
+      await waitFor(() => expect(ledgerAsked()).toHaveLength(1));
+      await new Promise((r) => setTimeout(r, 50));
+      expect(screen.queryByRole("columnheader", { name: "Running balance" })).not.toBeInTheDocument();
+      expect(document.body.textContent).not.toMatch(/RM [\d,.]+ (Debit|Credit)/);
+    } finally {
+      window.localStorage.removeItem("carres.finance.journal.v3");
+    }
   });
 
   it("says so when the balances cannot be read, and shows no figure", async () => {

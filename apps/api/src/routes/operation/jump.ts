@@ -42,10 +42,10 @@ import type { AppEnv } from "../../types";
  * returns carries an `href` into the destination that OWNS the document, and
  * that is the whole of what selecting a result may do.
  *
- * It does NOT search customer names, phone numbers, product text or arbitrary
- * table cells. That is the Register's own page-owned Search, and the MASTER
- * keeps the two apart on purpose: widening this set needs a governed
- * cross-module search index and a new architecture decision, not a filter here.
+ * Since the owner-confirmed handoff of 2026-10-08 it also finds a CUSTOMER
+ * name (that customer's Sales Orders) and a SUPPLIER name (that supplier's
+ * Purchase Orders) — see the NAMES block. It still does not search phone
+ * numbers, product text or arbitrary table cells.
  */
 const jumpRouter = new Hono<AppEnv>();
 
@@ -118,6 +118,62 @@ jumpRouter.get("/", requireOperation, async (c) => {
           number: `SO-${row.so}`,
           party: row.customer_name,
           href: `/operation/orders/so/${row.id}`,
+        });
+      }
+    }
+  }
+
+  // ── NAMES — owner-confirmed handoff 2026-10-08 ("Search SO, PO, supplier,
+  // customer"; Ops Rules §4: global search finds an order by SO no., customer,
+  // PO no. or supplier name). A typed NAME finds that customer's Sales Orders
+  // and that supplier's Purchase Orders. Same two layers as the numbers: the
+  // guard keeps the wrong role off, RLS decides which rows exist. The name is
+  // reduced to letters, digits, spaces and `&.'-` before it reaches `ilike`, so
+  // it can neither widen the pattern nor break the PostgREST grammar.
+  const nameTerm = parsed.raw.replace(/[^A-Z0-9 &.'-]/g, " ").replace(/\s+/g, " ").trim();
+  const numberShaped = /^(SO|PO|GRN|INV)[\s-]*\d/.test(parsed.raw) || /^[\d\s-]+$/.test(parsed.raw);
+  const nameSearch = !numberShaped && nameTerm.replace(/[^A-Z]/g, "").length >= 2;
+  if (nameSearch) {
+    const [custRes, supRes] = await Promise.all([
+      sb
+        .from("orders")
+        .select("id, so, customer_name")
+        .ilike("customer_name", `%${nameTerm}%`)
+        .not("so", "is", null)
+        .order("so", { ascending: false })
+        .limit(PER_TYPE),
+      sb.from("suppliers").select("id").ilike("name", `%${nameTerm}%`).limit(10),
+    ]);
+    if (custRes.error) return fail(c, custRes.error);
+    if (supRes.error) return fail(c, supRes.error);
+    for (const row of (custRes.data ?? []) as Array<{ id: string; so: number | null; customer_name: string | null }>) {
+      if (row.so == null) continue;
+      documents.push({
+        type: "SO",
+        number: `SO-${row.so}`,
+        party: row.customer_name,
+        href: `/operation/orders/so/${row.id}`,
+      });
+    }
+    const supplierIds = ((supRes.data ?? []) as Array<{ id: string }>).map((r) => r.id);
+    if (supplierIds.length > 0) {
+      const { data, error } = await sb
+        .from("purchase_orders")
+        .select("id, suppliers(name)")
+        .in("supplier_id", supplierIds)
+        .order("id", { ascending: false })
+        .limit(PER_TYPE);
+      if (error) return fail(c, error);
+      for (const row of (data ?? []) as Array<{
+        id: string;
+        suppliers: { name: string | null } | Array<{ name: string | null }> | null;
+      }>) {
+        const sup = Array.isArray(row.suppliers) ? row.suppliers[0] : row.suppliers;
+        documents.push({
+          type: "PO",
+          number: row.id,
+          party: sup?.name ?? null,
+          href: `/operation/procurement?po=${encodeURIComponent(row.id)}`,
         });
       }
     }

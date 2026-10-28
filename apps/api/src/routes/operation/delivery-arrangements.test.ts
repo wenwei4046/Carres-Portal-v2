@@ -8,6 +8,15 @@ vi.mock("../../lib/supabase", () => ({
   adminClient: vi.fn(),
 }));
 import { adminClient, userClient } from "../../lib/supabase";
+/* THE Delivery calendar is read through its one reader; the queue-shaped
+   client mock below stays about the arrangement tables. Default: the built-in
+   Selangor list; a test may hand in a stored calendar. */
+vi.mock("../../lib/delivery-calendar", async () => {
+  const shared = await vi.importActual<typeof import("@carres/shared")>("@carres/shared");
+  return { readDeliveryCalendar: vi.fn(async () => ({ calendar: shared.DEFAULT_DELIVERY_CALENDAR, stored: false })) };
+});
+import { readDeliveryCalendar } from "../../lib/delivery-calendar";
+import { deliveryCalendarOf } from "@carres/shared";
 
 /**
  * THE ARRANGEMENT DOORS (0379) — and the one rule they exist to enforce:
@@ -215,6 +224,20 @@ describe("POST /assign — one partner onto one or many scopes", () => {
     const body = (await res.json()) as { scopes: Array<{ orderId: string }> };
     expect(body.scopes).toHaveLength(1);
     expect(body.scopes[0]?.orderId).toBe(ORDER_B);
+  });
+
+  it.each([NETS, AL])("refuses assigned scopes in a bulk request even with a reason (%s)", async (partnerId) => {
+    const { upserts, inserts } = mockSb([
+      { data: { id: partnerId, name: "Logistics" } },
+      { data: [{ id: "arr-1", order_id: ORDER_B, leg: 0, partner_id: NETS }] },
+      { data: [{ id: ORDER_A, delivery_partner_id: null }, { id: ORDER_B, delivery_partner_id: null }] },
+    ]);
+    const res = await assign({ scopes: [{ orderId: ORDER_A, leg: 0 }, { orderId: ORDER_B, leg: 0 }],
+      partnerId, reason: "partner_capacity_full" });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "bulk_requires_unassigned", scopes: [{ orderId: ORDER_B, leg: 0 }] });
+    expect(upserts).toHaveLength(0);
+    expect(inserts).toHaveLength(0);
   });
 
   it("⭐ a Journey LEG inherits no carrier from the order-level column", async () => {
@@ -772,6 +795,33 @@ describe("PUT /:orderId — the in-panel writes (CARD 11, Delivery MASTER §8.6)
     const res = await save({ partnerId: NETS, confirmedDate: "2026-09-06" });
     expect(res.status).toBe(400);
     expect(((await res.json()) as { code: string }).code).toBe("not_a_delivery_day");
+  });
+
+  it("⭐ the Selangor holiday of the built-in list is refused (Sultan of Selangor's Birthday, Fri 11 Dec 2026)", async () => {
+    mockSb([{ data: { id: ORDER_A, delivery_date: null, delivery_date_tbd: false } }]);
+    const res = await save({ partnerId: NETS, confirmedDate: "2026-12-11" });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toBe("A Malaysian public holiday is not a delivery day");
+  });
+
+  it("⭐ a date of the IMPORTED Warehouse calendar is refused, and the imported year replaces the built-in one", async () => {
+    // The imported 2026 Selangor calendar lists Tue 20 Oct and not 11 Dec.
+    vi.mocked(readDeliveryCalendar).mockResolvedValueOnce({
+      calendar: deliveryCalendarOf({ region: "Selangor", dates: [{ onDate: "2026-10-20", name: "Imported holiday" }] }),
+      stored: true,
+    });
+    mockSb([{ data: { id: ORDER_A, delivery_date: null, delivery_date_tbd: false } }]);
+    const refused = await save({ partnerId: NETS, confirmedDate: "2026-10-20" });
+    expect(refused.status).toBe(400);
+    expect(((await refused.json()) as { code: string }).code).toBe("not_a_delivery_day");
+    vi.mocked(readDeliveryCalendar).mockResolvedValueOnce({
+      calendar: deliveryCalendarOf({ region: "Selangor", dates: [{ onDate: "2026-10-20", name: "Imported holiday" }] }),
+      stored: true,
+    });
+    mockSb([{ data: { id: ORDER_A, delivery_date: null, delivery_date_tbd: false } }]);
+    const kept = await save({ partnerId: NETS, confirmedDate: "2026-12-11" });
+    expect(kept.status).not.toBe(400);
+    expect(((await kept.json().catch(() => ({}))) as { code?: string }).code).not.toBe("not_a_delivery_day");
   });
 });
 

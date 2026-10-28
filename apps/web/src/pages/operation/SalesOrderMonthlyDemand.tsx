@@ -42,6 +42,16 @@ export function monthlyDemandRowLabel(row: Pick<MonthlyDemandRow, "kind" | "mont
 }
 
 /**
+ * The `To buy` cell, ONE spelling for the screen and the Excel export:
+ * `Not applicable` when the chosen category is not bought per order,
+ * `Unavailable` when SO Batch Purchase could not be read, else the number.
+ */
+export function monthlyDemandToBuyCell(row: Pick<MonthlyDemandRow, "toBuy">): string | number {
+  if (row.toBuy === "not-applicable") return "Not applicable";
+  return row.toBuy === null ? "Unavailable" : row.toBuy;
+}
+
+/**
  * What `Export` writes: exactly the `By month` table on screen — the same
  * rows, columns and words (`Unavailable` stays a word, never a zero).
  */
@@ -63,7 +73,7 @@ export function monthlyDemandSheet(view: MonthlyDemandView): { headers: string[]
     row.totalQty,
     row.delivered,
     row.notDelivered,
-    row.toBuy === null ? "Unavailable" : row.toBuy,
+    monthlyDemandToBuyCell(row),
   ]);
   return { headers, rows };
 }
@@ -170,7 +180,7 @@ export default function SalesOrderMonthlyDemand({
         totalQty: row.totalQty,
         delivered: row.delivered,
         notDelivered: row.notDelivered,
-        toBuy: row.toBuy === null ? "Unavailable" : row.toBuy,
+        toBuy: monthlyDemandToBuyCell(row),
       },
     };
   });

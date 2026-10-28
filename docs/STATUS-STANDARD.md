@@ -17,7 +17,7 @@ the rest.
 |---|---|---|
 | Unpaid | 0 (empty ring) | `text-info` blue |
 | Deposit | collected/total | `text-info` blue |
-| Overdue (owing past deadline) | collected/total | `text-danger` red |
+| Late (owing past deadline) | collected/total | `text-danger` red |
 | Paid | 1 (full) | `text-success` green |
 | Sent | — only rendered when an invoice-sent signal EXISTS (none today — omitted) |
 

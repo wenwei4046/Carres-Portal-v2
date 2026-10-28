@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import Button from "@/components/kit/Button";
 // Unified Internal Portal (2026-06-30) — shared role-aware rail.
 import PortalSidebar from "@/pages/portal/PortalSidebar";
 import { useAuth } from "@/lib/auth";
@@ -17,15 +18,42 @@ import PrincipalDealers from "../principal/PrincipalDealers";
 import OtherReceiptsPage from "./other-money-in/OtherReceiptsPage";
 import MoneyMovesPage from "./money-moves/MoneyMovesPage";
 import CardSettlementPage from "./card-settlement/CardSettlementPage";
+import CardMoneyWaiting from "./card-settlement/CardMoneyWaiting";
+import DailyBankPage from "./daily-bank/DailyBankPage";
 // The read-only Finance Ledger — three destinations, three nav rows.
 import LedgerJournal from "./ledger/LedgerJournal";
 import LedgerTrialBalance from "./ledger/LedgerTrialBalance";
+import GeneralLedger from "./ledger/GeneralLedger";
 import LedgerSelfCheck from "./ledger/LedgerSelfCheck";
+import OpeningBalances from "./ledger/OpeningBalances";
 import SupplierBills from "./payables/SupplierBills";
 import PaymentVouchers from "./payables/PaymentVouchers";
 import FinanceSettings from "./settings/FinanceSettings";
 import DealerCommission from "./reports/DealerCommission";
+import CardCharges from "./reports/CardCharges";
+import CashFlow from "./reports/CashFlow";
+import ApAging from "./reports/ApAging";
+import ArAging from "./reports/ArAging";
+import StockValue from "./reports/StockValue";
+import StockDrops from "./reports/StockDrops";
+import Collection from "./reports/Collection";
+import Forecast from "./reports/Forecast";
 import ApOutstanding from "./payables/ApOutstanding";
+import SupplierFinancePage from "./payables/SupplierFinancePage";
+import SupplierCreditNotes from "./payables/SupplierCreditNotes";
+import SupplierDebitNotes from "./payables/SupplierDebitNotes";
+import NotesToFollowUp from "./payables/NotesToFollowUp";
+import PaymentRequests from "./payment-requests/PaymentRequests";
+
+/** `/finance/reports` held both statements on one page. It now opens the Profit
+ *  and Loss, or the Balance Sheet when the address asked for a day, keeping
+ *  every value the address carried (Chew, 2026-10-03). */
+function ReportsRedirect() {
+  const { search } = useLocation();
+  const params = new URLSearchParams(search);
+  const page = params.has("asOf") || params.has("bsView") ? "balance-sheet" : "profit-and-loss";
+  return <Navigate to={`/finance/reports/${page}${search}`} replace />;
+}
 
 /**
  * Finance (HQ Internal) shell — sidebar + main routing area.
@@ -56,6 +84,9 @@ export default function FinanceApp() {
   }, []);
   const financeOnly = (page: React.ReactNode) =>
     role === "operation" ? <Navigate to="/finance/monitor" replace /> : page;
+  // 0687 (Chew 2026-10-12, 「hr & BD 也到能申请」, Finance MASTER §3.3): HR and
+  // BD reach Payment Requests and nothing else here.
+  if (role === "hr" || role === "bd") return <RequestsOnly role={role} />;
   return (
     /* ⭐ A FIXED FRAME, like the Operation shell (Payment Monitor Card 02,
        2026-09-16). With `min-h-screen` the page grew to its content, so a
@@ -79,6 +110,17 @@ export default function FinanceApp() {
           <Route path="bills/*"            element={financeOnly(<SupplierBills />)} />
           <Route path="payment-vouchers/*" element={financeOnly(<PaymentVouchers />)} />
           <Route path="ap-outstanding"     element={financeOnly(<ApOutstanding />)} />
+          {/* 0645 — staff ask Finance to pay a bill (Chew 2026-10-03). NOT finance-only:
+              the Operation staff Finance or the boss allows reach it here, and the database
+              shows each person only what they may see. */}
+          <Route path="payment-requests/*" element={<PaymentRequests />} />
+          {/* 0642 — a supplier's credit note takes money off what Carres owes (Chew 2026-10-03). */}
+          <Route path="credit-notes/*"     element={financeOnly(<SupplierCreditNotes />)} />
+          <Route path="debit-notes/*"      element={financeOnly(<SupplierDebitNotes />)} />
+          {/* 0676: the credit and debit notes suppliers still owe. */}
+          <Route path="notes-to-follow-up/*" element={financeOnly(<NotesToFollowUp />)} />
+          {/* 0636 — Finance's own tax and bank details per supplier (Chew 2026-10-03). */}
+          <Route path="suppliers"          element={financeOnly(<SupplierFinancePage />)} />
           {/* PAYMENTS → Monitor · Payment Records (owner ruling 2026-09-12).
               Monitor is the SO-keyed collection control listing and opens the
               collection workspace (`?invoice=`); Payment Records is the
@@ -97,12 +139,31 @@ export default function FinanceApp() {
           <Route path="invoices"  element={<LegacyPaymentRedirect to="/finance/monitor" />} />
           <Route path="refunds"   element={<Navigate to="/finance/payments" replace />} />
           <Route path="recon"     element={<Navigate to="/finance/payments" replace />} />
-          <Route path="reports"   element={financeOnly(<FinanceReports />)} />
+          {/* Chew 2026-10-03: the Profit and Loss and the Balance Sheet are
+              two pages, each a row under Reports. */}
+          <Route path="reports"   element={<ReportsRedirect />} />
+          <Route path="reports/profit-and-loss" element={financeOnly(<FinanceReports statement="pl" />)} />
+          <Route path="reports/balance-sheet" element={financeOnly(<FinanceReports statement="bs" />)} />
           {/* Payment MASTER §16 — Reports → Payment: the six approved
               read-only listings over the same register wires. */}
           <Route path="reports/payment" element={financeOnly(<FinancePaymentReport />)} />
           {/* 0544 — dealer commission and renovation rebate: rates and a read-only report. */}
           <Route path="reports/dealer-commission" element={financeOnly(<DealerCommission />)} />
+          {/* Card sales, card fee and what reached the bank, per month and card company. */}
+          <Route path="reports/card-charges" element={financeOnly(<CardCharges />)} />
+          {/* 0638 — cash and bank money over a period, and what it was for (Chew 2026-10-03). */}
+          <Route path="reports/cash-flow" element={financeOnly(<CashFlow />)} />
+          {/* 0640 — what was owed to suppliers on a day, by age (Chew 2026-10-03). */}
+          <Route path="reports/ap-aging" element={financeOnly(<ApAging />)} />
+          {/* 0686 — what customers and other debtors owed on a day, by age (Chew 2026-10-12). */}
+          <Route path="reports/ar-aging" element={financeOnly(<ArAging />)} />
+          {/* 0643 — the provisional month-end stock value (Chew 2026-10-03). */}
+          <Route path="reports/stock-value" element={financeOnly(<StockValue />)} />
+          <Route path="reports/stock-drops" element={financeOnly(<StockDrops />)} />
+          {/* 0644 — deposit and balance per salesperson (Chew 2026-10-03). */}
+          <Route path="reports/collection" element={financeOnly(<Collection />)} />
+          {/* 0646 — the plan for a month beside its actual (Chew 2026-10-03). */}
+          <Route path="reports/forecast" element={financeOnly(<Forecast />)} />
           {/* 0268 — the rent-to-own credit gate (9th tab). */}
           <Route path="rental-approver" element={financeOnly(<FinanceRentalApprover />)} />
           {/* 0538 — one month of subscription billing across every agreement. */}
@@ -115,17 +176,52 @@ export default function FinanceApp() {
           <Route path="money-moves" element={financeOnly(<MoneyMovesPage />)} />
           {/* 0572 — card settlement files matched to the recorded card payments. */}
           <Route path="card-settlement" element={financeOnly(<CardSettlementPage />)} />
+          {/* 0641 — each card payment not in the bank yet (Chew 2026-10-03). */}
+          <Route path="card-money-waiting" element={financeOnly(<CardMoneyWaiting />)} />
+          {/* 0637 — every money account on one day (Chew 2026-10-03). */}
+          <Route path="daily-bank" element={financeOnly(<DailyBankPage />)} />
           {/* The principal also reaches this page from the Finance rail, and
               keeps Invite dealer, Suspend and Reactivate here (0543: those
               stay principal-only, not off for everyone on this address). */}
           <Route path="dealers" element={financeOnly(<PrincipalDealers channel="dealer" financeView={role !== "principal"} />)} />
           {/* The Finance Ledger (read-only). `?entry=JE-…` opens one entry. */}
           <Route path="ledger" element={financeOnly(<LedgerJournal />)} />
+          {/* 0705 — Finance's figures at go-live: a draft, posted once (Chew 2026-10-21/22). */}
+          <Route path="ledger/opening-balances" element={financeOnly(<OpeningBalances />)} />
+          {/* 0639 — every account's period, one block each (Chew 2026-10-03). */}
+          <Route path="ledger/general-ledger" element={financeOnly(<GeneralLedger />)} />
           <Route path="ledger/trial-balance" element={financeOnly(<LedgerTrialBalance />)} />
           <Route path="ledger/self-check" element={financeOnly(<LedgerSelfCheck />)} />
           {/* 0512 — the one list of money accounts. */}
           <Route path="settings" element={financeOnly(<FinanceSettings />)} />
           <Route path="*"         element={<Navigate to="." replace />} />
+        </Routes>
+      </main>
+    </div>
+  );
+}
+
+/**
+ * HR and BD staff (0687): Payment Requests is the one page they reach under
+ * `/finance`; every other address lands on it. HR keeps its own rail, which
+ * carries the `Payment Requests` row for the staff Finance or the boss allows.
+ * BD works from the POS, which has no rail, so its frame carries one way back.
+ */
+function RequestsOnly({ role }: { role: "hr" | "bd" }) {
+  const navigate = useNavigate();
+  return (
+    <div className="flex h-screen bg-background text-foreground">
+      {role === "hr" && <PortalSidebar />}
+      <main className="flex min-w-0 min-h-0 flex-1 flex-col overflow-y-auto">
+        {role === "bd" && (
+          <div className="flex shrink-0 items-center border-b border-base-200 bg-white px-3 py-1" data-testid="requests-back-to-pos">
+            {/* PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0687). */}
+            <Button variant="ghost" icon="back" onClick={() => navigate("/bd")}>Back to POS</Button>
+          </div>
+        )}
+        <Routes>
+          <Route path="payment-requests/*" element={<PaymentRequests />} />
+          <Route path="*" element={<Navigate to="/finance/payment-requests" replace />} />
         </Routes>
       </main>
     </div>

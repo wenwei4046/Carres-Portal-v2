@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   financeExceptionHolds,
   financeExceptionReason,
+  financeHoldLineOf,
   isOpenFinanceException,
   openFinanceExceptions,
   type FinanceException,
@@ -116,5 +117,32 @@ describe("financeExceptionReason — a refusal names what closes it", () => {
 
   it("never returns an empty string — a caller cannot forget to check null", () => {
     expect(financeExceptionReason([])).not.toBe("");
+  });
+});
+
+describe("financeHoldLineOf — Operation's second line under `Hold delivery` (owner ruling 2026-09-25)", () => {
+  it("prints nothing when no exception is open", () => {
+    expect(financeHoldLineOf([])).toBeNull();
+    expect(financeHoldLineOf([cleared()])).toBeNull();
+  });
+
+  it("names the one open reason", () => {
+    expect(financeHoldLineOf([open(), cleared()])).toBe("Finance hold · Chargeback under investigation");
+  });
+
+  it("counts the reasons when several are open — the Order Route's own spelling", () => {
+    expect(
+      financeHoldLineOf([open({ id: "a" }), open({ id: "b", reason: "Suspected duplicate payment" })]),
+    ).toBe("Finance hold · 2 reasons");
+  });
+
+  it("a row without its reason (an older Worker) still says Finance hold, never a dangling separator", () => {
+    expect(financeHoldLineOf([{ status: "open" }])).toBe("Finance hold");
+    expect(financeHoldLineOf([{ status: "open", reason: "  " }])).toBe("Finance hold");
+  });
+
+  it("never uses a retired spelling", () => {
+    const said = financeHoldLineOf([open()]) ?? "";
+    expect(said).not.toMatch(/Finance is holding this delivery|Do not deliver|still to collect/);
   });
 });

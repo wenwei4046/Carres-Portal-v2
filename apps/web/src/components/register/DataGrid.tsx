@@ -1,3 +1,5 @@
+import { toast } from "sonner";
+import { matchesRegisterColumnFilters, type DatePreset, type RegisterColumnQuery } from "@carres/shared";
 // DataGrid — THE REGISTER ENGINE (Law 13: one engine for every Carres
 // register — Sales Orders · Delivery Orders · Purchase Orders · Receiving ·
 // Claims · Payments. A module may configure columns · filters · exports ·
@@ -11,7 +13,7 @@
 //     right of the caller's toolbar children)
 //   · ONE engine extension, done once so every register gets it (Law 13):
 //     a `selectable` grid shows a selection bar — "N selected · Clear ·
-//     Export Excel (N)" — and that export writes the SELECTED rows only.
+//     selected outputs in Page tools — that export writes the SELECTED rows only.
 //     The toolbar's own Export Excel stays the current view (Law 9).
 //   · when a page wires `onRowClick` (detail panel), row click no longer ALSO
 //     toggles selection — the checkbox column owns selection. Pages without
@@ -29,8 +31,8 @@
 //     multiple group levels supported; rows collapse with caret
 //   - Layout persisted to localStorage[storageKey]:
 //       { order, hidden, widths, groupBy, sort }
-//   - Sticky header. Density: row height ~28px, body fs-12, header fs-10
-//     uppercase letter-spacing 0.06em.
+//   - Sticky header. Look: the v4 template table (01 §5) — header 40 at
+//     12/500, body rows at least 54 at 13, one white card (DataGrid.module.css).
 //
 // Pure React + HTML5 drag-and-drop.
 //
@@ -43,6 +45,8 @@ import {
   type ReactNode,
   type MouseEvent,
   Fragment,
+  lazy,
+  Suspense,
   createContext,
   memo,
   useCallback,
@@ -53,23 +57,28 @@ import {
   useRef,
   useState,
 } from "react";
-import { Search, Columns3, RotateCcw, Filter, Download, ChevronDown, ChevronRight, Printer, X, Check, ArrowDown, ArrowUp } from "lucide-react";
+import { Search, Columns3, RotateCcw, Filter, ChevronDown, ChevronRight, X, Check, ArrowDown, ArrowUp } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { appTodayIso } from "@/lib/fmt-date";
 import Button from "@/components/kit/Button";
-import Popover from "@/components/kit/Popover";
+import Modal from "@/components/kit/Modal";
+const RegisterPdfPreview = lazy(() => import("@/components/kit/PdfPreview"));
+import Icon from "@/components/kit/Icon";
+import MIcon from "@/components/carres/MIcon";
+import CPopover, { CMenu, type CMenuEntry } from "@/components/carres/CPopover";
 import Tooltip from "@/components/kit/Tooltip";
 import { EXPANSION_JOIN_Y, ExpansionJoinContext } from "./expansion-connector";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { SkeletonRows } from "./Skeleton";
 import { DateField } from "./DateField";
 import styles from "./DataGrid.module.css";
+import RowContextMenu, { type RowMenuAt } from "./RowContextMenu";
 
-/* The row-highlight stripe (see `rowHighlight`). Literal class strings so the
-   Tailwind build keeps them; tokens only (kit red-9 / blue-9). */
+/* The row-highlight stripe (see `rowHighlight`), drawn by the v4 sheet in the
+   problem ink / neutral info ink (DataGrid.module.css). */
 const ROW_HIGHLIGHT_CLASS = {
-  critical: "[&>td:first-child]:shadow-[inset_3px_0_0_theme(colors.kit.red.9)]",
-  info: "[&>td:first-child]:shadow-[inset_3px_0_0_theme(colors.kit.blue.9)]",
+  critical: styles.rowHighlightCritical,
+  info: styles.rowHighlightInfo,
 } as const;
 
 import { ViewportExpansion } from "./ViewportExpansion";
@@ -88,6 +97,21 @@ export type DataGridColumn<T> = {
   label: string;
   /** Deliberate two-line presentation; label remains the accessible/export/filter name. */
   headerLines?: readonly [string, string];
+  /**
+   * A grey second line under the header label (01 §5; the design file's `l2`):
+   * `12 Oct` over `Mon`, `Free` over `stock`. The label stays the column's
+   * name for sort, filter, the Columns list and export; this line only adds
+   * to what the header shows. Omitted = the one-line header.
+   */
+  headerSub?: string;
+  /**
+   * The neutral column band (01 §5; the design file's `hl`): one soft grey
+   * fill down the whole column, header and rows, to mark the column the eye
+   * should find first (this month). It is one fixed grey, never the theme
+   * colour and never a page's own colour. An opened row's item rows carry the
+   * same fill with `bg-c-column-band`. Omitted = no band.
+   */
+  band?: boolean;
   /**
    * ⭐ A CUT VALUE OPENS WHOLE (Listing Standard, owner approved 2026-09-16).
    * Opt-in per column: the engine prints this string on one line and, ONLY
@@ -150,10 +174,12 @@ export type DataGridColumn<T> = {
       column also sorts by it (blanks last) unless it has a `sortFn`. */
   numberValue?: (row: T) => number | null | undefined;
   /**
-   * HOUZS port (so-list-houzs-port) — when true and the user hasn't manually
-   * hidden/shown anything yet (no persisted `layout.hidden` for this key),
-   * the column is hidden by default. User can show it via right-click "Show
-   * column" menu; the choice persists in localStorage from then on.
+   * HOUZS port (so-list-houzs-port) — when true and the person has not
+   * arranged the columns yet (a pristine layout for this key), the column is
+   * hidden by default. It stays hidden through pin, drag or hiding another
+   * column, until the person shows it (Columns, or the header menu's "Show");
+   * the choice persists in localStorage from then on, and `Reset columns`
+   * returns to these defaults.
    * Used to match Houzs "19 of 25 columns visible by default" semantics.
    */
   defaultHidden?: boolean;
@@ -216,8 +242,32 @@ export type DataGridContextMenuItem = {
   divider?: boolean;
 };
 
+// Volatile return context, separate from saved personal column layouts. Opt-in.
+const registerSessions = new Map<string, { search: string; filters: Record<string, string[]>;
+  dateFilters: Record<string, DatePreset>; numberFilters: Record<string, { min?: number; max?: number }>;
+  dateRangeFilters: Record<string, { from?: string; to?: string }>;
+  expanded: string[]; active: string | null; scroll: Record<string, [number, number]> }>();
+
 export type DataGridProps<T> = {
   rows: T[];
+  /** Opt-in shared-template toolbar and numeric recipe for the first adopter. */
+  presentationTools?: boolean;
+  /** Drawn AFTER the page tools (⋮), at the toolbar's end. The menu opens below
+   *  its button and to the left; with a control after it, the button is not
+   *  over the last column and its menu never covers that column. */
+  toolbarAfterTools?: ReactNode;
+  /** Module-owned presentation commands in the existing shared tools menu. */
+  pageToolsItems?: readonly CMenuEntry[];
+  toolbarSummary?: (rows: T[]) => ReactNode;
+  searchScope?: string;
+  /** Alternate presentation consumes this engine's exact sorted/filter result. */
+  renderResults?: (rows: T[], expansion: DataGridRowExpansion) => ReactNode;
+  /** Facet candidates pass through the SAME internal search/header predicate. */
+  facetRows?: T[];
+  onFacetRowsChange?: (rows: T[]) => void;
+  /** Temporary in-app return context; never a personal layout or server setting. */
+  sessionKey?: string;
+  presentationKey?: string;
   columns: DataGridColumn<T>[];
   /** localStorage key for column layout persistence */
   storageKey: string;
@@ -227,10 +277,21 @@ export type DataGridProps<T> = {
       the operator's own grouping is never overridden. Omitted = no grouping,
       exactly as before. */
   initialGroupBy?: string[];
+  /** The sort a register opens with when this browser has no saved layout
+      for `storageKey` yet (the design file's `sortDefault`). A saved layout
+      always wins, so a person's own sort, or their choice of none, is never
+      overridden. Omitted = unsorted, exactly as before. */
+  sortDefault?: { key: string; dir: "asc" | "desc" };
+  /** Governed page grouping replaces free column grouping, including older saved layouts. */
+  allowColumnGrouping?: boolean;
   /** Told the column sort whenever it changes, and once on load with the
       saved one; null when nothing is sorted. The Trial Balance prints its
       headings only while nothing is sorted. Pass a stable function. */
   onSortChange?: (sort: { key: string; dir: "asc" | "desc" } | null) => void;
+  /** Told the grouped columns whenever they change, and once on load with the
+      saved ones; [] when nothing is grouped. The Journal hides its running
+      balance while rows are grouped. Pass a stable function. */
+  onGroupByChange?: (groupBy: string[]) => void;
   /** Which rows a group heading's count counts. Absent = every row. The Trial
       Balance counts its accounts, never its heading rows. */
   countsInGroup?: (row: T) => boolean;
@@ -277,11 +338,14 @@ export type DataGridProps<T> = {
       appended automatically. (Wei Siang 2026-06-20 — storageKey filenames like
       "pr-g-so-list-layout-v1" read like junk.) */
   exportName?: string;
+  /** Full filtered population for paged registers; selection export stays selected-only. */
+  loadExportRows?: () => Promise<T[]>;
   onRowDoubleClick?: (row: T) => void;
   /** Commander 2026-05-28 — single-click anywhere on a row fires this (in
       addition to the highlight). Cells that stopPropagation (checkboxes,
       inline inputs) won't trigger it. Used by PO-from-SO to toggle a pick. */
-  onRowClick?: (row: T) => void;
+  /** The click event rides along (a Ctrl/⌘-click may open a new tab). */
+  onRowClick?: (row: T, event?: MouseEvent) => void;
   /** Commander 2026-05-29 — optional per-row inline style. Used by PO-from-SO
       to grey out rows whose supplier conflicts with the locked one. Returns
       undefined for the default look. */
@@ -299,6 +363,15 @@ export type DataGridProps<T> = {
    * setter.
    */
   onSearchChange?: (q: string) => void;
+  /** Paged registers keep filtering/sorting on the authorised full population.
+   * The module supplies server-owned choices, while this kit owns the controls. */
+  serverColumns?: {
+    values: Record<string, string[]>;
+    onChange: (query: RegisterColumnQuery) => void;
+    /** The page's own chosen values (from its URL): the filter menus show them
+     *  ticked and follow when the page clears one (a chip). */
+    selected?: Record<string, string[]>;
+  };
   /** Restores a destination URL search when returning from an owned object. */
   initialSearch?: string;
   /** Optional destination composition. `reference` changes geometry/chrome
@@ -319,14 +392,45 @@ export type DataGridProps<T> = {
    * every Register draws the slate-3 band it draws today.
    */
   headerTone?: "paleBlue";
+  /**
+   * FINANCE LOOK — opt-in, Finance pages only (Chew 2026-10-13, 「c」 then
+   * 「1，做吧」; docs/finance/MASTER.md §4.2). A Finance exception to the one
+   * kit, recorded there; omitted, every grid draws exactly what it draws today.
+   * A light blue header band, a hairline between columns, columns as wide as
+   * their content (the table stretches to the card only through its one
+   * `fillColumn`, Chew 2026-10-14), and a selected
+   * row in light grey with a dark edge on its left, so it never reads as the
+   * blue header. Rows the page marks with `rowTone` read as a subtotal (light
+   * grey, 600) or the total (light grey, 600, a heavy rule above).
+   */
+  look?: "finance";
+  /** With `look="finance"`: which rows are subtotals or the total. */
+  rowTone?: (row: T) => "subtotal" | "total" | null;
+  /**
+   * With `look="finance"` only (Chew 2026-10-14): the ONE column that takes
+   * the width the others leave, so the table fills its box again while the
+   * amounts, dates and codes keep their own widths and stay together. Its
+   * declared `width` is its minimum. A width the person saved for it by
+   * dragging (`layout.widths`) wins: the column then keeps that width and
+   * stops filling. Ignored without the Finance look, when the column is
+   * hidden, or when a pinned column sits after it.
+   */
+  fillColumn?: string;
   /** Opt-in responsive Register Search (owner ruling R4 2026-09-16): a
       readable box when the toolbar has room, an icon that opens when narrow,
       and an active query plus its clear control always visible. */
-  searchPresentation?: "icon" | "responsive";
+  searchPresentation?: "icon" | "responsive" | "none";
   /** Keep frequent controls labelled while the container has room. */
   labelledToolbar?: boolean;
   /** Let a page's date/context controls wrap without clipping; retains icon controls. */
   wrapToolbar?: boolean;
+  /**
+   * NOTHING IS CUT (01 §5, opt-in): a column is as wide as its longest value
+   * (header included), never narrower than its declared `width`; a list wider
+   * than its box scrolls sideways in its own box. A width the person dragged
+   * (`layout.widths`) still wins. `wrap` columns keep wrapping instead.
+   */
+  fitContent?: boolean;
   toolbar?: ReactNode;
   /** Reference-toolbar slots. Start renders before Search; End renders after
       Filters / Export / Columns. The legacy `toolbar` slot is unchanged. */
@@ -352,6 +456,8 @@ export type DataGridProps<T> = {
    * its unit passes it — `1 delivery scope selected` (owner ruling 2026-08-24).
    */
   selectionSummary?: (n: number) => string;
+  /** Same selection facts in shorter governed words, only when the full text cannot fit. */
+  selectionSummaryCompact?: (n: number) => string;
   /** Page-owned primary action beside the selection summary and Clear.
    *  Use this for structured ownership beside the governed work action;
    *  outputs remain separated at the toolbar's right edge. */
@@ -370,6 +476,13 @@ export type DataGridProps<T> = {
   focusSearchNonce?: number;
   /** bump to collapse every expanded drill-down row ("Collapse all") */
   collapseAllNonce?: number;
+  /**
+   * A page that draws its OWN toolbar row (Sales Order Outright's v12 toolbar
+   * and selection bar) hides the engine's; it then opens the engine's Columns
+   * chooser from its own ⋮ by bumping `openColumns` with where to show it.
+   */
+  hideToolbar?: boolean;
+  openColumns?: { nonce: number; top: number; right: number };
   /**
    * ⭐ STICKY IDENTITY — owner ruling 2026-08-15 (Chai). OPTIONAL, default OFF.
    *
@@ -463,7 +576,8 @@ export type DataGridProps<T> = {
    * 2026-09-26: 8 + 18 + 2 + 14 + 8 + 1px rule), for a register whose cells
    * carry a document over its goods identity (Supplier Claims, §9.5).
    */
-  rowHeight?: 38 | 40 | 51 | 72;
+  /** 54 is the kit's list row (01 §5); the others are the earlier listings'. */
+  rowHeight?: 32 | 38 | 40 | 51 | 54 | 72;
   /** show "Drag a column header here to group by that column" banner */
   groupBanner?: boolean;
   emptyMessage?: string;
@@ -507,10 +621,24 @@ export type DataGridProps<T> = {
     alignToColumn?: string;
     /** Keep the child within the visible width, retaining the data-column indent. */
     fitExpansionToViewport?: boolean;
+    /**
+     * The opened row and what it holds are one box (01 §5 "Expanded row": a
+     * 1px `--c-open-frame` frame with corners 8), as Sales Order Outright draws it.
+     * Opt-in; omitted, the §6.9 flush expansion stays exactly as it is.
+     */
+    frame?: boolean;
     /** Optional: derive a stable row id for expansion state. Defaults to rowKey. */
     rowExpansionKey?: (row: T) => string;
     /** Per-row test id for the disclosure chevron. */
     testId?: (row: T) => string;
+    /** A row with nothing to open gets an empty gutter cell, not a dead
+     *  chevron, and `Expand all` leaves it shut (Finance's Trial Balance:
+     *  a heading line does not drill, 2026-10-21). Omitted = every row opens,
+     *  as before. */
+    canExpand?: (row: T) => boolean;
+    /** The chevron's words when the page's dictionary names them (`Show items`
+     *  / `Hide items`); omitted, `Expand row` / `Collapse row`. */
+    label?: (row: T, open: boolean) => string;
     /**
      * ⭐ ENGINE extension (Warehouse unified card, 2026-09-07): the named
      * DATA column is the one expansion entry — its cell renders the chevron
@@ -563,6 +691,8 @@ export type DataGridProps<T> = {
     isIndeterminate?: (row: never) => boolean;
     /** Per-row test id for the checkbox. */
     testId?: (row: never) => string;
+    /** The tick's accessible name, e.g. `Select SO-1234`. Omitted = `Select row`. */
+    rowLabel?: (row: never) => string;
   };
   /** Per-row test id for the whole `<tr>`. */
   rowTestId?: (row: T) => string;
@@ -598,9 +728,14 @@ export type DataGridProps<T> = {
    * for (every optional power stays optional).
    */
   activeConditions?: Array<{ key: string; label: string; onClear: () => void }>;
+  /** Reserve the governed 36px condition strip, including when empty. */
+  reserveConditionRow?: boolean;
   /** Called by `Clear filters` after the grid clears its own column filters,
    *  so one click really does clear everything the strip listed. */
   onClearConditions?: () => void;
+  /** The owning page already draws the aggregate Clear filters control.
+   * Keep the no-match message without duplicating that same action. */
+  clearConditionsInToolbar?: boolean;
   /**
    * Compact mode for grids embedded inside another grid's expansion row
    * (the SO drill-down). Suppresses the search box and the bottom
@@ -619,6 +754,10 @@ type Layout = {
   groupBy: string[];
   pinned: string[];
   sort: { key: string; dir: "asc" | "desc" } | null;
+  /** The person has arranged the columns (pin · drag · hide · show · load),
+   *  so `hidden` is literal even when it is empty. Only `Reset columns`
+   *  clears it. Absent on a layout saved before 2026-10-05. */
+  arranged?: boolean;
 };
 
 const DEFAULT_LAYOUT: Layout = {
@@ -629,6 +768,35 @@ const DEFAULT_LAYOUT: Layout = {
   pinned: [],
   sort: null,
 };
+
+/**
+ * ⭐ PRISTINE = THE COLUMN SPEC'S OWN DEFAULTS. A layout nobody has arranged
+ * shows `defaultHidden: true` columns hidden; once arranged, `hidden` is the
+ * person's literal choice.
+ */
+function isPristineLayout(l: Layout): boolean {
+  return !l.arranged && l.order.length === 0 && l.hidden.length === 0;
+}
+
+/**
+ * ⭐ ONE RULE FOR EVERY LAYOUT WRITER (2026-10-05). The writer is handed the
+ * layout AS SEEN — on a pristine layout the default-hidden keys are written
+ * out first — so pin, drag, hide or show changes only the column acted on and
+ * never releases every default-hidden column at once. A writer that leaves the
+ * arrangement alone (sort · group · widths) keeps a pristine layout pristine.
+ * `Reset columns` is the one act that returns to pristine and does not pass
+ * through here.
+ */
+function settleLayout(prev: Layout, updater: (l: Layout) => Layout, defaultHidden: readonly string[]): Layout {
+  const pristine = isPristineLayout(prev);
+  const seen = pristine && defaultHidden.length ? { ...prev, hidden: [...defaultHidden] } : prev;
+  const next = updater(seen);
+  if (next === seen) return prev;
+  if (next.order === seen.order && next.hidden === seen.hidden) {
+    return seen === prev ? next : { ...next, hidden: prev.hidden };
+  }
+  return { ...next, arranged: true };
+}
 
 function readLayout(key: string): Layout {
   if (typeof window === "undefined") return DEFAULT_LAYOUT;
@@ -650,6 +818,16 @@ function writeLayout(key: string, layout: Layout) {
   }
 }
 
+/** A header cell's content width as drawn (its box less its padding), so a
+ *  drag on the Finance fill column starts from where its edge really is.
+ *  Falls back to the declared width where nothing is laid out (tests). */
+function renderedWidth(th: HTMLElement | null, fallback: number): number {
+  if (!th) return fallback;
+  const cs = window.getComputedStyle(th);
+  const w = th.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+  return w > 0 ? Math.round(w) : fallback;
+}
+
 const coerceSearchString = (v: ReactNode): string => {
   if (v == null || v === false) return "";
   if (typeof v === "string" || typeof v === "number") return String(v);
@@ -661,53 +839,18 @@ const coerceSearchString = (v: ReactNode): string => {
    2026-06-16). Evaluated in MYT (UTC+8) to match the rest of the app — a Date
    shifted by +8h has its UTC fields equal to the MYT wall clock, so date-only
    math via the getUTCDate / setUTCDate family is correct. */
-export type DatePreset = "today" | "tomorrow" | "thisWeek" | "thisMonth" | "lastMonth" | "overdue";
+export { dateMatchesPreset } from "@carres/shared";
+export type { DatePreset } from "@carres/shared";
 const DATE_PRESETS: { key: DatePreset; label: string }[] = [
   { key: "today", label: "Today" },
   { key: "tomorrow", label: "Tomorrow" },
   { key: "thisWeek", label: "This week" },
   { key: "thisMonth", label: "This month" },
   { key: "lastMonth", label: "Last month" },
-  { key: "overdue", label: "Overdue" },
+  { key: "overdue", label: "Passed" },
 ];
 /** Exported so a page's rail answers `Today` / `This week` / `This month` with
  *  the engine's ONE date arithmetic (Mon to Sun week, Malaysia time). */
-export const dateMatchesPreset = (iso: string | null | undefined, preset: DatePreset): boolean => {
-  if (!iso) return false;
-  const d = String(iso).slice(0, 10);
-  if (d.length < 10) return false;
-  const nowMyt = new Date(Date.now() + 8 * 3600 * 1000);
-  const today = nowMyt.toISOString().slice(0, 10);
-  switch (preset) {
-    case "today":
-      return d === today;
-    case "overdue":
-      return d < today;
-    case "tomorrow": {
-      const t = new Date(nowMyt);
-      t.setUTCDate(t.getUTCDate() + 1);
-      return d === t.toISOString().slice(0, 10);
-    }
-    case "thisWeek": {
-      const dow = (nowMyt.getUTCDay() + 6) % 7; // 0 = Monday
-      const mon = new Date(nowMyt);
-      mon.setUTCDate(mon.getUTCDate() - dow);
-      const sun = new Date(mon);
-      sun.setUTCDate(sun.getUTCDate() + 6);
-      return d >= mon.toISOString().slice(0, 10) && d <= sun.toISOString().slice(0, 10);
-    }
-    case "thisMonth":
-      return d.slice(0, 7) === today.slice(0, 7);
-    case "lastMonth": {
-      const lm = new Date(nowMyt);
-      lm.setUTCDate(1);
-      lm.setUTCMonth(lm.getUTCMonth() - 1);
-      return d.slice(0, 7) === lm.toISOString().slice(0, 7);
-    }
-    default:
-      return false;
-  }
-};
 
 /* Task #99 (UI perf) — Inner implementation, kept generic. Exported
    `DataGrid` below is the same function wrapped in React.memo so a parent
@@ -719,39 +862,52 @@ function DataGridInner<T>({
   columns,
   storageKey,
   initialGroupBy,
+  sortDefault,
+  allowColumnGrouping = true,
   onSortChange,
+  onGroupByChange,
   countsInGroup,
   fixedGroups,
   rowKey,
   rowDrag,
   searchPlaceholder = "Search…",
   exportName,
+  loadExportRows,
   onRowDoubleClick,
   onRowClick,
   rowStyle,
   onSelectionChange,
   rowTestId,
   rowHighlight,
+  look,
+  rowTone,
+  fillColumn,
   onFilteredRowsChange,
   onSearchChange,
-  initialSearch = "",
+  serverColumns,
+  initialSearch,
+  renderResults, presentationTools = false, toolbarAfterTools, pageToolsItems, toolbarSummary, searchScope, facetRows, onFacetRowsChange, sessionKey, presentationKey = "table",
   appearance = "default",
   palette,
   headerTone,
   searchPresentation = "icon",
   labelledToolbar = false,
   wrapToolbar = false,
+  fitContent = false,
   toolbar,
   toolbarStart,
   toolbarEnd,
   selectionActions,
   selectionSummary,
+  selectionSummaryCompact,
   selectionPrimary,
   expandTitle,
   hideSelectionExport,
   statusSummary,
   outputActions,
   focusSearchNonce,
+  hideToolbar = false,
+  openColumns,
   collapseAllNonce,
   stickyIdentity = false,
   leadingColumns,
@@ -769,16 +925,28 @@ function DataGridInner<T>({
   selectable,
   chooserGroupOrder,
   activeConditions,
+  reserveConditionRow = false,
   onClearConditions,
+  clearConditionsInToolbar = false,
   embedded = false,
 }: DataGridProps<T>) {
+  /* ⭐ ONE PAGE-TOOLS MENU (01 §4 toolbar: Summary · tabs · view · ⋮ · Tasks;
+     UI MASTER §6.2 "Page tools ⋮"; the separate Export ▾ and Columns buttons
+     are rejected, §7.6). Every Register list keeps Export and Columns inside
+     the one ⋮; `presentationTools` still adds Table/Cards, the responsive
+     search and the per-column sort/filter launchers. */
+  const toolsMenu = presentationTools || appearance === "reference";
   const selectionReasonId = useId();
+  const remembered = useRef(sessionKey ? registerSessions.get(sessionKey) : undefined).current;
+  const rememberedScroll = useRef(remembered?.scroll ?? {});
+  const restoreFocus = useRef(Boolean(remembered?.active));
+
   /* HOUZS-style inline expansion (PR so-list-houzs-port). Tracks the set of
      expanded row ids; rendering inserts a colSpan sub-<tr> directly under
      each expanded parent. Stored as a Set so the chevron column accessor
      can read state in O(1). */
   const [expandedRows, setExpandedRows] = useState<Set<string>>(
-    () => new Set(expandable?.defaultExpandedKeys ?? []),
+    () => new Set(remembered?.expanded ?? expandable?.defaultExpandedKeys ?? []),
   );
   const expansionId = expandable?.rowExpansionKey ?? rowKey;
   const toggleExpand = useCallback((id: string) => {
@@ -797,13 +965,29 @@ function DataGridInner<T>({
     [expandedRows, toggleExpand],
   );
   const [layout, setLayoutRaw] = useState<Layout>(() => {
-    const saved = readLayout(storageKey);
+    const stored = readLayout(storageKey);
+    const saved = allowColumnGrouping ? stored : { ...stored, groupBy: [] };
     // `readLayout` hands back DEFAULT_LAYOUT itself only when nothing is saved.
-    return saved === DEFAULT_LAYOUT && initialGroupBy?.length
-      ? { ...DEFAULT_LAYOUT, groupBy: [...initialGroupBy] }
+    if (saved !== DEFAULT_LAYOUT) return saved;
+    return initialGroupBy?.length || sortDefault
+      ? { ...DEFAULT_LAYOUT, groupBy: [...(initialGroupBy ?? [])], sort: sortDefault ? { ...sortDefault } : null }
       : saved;
   });
-  const setLayout = useCallback(
+  /* NOTHING IS CUT (`fitContent`, 01 §5): each column's longest value, header
+     included, as measured after the last paint; a column is never narrower
+     than its declared width, and a width the person dragged still wins. */
+  const [fitWidths, setFitWidths] = useState<Record<string, number>>({});
+  const widthOf = (col: { key: string; width?: number; wrap?: boolean }): number => {
+    const own = layout.widths[col.key] ?? col.width ?? 140;
+    if (!fitContent || col.wrap || layout.widths[col.key] != null) return Number(own);
+    return Math.max(Number(own), fitWidths[col.key] ?? 0);
+  };
+  /* The keys a pristine layout hides. Keyed by value so a page that rebuilds
+     its column array every render does not churn every layout writer. */
+  const defaultHiddenSignature = JSON.stringify(columns.filter((c) => c.defaultHidden).map((c) => c.key));
+  const defaultHiddenKeys = useMemo(() => JSON.parse(defaultHiddenSignature) as string[], [defaultHiddenSignature]);
+  /** Writes the layout exactly as given — `Reset columns` only. */
+  const commitLayout = useCallback(
     (updater: (l: Layout) => Layout) => {
       setLayoutRaw((prev) => {
         const next = updater(prev);
@@ -813,13 +997,18 @@ function DataGridInner<T>({
     },
     [storageKey],
   );
+  /** Every other layout writer: the one pristine rule in `settleLayout`. */
+  const setLayout = useCallback(
+    (updater: (l: Layout) => Layout) => commitLayout((prev) => settleLayout(prev, updater, defaultHiddenKeys)),
+    [commitLayout, defaultHiddenKeys],
+  );
 
-  const [search, setSearch] = useState(initialSearch);
+  const [search, setSearch] = useState(initialSearch ?? remembered?.search ?? "");
   /** Listing Standard 2026-09-16: below a 768px canvas a row checkbox gets a
    *  40×40 hit area (its column widens to 40 so the target is not shared). */
   const [narrowCanvas, setNarrowCanvas] = useState(false);
   /** The ONE row that holds the grid's Tab stop (roving tabindex). */
-  const [activeRowKey, setActiveRowKey] = useState<string | null>(null);
+  const [activeRowKey, setActiveRowKey] = useState<string | null>(remembered?.active ?? null);
   /** A keyboard-opened row menu may be followed by the browser's own
    *  `contextmenu` event for the same key press; that one is ignored. */
   const keyboardMenuAt = useRef(0);
@@ -827,13 +1016,7 @@ function DataGridInner<T>({
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set(fixedGroups?.groups.filter((g) => g.initiallyCollapsed).map((g) => g.key)));
   const [ctx, setCtx] = useState<{ x: number; y: number; colKey: string } | null>(null);
   /** Right-click row menu — anchor point + the menu items resolved at open time. */
-  const [rowCtx, setRowCtx] = useState<{
-    x: number;
-    y: number;
-    items: DataGridContextMenuItem[];
-    /** Opened from the keyboard: focus returns here when it closes. */
-    returnFocus?: HTMLElement | null;
-  } | null>(null);
+  const [rowCtx, setRowCtx] = useState<RowMenuAt | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [groupZoneActive, setGroupZoneActive] = useState(false);
   /* HOUZS-parity Columns popover — commander 2026-05-27: "为什么不是跟houzs的一样".
@@ -841,7 +1024,7 @@ function DataGridInner<T>({
      discoverable toolbar button + popover with a per-column checkbox + Reset
      link, matching houzs-erp/src/pages/SalesOrderPage.tsx lines 576-624. */
   const [columnsMenuOpen, setColumnsMenuOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(initialSearch.length > 0);
+  const [searchOpen, setSearchOpen] = useState((initialSearch?.length ?? 0) > 0);
   const [outputMenuOpen, setOutputMenuOpen] = useState(false);
   /* The Columns popover is fixed-positioned (not absolute) so it escapes the
      grid card's `overflow: hidden`, which otherwise clips the dropdown when the
@@ -859,18 +1042,26 @@ function DataGridInner<T>({
   /* Per-column value filter (Commander 2026-05-29 — "没有 drop-down 菜单让我
      去做选择"). filters[colKey] = the set of allowed values; absent / empty =
      no filter on that column. filterMenu anchors the open dropdown. */
-  const [filters, setFilters] = useState<Record<string, string[]>>({});
+  const [filters, setFilters] = useState<Record<string, string[]>>(serverColumns?.selected ?? remembered?.filters ?? {});
+  /* A page that owns its filter values (its URL) is followed: a chip cleared
+     on the page clears the menu's tick too. */
+  const selectedFromPage = serverColumns?.selected;
+  const selectedSignature = selectedFromPage ? JSON.stringify(selectedFromPage) : null;
+  useEffect(() => {
+    if (selectedSignature == null) return;
+    setFilters((was) => (JSON.stringify(was) === selectedSignature ? was : (JSON.parse(selectedSignature) as Record<string, string[]>)));
+  }, [selectedSignature]);
   // Date-preset filters for `filterType: 'date'` columns (colKey → preset).
-  const [dateFilters, setDateFilters] = useState<Record<string, DatePreset>>({});
+  const [dateFilters, setDateFilters] = useState<Record<string, DatePreset>>(remembered?.dateFilters ?? {});
   // Number range filters (`filterType: 'number'`): colKey → {min?, max?}.
   const [numberFilters, setNumberFilters] = useState<
     Record<string, { min?: number; max?: number }>
-  >({});
+  >(remembered?.numberFilters ?? {});
   // Custom date range (`filterType: 'date'`): colKey → {from?, to?} ISO. Sits
   // alongside the preset (if both set, they AND together).
   const [dateRangeFilters, setDateRangeFilters] = useState<
     Record<string, { from?: string; to?: string }>
-  >({});
+  >(remembered?.dateRangeFilters ?? {});
   const [filterMenu, setFilterMenu] = useState<{ colKey: string; x: number; y: number } | null>(
     null,
   );
@@ -878,10 +1069,21 @@ function DataGridInner<T>({
   const [filterSearch, setFilterSearch] = useState("");
   /* Same inside-vs-outside scroll guard as the Columns popover — the filter
      dropdown has its own scrollable value list (maxHeight 320 / overflow auto). */
+  const pageToolsRef = useRef<HTMLButtonElement>(null);
+  const filterOrigin = useRef<HTMLElement | null>(null);
   const filterMenuRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const searchIconRef = useRef<HTMLButtonElement>(null);
 
+  /* The page's own ⋮ opens the Columns chooser (`openColumns`). */
+  const openColumnsNonce = openColumns?.nonce;
+  useEffect(() => {
+    if (openColumnsNonce == null || !openColumns) return;
+    setColumnsMenuPos({ top: openColumns.top, right: openColumns.right });
+    setColumnsMenuOpen(true);
+    requestAnimationFrame(() => requestAnimationFrame(() => columnsMenuRef.current?.querySelector<HTMLElement>("button, input")?.focus()));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openColumnsNonce]);
   // Refocus search when parent bumps focusSearchNonce ("Find" button).
   useEffect(() => {
     if (focusSearchNonce != null) searchRef.current?.focus();
@@ -904,34 +1106,16 @@ function DataGridInner<T>({
     };
   }, [ctx]);
 
-  /* Close the row context menu on outside click, scroll, or Escape — same
-     UX as the header context menu but rendered at a higher z-index so it
-     clears the sticky <thead>. */
-  useEffect(() => {
-    if (!rowCtx) return;
-    const close = () => setRowCtx(null);
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        close();
-        rowCtx.returnFocus?.focus({ preventScroll: true });
-      }
-    };
-    window.addEventListener("click", close);
-    window.addEventListener("scroll", close, true);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("click", close);
-      window.removeEventListener("scroll", close, true);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [rowCtx]);
+  /* Closing on an outside click, a scroll or Escape lives with the menu
+     itself (RowContextMenu), shared with the kit DataTable. */
+  const closeRowCtx = useCallback(() => setRowCtx(null), []);
 
   /* Close the Columns popover on outside click — mirrors the `ctx` pattern.
      The popover itself stops propagation on its container so clicks inside
      don't dismiss it. Escape also closes for keyboard parity. */
   useEffect(() => {
     if (!columnsMenuOpen) return;
-    const close = () => setColumnsMenuOpen(false);
+    const close = () => { setColumnsMenuOpen(false); if (toolsMenu) pageToolsRef.current?.focus(); };
     /* Scrolling the menu's OWN list must not close the menu. We listen on the
        capture phase so we still catch scrolls of any outer page container, but
        skip the event when it originates inside the menu itself. */
@@ -955,7 +1139,7 @@ function DataGridInner<T>({
   /* Close the per-column filter dropdown on outside click / Escape. */
   useEffect(() => {
     if (!filterMenu) return;
-    const close = () => setFilterMenu(null);
+    const close = () => { setFilterMenu(null); filterOrigin.current?.focus(); };
     /* Same inside-scroll guard as the Columns menu: scrolling the filter
        dropdown's own list shouldn't dismiss it. */
     const onScroll = (e: Event) => {
@@ -975,10 +1159,27 @@ function DataGridInner<T>({
     };
   }, [filterMenu]);
 
+  // Keep the shared filter surface inside the viewport, including narrow
+  // registers whose later columns sit at the right edge of a scroller.
+  useLayoutEffect(() => {
+    if (!filterMenu || !filterMenuRef.current) return;
+    const place = () => {
+      const rect = filterMenuRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const x = Math.max(8, Math.min(filterMenu.x, window.innerWidth - rect.width - 8));
+      const y = Math.max(8, Math.min(filterMenu.y, window.innerHeight - rect.height - 8));
+      if (x !== filterMenu.x || y !== filterMenu.y) setFilterMenu({ ...filterMenu, x, y });
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [filterMenu, filterSearch, rows, serverColumns?.values, dateFilters, numberFilters, dateRangeFilters]);
+
   // Reset the numbering type-to-find when the open column changes / closes.
   useEffect(() => {
     setFilterSearch("");
-  }, [filterMenu?.colKey]);
+    if (filterMenu && presentationTools) requestAnimationFrame(() => filterMenuRef.current?.querySelector<HTMLElement>("input, button")?.focus());
+  }, [filterMenu?.colKey, presentationTools]);
 
   // Value a column reports for grouping/sorting (groupValue → searchValue → text).
   const colValue = useCallback((c: DataGridColumn<T>, row: T): string => {
@@ -1087,10 +1288,12 @@ function DataGridInner<T>({
      state survives). toggleColumn flips a column's presence in `hidden`. */
   const resetColumns = useCallback(() => {
     /* With personal layouts, `Reset columns` returns to the COMPANY layout,
-       which includes its default order of rows (no header sort). */
-    setLayout((l) => ({ ...l, hidden: [], order: [], widths: {}, ...(personalLayouts ? { sort: null } : {}) }));
+       which includes its default order of rows (no header sort). Back to
+       pristine: the column spec's defaults show again. */
+    commitLayout((l) => ({ ...l, hidden: [], order: [], widths: {}, arranged: false, ...(personalLayouts ? { sort: sortDefault ? { ...sortDefault } : null } : {}) }));
     setColumnsMenuOpen(false);
-  }, [setLayout, personalLayouts]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the default sort is read by value
+  }, [commitLayout, personalLayouts, sortDefault?.key, sortDefault?.dir]);
   /**
    * The columns a `leadingColumns` listing may never lose or reorder: the
    * owner's own leading columns, then the record date, then the identity. A key
@@ -1116,22 +1319,13 @@ function DataGridInner<T>({
   const toggleColumn = useCallback(
     (colKey: string) => {
       if (leadingKeys.includes(colKey)) return;
-      setLayout((l) => {
-        /* If we're still on the pristine-defaults overlay (no explicit
-         choices yet) materialize the current set of hidden keys before
-         toggling, so the first interaction doesn't silently un-hide every
-         defaultHidden column. */
-        const pristine = l.order.length === 0 && l.hidden.length === 0;
-        const baseHidden = pristine
-          ? columns.filter((c) => c.defaultHidden).map((c) => c.key)
-          : l.hidden;
-        const hidden = baseHidden.includes(colKey)
-          ? baseHidden.filter((k) => k !== colKey)
-          : [...baseHidden, colKey];
-        return { ...l, hidden };
-      });
+      // `setLayout` hands a pristine layout over with its defaults written out.
+      setLayout((l) => ({
+        ...l,
+        hidden: l.hidden.includes(colKey) ? l.hidden.filter((k) => k !== colKey) : [...l.hidden, colKey],
+      }));
     },
-    [columns, setLayout, leadingKeys],
+    [setLayout, leadingKeys],
   );
 
   // ── Resolve visible/ordered columns ───────────────────────────────
@@ -1139,22 +1333,20 @@ function DataGridInner<T>({
   // can't be reordered/hidden via the layout (filtered out of order /
   // hidden persistence on read). The accessor is built per-row inside
   // the tbody render so it can read expandedRows + call toggleExpand.
-  /* HOUZS port — when the persisted layout is pristine (no order +
-     no hidden customisations yet) apply `defaultHidden: true` from the
-     column spec so the grid starts with Houzs's 19-of-25 / 34-of-44
-     visible-by-default semantics. Once the user shows/hides anything,
-     the persisted `hidden` array takes precedence and we stop overlaying
-     defaults (their explicit choice wins). Lifted out of the visibleColumns
-     memo so the Columns popover can read the same set without recomputing. */
+  /* HOUZS port — when the persisted layout is pristine (`isPristineLayout`)
+     apply `defaultHidden: true` from the column spec so the grid starts with
+     Houzs's 19-of-25 / 34-of-44 visible-by-default semantics. Once the person
+     arranges anything, `settleLayout` has written those defaults into
+     `hidden` and the persisted array is their explicit choice. Lifted out of
+     the visibleColumns memo so the Columns popover can read the same set
+     without recomputing. */
+  const layoutPristine = isPristineLayout(layout);
   const effectiveHidden = useMemo(() => {
-    const pristineLayout = layout.order.length === 0 && layout.hidden.length === 0;
-    const hidden = pristineLayout
-      ? new Set(columns.filter((c) => c.defaultHidden).map((c) => c.key))
-      : new Set(layout.hidden);
+    const hidden = new Set(layoutPristine ? defaultHiddenKeys : layout.hidden);
     // A saved `hidden` from before the ruling cannot take the date or identity away.
     for (const k of leadingKeys) hidden.delete(k);
     return hidden;
-  }, [columns, layout.order, layout.hidden, leadingKeys]);
+  }, [layoutPristine, layout.hidden, defaultHiddenKeys, leadingKeys]);
 
   const visibleColumns = useMemo(() => {
     const byKey = new Map(columns.map((c) => [c.key, c]));
@@ -1174,20 +1366,8 @@ function DataGridInner<T>({
       .map((k) => byKey.get(k)!)
       .filter(Boolean);
     const synthetic: DataGridColumn<T>[] = [];
-    /* Synthetic select column — checkbox rendered in a dedicated <td>/<th>. */
-    if (selectable) {
-      synthetic.push({
-        key: "__select__",
-        label: "",
-        width: narrowCanvas ? 40 : 30,
-        minWidth: narrowCanvas ? 40 : 30,
-        sortable: false,
-        groupable: false,
-        accessor: () => null,
-        searchValue: () => "",
-      });
-    }
-    /* Synthetic chevron column — accessor is a placeholder; the actual chevron
+    /* ▸ first, then ☐ (01 §5 column order: expand · tick · identifier).
+       Synthetic chevron column — accessor is a placeholder; the actual chevron
        is rendered in a dedicated <td> in the tbody so it can wire click handlers
        without leaking `toggleExpand` into the column spec. With a `trigger`
        column declared, that data column IS the one expansion entry and no
@@ -1198,6 +1378,19 @@ function DataGridInner<T>({
         label: "",
         width: 32,
         minWidth: 32,
+        sortable: false,
+        groupable: false,
+        accessor: () => null,
+        searchValue: () => "",
+      });
+    }
+    /* Synthetic select column — checkbox rendered in a dedicated <td>/<th>. */
+    if (selectable) {
+      synthetic.push({
+        key: "__select__",
+        label: "",
+        width: narrowCanvas ? 40 : 30,
+        minWidth: narrowCanvas ? 40 : 30,
         sortable: false,
         groupable: false,
         accessor: () => null,
@@ -1246,7 +1439,7 @@ function DataGridInner<T>({
       if (col.key.startsWith("__")) {
         // The control gutter always pins, at cumulative offsets.
         m.set(col.key, left);
-        left += Number(layout.widths[col.key] ?? col.width ?? 140);
+        left += widthOf(col);
         continue;
       }
       if (named == null) {
@@ -1257,7 +1450,7 @@ function DataGridInner<T>({
       }
       if (named.includes(col.key)) {
         m.set(col.key, left);
-        left += Number(layout.widths[col.key] ?? col.width ?? 140);
+        left += widthOf(col);
         pinned += 1;
         // Every named column found: the block is complete.
         if (pinned === named.length) break;
@@ -1272,12 +1465,30 @@ function DataGridInner<T>({
     }
     return m;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stickyIdentity, leadingColumns, pinnedLeadingKeys, prefixKey, narrowCanvas, visibleColumns, layout.widths]);
+  }, [stickyIdentity, leadingColumns, pinnedLeadingKeys, prefixKey, narrowCanvas, visibleColumns, layout.widths, fitWidths]);
   /** The last pinned column carries the edge that says where the block ends. */
   const pinnedEdgeKey = useMemo(() => {
     const keys = [...pinnedLefts.keys()];
     return keys.length ? keys[keys.length - 1] : null;
   }, [pinnedLefts]);
+  /** The Finance look's fill column, when it is on (see `fillColumn`). A
+   *  pinned column after it would sit at an offset the fill moves, so the
+   *  fill is only ever the last pinned column or an unpinned one. */
+  const fillKey =
+    look === "finance" &&
+    fillColumn != null &&
+    layout.widths[fillColumn] == null &&
+    visibleColumns.some((c) => c.key === fillColumn) &&
+    (!pinnedLefts.has(fillColumn) || fillColumn === pinnedEdgeKey)
+      ? fillColumn
+      : null;
+  /** A body or footer cell's width: its pixels, or, for the fill column, no
+   *  width at all, so the table gives it what the others leave (`max-width: 0`
+   *  keeps a long value from widening it; its header holds its minimum).
+   *  Measured in Chromium 2026-10-14: a percentage width here would squeeze
+   *  the pixel columns to their content when the box is narrow. */
+  const cellWidth = (key: string, w: number | string): CSSProperties =>
+    key === fillKey ? { maxWidth: 0 } : { width: w, maxWidth: w };
   /** Both a `<th>` and a `<td>` need the same two decisions — one helper. */
   const pinStyle = (key: string): CSSProperties =>
     pinnedLefts.has(key) ? { left: pinnedLefts.get(key) } : {};
@@ -1338,7 +1549,7 @@ function DataGridInner<T>({
      JSX cells, constructs React nodes) on every character. */
   const searchBlobs = useMemo(() => {
     const m = new Map<T, string>();
-    for (const row of rows) {
+    for (const row of facetRows ?? rows) {
       let blob = "";
       for (const c of columns) {
         const sv = c.searchValue ? c.searchValue(row) : coerceSearchString(c.accessor(row));
@@ -1352,7 +1563,7 @@ function DataGridInner<T>({
       m.set(row, blob);
     }
     return m;
-  }, [rows, columns]);
+  }, [rows, facetRows, columns]);
 
   /* Debounce the value that drives filtering (the input itself stays bound to
      `search`, so typing is instant) — keeps large lists responsive while
@@ -1366,58 +1577,18 @@ function DataGridInner<T>({
     onSearchChange?.(debouncedSearch.trim());
   }, [debouncedSearch, onSearchChange]);
 
-  const filteredRows = useMemo(() => {
+  const filterRow = useMemo(() => {
     const q = debouncedSearch.trim().toLowerCase();
-    const active = Object.entries(filters).filter(([, vals]) => vals.length > 0);
-    const activeDates = Object.entries(dateFilters);
-    const activeNumbers = Object.entries(numberFilters);
-    const activeDateRanges = Object.entries(dateRangeFilters);
-    if (
-      !q &&
-      active.length === 0 &&
-      activeDates.length === 0 &&
-      activeNumbers.length === 0 &&
-      activeDateRanges.length === 0
-    )
-      return rows;
-    return rows.filter((row) => {
+    const query: RegisterColumnQuery = { filters, dateFilters, numberFilters, dateRangeFilters, sort: null };
+    return (row: T) => {
       if (q && !(searchBlobs.get(row) ?? "").includes(q)) return false;
-      for (const [colKey, vals] of active) {
-        const c = columns.find((cc) => cc.key === colKey);
-        if (!c) continue;
-        if (!vals.includes(filterColValue(c, row))) return false;
-      }
-      // Date-preset filters — match on the column's raw ISO dateValue (falls
-      // back to the displayed value if a date column didn't supply one).
-      for (const [colKey, preset] of activeDates) {
-        const c = columns.find((cc) => cc.key === colKey);
-        if (!c) continue;
-        const iso = c.dateValue ? c.dateValue(row) : filterColValue(c, row);
-        if (!dateMatchesPreset(iso, preset)) return false;
-      }
-      // Custom date range (from/to inclusive, ISO YYYY-MM-DD string compare).
-      for (const [colKey, range] of activeDateRanges) {
-        const c = columns.find((cc) => cc.key === colKey);
-        if (!c) continue;
-        const raw = c.dateValue ? c.dateValue(row) : filterColValue(c, row);
-        const d = String(raw ?? "").slice(0, 10);
-        if (!d) return false;
-        if (range.from && d < range.from) return false;
-        if (range.to && d > range.to) return false;
-      }
-      // Number range (min/max inclusive).
-      for (const [colKey, range] of activeNumbers) {
-        const c = columns.find((cc) => cc.key === colKey);
-        if (!c) continue;
-        const n = c.numberValue ? c.numberValue(row) : Number(filterColValue(c, row));
-        if (n == null || Number.isNaN(n)) return false;
-        if (range.min != null && n < range.min) return false;
-        if (range.max != null && n > range.max) return false;
-      }
-      return true;
-    });
+      return matchesRegisterColumnFilters(query, key => {
+        const column = columns.find(c => c.key === key);
+        if (!column) return undefined;
+        return { text: filterColValue(column, row), date: column.dateValue ? column.dateValue(row) ?? null : undefined, number: column.numberValue ? column.numberValue(row) ?? null : undefined };
+      });
+    };
   }, [
-    rows,
     columns,
     debouncedSearch,
     filters,
@@ -1428,18 +1599,28 @@ function DataGridInner<T>({
     searchBlobs,
   ]);
 
+  const onServerColumnsChange = serverColumns?.onChange;
+  useEffect(() => {
+    onServerColumnsChange?.({ filters, dateFilters, numberFilters, dateRangeFilters, sort: layout.sort ?? null });
+  }, [filters, dateFilters, numberFilters, dateRangeFilters, layout.sort, onServerColumnsChange]);
+  const remoteRows = Boolean(serverColumns);
+  const filteredRows = useMemo(() => remoteRows ? rows : rows.filter(filterRow), [rows, filterRow, remoteRows]);
+  const facetCandidates = useMemo(() => facetRows?.filter(filterRow), [facetRows, filterRow]);
+  useEffect(() => { if (facetCandidates) onFacetRowsChange?.(facetCandidates); }, [facetCandidates, onFacetRowsChange]);
+
   // Distinct values for the currently-open filter dropdown.
   const filterValues = useMemo(() => {
     if (!filterMenu) return [];
     const c = columns.find((cc) => cc.key === filterMenu.colKey);
     if (!c) return [];
+    if (serverColumns) return serverColumns.values[c.key] ?? [];
     const set = new Set<string>();
     for (const row of rows) set.add(filterColValue(c, row));
     return [...set].sort((a, b) => (a || "~").localeCompare(b || "~"));
-  }, [filterMenu, columns, rows, filterColValue]);
+  }, [filterMenu, columns, rows, filterColValue, serverColumns]);
 
   const sortedRows = useMemo(() => {
-    if (!layout.sort) return filteredRows;
+    if (remoteRows || !layout.sort) return filteredRows;
     const col = columns.find((c) => c.key === layout.sort!.key);
     if (!col) return filteredRows;
     const dir = layout.sort.dir === "asc" ? 1 : -1;
@@ -1473,11 +1654,14 @@ function DataGridInner<T>({
         return va.localeCompare(vb);
       });
     return [...filteredRows].sort((a, b) => cmp(a, b) * dir);
-  }, [filteredRows, columns, layout.sort, colValue]);
+  }, [filteredRows, columns, layout.sort, colValue, remoteRows]);
 
   useEffect(() => {
     onSortChange?.(layout.sort);
   }, [layout.sort, onSortChange]);
+  useEffect(() => {
+    onGroupByChange?.(layout.groupBy);
+  }, [layout.groupBy, onGroupByChange]);
 
   // Selection callback when row changes.
   useEffect(() => {
@@ -1516,6 +1700,35 @@ function DataGridInner<T>({
       selectable.selectedKeys.has(rowKey(r)) || selectable.isIndeterminate?.(r as never) === true,
     );
   }, [selectable, sortedRows, rowKey]);
+
+  const selectionText = selectedOrIndeterminateVisibleRows.length > 0 ? (selectionSummary?.(selectedOrIndeterminateVisibleRows.length) ?? `${selectedOrIndeterminateVisibleRows.length} selected`) : "";
+  const compactSelectionText = selectedOrIndeterminateVisibleRows.length > 0 ? selectionSummaryCompact?.(selectedOrIndeterminateVisibleRows.length) : undefined;
+  const selectionBarRef = useRef<HTMLDivElement>(null);
+  const selectionCountRef = useRef<HTMLSpanElement>(null);
+  const selectionMeasureRef = useRef<HTMLSpanElement>(null);
+  const [compactSelection, setCompactSelection] = useState(false);
+  useLayoutEffect(() => {
+    const bar = selectionBarRef.current, count = selectionCountRef.current, full = selectionMeasureRef.current;
+    if (!bar || !count || !full || !compactSelectionText) return;
+    const measure = () => {
+      if (bar.clientWidth === 0) return;
+      const children = [...bar.children] as HTMLElement[];
+      const css = getComputedStyle(bar);
+      // Measure the full wording even while its short version is displayed;
+      // otherwise a fitting short bar would oscillate back to the long one.
+      const needed = full.getBoundingClientRect().width
+        + children.filter(child => child !== count && !child.classList.contains(styles.toolbarSpacer)).reduce((n, child) => n + child.getBoundingClientRect().width, 0)
+        + (parseFloat(css.getPropertyValue("--selection-gap")) || 10) * (children.length - 1)
+        + parseFloat(css.paddingLeft) + parseFloat(css.paddingRight);
+      setCompactSelection(needed > bar.clientWidth + 1);
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(bar);
+    [...bar.children].forEach(child => observer.observe(child));
+    return () => observer.disconnect();
+  }, [selectionText, compactSelectionText, selectionPrimary, selectedOrIndeterminateVisibleRows.length]);
 
   // ── Group rendering ───────────────────────────────────────────────
   // Multi-level groups produced as a flat list of render instructions.
@@ -1612,8 +1825,9 @@ function DataGridInner<T>({
   /** Every group table is exactly as wide as the columns, so the groups line
    *  up with each other and with the horizontal scrollbar under them. */
   const groupedTableWidth = useMemo(
-    () => visibleColumns.reduce((sum, col) => sum + Number(layout.widths[col.key] ?? col.width ?? 140), 0),
-    [visibleColumns, layout.widths],
+    () => visibleColumns.reduce((sum, col) => sum + widthOf(col), 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [visibleColumns, layout.widths, fitWidths],
   );
 
   /** One section per governed group: its heading, then the rows under it. */
@@ -1716,7 +1930,7 @@ function DataGridInner<T>({
     const sourceKey = e.dataTransfer.getData("text/x-datagrid-col");
     if (!sourceKey) return;
     const col = columns.find((c) => c.key === sourceKey);
-    if (!col || col.groupable === false) return;
+    if (!allowColumnGrouping || !col || col.groupable === false) return;
     setLayout((l) =>
       l.groupBy.includes(sourceKey) ? l : { ...l, groupBy: [...l.groupBy, sourceKey] },
     );
@@ -1872,8 +2086,12 @@ function DataGridInner<T>({
     [deriveTable],
   );
 
-  /** The current view as a PDF — same derived cells, opened in a new tab so the
-   *  operator can read it before deciding to save or print it. */
+  const [pdfPreview, setPdfPreview] = useState<{ src: string; title: string } | null>(null);
+  const exportMounted = useRef(true);
+  useEffect(() => { exportMounted.current = true; return () => { exportMounted.current = false; }; }, []);
+  useEffect(() => () => { if (pdfPreview) URL.revokeObjectURL(pdfPreview.src); }, [pdfPreview]);
+
+  /** Preview in the shared viewer: async rendering must not depend on popups. */
   const exportPdfRows = useCallback(
     async (whichRows: T[]) => {
       if (whichRows.length === 0) return;
@@ -1886,12 +2104,29 @@ function DataGridInner<T>({
         rows,
         printedAt: new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }),
       });
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      if (!exportMounted.current) return;
+      setPdfPreview({ src: URL.createObjectURL(blob), title: stem });
     },
     [deriveTable],
   );
+
+  const [exportLoading, setExportLoading] = useState(false);
+  const exportBusy = useRef(false);
+  const exportCurrentView = async (format: "excel" | "pdf") => {
+    if (exportBusy.current) return;
+    exportBusy.current = true;
+    setExportLoading(true);
+    try {
+      const exportPopulation = loadExportRows ? await loadExportRows() : sortedRows;
+      if (format === "excel") await exportRows(exportPopulation);
+      else await exportPdfRows(exportPopulation);
+    } catch {
+      toast.error("The list could not be exported. Try again.");
+    } finally {
+      exportBusy.current = false;
+      setExportLoading(false);
+    }
+  };
 
   // ── Sort handlers ─────────────────────────────────────────────────
   const toggleSort = (key: string) => {
@@ -1988,9 +2223,11 @@ function DataGridInner<T>({
     setLayout((l) => {
       const widths = { ...l.widths };
       data.forEach((col, i) => {
+        // The Finance fill column keeps filling: a fitted width would fix it.
+        if (col.key === fillKey) return;
         const header = col.headerLines
           ? Math.max(col.headerLines[0].length, col.headerLines[1].length)
-          : col.label.length;
+          : Math.max(col.label.length, col.headerSub?.length ?? 0);
         let longest = 0;
         for (const row of cells) longest = Math.max(longest, (row[i] ?? "").length);
         const fit = Math.round(Math.max(header * 6.5 + 46, longest * 7 + 17, col.minWidth ?? 40));
@@ -2000,7 +2237,10 @@ function DataGridInner<T>({
     });
   };
   const expandAll = () => {
-    if (expandable) setExpandedRows(new Set(sortedRows.map(expansionId)));
+    if (expandable) {
+      const opens = expandable.canExpand;
+      setExpandedRows(new Set((opens ? sortedRows.filter(opens) : sortedRows).map(expansionId)));
+    }
     setCollapsedGroups(new Set());
   };
   /** Collapse all never closes a group that must stay open. */
@@ -2021,6 +2261,88 @@ function DataGridInner<T>({
      cases the normal full map renders, byte-identical to before. So at today's
      list sizes this is a no-op; it only kicks in past VIRTUAL_THRESHOLD rows. */
   const scrollRef = useRef<HTMLDivElement>(null);
+  /* THE OPENED ROW'S FRAME (`expandable.frame`): one box drawn over the opened
+     row and its expansion, measured after each paint; it moves with the list
+     and takes no clicks. */
+  const [frames, setFrames] = useState<ReadonlyArray<{ key: string; top: number; height: number; width: number }>>([]);
+  useLayoutEffect(() => {
+    if (!expandable?.frame) return;
+    const root = scrollRef.current;
+    if (!root) return;
+    const box = root.getBoundingClientRect();
+    const next = [...root.querySelectorAll<HTMLElement>("[data-expansion-of]")].flatMap((child) => {
+      const parent = child.previousElementSibling as HTMLElement | null;
+      if (!parent) return [];
+      const a = parent.getBoundingClientRect();
+      const b = child.getBoundingClientRect();
+      return [{ key: child.dataset.expansionOf!, top: Math.round(a.top - box.top + root.scrollTop), height: Math.round(b.bottom - a.top), width: Math.round(Math.max(a.width, b.width)) }];
+    });
+    setFrames((was) => (JSON.stringify(was) === JSON.stringify(next) ? was : next));
+  });
+  /* Measure every fitted column after each paint (`fitContent`): the widest
+     line of each of its cells, plus the cell's own padding. A line is a child
+     of the cell, or of the cell's one column of lines (`flex-col`), sized to
+     its words, so a column also narrows again when its long value leaves.
+     Setting the widths repaints once; equal measurements stop there. */
+  const [, setFontsReady] = useState(0);
+  useEffect(() => {
+    if (!fitContent) return;
+    void document.fonts?.ready.then(() => setFontsReady((n) => n + 1));
+  }, [fitContent]);
+  useLayoutEffect(() => {
+    if (!fitContent) return;
+    const root = scrollRef.current;
+    if (!root) return;
+    const lineWidth = (el: HTMLElement): number => {
+      const style = getComputedStyle(el);
+      if (style.position === "absolute") return 0;
+      if (style.display.endsWith("flex") && style.flexDirection === "column" && el.children.length > 0) {
+        return Math.max(0, ...Array.from(el.children).map((c) => lineWidth(c as HTMLElement)));
+      }
+      return el.getBoundingClientRect().width;
+    };
+    const next: Record<string, number> = {};
+    root.querySelectorAll<HTMLElement>("[data-col]").forEach((cell) => {
+      const key = cell.dataset.col!;
+      const style = getComputedStyle(cell);
+      /* A missing reading (no layout, e.g. a test page) counts as 0, so the
+         measurement settles instead of re-rendering on `NaN`. */
+      const pad = (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
+      let need = 0;
+      for (const child of Array.from(cell.children)) need = Math.max(need, lineWidth(child as HTMLElement) || 0);
+      next[key] = Math.max(next[key] ?? 0, Math.ceil(need + pad));
+    });
+    setFitWidths((was) => {
+      const keys = Object.keys(next);
+      return keys.length === Object.keys(was).length && keys.every((k) => was[k] === next[k]) ? was : next;
+    });
+  });
+  const sessionSnapshot = useRef({ search, filters, dateFilters, numberFilters, dateRangeFilters,
+    expanded: [...expandedRows], active: activeRowKey, scroll: rememberedScroll.current });
+  sessionSnapshot.current = { search, filters, dateFilters, numberFilters, dateRangeFilters,
+    expanded: [...expandedRows], active: activeRowKey, scroll: rememberedScroll.current };
+  useLayoutEffect(() => () => {
+    if (sessionKey) {
+      const viewport = scrollRef.current;
+      if (viewport && restoredPresentation.current === presentationKey) rememberedScroll.current[presentationKey] = [viewport.scrollTop, viewport.scrollLeft];
+      registerSessions.set(sessionKey, sessionSnapshot.current);
+    }
+  }, [sessionKey, presentationKey]);
+  const restoredPresentation = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    if (!sessionKey || isLoading || errorState != null || restoredPresentation.current === presentationKey) return;
+    const saved = rememberedScroll.current[presentationKey]?.slice();
+    const frame = requestAnimationFrame(() => {
+      const viewport = scrollRef.current;
+      if (viewport && saved) { viewport.scrollTop = saved[0]!; viewport.scrollLeft = saved[1]!; }
+      if (viewport && restoreFocus.current && activeRowKey) {
+        const row = [...viewport.querySelectorAll<HTMLElement>("[data-row-key]")].find(el => el.dataset.rowKey === activeRowKey);
+        if (row) { row.focus({ preventScroll: true }); restoreFocus.current = false; }
+      }
+      restoredPresentation.current = presentationKey;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [sessionKey, presentationKey, isLoading, sortedRows.length]);
   const [emptyViewportWidth, setEmptyViewportWidth] = useState<number>();
   useEffect(() => {
     const viewport = scrollRef.current;
@@ -2161,12 +2483,13 @@ function DataGridInner<T>({
    * `visibleColumns`, one `layout.widths`, one `layout.sort`, one resize
    * handle — so every group is the same table, not four tables that agree.
    */
-  const headerCells = (inGroup: boolean) =>
+  const headerCells = (inGroup: boolean, selectionRows: readonly T[] = sortedRows) =>
       visibleColumns.map((col) => {
-        const w = layout.widths[col.key] ?? col.width ?? 140;
+        const w = widthOf(col);
+        const fills = col.key === fillKey;
         const style: CSSProperties = {
-          width: w,
-          minWidth: col.minWidth ?? 40,
+          width: fills ? undefined : w,
+          minWidth: fills ? w : col.minWidth ?? 40,
           ...pinStyle(col.key),
         };
         const isSorted = layout.sort?.key === col.key;
@@ -2175,22 +2498,23 @@ function DataGridInner<T>({
           /* Select-all means "every row that CAN be selected". A header
              box that stays indeterminate forever because three rows can
              never be ticked is a control that lies about its own state. */
-          const keys = sortedRows
+          const keys = selectionRows
             .filter((r) => selectable.isSelectable?.(r as never) ?? true)
             .map(rowKey);
           const allSel = keys.length > 0 && keys.every((k) => selectable.selectedKeys.has(k));
           const someSel = !allSel && keys.some((k) => selectable.selectedKeys.has(k));
           return (
-            <th key={col.key} scope="col" className={`${styles.th}${inGroup ? ` ${styles.thInGroup}` : ""}${pinClass(col.key)}`} style={style}>
+            <th key={col.key} scope="col" className={`${styles.th}${inGroup ? ` ${styles.thInGroup}` : ""}${pinClass(col.key)}`} style={{ ...style, padding: "4px 6px", textAlign: "center" }}>
               <span className={styles.thInner}>
                 <input
                   type="checkbox"
                   aria-label="Select all rows"
                   checked={allSel}
+                  disabled={keys.length === 0}
                   ref={(el) => {
                     if (el) el.indeterminate = someSel;
                   }}
-                  onChange={() => selectable.onToggleAll(keys, allSel)}
+                  onChange={() => { if (keys.length > 0) selectable.onToggleAll(keys, allSel); }}
                 />
               </span>
             </th>
@@ -2198,9 +2522,10 @@ function DataGridInner<T>({
         }
         return (
           <th
+            data-col={fitContent && !col.wrap ? col.key : undefined}
             key={col.key}
             scope="col"
-            className={`${styles.th} ${inGroup ? styles.thInGroup : ""} ${col.headerLines ? styles.thTwoLine : ""} ${col.align === "right" ? styles.thAlignRight : ""} ${
+            className={`${styles.th} ${inGroup ? styles.thInGroup : ""} ${col.headerLines || col.headerSub ? styles.thTwoLine : ""} ${col.align === "right" ? styles.thAlignRight : ""} ${col.band ? styles.thBand : ""} ${
               dropTarget === col.key ? styles.thDragOver : ""
             }${pinClass(col.key)}`}
             style={style}
@@ -2226,7 +2551,9 @@ function DataGridInner<T>({
                     toggleSort(col.key);
                   }}
                 >
-                  {col.headerLines ? <span className={styles.headerLines}>{col.headerLines[0]}{" "}<br />{col.headerLines[1]}</span> : col.label}
+                  {col.headerLines ? <span className={styles.headerLines}>{col.headerLines[0]}{" "}<br />{col.headerLines[1]}</span>
+                    : col.headerSub ? <span className={styles.headerLines}>{col.label}{" "}<br /><span className={styles.headerSub}>{col.headerSub}</span></span>
+                    : col.label}
                   {/* ⭐ THE SORT IS AN ICON, NOT A LETTER (Card 12 review, 2026-09-21): a
                       12px Lucide arrow in the header ink, beside the same 11px
                       Filter icon. The direction is also spoken, never only drawn. */}
@@ -2241,6 +2568,8 @@ function DataGridInner<T>({
                     </span>
                   )}
                 </button>
+              ) : col.headerSub ? (
+                <span className={styles.headerLines}>{col.label}{" "}<br /><span className={styles.headerSub}>{col.headerSub}</span></span>
               ) : (
                 col.label
               )}
@@ -2249,9 +2578,20 @@ function DataGridInner<T>({
                   type="button"
                   title="Filter this column"
                   aria-label={`Filter ${col.label}`}
+                  className={styles.thFilter}
+                  data-active={
+                    (filters[col.key]?.length ?? 0) > 0 ||
+                    dateFilters[col.key] ||
+                    numberFilters[col.key] ||
+                    dateRangeFilters[col.key]
+                      ? "yes"
+                      : undefined
+                  }
                   onClick={(e) => {
                     e.stopPropagation();
-                    setFilterMenu({ colKey: col.key, x: e.clientX, y: e.clientY });
+                    filterOrigin.current = e.currentTarget;
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setFilterMenu({ colKey: col.key, x: rect.left, y: rect.bottom });
                   }}
                   style={{
                     background: "transparent",
@@ -2266,15 +2606,19 @@ function DataGridInner<T>({
                       dateFilters[col.key] ||
                       numberFilters[col.key] ||
                       dateRangeFilters[col.key]
-                        ? "var(--c-orange)"
-                        : "var(--fg-soft)",
+                        ? "var(--c-select-fg)"
+                        : "var(--c-muted)",
                   }}
                 >
-                  <Filter size={11} strokeWidth={2} aria-hidden />
+                  <Filter size={14} strokeWidth={1.75} aria-hidden />
                 </button>
               )}
             </span>
-            <div className={styles.resizeHandle} onMouseDown={(e) => onResizeStart(e, col.key, w)} />
+            <div
+              className={styles.resizeHandle}
+              data-testid={look === "finance" ? `grid-resize-${col.key}` : undefined}
+              onMouseDown={(e) => onResizeStart(e, col.key, fills ? renderedWidth(e.currentTarget.parentElement, Number(w)) : w)}
+            />
           </th>
         );
       });
@@ -2325,7 +2669,7 @@ function DataGridInner<T>({
           <td
             className={styles.groupRowCell}
             colSpan={totalCols || 1}
-            style={{ paddingLeft: 8 + item.level * 16 }}
+            style={{ paddingLeft: 14 + item.level * 16 }}
           >
             <span className={styles.groupCaret}>{item.collapsed ? ">" : "v"}</span>
             {item.label}
@@ -2336,7 +2680,8 @@ function DataGridInner<T>({
     }
     const row = item.row;
     const key = rowKey(row);
-    const expandKey = expandable ? expansionId(row) : null;
+    // A row `canExpand` refuses has no key: its gutter cell draws empty.
+    const expandKey = expandable && (expandable.canExpand?.(row) ?? true) ? expansionId(row) : null;
     const isExpanded = expandKey != null && expandedRows.has(expandKey);
     const highlight = rowHighlight?.(row) ?? null;
     return (
@@ -2374,6 +2719,8 @@ function DataGridInner<T>({
           title={highlight?.label}
           aria-description={highlight?.label}
           className={`${highlight ? ROW_HIGHLIGHT_CLASS[highlight.tone] : ""} ${styles.tr} ${
+            rowTone?.(row) === "total" ? styles.trTotal : rowTone?.(row) === "subtotal" ? styles.trSubtotal : ""
+          } ${
             palette === "slate"
               ? selectable && (selectable.selectedKeys.has(key) || (selectable.isIndeterminate?.(row as never) ?? false)) ? styles.trTicked : ""
               : selectedKey === key ? styles.trSelected : ""
@@ -2387,9 +2734,9 @@ function DataGridInner<T>({
              Without `onRowClick`, 2990's rule holds: 点行 = multi-select. L2
              drill-down opens ONLY via the left ▸ chevron (its own handler below,
              with stopPropagation). Row-click never expands. */
-          onClick={() => {
+          onClick={(e) => {
             setSelectedKey(key);
-            if (onRowClick) onRowClick(row);
+            if (onRowClick) onRowClick(row, e);
             else if (selectable && (selectable.isSelectable?.(row as never) ?? true)) {
               selectable.onToggle(key);
             }
@@ -2477,7 +2824,7 @@ function DataGridInner<T>({
           }}
         >
           {visibleColumns.map((col) => {
-            const w = layout.widths[col.key] ?? col.width ?? 140;
+            const w = widthOf(col);
             if (col.key === "__select__" && selectable) {
               const canSelect = selectable.isSelectable?.(row as never) ?? true;
               const refusal = canSelect ? null : (selectable.unselectableReason?.(row as never) ?? null);
@@ -2490,7 +2837,7 @@ function DataGridInner<T>({
                 >
                   <input
                     type="checkbox"
-                    aria-label="Select row"
+                    aria-label={selectable.rowLabel?.(row as never) ?? "Select row"}
                     aria-describedby={refusalId}
                     data-testid={selectable.testId?.(row as never)}
                     checked={selectable.selectedKeys.has(key)}
@@ -2502,7 +2849,7 @@ function DataGridInner<T>({
                     }}
                     onChange={() => selectable.onToggle(key)}
                   />
-                  {refusal ? <span id={refusalId} className="sr-only">{refusal}</span> : null}
+                  {refusal ? <span id={refusalId} hidden>{refusal}</span> : null}
                   </label>
               );
               return (
@@ -2528,7 +2875,7 @@ function DataGridInner<T>({
                 <td
                   key={col.key}
                   className={`${styles.td}${pinClass(col.key)}${isExpanded && expansionJoinable ? ` ${styles.expansionCaretCell}` : ""}`}
-                  style={{ width: w, maxWidth: w, padding: "4px 6px", textAlign: "center", ...pinStyle(col.key) }}
+                  style={{ width: w, maxWidth: w, padding: "4px", ...pinStyle(col.key) }}
                 >
                   {/* §6.9 — the drop from beneath the caret, shown only when
                       this row's expansion holds a connected section stack. */}
@@ -2537,7 +2884,7 @@ function DataGridInner<T>({
                   ) : null}
                   <button
                     type="button"
-                    aria-label={isExpanded ? "Collapse row" : "Expand row"}
+                    aria-label={expandable.label?.(row, isExpanded) ?? (isExpanded ? "Collapse row" : "Expand row")}
                     data-testid={expandable.testId?.(row)}
                     /* The disclosure has to ANNOUNCE its state, not only its
                        label: a screen reader lands on the chevron and must be
@@ -2555,31 +2902,13 @@ function DataGridInner<T>({
                       e.stopPropagation();
                       toggleExpand(expandKey);
                     }}
-                    style={{
-                      background: "transparent",
-                      border: 0,
-                      padding: 0,
-                      cursor: "pointer",
-                      /* ⭐ A DISCLOSURE IS CHROME, NOT AN ALARM — owner
-                         correction 2026-08-24 on a production screenshot.
-                         This was `var(--c-burnt)`: a 12px RED triangle in the
-                         leftmost gutter of every row, which is the portal's
-                         danger ink spent on a control that means "there is
-                         more here". Red down a whole column reads as ninety
-                         problems. Neutral grey is what a chevron is for, and
-                         fixing it in the ENGINE fixes every register at once
-                         rather than teaching one page a private colour.
-                         `--fg-muted` is the module's own base-500 alias — a
-                         token the sheet already speaks, not a new literal. */
-                      color: "var(--fg-muted)",
-                      fontSize: 14,
-                      lineHeight: 1,
-                      display: "inline-block",
-                      transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
-                      transition: "transform 120ms ease",
-                    }}
+                    /* ⭐ A DISCLOSURE IS CHROME, NOT AN ALARM (owner correction
+                       2026-08-24): grey, never the danger ink. The v12 Carres
+                       Table's control (01 §5): a 24 round button, `chevron_right`
+                       closed and `expand_more` open, the darker grey once open. */
+                    className={`grid h-6 w-6 place-items-center rounded-full hover:bg-c-hover ${isExpanded ? "text-c-tab" : "text-c-muted"}`}
                   >
-                    &#9656;
+                    <MIcon name={isExpanded ? "expand_more" : "chevron_right"} size={20} />
                   </button>
                 </td>
               );
@@ -2595,7 +2924,7 @@ function DataGridInner<T>({
               ? <OverflowText text={col.overflowText(row)} label={col.label} />
               : col.accessor(row);
             const isEmpty = content == null || content === "";
-            const wrapClass = col.wrap ? ` ${styles.tdWrap}` : "";
+            const wrapClass = `${col.wrap ? ` ${styles.tdWrap}` : ""}${col.band ? ` ${styles.tdBand}` : ""}`;
             /* ⭐ TRIGGER COLUMN — the arrow and the content are ONE expansion
                entry (Warehouse unified card §7): one button, chevron first,
                content beside it, `aria-expanded` announced. No second expand
@@ -2608,7 +2937,7 @@ function DataGridInner<T>({
                 <td
                   key={col.key}
                   className={`${styles.td}${wrapClass}${pinClass(col.key)}`}
-                  style={{ width: w, maxWidth: w, ...pinStyle(col.key) }}
+                  style={{ ...cellWidth(col.key, w), ...pinStyle(col.key) }}
                 >
                   <button
                     type="button"
@@ -2659,8 +2988,9 @@ function DataGridInner<T>({
             return (
               <td
                 key={col.key}
+                data-col={fitContent && !col.wrap ? col.key : undefined}
                 className={`${styles.td} ${col.align === "right" ? styles.tdAlignRight : ""}${wrapClass}${pinClass(col.key)}`}
-                style={{ width: w, maxWidth: w, ...pinStyle(col.key) }}
+                style={{ ...cellWidth(col.key, w), ...pinStyle(col.key) }}
               >
                 {isEmpty ? null : content}
               </td>
@@ -2670,8 +3000,9 @@ function DataGridInner<T>({
         {isExpanded && expandable && (
           <tr
             className={`${styles.tr} ${styles.trExpansion}`}
+            data-expansion-of={expandable.frame ? expandKey : undefined}
             style={{
-              background: "var(--grid-expansion, var(--c-cream))",
+              background: "var(--grid-expansion, var(--c-ground))",
               ...(expansionJoinable ? { ["--expansion-join-y" as string]: `${EXPANSION_JOIN_Y}px` } : {}),
             }}
           >
@@ -2688,7 +3019,7 @@ function DataGridInner<T>({
                   key={key}
                   data-testid={`grid-expansion-gutter-${key}`}
                   className={piece ? styles.expansionGutter : undefined}
-                  style={{ padding: 0, borderTop: "1px solid var(--line)", ...(piece ? pinStyle(key) : {}) }}
+                  style={{ padding: 0, borderTop: "1px solid var(--c-row-line)", ...(piece ? pinStyle(key) : {}) }}
                 >
                   {piece ? <span aria-hidden="true" className={piece} data-testid={`expansion-connector-${gi === caretAt ? "elbow" : "run"}`} /> : null}
                 </td>
@@ -2702,7 +3033,7 @@ function DataGridInner<T>({
                  one — but HORIZONTAL padding is exactly what the gutter cells
                  replaced, so it stays at zero: the left edge is the first data
                  column's, the right edge is the parent table's. */
-              style={{ padding: expandable.flush ? 0 : "12px 0", borderTop: "1px solid var(--line)" }}
+              style={{ padding: expandable.flush ? 0 : "12px 0", borderTop: "1px solid var(--c-row-line)" }}
             >
               {/* The caret line joins only a FLUSH expansion (the §6.9 Purchasing
                   geometry), where the stated join height is where the first
@@ -2731,6 +3062,7 @@ function DataGridInner<T>({
         isReference ? styles.rootReference : null,
         palette === "slate" ? styles.rootPaletteSlate : null,
         headerTone === "paleBlue" ? styles.rootHeaderPaleBlue : null,
+        look === "finance" ? styles.rootLookFinance : null,
         searchPresentation === "responsive" ? styles.rootSearchResponsive : null,
         labelledToolbar || wrapToolbar ? styles.rootLabelledToolbar : null,
       ]
@@ -2739,15 +3071,128 @@ function DataGridInner<T>({
       data-testid={isReference ? "sales-orders-grid" : undefined}
       style={rowHeight ? ({ "--grid-row-h": `${rowHeight}px` } as CSSProperties) : undefined}
       data-row-height={rowHeight}
+      data-presentation-tools={presentationTools || undefined}
+      onFocusCapture={sessionKey ? (event) => {
+        const row = (event.target as HTMLElement).closest<HTMLElement>("[data-row-key]");
+        if (row?.dataset.rowKey) setActiveRowKey(row.dataset.rowKey);
+      } : undefined}
     >
+      {/* ⭐ THE ACTIVE CONDITION BAR (owner ruling 2026-09-11) - every live
+          narrowing in ONE line, whoever applied it, each removable on its own
+          and all of them under one `Clear filters`. Renders nothing when
+          nothing is narrowed, and nothing at all for a grid whose page hands
+          in no conditions and carries no column filter. */}
+      {(() => {
+        const columnChips = [
+          ...Object.entries(filters)
+            .filter(([, v]) => v.length > 0)
+            .map(([key, values]) => ({
+              key: `col:${key}`,
+              label: `${columns.find((c) => c.key === key)?.label ?? key}: ${values.join(", ")}`,
+              onClear: () =>
+                setFilters((prev) => {
+                  const next = { ...prev };
+                  delete next[key];
+                  return next;
+                }),
+            })),
+          ...Object.keys(dateFilters).map((key) => ({
+            key: `date:${key}`,
+            label: `${columns.find((c) => c.key === key)?.label ?? key}: ${dateFilters[key]}`,
+            onClear: () =>
+              setDateFilters((prev) => {
+                const next = { ...prev };
+                delete next[key];
+                return next;
+              }),
+          })),
+          ...Object.keys(dateRangeFilters).map((key) => ({
+            key: `range:${key}`,
+            label: `${columns.find((c) => c.key === key)?.label ?? key}: ${dateRangeFilters[key]?.from ?? ""} - ${dateRangeFilters[key]?.to ?? ""}`,
+            onClear: () =>
+              setDateRangeFilters((prev) => {
+                const next = { ...prev };
+                delete next[key];
+                return next;
+              }),
+          })),
+          ...Object.keys(numberFilters).map((key) => ({
+            key: `num:${key}`,
+            label: columns.find((c) => c.key === key)?.label ?? key,
+            onClear: () =>
+              setNumberFilters((prev) => {
+                const next = { ...prev };
+                delete next[key];
+                return next;
+              }),
+          })),
+        ];
+        /* Listing Standard 2026-09-16: with the governed Register search, an
+           active query IS a condition — listed here and cleared by the same
+           `Clear filters` (which also returns a server search to the whole
+           population through `onSearchChange`). */
+        const searchChips = searchPresentation === "responsive" && search.trim() !== ""
+          ? [{ key: "search", label: `Search: ${search.trim()}`, onClear: () => setSearch("") }]
+          : [];
+        const chips = [...searchChips, ...(activeConditions ?? []), ...columnChips];
+        /* `hideToolbar`: the page draws its own chips in its own row. */
+        if (hideToolbar || (chips.length === 0 && !reserveConditionRow)) return null;
+        return (
+          <div className={`${styles.conditionBar}${reserveConditionRow ? ` ${styles.conditionBarReserved}` : ""}`} data-testid="active-conditions" aria-hidden={chips.length === 0 || undefined}>
+
+            {chips.map((chip) => (
+              <span key={chip.key} className={styles.conditionChip}>
+                <span className={styles.conditionChipText} title={chip.label}>
+                  {chip.label}
+                </span>
+                <button
+                  type="button"
+                  className={styles.conditionChipRemove}
+                  aria-label={`Remove ${chip.label}`}
+                  title={`Remove ${chip.label}`}
+                  onClick={chip.onClear}
+                >
+                  <X size={12} strokeWidth={2} aria-hidden />
+                </button>
+              </span>
+            ))}
+            {chips.length > 0 && !noMatchShowing && (
+            <button
+              type="button"
+              className={styles.conditionClear}
+              data-testid="clear-filters"
+              onClick={() => {
+                if (searchPresentation === "responsive") setSearch("");
+                setFilters({});
+                setDateFilters({});
+                setNumberFilters({});
+                setDateRangeFilters({});
+                onClearConditions?.();
+              }}
+            >
+              Clear all
+            </button>
+            )}
+          </div>
+        );
+      })()}
+
+
       {/* Toolbar — search LEFT (REGISTER LAW 2: always left, compact ~200px;
           2990 kept it right — that is the one composition change the laws
           mandate), then the caller's actions, then Export + Columns pinned
           right (LAWS 3 + 4). */}
       {!(selectable && selectedOrIndeterminateVisibleRows.length > 0) ? (
-      <div className={styles.toolbar} data-testid={isReference ? "work-toolbar" : undefined}>
+      <div
+        className={styles.toolbar}
+        data-testid={isReference ? "work-toolbar" : undefined}
+        /* `hideToolbar`: the page draws its own row; this one keeps only the
+           Columns chooser it opens (`openColumns`), which shows on its own. */
+        style={hideToolbar ? { height: 0, minHeight: 0, overflow: "hidden", visibility: "hidden", marginBottom: "calc(-1 * var(--table-gap))" } : undefined}
+        aria-hidden={hideToolbar || undefined}
+      >
         {isReference && toolbarStart}
-        {isReference && <div className={styles.toolbarSpacer} />}
+        {isReference && !presentationTools && <div className={styles.toolbarSpacer} />}
         {!embedded && searchPresentation === "responsive" ? (
           /* R4 (owner ruling 2026-09-16): both forms are rendered and the
              TOOLBAR's own width chooses (container query), so a narrow canvas
@@ -2780,6 +3225,8 @@ function DataGridInner<T>({
                 className={styles.searchInput}
                 type="search"
                 aria-label="Search"
+                title={searchScope}
+                aria-description={searchScope}
                 placeholder={searchPlaceholder}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -2811,7 +3258,7 @@ function DataGridInner<T>({
               )}
             </div>
           </>
-        ) : !embedded && (
+        ) : !embedded && searchPresentation !== "none" && (
           isReference && !labelledToolbar && !searchOpen && !search ? (
             <button
               type="button"
@@ -2831,6 +3278,8 @@ function DataGridInner<T>({
                 className={styles.searchInput}
                 type="search"
                 aria-label="Search"
+                title={searchScope}
+                aria-description={searchScope}
                 placeholder={searchPlaceholder}
                 value={search}
                 autoFocus={isReference && searchOpen}
@@ -2877,13 +3326,13 @@ function DataGridInner<T>({
             filter + sort) across the visible data columns. System-wide: every
             list rendered through DataGrid gets it for free (Wei Siang
             2026-06-19). Wording says the scope out loud (REGISTER LAW 3). */}
-        <div className={styles.columnsAnchor}>
-          <button
+        <div className={toolsMenu ? styles.toolsAnchor : styles.columnsAnchor}>
+          {!toolsMenu && <button
             ref={outputBtnRef}
             type="button"
             aria-label="Export"
             title="Export"
-            className={`${styles.toolbarPill} ${isReference && !labelledToolbar ? styles.toolbarPillIconCaret : ""} ${outputMenuOpen ? styles.toolbarPillOn : ""}`}
+            className={`${styles.toolbarPill} ${outputMenuOpen ? styles.toolbarPillOn : ""}`}
             onClick={() => setOutputMenuOpen((open) => {
               const next = !open;
               if (next && outputBtnRef.current) {
@@ -2892,22 +3341,20 @@ function DataGridInner<T>({
               }
               return next;
             })}
-            disabled={sortedRows.length === 0}
+            disabled={exportLoading || sortedRows.length === 0}
             aria-haspopup="menu"
             aria-expanded={outputMenuOpen}
           >
-            <Download size={14} strokeWidth={1.75} aria-hidden />
-            {(!isReference || labelledToolbar) && (
-              <>
-                <span>Export</span>
-                <ChevronDown size={12} strokeWidth={2} aria-hidden />
-              </>
-            )}
-          </button>
+            <Icon name="download" />
+            <span>Export</span>
+            <ChevronDown size={12} strokeWidth={2} aria-hidden />
+          </button>}
           {outputMenuOpen && (
             <div
               className={styles.columnsMenu}
               role="menu"
+              data-testid="register-output-menu"
+              onKeyDown={(event) => { if (event.key === "Escape") { setOutputMenuOpen(false); pageToolsRef.current?.focus(); } }}
               style={
                 outputMenuPos
                   ? { position: "fixed", top: outputMenuPos.top, right: outputMenuPos.right }
@@ -2920,7 +3367,7 @@ function DataGridInner<T>({
                 role="menuitem"
                 onClick={() => {
                   setOutputMenuOpen(false);
-                  void exportRows(sortedRows);
+                  void exportCurrentView("excel");
                 }}
               >
                 Excel
@@ -2931,7 +3378,7 @@ function DataGridInner<T>({
                 role="menuitem"
                 onClick={() => {
                   setOutputMenuOpen(false);
-                  void exportPdfRows(sortedRows);
+                  void exportCurrentView("pdf");
                 }}
               >
                 PDF
@@ -2953,8 +3400,8 @@ function DataGridInner<T>({
             </div>
           )}
         </div>
-        <div className={styles.columnsAnchor}>
-          <button
+        <div className={toolsMenu ? styles.toolsAnchor : styles.columnsAnchor}>
+          {!toolsMenu && <button
             ref={columnsBtnRef}
             type="button"
             aria-label="Columns"
@@ -2974,18 +3421,17 @@ function DataGridInner<T>({
           >
             <Columns3 size={14} strokeWidth={1.75} aria-hidden />
             {(!isReference || labelledToolbar) && <span>Columns</span>}
-          </button>
+          </button>}
           {columnsMenuOpen && (
             <>
-              <div className={styles.columnsMenuBackdrop} onClick={() => setColumnsMenuOpen(false)} />
+              <div className={styles.columnsMenuBackdrop} style={hideToolbar ? { visibility: "visible" } : undefined} onClick={() => setColumnsMenuOpen(false)} />
               <div
                 ref={columnsMenuRef}
                 className={`${styles.columnsMenu}${personalLayouts ? ` ${styles.columnsMenuWithLayouts}` : ""}`}
-                style={
-                  columnsMenuPos
-                    ? { position: "fixed", top: columnsMenuPos.top, right: columnsMenuPos.right }
-                    : undefined
-                }
+                style={{
+                  ...(columnsMenuPos ? { position: "fixed" as const, top: columnsMenuPos.top, right: columnsMenuPos.right } : {}),
+                  ...(hideToolbar ? { visibility: "visible" as const } : {}),
+                }}
                 onClick={(e) => e.stopPropagation()}
               >
                 <header className={styles.columnsMenuHeader}>
@@ -3072,7 +3518,8 @@ function DataGridInner<T>({
                        no group falls under "Other"; no groups at all = 2990's
                        flat list, byte-identical. */
                     const item = (c: DataGridColumn<T>) => (
-                      <label key={c.key} className={styles.columnsMenuItem}>
+                      <div key={c.key} className="flex items-center gap-1">
+                      <label className={styles.columnsMenuItem}>
                         <input
                           type="checkbox"
                           checked={!effectiveHidden.has(c.key)}
@@ -3082,6 +3529,20 @@ function DataGridInner<T>({
                         />
                         <span>{c.label || c.key}</span>
                       </label>
+                      {presentationTools && <>
+                        {c.sortable !== false && <Button variant="ghost" size="touch" aria-label={c.label} onClick={() => toggleSort(c.key)}>
+                          {layout.sort?.key === c.key && layout.sort.dir === "desc" ? <ArrowDown size={14} aria-hidden /> : <ArrowUp size={14} aria-hidden />}
+                          {layout.sort?.key === c.key && <span className="sr-only">{layout.sort.dir === "asc" ? "sorted ascending" : "sorted descending"}</span>}
+                        </Button>}
+                        {c.filterable !== false && <Button variant="ghost" size="touch" aria-label={`Filter ${c.label}`} onClick={(event) => {
+                          event.stopPropagation();
+                          const rect = pageToolsRef.current?.getBoundingClientRect();
+                          filterOrigin.current = pageToolsRef.current;
+                          setColumnsMenuOpen(false);
+                          setFilterMenu({ colKey: c.key, x: Math.max(8, (rect?.right ?? window.innerWidth) - 224), y: rect?.bottom ?? 80 });
+                        }}><Filter size={14} aria-hidden /></Button>}
+                      </>}
+                      </div>
                     );
                     if (!columns.some((c) => c.chooserGroup)) return columns.map(item);
                     const order: string[] = [...(chooserGroupOrder ?? [])];
@@ -3106,17 +3567,39 @@ function DataGridInner<T>({
             </>
           )}
         </div>
+        {!isLoading && errorState == null && toolbarSummary?.(sortedRows)}
         {isReference && toolbarEnd}
+        {toolsMenu && <div className={styles.pageTools}>
+          <CMenu label="Page tools" trigger={<Button ref={pageToolsRef} iconOnly icon="overflow" aria-label="Page tools" />}
+            items={[
+              /* The chosen menu opens at once; its first control takes focus a
+                 frame later, after the ⋮ menu has handed focus back. */
+              { key: "export", label: "Export", icon: "download", disabled: exportLoading || sortedRows.length === 0, onSelect: () => {
+                const r = pageToolsRef.current?.getBoundingClientRect();
+                if (r) setOutputMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+                setOutputMenuOpen(true);
+                requestAnimationFrame(() => requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-testid="register-output-menu"] button')?.focus()));
+              } },
+              ...(outputActions ?? []).map((action, index) => ({ key: `output-${index}`, label: action.label, onSelect: action.onClick })),
+              ...(pageToolsItems ?? []),
+              { key: "columns", label: "Columns", icon: "settings", onSelect: () => {
+                const r = pageToolsRef.current?.getBoundingClientRect();
+                if (r) setColumnsMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+                setColumnsMenuOpen(true);
+                requestAnimationFrame(() => requestAnimationFrame(() => columnsMenuRef.current?.querySelector<HTMLElement>("button, input")?.focus()));
+              } },
+            ]} />
+        </div>}
+        {isReference && toolbarAfterTools ? <div className={styles.afterTools} data-testid="toolbar-after-tools">{toolbarAfterTools}</div> : null}
       </div>
       ) : (
-        <div className={`${styles.toolbar} ${styles.selectionBar}`} data-testid="selection-bar">
-          <span className={styles.selectionCount}>
+        <div ref={selectionBarRef} data-compact={compactSelection && compactSelectionText ? "true" : undefined} className={`${styles.toolbar} ${styles.selectionBar}`} data-testid="selection-bar" style={hideToolbar ? { display: "none" } : undefined}>
+          <span ref={selectionCountRef} className={styles.selectionCount} title={selectionText}>
             {/* The page names its own unit when it has one: `3 delivery scopes
                 selected` beats `3 selected`, which is true and says nothing
                 about what three of. */}
-            {selectionSummary
-              ? selectionSummary(selectedOrIndeterminateVisibleRows.length)
-              : `${selectedOrIndeterminateVisibleRows.length} selected`}
+            <span>{compactSelection && compactSelectionText ? compactSelectionText : selectionText}</span>
+            {compactSelectionText ? <span ref={selectionMeasureRef} aria-hidden className={styles.selectionMeasure} data-full-summary={selectionText} /> : null}
           </span>
           <button
             type="button"
@@ -3128,16 +3611,11 @@ function DataGridInner<T>({
           {selectionPrimary}
           <div className={styles.toolbarSpacer} />
           {!hideSelectionExport && (
-            <button
-              type="button"
-              className={styles.toolbarPill}
-              onClick={() => {
-                void exportRows(selectedOrIndeterminateVisibleRows);
-              }}
-            >
-              <Download size={14} strokeWidth={1.75} aria-hidden />
-              <span>Export Excel ({selectedOrIndeterminateVisibleRows.length})</span>
-            </button>
+            <div className={styles.pageTools}>
+              <CMenu label="Page tools" trigger={<Button iconOnly icon="overflow" aria-label="Page tools" />}
+                items={[{ key: "selection-export", label: `Export Excel (${selectedOrIndeterminateVisibleRows.length})`, icon: "download",
+                  disabled: exportLoading, onSelect: () => { void exportRows(selectedOrIndeterminateVisibleRows); } }]} />
+            </div>
           )}
           {(selectionActions ?? [])
             /* ⭐ AN ACTION THAT CANNOT MEAN ANYTHING FOR THIS SELECTION IS NOT
@@ -3156,7 +3634,7 @@ function DataGridInner<T>({
                 {/* A printer on `Assign logistics` would be a lie about what
                     the button does. Only an OUTPUT keeps the printer glyph. */}
                 {a.kind === "write" ? null : (
-                  <Printer size={14} strokeWidth={1.75} aria-hidden />
+                  <Icon name="print" />
                 )}
                 <span>{a.label(selectedOrIndeterminateVisibleRows.length)}</span>
               </button>
@@ -3166,7 +3644,7 @@ function DataGridInner<T>({
 
       {warning != null && warning !== false && (
         <div
-          className="flex min-h-10 flex-none items-center gap-2 border-b border-kit-amber-6 bg-kit-amber-3 px-3 py-1.5 text-meta text-kit-amber-11"
+          className="flex min-h-10 flex-none items-center gap-2 rounded-lg bg-c-warn-bg px-3.5 py-1.5 text-[13px] leading-[18px] text-c-warn-fg"
           role="alert"
           data-testid="grid-warning"
         >
@@ -3174,104 +3652,6 @@ function DataGridInner<T>({
         </div>
       )}
 
-      {/* ⭐ THE ACTIVE CONDITION BAR (owner ruling 2026-09-11) - every live
-          narrowing in ONE line, whoever applied it, each removable on its own
-          and all of them under one `Clear filters`. Renders nothing when
-          nothing is narrowed, and nothing at all for a grid whose page hands
-          in no conditions and carries no column filter. */}
-      {(() => {
-        const columnChips = [
-          ...Object.entries(filters)
-            .filter(([, v]) => v.length > 0)
-            .map(([key, values]) => ({
-              key: `col:${key}`,
-              label: `${columns.find((c) => c.key === key)?.label ?? key}: ${values.join(", ")}`,
-              onClear: () =>
-                setFilters((prev) => {
-                  const next = { ...prev };
-                  delete next[key];
-                  return next;
-                }),
-            })),
-          ...Object.keys(dateFilters).map((key) => ({
-            key: `date:${key}`,
-            label: `${columns.find((c) => c.key === key)?.label ?? key}: ${dateFilters[key]}`,
-            onClear: () =>
-              setDateFilters((prev) => {
-                const next = { ...prev };
-                delete next[key];
-                return next;
-              }),
-          })),
-          ...Object.keys(dateRangeFilters).map((key) => ({
-            key: `range:${key}`,
-            label: `${columns.find((c) => c.key === key)?.label ?? key}: ${dateRangeFilters[key]?.from ?? ""} - ${dateRangeFilters[key]?.to ?? ""}`,
-            onClear: () =>
-              setDateRangeFilters((prev) => {
-                const next = { ...prev };
-                delete next[key];
-                return next;
-              }),
-          })),
-          ...Object.keys(numberFilters).map((key) => ({
-            key: `num:${key}`,
-            label: columns.find((c) => c.key === key)?.label ?? key,
-            onClear: () =>
-              setNumberFilters((prev) => {
-                const next = { ...prev };
-                delete next[key];
-                return next;
-              }),
-          })),
-        ];
-        /* Listing Standard 2026-09-16: with the governed Register search, an
-           active query IS a condition — listed here and cleared by the same
-           `Clear filters` (which also returns a server search to the whole
-           population through `onSearchChange`). */
-        const searchChips = searchPresentation === "responsive" && search.trim() !== ""
-          ? [{ key: "search", label: `Search: ${search.trim()}`, onClear: () => setSearch("") }]
-          : [];
-        const chips = [...searchChips, ...(activeConditions ?? []), ...columnChips];
-        if (chips.length === 0) return null;
-        return (
-          <div className={styles.conditionBar} data-testid="active-conditions">
-            <span className={styles.conditionBarLabel}>Showing only:</span>
-            {chips.map((chip) => (
-              <span key={chip.key} className={styles.conditionChip}>
-                <span className={styles.conditionChipText} title={chip.label}>
-                  {chip.label}
-                </span>
-                <button
-                  type="button"
-                  className={styles.conditionChipRemove}
-                  aria-label={`Remove ${chip.label}`}
-                  title={`Remove ${chip.label}`}
-                  onClick={chip.onClear}
-                >
-                  <X size={12} strokeWidth={2} aria-hidden />
-                </button>
-              </span>
-            ))}
-            {!noMatchShowing && (
-            <button
-              type="button"
-              className={styles.conditionClear}
-              data-testid="clear-filters"
-              onClick={() => {
-                if (searchPresentation === "responsive") setSearch("");
-                setFilters({});
-                setDateFilters({});
-                setNumberFilters({});
-                setDateRangeFilters({});
-                onClearConditions?.();
-              }}
-            >
-              Clear filters
-            </button>
-            )}
-          </div>
-        );
-      })()}
 
       {/* Group-by zone */}
       {groupBanner && (
@@ -3302,12 +3682,55 @@ function DataGridInner<T>({
         </div>
       )}
 
-      {/* Table */}
+      {/* Table — the scroll area and its status footer sit in ONE white card
+          (v4 template, 01 §5); the toolbar above stays on the page. A
+          drill-down draws no card, and an alternate presentation (cards)
+          keeps the footer without a card around its own cards. */}
+      <div
+        className={embedded
+          ? styles.tableCardEmbedded
+          : `${styles.tableCard}${renderResults && !isLoading && errorState == null && sortedRows.length > 0 ? ` ${styles.tableCardBare}` : ""}`}
+      >
       <div
         ref={scrollRef}
+        onScroll={(event) => {
+          if (sessionKey && restoredPresentation.current === presentationKey) rememberedScroll.current[presentationKey] = [event.currentTarget.scrollTop, event.currentTarget.scrollLeft];
+        }}
         className={`${styles.scroll} ${embedded ? styles.scrollEmbedded : ""}`}
         data-testid={isReference ? "grid-scroll" : undefined}
+        /* The kit list's own scroller (01 §5): when the middle is narrower than
+           the columns' minimums, the whole table scrolls sideways here with its
+           first column fixed, and nothing is cut. `carres-check.js` reads this
+           mark; `e2e-kit` still measures that the list FITS wherever it must. */
+        data-list-scroll={isReference ? "" : undefined}
+        style={expandable?.frame ? { position: "relative" } : undefined}
       >
+        {expandable?.frame
+          ? frames.map((f) => (
+              <div
+                key={f.key}
+                aria-hidden="true"
+                className={styles.openFrame}
+                data-testid="grid-open-frame"
+                style={{ top: f.top, height: f.height, width: f.width - 10 }}
+              />
+            ))
+          : null}
+        {renderResults && !isLoading && errorState == null && sortedRows.length > 0
+          ? groupLocalHeaders
+            ? groupSections.map(section => (
+              <section key={section.group.path} data-testid={`grid-card-section-${section.group.path}`}>
+                <table className={`${styles.table} ${styles.tableGrouped}`}>
+                  <thead>{renderGridRow(section.group, section.index)}</thead>
+                </table>
+                {!section.group.collapsed && renderResults(
+                  section.rows.flatMap(item => item.kind === "row" ? [item.row] : []),
+                  rowExpansionApi,
+                )}
+              </section>
+            ))
+            : renderResults(sortedRows, rowExpansionApi)
+          : <>
         {/* ⭐ NO HEADER ABOVE ALL GROUPS — owner ruling, Jess 2026-09-18.
             This SUPERSEDES the single global header.
 
@@ -3331,12 +3754,12 @@ function DataGridInner<T>({
               <table
                 key={`gs-${section.group.path}`}
                 className={`${styles.table} ${styles.tablePinnedBlock} ${styles.tableGrouped}`}
-                style={{ width: groupedTableWidth }}
+                style={fillKey ? { width: "100%", minWidth: groupedTableWidth } : { width: groupedTableWidth }}
                 data-testid={`grid-section-${section.group.path}`}
               >
                 <colgroup>
                   {visibleColumns.map((col) => (
-                    <col key={col.key} style={{ width: layout.widths[col.key] ?? col.width ?? 140 }} />
+                    <col key={col.key} style={col.key === fillKey ? undefined : { width: widthOf(col) }} />
                   ))}
                 </colgroup>
                 <thead className={styles.thead}>
@@ -3349,7 +3772,7 @@ function DataGridInner<T>({
                       that had no rows in it. The heading and its count are the
                       whole truth there. */}
                   {!section.group.collapsed && section.rows.length > 0 && (
-                    <tr data-testid={`grid-header-${section.group.path}`}>{headerCells(true)}</tr>
+                    <tr data-testid={`grid-header-${section.group.path}`}>{headerCells(true, section.rows.flatMap(item => item.kind === "row" ? [item.row] : []))}</tr>
                   )}
                 </thead>
                 <tbody className={styles.tbody}>
@@ -3361,6 +3784,7 @@ function DataGridInner<T>({
         <table
           className={`${styles.table}${pinnedPrefix || leadingColumns || (typeof stickyIdentity === "object" && Array.isArray(stickyIdentity.columnKey)) ? ` ${styles.tablePinnedBlock}` : ""}`}
           hidden={groupLocalHeaders && !isLoading && errorState == null && renderList.length > 0}
+          style={fillKey ? { minWidth: "100%" } : undefined}
         >
           {/* A flat register keeps the one sticky header it has always had. */}
           {!groupLocalHeaders && (
@@ -3383,7 +3807,7 @@ function DataGridInner<T>({
             {!isLoading && errorState == null && renderList.length === 0 && (
               <tr>
                 <td colSpan={totalCols || 1} style={{ padding: 0 }}>
-                  <div className={styles.empty} style={{ position: "sticky", left: 0, width: emptyViewportWidth, boxSizing: "border-box", whiteSpace: "normal" }}>{noMatchShowing ? <>{noMatchMessage}<Button variant="neutral" size="md" onClick={() => { setSearch(""); setFilters({}); setDateFilters({}); setNumberFilters({}); setDateRangeFilters({}); onClearConditions?.(); }}>Clear filters</Button></> : emptyMessage}</div>
+                  <div className={styles.empty} style={{ position: "sticky", left: 0, width: emptyViewportWidth, boxSizing: "border-box", whiteSpace: "normal" }}>{noMatchShowing ? <>{noMatchMessage}{!clearConditionsInToolbar && <Button variant="neutral" size="md" onClick={() => { setSearch(""); setFilters({}); setDateFilters({}); setNumberFilters({}); setDateRangeFilters({}); onClearConditions?.(); }}>Clear filters</Button>}</> : emptyMessage}</div>
                 </td>
               </tr>
             )}
@@ -3421,12 +3845,12 @@ function DataGridInner<T>({
               <tfoot className={styles.tfoot} data-testid="footer-totals">
                 <tr>
                   {visibleColumns.map((col) => {
-                    const w = layout.widths[col.key] ?? col.width ?? 140;
+                    const w = widthOf(col);
                     return (
                       <td
                         key={col.key}
                         className={`${styles.tfootTd} ${col.align === "right" ? styles.tdAlignRight : ""}`}
-                        style={{ width: w, maxWidth: w }}
+                        style={cellWidth(col.key, w)}
                       >
                         {col.footerTotal ? col.footerTotal(sortedRows) : null}
                       </td>
@@ -3436,6 +3860,7 @@ function DataGridInner<T>({
               </tfoot>
             )}
         </table>
+        </>}
       </div>
 
       {/* Status / footer — hidden in embedded (drill-down) mode where the
@@ -3451,12 +3876,13 @@ function DataGridInner<T>({
               : <span>{`${filteredRows.length} of ${rows.length} rows`}</span>}
         </div>
       )}
+      </div>
 
       {/* Context menu */}
       {ctx &&
         (() => {
           const col = columns.find((c) => c.key === ctx.colKey);
-          const hidden = layout.hidden.includes(ctx.colKey);
+          const hidden = effectiveHidden.has(ctx.colKey);
           const grouped = layout.groupBy.includes(ctx.colKey);
           return (
             <div className={styles.ctxMenu} style={{ top: ctx.y, left: ctx.x }} onClick={(e) => e.stopPropagation()}>
@@ -3493,7 +3919,7 @@ function DataGridInner<T>({
               >
                 Auto-fit width
               </button>
-              {col?.groupable !== false && (
+              {allowColumnGrouping && col?.groupable !== false && (
                 <button
                   className={styles.ctxItem}
                   onClick={() => {
@@ -3508,15 +3934,12 @@ function DataGridInner<T>({
                 /* HOUZS port — surface BOTH explicitly hidden columns and
                  the pristine-default-hidden set so the user can reveal
                  the optional columns shipped hidden by default. */
-                const pristine = layout.order.length === 0 && layout.hidden.length === 0;
-                const hiddenKeys = pristine
-                  ? columns.filter((c) => c.defaultHidden).map((c) => c.key)
-                  : layout.hidden;
+                const hiddenKeys = layoutPristine ? defaultHiddenKeys : layout.hidden;
                 if (hiddenKeys.length === 0) return null;
                 return (
                   <>
                     <div className={styles.ctxDivider} />
-                    <div style={{ padding: "4px 10px", color: "var(--fg-muted)", fontSize: "var(--fs-11)" }}>
+                    <div style={{ padding: "6px 10px 2px", color: "var(--c-muted)", fontSize: "var(--fs-small)", fontWeight: 600 }}>
                       Hidden:
                     </div>
                     {hiddenKeys.map((k) => {
@@ -3566,7 +3989,7 @@ function DataGridInner<T>({
               ref={filterMenuRef}
               data-testid={isReference ? "column-filter-menu" : undefined}
               className={styles.ctxMenu}
-              style={{ top: filterMenu.y, left: filterMenu.x, maxHeight: 320, overflowY: "auto", minWidth: 200 }}
+              style={{ top: filterMenu.y, left: filterMenu.x, maxHeight: "min(320px, calc(100vh - 16px))", overflowY: "auto", width: "min(250px, calc(100vw - 16px))", maxWidth: "calc(100vw - 16px)" }}
               onClick={(e) => e.stopPropagation()}
             >
               <div
@@ -3574,11 +3997,13 @@ function DataGridInner<T>({
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  padding: "4px 10px",
-                  borderBottom: "1px solid var(--line)",
+                  gap: 8,
+                  padding: "6px 10px",
+                  marginBottom: 4,
+                  borderBottom: "1px solid var(--c-section-line)",
                 }}
               >
-                <strong style={{ fontSize: "var(--fs-11)" }}>Filter: {col?.label}</strong>
+                <strong style={{ fontSize: "var(--fs-label)", fontWeight: 600, color: "var(--c-secondary)" }}>Filter: {col?.label}</strong>
                 {(sel.length > 0 ||
                   dateFilters[filterMenu.colKey] ||
                   numberFilters[filterMenu.colKey] ||
@@ -3589,9 +4014,11 @@ function DataGridInner<T>({
                     style={{
                       background: "transparent",
                       border: 0,
-                      color: "var(--c-orange)",
+                      borderRadius: "var(--radius)",
+                      padding: "2px 6px",
+                      color: "var(--c-body)",
                       cursor: "pointer",
-                      fontSize: "var(--fs-11)",
+                      fontSize: "var(--fs-label)",
                       fontWeight: 600,
                     }}
                   >
@@ -3601,8 +4028,8 @@ function DataGridInner<T>({
               </div>
               {col?.filterType === "number" ? (
                 /* ── Number: min / max range ── */
-                <div style={{ display: "grid", gap: 8, padding: "10px" }}>
-                  <label style={{ display: "grid", gap: 3, fontSize: "var(--fs-11)", color: "var(--fg-muted)" }}>
+                <div style={{ display: "grid", gap: 8, padding: "6px 10px" }}>
+                  <label style={{ display: "grid", gap: 4, fontSize: "var(--fs-label)", color: "var(--c-secondary)" }}>
                     Min
                     <input
                       type="number"
@@ -3611,14 +4038,17 @@ function DataGridInner<T>({
                       value={numberFilters[filterMenu.colKey]?.min ?? ""}
                       onChange={(e) => setNumberBound(filterMenu.colKey, "min", e.target.value)}
                       style={{
-                        fontSize: "var(--fs-12)",
-                        padding: "4px 8px",
-                        border: "1px solid var(--line)",
-                        borderRadius: "var(--radius-sm, 6px)",
+                        boxSizing: "border-box",
+                        height: "var(--input-h)",
+                        fontSize: "var(--fs-body)",
+                        padding: "0 10px",
+                        color: "var(--c-ink)",
+                        border: "1px solid var(--c-input-border)",
+                        borderRadius: "var(--radius)",
                       }}
                     />
                   </label>
-                  <label style={{ display: "grid", gap: 3, fontSize: "var(--fs-11)", color: "var(--fg-muted)" }}>
+                  <label style={{ display: "grid", gap: 4, fontSize: "var(--fs-label)", color: "var(--c-secondary)" }}>
                     Max
                     <input
                       type="number"
@@ -3627,18 +4057,21 @@ function DataGridInner<T>({
                       value={numberFilters[filterMenu.colKey]?.max ?? ""}
                       onChange={(e) => setNumberBound(filterMenu.colKey, "max", e.target.value)}
                       style={{
-                        fontSize: "var(--fs-12)",
-                        padding: "4px 8px",
-                        border: "1px solid var(--line)",
-                        borderRadius: "var(--radius-sm, 6px)",
+                        boxSizing: "border-box",
+                        height: "var(--input-h)",
+                        fontSize: "var(--fs-body)",
+                        padding: "0 10px",
+                        color: "var(--c-ink)",
+                        border: "1px solid var(--c-input-border)",
+                        borderRadius: "var(--radius)",
                       }}
                     />
                   </label>
                 </div>
               ) : col?.filterType === "date" ? (
                 /* ── Date: quick presets + custom from→to range ── */
-                <div style={{ display: "grid", gap: 8, padding: "8px 10px" }}>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                <div style={{ display: "grid", gap: 8, padding: "6px 10px" }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                     {DATE_PRESETS.map((p) => {
                       const on = dateFilters[filterMenu.colKey] === p.key;
                       return (
@@ -3647,14 +4080,14 @@ function DataGridInner<T>({
                           type="button"
                           onClick={() => toggleDatePreset(filterMenu.colKey, p.key)}
                           style={{
-                            fontSize: "var(--fs-11)",
+                            fontSize: "var(--fs-label)",
                             fontWeight: 600,
-                            padding: "3px 9px",
-                            borderRadius: "999px",
+                            padding: "var(--chip-pad)",
+                            borderRadius: "var(--radius)",
                             cursor: "pointer",
-                            border: `1px solid ${on ? "var(--c-orange)" : "var(--line)"}`,
-                            background: on ? "var(--c-orange)" : "var(--c-paper)",
-                            color: on ? "var(--c-paper)" : "var(--c-ink)",
+                            border: `1px solid ${on ? "var(--c-select-bg)" : "var(--c-input-border)"}`,
+                            background: on ? "var(--c-select-bg)" : "var(--c-search-bg)",
+                            color: on ? "var(--c-select-fg)" : "var(--c-body)",
                           }}
                         >
                           {p.label}
@@ -3662,7 +4095,7 @@ function DataGridInner<T>({
                       );
                     })}
                   </div>
-                  <label style={{ display: "grid", gap: 3, fontSize: "var(--fs-11)", color: "var(--fg-muted)" }}>
+                  <label style={{ display: "grid", gap: 4, fontSize: "var(--fs-label)", color: "var(--c-secondary)" }}>
                     From
                     <DateField
                       fullWidth
@@ -3671,7 +4104,7 @@ function DataGridInner<T>({
                       onChange={(iso) => setDateBound(filterMenu.colKey, "from", iso)}
                     />
                   </label>
-                  <label style={{ display: "grid", gap: 3, fontSize: "var(--fs-11)", color: "var(--fg-muted)" }}>
+                  <label style={{ display: "grid", gap: 4, fontSize: "var(--fs-label)", color: "var(--c-secondary)" }}>
                     To
                     <DateField
                       fullWidth
@@ -3686,7 +4119,7 @@ function DataGridInner<T>({
                  type-to-find box shows for 'numbering' and any long value list. */
                 <>
                   {(col?.filterType === "numbering" || filterValues.length > 8) && (
-                    <div style={{ padding: "6px 10px", borderBottom: "1px solid var(--line)" }}>
+                    <div style={{ padding: "4px 4px 8px" }}>
                       <input
                         type="search"
                         value={filterSearch}
@@ -3695,28 +4128,30 @@ function DataGridInner<T>({
                         style={{
                           width: "100%",
                           boxSizing: "border-box",
-                          fontSize: "var(--fs-12)",
-                          padding: "4px 8px",
-                          border: "1px solid var(--line)",
-                          borderRadius: "var(--radius-sm, 6px)",
+                          height: "var(--input-h)",
+                          fontSize: "var(--fs-body)",
+                          padding: "0 10px",
+                          color: "var(--c-ink)",
+                          border: "1px solid var(--c-input-border)",
+                          borderRadius: "var(--radius)",
                         }}
                       />
                     </div>
                   )}
                   {visibleFilterValues.length > 0 && (
-                    <div style={{ display: "flex", gap: 4, padding: "6px 10px", borderBottom: "1px solid var(--line)" }}>
+                    <div style={{ display: "flex", gap: 6, padding: "4px 10px 8px", marginBottom: 4, borderBottom: "1px solid var(--c-section-line)" }}>
                       <button
                         type="button"
                         onClick={() => selectAllFilterValues(filterMenu.colKey, visibleFilterValues)}
                         style={{
-                          fontSize: "var(--fs-11)",
-                          fontWeight: 600,
-                          padding: "3px 9px",
-                          borderRadius: "999px",
+                          fontSize: "var(--fs-label)",
+                          fontWeight: 500,
+                          padding: "var(--chip-pad)",
+                          borderRadius: "var(--radius)",
                           cursor: "pointer",
-                          border: "1px solid var(--line)",
-                          background: "var(--c-paper)",
-                          color: "var(--c-ink)",
+                          border: "1px solid var(--c-input-border)",
+                          background: "var(--c-search-bg)",
+                          color: "var(--c-body)",
                         }}
                       >
                         Select all
@@ -3725,14 +4160,14 @@ function DataGridInner<T>({
                         type="button"
                         onClick={() => invertFilterValues(filterMenu.colKey, visibleFilterValues)}
                         style={{
-                          fontSize: "var(--fs-11)",
-                          fontWeight: 600,
-                          padding: "3px 9px",
-                          borderRadius: "999px",
+                          fontSize: "var(--fs-label)",
+                          fontWeight: 500,
+                          padding: "var(--chip-pad)",
+                          borderRadius: "var(--radius)",
                           cursor: "pointer",
-                          border: "1px solid var(--line)",
-                          background: "var(--c-paper)",
-                          color: "var(--c-ink)",
+                          border: "1px solid var(--c-input-border)",
+                          background: "var(--c-search-bg)",
+                          color: "var(--c-body)",
                         }}
                       >
                         Select invert
@@ -3740,7 +4175,7 @@ function DataGridInner<T>({
                     </div>
                   )}
                   {visibleFilterValues.length === 0 && (
-                    <div style={{ padding: "6px 10px", color: "var(--fg-muted)", fontSize: "var(--fs-11)" }}>
+                    <div style={{ padding: "var(--menu-item-pad)", color: "var(--c-secondary)", fontSize: "var(--fs-label)" }}>
                       No values.
                     </div>
                   )}
@@ -3748,7 +4183,7 @@ function DataGridInner<T>({
                     <label
                       key={v}
                       className={styles.ctxItem}
-                      style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}
+                      style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}
                     >
                       <input
                         type="checkbox"
@@ -3767,58 +4202,21 @@ function DataGridInner<T>({
       {/* Row context menu — opened on right-click via the row's onContextMenu.
           Rendered after the header ctx menu so its z-index naturally wins
           if both ever opened simultaneously. */}
-      {rowCtx && (
-        <div
-          className={styles.contextMenu}
-          role="menu"
-          aria-label="Row actions"
-          style={{ top: rowCtx.y, left: rowCtx.x }}
-          onClick={(e) => e.stopPropagation()}
-          onContextMenu={(e) => e.preventDefault()}
-          ref={(el) => {
-            /* The menu takes focus when it opens, so the keyboard lands on
-               its first act — never somewhere down the page. */
-            if (el && !el.contains(document.activeElement)) {
-              el.querySelector<HTMLButtonElement>("[role=menuitem]")?.focus({ preventScroll: true });
-            }
-          }}
-          onKeyDown={(e) => {
-            const items = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>("[role=menuitem]"));
-            const at = items.indexOf(document.activeElement as HTMLButtonElement);
-            const go = (i: number) => items[(i + items.length) % items.length]?.focus({ preventScroll: true });
-            if (e.key === "ArrowDown") { e.preventDefault(); go(at + 1); }
-            else if (e.key === "ArrowUp") { e.preventDefault(); go(at - 1); }
-            else if (e.key === "Home") { e.preventDefault(); go(0); }
-            else if (e.key === "End") { e.preventDefault(); go(items.length - 1); }
-            else if (e.key === "Tab") {
-              e.preventDefault();
-              setRowCtx(null);
-              rowCtx.returnFocus?.focus({ preventScroll: true });
-            }
-          }}
-        >
-          {rowCtx.items.map((it, i) => {
-            if (it.divider) return <div key={`d-${i}`} role="separator" className={styles.contextMenuDivider} />;
-            return (
-              <button
-                key={`i-${i}-${it.label}`}
-                type="button"
-                role="menuitem"
-                className={`${styles.contextMenuItem} ${it.danger ? styles.contextMenuDanger : ""}`}
-                onClick={() => {
-                  // Close before firing — handlers may navigate or open
-                  // dialogs, and we don't want a stale menu lingering.
-                  setRowCtx(null);
-                  it.onClick?.();
-                }}
-              >
-                {it.label}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {rowCtx && <RowContextMenu menu={rowCtx} onClose={closeRowCtx} />}
     </div>
+    {pdfPreview && <Modal open width="viewer" title={`${pdfPreview.title} · PDF`}
+      onOpenChange={open => { if (!open) setPdfPreview(null); }}
+      footer={<Button onClick={() => {
+        const link = document.createElement("a");
+        link.href = pdfPreview.src;
+        link.download = `${pdfPreview.title}.pdf`;
+        document.body.appendChild(link);
+        try { link.click(); } finally { link.remove(); }
+      }}>Download</Button>}>
+      <Suspense fallback={<p role="status">Loading…</p>}>
+        <RegisterPdfPreview src={pdfPreview.src} title={pdfPreview.title} />
+      </Suspense>
+    </Modal>}
     </DataGridRowExpansionContext.Provider>
   );
 }
@@ -3856,7 +4254,7 @@ export function OverflowText({ text, label }: { text: string; label: string }) {
   );
   if (!cut) return line;
   return (
-    <Popover
+    <CPopover
       label={label}
       trigger={
         <Tooltip content={text}>
@@ -3873,8 +4271,8 @@ export function OverflowText({ text, label }: { text: string; label: string }) {
         </Tooltip>
       }
     >
-      <p className="max-w-[320px] whitespace-normal break-words text-body text-kit-slate-12">{text}</p>
-    </Popover>
+      <p className="max-w-[320px] whitespace-normal break-words text-body text-c-ink">{text}</p>
+    </CPopover>
   );
 }
 

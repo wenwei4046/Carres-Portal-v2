@@ -151,3 +151,25 @@ describe("source and Receiving ownership", () => {
     ).toBe(409);
   });
 });
+
+
+describe("selected Showroom goods options", () => {
+  it("rejects malformed source identities before reading any stock", async () => {
+    const response = await app().request("/sources/options?unit=not-an-id");
+    expect(response.status).toBe(422);
+    expect(userClient).not.toHaveBeenCalled();
+  });
+  it("applies explicit IDs before the 100-row cap can hide old showroom goods", async () => {
+    const filters: unknown[] = [];
+    const chain = {
+      select: () => chain, eq: () => chain, order: () => chain, limit: () => chain,
+      in: (column: string, values: string[]) => { filters.push([column, values]); return chain; },
+      then: (resolve: (result: unknown) => void) => resolve({data: [],error: null}),
+    };
+    vi.mocked(userClient).mockReturnValue({from: () => chain} as never);
+    const response=await app().request(`/sources/options?unit=${id}&unit=${other}`);
+    expect(response.status).toBe(200);
+    expect(filters).toContainEqual(["id", [id,other]]);
+    expect(adminClient).not.toHaveBeenCalled();
+  });
+});

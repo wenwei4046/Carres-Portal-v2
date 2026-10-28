@@ -115,13 +115,13 @@ describe("the empty query", () => {
     /* `operation:stock` is the Inventory Register — the 2026-09-01 Blueprint's
      * word for the Warehouse master list (CARD-2026-09-01-warehouse-01-sidebar);
      * same key, same route, the sidebar's own word. */
-    /* `operation:orders` is `Outright Sales` since the 2026-09-23 navigation
-     * ruling — same key, same route, same recent entry, the sidebar's own
-     * word. ⌘K composes from `visibleItems`, so the rail and the jump surface
+    /* `operation:orders` is `Outright` since the 2026-10-08 menu (it was
+     * `Outright Sales` from 2026-09-23) — same key, same route, same recent
+     * entry, the sidebar's own word. ⌘K composes from `visibleItems`, so the rail and the jump surface
      * can never drift into two words for one destination. */
     expect(labels.slice(0, 5)).toEqual([
       "WorkspaceOperations",
-      "Outright SalesOperations",
+      "OutrightOperations",
       "InventoryOperations",
       // `operation:payments` is the Payments module's `Monitor` since the
       // 2026-09-12 ruling — same key, same recent, the sidebar's own word.
@@ -162,7 +162,17 @@ describe("what typing searches", () => {
     ).toEqual([
       "Purchase Orders",
       "Purchase Returns",
+      /* Follows Houzs Sidebar.tsx:552 per Weisiang's ruling (2026-10-22):
+         the consignment receive page is a live destination. */
+      "Purchase Consignment Receive",
+      /* The Purchasing REPORT page under DATA → Reports (owner 2026-10-08) —
+         a real page, so a real destination, named as a report. */
+      "Purchasing report",
+      /* Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): the supplier bills,
+         read-only, under Suppliers. */
+      "Purchase Invoices",
       "SO Batch Purchase",
+      "Forecast Purchase",
       "Manual Purchase Request",
     ]);
   });
@@ -272,9 +282,12 @@ describe("the keyboard", () => {
     expect(screen.getByTestId("jump-to-surface")).toBeInTheDocument();
   });
 
-  it("the trigger prints its keyboard hint", () => {
+  it("the icon-only trigger retains its tooltip and keyboard shortcuts", () => {
     renderJump();
-    expect(screen.getByTestId("jump-to-trigger").textContent).toMatch(/⌘K|Ctrl K/);
+    const trigger = screen.getByTestId("jump-to-trigger");
+    expect(trigger.textContent).toBe("");
+    expect(trigger).toHaveAttribute("title", expect.stringMatching(/⌘K|Ctrl K/));
+    expect(trigger).toHaveAttribute("aria-keyshortcuts", "Meta+K Control+K");
   });
 });
 

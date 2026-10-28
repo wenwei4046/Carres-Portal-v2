@@ -8,7 +8,6 @@ import {
   readyStockRef,
   stockMatchKey,
   workWeekOffDaysFor,
-  transitDaysFor,
   type ProductCategory,
   type ToOrderLine,
   type ToOrderProposal,
@@ -46,6 +45,14 @@ import { todayIsoMYT } from "./today";
  *
  * userClient / RLS is the security boundary throughout — never service_role.
  */
+
+/** Same preserved revision-1 source as the Sales Order listing; no fallback. */
+export function originalRequestDate(revisions: unknown): string | null {
+  if (!Array.isArray(revisions)) return null;
+  const header = revisions.find(revision => revision?.revision === 1)?.snapshot?.header;
+  if (!header || header.delivery_date_tbd || typeof header.delivery_date !== "string") return null;
+  return /^\d{4}-\d{2}-\d{2}/.test(header.delivery_date) ? header.delivery_date.slice(0, 10) : null;
+}
 
 export function todayIso(): string {
   return todayIsoMYT();
@@ -107,6 +114,10 @@ export type CatalogFact = {
   variantKind: string | null;
   category: string | undefined;
   modelName: string | null;
+  /** 0442 · Catalog's `Stock identity` (`unit` · `quantity`). `null` is
+   *  `Not set`: the official PO door (0443) refuses it, so the Register names
+   *  it before Issue. */
+  stockIdentityMode: string | null;
 };
 
 /**
@@ -159,6 +170,8 @@ export interface RegisterOrderFact {
   customer: string | null;
   /** The customer's promised day. `null` when TBD or never set. */
   delivery: string | null;
+  /** Version 1 request for display only; never replaces buying arithmetic. */
+  originalRequestedDelivery?: string | null;
   /** Who owns the customer conversation (`orders.salesperson_id`). */
   salespersonId: string | null;
   /** Card 02-B — `place` is not proceeded, and the order Register must know. */
@@ -328,6 +341,7 @@ export type FreeStockUnit = {
   qty: number;
   condition: string | null;
   siteName: string | null;
+  warehouseId?: string | null;
   holderName: string | null;
   ownership: string;
   supplier: string | null;
@@ -339,7 +353,7 @@ export type FreeStockUnit = {
   poNo: string | null;
 };
 
-export async function readFreeStock(sb: ReturnType<typeof userClient>): Promise<{
+export async function readFreeStock(sb: ReturnType<typeof userClient>, required = false): Promise<{
   stockWarehouse: { id: string; name: string } | null;
   freeStock: Record<string, { id: string; qty: number }[]>;
   stockQtyById: Map<string, number>;
@@ -392,12 +406,17 @@ export async function readFreeStock(sb: ReturnType<typeof userClient>): Promise<
      * 2026-09-10) so nothing moves, but a second site would have been silently
      * unsellable and the fix costs a removed `.eq()`.
      */
-    const { data: itemRows, error: itemErr } = await sb
+    const stockQuery = () => sb
       .from("stock_unit_register_v")
       .select(
         "id, unit_code, sku, qty, date_in, condition, site_name, holder_name, ownership, supplier, identity_scope, warehouse_id, po_no",
       )
       .eq("availability", "available");
+    const complete = required ? await readAllPages<Record<string, unknown>>((from, to) =>
+      stockQuery().order("id").range(from, to)) : null;
+    if (complete && !("rows" in complete)) throw new Error("stock_candidates_unavailable");
+    const { data: itemRows, error: itemErr } = complete && "rows" in complete
+      ? { data: complete.rows, error: null } : await stockQuery();
     if (itemErr) throw new Error(itemErr.message);
 
     /**
@@ -441,6 +460,7 @@ export async function readFreeStock(sb: ReturnType<typeof userClient>): Promise<
         qty,
         condition: (it.condition as string | null) ?? null,
         siteName: (it.site_name as string | null) ?? null,
+        warehouseId: (it.warehouse_id as string | null) ?? null,
         holderName: (it.holder_name as string | null) ?? null,
         ownership: (it.ownership as string | null) ?? "carres_owned",
         supplier: (it.supplier as string | null) ?? null,
@@ -457,6 +477,7 @@ export async function readFreeStock(sb: ReturnType<typeof userClient>): Promise<
       stockQtyById.set(id, qty);
     }
   } catch (e) {
+    if (required) throw e;
     console.error("ready stock unavailable — no offer made", (e as Error).message);
   }
   return { stockWarehouse, freeStock, stockQtyById, freeUnitsByKey };
@@ -495,7 +516,7 @@ export async function loadToOrder(
       // `customer_address_city/state` are Card 02-B's Delivery Location facts,
       // read here because the row is already being fetched — the To Order
       // projection ignores them, so the workspace response is unchanged.
-      "id, so, customer_name, status, delivery_date, delivery_date_tbd, placed_at, created_at, proceed_date, proceeded_at, salesperson_id, customer_address_city, customer_address_state",
+      "id, so, customer_name, status, delivery_date, delivery_date_tbd, placed_at, created_at, proceed_date, proceeded_at, salesperson_id, customer_address_city, customer_address_state, original_request:sales_order_revisions(revision,snapshot)",
     )
     /**
      * ⭐ THE PROCEEDED-ORDER BOUNDARY (Card 02-C, RESOLVED FROM AUTHORITY,
@@ -510,6 +531,7 @@ export async function loadToOrder(
      * by name. Until 2026-08-27 this read admitted `place` too, which let the
      * rail count orders Purchasing could not legitimately buy.
      */
+    .eq("original_request.revision", 1)
     .eq("status", "proceed_order");
   if (orderErr) {
     const m = mapPgError(orderErr);
@@ -580,7 +602,7 @@ export async function loadToOrder(
   const { data: skuRows, error: skuErr } = await sb
     .from("product_skus")
     .select(
-      "sku, supplier_id, cost, variant, variant_kind, product_models!inner(category, name)",
+      "sku, supplier_id, cost, variant, variant_kind, stock_identity_mode, product_models!inner(category, name)",
     );
   if (skuErr) {
     const m = mapPgError(skuErr);
@@ -595,6 +617,7 @@ export async function loadToOrder(
       variantKind: (row.variant_kind as string | null) ?? null,
       category: (pm?.category as string | undefined) ?? undefined,
       modelName: (pm?.name as string | null) ?? null,
+      stockIdentityMode: (row.stock_identity_mode as string | null | undefined) ?? null,
     });
   }
 
@@ -638,6 +661,7 @@ export async function loadToOrder(
       delivery: o.delivery_date_tbd
         ? null
         : (((o.delivery_date as string | null) ?? null)?.slice(0, 10) ?? null),
+      originalRequestedDelivery: originalRequestDate(o.original_request),
       salespersonId: (o.salesperson_id as string | null) ?? null,
       status: (o.status as string | null) ?? null,
       proceededAt: (o.proceeded_at as string | null) ?? null,
@@ -800,12 +824,6 @@ export async function loadToOrder(
       deadline: deadline ? deadline.slice(0, 10) : null,
       leadDays,
       offDays: workWeekOffDaysFor(settings, supplierId),
-      /* The lorry leg. `expectedArrivalOf` has always ADDED this when stamping
-         a PO's `eta_date`; until 2026-09-09 the backward walk that produces
-         Order By did not SUBTRACT it, so a PO issued exactly on Order By landed
-         a working day after Goods Must Arrive. Same governed number, same
-         office calendar, one arithmetic (Law D). */
-      transitDays: transitDaysFor(settings, supplierId),
       placedAt: placedAt.slice(0, 10),
       committed: order.status === "proceed_order",
       so: order.so != null ? Number(order.so) : null,
@@ -865,6 +883,19 @@ export async function loadToOrder(
    * the line it answers is netted below exactly like a Ready Stock binding.
    * A failed read refuses the response rather than cover a line twice.
    */
+  const lineage = await readLineageByLine(sb, orderIds);
+  // Source commitment and its own reserved Units are one coverage binding.
+  // Keep only Units above that commitment in the stock projection; the register
+  // retains the complete PO lineage. Consume one budget across Unit statuses.
+  const sourceBudget = new Map(lineage?.bindings);
+  const linkedIncomingByLine = new Map<string, number>();
+  const linkedStockByLine = new Map<string, number>();
+  const independentUnits = (lineId: string, poLine: string | null, qty: number) => {
+    const key = `${lineId}::${poLine}`;
+    const overlap = poLine ? Math.min(qty, sourceBudget.get(key) ?? 0) : 0;
+    if (overlap) sourceBudget.set(key, (sourceBudget.get(key) ?? 0) - overlap);
+    return qty - overlap;
+  };
   const boundIncomingByPoLine = new Map<string, number>();
   const boundIncomingByLine = new Map<string, Map<string, number>>();
   {
@@ -887,6 +918,9 @@ export async function loadToOrder(
       const lineId = r.reserved_order_line_id as string;
       const poNo = (r.po_no as string | null) ?? "";
       const per = boundIncomingByLine.get(lineId) ?? new Map<string, number>();
+      const independent = independentUnits(lineId, poLine, n);
+      const linkKey = `${lineId}::${poNo}`;
+      linkedIncomingByLine.set(linkKey, (linkedIncomingByLine.get(linkKey) ?? 0) + n - independent);
       per.set(poNo, (per.get(poNo) ?? 0) + n);
       boundIncomingByLine.set(lineId, per);
     }
@@ -994,7 +1028,7 @@ export async function loadToOrder(
   try {
     const { data: boundRows, error: boundErr } = await sb
       .from("ops_stock_items")
-      .select("id, unit_code, qty, status, reserved_order_line_id")
+      .select("id, unit_code, qty, status, po_line_id, reserved_order_line_id")
       .not("reserved_order_line_id", "is", null)
       .in("status", ["reserved", "sold"]);
     if (boundErr) throw new Error(boundErr.message);
@@ -1005,7 +1039,10 @@ export async function loadToOrder(
          Stock; it is netted by the PO binding above. The SQL narrows it; this
          keeps the split true under a permissive read. */
       if (r.status != null && r.status !== "reserved" && r.status !== "sold") continue;
-      boundByLine.set(lineId, (boundByLine.get(lineId) ?? 0) + Math.max(1, Number(r.qty ?? 1)));
+      const independent = independentUnits(lineId, (r.po_line_id as string | null) ?? null, Math.max(1, Number(r.qty ?? 1)));
+      const qty = Math.max(1, Number(r.qty ?? 1));
+      linkedStockByLine.set(lineId, (linkedStockByLine.get(lineId) ?? 0) + qty - independent);
+      boundByLine.set(lineId, (boundByLine.get(lineId) ?? 0) + qty);
       boundUnitIds.add(r.id as string);
       const code = (r.unit_code as string | null) ?? null;
       if (code) boundUnitCodesByLine.set(lineId, [...(boundUnitCodesByLine.get(lineId) ?? []), code]);
@@ -1135,13 +1172,16 @@ export async function loadToOrder(
        included — a Sales Order the stock fully covers must still be able to
        explain itself on the permanent Register. */
     if (!l.readyStock) {
+      const independentPoReserved = poReserved
+        .map((r) => ({ ...r, qty: Math.max(0, r.qty - (linkedIncomingByLine.get(`${l.lineId}::${r.poId}`) ?? 0)) }))
+        .filter((r) => r.qty > 0);
       soLines.push({
         lineId: l.lineId,
         orderId: l.orderId,
         sku: l.sku,
         qty: l.qty + (l.takenFromStock ?? 0) + poTake,
-        stockTaken: l.takenFromStock ?? 0,
-        ...(poReserved.length > 0 ? { poReserved } : {}),
+        stockTaken: Math.max(0, (l.takenFromStock ?? 0) - (linkedStockByLine.get(l.lineId) ?? 0)),
+        ...(independentPoReserved.length > 0 ? { poReserved: independentPoReserved } : {}),
         modelName: l.modelName,
         variant: l.variant,
         category: l.category,
@@ -1204,7 +1244,7 @@ export async function loadToOrder(
       ),
       registerFacts: { lines: registerLines, ordersById: registerOrders, soLines },
       poFreeByKey: await readPoFreeByKey(sb),
-      lineageByLine: await readLineageByLine(sb, orderIds),
+      lineageByLine: lineage?.totals,
     },
   };
 }
@@ -1216,12 +1256,13 @@ export async function loadToOrder(
 async function readLineageByLine(
   sb: ReturnType<typeof userClient>,
   orderIds: readonly string[],
-): Promise<Map<string, number> | undefined> {
+): Promise<{ totals: Map<string, number>; bindings: Map<string, number> } | undefined> {
   const out = new Map<string, number>();
+  const bindings = new Map<string, number>();
   for (const batch of chunk([...orderIds])) {
     const { data, error } = await sb
       .from("po_line_sources")
-      .select("order_line_id, qty, purchase_orders!inner(status)")
+      .select("order_line_id, po_line_id, qty, purchase_orders!inner(status)")
       .in("order_id", batch)
       .neq("purchase_orders.status", "cancelled");
     if (error) {
@@ -1233,10 +1274,15 @@ async function readLineageByLine(
       if (po?.status === "cancelled") continue;
       const id = r.order_line_id as string | null;
       if (!id) continue;
-      out.set(id, (out.get(id) ?? 0) + Math.max(0, Number(r.qty ?? 0)));
+      const qty = Math.max(0, Number(r.qty ?? 0));
+      out.set(id, (out.get(id) ?? 0) + qty);
+      if (r.po_line_id) {
+        const key = `${id}::${r.po_line_id}`;
+        bindings.set(key, (bindings.get(key) ?? 0) + qty);
+      }
     }
   }
-  return out;
+  return { totals: out, bindings };
 }
 
 /**

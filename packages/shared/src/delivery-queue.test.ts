@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
+  assignLogisticsDueIso,
+  deliveryQueueLeads,
   DELIVERY_QUEUES,
   DELIVERY_QUEUE_LABELS,
   deliveryQueueByKey,
@@ -137,5 +139,29 @@ describe("deliveryStepOverdue — the queue turns late by itself", () => {
     // holidays the Monday counts and it is due Fri 08-28.
     expect(deliveryStepDueIso("chase", "2026-09-01")).toBe("2026-08-28");
     expect(deliveryStepDueIso("chase", "2026-09-01", HOLS)).toBe("2026-08-27");
+  });
+});
+
+describe("Assign logistics by — the ONE assignment deadline (DEL-04)", () => {
+  const opts = { holidays: [] as string[] };
+  it("counts the lead in Delivery working days before Scheduled, else Requested", () => {
+    // Tue 27 Oct 2026, Mon–Sat: T−3 Fri 23.
+    expect(assignLogisticsDueIso({ requestedIso: "2026-10-27", opts })).toBe("2026-10-23");
+    expect(assignLogisticsDueIso({ requestedIso: "2026-10-27", scheduledIso: "2026-10-29", opts })).toBe("2026-10-26");
+    expect(assignLogisticsDueIso({ requestedIso: "2026-10-27", opts, leads: { chase: 3, assign: 1 } })).toBe("2026-10-26");
+  });
+  it("the opening day is not the deadline, but an order opening inside it is due the day it opens", () => {
+    expect(assignLogisticsDueIso({ requestedIso: "2026-10-27", openedIso: "2026-10-01", opts })).toBe("2026-10-23");
+    expect(assignLogisticsDueIso({ requestedIso: "2026-10-27", openedIso: "2026-10-26T03:00:00Z", opts })).toBe("2026-10-26");
+  });
+  it("no customer date, no countdown", () => {
+    expect(assignLogisticsDueIso({ requestedIso: null, openedIso: "2026-10-01", opts })).toBeNull();
+  });
+  it("the Orders list's step reads the same stored lead", () => {
+    const leads = deliveryQueueLeads({ logisticsCallWorkingDays: 3, assignmentLeadWorkingDays: 5 });
+    expect(leads).toEqual({ chase: 3, assign: 5 });
+    expect(deliveryStepDueIso("assign", "2026-10-27", opts, leads)).toBe("2026-10-21");
+    // A caller that read only the Contact lead keeps the seed.
+    expect(deliveryStepDueIso("assign", "2026-10-27", opts, deliveryQueueLeads({ logisticsCallWorkingDays: 5 }))).toBe("2026-10-23");
   });
 });

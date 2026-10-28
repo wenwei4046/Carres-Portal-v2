@@ -1,0 +1,185 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Payment Monitor</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<style>
+  /* Carres tokens (docs/01-design-tokens.md). Same density as the Sales Orders register: 40px rows, 13px cells, 11px headers. */
+  :root{--canvas:#F7F8FA;--surface:#fff;--surface-alt:#f0f0f3;--expansion:#f9f9fb;--border:#e0e1e6;--divider:#d9d9e0;
+    --ink:#1c2024;--ink-2:#60646c;--ink-3:#8b8d98;--blue-3:#e6f4fe;--blue-6:#b7d9f8;--blue-9:#0090ff;--blue-11:#0d74ce;
+    --green-11:#218358;--amber-11:#ab6400;--red-11:#ce2c31;--r-control:6px;--r-card:10px;color-scheme:light}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--canvas);color:var(--ink);font:13px/18px Inter,system-ui,-apple-system,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums;padding-block:0}
+  .note{background:#17243a;color:#fff;font-size:12px;line-height:16px;padding:6px 16px}
+  .shell{display:grid;grid-template-columns:60px 1fr;min-height:calc(100vh - 28px)}
+  .side{background:#fff;border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:6px;padding-block:14px}
+  .side .logo{color:#e8412c;font-weight:600;font-size:11px;letter-spacing:.06em;margin-bottom:10px}
+  .side .ic{width:36px;height:36px;border-radius:var(--r-control);display:grid;place-items:center;color:var(--ink-2)}
+  .side .ic.on{background:var(--blue-3);color:var(--blue-11)}
+  .side svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .main{display:flex;flex-direction:column;min-width:0;overflow-x:auto}
+  header.dest{height:50px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:12px}
+  header.dest h1{font-size:24px;line-height:32px;font-weight:600;margin:0}
+  header.dest .crumb{color:var(--ink-2);font-size:12px}
+  header.dest .util{margin-left:auto;display:flex;gap:10px;color:var(--ink-2);font-size:12px}
+  .stage{display:grid;grid-template-columns:240px 1fr;min-width:1100px;flex:1;min-height:0}
+  /* Rail — portal style C (UI MASTER §6.7): flat white, right border, icon + 13/600 group titles, 36px rows, grey counts */
+  .rail{background:#fff;border-right:1px solid var(--border);padding:4px 12px 12px;position:relative;align-self:stretch}
+  .hide{position:absolute;right:8px;top:8px;width:28px;height:28px;border:1px solid var(--divider);border-radius:var(--r-control);background:#fff;color:var(--ink-2);display:grid;place-items:center;cursor:pointer}
+  .hide svg,.gh svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .group{padding:8px 0}.group+.group{border-top:1px solid var(--border)}
+  .gh{display:flex;align-items:center;gap:8px;min-height:36px;padding:0 6px;font-weight:600;color:var(--ink)}
+  .gh svg{color:var(--ink-2)}.gh .wk{margin-left:auto;font-size:12px;line-height:16px;font-weight:400;color:var(--ink-2)}.gh .chev{margin-left:8px;color:var(--ink-2)}
+  .row{display:flex;align-items:center;gap:8px;min-height:36px;width:100%;border:0;background:none;text-align:left;padding:3px 6px;border-radius:var(--r-control);font:inherit;color:var(--ink);cursor:pointer}
+  .row:hover{background:var(--surface-alt)}.row[aria-pressed="true"]{background:var(--blue-3);font-weight:600}
+  .row .w{flex:1;min-width:0}.row .w b{font-weight:600}.row .w .ex{color:var(--ink-2);margin-left:6px;font-weight:400}
+  .row.today .w b,.row.today .w .ex{color:var(--blue-11)}
+  .row .n{font-size:12px;line-height:16px;color:var(--ink-2)}.row .n.red{color:var(--red-11);font-weight:600}
+  .row.all{font-weight:600}
+  .row:focus-visible,.xchev:focus-visible,.btn:focus-visible,.link:focus-visible{outline:2px solid var(--blue-9);outline-offset:2px}
+  /* Register — the shared DataGrid recipe */
+  .reg{display:flex;flex-direction:column;min-width:0;padding:16px}
+  .box{background:#fff;border:1px solid var(--border);border-radius:var(--r-card);display:flex;flex-direction:column;min-height:0;overflow:hidden}
+  .tb{height:40px;display:flex;align-items:center;gap:12px;padding:0 12px;border-bottom:1px solid var(--border)}
+  .tb .picked{font-weight:600}.tb .picked span{font-weight:400;color:var(--ink-2)}
+  .tb .util{margin-left:auto;display:flex;gap:6px}
+  .tb .util button{height:28px;padding:0 8px;border:1px solid var(--divider);background:#fff;border-radius:var(--r-control);color:var(--ink);display:flex;align-items:center;gap:6px;font:inherit;font-size:12px;cursor:pointer}
+  .tb .search{display:flex;align-items:center;gap:6px;height:28px;padding:0 8px;border:1px solid var(--divider);border-radius:14px;background:#fff;color:var(--ink-2)}.tb .search input{border:0;outline:0;font:inherit;font-size:12px;width:200px;background:none}
+  .tb .util svg,.xchev svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .sheet{overflow-x:auto}
+  table.grid{border-collapse:separate;border-spacing:0;min-width:1780px;width:100%}
+  .grid thead th{position:sticky;top:0;background:var(--surface-alt);color:var(--ink-2);font-size:11px;line-height:14px;font-weight:600;text-align:left;padding:0 12px;height:34px;border-bottom:1px solid var(--divider);border-right:1px solid var(--border);white-space:nowrap}
+  .grid th.num,.grid td.num{text-align:right}
+  .grid th:last-child,.grid td:last-child{border-right:0}
+  .grid tbody td{height:40px;padding:0 12px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:0}
+  .grid td.ctl,.grid th.ctl{width:32px;padding:0 8px;border-right:0;max-width:none}
+  .grid td.s2{max-width:none;min-width:110px}
+  .grid td.ctl+td,.grid th.ctl+th{border-left:1px solid var(--border)}
+  .s1{position:sticky;left:0;background:#fff;z-index:1}.s2{position:sticky;left:32px;background:#fff;z-index:1}.s3{position:sticky;left:142px;background:#fff;z-index:1;box-shadow:1px 0 0 var(--border)}
+  .so{text-decoration:none;color:var(--blue-11);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:500}
+  .g{color:var(--green-11)}.o{color:var(--amber-11)}.r{color:var(--red-11)}.m{color:var(--ink-2)}
+  .xchev{width:24px;height:24px;border:0;background:none;color:var(--ink-2);border-radius:var(--r-control);display:grid;place-items:center;cursor:pointer}
+  .xchev[aria-expanded="true"] svg{transform:rotate(90deg)}
+  .av{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:#dbe7f5;color:#17243a;font-size:10px;font-weight:600;vertical-align:middle;margin-right:6px}
+  /* Expansion — compact, uses WIDTH: doors row · 4-column fact grid · three blocks side by side */
+  tr.exp>td{background:var(--expansion);height:auto;padding:0;white-space:normal;max-width:none;overflow:visible}
+  .expbox{position:sticky;left:0;padding:8px 12px 12px 44px}
+  .doors{display:flex;justify-content:flex-end;gap:6px;margin-bottom:8px}
+  .btn{height:28px;padding:0 10px;border-radius:var(--r-control);border:1px solid var(--divider);background:#fff;font:inherit;font-size:12px;font-weight:500;color:var(--ink);cursor:pointer}
+  .btn.p{background:var(--blue-9);border-color:var(--blue-9);color:#fff;font-weight:600}
+  .expbox{padding:8px 12px 12px 44px}
+  table.nest{border-collapse:separate;border-spacing:0;width:auto;min-width:720px;background:#fff;border:1px solid var(--border);border-radius:var(--r-control);overflow:hidden}
+  .grid .nest th{position:static;height:30px;padding:0 12px;background:var(--surface-alt);color:var(--ink-2);font-size:11px;line-height:14px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;border-bottom:1px solid var(--divider);border-right:1px solid var(--border);text-align:left}
+  .grid .nest th.num{text-align:right}
+  .grid .nest td{height:34px;padding:0 12px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);max-width:none;white-space:nowrap}
+  .grid .nest tr:last-child td{border-bottom:0}.grid .nest th:last-child,.grid .nest td:last-child{border-right:0}
+  .grid .nest td.num{text-align:right}
+  footer.ft{height:32px;display:flex;align-items:center;padding:0 12px;border-top:1px solid var(--border);color:var(--ink-2);font-size:12px}
+  @media (max-width:1100px){.side{display:none}.shell{grid-template-columns:1fr}}
+  
+  @media (prefers-reduced-motion:no-preference){.xchev svg{transition:transform 150ms}}
+</style>
+<div class="note">Design mock · Payment Monitor · same density as the Sales Orders register (40px rows) · fixture data, not customer data · a narrow window scrolls sideways</div>
+<div class="shell">
+  <aside class="side" aria-label="Portal rail">
+    <div class="logo">CARRES</div>
+    <div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></div>
+    <div class="ic"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h1M4 12h1M4 18h1"/></svg></div>
+    <div class="ic"><svg viewBox="0 0 24 24"><path d="M3 7h18v10H3zM3 12h18"/></svg></div>
+    <div class="ic on" title="Payments"><svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20"/></svg></div>
+    <div class="ic"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div>
+  </aside>
+  <div class="main">
+    <header class="dest"><h1>Monitor</h1><span class="crumb">Payments</span><div class="util"><span>Jump to… ⌘K</span><span>🔔</span><span>?</span><span>⚙</span></div></header>
+    <div class="stage">
+      <nav class="rail" aria-label="Filters">
+        <button class="hide" aria-label="Hide filters" title="Hide filters"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M16 15l-3-3 3-3"/></svg></button>
+        <div class="group"><button class="row all" data-d="all" aria-pressed="false"><span class="w">All unpaid orders</span><span class="n">7</span></button></div>
+        <div class="group">
+          <div class="gh"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>Date<span class="wk">‹ 14–18 Sep ›</span><span class="chev">˄</span></div>
+          <button class="row" data-d="missed" aria-pressed="false"><span class="w"><b>Missed</b></span><span class="n red">1</span></button>
+          <button class="row" data-d="2026-09-14" aria-pressed="false"><span class="w"><b>Mon 14</b></span><span class="n">0</span></button>
+          <button class="row" data-d="2026-09-15" aria-pressed="false"><span class="w"><b>Tue 15</b></span><span class="n">1</span></button>
+          <button class="row" data-d="2026-09-16" aria-pressed="false"><span class="w"><b>Wed 16</b><span class="ex">· Malaysia Day</span></span><span class="n">0</span></button>
+          <button class="row today" data-d="2026-09-17" aria-pressed="true"><span class="w"><b>Thu 17</b><span class="ex">· Today</span></span><span class="n">4</span></button>
+          <button class="row" data-d="2026-09-18" aria-pressed="false"><span class="w"><b>Fri 18</b></span><span class="n">1</span></button>
+          <button class="row" data-d="nodate" aria-pressed="false"><span class="w">No date</span><span class="n">0</span></button>
+        </div>
+        <div class="group">
+          <div class="gh"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Status<span class="chev">˄</span></div>
+          <button class="row" data-k="ask" aria-pressed="false"><span class="w">Ask customer today</span><span class="n">2</span></button>
+          <button class="row" data-k="due" aria-pressed="false"><span class="w">Payment due today</span><span class="n">1</span></button>
+          <button class="row" data-k="promised" aria-pressed="false"><span class="w">Customer promised to pay today</span><span class="n">1</span></button>
+          <button class="row" data-k="storage" aria-pressed="false"><span class="w">Storage Invoice not paid</span><span class="n">0</span></button>
+          <button class="row" data-k="later" aria-pressed="false"><span class="w">Payment due later</span><span class="n">0</span></button>
+          <button class="row" data-k="nodel" aria-pressed="false"><span class="w">No delivery date</span><span class="n">0</span></button>
+          <button class="row" data-k="goods" aria-pressed="false"><span class="w">Waiting for goods</span><span class="n">0</span></button>
+          <button class="row" data-k="hold" aria-pressed="false"><span class="w">Finance hold</span><span class="n">0</span></button>
+          <button class="row" data-k="review" aria-pressed="false"><span class="w">Needs review</span><span class="n">0</span></button>
+          <button class="row" data-k="paid" aria-pressed="false"><span class="w">Paid orders</span><span class="n">0</span></button>
+        </div>
+      </nav>
+      <section class="reg" aria-label="Payment Monitor register"><div class="box">
+        <div class="tb"><span class="picked" id="picked">Thu, 17 Sep · Today <span>· 4 orders</span></span>
+          <div class="util"><label class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" placeholder="Search by SO, customer or phone…" aria-label="Search"></label><button><svg viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 21h16"/></svg>Export</button><button><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/></svg>Columns</button></div></div>
+        <div class="sheet">
+          <table class="grid">
+            <thead><tr><th class="ctl s1"></th><th class="s2" style="min-width:110px">SO No</th><th class="s3" style="min-width:220px">Customer</th><th class="num" style="min-width:120px">Balance due</th><th style="min-width:140px">Items &amp; Stock</th><th style="min-width:250px">Storage</th><th style="min-width:170px">Requested Delivery Date</th><th style="min-width:210px">Scheduled delivery</th><th style="min-width:250px">Payment timing</th><th style="min-width:250px">Collection owner</th></tr></thead>
+            <tbody id="rows">
+              <tr data-d="missed" data-k="missed"><td class="ctl s1"><button class="xchev" aria-label="Show payment details" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="s2"><span class="so">SO-1401</span></td><td class="s3">TAN SRI DATO' SERI MUHAMMAD</td><td class="num">RM 1,700.00</td><td>Ready · 1 of 1</td><td>No storage charge</td><td>Fri, 18 Sep</td><td>Scheduled · Fri, 18 Sep · 2 PM</td><td class="r">Payment should have been received</td><td><span class="av">SH</span>Shasha</td></tr>
+              <tr data-d="2026-09-18" data-k="storage"><td class="ctl s1"><button class="xchev" aria-label="Show payment details" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="s2"><span class="so">SO-1404</span></td><td class="s3">WONG MEI LING</td><td class="num">RM 1,800.00</td><td>Ready · 1 of 1</td><td>Storage Invoice issued · RM 200.00 not paid</td><td>Wed, 23 Sep</td><td>Scheduled · Wed, 23 Sep</td><td>Storage Invoice not paid</td><td><span class="av">YJ</span>Yu Jun</td></tr>
+              <tr data-d="2026-09-17" data-k="promised"><td class="ctl s1"><button class="xchev" aria-label="Show payment details" aria-expanded="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="s2"><a class="so" href="payment-page.html">SO-1405</a></td><td class="s3">SITI AMINAH</td><td class="num">RM 2,500.00</td><td>Ready · 1 of 1</td><td>Sofa · Day 29 · RM 400.00 so far</td><td>Thu, 24 Sep</td><td>Scheduled · Thu, 24 Sep</td><td class="o">Customer promised to pay today</td><td><span class="av">SH</span>Shasha</td></tr>
+              <tr class="exp" data-d="2026-09-17" data-k="promised"><td colspan="10"><div class="expbox">
+                <table class="nest">
+                  <thead><tr><th>Date</th><th>Event</th><th class="num">Amount</th><th>By</th><th>Document</th></tr></thead>
+                  <tbody>
+                    <tr><td>Tue, 15 Sep</td><td>Customer will pay on a date · promised Thu, 17 Sep</td><td class="num m">—</td><td>Shasha</td><td class="m">—</td></tr>
+                    <tr><td>Tue, 15 Sep</td><td>Payment message sent</td><td class="num m">—</td><td>Shasha</td><td><a class="link" href="#">WhatsApp screenshot</a></td></tr>
+                    <tr><td>Mon, 7 Sep</td><td>Payment recorded</td><td class="num">RM 900.00</td><td>POS</td><td><span class="so">RC2609-4830</span></td></tr>
+                  </tbody>
+                </table>
+              </div></td></tr>
+              <tr data-d="2026-09-17" data-k="ask"><td class="ctl s1"><button class="xchev" aria-label="Show payment details" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="s2"><span class="so">SO-1406</span></td><td class="s3">CHONG WEI JIE</td><td class="num">RM 1,000.00</td><td>Ready · 1 of 1</td><td>Free until Sun, 27 Sep</td><td>Fri, 25 Sep</td><td>Scheduled · Fri, 25 Sep · 10 AM</td><td>Ask customer today</td><td><span class="av">SH</span>Shasha</td></tr>
+              <tr data-d="2026-09-17" data-k="ask"><td class="ctl s1"><button class="xchev" aria-label="Show payment details" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="s2"><span class="so">SO-1403</span></td><td class="s3">LIM KUAN YANG</td><td class="num">RM 1,800.00</td><td>Ready · 2 of 2</td><td>No storage charge</td><td>Sat, 26 Sep</td><td>Scheduled · Sat, 26 Sep</td><td>Ask customer today</td><td><span class="av">YJ</span>Yu Jun</td></tr>
+              <tr data-d="2026-09-17" data-k="due"><td class="ctl s1"><button class="xchev" aria-label="Show payment details" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="s2"><span class="so">SO-1408</span></td><td class="s3">RAJESH KUMAR</td><td class="num">RM 1,000.00</td><td>Ready · 1 of 1</td><td>No storage charge</td><td>Wed, 23 Sep</td><td>Scheduled · Wed, 23 Sep · 2 PM</td><td>Payment due today</td><td><span class="av">SH</span>Shasha</td></tr>
+              <tr data-d="2026-09-15" data-k="later"><td class="ctl s1"><button class="xchev" aria-label="Show payment details" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="s2"><span class="so">SO-1409</span></td><td class="s3">NORAINI BINTI ABDULLAH</td><td class="num">RM 3,400.00</td><td>Ready · 2 of 2</td><td>No storage charge</td><td>Fri, 2 Oct</td><td>Scheduled · Fri, 2 Oct</td><td>Payment due Wed, 30 Sep</td><td></td></tr>
+              <tr data-d="nodate" data-k="goods"><td class="ctl s1"><button class="xchev" aria-label="Show payment details" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="s2"><span class="so">SO-1402</span></td><td class="s3">NURUL AIN BINTI ISMAIL</td><td class="num">RM 1,600.00</td><td><span class="o">Not ready</span> · 2 of 3 · 1 short</td><td>No storage charge</td><td>Wed, 7 Oct</td><td>Not scheduled</td><td>Arrival not confirmed</td><td></td></tr>
+              <tr data-d="paidday" data-k="paid"><td class="ctl s1"><button class="xchev" aria-label="Show payment details" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="s2"><span class="so">SO-1398</span></td><td class="s3">LEE MEI FONG</td><td class="num">RM 0.00</td><td>Delivered</td><td>No storage charge</td><td>Tue, 15 Sep</td><td>Delivered · Tue, 15 Sep</td><td class="g">Paid</td><td class="m">RC2609-4790 · INV2609-4790</td></tr>
+              <tr data-d="paidday" data-k="paid"><td class="ctl s1"><button class="xchev" aria-label="Show payment details" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></td><td class="s2"><span class="so">SO-1399</span></td><td class="s3">AHMAD FAIZAL</td><td class="num">RM 0.00</td><td>Ready · 1 of 1</td><td>No storage charge</td><td>Mon, 28 Sep</td><td>Scheduled · Mon, 28 Sep</td><td class="g">Paid</td><td class="m">RC2609-4812 · INV2609-4812</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <footer class="ft" id="ft">4 orders · RM 5,900.00 unpaid</footer>
+      </div></section>
+    </div>
+  </div>
+</div>
+<script>
+  (function(){
+    var rows=[].slice.call(document.querySelectorAll('#rows > tr'));
+    var dayBtns=[].slice.call(document.querySelectorAll('.rail .row[data-d]'));
+    var stBtns=[].slice.call(document.querySelectorAll('.rail .row[data-k]'));
+    var dayWord={all:'All unpaid orders',missed:'Missed','2026-09-14':'Mon, 14 Sep','2026-09-15':'Tue, 15 Sep','2026-09-16':'Wed, 16 Sep','2026-09-17':'Thu, 17 Sep · Today','2026-09-18':'Fri, 18 Sep',nodate:'No date'};
+    var stWord={ask:'Ask customer today',due:'Payment due today',promised:'Customer promised to pay today',storage:'Storage Invoice not paid',later:'Payment due later',nodel:'No delivery date',goods:'Waiting for goods',hold:'Finance hold',review:'Needs review',paid:'Paid orders'};
+    var day='2026-09-17', st=null;
+    function money(tr){var t=tr.querySelector('td.num').textContent.replace(/[^\d.]/g,'');return Number(t)||0;}
+    function inDay(tr){if(day==='all')return tr.dataset.k!=='paid';if(day==='missed')return tr.dataset.d==='missed';return tr.dataset.d===day;}
+    function render(){
+      dayBtns.forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.d===day));});
+      stBtns.forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.k===st));});
+      var inday=rows.filter(function(tr){return !tr.classList.contains('exp')&&inDay(tr);});
+      stBtns.forEach(function(b){var c=inday.filter(function(tr){return tr.dataset.k===b.dataset.k;}).length;var n=b.querySelector('.n');n.textContent=c;});
+      var n=0,sum=0;
+      rows.forEach(function(tr){if(tr.classList.contains('exp'))return;var on=inDay(tr)&&(!st||tr.dataset.k===st);tr.hidden=!on;if(on){n++;sum+=money(tr);}});
+      rows.forEach(function(tr){if(tr.classList.contains('exp')){var prev=tr.previousElementSibling;var c=prev.querySelector('.xchev');tr.hidden=prev.hidden||c.getAttribute('aria-expanded')!=='true';}});
+      document.getElementById('picked').innerHTML=dayWord[day]+(st?' · '+stWord[st]:'')+' <span>· '+n+(n===1?' order':' orders')+'</span>';
+      var ft=document.getElementById('ft');
+      ft.textContent=n===0?'No follow-up planned on '+dayWord[day].replace(' · Today','')+'.':(st==='paid'?n+(n===1?' order':' orders')+' · Paid':n+(n===1?' order':' orders')+' · RM '+sum.toLocaleString('en-MY',{minimumFractionDigits:2})+' unpaid');
+    }
+    dayBtns.forEach(function(b){b.addEventListener('click',function(){day=b.dataset.d;st=null;render();});});
+    stBtns.forEach(function(b){b.addEventListener('click',function(){st=(st===b.dataset.k)?null:b.dataset.k;render();});});
+    document.querySelectorAll('.xchev').forEach(function(c){c.addEventListener('click',function(){var open=c.getAttribute('aria-expanded')==='true';document.querySelectorAll('.xchev').forEach(function(o){o.setAttribute('aria-expanded','false');});c.setAttribute('aria-expanded',String(!open));render();});});
+    function fit(){var w=document.querySelector('.sheet').clientWidth;document.querySelectorAll('.expbox').forEach(function(b){b.style.width=w+'px';});}
+    window.addEventListener('resize',fit);fit();
+    render();
+  })();
+</script>

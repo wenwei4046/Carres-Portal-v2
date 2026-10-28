@@ -6,6 +6,11 @@ import App from "./App.tsx";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { queryClient } from "./lib/query-client";
 import "./index.css";
+import { applyStoredAppearance } from "./lib/appearance";
+
+/* This browser's copy of the person's Appearance paints the first frame;
+   their profile wins as soon as the session is read (App). */
+applyStoredAppearance();
 // POS prototype skin — scoped under .pos-proto (Loo's Claude Design, 2026-07-04).
 import "./styles/pos-prototype.css";
 

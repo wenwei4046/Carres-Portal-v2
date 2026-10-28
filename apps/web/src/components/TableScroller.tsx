@@ -48,7 +48,7 @@ export default function TableScroller({ label, children, testId }: {
         {children}
       </div>
       {state.right ? (
-        <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-kit-slate-6/60 to-transparent" />
+        <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-c-head-line to-transparent" />
       ) : null}
       {state.over ? (
         <span className="absolute right-1 top-1 z-10">

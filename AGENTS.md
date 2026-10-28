@@ -1,7 +1,27 @@
 # Repository entry point
 
 Read [CLAUDE.md](CLAUDE.md) first for every task — its §2 ONE KIT LAW (2026-09-27) binds every UI chat: one kit, read it before drawing, never create new, delete the old. It is the single constitution, not a separate
-Claude-only policy. Before UI work, follow its Mandatory UI cold-start: UI MASTER §6.7–6.9,
-the owning module MASTER and COPY-STANDARD. Do not create another UI guide or versioned MASTER.
+Claude-only policy. Before UI work, follow its Mandatory UI cold-start: UI MASTER §0 Current kit index first, then §0.1–§0.3, §6.0 and the section for the part being built, and its §2.2 acceptance checklist,
+the owning module MASTER and COPY-STANDARD. Reuse its kit components and run its complete-page acceptance checks. Do not create another UI guide or versioned MASTER.
+**One physical UI/UX MASTER:** [docs/ui/MASTER.md](docs/ui/MASTER.md). Values, measurements, component contracts, UX and page patterns are all inside it. The old 01/02/03 files are navigation-only redirects and must never regain rules. Every UI task names its MASTER value/trigger/shared component, preserves conforming work and fixes concrete deviations. Owner corrections update the same MASTER and shared component once. Do not create another guide or require repeated owner approval of recorded decisions.
+
 Approved SO Batch stock-selection UI is in Purchasing MASTER §9.1, BUILT 2026-09-18; the
 authenticated production walk is still owed, and approval is never build proof.
+
+**Preserved older checkouts:** fetch `origin/main` before UI work and read `git show origin/main:docs/ui/MASTER.md` if the local checkout still contains older UI drafts. Preserve uncommitted work; the current main MASTER is the authority, not an older local specimen or chat memory. PR #2087 published the consolidated baseline; publication alone does not prove runtime adoption.
+
+## Shared Blueprint reading entry — Claude, Codex and ChatGPT
+
+Use the current repository files, not a remembered chat answer or frozen restart copy.
+Before ERP work, read `docs/ERP-ARCHITECTURE.md`, the owning `docs/<module>/MASTER.md`,
+and the relevant upstream/downstream authority. `Carres Settings List.md` is the single
+Settings inventory; `Carres-Business-Blueprint-RESTART-2026-10-07/26-BLUEPRINT-AUDIT-BACKLOG.md`
+is the existing completion/gap audit, not another business authority.
+
+Independent checkouts must fetch `origin/main` and compare their governing files before
+continuing; preserve local work and reconcile newer authority instead of overwriting it.
+A chat can read current remote authority with `git show origin/main:<path>` without changing
+its application branch. Claude and Codex follow this same entry. ChatGPT needs repository
+access or the current supplied files; chat memory alone is not repository access.
+Document publication does not turn proposals into approved law, authorise application builds,
+or prove production implementation. Keep FACT, PROPOSAL, APPROVED, BUILT and VERIFIED separate.

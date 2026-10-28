@@ -32,8 +32,9 @@ import {
   LOGISTICS_COPY,
   STOCK_ROUTE_LABEL,
   logisticsCardModel,
+  isOutstation,
   moneyAffectsDelivery,
-  myHolidaySet,
+  mytDayOf,
   type LogisticsAction,
   type LogisticsCheckRow,
   type LogisticsGap,
@@ -44,6 +45,7 @@ import { apiFetch } from "@/lib/api";
 import { appTodayIso, fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { displayCustomerName } from "@/lib/customer-name";
 import { useDeliveryLinkActs, useDeliveryPartners, useLogisticsCardFacts } from "@/lib/queries";
+import { useDeliveryDays, useDeliveryLeads, useOrderCollectionTiming } from "@/lib/deadline-queries";
 import { DeliveryDatesEdit, LogisticsDetailsEdit } from "../components/DeliveryBrief";
 import { useDeliveryScopeCard } from "../delivery-scope-card";
 import { chaseMessageFor } from "../delivery-chase";
@@ -125,15 +127,15 @@ function StateIcon({ row }: { row: LogisticsCheckRow }) {
 }
 
 function SectionTitle({ children }: { children: ReactNode }) {
-  /* Plain case, 12/16 (Jess, 2026-09-27: no small uppercase titles). */
-  return <h4 className="text-[12px] font-semibold leading-4 text-kit-slate-11">{children}</h4>;
+  /* Plain case (Jess, 2026-09-27: no small uppercase titles); a section title inside a card is 15/500 (01 §2). */
+  return <h4 className="text-strong text-kit-slate-12">{children}</h4>;
 }
 
 function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 py-0.5">
-      <span className="text-label text-kit-slate-11">{label}</span>
-      <span className="min-w-0 text-right text-body text-kit-slate-12">{children}</span>
+      <span className="text-meta text-kit-slate-11">{label}</span>
+      <span className="min-w-0 text-right text-body font-medium text-kit-slate-12">{children}</span>
     </div>
   );
 }
@@ -152,10 +154,18 @@ export function useLogisticsModel(orderId: string, leg = 0) {
   const partnerName = card?.logisticsPartnerName ?? facts?.partner?.name ?? null;
   const o = card?.scope.o ?? null;
   const linkUrl = facts?.link ? `${window.location.origin}/delivery-link/${facts.link.token}` : null;
+  /* The stored settings every date on this card reads (9 Oct 2026): the
+     Collection timing this order's clock runs under, THE Delivery calendar
+     (the checks, Assign logistics by and the payment-due FACT) and the two
+     Delivery leads. */
+  const collectionTiming = useOrderCollectionTiming(orderId);
+  const deliveryDays = useDeliveryDays();
+  const leads = useDeliveryLeads();
 
   const model = useMemo(() => {
     if (!card || !o) return null;
-    const holidays = myHolidaySet();
+    /* The Delivery calendar's holidays — the checks are Delivery facts. */
+    const holidays = deliveryDays.holidays;
     const anchor = card.confirmedDate ?? card.scope.customerDeliveryIso ?? null;
     const money = moneyOfOrder(o);
     const owed = money.known ? money.outstanding : 0;
@@ -163,8 +173,9 @@ export function useLogisticsModel(orderId: string, leg = 0) {
       owed,
       anchorIso: anchor,
       todayIso: today,
-      outstation: facts?.partner ? !facts.partner.kvDefault : false,
+      outstation: isOutstation(facts?.partner),
       holidays,
+      timing: collectionTiming,
     });
     const financeHolds = (o.order_finance_exceptions ?? []).some((e) => e.status === "open");
     const arrangement = card.scope.arrangement;
@@ -198,10 +209,16 @@ export function useLogisticsModel(orderId: string, leg = 0) {
     return logisticsCardModel({
       todayIso: today,
       holidays,
+      ...(leads.contactLeadWorkingDays !== null ? { contactLeadWorkingDays: leads.contactLeadWorkingDays } : {}),
+      assignLeadWorkingDays: leads.assignmentLeadWorkingDays,
       requestedIso: card.scope.customerDeliveryIso ?? null,
       scheduledIso: card.confirmedDate,
       partnerName,
-      startedIso: (o.proceeded_at ?? o.proceed_date ?? null)?.slice(0, 10) ?? null,
+      /* The PROCEED day is `proceeded_at` (the Sales → Operation hand-off),
+         read as the Kuala Lumpur day exactly as the Order Route reads it.
+         Never `proceed_date` — that is the Planned production start, a
+         different fact with its own name (owner ruling 2026-10-06). */
+      startedIso: o.proceeded_at ? mytDayOf(o.proceeded_at) : null,
       detailsReceivedIso: facts?.detailsReceivedAt?.slice(0, 10) ?? null,
       answer,
       settled: card.settled,
@@ -210,8 +227,8 @@ export function useLogisticsModel(orderId: string, leg = 0) {
       financeHold: financeHolds ? "" : null,
       spell,
     });
-  }, [card, o, facts, partnerName, today]);
-  return { scope, factsQ, card, facts, today, partnerName, o, linkUrl, model };
+  }, [card, o, facts, partnerName, today, collectionTiming, deliveryDays, leads]);
+  return { scope, factsQ, card, facts, today, partnerName, o, linkUrl, model, collectionTiming, deliveryDays };
 }
 
 /** THE PREPARED LOGISTICS MESSAGES for the act card (§5.10): Delivery's
@@ -408,14 +425,14 @@ export default function LogisticsCard({
 
   const template = communication ? communication.templates.find((t) => t.key === templateKey) ?? communication.templates[0] ?? null : null;
   const status = (
-    <span className="flex min-w-0 flex-col text-[12px] font-normal leading-4 text-kit-slate-11" data-testid="logistics-card-status-lines">
+    <span className="flex min-w-0 flex-col text-meta text-kit-slate-11" data-testid="logistics-card-status-lines">
       {action ? (
         <span className="flex min-w-0 flex-col" data-testid="logistics-card-action">
-          <span className="text-[13px] font-semibold leading-[18px] text-kit-slate-12">
+          <span className="text-body font-medium text-kit-slate-12">
             {action.act}
             {dueText(action) ? <span className={`font-normal ${timingTone}`}>{` · ${dueText(action)}`}</span> : null}
           </span>
-          <span className="text-[12px] leading-4 text-kit-slate-11">{action.result}</span>
+          <span className="text-meta text-kit-slate-11">{action.result}</span>
         </span>
       ) : null}
       <span className="min-w-0 truncate">
@@ -457,14 +474,14 @@ export default function LogisticsCard({
                 {/* In the order sheet the row above already says the act: only its doors follow. */}
                 {communicationInPane ? null : (
                 <div>
-                  <div className="text-[13px] font-semibold leading-[18px] text-kit-slate-12 min-[768px]:text-[14px] min-[768px]:leading-5">{action.act}</div>
-                  <div className={`text-[12px] font-normal leading-4 ${timingTone}`}>{[action.result, dueText(action)].filter(Boolean).join(" · ")}</div>
+                  <div className="text-body font-medium text-kit-slate-12">{action.act}</div>
+                  <div className={`text-meta ${timingTone}`}>{[action.result, dueText(action)].filter(Boolean).join(" · ")}</div>
                 </div>
                 )}
                 {editing === null ? (
                   <div className="flex flex-wrap items-center gap-2">
                     {doorFor(action.door)}
-                    <Link className="inline-flex min-h-6 items-center gap-1 text-label text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" to={`/operation?tab=delivery&view=all&open=${encodeURIComponent(orderId)}`}>
+                    <Link className="inline-flex min-h-6 items-center gap-1 text-meta text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" to={`/operation?tab=delivery&view=all&open=${encodeURIComponent(orderId)}`}>
                       {PARTY_COPY.openInDelivery}
                       <Icon name="open" size={14} />
                     </Link>
@@ -495,11 +512,11 @@ export default function LogisticsCard({
                   <div className="flex items-start gap-2">
                     <StateIcon row={row} />
                     <div className="min-w-0 flex-1">
-                      <div className="text-[12px] font-normal leading-4 text-kit-slate-11">
+                      <div className="text-meta text-kit-slate-11">
                         {row.label}
                         {row.dueIso ? ` · ${spell(row.dueIso)}` : ""}
                       </div>
-                      <div className={`text-[13px] font-normal leading-[18px] ${row.state === "missed" ? "text-kit-red-11" : "text-kit-slate-12"}`}>
+                      <div className={`text-body ${row.state === "missed" ? "text-kit-red-11" : "text-kit-slate-12"}`}>
                         {row.state === "not_needed"
                           ? LOGISTICS_COPY.notNeeded
                           : row.fact ?? (row.dueIso ? LOGISTICS_COPY.opens(spell(row.dueIso)) : LOGISTICS_COPY.noRequested)}
@@ -525,7 +542,7 @@ export default function LogisticsCard({
               {card.scope.customerDeliveryIso ? spell(card.scope.customerDeliveryIso) : LOGISTICS_COPY.noRequested}
             </Fact>
             <Fact label={LOGISTICS_COPY.scheduled}>
-              <span className="font-semibold">{scheduledLine ?? LOGISTICS_COPY.notScheduled}</span>
+              <span className="font-medium">{scheduledLine ?? LOGISTICS_COPY.notScheduled}</span>
             </Fact>
             {delivered ? <Fact label={LOGISTICS_COPY.delivered}>{delivered}</Fact> : null}
           </section>
@@ -537,7 +554,7 @@ export default function LogisticsCard({
               <div className="min-w-0">
                 <div className="text-body text-kit-slate-12">{partnerName ?? LOGISTICS_COPY.notAssigned}</div>
                 {partner ? (
-                  <div className="text-label text-kit-slate-11">
+                  <div className="text-meta text-kit-slate-11">
                     {partner.hasPortal ? PARTY_COPY.answersInPortal(partner.name) : PARTY_COPY.answersByLink(partner.name)}
                   </div>
                 ) : null}
@@ -560,11 +577,11 @@ export default function LogisticsCard({
             ) : (
               (facts?.routes ?? []).map((route) => (
                 <div key={`${route.key}-${route.place ?? ""}`} className="flex flex-col gap-0.5" data-testid={`logistics-route-${route.key}`}>
-                  <div className="text-body font-semibold text-kit-slate-12">
+                  <div className="text-body font-medium text-kit-slate-12">
                     {[STOCK_ROUTE_LABEL[route.key], route.place].filter(Boolean).join(" · ")}
                   </div>
                   {route.purchaseOrders.map((po) => (
-                    <div key={po.poNo} className="text-label text-kit-slate-11">
+                    <div key={po.poNo} className="text-meta text-kit-slate-11">
                       {[
                         PARTY_COPY.poLine(po.poNo, po.supplier),
                         po.poDeliveryDate ? PARTY_COPY.poDelivery(spell(po.poDeliveryDate)) : null,
@@ -575,12 +592,12 @@ export default function LogisticsCard({
                     </div>
                   ))}
                   {route.readyUnits > 0 ? (
-                    <div className="text-label text-kit-slate-11">{PARTY_COPY.readyUnits(route.readyUnits, route.place)}</div>
+                    <div className="text-meta text-kit-slate-11">{PARTY_COPY.readyUnits(route.readyUnits, route.place)}</div>
                   ) : null}
                 </div>
               ))
             )}
-            <Link className="inline-flex min-h-6 items-center gap-1 self-start text-label text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" to="/operation/procurement">
+            <Link className="inline-flex min-h-6 items-center gap-1 self-start text-meta text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" to="/operation/procurement">
               {PARTY_COPY.openPurchasing}
               <Icon name="open" size={14} />
             </Link>
@@ -597,12 +614,12 @@ export default function LogisticsCard({
               <p className="text-body text-kit-slate-11">{PARTY_COPY.answersInPortal(partner.name)}</p>
             ) : facts?.link && linkUrl ? (
               <>
-                <div className="text-body font-semibold text-kit-slate-12">{LINK_COPY.active}</div>
-                <div className="break-all font-mono text-label text-kit-slate-11" data-testid="logistics-card-link-url">{linkUrl}</div>
-                <div className="text-label text-kit-slate-11">
+                <div className="text-body font-medium text-kit-slate-12">{LINK_COPY.active}</div>
+                <div className="break-all font-mono text-meta text-kit-slate-11" data-testid="logistics-card-link-url">{linkUrl}</div>
+                <div className="text-meta text-kit-slate-11">
                   {LINK_COPY.created(spell(facts.link.createdAt.slice(0, 10)), facts.link.createdByName ?? "Staff identity not recorded")}
                 </div>
-                <div className="text-label text-kit-slate-11">
+                <div className="text-meta text-kit-slate-11">
                   {facts.link.lastOpenedAt
                     ? LINK_COPY.opened(partner.name, fmtDate(facts.link.lastOpenedAt.slice(0, 10)))
                     : LINK_COPY.notOpened}
@@ -642,11 +659,11 @@ export default function LogisticsCard({
               <>
                 {communication && template ? (
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                    <span className="text-[12px] leading-4 text-kit-slate-11">{ACTION_COPY.template}</span>
+                    <span className="text-meta text-kit-slate-11">{ACTION_COPY.template}</span>
                     <div className="w-[200px]">
                       <Select id={`logistics-template-${orderId}`} toolbar options={communication.templates.map((t) => ({ value: t.key, label: t.label }))} value={template.key} onValueChange={setTemplateKey} />
                     </div>
-                    <button type="button" className="text-[12px] leading-4 text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" onClick={() => setShowMessage((v) => !v)} data-testid="logistics-card-toggle-message">
+                    <button type="button" className="text-meta text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" onClick={() => setShowMessage((v) => !v)} data-testid="logistics-card-toggle-message">
                       {showMessage ? ACTION_COPY.hideMessage : ACTION_COPY.showMessage}
                     </button>
                   </div>
@@ -661,15 +678,15 @@ export default function LogisticsCard({
                     {PARTY_COPY.copyMessage}
                   </Button>
                   {partnerRow?.whatsapp_group_url ? (
-                    <a className="inline-flex min-h-6 items-center gap-1 text-label text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" href={partnerRow.whatsapp_group_url} target="_blank" rel="noreferrer">
+                    <a className="inline-flex min-h-6 items-center gap-1 text-meta text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" href={partnerRow.whatsapp_group_url} target="_blank" rel="noreferrer">
                       <Icon name="message" size={14} />
                       {PARTY_COPY.openGroup}
                     </a>
                   ) : (
-                    <span className="text-label text-kit-slate-11">{PARTY_COPY.groupNotSet}</span>
+                    <span className="text-meta text-kit-slate-11">{PARTY_COPY.groupNotSet}</span>
                   )}
                 </div>
-                <p className="text-label text-kit-slate-11">{PARTY_COPY.sentIsNotConfirmed}</p>
+                <p className="text-meta text-kit-slate-11">{PARTY_COPY.sentIsNotConfirmed}</p>
               </>
             ) : (
               <p className="text-body text-kit-slate-11">{PARTY_COPY.assignFirst}</p>
@@ -687,10 +704,10 @@ export default function LogisticsCard({
               <ol className="flex flex-col gap-2">
                 {(facts?.history ?? []).map((h, i) => (
                   <li key={`${h.at}-${i}`}>
-                    <div className="text-[12px] font-normal leading-4 text-kit-slate-12">{HISTORY_WORD[h.event] ?? "Activity"}</div>
-                    <div className="text-[12px] font-normal leading-4 text-kit-slate-11">{[h.who, fmtDate(h.at)].filter(Boolean).join(" · ")}</div>
+                    <div className="text-body font-medium text-kit-slate-12">{HISTORY_WORD[h.event] ?? "Activity"}</div>
+                    <div className="text-meta text-kit-slate-11">{[h.who, fmtDate(h.at)].filter(Boolean).join(" · ")}</div>
                     {h.detail ? (
-                      <div className="text-[12px] font-normal leading-4 text-kit-slate-11">
+                      <div className="text-meta text-kit-slate-11">
                         {/* The API hands ISO days; the screen spells them (COPY: no ISO on screen). */}
                         {h.detail.replace(/\d{4}-\d{2}-\d{2}/g, (iso) => spell(iso))}
                       </div>

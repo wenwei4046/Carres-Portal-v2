@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { collectionOutcomeInput } from "@carres/shared/payment-collection-outcome";
-import { storageHold } from "@carres/shared";
+import { salesOrderParamOf, storageHold } from "@carres/shared";
 import { storageSkuCategories } from "../../lib/sku-categories";
 import {
   GUARANTEE_ENTITLEMENTS,
@@ -59,23 +59,31 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const INVOICE_REGISTER_SELECT =
   "id,invoice_no,status,kind,amount,tax_amount,issued_at,voided_at,void_reason," +
   "replaces_invoice_id,created_at,order_id," +
+  // The invoice's OWN lines, frozen at issue (0429 snapshot; 0712 office part
+  // invoices add `addons` and `issued_from`). Reports → Sales invoice lines
+  // reads these — follows Houzs backend/src/scm/routes/reports.ts:502-528 per
+  // Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs — and falls back to the live order only when
+  // the snapshot holds no lines (dispatch-issued / pre-0429 invoices).
+  "snapshot_lines:snapshot->lines,snapshot_addons:snapshot->addons,snapshot_from:snapshot->>issued_from," +
   "orders(id,so,customer_name,customer_phone,source_ref,status,paid,delivery_date,delivery_date_tbd,delivered_at," +
   // The Finance Dashboard's A/R Aging counts an order's age from the day it
   // was placed — the same date finance_ar_aging (0062/0125) aged it by.
   "placed_at," +
-  "ops_assigned_logistic,delivery_partners!orders_delivery_partner_id_fkey(name,contact)," +
+  // `kv_default` decides outstation — the collection clock's outstation pair
+  // (PAY-04, `invoiceOutstation`).
+  "ops_assigned_logistic,delivery_partners!orders_delivery_partner_id_fkey(name,contact,kv_default)," +
   // §5 likely-duplicate: the comparison needs the reference and the method
   // beside the amount and the paid date, so the operator inspects the RIGHT
   // earlier payment instead of guessing from a figure alone.
   "order_payments(id,receipt_no,amount,paid_on,voided_at,reference,method)," +
   "payment_communications(id,kind,message_text,template_key,sent_screenshot_url,recorded_at)," +
-  "order_lines(sku,qty,unit_price),order_addons(qty,unit_price)," +
+  "order_lines(sku,qty,unit_price),order_addons(addon_key,qty,unit_price)," +
   // Payment Monitor Card 02 (2026-09-16): the confirmed delivery is
   // DELIVERY'S fact — its Delivery Orders and its arrangement per leg, then
   // the booking overlay only while its stage is `confirmed`. The shared
   // `invoiceConfirmedDelivery` reads these for the Monitor AND the Work feed,
   // so the clock starts on the day Delivery actually agreed.
-  "ops_delivery_arrangements(leg,confirmed_date,confirmed_time)," +
+  "ops_delivery_arrangements(leg,confirmed_date,confirmed_time,partner_id,delivery_partners(kv_default))," +
   "ops_delivery_orders(leg,delivery_date,time_slot,voided_at,issued_at)," +
   "ops_order_control(balance,confirmed_date,booking_stage,confirmed_time_slot,line_etas,line_stock_status," +
   // The 2026-09-08 correction: the Payment screens must see the LEGACY
@@ -430,7 +438,7 @@ financeInvoicesRouter.post("/:id/issue", async (c) => {
   const inv: any = invoice;
   const { data: order, error: ordErr } = await sb
     .from("orders")
-    .select("id,so,customer_name,customer_phone,customer_address,order_lines(sku,qty,unit_price)")
+    .select("id,so,customer_name,customer_phone,customer_address,order_lines(sku,qty,unit_price),order_addons(id,addon_key,qty,unit_price)")
     .eq("id", inv.order_id)
     .maybeSingle();
   if (ordErr) {
@@ -457,6 +465,16 @@ financeInvoicesRouter.post("/:id/issue", async (c) => {
       (l: { sku: string; qty: number; unit_price: number | null }) => ({
         sku: l.sku, qty: Number(l.qty), unit_price: Number(l.unit_price ?? 0),
       })),
+    // Add-ons are frozen too. Follows Houzs backend/src/scm/lib/si-from-do.ts:511
+    // (every billed line, accessories and services included, is copied into
+    // sales_invoice_items) per Weisiang's ruling (2026-10-22): clear Carres
+    // rules, implement Houzs. Same shape as 0712 office invoices and 0726.
+    addons: [...(ord.order_addons ?? [])]
+      .sort((a: { addon_key: string; id: string }, b: { addon_key: string; id: string }) =>
+        a.addon_key.localeCompare(b.addon_key) || a.id.localeCompare(b.id))
+      .map((a: { addon_key: string; qty: number; unit_price: number | null }) => ({
+        addon_key: a.addon_key, qty: Number(a.qty), unit_price: Number(a.unit_price ?? 0),
+      })),
   };
   const { data, error } = await sb.rpc("payment_invoice_issue", {
     p_invoice_id: id,
@@ -467,6 +485,95 @@ financeInvoicesRouter.post("/:id/issue", async (c) => {
     return c.json(m.body, m.status);
   }
   return c.json(data);
+});
+
+/* ── New Sales Invoice (office) ────────────────────────────────────────────
+ * Weisiang's decision (Mr Lim, WhatsApp 2026-10-22, relayed by YH
+ * 2026-10-23): office staff open a Sales Invoice by hand from a Sales Order
+ * or a Delivery Order, part invoices included — the Houzs way. Overturns
+ * Jess's payment/MASTER.md rules (no manual Generate invoice; one live Sales
+ * Invoice per order); Jess was not part of this decision.
+ * Follows Houzs frontend/src/pages/scm-v2/SalesInvoiceFromDo.tsx:7-10 (part
+ * invoices by line and qty) per Weisiang's ruling (2026-10-22): clear Carres
+ * rules, implement Houzs.
+ *
+ *   GET  /office-offer/:ref — `ref` is an SO No or a DO No; the order's lines
+ *                             and what is left to invoice (0712), plus the
+ *                             DO's delivery groups when found by a DO.
+ *   POST /office            — { orderId, lines: [{ orderLineId, qty }] }
+ *                             through sales_invoice_office_open, which issues
+ *                             with the ONE numbering and posting authority.
+ */
+const OFFICE_ROLES = ["operation", "finance", "principal"];
+
+financeInvoicesRouter.get("/office-offer/:ref", async (c) => {
+  const auth = c.var.auth;
+  if (!OFFICE_ROLES.includes(auth.role)) {
+    throw new HTTPException(403, { message: "You cannot open invoices." });
+  }
+  const raw = c.req.param("ref").trim();
+  const sb = userClient(c.env, auth.jwt);
+  const so = salesOrderParamOf(raw);
+  let orderId: string | null = null;
+  let deliveryOrder: { do_number: string; groups: string[] | null } | null = null;
+  if (so.kind === "id") orderId = so.id;
+  else if (so.kind === "number") {
+    const { data, error } = await sb.from("orders").select("id").eq("so", so.so).maybeSingle();
+    if (error) {
+      const m = mapPgError(error);
+      return c.json(m.body, m.status);
+    }
+    orderId = (data as { id: string } | null)?.id ?? null;
+  } else if (raw !== "") {
+    const { data, error } = await sb.from("ops_delivery_orders")
+      .select("order_id, do_number, trip_groups")
+      .eq("do_number", raw.toUpperCase()).is("voided_at", null).maybeSingle();
+    if (error) {
+      const m = mapPgError(error);
+      return c.json(m.body, m.status);
+    }
+    const d = data as { order_id: string; do_number: string; trip_groups: string[] | null } | null;
+    if (d) {
+      orderId = d.order_id;
+      deliveryOrder = { do_number: d.do_number, groups: d.trip_groups };
+    }
+  }
+  if (!orderId) {
+    return c.json({ error: "not_found", code: "not_found", message: "No Sales Order or Delivery Order has that number." }, 404);
+  }
+  const { data, error } = await sb.rpc("sales_invoice_office_offer", { p_order_id: orderId });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ ...(data as Record<string, unknown>), delivery_order: deliveryOrder });
+});
+
+financeInvoicesRouter.post("/office", async (c) => {
+  const auth = c.var.auth;
+  if (!OFFICE_ROLES.includes(auth.role)) {
+    throw new HTTPException(403, { message: "You cannot open invoices." });
+  }
+  const body = (await c.req.json().catch(() => null)) as {
+    orderId?: unknown; lines?: Array<{ orderLineId?: unknown; qty?: unknown }>;
+  } | null;
+  const orderId = typeof body?.orderId === "string" ? body.orderId : "";
+  const lines = Array.isArray(body?.lines) ? body.lines : [];
+  if (!UUID_RE.test(orderId) || lines.length === 0
+      || lines.some((l) => typeof l?.orderLineId !== "string" || !Number.isInteger(l?.qty))) {
+    return c.json({ error: "invalid_body", code: "invalid_body", message: "Pick the goods to invoice." }, 422);
+  }
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb.rpc("sales_invoice_office_open", {
+    p_order_id: orderId,
+    p_lines: lines.map((l) => ({ order_line_id: l.orderLineId, qty: l.qty })),
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  const inv = (data as { invoice?: { invoice_no?: string; amount?: number | string } } | null)?.invoice;
+  return c.json({ invoiceNo: inv?.invoice_no ?? null, amount: Number(inv?.amount ?? 0) }, 201);
 });
 
 /** The document read (payment/MASTER.md §4): an issued invoice prints from
@@ -816,7 +923,7 @@ financeInvoicesRouter.get("/:id/pdf-data", requireFinance, async (c) => {
 
   const { data: invoice, error: invErr } = await sb
     .from("invoices")
-    .select("id, invoice_no, order_id, amount, tax_amount, issued_at, voided_at")
+    .select("id, invoice_no, order_id, amount, tax_amount, issued_at, voided_at, snapshot")
     .eq("id", id)
     .maybeSingle();
   if (invErr) {
@@ -884,8 +991,10 @@ financeInvoicesRouter.get("/:id/pdf-data", requireFinance, async (c) => {
     const m = mapPgError(lineErr);
     return c.json(m.body, m.status);
   }
+  // 0712: an office (part) invoice prints only the goods it bills.
+  const officeLines = inv.snapshot?.issued_from === "office" && Array.isArray(inv.snapshot.lines) ? inv.snapshot.lines : null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const lineRows = (lines ?? []) as any[];
+  const lineRows = (officeLines ?? lines ?? []) as any[];
 
   // SKU descriptions (separate query — order_lines.sku is text, not FK'd).
   const skus: string[] = lineRows.map((l) => String(l.sku));

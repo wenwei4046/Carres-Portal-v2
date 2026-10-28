@@ -457,3 +457,68 @@ describe("attemptDeliveryOrderIssue — a split trip's own document (0542)", () 
     expect(t.orders.update).not.toHaveBeenCalled();
   });
 });
+
+describe("attemptDeliveryOrderIssue — New Delivery Order, opened by the office (Weisiang 2026-10-22)", () => {
+  const OFFICE = { booking_stage: "proposed", confirmed_date: null, confirmed_time_slot: null };
+  function officeSb(t: ReturnType<typeof tables>) {
+    const sb = makeSb(t);
+    sb.rpc.mockImplementation((fn: string) =>
+      Promise.resolve(
+        fn === "delivery_office_document_mint"
+          ? { data: { do_number: DO_NUMBER, trip: 1 }, error: null }
+          : fn === "delivery_document_number_draw"
+            ? { data: DO_NUMBER, error: null }
+            : { data: null, error: null },
+      ),
+    );
+    return sb;
+  }
+
+  it("the picked groups mint through the office door, with the allocator's number and no booking", async () => {
+    const t = tables({ control: OFFICE });
+    const sb = officeSb(t);
+    const attempt = await attemptDeliveryOrderIssue(sb, ORDER_ID, { waitBookingConfirm: false, groups: ["bed"] });
+    expect(attempt).toEqual({ outcome: "issued", doNumber: DO_NUMBER });
+    expect(sb.rpc).toHaveBeenCalledWith("delivery_office_document_mint", {
+      p_order_id: ORDER_ID,
+      p_groups: ["bed"],
+      p_do_number: DO_NUMBER,
+    });
+    expect(t.orders.update).not.toHaveBeenCalled();
+    expect(sb.rpc).toHaveBeenCalledWith("operation_add_annotation", expect.objectContaining({
+      p_content: `${orderActionDone("issue_delivery_order")}: ${DO_NUMBER}, on New Delivery Order`,
+    }));
+  });
+
+  it("an order already carrying an earlier trip's number still opens the next trip", async () => {
+    const sb = officeSb(tables({ control: OFFICE, doNumber: "DO2609-1111" }));
+    const attempt = await attemptDeliveryOrderIssue(sb, ORDER_ID, { waitBookingConfirm: false, groups: ["bed"] });
+    expect(attempt).toEqual({ outcome: "issued", doNumber: DO_NUMBER });
+  });
+
+  it("the whole order goes as one document when the office picks everything", async () => {
+    const sb = officeSb(tables({ control: OFFICE }));
+    await attemptDeliveryOrderIssue(sb, ORDER_ID, { waitBookingConfirm: false, groups: null });
+    expect(sb.rpc).toHaveBeenCalledWith("delivery_office_document_mint", {
+      p_order_id: ORDER_ID,
+      p_groups: null,
+      p_do_number: DO_NUMBER,
+    });
+  });
+
+  it("the money gate still refuses: payment before delivery is unchanged", async () => {
+    const sb = officeSb(tables({ control: OFFICE, paid: 0 }));
+    const attempt = await attemptDeliveryOrderIssue(sb, ORDER_ID, { waitBookingConfirm: false, groups: ["bed"] });
+    expect(attempt.outcome).toBe("blocked");
+    expect(sb.rpc).not.toHaveBeenCalledWith("delivery_office_document_mint", expect.anything());
+  });
+
+  it("the system's own issue never uses the office door", async () => {
+    const t = tables();
+    const sb = makeSb(t);
+    const attempt = await attemptDeliveryOrderIssue(sb, ORDER_ID);
+    expect(attempt).toEqual({ outcome: "issued", doNumber: DO_NUMBER });
+    expect(t.orders.update).toHaveBeenCalledWith({ do_number: DO_NUMBER });
+    expect(sb.rpc).not.toHaveBeenCalledWith("delivery_office_document_mint", expect.anything());
+  });
+});

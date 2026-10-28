@@ -13,8 +13,13 @@ import {
  * COPY-STANDARD table "Sales Orders navigation").
  *
  *     Sales Orders
- *     ├─ Outright Sales
+ *     ├─ Outright        (was `Outright Sales`; owner 2026-10-08)
+ *     ├─ Amendments      (Weisiang, 2026-10-22)
  *     └─ Subscription
+ *
+ * `Amendments` joined between them on Weisiang's decision (Mr Lim, WhatsApp
+ * 2026-10-22; Jess was not part of this decision): every Sales Order amendment
+ * waits in an approver's queue, the Houzs way.
  *
  * This file guards the MODEL — the words, the addresses and the one-place rule
  * — so a later rail refactor cannot quietly re-open a settled ruling.
@@ -31,13 +36,13 @@ describe("the approved Sales Orders navigation", () => {
     );
   });
 
-  it("holds exactly two children, in the approved order", () => {
+  it("holds exactly three children, in the approved order", () => {
     const block = navBlocks(OPERATIONS, "operation").find(
       (b) => b.kind === "module" && b.module.section === "Sales",
     );
     expect(block?.kind).toBe("module");
     const pages = block!.kind === "module" ? block!.pages : [];
-    expect(pages.map((p) => p.label)).toEqual(["Outright Sales", "Subscription"]);
+    expect(pages.map((p) => p.label)).toEqual(["Outright", "Amendments", "Subscription"]);
   });
 
   /* NEITHER ADDRESS MOVED. "Menu removal does not delete orders, history,
@@ -95,7 +100,10 @@ describe("the approved Sales Orders navigation", () => {
      once, and both rows address `/operation/orders`. */
   it("the Admin jump to the same register says the same word", () => {
     const admin = ADMIN.items.find((i) => i.path === "/operation/orders");
-    expect(admin?.label).toBe("Outright Sales");
+    const ops = OPERATIONS.items.find((i) => i.path === "/operation/orders");
+    // The word is `Outright` since 2026-10-08; both rows must say it.
+    expect(ops?.label).toBe("Outright");
+    expect(admin?.label).toBe(ops?.label);
   });
 
   /* The shared parent is NAVIGATION ONLY. Purchasing keeps its own module, and

@@ -21,6 +21,7 @@ import { workspaceDutyActor } from "./workspace-duty-owner";
 import { useActiveOrder } from "@/lib/active-order";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { appTodayIso, fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import { useDeliveryDays, useDeliveryLeads, useOfficeDays } from "@/lib/deadline-queries";
 import { orderStatusPill } from "@/lib/status-pill";
 import { cjkClassName } from "@/lib/cjk";
 import { areaForAddress, detectState, locationForAddress } from "@/lib/region";
@@ -53,7 +54,6 @@ import { TASKS_KEY } from "./components/rail/TasksPanel";
 import {
   distributeOrders,
   seenTodayMYT,
-  countsAsInToday,
   isOpsManager,
   isOpsManagerRow,
   isOpsGenericAccount,
@@ -63,7 +63,9 @@ import {
   deliveryQueueLeads,
   deliveryStepOverdue,
   orderActionOverdue,
-  myHolidaySet,
+  assignLogisticsDueIso,
+  type DeliveryQueueLeads,
+  type WorkingDayOptions,
   // `deliveryDateGapFact` is deliberately NOT imported here (C14). The list's
   // Delivery cell used to print it beside the Actions cell that already said
   // the same thing; the drawer badge keeps it, and that is its one home.
@@ -555,14 +557,14 @@ export function slackDays(o: operationOrderListRow): number {
 // DEADLINE filter buckets (Jess 2026-07-19, B redesign) — the CUSTOMER deadline
 // (delivery_date) is the single shared spine; SUPPLIER + LOGISTIC both filter by
 // it. Multi-select. "Next week" caps at 14d; further-out orders are unbucketed
-// (the filter is opt-in). "Overdue" is ALSO the QUEUES Overdue row (same state).
-const DUE_BUCKETS = ["Overdue", "Due ≤3d", "This week", "Next week"] as const;
+// (the filter is opt-in). "Late" is ALSO the QUEUES Late row (same state).
+const DUE_BUCKETS = ["Late", "Due ≤3d", "This week", "Next week"] as const;
 type DueBucket = (typeof DUE_BUCKETS)[number];
 function dueBucketOf(o: operationOrderListRow): DueBucket | null {
   if (controlTabOf(o) === "completed") return null;
   const diff = daysToDue(o);
   if (diff === null) return null;
-  if (diff < 0) return "Overdue";
+  if (diff < 0) return "Late";
   if (diff <= 3) return "Due ≤3d";
   if (diff <= 7) return "This week";
   if (diff <= 14) return "Next week";
@@ -683,12 +685,43 @@ export function delayActionAnchor(
 const DELIVERY_PHOTO_VERB = deliveryQueueByKey("photo").label;
 /** The step's anchor date for the auto-overdue check — a TBD customer date has
  *  no anchor, so those rows can never be late (silence over a false alarm). */
+/**
+ * `Assign logistics` late on the list — Delivery's ONE assignment deadline
+ * (§2.1, `assignLogisticsDueIso`, the same one Work and the Logistics card
+ * read): the stored lead before the Scheduled delivery, else the Requested
+ * one; the first PO's issue day (a stock order: the order day) only OPENS it,
+ * so an order that opens inside the cut-off is due the day it opens and is
+ * never late for days before it existed.
+ */
+export function assignLogisticsOverdue(
+  o: operationOrderListRow,
+  todayIso: string,
+  opts: WorkingDayOptions,
+  leads: DeliveryQueueLeads | undefined,
+): boolean {
+  const poDays = (o.order_supplier_threads ?? [])
+    .map((t) => t.purchase_orders?.placed_at ?? null)
+    .filter((d): d is string => Boolean(d))
+    .sort();
+  const due = assignLogisticsDueIso({
+    scheduledIso: ovlOf(o)?.confirmed_date ?? null,
+    requestedIso: o.delivery_date_tbd ? null : o.delivery_date,
+    openedIso: poDays[0] ?? o.placed_at ?? null,
+    opts,
+    leads,
+  });
+  return due !== null && todayIso.slice(0, 10) > due;
+}
+
 export function deliveryStepAnchor(
   o: operationOrderListRow,
   step: DeliveryQueueKey,
 ): string | null {
   switch (step) {
+    // DEL-04: `Assign logistics by` counts back from the Scheduled delivery,
+    // else the Requested one (`assignLogisticsDueIso`'s anchor).
     case "assign":
+      return ovlOf(o)?.confirmed_date ?? (o.delivery_date_tbd ? null : o.delivery_date);
     case "chase":
       return o.delivery_date_tbd ? null : o.delivery_date;
     case "deliver_today":
@@ -1736,7 +1769,7 @@ interface Props {
  *  (Jess 2026-06-25, #4 top-bar Export menu). */
 const EXPORT_HEADER = [
   "SO", "Customer", "Phone", "Address", "Units", "Items",
-  "Deadline", "Proceed", "Location", "Logistics", "Status",
+  "Deadline", "Planned production start", "Location", "Logistics", "Status",
 ] as const;
 
 /** One order → its export cells (strings). Shared by CSV + print so the two
@@ -2653,10 +2686,13 @@ export default function OperationOrdersControl({ onImport }: Props) {
     () => liveScope.filter(isSupplierLate).length,
     [liveScope],
   );
-  // ONE holiday set for the page — every deadline on this screen skips the same
-  // Malaysian public holidays (Law 2A: the calendars differ in their WEEK, never
-  // in their holidays).
-  const officeHolidays = useMemo(() => myHolidaySet(), []);
+  // The Delivery calendar (Mon–Sat + the stored Selangor holidays, else the
+  // built-in list) — the delivery queues are Delivery facts.
+  const deliveryDays = useDeliveryDays();
+  /* The two delay clocks are OFFICE work: they count on the stored Office
+     calendar (Settings → Office, 9 Oct 2026) — its holidays and its week. */
+  const officeDays = useOfficeDays();
+  const deliveryLeads = useDeliveryLeads();
   // C8b · THE TWO DELAY CLOCKS (Loo 2026-07-28, `ORDERS-WORKING-FLOW` §3).
   // Delay planning gets 2 working days from the day the supplier's date first
   // overshot the promise; the logistics call gets the SAME working day from the
@@ -2678,7 +2714,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
           a.key,
           delayActionAnchor(o, a.key),
           today,
-          officeHolidays,
+          officeDays.holidays,
+          officeDays.offDays,
         )
       )
         cur.late += 1;
@@ -2686,19 +2723,23 @@ export default function OperationOrdersControl({ onImport }: Props) {
     }
     return stat;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveScope, availableBySku, officeHolidays]);
+  }, [liveScope, availableBySku, officeDays]);
   // T7 · DELIVERY queues + auto-overdue (Jess 2026-07-27). Each of the four
   // delivery steps carries its own deadline (shared `delivery-queue.ts`), so a
   // queue item turns LATE by itself — nobody has to watch it. Counts still come
   // from the NEXT verb, so queue numbers equal the NEXT column by construction
   // (C-vocab). The photo queue is the one that spans CLOSED orders, for the same
   // reason Owing does: the proof is still outstanding after delivery.
-  const holidayOpts = useMemo(() => ({ holidays: officeHolidays }), [officeHolidays]);
+  const holidayOpts = deliveryDays.opts;
   // P1 — the working days of notice on `Confirm delivery date` (Jess may set
   // 5). Undefined until the settings land, which leaves the step on its seed.
+  // DEL-04 — `Assign logistics by` reads Delivery Rules (0673) through the
+  // same helper, so the list and Work count the one stored lead.
   const queueLeads = useMemo(
-    () => (purchasingSettings ? deliveryQueueLeads(purchasingSettings) : undefined),
-    [purchasingSettings],
+    () => (purchasingSettings
+      ? deliveryQueueLeads({ ...purchasingSettings, assignmentLeadWorkingDays: deliveryLeads.assignmentLeadWorkingDays })
+      : undefined),
+    [purchasingSettings, deliveryLeads.assignmentLeadWorkingDays],
   );
   const deliveryQueueStats = useMemo(() => {
     const today = todayIso();
@@ -2716,13 +2757,15 @@ export default function OperationOrdersControl({ onImport }: Props) {
       if (only ? def.key !== only : def.key === "photo") return;
       bump(
         label,
-        deliveryStepOverdue(
-          def.key,
-          deliveryStepAnchor(o, def.key),
-          today,
-          holidayOpts,
-          queueLeads,
-        ),
+        def.key === "assign"
+          ? assignLogisticsOverdue(o, today, holidayOpts, queueLeads)
+          : deliveryStepOverdue(
+              def.key,
+              deliveryStepAnchor(o, def.key),
+              today,
+              holidayOpts,
+              queueLeads,
+            ),
       );
     };
     for (const o of liveScope) tally(o);
@@ -2889,11 +2932,11 @@ export default function OperationOrdersControl({ onImport }: Props) {
     const all = data?.orders ?? [];
     const open = all.filter((o) => controlTabOf(o) !== "completed");
     const mine = open.filter((o) => ownerOf(o) === userId);
-    // Same rule as the server sweep: away is out; after the 10:00 MYT cutoff
-    // a member with no heartbeat today is auto-treated absent (Jess round-3).
+    // A manual handover uses the same active, available pool as the durable
+    // order allocation. Portal activity never grants execution permission.
     const others = poolStaff.filter(
       (s) =>
-        s.available && countsAsInToday(s.last_seen_at) && s.user_id !== userId,
+        s.available && s.user_id !== userId,
     );
     if (mine.length === 0 || others.length === 0) {
       toast.error(
@@ -3577,7 +3620,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       label: "Follow-up",
       headerContent: <KitIcon name="flag" size={14} />,
       width: FOLLOW_UP_WIDTH,
-      headerTitle: "Flag an order for follow-up. Amber while open, red once overdue",
+      headerTitle: "Flag an order for follow-up. Amber while open, red once late",
       cell: (r) => <FollowUpFlag order={r.o} tasks={r.tasks} onFlag={openFollowUp} />,
     },
     {
@@ -3900,15 +3943,15 @@ export default function OperationOrdersControl({ onImport }: Props) {
                     top, then the action queues — the row's queue IS its action,
                     so the numbers match the Actions column by construction.
                     States live in FILTERS; no-logistics = Assign logistics. */}
-                {(dueEntries.find((e) => e.bucket === "Overdue")?.count ?? 0) > 0 && (
+                {(dueEntries.find((e) => e.bucket === "Late")?.count ?? 0) > 0 && (
                   <KanbanRow
-                    label="Overdue"
-                    count={dueEntries.find((e) => e.bucket === "Overdue")?.count ?? 0}
+                    label="Late"
+                    count={dueEntries.find((e) => e.bucket === "Late")?.count ?? 0}
                     tone="danger"
-                    active={dueFilter.has("Overdue")}
+                    active={dueFilter.has("Late")}
                     chip={emptyQueueChip}
                     title="Past the delivery date and not delivered yet. Who to call = the row's Actions cell"
-                    onClick={() => setDueFilter((p) => toggleInSet(p, "Overdue"))}
+                    onClick={() => setDueFilter((p) => toggleInSet(p, "Late"))}
                   />
                 )}
                 {owing.n > 0 && (
@@ -4219,7 +4262,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
                         a permanent `Overdue 0` on a page that has one.
 
                     `DUE_BUCKETS` and `dueBucketOf` are UNCHANGED — the
-                    classifier must still return "Overdue" or the QUEUES row
+                    classifier must still return "Late" (the word since the
+                    owner's 12 Oct 2026 time-word ruling) or the QUEUES row
                     would have nothing to count and nothing to filter. Only
                     this band's render drops the pill. */}
                 <KanbanGroup
@@ -4229,7 +4273,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   onToggle={() => toggleGroup("DEADLINE")}
                 >
                   <div className="flex flex-wrap items-center gap-1.5 px-2.5 py-1">
-                    {DUE_BUCKETS.filter((b) => b !== "Overdue").map((b) => {
+                    {DUE_BUCKETS.filter((b) => b !== "Late").map((b) => {
                       const count = dueEntries.find((e) => e.bucket === b)?.count ?? 0;
                       // No `pill-overdue` branch: Overdue left this band (above).
                       const cls = b === "Due ≤3d" ? "pill-warning" : "pill-neutral";
@@ -4642,7 +4686,7 @@ function OrdersBulkBar({
             <BulkMenuItem
               icon={MessageCircle}
               label="Call suppliers: confirm ready date"
-              hint="overdue"
+              hint="deadline passed"
               tone="wa"
               onClick={() => onChaseSupplier("chase")}
             />
@@ -4683,7 +4727,7 @@ function OrdersBulkBar({
             <BulkMenuItem
               icon={MessageCircle}
               label="Call logistics: confirm delivery date"
-              hint="overdue"
+              hint="delivery day passed"
               tone="wa"
               onClick={() => onChasePartner("chase")}
             />
@@ -5753,7 +5797,7 @@ function FollowUpFlag({
   const word = !lead
     ? "Flag for follow-up"
     : u === "overdue"
-      ? "Follow-up overdue"
+      ? "Follow-up late"
       : "Follow-up open";
   return (
     /* Icon-only in the CELL (Jess 2026-06-29): no "Flag" / "Late" text — the

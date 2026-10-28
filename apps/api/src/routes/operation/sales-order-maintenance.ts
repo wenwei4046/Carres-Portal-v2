@@ -3,6 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import { parseOrderEntryConfigRow, setOrderEntryConfigInput } from "@carres/shared";
 import { userClient } from "../../lib/supabase";
 import { parseJsonBody, fail } from "../../lib/route-helpers";
+import { canEditSettings, requireSettingsEditor } from "../../lib/settings-editor";
 import type { AppEnv } from "../../types";
 
 /**
@@ -37,10 +38,12 @@ router.get("/entry-config", async (c) => {
     .eq("id", true)
     .maybeSingle();
   if (error) throw new HTTPException(500, { message: error.message });
-  return c.json({ entryConfig: parseOrderEntryConfigRow(data) });
+  // TEAM-02 (0674): the owner, or a person named for Sales Orders, changes it.
+  const canEdit = await canEditSettings(c.env, c.var.auth.jwt, "sales_orders", c.var.auth.role);
+  return c.json({ entryConfig: parseOrderEntryConfigRow(data), canEdit });
 });
 
-router.put("/entry-config", async (c) => {
+router.put("/entry-config", requireSettingsEditor("sales_orders"), async (c) => {
   const parsed = await parseJsonBody(c, setOrderEntryConfigInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
 

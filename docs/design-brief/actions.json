@@ -1,0 +1,1399 @@
+[
+  {
+    "key": "delay_planning",
+    "label_exact": "Delay planning",
+    "module": "orders",
+    "trigger": "The supplier's date lands after the customer's promised date and nobody decided about this date",
+    "owner_rule": "The order's PIC (order_pic)",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Check the supplier's real ready date, ready stock, another supplier and logistics dates",
+        "input_type": "confirm",
+        "options": []
+      },
+      {
+        "order": 2,
+        "what_staff_does": "Answer: can we still make the promised date?",
+        "input_type": "choice",
+        "options": [
+          "We can still make the promised date",
+          "We cannot make the promised date"
+        ]
+      }
+    ],
+    "done_when": "A delay decision is recorded for this exact supplier date",
+    "next_action_key": "arrange_new_delivery_date",
+    "deadline_rule": "2 working days from delay detection, Office calendar",
+    "status": "BUILT",
+    "work_feed": "EMITTED",
+    "source": "packages/shared/src/work-engine.ts:148; packages/shared/src/work-engine.ts:862; apps/api/src/routes/operation/work.ts:1797; docs/orders/MASTER.md:6147; docs/orders/MASTER.md:6163; docs/COPY-STANDARD.md:928; docs/COPY-STANDARD.md:974"
+  },
+  {
+    "key": "ask_delivery_date",
+    "label_exact": "UNKNOWN — ask Jess",
+    "module": "orders",
+    "trigger": "No Requested Delivery Date and the customer was never asked",
+    "owner_rule": "The responsible salesperson (a name, not an Operation account)",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Ask the customer for the delivery date and record the Requested Delivery Date",
+        "input_type": "date",
+        "options": []
+      },
+      {
+        "order": 2,
+        "what_staff_does": "Or record the customer's own 'not yet' answer",
+        "input_type": "confirm",
+        "options": []
+      }
+    ],
+    "done_when": "A Requested Delivery Date or the customer's 'not yet' is recorded",
+    "next_action_key": null,
+    "deadline_rule": "No clock; listed under No date until answered",
+    "status": "BUILT",
+    "work_feed": "EMITTED",
+    "source": "packages/shared/src/work-engine.ts:288; apps/api/src/lib/sales-order-work-completion.ts:7; apps/api/src/routes/operation/work.ts:1797; docs/workspace/MASTER.md:2356; docs/orders/MASTER.md:4690"
+  },
+  {
+    "key": "resolve_payment_exception",
+    "label_exact": "Resolve the payment exception",
+    "module": "orders",
+    "trigger": "An open Finance exception holds the delivery",
+    "owner_rule": "Only Finance clears it; no person resolves, the word Finance stands",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Review the payment evidence behind the exception",
+        "input_type": "confirm",
+        "options": []
+      },
+      {
+        "order": 2,
+        "what_staff_does": "Clear the exception with its evidence",
+        "input_type": "photo",
+        "options": []
+      }
+    ],
+    "done_when": "The exception reads cleared, with its evidence",
+    "next_action_key": null,
+    "deadline_rule": "Immediately (due today)",
+    "status": "BUILT",
+    "work_feed": "EMITTED",
+    "source": "packages/shared/src/work-engine.ts:275; packages/shared/src/work-engine.ts:890; apps/api/src/routes/operation/work.ts:1797; docs/COPY-STANDARD.md:3807; docs/workspace/MASTER.md:2380"
+  },
+  {
+    "key": "arrange_new_delivery_date",
+    "label_exact": "Arrange new delivery date",
+    "module": "delivery",
+    "trigger": "The delay decision is a new date and no reachable booking exists",
+    "owner_rule": "The order's PIC as governed proxy (order_pic)",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Call {logistics}; record the new date the customer agreed (time only if agreed)",
+        "input_type": "date",
+        "options": []
+      }
+    ],
+    "done_when": "A customer-confirmed date and slot on or after the supplier's ready date are recorded",
+    "next_action_key": "deliver_today",
+    "deadline_rule": "The same Office working day as the delay decision",
+    "status": "BUILT",
+    "work_feed": "EMITTED",
+    "source": "packages/shared/src/work-engine.ts:159; packages/shared/src/work-engine.ts:864; apps/api/src/routes/operation/work.ts:1822; docs/COPY-STANDARD.md:975; docs/orders/MASTER.md:6168; packages/shared/src/work-engine.ts:215"
+  },
+  {
+    "key": "assign_logistics",
+    "label_exact": "Assign logistics",
+    "module": "delivery",
+    "trigger": "The order needs delivering and no company is chosen",
+    "owner_rule": "The Sales Order's responsible Operation person; Delivery Duty only when the order has no such person",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Choose the company that carries this delivery from the configured Logistics Partners",
+        "input_type": "choice",
+        "options": []
+      }
+    ],
+    "done_when": "A delivery company is recorded on the order",
+    "next_action_key": "confirm_delivery_date",
+    "deadline_rule": "Built: the day the PO is issued (stock order with no PO: the order day)",
+    "status": "BUILT",
+    "work_feed": "EMITTED",
+    "source": "packages/shared/src/work-engine.ts:170; packages/shared/src/work-engine.ts:841; apps/api/src/routes/operation/work.ts:1822; docs/COPY-STANDARD.md:969; docs/delivery/MASTER.md:1778; packages/shared/src/work-engine.ts:183"
+  },
+  {
+    "key": "confirm_delivery_date",
+    "label_exact": "Confirm delivery date",
+    "module": "delivery",
+    "trigger": "Logistics assigned and no confirmed scheduled date",
+    "owner_rule": "The Sales Order's responsible Operation person; Delivery Duty only when the order has no such person",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Call {logistics} (or the customer in an exception) and record the scheduled delivery date; time only if agreed",
+        "input_type": "date",
+        "options": []
+      },
+      {
+        "order": 2,
+        "what_staff_does": "Attach the reply evidence",
+        "input_type": "photo",
+        "options": []
+      }
+    ],
+    "done_when": "A scheduled date with the required reply evidence is recorded",
+    "next_action_key": "deliver_today",
+    "deadline_rule": "2 working days before the Scheduled date (else Requested date), Mon–Sat with Malaysian holidays",
+    "status": "BUILT",
+    "work_feed": "EMITTED",
+    "source": "packages/shared/src/work-engine.ts:181; packages/shared/src/work-engine.ts:849; apps/api/src/routes/operation/work.ts:1822; docs/COPY-STANDARD.md:970; docs/delivery/MASTER.md:478; docs/delivery/MASTER.md:1779; packages/shared/src/work-engine.ts:215"
+  },
+  {
+    "key": "deliver_today",
+    "label_exact": "Deliver on {weekday, date}",
+    "module": "delivery",
+    "trigger": "The confirmed date is today and nothing has been delivered",
+    "owner_rule": "The Sales Order's responsible Operation person; Delivery Duty only when the order has no such person",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Choose the delivery result",
+        "input_type": "choice",
+        "options": [
+          "Delivered",
+          "Partially Delivered",
+          "Failed Delivery"
+        ]
+      },
+      {
+        "order": 2,
+        "what_staff_does": "Record the actual delivery date from the driver's report",
+        "input_type": "date",
+        "options": []
+      },
+      {
+        "order": 3,
+        "what_staff_does": "For a Failed Delivery pick the reason group",
+        "input_type": "choice",
+        "options": [
+          "Customer",
+          "Location",
+          "Goods",
+          "Warehouse / preparation",
+          "Logistics",
+          "Carres / Order",
+          "External",
+          "Other"
+        ]
+      }
+    ],
+    "done_when": "A delivery attempt with its result is recorded",
+    "next_action_key": "upload_delivery_photo",
+    "deadline_rule": "The confirmed delivery date itself",
+    "status": "BUILT",
+    "work_feed": "EMITTED",
+    "source": "packages/shared/src/work-engine.ts:213; packages/shared/src/work-engine.ts:857; apps/api/src/routes/operation/work.ts:1822; docs/COPY-STANDARD.md:972; docs/delivery/MASTER.md:565; docs/delivery/MASTER.md:568; docs/delivery/MASTER.md:653; packages/shared/src/work-engine.ts:227"
+  },
+  {
+    "key": "upload_delivery_photo",
+    "label_exact": "Upload delivery photo",
+    "module": "delivery",
+    "trigger": "Delivered with no photo on file, or proof was rejected or more proof required",
+    "owner_rule": "The Sales Order's responsible Operation person; Delivery Duty only when the order has no such person",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Upload the delivery photo from {logistics}",
+        "input_type": "photo",
+        "options": []
+      }
+    ],
+    "done_when": "A delivery photo is in the ledger",
+    "next_action_key": "check_delivery_proof",
+    "deadline_rule": "1 working day after delivery, delivery week with Malaysian holidays",
+    "status": "BUILT",
+    "work_feed": "EMITTED",
+    "source": "packages/shared/src/work-engine.ts:225; packages/shared/src/work-engine.ts:924; apps/api/src/routes/operation/work.ts:1822; docs/COPY-STANDARD.md:973; docs/workspace/MASTER.md:2371"
+  },
+  {
+    "key": "check_delivery_proof",
+    "label_exact": "Check delivery proof",
+    "module": "delivery",
+    "trigger": "A delivered or partly delivered result has a file no review has judged",
+    "owner_rule": "The Sales Order's responsible Operation person; Delivery Duty only when the order has no such person",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Review the latest file; a reason is required for the last two results",
+        "input_type": "choice",
+        "options": [
+          "Proof Accepted",
+          "More Proof Required",
+          "Proof Rejected"
+        ]
+      }
+    ],
+    "done_when": "A proof review newer than the latest file is recorded",
+    "next_action_key": null,
+    "deadline_rule": "1 working day after delivery, delivery week with Malaysian holidays",
+    "status": "BUILT",
+    "work_feed": "EMITTED",
+    "source": "packages/shared/src/work-engine.ts:251; apps/api/src/routes/operation/work.ts:1822; docs/COPY-STANDARD.md:3531; docs/delivery/MASTER.md:613"
+  },
+  {
+    "key": "collect_loan_item",
+    "label_exact": "Collect the loan item",
+    "module": "delivery",
+    "trigger": "A loan item is still out and the delivery day has arrived",
+    "owner_rule": "The Sales Order's responsible Operation person; Delivery Duty only when the order has no such person",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Bring back {Unit ID} on the delivery day and record it returned",
+        "input_type": "confirm",
+        "options": []
+      }
+    ],
+    "done_when": "The loan row reads returned",
+    "next_action_key": null,
+    "deadline_rule": "The delivery day (confirmed date, else the recorded delivery)",
+    "status": "BUILT",
+    "work_feed": "EMITTED",
+    "source": "packages/shared/src/work-engine.ts:264; packages/shared/src/work-engine.ts:884; apps/api/src/routes/operation/work.ts:1822; docs/COPY-STANDARD.md:3806"
+  },
+  {
+    "key": "purchasing.po_window",
+    "label_exact": "Issue the POs by {time}",
+    "module": "purchasing",
+    "trigger": "Eligible Sales Order demand is stamped into a daily PO window, or a PO from it has an unsent current version",
+    "owner_rule": "The effective PO Duty holder; Buddy cover may act",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Open the {time} PO window and buy all of its demand (issue the POs)",
+        "input_type": "confirm",
+        "options": []
+      },
+      {
+        "order": 2,
+        "what_staff_does": "Send each PO on the supplier's recorded channel",
+        "input_type": "choice",
+        "options": [
+          "WhatsApp",
+          "Email"
+        ]
+      },
+      {
+        "order": 3,
+        "what_staff_does": "Press PO sent to supplier for each PO (opening WhatsApp records nothing)",
+        "input_type": "confirm",
+        "options": []
+      }
+    ],
+    "done_when": "No eligible demand left in the window and every PO from it has its current version marked sent",
+    "next_action_key": null,
+    "deadline_rule": "The window's own time on its day (PO Days that are Office working days)",
+    "status": "BUILT",
+    "work_feed": "EMITTED",
+    "source": "packages/shared/src/work-engine.ts:334; apps/api/src/routes/operation/work.ts:1810; apps/api/src/lib/purchasing-work-completion.ts:4; docs/workspace/MASTER.md:2411; docs/COPY-STANDARD.md:231; docs/COPY-STANDARD.md:3889"
+  },
+  {
+    "key": "purchasing.supplier_date_passed",
+    "label_exact": "Ask {supplier} when the goods will arrive",
+    "module": "purchasing",
+    "trigger": "The evidenced supplier delivery date passed while the PO still owes goods",
+    "owner_rule": "The effective PO Duty holder; Buddy cover may act",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Record supplier answer per item: what changed?",
+        "input_type": "choice",
+        "options": [
+          "No change",
+          "Confirmed",
+          "New date",
+          "Split delivery"
+        ]
+      },
+      {
+        "order": 2,
+        "what_staff_does": "For a delay pick the reason",
+        "input_type": "choice",
+        "options": [
+          "Production delay",
+          "Material unavailable",
+          "Capacity / scheduling delay",
+          "Quality issue / remake",
+          "Transport delay",
+          "Supplier closed / holiday",
+          "Partial quantity ready",
+          "Other"
+        ]
+      },
+      {
+        "order": 3,
+        "what_staff_does": "Enter the new date",
+        "input_type": "date",
+        "options": []
+      },
+      {
+        "order": 4,
+        "what_staff_does": "Add a WhatsApp screenshot",
+        "input_type": "photo",
+        "options": []
+      }
+    ],
+    "done_when": "A new evidenced supplier answer and date for the current PO version is recorded",
+    "next_action_key": "purchasing.confirm_tomorrows_delivery",
+    "deadline_rule": "The supplier delivery date, moved only to the next Office working day if closed",
+    "status": "BUILT",
+    "work_feed": "EMITTED",
+    "source": "packages/shared/src/work-engine.ts:413; apps/api/src/routes/operation/work.ts:1808; apps/api/src/lib/purchasing-work-completion.ts:11; docs/COPY-STANDARD.md:221; docs/COPY-STANDARD.md:1295; docs/workspace/MASTER.md:2363"
+  },
+  {
+    "key": "purchasing.confirm_tomorrows_delivery",
+    "label_exact": "Click WhatsApp, ask {Supplier} for the Supplier DO for {PO No}",
+    "module": "purchasing",
+    "trigger": "A sent PO line or split batch is expected to arrive on the next Office working day",
+    "owner_rule": "The PO Duty holder; any active Operation person may record the answer",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Ask {Supplier} for the Supplier DO or confirmation for that date",
+        "input_type": "confirm",
+        "options": []
+      },
+      {
+        "order": 2,
+        "what_staff_does": "Record supplier answer",
+        "input_type": "choice",
+        "options": [
+          "Supplier DO received",
+          "No change",
+          "Confirmed",
+          "New date",
+          "Split delivery"
+        ]
+      },
+      {
+        "order": 3,
+        "what_staff_does": "Add the evidence",
+        "input_type": "photo",
+        "options": []
+      }
+    ],
+    "done_when": "Supplier DO or evidenced confirmation for that date and the PO's Warehouse is recorded",
+    "next_action_key": null,
+    "deadline_rule": "The Office working day before each expected arrival",
+    "status": "BUILT",
+    "work_feed": "EMITTED",
+    "source": "packages/shared/src/work-engine.ts:423; apps/api/src/routes/operation/work.ts:562; apps/api/src/routes/operation/work.ts:1809; docs/workspace/MASTER.md:2363; docs/COPY-STANDARD.md:221; docs/COPY-STANDARD.md:1294"
+  },
+  {
+    "key": "manual_purchase.approve",
+    "label_exact": "Approve the purchase",
+    "module": "purchasing",
+    "trigger": "A Manual Purchase request needs a decision and has none",
+    "owner_rule": "The Purchasing Approver (an active Principal person); never the requester",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Decide the purchase request",
+        "input_type": "choice",
+        "options": [
+          "Approve",
+          "Refuse"
+        ]
+      }
+    ],
+    "done_when": "An approval or refusal decision is stored on the request",
+    "next_action_key": "manual_purchase.issue_po",
+    "deadline_rule": "No later than the request's Order By date, Office calendar",
+    "status": "BUILT",
+    "work_feed": "EMITTED",
+    "source": "packages/shared/src/work-engine.ts:309; packages/shared/src/manual-purchase.ts:1417; apps/api/src/routes/operation/work.ts:1807; docs/COPY-STANDARD.md:1306; docs/workspace/MASTER.md:2358; docs/workspace/MASTER.md:307"
+  },
+  {
+    "key": "manual_purchase.issue_po",
+    "label_exact": "Issue PO",
+    "module": "purchasing",
+    "trigger": "Approved Manual Purchase demand is uncovered or its current PO version is not marked sent",
+    "owner_rule": "The effective PO Duty holder; Buddy cover may act",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Issue the PO for the approved demand",
+        "input_type": "confirm",
+        "options": []
+      },
+      {
+        "order": 2,
+        "what_staff_does": "Send it and press PO sent to supplier",
+        "input_type": "confirm",
+        "options": []
+      }
+    ],
+    "done_when": "Every linked current PO version is marked sent",
+    "next_action_key": null,
+    "deadline_rule": "No later than the request's Order By date, Office calendar",
+    "status": "BUILT",
+    "work_feed": "EMITTED",
+    "source": "packages/shared/src/work-engine.ts:319; packages/shared/src/manual-purchase.ts:1451; apps/api/src/routes/operation/work.ts:1807; docs/COPY-STANDARD.md:1293; docs/workspace/MASTER.md:2359"
+  },
+  {
+    "key": "receiving.check_in",
+    "label_exact": "Check in {PO No} from {Supplier}",
+    "module": "receiving",
+    "trigger": "A submitted physical receipt report has not been posted",
+    "owner_rule": "Built: the effective GRN Duty holder (never inferred from PO Duty)",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Count what physically arrived on each line",
+        "input_type": "count",
+        "options": []
+      },
+      {
+        "order": 2,
+        "what_staff_does": "Add the Supplier DO",
+        "input_type": "photo",
+        "options": []
+      },
+      {
+        "order": 3,
+        "what_staff_does": "Finish receiving; the GRN is created once",
+        "input_type": "confirm",
+        "options": []
+      }
+    ],
+    "done_when": "The Receiving Session is posted",
+    "next_action_key": "purchasing.confirm_balance_delivery_date",
+    "deadline_rule": "The actual goods received date, else the report submission date",
+    "status": "BUILT",
+    "work_feed": "EMITTED",
+    "source": "packages/shared/src/work-engine.ts:458; packages/shared/src/warehouse-receipt.ts:716; apps/api/src/routes/operation/work.ts:1821; docs/COPY-STANDARD.md:2261; docs/purchasing/MASTER.md:7757; docs/workspace/MASTER.md:2364"
+  },
+  {
+    "key": "repair_order.issue",
+    "label_exact": "Issue repair order to {supplier}",
+    "module": "purchasing",
+    "trigger": "A Repair Order exists and its current version is not marked sent",
+    "owner_rule": "The effective PO Duty holder; Buddy cover may act",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Send {RO No} to {Supplier}",
+        "input_type": "confirm",
+        "options": []
+      },
+      {
+        "order": 2,
+        "what_staff_does": "Record what you sent",
+        "input_type": "confirm",
+        "options": []
+      }
+    ],
+    "done_when": "A confirmed send of the current RO version is recorded",
+    "next_action_key": "repair_order.confirm_receipt",
+    "deadline_rule": "Next Office working day after the RO Doc Date",
+    "status": "BUILT",
+    "work_feed": "EMITTED",
+    "source": "packages/shared/src/work-engine.ts:470; apps/api/src/lib/repair-order-work.ts:14; apps/api/src/routes/operation/work.ts:1817; docs/COPY-STANDARD.md:990; docs/COPY-STANDARD.md:1026; docs/workspace/MASTER.md:2389"
+  },
+  {
+    "key": "repair_order.confirm_receipt",
+    "label_exact": "Ask {Supplier} to confirm they received {RO No}",
+    "module": "purchasing",
+    "trigger": "The current RO version was sent and the Supplier's receipt is not recorded",
+    "owner_rule": "The effective PO Duty holder; Buddy cover may act",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Record Supplier receipt with its date",
+        "input_type": "date",
+        "options": []
+      },
+      {
+        "order": 2,
+        "what_staff_does": "Attach the evidence of receipt",
+        "input_type": "photo",
+        "options": []
+      }
+    ],
+    "done_when": "An evidenced Supplier receipt of the RO is recorded (starts the return target)",
+    "next_action_key": "repair_order.return_date_passed",
+    "deadline_rule": "Next Office working day after the first confirmed send of the current version",
+    "status": "BUILT",
+    "work_feed": "EMITTED",
+    "source": "packages/shared/src/work-engine.ts:480; apps/api/src/lib/repair-order-work.ts:15; apps/api/src/routes/operation/work.ts:1817; docs/COPY-STANDARD.md:991; docs/workspace/MASTER.md:2390; docs/workspace/MASTER.md:2391"
+  },
+  {
+    "key": "repair_order.return_date_passed",
+    "label_exact": "Ask {Supplier} when {Unit ID} will return",
+    "module": "purchasing",
+    "trigger": "The Carres return target passed and a Unit on the RO is not back",
+    "owner_rule": "The effective PO Duty holder; Buddy cover may act",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Ask {Supplier} for the return date and record the reply (a reply never closes this job)",
+        "input_type": "date",
+        "options": []
+      }
+    ],
+    "done_when": "Every Unit is received back on a posted GRN, or the RO is cancelled",
+    "next_action_key": null,
+    "deadline_rule": "14 Office working days from the evidenced Supplier receipt",
+    "status": "BUILT",
+    "work_feed": "EMITTED",
+    "source": "packages/shared/src/work-engine.ts:490; apps/api/src/lib/repair-order-work.ts:17; apps/api/src/routes/operation/work.ts:1817; docs/COPY-STANDARD.md:1028; docs/workspace/MASTER.md:2391"
+  },
+  {
+    "key": "repair_order.owner_consent",
+    "label_exact": "Ask {owner} to agree to repair {Unit ID}",
+    "module": "purchasing",
+    "trigger": "A non-Carres-owned Unit on the RO has no given owner consent",
+    "owner_rule": "The effective PO Duty holder; Buddy cover may act",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Record owner consent (a refusal keeps the job open)",
+        "input_type": "choice",
+        "options": []
+      }
+    ],
+    "done_when": "A given owner consent is recorded for every such Unit",
+    "next_action_key": null,
+    "deadline_rule": "No date (no due date is invented)",
+    "status": "BUILT",
+    "work_feed": "EMITTED",
+    "source": "packages/shared/src/work-engine.ts:500; apps/api/src/lib/repair-order-work.ts:16; apps/api/src/routes/operation/work.ts:1817; docs/COPY-STANDARD.md:994; docs/COPY-STANDARD.md:1028; docs/workspace/MASTER.md:2392"
+  },
+  {
+    "key": "claims.issue_claim",
+    "label_exact": "Share the claim with {Supplier} and record the actual message sent",
+    "module": "purchasing",
+    "trigger": "An open claim has a recorded ask and no confirmed Claim sent to supplier",
+    "owner_rule": "The effective PO Duty holder; Buddy cover may act",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Send the claim to {Supplier}",
+        "input_type": "confirm",
+        "options": []
+      },
+      {
+        "order": 2,
+        "what_staff_does": "Record Channel, Recipient and Note, then press Claim sent to supplier",
+        "input_type": "confirm",
+        "options": []
+      }
+    ],
+    "done_when": "A confirmed send of the claim is recorded",
+    "next_action_key": "claims.obtain_reply",
+    "deadline_rule": "Next Office working day after the ask was recorded",
+    "status": "BUILT",
+    "work_feed": "EMITTED",
+    "source": "packages/shared/src/work-engine.ts:512; apps/api/src/lib/supplier-claim-work.ts:8; apps/api/src/routes/operation/work.ts:1818; docs/COPY-STANDARD.md:228; docs/workspace/MASTER.md:2382"
+  },
+  {
+    "key": "claims.obtain_reply",
+    "label_exact": "Ask {Supplier} to reply to the supplier claim",
+    "module": "purchasing",
+    "trigger": "An open claim was asked and sent and the supplier's reply is not recorded",
+    "owner_rule": "The effective PO Duty holder; any active Operation person may record the reply",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Record supplier reply: the supplier's answer (a note is required for Reject and Other agreement)",
+        "input_type": "choice",
+        "options": [
+          "Replacement",
+          "Deliver remaining",
+          "Repair",
+          "Return & replace",
+          "Reject",
+          "Other agreement"
+        ]
+      },
+      {
+        "order": 2,
+        "what_staff_does": "Say what the answer applies to",
+        "input_type": "choice",
+        "options": [
+          "Whole claim",
+          "These Units"
+        ]
+      },
+      {
+        "order": 3,
+        "what_staff_does": "Enter the supplier's date",
+        "input_type": "date",
+        "options": []
+      },
+      {
+        "order": 4,
+        "what_staff_does": "Add the evidence",
+        "input_type": "photo",
+        "options": []
+      }
+    ],
+    "done_when": "The supplier's reply is stored with scope, date and evidence",
+    "next_action_key": null,
+    "deadline_rule": "The ask + Reply waiting days (starting value 2), Office calendar",
+    "status": "BUILT",
+    "work_feed": "EMITTED",
+    "source": "packages/shared/src/work-engine.ts:522; apps/api/src/lib/supplier-claim-work.ts:9; apps/api/src/routes/operation/work.ts:1818; docs/COPY-STANDARD.md:227; docs/purchasing/MASTER.md:5722; docs/workspace/MASTER.md:2383"
+  },
+  {
+    "key": "claims.no_reply_decision",
+    "label_exact": "Decide how Carres will resolve the item problem",
+    "module": "purchasing",
+    "trigger": "Extra days before escalation passed after Reply expected with no supplier reply",
+    "owner_rule": "The Purchasing Approver; PO Duty keeps the chase",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Decide how Carres resolves the item problem",
+        "input_type": "choice",
+        "options": []
+      }
+    ],
+    "done_when": "Built: only the supplier's reply closes it (no decision writer yet)",
+    "next_action_key": null,
+    "deadline_rule": "Reply expected + Extra days before escalation (starting value 2), Office calendar",
+    "status": "BUILT",
+    "work_feed": "EMITTED",
+    "source": "packages/shared/src/work-engine.ts:532; apps/api/src/lib/supplier-claim-work.ts:10; apps/api/src/routes/operation/work.ts:1818; docs/COPY-STANDARD.md:228; docs/workspace/MASTER.md:2384"
+  },
+  {
+    "key": "purchase_return.issue",
+    "label_exact": "Issue the purchase return to {Supplier}",
+    "module": "purchasing",
+    "trigger": "An open claim records Return to supplier and no Purchase Return is issued for it",
+    "owner_rule": "The effective PO Duty holder; Buddy cover may act",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Tick the Units to return",
+        "input_type": "choice",
+        "options": []
+      },
+      {
+        "order": 2,
+        "what_staff_does": "Choose the Pickup Location",
+        "input_type": "choice",
+        "options": []
+      },
+      {
+        "order": 3,
+        "what_staff_does": "Choose Return To",
+        "input_type": "choice",
+        "options": []
+      },
+      {
+        "order": 4,
+        "what_staff_does": "Enter the Confirmed Pickup date",
+        "input_type": "date",
+        "options": []
+      },
+      {
+        "order": 5,
+        "what_staff_does": "Press Issue Purchase Return",
+        "input_type": "confirm",
+        "options": []
+      }
+    ],
+    "done_when": "A Purchase Return is issued for the claim",
+    "next_action_key": "purchase_return.send",
+    "deadline_rule": "Next Office working day after Return to supplier was recorded",
+    "status": "BUILT",
+    "work_feed": "EMITTED",
+    "source": "packages/shared/src/work-engine.ts:544; apps/api/src/lib/purchase-return-work.ts:8; apps/api/src/routes/operation/work.ts:1819; docs/COPY-STANDARD.md:229; docs/workspace/MASTER.md:2385"
+  },
+  {
+    "key": "purchase_return.send",
+    "label_exact": "Send the return document to {Supplier}",
+    "module": "purchasing",
+    "trigger": "A Purchase Return has no confirmed Return document sent to supplier",
+    "owner_rule": "The effective PO Duty holder; any active Operation person may record the send",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Send the return document and press Return document sent to supplier",
+        "input_type": "confirm",
+        "options": []
+      }
+    ],
+    "done_when": "A confirmed send of the return document is recorded",
+    "next_action_key": "purchase_return.confirm_tomorrows_pickup",
+    "deadline_rule": "Next Office working day after the PR Doc Date",
+    "status": "BUILT",
+    "work_feed": "EMITTED",
+    "source": "packages/shared/src/work-engine.ts:554; apps/api/src/lib/purchase-return-work.ts:9; apps/api/src/routes/operation/work.ts:1819; docs/COPY-STANDARD.md:229; docs/workspace/MASTER.md:2386; docs/workspace/MASTER.md:2387"
+  },
+  {
+    "key": "purchase_return.confirm_tomorrows_pickup",
+    "label_exact": "Confirm tomorrow's pickup · {Supplier}",
+    "module": "purchasing",
+    "trigger": "The Confirmed Pickup Date is the next Office working day and nothing is fully picked up",
+    "owner_rule": "The effective PO Duty holder; any active Operation person may record the confirmation",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Ask {Supplier} to confirm tomorrow's pickup",
+        "input_type": "confirm",
+        "options": []
+      },
+      {
+        "order": 2,
+        "what_staff_does": "Record who confirmed it and how, with evidence",
+        "input_type": "photo",
+        "options": []
+      }
+    ],
+    "done_when": "An evidenced pickup confirmation for that date is recorded on or after the day before",
+    "next_action_key": null,
+    "deadline_rule": "One Office working day before the Confirmed Pickup Date",
+    "status": "BUILT",
+    "work_feed": "EMITTED",
+    "source": "packages/shared/src/work-engine.ts:564; apps/api/src/lib/purchase-return-work.ts:10; apps/api/src/routes/operation/work.ts:1819; docs/COPY-STANDARD.md:229; docs/workspace/MASTER.md:2387"
+  },
+  {
+    "key": "purchase_return.pickup_missed",
+    "label_exact": "Pickup missed · Follow up supplier",
+    "module": "purchasing",
+    "trigger": "The Confirmed Pickup Date passed and Stock recorded no Unit collected",
+    "owner_rule": "The effective PO Duty holder; Buddy cover may act",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Follow up the supplier and record a new Confirmed Pickup date",
+        "input_type": "date",
+        "options": []
+      }
+    ],
+    "done_when": "A Unit is collected, or a new confirmed pickup date has not yet passed",
+    "next_action_key": null,
+    "deadline_rule": "The Confirmed Pickup Date",
+    "status": "BUILT",
+    "work_feed": "EMITTED",
+    "source": "packages/shared/src/work-engine.ts:574; apps/api/src/lib/purchase-return-work.ts:11; apps/api/src/routes/operation/work.ts:1819; docs/COPY-STANDARD.md:229; docs/workspace/MASTER.md:2388"
+  },
+  {
+    "key": "payment.collect_customer_balance",
+    "label_exact": "Ask customer to pay",
+    "module": "payment",
+    "trigger": "An issued invoice is owing, goods are ready or arrival is known, and the collection window is due or late",
+    "owner_rule": "The order's one collection owner (Responsible Delivery Operation); Buddy cover may act",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Send the payment message to the customer",
+        "input_type": "confirm",
+        "options": []
+      },
+      {
+        "order": 2,
+        "what_staff_does": "Record the result",
+        "input_type": "choice",
+        "options": [
+          "Customer paid",
+          "Customer will pay on a date",
+          "Customer needs help",
+          "Customer disputes the amount",
+          "Customer did not answer"
+        ]
+      },
+      {
+        "order": 3,
+        "what_staff_does": "If the customer will pay on a date, enter it (not in the past)",
+        "input_type": "date",
+        "options": []
+      },
+      {
+        "order": 4,
+        "what_staff_does": "When money arrives, Record payment: amount received",
+        "input_type": "number",
+        "options": []
+      },
+      {
+        "order": 5,
+        "what_staff_does": "Paid date",
+        "input_type": "date",
+        "options": []
+      },
+      {
+        "order": 6,
+        "what_staff_does": "Payment method from the Settings list",
+        "input_type": "choice",
+        "options": []
+      },
+      {
+        "order": 7,
+        "what_staff_does": "Attach the slip, screenshot or other evidence",
+        "input_type": "photo",
+        "options": []
+      }
+    ],
+    "done_when": "The invoice/order balance is RM 0 after a recorded payment allocation",
+    "next_action_key": null,
+    "deadline_rule": "Two working days before confirmed delivery, else requested delivery",
+    "status": "BUILT",
+    "work_feed": "EMITTED",
+    "source": "packages/shared/src/work-engine.ts:344; apps/api/src/routes/operation/work.ts:741; apps/api/src/routes/operation/work.ts:1824; docs/COPY-STANDARD.md:2706; docs/payment/MASTER.md:477; docs/payment/MASTER.md:526; docs/payment/MASTER.md:1719"
+  },
+  {
+    "key": "payment.missed_promise",
+    "label_exact": "Ask customer to pay",
+    "module": "payment",
+    "trigger": "The customer promised to pay on a named day, that day passed and the balance is still owing",
+    "owner_rule": "The order's one collection owner (Responsible Delivery Operation); Buddy cover may act",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Send the payment message to the customer",
+        "input_type": "confirm",
+        "options": []
+      },
+      {
+        "order": 2,
+        "what_staff_does": "Record the result",
+        "input_type": "choice",
+        "options": [
+          "Customer paid",
+          "Customer will pay on a date",
+          "Customer needs help",
+          "Customer disputes the amount",
+          "Customer did not answer"
+        ]
+      },
+      {
+        "order": 3,
+        "what_staff_does": "When money arrives, Record payment: amount received",
+        "input_type": "number",
+        "options": []
+      }
+    ],
+    "done_when": "The invoice/order balance is RM 0 after a recorded payment allocation",
+    "next_action_key": null,
+    "deadline_rule": "The day the customer promised, Office calendar",
+    "status": "BUILT",
+    "work_feed": "EMITTED",
+    "source": "packages/shared/src/work-engine.ts:377; apps/api/src/routes/operation/work.ts:741; apps/api/src/routes/operation/work.ts:1824; docs/COPY-STANDARD.md:2706; docs/payment/MASTER.md:477; docs/payment/MASTER.md:709"
+  },
+  {
+    "key": "payment.send_storage_invoice",
+    "label_exact": "Send the invoice and collect payment",
+    "module": "payment",
+    "trigger": "An issued Storage or Additional Storage Invoice is live and unpaid",
+    "owner_rule": "The order's one collection owner (Responsible Delivery Operation)",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Send the storage invoice to the customer",
+        "input_type": "confirm",
+        "options": []
+      },
+      {
+        "order": 2,
+        "what_staff_does": "When money arrives, Record payment: amount received",
+        "input_type": "number",
+        "options": []
+      }
+    ],
+    "done_when": "The order's live storage owing is RM 0",
+    "next_action_key": null,
+    "deadline_rule": "The shared collection deadline for the order's delivery, else no date",
+    "status": "BUILT",
+    "work_feed": "EMITTED",
+    "source": "packages/shared/src/work-engine.ts:393; apps/api/src/routes/operation/work.ts:813; apps/api/src/routes/operation/work.ts:1824; docs/COPY-STANDARD.md:2706; docs/payment/MASTER.md:710"
+  },
+  {
+    "key": "payment.review_overpayment",
+    "label_exact": "UNKNOWN — ask Jess",
+    "module": "payment",
+    "trigger": "An order holds more money than its live obligations and no approved refund covers it",
+    "owner_rule": "The effective Payment Approver duty holder",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Review the extra RM {amount}: allocate it to a valid obligation or cover it by an approved refund",
+        "input_type": "choice",
+        "options": []
+      }
+    ],
+    "done_when": "Overpaid amount is RM 0 after allocation, or an approved refund covers it",
+    "next_action_key": null,
+    "deadline_rule": "No date (opens with the overpayment)",
+    "status": "BUILT",
+    "work_feed": "EMITTED",
+    "source": "packages/shared/src/work-engine.ts:361; apps/api/src/routes/operation/work.ts:881; apps/api/src/routes/operation/work.ts:1824; docs/payment/MASTER.md:713; docs/workspace/MASTER.md:2378"
+  },
+  {
+    "key": "issue_po",
+    "label_exact": "Issue PO",
+    "module": "orders",
+    "trigger": "No purchase order covers these goods",
+    "owner_rule": "The effective PO Duty holder",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Issue PO to {supplier}",
+        "input_type": "confirm",
+        "options": []
+      }
+    ],
+    "done_when": "A purchase order covers the demand",
+    "next_action_key": null,
+    "deadline_rule": "The purchasing order-by date (computed on Batch Purchase)",
+    "status": "BUILT",
+    "work_feed": "NOT EMITTED — Sales Order ladder word only; Work shows purchasing.po_window",
+    "source": "packages/shared/src/work-engine.ts:124; apps/api/src/routes/operation/work.ts:630; apps/api/src/routes/operation/work.ts:1805; docs/workspace/MASTER.md:2400; docs/COPY-STANDARD.md:1293"
+  },
+  {
+    "key": "confirm_ready_date",
+    "label_exact": "Confirm ready date",
+    "module": "orders",
+    "trigger": "Goods on order with no standing supplier ready/arrival promise",
+    "owner_rule": "The current PO Duty",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Call {supplier} and record the ready date",
+        "input_type": "date",
+        "options": []
+      }
+    ],
+    "done_when": "A standing supplier promise is on the ledger",
+    "next_action_key": null,
+    "deadline_rule": "The purchasing calls calendar",
+    "status": "BUILT",
+    "work_feed": "NOT EMITTED — retired from Work; the calculated PO date is not a supplier confirmation",
+    "source": "packages/shared/src/work-engine.ts:136; apps/api/src/routes/operation/work.ts:630; apps/api/src/routes/operation/work.ts:1805; docs/workspace/MASTER.md:2400; docs/COPY-STANDARD.md:968"
+  },
+  {
+    "key": "collect",
+    "label_exact": "Collect RM {amount}",
+    "module": "orders",
+    "trigger": "Outstanding above RM 0 with goods ready or arrival confirmed",
+    "owner_rule": "The Sales Order's stable collection owner",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Collect RM {amount} from {customer}; Record payment",
+        "input_type": "number",
+        "options": []
+      }
+    ],
+    "done_when": "Outstanding is RM 0",
+    "next_action_key": null,
+    "deadline_rule": "2 working days before delivery (confirmed, else promised)",
+    "status": "BUILT",
+    "work_feed": "NOT EMITTED — collection Work is payment.collect_customer_balance",
+    "source": "packages/shared/src/work-engine.ts:236; apps/api/src/routes/operation/work.ts:1800; docs/workspace/MASTER.md:2401; docs/COPY-STANDARD.md:976"
+  },
+  {
+    "key": "issue_delivery_order",
+    "label_exact": "Issue Delivery Order",
+    "module": "orders",
+    "trigger": "Date and slot confirmed, core goods ready, no open Finance exception, DO not issued",
+    "owner_rule": "The system — issued automatically when the last requirement lands",
+    "steps": [],
+    "done_when": "The Delivery Order exists",
+    "next_action_key": null,
+    "deadline_rule": "Immediate — the act that completes the gate issues the document",
+    "status": "BUILT",
+    "work_feed": "NOT EMITTED — system automation, never a person's work",
+    "source": "packages/shared/src/work-engine.ts:193; docs/workspace/MASTER.md:2397; docs/COPY-STANDARD.md:560"
+  },
+  {
+    "key": "purchasing.supplier_reply",
+    "label_exact": "None — retired; COPY-STANDARD bans the after-sending chase",
+    "module": "purchasing",
+    "trigger": "Retired 2026-09-24: no reply after sending is not work",
+    "owner_rule": "None (retired)",
+    "steps": [],
+    "done_when": "Not applicable (retired)",
+    "next_action_key": null,
+    "deadline_rule": "Not applicable (retired)",
+    "status": "BUILT",
+    "work_feed": "NOT EMITTED — retired",
+    "source": "packages/shared/src/work-engine.ts:403; apps/api/src/routes/operation/work.ts:507; apps/api/src/lib/purchasing-work-completion.ts:20; docs/workspace/MASTER.md:2361; docs/COPY-STANDARD.md:219"
+  },
+  {
+    "key": "purchasing.confirm_balance_delivery_date",
+    "label_exact": "Ask {supplier} for the balance delivery date",
+    "module": "purchasing",
+    "trigger": "A short delivery left a PO line owing goods",
+    "owner_rule": "The PO Duty holder",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Ask {supplier} for the balance delivery date and record it",
+        "input_type": "date",
+        "options": []
+      }
+    ],
+    "done_when": "A balance promise for the line is recorded",
+    "next_action_key": null,
+    "deadline_rule": "Opens with the short receipt; the calls calendar files it",
+    "status": "BUILT",
+    "work_feed": "NOT EMITTED — no projector in the Work feed",
+    "source": "packages/shared/src/work-engine.ts:433; apps/api/src/routes/operation/work.ts:1806; docs/workspace/MASTER.md:2364; docs/COPY-STANDARD.md:1297"
+  },
+  {
+    "key": "payment.check_stored_furniture",
+    "label_exact": "UNKNOWN — ask Jess",
+    "module": "payment",
+    "trigger": "An open storage case was not checked within the inspection interval",
+    "owner_rule": "Warehouse (no duty roster; the word stands)",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Check the stored goods and record the inspection",
+        "input_type": "confirm",
+        "options": []
+      }
+    ],
+    "done_when": "A storage inspection is recorded on or after the due day",
+    "next_action_key": null,
+    "deadline_rule": "Last check (else storage start) + configured inspection days",
+    "status": "BUILT",
+    "work_feed": "NOT EMITTED — projector exists but is not called; not admitted",
+    "source": "packages/shared/src/work-engine.ts:448; apps/api/src/routes/operation/work.ts:1570; apps/api/src/routes/operation/work.ts:1824; docs/workspace/MASTER.md:2379; docs/COPY-STANDARD.md:2688"
+  },
+  {
+    "key": "claims.confirm_what_happens_next",
+    "label_exact": "Call {supplier} to confirm what happens next",
+    "module": "claims",
+    "trigger": "A claim has the supplier's answer and no Carres resolution",
+    "owner_rule": "The PO Duty holder of the month the claim was opened",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Call {supplier}; Record what happens next",
+        "input_type": "choice",
+        "options": []
+      }
+    ],
+    "done_when": "The customer resolution is recorded",
+    "next_action_key": null,
+    "deadline_rule": "No clock",
+    "status": "BUILT",
+    "work_feed": "NOT EMITTED — not admitted",
+    "source": "packages/shared/src/work-engine.ts:584; apps/api/src/routes/operation/work.ts:1806; docs/workspace/MASTER.md:2393; docs/COPY-STANDARD.md:1298"
+  },
+  {
+    "key": "claims.record_ask",
+    "label_exact": "Record what we asked",
+    "module": "purchasing",
+    "trigger": "A claim is open with no recorded ask",
+    "owner_rule": "PO Duty",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Record what Carres asks the supplier (one of the governed asks)",
+        "input_type": "choice",
+        "options": []
+      }
+    ],
+    "done_when": "The requested action is stored with actor and time",
+    "next_action_key": "claims.issue_claim",
+    "deadline_rule": "Next Office working day after intake/evidence readiness",
+    "status": "APPROVED",
+    "work_feed": "NOT EMITTED",
+    "source": "docs/workspace/MASTER.md:2381; docs/COPY-STANDARD.md:227; docs/purchasing/MASTER.md:5718"
+  },
+  {
+    "key": "upload_signed_delivery_order",
+    "label_exact": "Upload signed DO",
+    "module": "delivery",
+    "trigger": "A delivered result lacks the signed Delivery Order",
+    "owner_rule": "Current Work assignment, initially Sales Order PIC; Delivery Duty only when no PIC",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Attach the paper the customer signed",
+        "input_type": "photo",
+        "options": []
+      }
+    ],
+    "done_when": "A signed Delivery Order file is on record",
+    "next_action_key": "check_delivery_proof",
+    "deadline_rule": "1 delivery working day after delivery",
+    "status": "APPROVED",
+    "work_feed": "NOT EMITTED",
+    "source": "docs/workspace/MASTER.md:2372; docs/delivery/MASTER.md:1786; docs/COPY-STANDARD.md:3531"
+  },
+  {
+    "key": "failed_delivery_next_step",
+    "label_exact": "UNKNOWN — ask Jess",
+    "module": "delivery",
+    "trigger": "A Failed Delivery has no recorded next step",
+    "owner_rule": "Current Work assignment, initially Sales Order PIC; Delivery Duty only when no PIC",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Choose and complete the named next step",
+        "input_type": "choice",
+        "options": [
+          "Confirm New Delivery Date",
+          "Confirm Delivery Address",
+          "Confirm Customer Availability",
+          "Obtain Correct Contact Details",
+          "Confirm Site Access",
+          "Return Goods to Warehouse",
+          "Inspect Returned Goods",
+          "Arrange Replacement Goods",
+          "Assign Another Logistics",
+          "Keep NETS and Change Date",
+          "Correct Delivery Information",
+          "Obtain Missing Delivery Proof",
+          "Confirm Delivery Cancellation",
+          "Management Review"
+        ]
+      }
+    ],
+    "done_when": "The named next fact exists",
+    "next_action_key": null,
+    "deadline_rule": "Same Delivery working day",
+    "status": "APPROVED",
+    "work_feed": "NOT EMITTED",
+    "source": "docs/workspace/MASTER.md:2374; docs/delivery/MASTER.md:684; docs/delivery/MASTER.md:1788"
+  },
+  {
+    "key": "warehouse.outbound_handover",
+    "label_exact": "UNKNOWN — ask Jess",
+    "module": "stock",
+    "trigger": "A dated pickup has Units not handed over",
+    "owner_rule": "Proposal: the current GRN Duty until a NETS operator or Site queue exists",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Load the goods and record the handover to {company}",
+        "input_type": "confirm",
+        "options": []
+      }
+    ],
+    "done_when": "Every required Unit has accepted handover evidence",
+    "next_action_key": null,
+    "deadline_rule": "The scheduled Site handover date, Warehouse calendar",
+    "status": "PROPOSAL",
+    "work_feed": "NOT EMITTED — not admitted",
+    "source": "docs/workspace/MASTER.md:2366"
+  },
+  {
+    "key": "service.first_response",
+    "label_exact": "UNKNOWN — ask Jess",
+    "module": "service",
+    "trigger": "A Case has no reply yet",
+    "owner_rule": "Service Duty (the Case's one owner)",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Reply to {customer}; record what you told them",
+        "input_type": "confirm",
+        "options": []
+      }
+    ],
+    "done_when": "A first_response event is recorded",
+    "next_action_key": null,
+    "deadline_rule": "2 Office working days from the Case opening",
+    "status": "APPROVED",
+    "work_feed": "NOT EMITTED — not admitted",
+    "source": "docs/service/MASTER.md:19; docs/service/MASTER.md:623"
+  },
+  {
+    "key": "service.decide_remedy",
+    "label_exact": "UNKNOWN — ask Jess",
+    "module": "service",
+    "trigger": "Evidence is complete",
+    "owner_rule": "The Case owner prepares; Service Case Approver approves every formal decision",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Pick the remedy the policy allows",
+        "input_type": "choice",
+        "options": [
+          "Replace",
+          "Exchange for another model",
+          "Repair",
+          "Missing parts",
+          "Clean",
+          "Paid service",
+          "No remedy",
+          "Goodwill exception"
+        ]
+      },
+      {
+        "order": 2,
+        "what_staff_does": "Pick the movement",
+        "input_type": "choice",
+        "options": [
+          "Replace First",
+          "Collect First",
+          "Exchange on Collection",
+          "Collect Defective Item"
+        ]
+      }
+    ],
+    "done_when": "A recorded proposal, then an authorised decision",
+    "next_action_key": "service.approve_exception",
+    "deadline_rule": "Next Office working day after evidence is complete",
+    "status": "APPROVED",
+    "work_feed": "NOT EMITTED — not admitted",
+    "source": "docs/service/MASTER.md:509; docs/service/MASTER.md:520; docs/service/MASTER.md:592; docs/service/MASTER.md:625"
+  },
+  {
+    "key": "service.approve_exception",
+    "label_exact": "UNKNOWN — ask Jess",
+    "module": "service",
+    "trigger": "A remedy needs approval",
+    "owner_rule": "Service Case Approver",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Approve or refuse {remedy} for {Case No}",
+        "input_type": "choice",
+        "options": []
+      }
+    ],
+    "done_when": "An approval event is recorded",
+    "next_action_key": null,
+    "deadline_rule": "Next Office working day after the request is ready",
+    "status": "APPROVED",
+    "work_feed": "NOT EMITTED — not admitted",
+    "source": "docs/service/MASTER.md:520; docs/service/MASTER.md:592; docs/service/MASTER.md:626"
+  },
+  {
+    "key": "service.deadline_call",
+    "label_exact": "UNKNOWN — ask Jess",
+    "module": "service",
+    "trigger": "Four working days are left before the 14-working-day Case deadline",
+    "owner_rule": "Service Duty",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Call {customer} to say why it is taking longer; pick the reason from the locked list of seven",
+        "input_type": "choice",
+        "options": []
+      }
+    ],
+    "done_when": "customer_told is recorded against that deadline",
+    "next_action_key": null,
+    "deadline_rule": "Day 10 of the 14-working-day deadline",
+    "status": "APPROVED",
+    "work_feed": "NOT EMITTED — not admitted",
+    "source": "docs/service/MASTER.md:357; docs/service/MASTER.md:359; docs/service/MASTER.md:628"
+  },
+  {
+    "key": "service.condition_refused",
+    "label_exact": "UNKNOWN — ask Jess",
+    "module": "service",
+    "trigger": "{Logistics} did not collect and gave a reason",
+    "owner_rule": "Service Duty",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Tell {customer} the outcome; record the reply",
+        "input_type": "confirm",
+        "options": []
+      }
+    ],
+    "done_when": "An outcome_sent event is recorded",
+    "next_action_key": null,
+    "deadline_rule": "Same Office working day (after office hours: next Office working day)",
+    "status": "APPROVED",
+    "work_feed": "NOT EMITTED — not admitted",
+    "source": "docs/service/MASTER.md:592; docs/service/MASTER.md:629"
+  },
+  {
+    "key": "service.public_escalation",
+    "label_exact": "UNKNOWN — ask Jess",
+    "module": "service",
+    "trigger": "A public post about a Case is recorded",
+    "owner_rule": "Service Case Approver (one spokesperson)",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Answer the post about {Case No}; record the reply",
+        "input_type": "confirm",
+        "options": []
+      }
+    ],
+    "done_when": "The reply is recorded",
+    "next_action_key": null,
+    "deadline_rule": "Same Office working day (after office hours: next Office working day)",
+    "status": "APPROVED",
+    "work_feed": "NOT EMITTED — not admitted",
+    "source": "docs/service/MASTER.md:592; docs/service/MASTER.md:630"
+  },
+  {
+    "key": "service.customer_confirm",
+    "label_exact": "UNKNOWN — ask Jess",
+    "module": "service",
+    "trigger": "Every leg of the Case is done",
+    "owner_rule": "Service Duty",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Call {customer} to confirm the problem is solved; Record customer confirmed",
+        "input_type": "confirm",
+        "options": []
+      }
+    ],
+    "done_when": "customer_confirmed is recorded",
+    "next_action_key": null,
+    "deadline_rule": "Next Office working day after all execution facts are ready",
+    "status": "APPROVED",
+    "work_feed": "NOT EMITTED — not admitted",
+    "source": "docs/service/MASTER.md:592; docs/service/MASTER.md:631; docs/service/MASTER.md:646"
+  },
+  {
+    "key": "service.obtain_evidence",
+    "label_exact": "UNKNOWN — ask Jess",
+    "module": "service",
+    "trigger": "Required Case evidence is missing",
+    "owner_rule": "Service Duty",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Ask {customer} for {evidence}; record their reply and the files",
+        "input_type": "photo",
+        "options": []
+      }
+    ],
+    "done_when": "Required evidence slots are filled (a contact result alone does not complete it)",
+    "next_action_key": null,
+    "deadline_rule": "Proposal: next Office working day",
+    "status": "PROPOSAL",
+    "work_feed": "NOT EMITTED — not admitted",
+    "source": "docs/service/MASTER.md:592; docs/service/MASTER.md:624"
+  },
+  {
+    "key": "service.pickup_photos",
+    "label_exact": "UNKNOWN — ask Jess",
+    "module": "service",
+    "trigger": "Pickup photos are not approved",
+    "owner_rule": "Service Duty",
+    "steps": [
+      {
+        "order": 1,
+        "what_staff_does": "Check {customer}'s photos; approve or refuse the pickup",
+        "input_type": "choice",
+        "options": []
+      }
+    ],
+    "done_when": "Pickup approved or refused is recorded",
+    "next_action_key": null,
+    "deadline_rule": "Proposal: next Office working day (clock not in the approved list)",
+    "status": "PROPOSAL",
+    "work_feed": "NOT EMITTED — not admitted",
+    "source": "docs/service/MASTER.md:592; docs/service/MASTER.md:619; docs/service/MASTER.md:627"
+  }
+]

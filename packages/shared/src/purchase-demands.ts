@@ -90,6 +90,8 @@ export type PurchaseDemandBlockerState =
   | "no_sku"
   | "no_supplier"
   | "no_cost"
+  /** 0443 · Catalog has not set the SKU's Stock identity (Unit ID or Quantity). */
+  | "no_stock_identity"
   | "no_production_days"
   /** The supplier is collected from the factory and no collector is set. */
   | "no_pickup_partner";
@@ -111,9 +113,16 @@ export const PURCHASE_DEMAND_STATES: readonly PurchaseDemandState[] = [
   "no_sku",
   "no_supplier",
   "no_cost",
+  "no_stock_identity",
   "no_production_days",
   "no_pickup_partner",
 ] as const;
+
+/** Price resolution belongs to commercial approval, never operational eligibility.
+ * Owner ruling 2026-10-01. Retained as the shared row/door contract. */
+export function catalogCostBlocksIssue(_cost: number | null | undefined): boolean {
+  return false;
+}
 
 export function isPurchaseDemandTimingState(v: unknown): v is PurchaseDemandTimingState {
   return (
@@ -146,6 +155,7 @@ export function purchaseDemandStateWords(
     no_sku: "SKU not found",
     no_supplier: "Supplier not assigned",
     no_cost: "Catalog cost is missing",
+    no_stock_identity: "Stock identity not set",
     no_production_days: "Production days not set",
     no_pickup_partner: "Collection is not configured",
   };
@@ -186,6 +196,7 @@ export const PURCHASE_DEMAND_OWNER_DUTY: Record<PurchaseDemandState, string | nu
   no_sku: "PO duty",
   no_supplier: "PO duty",
   no_cost: "PO duty",
+  no_stock_identity: "PO duty",
   no_production_days: "Purchasing Settings",
   no_pickup_partner: "Purchasing Settings",
 };
@@ -302,26 +313,8 @@ export interface PurchaseDemandRow {
   issueRef: { proposalKey: string; buildKey: string } | null;
   /** The structured Work contract. `null` when nothing is owed on this line. */
   action: SoBatchPurchaseAction | null;
-  /**
-   * THE CATALOG COST PER SKU, so the 50/50 can ask for the one it does not have
-   * (Card §5.2). `unitCost: null` is the whole point: a SKU Catalog has no price
-   * for cannot be issued until the operator states a Transaction Cost or marks
-   * it Free of Charge with a reason. A `0` here would be a price nobody set.
-   *
-   * It is the CATALOG's number, carried for display and for the unchanged-cost
-   * comparison. The server re-reads it at issue and refuses a stale one.
-   */
-  /**
-   * ⭐ THE PARTS INSIDE THIS BUYING LINE — one entry per SKU.
-   *
-   * A row is one BUILD, and a build can be a matched set: a sofa is one row and
-   * three module codes. The row itself can only name the set, so this is where
-   * the modules live and the issue authority can validate their Catalog cost.
-   *
-   * It was called `costs` and carried only the price, so the expand had no
-   * quantity to print and re-stated the row's own numbers instead. One list,
-   * three facts (Law D): what it is, how many, what Catalog charges.
-   */
+  /** Goods making up this buying line. Operation receives null unitCost;
+   * Catalog prices are re-read privately by the server when issuing. */
   parts: Array<{ sku: string; qty: number; unitCost: number | null }>;
   /**
    * Whether this supplier's goods are collected from the factory. The
@@ -394,6 +387,7 @@ const ACTION_OWNER_RULE: Record<PurchaseDemandState, string> = {
   no_sku: "Catalog/Master Data through Current PO Duty",
   no_supplier: "Current PO Duty",
   no_cost: "Catalog/Master Data through Current PO Duty",
+  no_stock_identity: "Catalog/Master Data through Current PO Duty",
   no_production_days: "Purchasing Settings authority",
   no_pickup_partner: "Purchasing Settings authority",
 };
@@ -414,6 +408,7 @@ const ACTION_COMPLETION_FACT: Record<PurchaseDemandState, string> = {
   no_sku: "Approved SKU exists",
   no_supplier: "Approved supplier relationship exists",
   no_cost: "Approved Catalog cost exists",
+  no_stock_identity: "Catalog Stock identity exists",
   no_production_days: "Governed supplier/category days exist",
   no_pickup_partner: "Governed supplier collection rule exists",
 };
@@ -515,8 +510,12 @@ export interface PurchaseDemandTimingInput {
   customerDelivery: IsoDate;
   /** The governed Safety days value (`order_by_buffer_days`). */
   safetyDays: number;
-  /** Malaysian public holidays — the same set the engine planned with. */
+  /** The Office holidays the Safety-days margin counts on (Settings →
+   *  Office, `officeWorkingDayOptions(cal).holidays`). */
   holidays: ReadonlySet<string>;
+  /** The stored Office calendar's non-working weekdays. Absent ⇒ Saturday
+   *  and Sunday (the owner default). */
+  offDays?: readonly number[];
 }
 
 /**
@@ -562,7 +561,7 @@ export function purchaseDemandSafetyDaysLeft(f: PurchaseDemandTimingInput): numb
   const days = countWorkingDays(
     forward ? f.readyIfOrderedToday : f.customerDelivery,
     forward ? f.customerDelivery : f.readyIfOrderedToday,
-    { offDays: PURCHASING_OFFICE_OFF_DAYS, holidays: f.holidays },
+    { offDays: f.offDays ?? PURCHASING_OFFICE_OFF_DAYS, holidays: f.holidays },
   );
   return forward ? days : -days;
 }
@@ -654,6 +653,8 @@ export function purchaseDemandHelpLine(row: {
       return `Check the supplier for ${row.item}`;
     case "no_cost":
       return `Set the cost of ${row.item} in Catalog`;
+    case "no_stock_identity":
+      return `Set the stock identity (Unit ID or Quantity) for ${row.item} in Catalog before issuing a PO`;
     case "no_production_days":
       return `Add production days for ${row.supplier ?? "the supplier"} · ${
         row.category ? categoryLabel(row.category) : "the category"
@@ -846,6 +847,7 @@ export const purchaseDemandStateSchema = z.enum([
   "no_sku",
   "no_supplier",
   "no_cost",
+  "no_stock_identity",
   "no_production_days",
   "no_pickup_partner",
 ]);

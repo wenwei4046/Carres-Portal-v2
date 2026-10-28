@@ -23,7 +23,7 @@ export default function SearchInput({
 }: {
   id: string;
   placeholder?: string;
-  /** The top-strip shape — fully rounded, the Orders page's own search. */
+  /** The global search shape (01 §3): 34px, round, search grey, no edge. */
   pill?: boolean;
   /** A workspace toolbar control — 36px, 40px below 768px. */
   toolbar?: boolean;
@@ -32,8 +32,10 @@ export default function SearchInput({
     <div className="relative">
       {/* The glyph sits INSIDE the control's left padding — an icon in its own
        *  box beside the field would be a second border and a second radius. */}
-      <span className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-kit-slate-9">
-        <Icon name="search" size={14} />
+      <span
+        className={`pointer-events-none absolute inset-y-0 ${pill || toolbar ? "left-3" : "left-[10px]"} flex items-center text-c-secondary`}
+      >
+        <Icon name="search" size={16} />
       </span>
       <input
         id={id}
@@ -41,7 +43,7 @@ export default function SearchInput({
         placeholder={placeholder}
         aria-label={rest["aria-label"] ?? placeholder}
         data-kit="search-input"
-        className={`${controlClass(false, toolbar ? "toolbar" : pill ? "pill" : "single")} pl-8`}
+        className={controlClass(false, toolbar ? "toolbar" : pill ? "pill" : "single", true)}
         {...rest}
       />
     </div>

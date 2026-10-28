@@ -5,6 +5,7 @@ import {
   partnerSaveArrangementInput,
   type PartnerDeliveryCard,
 } from "@carres/shared";
+import { heldDeliveryScopes, holdKey } from "../../lib/delivery-hold";
 import { fail } from "../../lib/route-helpers";
 import { adminClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -15,14 +16,19 @@ import type { AppEnv } from "../../types";
  *
  * The ruled NETS portal: the partner sees ONLY its own assigned deliveries and
  * the minimum facts (DO, customer, area, goods summary, requested date,
- * special requirements), and has exactly TWO acts:
+ * special requirements), and has exactly TWO acts (words: owner ruling
+ * 2026-09-26, §5.4):
  *
- *   `Save Delivery Arrangement`  — confirmed date · window · ETA · note
- *   `Cannot Deliver`             — a governed reason, append-only, reassigning
- *                                  NOTHING; Operations decides what happens next
+ *   `Save delivery date`  — scheduled date · scheduled time (optional) ·
+ *                           ETA (optional) · note
+ *   `Cannot Deliver`      — a governed reason, append-only, reassigning
+ *                           NOTHING; Operations decides what happens next
  *
  * There is no Accept (NETS is responsible without one), no money, no other
- * partner's work, no commercial terms, and no way to reassign.
+ * partner's work, no commercial terms, and no way to reassign. While a
+ * Scheduled delivery exists and the DO money gate holds, the card carries
+ * `holdDelivery: true` and the page prints `Hold delivery` — never an amount,
+ * never the reason (owner ruling 2026-09-25, §3).
  *
  * ── WHY ADMIN CLIENT ────────────────────────────────────────────────────────
  * `ops_delivery_arrangements` has SELECT for internal roles only and NO write
@@ -188,6 +194,7 @@ partnerDeliveriesRouter.get("/", async (c) => {
       expectedArrival: a.expected_arrival ? a.expected_arrival.slice(0, 5) : null,
       note: a.logistics_note,
       cannotDeliverReported: false,
+      holdDelivery: false,
     });
   }
 
@@ -212,6 +219,7 @@ partnerDeliveriesRouter.get("/", async (c) => {
       expectedArrival: null,
       note: null,
       cannotDeliverReported: false,
+      holdDelivery: false,
     });
   }
 
@@ -231,13 +239,31 @@ partnerDeliveriesRouter.get("/", async (c) => {
       card.cannotDeliverReported =
         latestByScope.get(`${card.orderId}#${card.leg}`) === "cannot_deliver";
     }
+
+    /* ⭐ `Hold delivery` (owner ruling 2026-09-25, §3/§5.4): a Scheduled
+       delivery exists AND the DO money gate holds — one yes/no per scope from
+       `heldDeliveryScopes`, which asks the gate's own figure. The card carries
+       the boolean and nothing else: no amount, no Finance reason. */
+    try {
+      const held = await heldDeliveryScopes(
+        sb,
+        cards.map((card) => ({
+          orderId: card.orderId,
+          leg: card.leg,
+          arrangement: { confirmedDate: card.confirmedDate, confirmedTime: card.confirmedTime },
+        })),
+      );
+      for (const card of cards) card.holdDelivery = held.has(holdKey(card.orderId, card.leg));
+    } catch (err) {
+      return fail(c, err as { message?: string });
+    }
   }
 
   cards.sort((a, b) => (a.confirmedDate ?? "9999").localeCompare(b.confirmedDate ?? "9999"));
   return c.json({ partner: me.partnerName, deliveries: cards });
 });
 
-/** PUT /:orderId/arrangement?leg= — Save Delivery Arrangement, partner-scoped. */
+/** PUT /:orderId/arrangement?leg= — Save delivery date, partner-scoped. */
 partnerDeliveriesRouter.put("/:orderId/arrangement", async (c) => {
   const me = await requirePartner(c);
   const orderId = c.req.param("orderId");

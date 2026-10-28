@@ -1,3 +1,4 @@
+import { requestAttrsKey } from "./purchase-request/purchase-request-draft";
 /**
  * MANUAL PURCHASE → REVIEW PURCHASE ORDERS — the selection, resolved once
  * (owner instruction 2026-09-23; `docs/purchasing/MASTER.md` §9.2).
@@ -55,6 +56,7 @@ export interface ManualPurchaseIssueWall {
   item: string;
   /** 0591 — the line's configuration words, printed under the item. */
   configuration?: string | null;
+  attrs?: Record<string, unknown> | null;
   requestNo?: string | null;
   remainingQty: number;
 }
@@ -119,6 +121,7 @@ export function manualPurchaseReviewDocuments(
       supplierKind: null,
       lines: lines.map((line) => ({
         demandId: line.demandId,
+        ...(line.attrs !== undefined ? { previewPhysicalKey: JSON.stringify([line.sku,requestAttrsKey(line.attrs)]) } : {}),
         /* The REQUEST is this line's parent record; the review's `1 of n`
            and the evidence step both key on the document, not on this. */
         orderId: line.demandId,

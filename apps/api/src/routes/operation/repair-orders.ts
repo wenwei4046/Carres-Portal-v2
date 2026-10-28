@@ -13,6 +13,7 @@ import {
   REPAIR_ORDER_WORK_RULE,
   REPAIR_ORDER_DEFAULT_WORKING_DAYS,
   REPAIR_ORDER_TARGET_CALENDAR,
+  officeWorkingDayOptions,
   type RepairCostResponsibility,
   type RepairOrderConsent,
   type RepairOrderDetail,
@@ -28,6 +29,7 @@ import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { chunk } from "../../lib/purchase-demand-read";
 import { adminClient, userClient } from "../../lib/supabase";
 import { resolveActorNames } from "../../lib/actor-names";
+import { readOfficeCalendar } from "../../lib/office-calendar";
 import type { AppEnv } from "../../types";
 import { repairOrderWorkCompletion } from "../../lib/repair-order-work";
 
@@ -472,7 +474,11 @@ router.post("/:id/supplier-receipt", repairOrderWorkCompletion([REPAIR_ORDER_WOR
   const sb = userClient(c.env, c.var.auth.jwt);
   const setting = await sb.from("purchasing_settings").select("repair_return_working_days").order("id").limit(1).maybeSingle();
   const period = (setting.data?.repair_return_working_days as number | undefined) ?? REPAIR_ORDER_DEFAULT_WORKING_DAYS;
-  const target = repairOrderReturnTarget(p.data.received_at, period);
+  /* 14 OFFICE working days on the STORED Office calendar (Settings → Office:
+     weekdays + holidays); the 0678 door refuses a target that calendar does
+     not work. Fails safe to the owner defaults. */
+  const office = (await readOfficeCalendar(sb)).calendar;
+  const target = repairOrderReturnTarget(p.data.received_at, period, officeWorkingDayOptions(office));
   const { data, error } = await sb.rpc("repair_order_record_supplier_receipt", {
     p_ro_id: c.req.param("id"), p_received_at: p.data.received_at, p_source: p.data.source,
     p_evidence: p.data.reference, p_target: target, p_calendar: REPAIR_ORDER_TARGET_CALENDAR,

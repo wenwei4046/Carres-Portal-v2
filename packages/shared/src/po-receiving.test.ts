@@ -171,3 +171,11 @@ describe("poLineReportable", () => {
     expect(poLineReportable({ qty: 3, received_qty: 3 })).toBe(0);
   });
 });
+
+
+it("effective cancellation keeps original order/receipt but removes only cancelled commitment from reportable quantity",()=>{
+ const line={qty:5,received_qty:2,cancelled_qty:2,damaged_qty:1};
+ expect(poLineReportable(line)).toBe(1);
+ expect(poReceivingProgress([line])).toMatchObject({ordered:5,received:2,pendingDelivery:1});
+ expect(poLineReportable({...line,cancelled_qty:3})).toBe(0);
+});

@@ -279,6 +279,26 @@ export type CatalogConfigHistoryDto = z.infer<typeof catalogConfigHistorySchema>
 
 export const fabricTierValueSchema = z.enum(["PRICE_1", "PRICE_2", "PRICE_3"]);
 
+/** 0721 — Houzs fabric_trackings stock columns (fabric-tracking.ts:264-275):
+ *  whole numbers in sen / days, as Houzs stores them. */
+export const FABRIC_STOCK_KEYS = [
+  "priceSen",
+  "sohSen",
+  "poOutstandingSen",
+  "lastMonthUsageSen",
+  "oneWeekUsageSen",
+  "twoWeeksUsageSen",
+  "oneMonthUsageSen",
+  "shortageSen",
+  "reorderPointSen",
+  "leadTimeDays",
+] as const;
+const fabricStockInt = z.number().int().min(-2_000_000_000).max(2_000_000_000);
+const fabricStockShape = Object.fromEntries(FABRIC_STOCK_KEYS.map((k) => [k, fabricStockInt])) as Record<
+  (typeof FABRIC_STOCK_KEYS)[number],
+  typeof fabricStockInt
+>;
+
 /** One fabric row (bundle DTO, camelCased). */
 export const catalogFabricSchema = z.object({
   id: z.string().uuid(),
@@ -293,6 +313,8 @@ export const catalogFabricSchema = z.object({
   // 0226 — operation's buying add-on (RM). Optional so pre-0226 fixtures and
   // history-shaped entries stay valid; the adapter always emits it.
   cost: z.number().nullable().optional(),
+  // 0721 — Houzs stock columns; only operation/principal receive them.
+  stock: z.object(fabricStockShape).optional(),
 });
 export type CatalogFabricDto = z.infer<typeof catalogFabricSchema>;
 
@@ -308,6 +330,8 @@ export const catalogFabricEntryInput = z
     bedframeTier: fabricTierValueSchema.optional(),
     active: z.boolean().optional(),
   })
+  // 0721 — absent = keep the stored value (the RPC carries it forward).
+  .merge(z.object(fabricStockShape).partial())
   .strict();
 export type CatalogFabricEntryInput = z.infer<typeof catalogFabricEntryInput>;
 
@@ -1117,6 +1141,14 @@ export const productModelCreateInput = z
   })
   .strict();
 export type ProductModelCreateInput = z.infer<typeof productModelCreateInput>;
+
+/** 0659 — the create body may also name the Finance item group the new product
+ *  starts in (Chew 2026-10-07, Finance MASTER §1). It is not a field of the
+ *  model, so PATCH (built from productModelCreateInput) does not take it. */
+export const productModelCreateBody = productModelCreateInput
+  .extend({ itemGroupId: z.string().uuid().optional() })
+  .strict();
+export type ProductModelCreateBody = z.infer<typeof productModelCreateBody>;
 
 export const productModelPatchInput = productModelCreateInput
   .partial()

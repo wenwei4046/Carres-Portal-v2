@@ -15,6 +15,8 @@ describe("ledgerSourceWord", () => {
   it("prints Other entry for a source it does not know, never the key", () => {
     expect(ledgerSourceWord("SOMETHING_NEW")).toBe("Other entry");
     expect(ledgerSourceWord("SOMETHING_NEW_REVERSAL")).toBe("Other entry reversal");
+    // 0666: the month close's accrual.
+    expect(ledgerSourceWord("DEALER_COMMISSION")).toBe("Dealer commission");
   });
 });
 

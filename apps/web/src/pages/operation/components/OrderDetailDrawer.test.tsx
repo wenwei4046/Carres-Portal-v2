@@ -349,3 +349,28 @@ describe("OrderDetailDrawer - storage scope asks the catalog (CARD-2026-08-28)",
     expect(SRC).not.toContain('lineCategory(l.sku) === "sofa"');
   });
 });
+
+/**
+ * 0660 — Chew 2026-10-07 (Finance MASTER §0, approved for this form
+ * 「要做，直接做」): the balance form asks Online transfer · Cash · Cheque ·
+ * Merchant first, and Merchant then asks which card machine. The machine is
+ * the method the payment records, so its money lands in that machine's
+ * clearing account. The two-step choice is the shared `useMethodChoice`
+ * (lib/payment-methods, where its behaviour is tested); this guards that the
+ * form uses it and sends its answer, in this file's source-scan method.
+ */
+describe("OrderDetailDrawer — Merchant asks the card machine (0660)", () => {
+  it("the first picker offers the two-step list and the second the machines", () => {
+    expect(SRC).toContain("useMethodChoice(methods)");
+    expect(SRC).toContain("{steps.first.map((m) => (");
+    expect(SRC).toContain('aria-label="Card machine"');
+    expect(SRC).toContain("{machineWord(m.label)}");
+  });
+
+  it("nothing is saved until Merchant has its machine, and the machine is what is sent", () => {
+    expect(SRC).toContain('&& method !== null && (!refWord || refNo.trim() !== "");');
+    expect(SRC).toContain("if (!amtOk || method === null || saving || record.isPending) return;");
+    // the method sent is the hook's answer: the first step, or the machine
+    expect(SRC).not.toMatch(/const \[chosenMethod, setMethod\] = useState/);
+  });
+});

@@ -20,6 +20,7 @@ import principalPartnersRouter from "./routes/principal/partners";
 import operationStockRouter from "./routes/operation/stock";
 import operationOrdersFeedRouter from "./routes/operation/orders-feed";
 import operationSuppliersOverviewRouter from "./routes/operation/suppliers-overview";
+import purchaseInvoicesRouter from "./routes/operation/purchase-invoices";
 import operationBadgesRouter from "./routes/operation/badges";
 import registerLayoutsRouter from "./routes/operation/register-layouts";
 import operationDashboardRouter from "./routes/operation/dashboard";
@@ -31,6 +32,8 @@ import correctionWorkRouter from "./routes/operation/correction-work";
 import operationOrdersRouter from "./routes/operation/orders";
 import operationPartnersRouter from "./routes/operation/partners";
 import deliverySettingsRouter from "./routes/operation/delivery-settings";
+import fleetRouter from "./routes/operation/fleet";
+import peopleWorkDaysRouter from "./routes/operation/people-work-days";
 import operationPosRouter from "./routes/operation/pos";
 import operationReceiveThreadsRouter from "./routes/operation/receive-threads";
 // R2 — the supplier-claim queue (read side; claims are minted by 0288 RPCs)
@@ -40,13 +43,20 @@ import repairOrdersRouter from "./routes/operation/repair-orders";
 // R6 — the ops half: review what the warehouse filed, then replay it through
 // the ONE receive engine (0302).
 import warehouseReceiptsRouter from "./routes/operation/warehouse-receipts";
+import workActivityRouter from "./routes/operation/work-activity";
+import settingsCoreRouter, { addressListsReadRouter, companyProfileReadRouter } from "./routes/operation/settings-core";
 import workspaceDutiesRouter from "./routes/operation/workspace-duties";
+import leaveRouter from "./routes/operation/leave";
+import saturdayOnCallRouter from "./routes/operation/saturday-on-call";
 import operationWorkRouter from "./routes/operation/work";
+import internalTasksRouter from "./routes/operation/internal-tasks";
 import procurementTabsRouter from "./routes/operation/procurement-tabs";
 import dispatchCustomerLegRouter from "./routes/operation/dispatch-customer-leg";
 import deliveryChainRouter from "./routes/operation/delivery-chain";
 import orderControlRouter from "./routes/operation/order-control";
 import deliveryOrdersRouter from "./routes/operation/delivery-orders";
+import deliveryReturnsRouter from "./routes/operation/delivery-returns";
+import deliveryPlanningRouter from "./routes/operation/delivery-planning";
 // 0379 — Delivery's OWN arrangement doors (owner correction 2026-08-24).
 import deliveryArrangementsRouter from "./routes/operation/delivery-arrangements";
 import paymentApprovalsRouter from "./routes/operation/payment-approvals";
@@ -54,6 +64,7 @@ import purchaseRouter from "./routes/operation/purchase";
 import toOrderRouter from "./routes/operation/to-order";
 import soBatchReadyStockRouter from "./routes/operation/so-batch-ready-stock";
 import purchaseDemandsRouter from "./routes/operation/purchase-demands";
+import forecastPurchaseRouter from "./routes/operation/forecast-purchase";
 import manualPurchaseRouter from "./routes/operation/manual-purchase";
 import purchasingSettingsRouter from "./routes/operation/purchasing-settings";
 // Settings → Warehouse — the ONE Warehouse Settings surface (0456 · 0457).
@@ -90,14 +101,17 @@ import collectionOwnerRouter from "./routes/finance/collection-owner";
 import paymentStorageRouter from "./routes/finance/payment-storage";
 import financeRefundsRouter from "./routes/finance/refunds";
 import financePayablesRouter from "./routes/finance/payables";
+import financePaymentRequestsRouter from "./routes/finance/payment-requests";
 import financeExceptionsRouter from "./routes/finance/exceptions";
 import financeReconciliationRouter from "./routes/finance/reconciliation";
 import financeOtherMoneyInRouter from "./routes/finance/other-money-in";
 // The read-only Finance Ledger — Journal, Trial Balance, Self-check.
 import financeLedgerRouter from "./routes/finance/ledger";
-import financeDealerCommissionRouter from "./routes/finance/dealer-commission";
+import financeDealerCommissionRouter, { dealerStatementRouter } from "./routes/finance/dealer-commission";
 // The manual journal door — the principal's one write to the ledger (0462).
 import financeManualJournalsRouter from "./routes/finance/manual-journals";
+// 0705 — Finance's opening balances at go-live: a draft, posted once (principal).
+import financeOpeningBalancesRouter from "./routes/finance/opening-balances";
 import financeMoneyMovesRouter from "./routes/finance/money-moves";
 import financeCardSettlementRouter from "./routes/finance/card-settlement";
 import supplierActivityRouter from "./routes/supplier/activity";
@@ -122,6 +136,8 @@ import guaranteesRouter from "./routes/guarantees";
 import dosRouter from "./routes/storage/dos";
 // Phase A step 5 (migration 0137) — per-unit stock register.
 import opsStockRouter from "./routes/ops/stock";
+import customerConsignmentRouter from "./routes/ops/customer-consignment";
+import stockMovesRouter from "./routes/ops/stock-moves";
 import opsStockPlanRouter from "./routes/ops/stock-plan";
 import opsStockEmergencyRouter from "./routes/ops/stock-emergency";
 // Migration 0140 — Service Notes (SN / Issue Tracker).
@@ -142,6 +158,10 @@ import stripeWebhookRouter from "./routes/stripe-webhook";
 import rentalRouter from "./routes/rental";
 import itSupportRouter from "./routes/it-support";
 import { runContactByCron, runFollowUpMaintenanceCron } from "./cron/contact-by";
+import { runDealerCommissionCloseCron } from "./cron/dealer-commission-close";
+import { runWorkActivityCron } from "./cron/work-activity";
+import { runVelocityPoll } from "./cron/velocity-poll";
+import { runDutyRotaCron } from "./cron/duty-rota";
 import type { AppEnv, Bindings } from "./types";
 
 const app = new Hono<AppEnv>();
@@ -212,7 +232,7 @@ api.route("/it-support", itSupportRouter);
 // Guarantee packages (0261-0263) — terms config + the claim/track-back desk.
 api.route("/guarantees", guaranteesRouter);
 api.route("/operation/badges", operationBadgesRouter);
-// 0528 — personal saved column layouts (Purchase Orders pilot), own rows only.
+// 0528 — personal saved column layouts (Purchase Orders pilot; Finance tables since 0704), own rows only.
 api.route("/operation/register-layouts", registerLayoutsRouter);
 api.route("/operation/dashboard", operationDashboardRouter);
 api.route("/operation/jump", jumpRouter);
@@ -226,6 +246,11 @@ api.route("/operation/orders", deliveryChainRouter);
 // 0159 P2 control overlay — GET + PUT /:id/control
 api.route("/operation/orders", orderControlRouter);
 api.route("/operation/delivery-orders", deliveryOrdersRouter);
+// 0716 — Weisiang's decision (WhatsApp 2026-10-22): Delivery Returns + Load scan.
+api.route("/operation/delivery-returns", deliveryReturnsRouter);
+// 0723 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): Delivery Planning, DP Orders,
+// Auto-schedule and Trips with time slots, Houzs way. Jess was not part of this decision.
+api.route("/operation/delivery-planning", deliveryPlanningRouter);
 api.route("/operation/delivery-arrangements", deliveryArrangementsRouter);
 api.route("/operation/delivery-arrangements", deliveryLinksRouter);
 // 0362 — the Delivery Payment Approval: raise · decide · read (owner ruling 2026-08-19)
@@ -243,6 +268,7 @@ api.route("/operation/purchase/to-order", toOrderRouter);
 // CARD-2026-08-20 — the read-only customer-demand Register. Mounted beside To
 // Order, on the same recomputation; it issues nothing.
 api.route("/operation/purchase/demands", purchaseDemandsRouter);
+api.route("/operation/purchase/forecast", forecastPurchaseRouter);
 // 0471 — SO Batch Purchase's Ready Stock: the offer for one Sales Order, and
 // the one act that commits an exact Unit to an exact item line. Mounted on the
 // same path so the page reads one base, not two.
@@ -252,10 +278,22 @@ api.route("/operation/purchasing/requests", manualPurchaseRouter);
 // P1 (0303) — Purchasing → Settings: the numbers the ordering engine reads.
 api.route("/operation/purchasing/settings", purchasingSettingsRouter);
 api.route("/operation/warehouse-settings", warehouseSettingsRouter);
+// 0668 + 0669 — Settings → Company · Office · Settings editors (Carres Settings
+// List COM · OFF · TEAM-02). The company identity read is open to every
+// signed-in account because every printed document carries it.
+api.route("/operation/settings", settingsCoreRouter);
+api.route("/company-profile", companyProfileReadRouter);
+// 0722 — Settings → Address lists (Weisiang's decision, Mr Lim, WhatsApp
+// 2026-10-22): every signed-in account reads the office's list changes.
+api.route("/address-lists", addressListsReadRouter);
 // 0232 staff assignment pool — GET / + PUT /:userId
 api.route("/operation/staff", opsStaffRouter);
 api.route("/operation/partners", operationPartnersRouter);
 api.route("/operation/delivery-settings", deliverySettingsRouter);
+// 0724 · Carres own lorries (Weisiang's decision 2026-10-22, Houzs way).
+api.route("/operation/fleet", fleetRouter);
+// 0678 — the responsible person's recorded working week (People/HR), read-only.
+api.route("/operation/people", peopleWorkDaysRouter);
 api.route("/operation/pos", operationPosRouter);
 api.route("/operation/pos", lpInboundRouter);
 api.route("/operation/pos", dispatchCustomerLegRouter);
@@ -266,6 +304,7 @@ api.route("/operation/stock-alerts", stockAlertsRouter);
 api.route("/operation/stock", operationStockRouter);
 api.route("/operation/orders-feed", operationOrdersFeedRouter);
 api.route("/operation/suppliers-overview", operationSuppliersOverviewRouter);
+api.route("/operation/purchase-invoices", purchaseInvoicesRouter);
 api.route("/operation", thresholdsRouter);
 api.route("/operation/suppliers", operationSuppliersRouter);
 api.route("/operation/warehouse", operationWarehouseRouter);
@@ -294,6 +333,8 @@ api.route("/finance/refunds", financeRefundsRouter);
 api.route("/finance/other-money-in", financeOtherMoneyInRouter);
 // Supplier bills and payment vouchers (0477). Before the `/finance` catch-all.
 api.route("/finance/payables", financePayablesRouter);
+// Staff ask Finance to pay a bill (0645, Chew 2026-10-03). Before the catch-all.
+api.route("/finance/payment-requests", financePaymentRequestsRouter);
 // The one money blocker on a delivery order (0355, owner ruling 2026-08-16).
 // Mounted before the catch-all `/finance` reconciliation router below.
 api.route("/finance/exceptions", financeExceptionsRouter);
@@ -301,8 +342,12 @@ api.route("/finance/exceptions", financeExceptionsRouter);
 api.route("/finance/ledger", financeLedgerRouter);
 // Dealer commission and renovation rebate rates and report (0544). Before the catch-all.
 api.route("/finance/dealer-commission", financeDealerCommissionRouter);
+// 0664 — a dealer's own commission statement (its store owner).
+api.route("/dealer-commission", dealerStatementRouter);
 // The manual journal (principal only). Before the catch-all as well.
 api.route("/finance/manual-journals", financeManualJournalsRouter);
+// The opening balances (0705). Before the catch-all as well.
+api.route("/finance/opening-balances", financeOpeningBalancesRouter);
 // Bank transfers and card payouts (0529). Before the catch-all as well.
 api.route("/finance/money-moves", financeMoneyMovesRouter);
 // Card settlement files and their matching (0572). Before the catch-all as well.
@@ -317,6 +362,10 @@ api.route("/supplier/threads", supplierThreadsRouter);
 api.route("/warehouse", warehouseReceivingRouter);
 api.route("/storage/dos", dosRouter);
 api.route("/ops/stock", opsStockRouter);
+// 0719 — Weisiang's decision (WhatsApp 2026-10-22): Customer Consignment Order, Consignment Note, Customer Consignment Return.
+api.route("/ops/customer-consignment", customerConsignmentRouter);
+// 0714 — Weisiang's decision (WhatsApp 2026-10-22): Stock Adjustment, Transfer, Take.
+api.route("/ops/stock-moves", stockMovesRouter);
 // K2 (0287) — the monthly ready stock plan. Mounted BELOW /ops/stock so the
 // K1 reorder routes on that router keep their paths unchanged.
 api.route("/ops/stock-plan", opsStockPlanRouter);
@@ -334,7 +383,11 @@ api.route("/operation/purchase-returns", purchaseReturnsRouter);
 api.route("/operation/repair-orders", repairOrdersRouter);
 api.route("/operation/warehouse-receipts", warehouseReceiptsRouter);
 api.route("/operation/workspace-duties", workspaceDutiesRouter);
+api.route("/operation/work-activity", workActivityRouter);
+api.route("/operation/leave", leaveRouter);
+api.route("/operation/saturday-on-call", saturdayOnCallRouter);
 api.route("/operation/work", operationWorkRouter);
+api.route("/operation/internal-tasks", internalTasksRouter);
 api.route("/operation/orders", annotationsRouter);
 api.route("/operation/escalations", escalationsRouter);
 api.route("/operation/activity", activityRouter);
@@ -350,6 +403,29 @@ export default {
   scheduled: (_event: ScheduledController, env: Bindings, ctx: ExecutionContext) => {
     ctx.waitUntil(
       (async () => {
+        /* The activity check runs every minute 08:00–20:59 MYT every day; the
+           stored Office calendar decides which days and hours count. */
+        /* 0724 (YH 2026-10-26): Radius Velocity lorry positions every 5 minutes,
+           as Houzs. A no-op until the VELOCITY_* secrets are set.
+           Follows Houzs backend/src/index.ts:648-654 per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
+        if (_event.cron === "*/5 * * * *") {
+          const r = await runVelocityPoll(env).catch((e) => {
+            console.error("[cron velocity]", e instanceof Error ? e.message : e);
+            return { skipped: true } as const;
+          });
+          if (!("skipped" in r)) console.log(`[cron velocity] ${JSON.stringify(r)}`);
+          return;
+        }
+        if (_event.cron === "* 0-12 * * *") {
+          await runWorkActivityCron(env);
+          return;
+        }
+        // 0666: the dealer commission month before closes by itself (on the 1st);
+        // its failure is logged and never stops the jobs after it.
+        await runDealerCommissionCloseCron(env).catch((e) => console.error("dealer commission close failed:", e));
+        // 0671: the monthly PO / GRN rota — this month, and next month from the
+        // 25th. Its failure is logged and never stops the jobs after it.
+        await runDutyRotaCron(env).catch((e) => console.error("duty rota failed:", e));
         await runContactByCron(env);
         await runFollowUpMaintenanceCron(env);
         // Purchasing MASTER §9.5: an overdue date is PO/Work follow-up,

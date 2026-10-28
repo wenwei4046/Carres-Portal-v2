@@ -367,3 +367,21 @@ describe("the week plan — a view of the shared Work Engine (owner ruling 2026-
     expect(plan.days.every((d) => d.lines.length === 0 && d.orderIds.length === 0)).toBe(true);
   });
 });
+
+describe("the plan follows the stored Office calendar (9 Oct 2026)", () => {
+  const none = new Set<string>();
+  it("an Office holiday is skipped by the plan day", () => {
+    // Tue 15 Sep 2026 recorded as an Office holiday → the plan day is Wed 16.
+    expect(paymentPlanDay("2026-09-15", new Set(["2026-09-15"]))).toBe("2026-09-16");
+  });
+  it("an Office that works Saturday plans on Saturday and shows six days", () => {
+    expect(paymentPlanDay("2026-09-19", none, [0])).toBe("2026-09-19");
+    const plan = paymentWeekPlan({ items: [], rows: [], todayIso: "2026-09-19", weekOfIso: "2026-09-14", holidays: none, offDays: [0] });
+    expect(plan.days.map((d) => d.iso)).toEqual([
+      "2026-09-14", "2026-09-15", "2026-09-16", "2026-09-17", "2026-09-18", "2026-09-19",
+    ]);
+    expect(plan.planDayIso).toBe("2026-09-19");
+    // The default stays Monday to Friday.
+    expect(paymentWeekPlan({ items: [], rows: [], todayIso: "2026-09-15", weekOfIso: "2026-09-14", holidays: none }).days).toHaveLength(5);
+  });
+});

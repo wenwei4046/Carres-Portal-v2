@@ -1,5 +1,5 @@
 /**
- * The ONE floating surface, shared by `Select` · `DropdownMenu` · `Popover` ·
+ * The ONE floating surface, shared by `Select` · `Popover` ·
  * `DatePicker` · `Tooltip` (UI-KIT §6.6, card D0.5b).
  *
  * §6.6: *"If a UI element appears a second time, it stops being inline and
@@ -9,26 +9,22 @@
  * times rather than pasted — the D0.5a `field-recipe.ts` move, applied to the
  * overlays.
  *
- * **A note on the radius, reported rather than invented.** §4.2 names its four
- * radii by USE: `rounded-control` (6) covers *button · input · dropdown*, and
- * `rounded-card` (10) covers *card · panel · modal · drawer*. A **popover** and
- * a **tooltip** appear in neither list. They take the dropdown's 6 here because
- * that is what they are — a small surface hanging off a control — but the law
- * does not say so, and the finding goes back to the kit rather than being
- * quietly settled in a component.
+ * v4 (owner instruction 9 Oct 2026, 01 §3 Popup): white, 8px corner, the
+ * menu shadow and no hairline. The surface carries NO padding: the menu, the
+ * list and the popover each add the popup's 6px themselves.
  */
 import { Z_FLOATING } from "./overlay-layer";
 
-/** White surface · §3.2 hairline · §4.2 dropdown radius · §4.4 layer 3. */
+/** White surface · 8px corner · `--shadow-menu` · §4.4 layer 3. */
 export const FLOATING_SURFACE =
-  `bg-white border border-kit-slate-5 rounded-control ${Z_FLOATING}`;
+  `bg-c-card text-c-ink rounded-lg [box-shadow:var(--shadow-menu)] ${Z_FLOATING}`;
 
 /**
- * A row inside a menu or a listbox. The hover is §3.5's single faint blue tint
- * — never grey, which reads as structure rather than as "you are on this one".
+ * A row inside a menu or a listbox: pad 7 × 10, 13 / 500. Hover is the warm
+ * hover grey; the chosen row is the person's theme selection pair.
  */
 export const FLOATING_ITEM =
-  "flex w-full items-center gap-2 rounded-control px-2 py-1.5 text-body text-kit-slate-12 " +
+  "flex w-full max-[767px]:min-h-11 items-center gap-2 rounded-lg [padding:var(--menu-item-pad)] text-body font-medium text-c-ink " +
   "cursor-pointer select-none outline-none " +
-  "data-[highlighted]:bg-kit-blue-3 data-[state=checked]:bg-kit-blue-3 " +
-  "data-[disabled]:opacity-40 data-[disabled]:cursor-not-allowed data-[disabled]:bg-transparent";
+  "data-[highlighted]:bg-c-hover data-[state=checked]:bg-c-select-bg data-[state=checked]:text-c-select-fg " +
+  "data-[disabled]:opacity-[0.45] data-[disabled]:cursor-not-allowed data-[disabled]:bg-transparent";

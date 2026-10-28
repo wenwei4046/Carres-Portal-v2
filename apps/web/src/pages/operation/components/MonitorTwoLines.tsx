@@ -10,7 +10,7 @@
  * reachable by click and keyboard, never by hover alone. The two lines become
  * one plain focusable control that opens the kit Popover with every word.
  */
-import Popover from "@/components/kit/Popover";
+import CPopover from "@/components/carres/CPopover";
 import type { DeliveryWorkStatusTone } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
 import { STATUS_TONE_TEXT } from "./DeliveryBrief";
@@ -29,7 +29,9 @@ export function TwoLines({
   line2Tone = "none",
   line1Title,
   line2TestId,
+  cellTitle,
   reveal = false,
+  secondary = false,
 }: {
   line1: string;
   line2?: string | null;
@@ -37,17 +39,26 @@ export function TwoLines({
   line2Tone?: "none" | "orange" | "red";
   line1Title?: string;
   line2TestId?: string;
+  /** One fact the whole cell carries as its tooltip and accessible name, in
+   *  place of its own words (Monitor's contact deadline on `Order details
+   *  incomplete`, owner ruling 2026-09-25). */
+  cellTitle?: string;
   reveal?: boolean;
+  /** A reference line under an identifier: 12 / 400 grey (01 §2 second line). */
+  secondary?: boolean;
 }) {
   const lines = (
-    <span className="block min-w-0">
-      <span className={`block truncate ${STATUS_TONE_TEXT[tone]}`} title={line1Title ?? line1}>
+    <span
+      className="block min-w-0"
+      {...(cellTitle ? { title: cellTitle, "aria-label": joinLines(joinLines(line1, line2), cellTitle) } : {})}
+    >
+      <span className={`block truncate ${secondary ? "text-meta text-c-secondary" : STATUS_TONE_TEXT[tone]}`} title={cellTitle ?? line1Title ?? line1}>
         {line1}
       </span>
       {line2 ? (
         <span
-          className={`block truncate text-label ${LINE2_TEXT[line2Tone]}`}
-          title={line2}
+          className={`block truncate text-meta ${LINE2_TEXT[line2Tone]}`}
+          title={cellTitle ?? line2}
           data-testid={line2TestId}
         >
           {line2}
@@ -58,7 +69,7 @@ export function TwoLines({
   if (!reveal) return lines;
   const full = joinLines(line1, line2);
   return (
-    <Popover
+    <CPopover
       label={full}
       trigger={
         <button
@@ -75,7 +86,7 @@ export function TwoLines({
         <span className={`block ${STATUS_TONE_TEXT[tone]}`}>{line1}</span>
         {line2 ? <span className="block text-kit-slate-11">{line2}</span> : null}
       </span>
-    </Popover>
+    </CPopover>
   );
 }
 

@@ -624,12 +624,15 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
   }
 
   // Row order + words fixed by the owner (round 23): Doc No · Ordered ·
-  // Sales Location (2990's word; was Showroom) · Proceed date · Delivery
-  // date · Salesperson · Access.
+  // Sales Location (2990's word; was Showroom) · planned production start ·
+  // Delivery date · Salesperson · Access. The planned date (`proceed_date`)
+  // prints as `Planned production start` — two dates, two names (owner ruling
+  // 2026-10-06; SO-PDF-STANDARD change log): `Proceed Date` is the actual
+  // hand-off and is not on this paper. Name only, same value.
   const orderDetailRows: Array<[string, string | null]> = [
     ["SO No", so_number],
     ["SO Doc Date", niceDate(issue_date, true)],
-    ["Proceed Date", proceed_date ? niceDate(proceed_date, true) : null],
+    ["Planned production start", proceed_date ? niceDate(proceed_date, true) : null],
     /* TWO deliberate lines (owner, 2026-09-21) — the colon and value sit on
        the label's SECOND line; SALES ORDER INFO rows bottom-align for it. */
     ["Customer Requested\nDelivery Date", niceDate(delivery.date, true) ?? delivery.date],

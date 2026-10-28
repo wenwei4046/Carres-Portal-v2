@@ -83,11 +83,31 @@ export interface LedgerAccount {
    *  Ties break on code, so 0 everywhere reads exactly as by-code order. It is
    *  the order, never the account number. */
   sort_order: number;
+  /** 0656: AutoCount's section (CAPITAL ... TAXATION). The Chart of accounts
+   *  groups an account by the section of the account above it that sits
+   *  directly under a top heading. Absent before 0656. */
+  section?: string | null;
+  /** 0656: AutoCount's special account type (SFA, SAD, SBK ...), shown beside
+   *  the name. Absent before 0656. */
+  special?: string | null;
+}
+
+/** 0656: one of AutoCount's sections, in AutoCount's order. */
+export interface LedgerSection {
+  section: string;
+  kind: string;
+  sort_order: number;
 }
 
 export interface LedgerChart {
   go_live_on: string | null;
   accounts: LedgerAccount[];
+  /** 0656: AutoCount's sections, in order. Sent by GET /accounts only. */
+  sections?: LedgerSection[];
+  /** 0656: every account an income or payment map row posts to. With the
+   *  roles and the money accounts, the accounts the retire door always
+   *  refuses. Sent by GET /accounts only. */
+  system_accounts?: string[];
   /** The headings no account moves into or out of, because their accounts
    *  decide how money may be recorded (0570 `gl_rule_headings`). Sent by
    *  GET /accounts only; absent elsewhere. */
@@ -317,11 +337,17 @@ export const LEDGER_SOURCE_WORDS: Readonly<Record<string, string>> = {
   OTHER_RECEIPT: "Other receipt",
   RENTAL_PAYMENT: "Rental payment",
   SUPPLIER_MONEY_BACK: "Supplier money back",
+  SUPPLIER_CREDIT_NOTE: "Supplier credit note",
+  SUPPLIER_DEBIT_NOTE: "Supplier debit note",
   MONEY_TRANSFER: "Bank transfer",
   CARD_PAYOUT: "Card payout",
   BANK_CHARGE: "Bank charge",
   BANK_CREDIT: "Bank credit",
   MANUAL: "Manual journal",
+  // The month close's accrual (migration 0666).
+  DEALER_COMMISSION: "Dealer commission",
+  // Finance's figures at go-live, posted once (migration 0705).
+  OPENING: "Opening balances",
 };
 
 export function isReversalSource(sourceType: string): boolean {

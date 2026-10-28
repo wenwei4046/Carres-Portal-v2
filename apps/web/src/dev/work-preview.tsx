@@ -14,15 +14,17 @@
  */
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import OperationApp from "@/pages/operation/OperationApp";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { OperationWorkItem, OperationWorkModule, OperationWorkResponse } from "@carres/shared";
-import { addWorkingDays, myHolidaySet } from "@carres/shared";
+import type { InternalTaskOpen, OperationWorkItem, OperationWorkModule, OperationWorkResponse } from "@carres/shared";
+import { addWorkingDays, myHolidaySet, projectInternalTaskWork } from "@carres/shared";
 import { useAuth } from "@/lib/auth";
 import { appTodayIso } from "@/lib/fmt-date";
-import OperationWork from "@/pages/operation/OperationWork";
+import WorkspaceTasks from "@/pages/operation/tasks/WorkspaceTasks";
 import PreviewFrame from "./preview-frame";
 import "@/index.css";
+import type { SalesOrderTemplateData } from "@/lib/pdf/types";
 
 const ME = "00000000-0000-4000-8000-0000000000aa";
 /* The machine's own today, in Malaysia; `wd(n)` is n Office working days
@@ -58,11 +60,13 @@ const WORDS: Record<OperationWorkModule, Words[]> = {
   ],
   receiving: [{ problem: "Supplier date passed · nothing received yet", action: "Check in", recipient: "Warehouse Klang", ref: "PO2609-1031" }],
   delivery: [
-    { problem: "Overdue delivery", action: "Call NETS", recipient: "NETS" },
+    { problem: "Delivery date passed", action: "Call NETS", recipient: "NETS" },
     { problem: "Delivery proof not reviewed", action: "Check delivery proof", recipient: "AL Logistics", ref: "DO2609-20411" },
   ],
   payment: [{ problem: "Payment due today", action: "Ask customer to pay", recipient: "Wong Kah Wai" }],
   issue_tracker: [{ problem: "Issue waiting for a reply", action: "Record result", recipient: null }],
+  /* Internal tasks come from the production projection below, never from this table. */
+  workspace: [],
 };
 const used: Partial<Record<OperationWorkModule, number>> = {};
 
@@ -124,13 +128,21 @@ function item(module: OperationWorkModule, actionOn: string | null, missedDays =
   };
 }
 
+const COLLEAGUE = { userId: "00000000-0000-4000-8000-0000000000b2", name: "TEST · Staff B" };
+const INTERNAL_TASKS: InternalTaskOpen[] = [
+  { id: "00000000-0000-4000-8000-0000000000c1", title: "TEST · Get the new product photographs", dueOn: TODAY, createdAt: `${TODAY}T01:20:00.000Z`,
+    createdBy: COLLEAGUE, assignedTo: { userId: ME, name: "Shasha" } },
+  { id: "00000000-0000-4000-8000-0000000000c2", title: "TEST · Count the showroom price tags", dueOn: wd(1), createdAt: `${TODAY}T02:05:00.000Z`,
+    createdBy: { userId: ME, name: "Shasha" }, assignedTo: COLLEAGUE },
+];
+
 const FEED: OperationWorkResponse = {
   contractVersion: 2,
   complete: true,
   generatedOn: TODAY,
   closureReceipt: null,
-  staff: [{ userId: ME, name: "Shasha", email: "sha@carres.co" }],
-  sources: (["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"] as const).map((key) => ({
+  staff: [{ userId: ME, name: "Shasha", email: "sha@carres.co" }, { userId: COLLEAGUE.userId, name: COLLEAGUE.name, email: "staff-b@carres.local" }],
+  sources: (["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker", "workspace"] as const).map((key) => ({
     key,
     state: "healthy" as const,
     observedAt: `${TODAY}T01:00:00.000Z`,
@@ -152,6 +164,8 @@ const FEED: OperationWorkResponse = {
     item("purchasing", wd(2)),
     item("orders", null),
     item("payment", null),
+    /* `+ Task`: one a colleague added for the preview person, one the other way round. */
+    ...projectInternalTaskWork({ tasks: INTERNAL_TASKS, today: TODAY, observedAt: `${TODAY}T01:00:00.000Z` }),
   ],
 };
 
@@ -400,8 +414,33 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 const realFetch = globalThis.fetch.bind(globalThis);
+let fileReadAttempts = 0;
 globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  /* Task Files uses the owning document reader, with the SAME TEST order facts
+     as the Route. Unknown orders keep the unseeded404 below. `file=retry`
+     fails the first read only, so retry can be walked without a business write. */
+  if (new URL(url, window.location.href).pathname === `/api/orders/${ORDER}/sales-order-data`) {
+    const state = new URLSearchParams(window.location.search).get("file");
+    if (state === "failed" || (state === "retry" && fileReadAttempts++ === 0)) return json({ message: "TEST document read failed" }, 503);
+    const order = ORDERS.orders[0]!;
+    const total = order.order_lines.reduce((sum, line) => sum + line.qty * line.unit_price, 0);
+    const document: SalesOrderTemplateData = {
+      order_id: order.id, order_code: `SO-${order.so}`, so_number: `SO-${order.so}`, issue_date: order.placed_at,
+      status_label: "Open", channel: "dealer", currency: "MYR", signed: false,
+      customer: { name: order.customer_name, address: order.customer_address, phone: order.customer_phone, email: order.customer_email },
+      dealer: { name: order.dealers.name, address: null, contact: null, outlet_name: null, outlet_address: null, salesperson_name: null, salesperson_phone: null },
+      delivery: { date: order.delivery_date, floor: order.delivery_floor, has_lift: order.delivery_has_lift },
+      lines: order.order_lines.map((line) => {
+        const sku = CATALOG.skus.find((candidate) => candidate.sku === line.sku);
+        const model = CATALOG.models.find((candidate) => candidate.id === sku?.modelId);
+        return { ...line, description: [model?.name, sku?.variant].filter(Boolean).join(" · ") || line.sku,
+          line_total: line.qty * line.unit_price, attrs: null, category: model?.category };
+      }),
+      addons: [], subtotal: total, total, paid: order.paid, balance_due: total - order.paid,
+    };
+    return json(document);
+  }
   if (/\/api\/operation\/work(\?|$)/.test(url)) {
     return new Response(JSON.stringify(FEED), { status: 200, headers: { "Content-Type": "application/json" } });
   }
@@ -420,6 +459,30 @@ globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   }
   const poConfirm = /\/api\/operation\/pos\/([^/]+)\/confirm-sent/.exec(url);
   if (poConfirm) { sentPos.add(decodeURIComponent(poConfirm[1]!)); return json({ ok: true }); }
+  /* The purchase batch task's own PO reads (`BatchPanel`): the issued PO, its
+     document and its send record. Seeded so the task's send steps can be walked. */
+  const batchPo = /\/api\/operation\/pos\/([^/?]+)\/(issue-context|print-data|sends)/.exec(url);
+  if (batchPo) {
+    const id = decodeURIComponent(batchPo[1]!);
+    const po = SO_BATCH.registerRows[0]!.pos.find((p) => p.poId === id);
+    if (!po) return json({ message: "not seeded" }, 404);
+    const supplier = WINDOW_SUPPLIERS.find((s) => s.id === po.supplierId);
+    if (batchPo[2] === "issue-context") return json({
+      id, supplierId: po.supplierId, supplierName: po.supplierName, destinationId: "dest-klang", destination: "Carres Klang Warehouse",
+      poSendChannel: "whatsapp", contact: null, contactEmail: supplier?.contact_email ?? null, whatsappGroupUrl: supplier?.whatsapp_group_url ?? null, version: 1,
+    });
+    if (batchPo[2] === "print-data") return json({
+      po_id: id, po_number: id, version: 1, issue_date: TODAY,
+      supplier: { name: po.supplierName, address: "TEST supplier address", contact: "TEST contact" },
+      destination: { name: "Carres Klang Warehouse", address: "TEST warehouse address" },
+      delivery_instructions: "TEST data only. Do not send this document.", eta_date: "2026-10-20",
+      so_refs: [1390], issued_by: "TEST · Staff A",
+      lines: [{ sku: "TEST-MAT-K", description: "TEST Mattress · King", qty: 6, unit: "pcs", identity_mode: "quantity" }],
+      terms: "LOCAL TEST. No purchase was placed.",
+    });
+    return json({ sends: sentPos.has(id) ? [{ channel: "whatsapp", note: null, sent_at: `${TODAY}T03:10:00Z`, kind: "confirmed_sent", recipient: "group", po_version: 1, sent_by_name: "TEST · Staff A" }] : [] });
+  }
+  if (/\/api\/operation\/pos\/email-capability/.test(url)) return json({ configured: false });
   const onePo = /\/api\/operation\/pos\?[^#]*poId=([^&]+)/.exec(url);
   if (onePo) return json(poRow(decodeURIComponent(onePo[1]!)));
   if (/\/api\/operation\/delivery-arrangements(\?|$)/.test(url)) return json(ARRANGEMENTS);
@@ -427,25 +490,51 @@ globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (/\/logistics-card/.test(url)) return json(facts());
   if (/\/link\/revoke/.test(url)) { linkActive = false; return json({ revoked: true }); }
   if (/\/link(\?|$)/.test(url)) { linkActive = true; return json({ link: { id: "link-1" } }, 201); }
+  const internalTask = /\/api\/operation\/internal-tasks\/([0-9a-f-]{36})(\/done)?$/.exec(url.split("?")[0]!);
+  if (internalTask) {
+    const task = INTERNAL_TASKS.find((row) => row.id === internalTask[1]);
+    if (!task) return json({ code: "task_not_found", message: "task not found" }, 404);
+    if (internalTask[2]) return json({ id: task.id, occurrenceId: `workspace:${task.id}:internal_task`, doneAt: `${TODAY}T04:00:00.000Z`, completionRecorded: true });
+    return json({ ...task, detail: task.id.endsWith("c1") ? "TEST data. Ask TEST Supplier A for the photographs of the two new models." : null,
+      doneAt: null, doneBy: null, events: [{ event: "added", at: task.createdAt, actor: task.createdBy }] });
+  }
+  if (/\/api\/operation\/internal-tasks$/.test(url.split("?")[0]!)) return json({ id: "00000000-0000-4000-8000-0000000000c9", occurrenceId: "workspace:00000000-0000-4000-8000-0000000000c9:internal_task" }, 201);
   if (url.includes("/api/")) return new Response(JSON.stringify({ message: "not seeded" }), { status: 404 });
   return realFetch(input, init);
 };
 
-useAuth.setState({ role: "operation", user: { id: ME, email: "sha@carres.co" } as never });
+/* `?shell=1` mounts the REAL shell over the same seeded reads, so the Tasks
+   panel's one task view (its Route tab reads the Order Route's own sources)
+   can be walked and measured with shaped answers. */
+const shell = new URLSearchParams(window.location.search).get("shell") === "1";
+useAuth.setState({
+  role: "operation", hydrated: true, loading: false,
+  user: { id: ME, email: "sha@carres.co" } as never,
+  ...(shell ? { session: { access_token: "preview", user: { id: ME, email: "sha@carres.co" } } as never } : {}),
+});
+if (shell) {
+  try { window.localStorage.setItem(`carres.pendingWork.shownOn.${ME}`, REAL_TODAY); } catch { /* a private window: the reminder shows */ }
+}
 
 const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 const start = new URLSearchParams(window.location.search).get("at")
-  ?? "/operation?tab=work&day=missed&selected=delivery%3ASO-1362%3Aconfirm_delivery_date";
+  ?? (shell ? "/operation?tab=purchase" : "/operation?tab=work&day=missed&selected=delivery%3ASO-1362%3Aconfirm_delivery_date");
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={[start]}>
-        <PreviewFrame label="Work shell and middle cards (illustrative data)">
-          <div className="flex h-full flex-col">
-            <OperationWork />
-          </div>
-        </PreviewFrame>
+        {shell ? (
+          <Routes>
+            <Route path="/operation/*" element={<OperationApp />} />
+          </Routes>
+        ) : (
+          <PreviewFrame label="Work shell and middle cards (illustrative data)">
+            <div className="flex h-full flex-col">
+              <WorkspaceTasks />
+            </div>
+          </PreviewFrame>
+        )}
       </MemoryRouter>
     </QueryClientProvider>
   </StrictMode>,

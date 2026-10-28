@@ -1,0 +1,43 @@
+{
+  "lines": [
+    {
+      "qty": 1,
+      "sku": "MS01-B1201F-K",
+      "unit": "pc",
+      "attrs": {},
+      "sources": [
+        {
+          "so": null,
+          "qty": 1
+        }
+      ],
+      "unit_codes": [
+        "U1-000-001"
+      ],
+      "description": "Breeze FirmCare-B1201F-K",
+      "destination": {
+        "name": "Carres Klang",
+        "address": "TEST isolated replay destination address"
+      },
+      "identity_mode": "exact_unit"
+    }
+  ],
+  "po_id": "PO261018-9859",
+  "terms": null,
+  "so_refs": [],
+  "version": 1,
+  "eta_date": "2026-10-27",
+  "supplier": {
+    "name": "Nice Future",
+    "address": "TEST isolated replay supplier address",
+    "contact": null
+  },
+  "issued_by": "TEST Requester",
+  "po_number": "PO261018-9859",
+  "issue_date": "2026-10-18",
+  "destination": {
+    "name": "Carres Klang",
+    "address": "TEST isolated replay destination address"
+  },
+  "delivery_instructions": null
+}

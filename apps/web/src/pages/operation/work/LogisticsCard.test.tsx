@@ -26,6 +26,34 @@ vi.mock("@/lib/queries", () => ({
   useDeliveryLinkActs: () => ({ create, revoke }),
   useCatalog: () => ({ data: undefined }),
 }));
+/* The stored deadline settings answer their owner defaults here (the hooks'
+   own loading answer): Office Mon–Fri with the built-in holidays, the ruled
+   Collection timing and the seed leads. */
+const leadsState: { contactLeadWorkingDays: number | null; assignmentLeadWorkingDays: number } = {
+  contactLeadWorkingDays: null,
+  assignmentLeadWorkingDays: 3,
+};
+vi.mock("@/lib/deadline-queries", async () => {
+  const shared = await vi.importActual<typeof import("@carres/shared")>("@carres/shared");
+  const office = shared.officeWorkingDayOptions(shared.DEFAULT_OFFICE_CALENDAR);
+  return {
+    useOrderCollectionTiming: () => shared.DEFAULT_COLLECTION_TIMING,
+    useOfficeDays: () => ({
+      calendar: shared.DEFAULT_OFFICE_CALENDAR,
+      office,
+      holidays: office.holidays,
+      offDays: office.offDays,
+      owner: shared.officeOwnerCalendar(shared.DEFAULT_OFFICE_CALENDAR),
+      holidayName: () => null,
+    }),
+    useDeliveryLeads: () => leadsState,
+    useDeliveryDays: () => {
+      const cal = shared.DEFAULT_DELIVERY_CALENDAR;
+      const opts = shared.deliveryWorkingDayOptions(cal);
+      return { calendar: cal, opts, holidays: opts.holidays, holidayName: () => null, refusal: (iso: string) => shared.deliveryDayRefusal(cal, iso) };
+    },
+  };
+});
 vi.mock("../components/DeliveryBrief", () => ({
   DeliveryDatesEdit: () => <div data-testid="stub-dates-edit" />,
   LogisticsDetailsEdit: () => <div data-testid="stub-logistics-edit" />,
@@ -97,6 +125,26 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 
+/* Owner ruling 2026-10-06: two facts, two names. The checks start on the
+   PROCEED day (`proceeded_at`, the hand-off), read as the Kuala Lumpur day;
+   the Planned production start (`proceed_date`) never stands in for it. */
+describe("the checks start on the proceed day — proceeded_at only", () => {
+  it("a check due before the hand-off day is passed, counted on the Kuala Lumpur day", () => {
+    /* 23 Oct 17:00 UTC is 24 Oct 01:00 in Kuala Lumpur: the 23 Oct check was
+       behind the delivery before it started. */
+    vi.setSystemTime(new Date("2026-10-24T02:00:00Z"));
+    scopeState.card = card({}, { proceeded_at: "2026-10-23T17:00:00Z" });
+    draw();
+    expect(screen.getByTestId("logistics-card-progress").textContent).toBe("Checks 1 of 3");
+  });
+
+  it("never starts the checks on the Planned production start when no hand-off is recorded", () => {
+    scopeState.card = card({}, { proceeded_at: null, proceed_date: "2026-10-24" });
+    draw();
+    expect(screen.getByTestId("logistics-card-progress").textContent).toBe("Checks 0 of 3");
+  });
+});
+
 describe("collapsed — at most five facts", () => {
   it("company, the one action, the check count — nothing else when nothing is scheduled or wrong", () => {
     draw();
@@ -153,6 +201,20 @@ describe("collapsed — at most five facts", () => {
     /* One row in three segments (Jess, 2026-09-27): the heading column, the
        status column, then the trailing date/button outside the toggle. */
     expect(screen.getByTestId("logistics-card-status").textContent).toBe("Scheduled delivery · 27 Oct · Hold delivery · RM 1,000.00 unpaid");
+  });
+});
+
+describe("the stored Contact lead (DEL-05, 9 Oct 2026)", () => {
+  it("the first check counts the stored lead and names it; the other two stay fixed", () => {
+    leadsState.contactLeadWorkingDays = 5;
+    try {
+      draw();
+      fireEvent.click(screen.getByTestId("logistics-card-toggle"));
+      expect(screen.getByTestId("logistics-check-t3")).toHaveTextContent("5 working days before · 21 Oct");
+      expect(screen.getByTestId("logistics-check-t2")).toHaveTextContent("2 working days before · 24 Oct");
+    } finally {
+      leadsState.contactLeadWorkingDays = null;
+    }
   });
 });
 
@@ -235,18 +297,17 @@ describe("the external link", () => {
 });
 
 describe("density below 768px — owner ruling 2026-09-25 (classes only; behaviour and words unchanged)", () => {
-  it("collapsed: at least 72px, 12px sides, 15/20 heading, 13/18/600 action, 12/16 status, 12px checks, 40×40 chevron", () => {
+  /* The one type scale (01 §2): card title 15/500 on a 20 line, task title 13/500, second lines 12/400. */
+  it("collapsed: at least 72px, 12px sides, 15/500 heading, 13/500 action, 12/400 status, 12px checks, 40×40 chevron", () => {
     draw();
-    expect(screen.getByTestId("logistics-card-heading").className).toContain("text-[14px]");
+    expect(screen.getByTestId("logistics-card-heading").className).toContain("text-strong");
     expect(screen.getByTestId("logistics-card-heading").className).toContain("leading-5");
     const [act, status] = Array.from(screen.getByTestId("logistics-card-action").children) as HTMLElement[];
-    expect(screen.getByTestId("logistics-card-status-lines").className).toContain("text-[12px]");
-    expect(act.className).toContain("text-[13px]");
-    expect(act.className).toContain("leading-[18px]");
-    expect(act.className).toContain("font-semibold");
-    expect(status.className).toContain("text-[12px]");
-    expect(status.className).toContain("leading-4");
-    expect(screen.getByTestId("logistics-card-progress").className).toContain("text-[12px]");
+    expect(screen.getByTestId("logistics-card-status-lines").className).toContain("text-meta");
+    expect(act.className).toContain("text-body");
+    expect(act.className).toContain("font-medium");
+    expect(status.className).toContain("text-meta");
+    expect(screen.getByTestId("logistics-card-progress").className).toContain("text-meta");
     const chevron = screen.getByTestId("logistics-card-chevron");
     expect(chevron.className).toContain("h-9");
     expect(chevron.className).toContain("w-9");

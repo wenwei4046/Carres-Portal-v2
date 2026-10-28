@@ -105,8 +105,15 @@ export const BANNED: readonly [RegExp, string][] = [
   // `Needs attention` is banned as a STATE word. The Payment Monitor's rail
   // filter of that name is an owner-ruled FILTER word (2026-09-12) and lives
   // in `@carres/shared/payment-monitor`, outside this scan of page files.
-  [/\bneeds attention\b/i, "Attention → Due soon / Overdue"],
+  [/\bneeds attention\b/i, "Attention → Due soon / Late"],
   [/\bpending\b/i, "Pending → the state it actually selects"],
+  // Words for time (owner ruling 12 Oct 2026). A date or time that has gone by
+  // is `passed`, on the row of that date; a party slow by a count is
+  // `{n} days late`; a one-word status is `Late`. The guards on both sides keep
+  // a key out (`"overdue"`, `pill-overdue`, `.overdue`, `missedAge`): only the
+  // word standing as a word is read.
+  [/(?<![\w.'"`-])overdue(?![\w'"`-])/i, "Overdue → {n} days late / {date} · passed / Late"],
+  [/(?<![\w.'"`-])missed(?![\w'"`-])/i, "Missed → {n} days late / {date} · passed / Late"],
   // The PO sending fact (COPY-STANDARD "PO send wording", Jess 2026-09-17).
   // The shared completion sentence `Current PO version marked as sent` stays:
   // `\bmark as sent` never matches `marked as sent`.

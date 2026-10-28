@@ -15,6 +15,11 @@
  * `opened` is posted from the RENDERED page, never from the GET a chat app
  * makes to draw its preview, so "the company has the details" is a fact the
  * portal actually observed.
+ *
+ * `Hold delivery` (owner ruling 2026-09-25, §3/§5.5): while a Scheduled
+ * delivery exists and the DO money gate holds, the page prints those two words
+ * alone — no amount, no reason, no door — from the server's `holdDelivery`.
+ * The three answers keep working.
  */
 // design-standard: not-a-list-page — a phone-first public answer page, outside the portal shell.
 import { useEffect, useState } from "react";
@@ -24,8 +29,8 @@ import {
   CANNOT_DELIVER_REASONS,
   DELIVERY_TIME_SLOTS,
   LINK_COPY,
-  isSundayIso,
-  myHolidaySet,
+  deliveryDayRefusal,
+  deliveryHolidaySet,
   type ExternalDeliveryLinkView,
 } from "@carres/shared";
 import Button from "@/components/kit/Button";
@@ -37,11 +42,16 @@ import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 
 type Mode = "schedule" | "another" | "cannot";
 
-function dayRefusal(iso: string | null): string | undefined {
+/** The same refusal the link's API makes: not past, not Sunday, not a holiday
+ *  of the ONE Delivery calendar — the holidays the view carries (the stored
+ *  Selangor calendar, else the built-in list); an older Worker that sends
+ *  none leaves the built-in list. */
+function dayRefusal(iso: string | null, holidays: readonly string[] | undefined): string | undefined {
   if (!iso) return undefined;
   if (iso < appTodayIso()) return LINK_COPY.pastRefused;
-  if (isSundayIso(iso)) return LINK_COPY.sundayRefused;
-  if (myHolidaySet().has(iso)) return LINK_COPY.holidayRefused;
+  const refusal = deliveryDayRefusal(holidays ?? deliveryHolidaySet(), iso);
+  if (refusal === "sunday") return LINK_COPY.sundayRefused;
+  if (refusal === "holiday") return LINK_COPY.holidayRefused;
   return undefined;
 }
 
@@ -110,6 +120,12 @@ export default function DeliveryLinkPage() {
         });
         setDone(LINK_COPY.savedCannot);
       }
+      /* Read the delivery again, quietly: a date just saved is now the
+         Scheduled delivery, and the moment one exists `Hold delivery` must
+         show if the gate holds (owner ruling 2026-09-25, §3). */
+      void apiFetch<ExternalDeliveryLinkView>(base)
+        .then(setView)
+        .catch(() => undefined);
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) setState("dead");
       else setError(err instanceof Error ? err.message : LINK_COPY.loadFailed);
@@ -130,7 +146,7 @@ export default function DeliveryLinkPage() {
     );
   }
 
-  const refusal = mode === "cannot" ? undefined : dayRefusal(date);
+  const refusal = mode === "cannot" ? undefined : dayRefusal(date, view.deliveryHolidays);
   const canSave =
     !busy &&
     (mode === "cannot"
@@ -142,7 +158,7 @@ export default function DeliveryLinkPage() {
       <div className="mx-auto flex w-full max-w-[560px] flex-col gap-4">
         <header className="rounded-work border border-work-line bg-white px-4 py-3">
           <p className="text-label text-kit-slate-11">{LINK_COPY.pageTitle}</p>
-          <h1 className="text-section font-semibold text-kit-slate-12">{view.company}</h1>
+          <h1 className="text-strong text-kit-slate-12">{view.company}</h1>
         </header>
 
         <section aria-label="Delivery" className="rounded-work border border-work-line bg-white px-4 py-2">
@@ -169,6 +185,11 @@ export default function DeliveryLinkPage() {
             <Row label="Scheduled delivery">
               {[fmtDate(view.scheduledDate), view.scheduledTime].filter(Boolean).join(" · ")}
             </Row>
+          ) : null}
+          {view.holdDelivery ? (
+            <p className="py-1.5 text-body font-semibold text-kit-red-11" data-testid="delivery-link-hold">
+              {LINK_COPY.holdDelivery}
+            </p>
           ) : null}
         </section>
 

@@ -28,8 +28,8 @@
  */
 
 import { logisticsCheckDueIso } from "./logistics-card";
-import { collectionClock, type CollectionTiming } from "./collection-clock";
-import { deliveryStepDueIso, type DeliveryQueueLeads } from "./delivery-queue";
+import { collectionClock, type CollectionTiming, type OwnerCalendar } from "./collection-clock";
+import { assignLogisticsDueIso, deliveryStepDueIso, type DeliveryQueueLeads } from "./delivery-queue";
 import { orderActionDueIso, OFFICE_OFF_DAYS } from "./order-action-due";
 import type { OrderOpenAction } from "./order-actions";
 import { orderActionQueue, type OrderActionKey } from "./order-action-words";
@@ -94,7 +94,8 @@ export type WorkOwnerRule =
    * `workItemsForOrder`; Card 9's recorded boundary): */
   | "grn_duty" // the effective GRN Duty resolution from Workspace
   | "claim_month_po_duty" // the holder of the month the claim was OPENED — forever
-  | "purchasing_approver";
+  | "purchasing_approver"
+  | "service_case_approver";
 
 export interface WorkRuleDefinition {
   key: string;
@@ -152,7 +153,7 @@ export const ORDER_WORK_RULES: readonly WorkRuleDefinition[] = [
       "the order's PIC — the decision is about the CUSTOMER commitment, not the supplier chase (which is PO Duty's, above)",
     ownerRule: "order_pic",
     action: orderActionQueue("delay_planning"),
-    dueRule: "2 working days from delay_detected_at, OFFICE calendar",
+    dueRule: "2 working days from delay_detected_at, on the stored Office calendar (Settings → Office)",
     completionFact: "a decision recorded about this supplier date (delay_decision + delay_decision_eta, 0304)",
   },
   {
@@ -163,7 +164,7 @@ export const ORDER_WORK_RULES: readonly WorkRuleDefinition[] = [
       "the order's PIC as governed proxy (§0.1: customer date/time confirmation → assigned Partner or governed proxy owner; ACTION-FLOW Law 4 rung 2 — the conversation is logistics', the ACTION in this portal is ours, and a partner has no login to close it)",
     ownerRule: "order_pic",
     action: orderActionQueue("arrange_new_delivery_date"),
-    dueRule: "the SAME office working day as delay_decision_at",
+    dueRule: "the SAME Office working day as delay_decision_at (the stored Office calendar)",
     completionFact: "a customer-confirmed date + slot on/after the supplier's ready date (0277)",
   },
   {
@@ -174,7 +175,8 @@ export const ORDER_WORK_RULES: readonly WorkRuleDefinition[] = [
       "the Sales Order's responsible Operation person — the individual it was dealt to, with buddy cover (owner ruling 2026-09-17); Delivery Duty only when the order has no such person. Choosing the company is Delivery's arrangement act",
     ownerRule: "responsible_operation",
     action: orderActionQueue("assign_logistics"),
-    dueRule: "3 working days before the promised date, delivery week + MY holidays",
+    dueRule:
+      "opens on the PO issue day (stock order: the day it entered Operations); due `Assign logistics by` — the Delivery Rules assignment lead (3) Delivery working days before the Scheduled delivery, else the Requested one (Delivery MASTER §2.1); an order opening inside it is due the day it opens",
     completionFact: "a company recorded (orders.delivery_partners / ops_assigned_logistic)",
   },
   {
@@ -186,7 +188,7 @@ export const ORDER_WORK_RULES: readonly WorkRuleDefinition[] = [
     ownerRule: "responsible_operation",
     action: orderActionQueue("confirm_delivery_date"),
     dueRule:
-      "logistics_call_working_days (3 — Card 3's ruling) before the promised date, delivery week + MY holidays",
+      "the Logistics card's fixed `2 working days before` check (Workspace §5.9 gap 6): Requested delivery, else Scheduled, delivery week + MY holidays",
     completionFact: "a customer-confirmed date AND slot with evidence (booking_stage='confirmed', 0277)",
   },
   {
@@ -241,7 +243,7 @@ export const ORDER_WORK_RULES: readonly WorkRuleDefinition[] = [
     ownerRule: "collection_owner",
     action: orderActionQueue("collect"),
     dueRule:
-      "T−2 working days before the delivery (confirmed, else promised) — the collection clock, deadline re-ruled 2026-08-19 (logistics takes the DO at T−1); T−3 attention",
+      "the collection clock: Settings → Payments → Collection timing (2, outstation 3) working days before the delivery (confirmed, else promised), on the Delivery calendar (Mon–Sat + the Selangor holidays); the action follows the responsible person's working days (Office weekdays when none are recorded) and never moves the customer's dates",
     completionFact: "outstanding = RM 0 through the one money arithmetic (orderMoney over orders.paid)",
   },
   // ── The blueprint card's two NEW acts (owner-approved 2026-08-16, §7) ──
@@ -305,6 +307,7 @@ export const ORDER_WORK_RULES: readonly WorkRuleDefinition[] = [
  *  Receiving rail, the Claims queue) and join the composed feed when their
  *  server feeds are wired (Card 9's recorded boundary). */
 export const MODULE_WORK_RULES: readonly WorkRuleDefinition[] = [
+  { key: "service_case.remedy_approve", module: "purchasing", trigger: "a linked SC purchase has a current submitted Case remedy proposal", owner: "the existing Service Case Approver duty holder", ownerRule: "service_case_approver", action: "Review Case remedy", dueRule: "next Office working day after the ready proposal was recorded (Service §7.9)", completionFact: "the exact immutable Case remedy approval record is approved or refused" },
   {
     key: "manual_purchase.approve",
     module: "purchasing",
@@ -324,6 +327,9 @@ export const MODULE_WORK_RULES: readonly WorkRuleDefinition[] = [
     action: "Issue PO",
     dueRule: "no later than the request's Order By date on the OFFICE calendar",
     completionFact: "a sent mark for every linked current PO version (po_sends)",
+  },
+  {
+    key:"purchasing.cancellation_send",module:"purchasing",trigger:"an effective PO cancellation has a current version not confirmed sent",owner:"effective PO Duty holder and governed cover",ownerRule:"po_duty",action:"Send PO to supplier",dueRule:"no new deadline; preserve actual cancellation version",completionFact:"confirmed_sent for the exact current cancellation PO version",
   },
   {
     /* ⭐ ONE OCCURRENCE PER PO WINDOW (Purchasing §5.6.1, owner rulings
@@ -366,6 +372,19 @@ export const MODULE_WORK_RULES: readonly WorkRuleDefinition[] = [
     action: "Review RM {amount}",
     dueRule: "opens with the overpayment; §10 gives this row no clock",
     completionFact: "the order's overpaid figure is RM 0 after allocation, or an approved refund covers it (order_refunds)",
+  },
+  {
+    /* 0707 (Houzs port, row 11; DRAFT, awaits Jess's review): a manual payment
+     * whose paid date is more than 14 days back waits for the Payment Approver
+     * (section 12 duty). Nobody decides their own request. */
+    key: "payment.approve_backdated_payment",
+    module: "payment",
+    trigger: "a manual payment was recorded with a paid date more than 14 days before today (payment_backdate_requests, waiting)",
+    owner: "the effective Payment Approver duty holder from Workspace; never the person who asked",
+    ownerRule: "payment_approver_duty",
+    action: "Approve RM {amount} paid on {weekday}, {day} {month}",
+    dueRule: "the day it was asked; no clock beyond that",
+    completionFact: "the request is approved (the payment is recorded through _customer_payment_post) or refused with a reason",
   },
   {
     /* §10 row 2 — the SAME act with a should-have-been-done state. It is its
@@ -457,11 +476,11 @@ export const MODULE_WORK_RULES: readonly WorkRuleDefinition[] = [
   {
     key: "receiving.check_in",
     module: "receiving",
-    trigger: "goods have an arrival promise and no posted Receiving Session covers them",
+    trigger: "an actual submitted physical receipt report has not been posted",
     owner: "the effective GRN Duty holder from Workspace; never inferred from PO Duty",
     ownerRule: "grn_duty",
     action: "Check in",
-    dueRule: "the promised arrival day",
+    dueRule: "the actual goods received date, or the report submission date when not recorded",
     completionFact: "a posted Receiving Session (warehouse_receipts + receiving_events 'posted')",
   },
   /* ⭐ REPAIR ORDERS (Purchasing §9.7 · §10, owner rulings 2026-09-19/20/28).
@@ -607,11 +626,14 @@ const WORK_COMPLETION_STATEMENTS: Readonly<Record<string, string>> = {
   collect_loan_item: "The loan item is recorded as returned",
   resolve_payment_exception: "The payment exception is cleared with evidence",
   ask_delivery_date: "The requested delivery date or governed no-date answer is recorded",
+  "service_case.remedy_approve": "The exact Case remedy decision is recorded",
   "manual_purchase.approve": "The approval or refusal decision is recorded",
   "manual_purchase.issue_po": "Every linked current PO version marked as sent",
+  "purchasing.cancellation_send": "Current cancellation PO version marked as sent",
   "purchasing.po_window": "Every PO issued from the window has its current version marked as sent",
   "payment.collect_customer_balance": "The outstanding balance is RM 0",
   "payment.review_overpayment": "The overpaid amount is RM 0 or an approved refund covers it",
+  "payment.approve_backdated_payment": "The approval or refusal decision is recorded",
   "payment.missed_promise": "The outstanding balance is RM 0",
   "payment.send_storage_invoice": "The live storage owing is RM 0",
   "purchasing.supplier_reply": "An evidenced supplier answer for the current PO version is recorded",
@@ -818,8 +840,26 @@ export interface OrderWorkContext {
   financeExceptionHolds?: boolean;
   /** `Settings → Payments → Collection timing` (owner ruling 2026-09-12) —
    *  the effective ask/deadline pair for this order's clock. Absent ⇒ the
-   *  ruled default (3 · 2). */
+   *  ruled default (3 · 2; outstation 4 · 3). */
   collectionTiming?: CollectionTiming;
+  /** The delivery is outstation (`isOutstation`) — the clock counts the
+   *  outstation pair (PAY-04). Absent ⇒ ordinary. */
+  outstation?: boolean;
+}
+
+/**
+ * The calendars one order's work counts on (9 Oct 2026). `delivery` facts
+ * (Logistics checks, Assign logistics by, deliver/photo, the payment-due
+ * fact) count on the Delivery calendar passed as `opts`
+ * (`deliveryWorkingDayOptions`); OFFICE work — when Operation must act —
+ * counts on the stored Office calendar (`officeWorkingDayOptions`), and the
+ * payment clock's owner acts on its weekdays AND holidays
+ * (`officeOwnerCalendar`). Absent ⇒ the owner-confirmed defaults (Mon–Fri
+ * with the delivery-fact holidays).
+ */
+export interface OrderWorkCalendars {
+  office?: WorkingDayOptions;
+  owner?: OwnerCalendar;
 }
 
 /**
@@ -832,23 +872,32 @@ export function workItemsForOrder(
   ctx: OrderWorkContext,
   todayIso: string,
   opts: WorkingDayOptions = {},
-  /* Kept for callers; the delivery-date clock is now the Logistics check. */
-  _leads?: DeliveryQueueLeads,
+  /** The stored Delivery leads — `assign` (DEL-04) and `chase` (DEL-05). */
+  leads?: DeliveryQueueLeads,
+  calendars: OrderWorkCalendars = {},
 ): WorkItem[] {
-  const officeOpts: WorkingDayOptions = { ...opts, offDays: OFFICE_OFF_DAYS };
+  const officeOpts: WorkingDayOptions = calendars.office ?? { ...opts, offDays: OFFICE_OFF_DAYS };
   const dueOf = (key: OrderActionKey): IsoDate | null => {
     switch (key) {
-      case "assign_logistics": {
-        // Owner re-ruling 2026-08-16 (blueprint card §7): due WITHIN THE DAY
-        // the PO is issued; a stock-source order with no PO — within the
-        // order day. The old 3-working-days-before-the-customer-date law is
-        // SUPERSEDED.
-        const anchor = ctx.poIssuedAtIso ?? ctx.placedAtIso ?? null;
-        return anchor ? (anchor.slice(0, 10) as IsoDate) : null;
-      }
+      case "assign_logistics":
+        // Delivery MASTER §2.1 (owner 2026-09-29 · confirmed 9 Oct 2026): the
+        // PO issue day (a stock order: the day it entered Operations) only
+        // OPENS the action; it is due by the configured assignment deadline
+        // before the Scheduled delivery, else the Requested one — the ONE
+        // `assignLogisticsDueIso` the Logistics card reads too. The 2026-08-16
+        // "within the PO day" due is superseded.
+        return assignLogisticsDueIso({
+          scheduledIso: ctx.confirmedDateIso,
+          requestedIso: ctx.promisedDateIso,
+          openedIso: ctx.poIssuedAtIso ?? ctx.placedAtIso ?? null,
+          opts,
+          leads,
+        });
       case "confirm_delivery_date":
         /* ONE clock with the Logistics card (Workspace §5.9 gap 6, owner
-           decision 2026-09-25): the `2 working days before` check. */
+           decision 2026-09-25): the FIXED `2 working days before` check —
+           the Scheduled-date deadline, never relabelled as the contact day
+           (§5.9 item 8). */
         return logisticsCheckDueIso("t2", {
           requestedIso: ctx.promisedDateIso,
           scheduledIso: ctx.confirmedDateIso,
@@ -860,12 +909,13 @@ export function workItemsForOrder(
       case "check_delivery_proof":
         return deliveryStepDueIso("photo", ctx.deliveredAtIso, opts);
       case "delay_planning":
-        return orderActionDueIso("delay_planning", ctx.delayDetectedAtIso, opts.holidays);
+        return orderActionDueIso("delay_planning", ctx.delayDetectedAtIso, officeOpts.holidays, officeOpts.offDays);
       case "arrange_new_delivery_date":
         return orderActionDueIso(
           "arrange_new_delivery_date",
           ctx.delayDecisionAtIso,
-          opts.holidays,
+          officeOpts.holidays,
+          officeOpts.offDays,
         );
       case "collect":
       case "issue_delivery_order":
@@ -876,10 +926,14 @@ export function workItemsForOrder(
           {
             confirmedDateIso: ctx.confirmedDateIso,
             promisedDateIso: ctx.promisedDateIso,
+            outstation: ctx.outstation,
           },
           todayIso,
+          // The payment-due FACT counts on the Delivery calendar (`opts`);
+          // the owner's action day steps back on the Office calendar.
           opts,
           ctx.collectionTiming,
+          calendars.owner,
         ).dueIso;
       case "collect_loan_item":
         // The delivery day itself (blueprint card §7): the loan comes back on

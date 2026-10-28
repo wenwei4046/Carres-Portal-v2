@@ -260,3 +260,13 @@ describe("Receiving · confirmation belongs to the actual draft", () => {
     expect(screen.getByTestId("receiving-save")).toBeDisabled();
   });
 });
+
+
+it("read summary keeps original quantities and does not offer receiving for a fully cancelled remainder",()=>{
+ render(<MemoryRouter><ReceivingWorkspace po={{...po,purchase_order_lines:[{...po.purchase_order_lines[0],received_qty:2,cancelled_qty:3}]}} supplier={{id:"s",name:"Factory"} as never} warehouseName="TEST site" receiving={false} onReceiving={()=>{}}/></MemoryRouter>);
+ expect(screen.getByTestId("summary-order-qty")).toHaveTextContent("5");
+ expect(screen.getByTestId("summary-received-qty")).toHaveTextContent("2");
+ expect(screen.getByTestId("summary-cancelled-qty")).toHaveTextContent("3");
+ expect(screen.getByTestId("summary-pending-qty")).toHaveTextContent("0");
+ expect(screen.queryByRole("button",{name:"Start Receiving"})).not.toBeInTheDocument();
+});

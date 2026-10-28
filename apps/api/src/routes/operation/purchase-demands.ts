@@ -1,12 +1,13 @@
 import { Hono } from "hono";
 import {
-  myHolidaySet,
+  officeWorkingDayOptions,
   parsePoWindowKey,
   poDeliveryDateOf,
   poWindowCalendarOf,
   poWindowFor,
   poWindowKeyOf,
   productionWorkingDaysFor,
+  catalogCostBlocksIssue,
   purchaseDemandBlockerOf,
   purchaseDemandQuantities,
   purchaseDemandTimingOf,
@@ -14,6 +15,7 @@ import {
   isPurchaseDemandTimingState,
   soBatchAction,
   soBatchOrderLineOutstandingQty,
+  soBatchOrderPlanning,
   soBatchOrderStatusOf,
   stockMatchKey,
   PURCHASE_DEMAND_OWNER_DUTY,
@@ -37,6 +39,7 @@ import {
 import { mapPgError, fail } from "../../lib/route-helpers";
 import { purchasingActorMayIssue } from "../../lib/purchasing-po-authority";
 import { loadPoWindows } from "../../lib/purchasing-settings";
+import { readOfficeCalendar } from "../../lib/office-calendar";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -335,6 +338,7 @@ async function loadRegisterRows(
       status: soBatchOrderStatusOf({ buyingRequiredQty, sentCoveredQty }),
       proceededAt: fact.proceededAt,
       requestedDeliveryDate: fact.delivery,
+      originalRequestedDeliveryDate: fact.originalRequestedDelivery ?? null,
       deliveryCity: fact.city,
       deliveryState: fact.state,
       pos,
@@ -382,9 +386,14 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
   if (!res.ok) return c.json(res.body as Record<string, unknown>, res.status as 400);
   const { proposals, registerFacts, supplierNames, supplierAddresses, supplierKinds, catalog, today, settings } =
     res.data;
-  /* The SAME holiday set the engine planned with — the classification only
-     compares the engine's dates, it never re-plans them. */
-  const holidays = myHolidaySet();
+  /* The classification only compares the engine's dates, it never re-plans
+     them; the Safety-days margin and the PO windows are OFFICE arithmetic
+     (Law 2A), so they count on the STORED Office calendar — its weekdays and
+     its holidays (Settings → Office; owner defaults when unreadable). */
+  const officeStored = await readOfficeCalendar(sb);
+  const officeOpts = officeWorkingDayOptions(officeStored.calendar);
+  const holidays = new Set(officeStored.calendar.holidays.map((h) => h.date));
+  const officeOffDays = officeOpts.offDays ?? [0, 6];
 
   /**
    * The two owner facts, read here because they are Register-only.
@@ -550,10 +559,17 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
         /* THE ENGINE'S OWN ARRIVAL DATE. `stockReady` IS `arriveBy` — the day
            the goods must be at Carres for this customer promise to hold. */
         const goodsMustArrive = row.stockReady;
-        const catalogCostMissing = build.lines.some((l) => {
-          const cost = catalog.get(l.sku)?.cost ?? null;
-          return cost == null || cost <= 0;
-        });
+        /* ONE RULE WITH THE ISSUE DOOR (`catalogCostBlocksIssue`): an
+           unrecorded price is bought without a commercial claim (0573); only a
+           recorded price that is not positive blocks the row. */
+        const catalogCostMissing = build.lines.some((l) =>
+          catalogCostBlocksIssue(catalog.get(l.sku)?.cost ?? null),
+        );
+        /* 0443 · the official PO door refuses a SKU whose Stock identity is
+           `Not set`, so the row names it before the operator presses Issue. */
+        const stockIdentityMissing = build.lines.some(
+          (l) => (catalog.get(l.sku)?.stockIdentityMode ?? null) == null,
+        );
         /* A carried build has its SKU, supplier and production days by
            construction — the read refuses the others line by line into
            `registerFacts` below. The one blocker it can still carry is the
@@ -583,11 +599,14 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
                 customerDelivery: row.delivery,
                 safetyDays: settings.orderByBufferDays,
                 holidays,
+                offDays: officeOffDays,
               }
             : null;
         const state: PurchaseDemandState =
           row.delivery == null
             ? "no_customer_date"
+            : stockIdentityMissing
+              ? "no_stock_identity"
             : catalogCostMissing
               ? "no_cost"
             : pickupPartnerMissing
@@ -646,20 +665,17 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
           /* A CARRIED build can be issued, so it carries the reference the
              issue endpoint recomputes against. A refused line below cannot,
              and says so by having none. */
-          issueRef: state === "no_cost"
+          issueRef: state === "no_cost" || state === "no_stock_identity"
             ? null
             : { proposalKey: proposal.key, buildKey: build.key },
-          /* The CATALOG's price per SKU, carried so the 50/50 can ask for the
-             one it does not have. `null` is load-bearing: a SKU with no price
-             cannot be issued until somebody states a cost or marks it Free of
-             Charge, and a `0` here would be a price nobody set. */
+          // Operation receives goods facts only; server-side issue still reads Catalog.
           /* The build's own lines — the modules a matched set is made of. The
              quantity rides with them, so the expand can list the parts instead
              of re-stating the row's numbers. */
           parts: build.lines.map((l) => ({
             sku: l.sku,
             qty: l.qty,
-            unitCost: catalog.get(l.sku)?.cost ?? null,
+            unitCost: c.var.auth.role === "operation" ? null : catalog.get(l.sku)?.cost ?? null,
           })),
           supplierKind: supplierKinds.get(proposal.supplierId) ?? "own_logistics",
           supplierCollection: collectionBySupplier.get(proposal.supplierId) ?? null,
@@ -729,7 +745,7 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
          offer an act that cannot succeed. */
       goodsMustArrive: null,
       issueRef: null,
-      parts: [{ sku: line.sku, qty: line.qty, unitCost: catalog.get(line.sku)?.cost ?? null }],
+      parts: [{ sku: line.sku, qty: line.qty, unitCost: c.var.auth.role === "operation" ? null : catalog.get(line.sku)?.cost ?? null }],
       supplierKind: line.supplierId
         ? (supplierKinds.get(line.supplierId) ?? "own_logistics")
         : null,
@@ -839,9 +855,12 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
    * disagree. An unreadable setting stamps nothing and SAYS so — buying still
    * works, and Work reports its Purchasing source instead of an empty day. */
   let poWindowsUnavailable = false;
+  let poCutoffTimes: string[] | undefined;
+  let poRounds: SoBatchPurchaseResponse["poRounds"];
   try {
     const windows = await loadPoWindows(sb);
-    const calendar = poWindowCalendarOf(windows.poDays, holidays);
+    poCutoffTimes = [...new Set([windows.settings.first, ...(windows.settings.secondEnabled && windows.settings.second ? [windows.settings.second] : [])].map(time => time.slice(0, 5)))];
+    const calendar = poWindowCalendarOf(windows.poDays, holidays, officeOffDays);
     const memo = new Map<string, string | null>();
     const stamp = (orderId: string, supplierId: string | null): string | null => {
       const key = `${orderId}::${supplierId ?? ""}`;
@@ -862,6 +881,29 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
     for (const reg of registerRes.registerRows) {
       for (const po of reg.pos) po.poWindow = stamp(reg.orderId, po.supplierId);
     }
+    // Keep dated historical rounds; an excluded day creates no occurrence.
+    // The two next standard rounds read the same editable settings/calendar.
+    const rounds = new Map<string, Set<string>>();
+    const first = poWindowFor(new Date().toISOString(), windows.settings, null, calendar);
+    const next = poWindowFor(first.dueAt, windows.settings, null, calendar);
+    for (const window of [first, next]) rounds.set(poWindowKeyOf(window), new Set());
+    // Read the Register's canonical remaining-demand judgement, including
+    // completed PO/Stock coverage and blocked or unverified demand.
+    const unfinishedOrders = new Set(registerRes.registerRows
+      .filter(order => soBatchOrderPlanning(order, rows.filter(row => row.orderId === order.orderId)).group === "to-buy")
+      .map(order => order.orderId));
+    for (const row of rows) {
+      if (!row.poWindow) continue;
+      if (!rounds.has(row.poWindow)) rounds.set(row.poWindow, new Set());
+      if (unfinishedOrders.has(row.orderId)) rounds.get(row.poWindow)!.add(row.orderId);
+    }
+    for (const reg of registerRes.registerRows) {
+      for (const po of reg.pos) {
+        if (po.poWindow && !rounds.has(po.poWindow)) rounds.set(po.poWindow, new Set());
+      }
+    }
+    poRounds = [...rounds].sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, orderIds]) => ({ key, unfinishedSoCount: orderIds.size }));
   } catch (e) {
     poWindowsUnavailable = true;
     console.error("so batch — PO windows unavailable", (e as Error).message);
@@ -902,7 +944,10 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
     /* Card 02-A — the governed Safety days value, so the rail words follow
        the one setting. The browser prints it; the arithmetic stayed here. */
     safetyDays: settings.orderByBufferDays,
+    readyStockPriority: settings.readyStockPriority ?? null,
     ...(poWindowsUnavailable ? { poWindowsUnavailable: true } : {}),
+    ...(poCutoffTimes ? { poCutoffTimes } : {}),
+    ...(poRounds ? { poRounds } : {}),
   };
   return c.json(body);
 });

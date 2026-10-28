@@ -234,7 +234,7 @@ export default function ChangeDeliverToForm({
             </div>
             {byUnit && qtyValid ? (
               <fieldset data-testid="cdt-units">
-                <legend className="text-label font-medium text-kit-slate-11">Units moving</legend>
+                <legend className="text-meta text-kit-slate-11">Units moving</legend>
                 <div className="mt-1 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
                   {lineUnits.map((code) => (
                     <div key={code} className="font-mono text-meta">
@@ -269,7 +269,7 @@ export default function ChangeDeliverToForm({
 
       {reviewed && preview && !gap ? (
         <div className="mt-4" data-testid="cdt-review">
-          <div className="mb-2 text-body font-semibold text-kit-slate-12">
+          <div className="mb-2 text-strong text-kit-slate-12">
             <span className="font-mono">{nextDocNo}</span> · {supplierName}
           </div>
           <table className={SO_TABLE}>
@@ -289,8 +289,8 @@ export default function ChangeDeliverToForm({
                 </tr>
               ))}
               <tr className={SO_ROW}>
-                <td className={`${SO_TD} font-semibold`} colSpan={2}>Total unchanged</td>
-                <td className={`${SO_TD} text-right font-semibold tabular-nums`} data-testid="cdt-total">{preview.total}</td>
+                <td className={`${SO_TD} font-medium`} colSpan={2}>Total unchanged</td>
+                <td className={`${SO_TD} text-right font-medium tabular-nums`} data-testid="cdt-total">{preview.total}</td>
               </tr>
             </tbody>
           </table>

@@ -54,6 +54,9 @@ export const supplierBillLineInput = z
   .object({
     warehouseReceiptId: z.string().uuid().nullable().optional(),
     poLineId: z.string().uuid().nullable().optional(),
+    /** 0689: the delivery order a logistics partner's bill line charges for.
+     *  Its channel is the DO's order's; the form sends none. */
+    deliveryOrderId: z.string().uuid().nullable().optional(),
     accountCode: optText(10),
     description: optText(300),
     sku: optText(120),
@@ -87,10 +90,169 @@ export const otherCreditorInput = z
   .strict();
 export type OtherCreditorInput = z.infer<typeof otherCreditorInput>;
 
+// ── a supplier's finance details (0636; Chew 2026-10-03, Finance MASTER §3.2) ─
+/** Blank text means no value, exactly as the database door stores it. */
+const blankToNull = (v: string | null | undefined): string | null => {
+  const t = (v ?? "").trim();
+  return t === "" ? null : t;
+};
+
+/**
+ * Finance's own tax and bank details for a supplier. The supplier stays
+ * Purchasing's record. finance_supplier_profile_save checks the same rules;
+ * this only turns a bad form into a sentence before the round trip.
+ */
+export const supplierFinanceInput = z
+  .object({
+    taxNo: z.string().max(40, "The tax number is too long.").nullable().optional(),
+    registrationNo: z.string().max(60, "The registration number is too long.").nullable().optional(),
+    bankName: z.string().max(100, "The bank name is too long.").nullable().optional(),
+    bankAccountNo: z.string().max(40, "An account number is 6 to 20 digits.").nullable().optional(),
+    bankAccountHolder: z.string().max(200, "The account holder's name is too long.").nullable().optional(),
+  })
+  .strict()
+  .transform((v) => ({
+    taxNo: blankToNull(v.taxNo),
+    registrationNo: blankToNull(v.registrationNo),
+    bankName: blankToNull(v.bankName),
+    // Spaces and dashes typed with the number are dropped (0636, as 0598 does for dealers).
+    bankAccountNo: blankToNull(v.bankAccountNo?.replace(/[\s-]/g, "")),
+    bankAccountHolder: blankToNull(v.bankAccountHolder),
+  }))
+  .refine((v) => v.bankAccountNo === null || /^[0-9]{6,20}$/.test(v.bankAccountNo), {
+    message: "An account number is 6 to 20 digits.",
+    path: ["bankAccountNo"],
+  })
+  .refine((v) => v.bankAccountNo === null || v.bankName !== null, {
+    message: "Choose the bank for this account number.",
+    path: ["bankName"],
+  });
+export type SupplierFinanceInput = z.infer<typeof supplierFinanceInput>;
+/** What the form sends, before blanks become null. */
+export type SupplierFinanceFormInput = z.input<typeof supplierFinanceInput>;
+
+/** One supplier on Finance's Suppliers page (finance_supplier_list, 0636). */
+export interface SupplierFinanceRow {
+  supplier_id: string;
+  name: string;
+  kind: string;
+  /** 0691: Finance's AutoCount-style code, like 400-A001. Absent before 0691. */
+  code?: string | null;
+  tax_no: string | null;
+  registration_no: string | null;
+  bank_name: string | null;
+  bank_account_no: string | null;
+  bank_account_holder: string | null;
+  updated_at: string | null;
+  updated_by_name: string | null;
+}
+
+/** Where a payment to this supplier goes, on one line: `Maybank · 514012345678 ·
+ *  Ah Seng Trading`. Null while Finance keeps no account number. */
+/** 0691 (Chew 2026-10-12): a supplier's, other creditor's or other debtor's
+ *  code, in AutoCount's form: three digits, a dash, a letter or digit, three
+ *  digits (400-A001). Typed in small letters it is kept in capitals. */
+export const PARTY_CODE_MESSAGE = "Type a code like 400-A001.";
+export const partyCodeInput = z
+  .object({
+    code: z
+      .string()
+      .trim()
+      .transform((s) => s.toUpperCase())
+      .pipe(z.string().regex(/^[0-9]{3}-[0-9A-Z][0-9]{3}$/, PARTY_CODE_MESSAGE)),
+  })
+  .strict();
+export type PartyCodeInput = z.infer<typeof partyCodeInput>;
+
+/** How a creditor reads in a picker: its code first when it has one. */
+export function partyLabel(p: { name: string; code?: string | null }): string {
+  return p.code ? `${p.code} ${p.name}` : p.name;
+}
+
+export function supplierPayTo(
+  row: Pick<SupplierFinanceRow, "bank_name" | "bank_account_no" | "bank_account_holder">,
+): string | null {
+  if (!row.bank_account_no) return null;
+  return [row.bank_name, row.bank_account_no, row.bank_account_holder].filter(Boolean).join(" · ");
+}
+
 export const apReasonInput = z
   .object({ reason: z.string().trim().min(1, "Say why").max(500) })
   .strict();
 export type ApReasonInput = z.infer<typeof apReasonInput>;
+
+// ── supplier credit notes (0642; Chew 2026-10-03, Finance MASTER §3.2) ────────
+/** One line of a supplier's credit note: what the credit is for, and where it
+ *  goes back to (an expense, asset or income account — the database checks). */
+export const supplierCreditNoteLineInput = z
+  .object({
+    accountCode: z.string().trim().min(1, "Choose an account").max(10),
+    description: z.string().trim().min(1, "Say what this credit is for").max(200, "The description is too long"),
+    amount: money.refine((n) => n > 0, "The amount must be more than RM 0.00"),
+    ...lineDepartmentFields,
+  })
+  .strict();
+export type SupplierCreditNoteLineInput = z.infer<typeof supplierCreditNoteLineInput>;
+
+export const supplierCreditNoteDraftInput = z
+  .object({
+    supplierId: z.string().uuid({ message: "Choose who sent this credit note" }),
+    supplierNoteNo: z.string().trim().min(1, "Type the supplier's credit note number").max(60, "The credit note number is too long"),
+    noteDate: isoDate,
+    apAccountCode: optText(10),
+    narration: optText(500),
+    lines: z.array(supplierCreditNoteLineInput).min(1, "A credit note needs at least one line").max(300),
+  })
+  .strict();
+export type SupplierCreditNoteDraftInput = z.infer<typeof supplierCreditNoteDraftInput>;
+
+// ── a bill's foreign currency (0682; Chew 2026-10-03, Finance MASTER §3.2) ────
+/** Record only: the bill stays in RM. No currency removes what was recorded. */
+export const billForeignAmountInput = z.union([
+  z.object({ currency: z.null() }).strict(),
+  z.object({
+    currency: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, "Type the currency as three letters, like USD")
+      .refine((c) => c !== "MYR", "A bill in ringgit has no foreign currency"),
+    foreignAmount: money.refine((n) => n > 0, "Type the amount on the supplier's invoice"),
+    rate: z.number().positive("Type the rate as a number above 0")
+      .refine((n) => Number(n.toFixed(6)) === n, "Keep the rate to six decimals"),
+  }).strict(),
+]);
+export type BillForeignAmountInput = z.infer<typeof billForeignAmountInput>;
+
+/** What a bill records of its foreign currency (0682), or null. */
+export interface BillForeignAmount {
+  currency: string;
+  foreign_amount: ApMoney;
+  rate: ApMoney;
+  set_at: string;
+}
+
+// ── supplier debit notes (0681; Chew 2026-10-03, Finance MASTER §3.2) ─────────
+/** One line of a supplier's debit note: what the supplier charges more for, and
+ *  the cost it goes to (an expense or asset account — the database checks). */
+export const supplierDebitNoteLineInput = z
+  .object({
+    accountCode: z.string().trim().min(1, "Choose an account").max(10),
+    description: z.string().trim().min(1, "Say what the supplier charges more for").max(200, "The description is too long"),
+    amount: money.refine((n) => n > 0, "The amount must be more than RM 0.00"),
+    ...lineDepartmentFields,
+  })
+  .strict();
+export type SupplierDebitNoteLineInput = z.infer<typeof supplierDebitNoteLineInput>;
+
+export const supplierDebitNoteDraftInput = z
+  .object({
+    supplierId: z.string().uuid({ message: "Choose who sent this debit note" }),
+    supplierNoteNo: z.string().trim().min(1, "Type the supplier's debit note number").max(60, "The debit note number is too long"),
+    noteDate: isoDate,
+    dueDate: isoDate.nullable().optional(),
+    apAccountCode: optText(10),
+    narration: optText(500),
+    lines: z.array(supplierDebitNoteLineInput).min(1, "A debit note needs at least one line").max(300),
+  })
+  .strict();
+export type SupplierDebitNoteDraftInput = z.infer<typeof supplierDebitNoteDraftInput>;
 
 // ── payment vouchers ─────────────────────────────────────────────────────────
 export const PAYMENT_VOUCHER_PURPOSES = ["SUPPLIER_BILLS", "DIRECT"] as const;
@@ -106,9 +268,18 @@ export const paymentVoucherLineInput = z
   })
   .strict();
 
+/** What a voucher pays: a confirmed bill, or (0681) a confirmed supplier debit note. */
 export const paymentVoucherAllocationInput = z
-  .object({ billId: z.string().uuid(), amount: money })
-  .strict();
+  .object({
+    billId: z.string().uuid().optional(),
+    debitNoteId: z.string().uuid().optional(),
+    /** 0705: an opening bill (Opening balances, a supplier's open item). */
+    openingItemId: z.string().uuid().optional(),
+    amount: money,
+  })
+  .strict()
+  .refine((a) => (a.billId ? 1 : 0) + (a.debitNoteId ? 1 : 0) + (a.openingItemId ? 1 : 0) === 1,
+    "Choose a bill, a debit note or an opening bill");
 
 export const paymentVoucherDraftInput = z
   .object({
@@ -252,18 +423,26 @@ export interface SupplierBillDocument {
     price_diff: ApMoney | null;
     /** 0540 */
     department_type?: string | null; department_id?: string | null;
+    /** 0659: a person chose this line's account. A goods line nobody chose an
+     *  account for takes its item group's purchase account when confirmed. */
+    account_chosen?: boolean;
+    /** 0689: the delivery order this line charges for, and its number. Absent before 0689. */
+    delivery_order_id?: string | null;
+    do_no?: string | null;
   }>;
-  /** A voucher that pays the bill, or (0485) an advance knocked off it. */
+  /** A voucher that pays the bill, (0485) an advance knocked off it, or
+   *  (0642) a supplier credit note knocked off it. For a credit note,
+   *  voucher_id / voucher_no / voucher_date are the note's own. */
   payments: Array<{
-    kind: "voucher" | "advance";
-    /** The knock-off's own id — set for kind "advance" only. */
+    kind: "voucher" | "advance" | "credit_note";
+    /** The knock-off's own id — set for kinds "advance" and "credit_note". */
     application_id: string | null;
     voucher_id: string;
     voucher_no: string | null;
     /** The voucher's status, or the knock-off's: "applied" · "cancelled". */
     status: string;
     voucher_date: string;
-    /** The day an advance was applied; null for a voucher. */
+    /** The day a knock-off was made; null for a voucher. */
     applied_on: string | null;
     amount_applied: ApMoney;
   }>;
@@ -277,6 +456,9 @@ export interface SupplierBillDocument {
   /** The supplier's advances left on this bill's payables account. */
   advance_open: ApMoney;
   go_live_on: string | null;
+  /** 0682: the currency the supplier invoiced in, when not ringgit; null when
+   *  none is recorded. Absent before 0682 is applied. */
+  foreign_amount?: BillForeignAmount | null;
   can: {
     edit: boolean;
     confirm: boolean;
@@ -285,6 +467,35 @@ export interface SupplierBillDocument {
     apply_advance: boolean;
     take_advance_off: boolean;
   };
+}
+
+/** 0689: a delivery order a logistics partner's bill can charge for. */
+export interface BillDeliveryOrder {
+  id: string;
+  do_no: string;
+  delivery_date: string | null;
+  order_id: string;
+  so: number | null;
+  /** The order's channel (fin_order_channels). */
+  department_type: string | null;
+  department_id: string | null;
+}
+
+/** 0689: a logistics partner and its live delivery orders not on another live bill. */
+export interface BillDeliveryPartner {
+  partner_id: string;
+  name: string;
+  delivery_orders: BillDeliveryOrder[];
+}
+
+/** 0689: a total split equally over n delivery orders, in whole sen, the first
+ *  ones taking the odd sen so the parts always add up to the total. */
+export function splitEqually(total: number, n: number): number[] {
+  if (!Number.isFinite(total) || n <= 0) return [];
+  const sen = Math.round(total * 100);
+  const each = Math.floor(sen / n);
+  const odd = sen - each * n;
+  return Array.from({ length: n }, (_, i) => (each + (i < odd ? 1 : 0)) / 100);
 }
 
 export interface GrnCandidateRow {
@@ -315,8 +526,18 @@ export interface GrnLineRow {
   open_qty: ApMoney;
   po_unit_cost: ApMoney | null;
   commercial_treatment: string | null;
-  /** 0540 (DEPT-6): the default department, from the PO line's sales orders. */
+  /** 0683 (Chew ruling 2): where the line's open quantity goes, worked out from
+   *  the orders it was bought for. The bill splits it this way when saved. */
+  channels?: GoodsLineChannel[];
+  /** The one channel, when the line goes to exactly one; else null. */
   department_type?: string | null; department_id?: string | null;
+}
+
+/** 0683: a part of a goods line and the channel it goes to. */
+export interface GoodsLineChannel {
+  department_type: string;
+  department_id: string | null;
+  qty: ApMoney;
 }
 
 export interface ApAccountChoice {
@@ -330,12 +551,16 @@ export interface ApAccountChoice {
   for_voucher_line: boolean;
   for_ap: boolean;
   for_pay_from: boolean;
+  /** 0642: a supplier credit note line — expense, asset or income. */
+  for_credit_line?: boolean;
 }
 
 export interface ApCreditor {
   id: string;
   name: string;
   kind: string;
+  /** 0691: Finance's AutoCount-style code, like 400-A001. Absent before 0691. */
+  code?: string | null;
   /** 0530 — days after the bill date the supplier is paid. Null = not set. */
   terms_days: number | null;
 }
@@ -356,8 +581,178 @@ export interface ApOutstandingRow {
   oldest_unpaid_bill_date: string | null;
   /** 0484: advance paid and not yet knocked off a bill or sent back. */
   advance_open: ApMoney;
-  /** 0484: balance_owing less advance_open — what the ledger says is owed. */
+  /** 0484 · 0642 · 0681: balance_owing plus debit_open, less advance_open and
+   *  credit_open — what the ledger says is owed. */
   net_owing: ApMoney;
+  /** 0642: confirmed supplier credit notes not yet knocked off a bill. */
+  credit_open?: ApMoney;
+  /** 0681: confirmed supplier debit notes not yet paid. */
+  debit_open?: ApMoney;
+}
+
+/** One supplier debit note on its register (0681 supplier_debit_note_register). */
+export interface SupplierDebitNoteRegisterRow {
+  id: string;
+  note_no: string | null;
+  status: "draft" | "confirmed" | "cancelled";
+  supplier_id: string;
+  supplier_name: string;
+  supplier_kind: string;
+  supplier_note_no: string;
+  note_date: string;
+  due_date: string | null;
+  ap_account_code: string;
+  total_amount: ApMoney;
+  /** Paid by approved vouchers; null unless confirmed. */
+  paid_total: ApMoney | null;
+  /** On vouchers not cancelled; null unless confirmed. */
+  held_total: ApMoney | null;
+  /** Not paid yet; null unless confirmed. */
+  debit_open: ApMoney | null;
+  file_count: number;
+  created_at: string;
+}
+
+/** One supplier debit note, whole (0681 supplier_debit_note_document). */
+export interface SupplierDebitNoteDocument {
+  note: {
+    id: string;
+    note_no: string | null;
+    status: "draft" | "confirmed" | "cancelled";
+    supplier_id: string;
+    supplier_name: string;
+    supplier_kind: string;
+    supplier_note_no: string;
+    note_date: string;
+    due_date: string | null;
+    ap_account_code: string;
+    ap_account_name: string | null;
+    total_amount: ApMoney;
+    narration: string | null;
+    cancel_reason: string | null;
+    created_at: string;
+    created_by_name: string | null;
+    confirmed_at: string | null;
+    confirmed_by_name: string | null;
+    cancelled_at: string | null;
+    cancelled_by_name: string | null;
+    entry_no: string | null;
+    reversal_entry_no: string | null;
+  };
+  lines: Array<{
+    line_no: number;
+    account_code: string;
+    account_name: string | null;
+    description: string;
+    amount: ApMoney;
+    department_type: string | null;
+    department_id: string | null;
+  }>;
+  /** Each voucher that pays this note, whatever its stage. */
+  payments: Array<{
+    voucher_id: string;
+    voucher_no: string | null;
+    voucher_status: PaymentVoucherStatus;
+    voucher_date: string;
+    amount_applied: ApMoney;
+    created_at: string;
+  }>;
+  files: ApFile[];
+  events: ApEvent[];
+  paid_total: ApMoney | null;
+  held_total: ApMoney | null;
+  debit_open: ApMoney | null;
+  go_live_on: string | null;
+  can: {
+    edit: boolean;
+    confirm: boolean;
+    cancel: boolean;
+    add_file: boolean;
+  };
+}
+
+/** One supplier credit note on its register (0642 supplier_credit_note_register). */
+export interface SupplierCreditNoteRegisterRow {
+  id: string;
+  note_no: string | null;
+  status: "draft" | "confirmed" | "cancelled";
+  supplier_id: string;
+  supplier_name: string;
+  supplier_kind: string;
+  supplier_note_no: string;
+  note_date: string;
+  ap_account_code: string;
+  total_amount: ApMoney;
+  /** Knocked off bills; null unless confirmed. */
+  applied_total: ApMoney | null;
+  /** Not knocked off yet; null unless confirmed. */
+  credit_open: ApMoney | null;
+  file_count: number;
+  created_at: string;
+}
+
+/** One supplier credit note, whole (0642 supplier_credit_note_document). */
+export interface SupplierCreditNoteDocument {
+  note: {
+    id: string;
+    note_no: string | null;
+    status: "draft" | "confirmed" | "cancelled";
+    supplier_id: string;
+    supplier_name: string;
+    supplier_kind: string;
+    supplier_note_no: string;
+    note_date: string;
+    ap_account_code: string;
+    ap_account_name: string | null;
+    total_amount: ApMoney;
+    narration: string | null;
+    cancel_reason: string | null;
+    created_at: string;
+    created_by_name: string | null;
+    confirmed_at: string | null;
+    confirmed_by_name: string | null;
+    cancelled_at: string | null;
+    cancelled_by_name: string | null;
+    entry_no: string | null;
+    reversal_entry_no: string | null;
+  };
+  lines: Array<{
+    line_no: number;
+    account_code: string;
+    account_name: string | null;
+    description: string;
+    amount: ApMoney;
+    department_type: string | null;
+    department_id: string | null;
+  }>;
+  /** Each knock-off of this note's credit off a bill. */
+  applications: Array<{
+    application_id: string;
+    bill_id: string;
+    bill_no: string | null;
+    supplier_invoice_no: string;
+    bill_date: string;
+    amount: ApMoney;
+    status: "applied" | "cancelled";
+    created_at: string;
+    applied_on: string;
+    created_by_name: string | null;
+    cancelled_at: string | null;
+    cancel_reason: string | null;
+  }>;
+  files: ApFile[];
+  events: ApEvent[];
+  applied_total: ApMoney | null;
+  credit_open: ApMoney | null;
+  go_live_on: string | null;
+  can: {
+    edit: boolean;
+    confirm: boolean;
+    cancel: boolean;
+    add_file: boolean;
+    apply: boolean;
+    take_off: boolean;
+  };
 }
 
 /** One approved advance and what is left of it (0485 supplier_advances). */
@@ -373,6 +768,22 @@ export interface SupplierAdvanceRow {
   applied_total: ApMoney;
   money_back_total: ApMoney;
   advance_open: ApMoney;
+}
+
+/** 0705: a supplier's posted opening bill, as the voucher and Unpaid by Supplier list it. */
+export interface ApOpeningBillRow {
+  item_id: string;
+  doc_no: string;
+  supplier_id: string;
+  supplier_name: string;
+  doc_date: string;
+  due_date: string | null;
+  total_amount: ApMoney;
+  paid_total: ApMoney;
+  balance_owing: ApMoney;
+  ap_account_code: string;
+  allocated_total: ApMoney;
+  unallocated: ApMoney;
 }
 
 export interface ApBillOutstandingRow {
@@ -408,7 +819,8 @@ export interface PaymentVoucherRegisterRow {
   amount: ApMoney;
   pay_method: string;
   pay_reference: string | null;
-  pay_from_account_code: string;
+  /** 0666: empty on a draft the system raised (a dealer's commission) until Finance picks it. */
+  pay_from_account_code: string | null;
   pay_from_name: string | null;
   bill_nos: string | null;
   line_count: number;
@@ -488,7 +900,8 @@ export interface PaymentVoucherDocument {
     ap_account_name: string | null;
     pay_method: string;
     pay_reference: string | null;
-    pay_from_account_code: string;
+    /** 0666: empty on a draft the system raised until Finance picks it. */
+    pay_from_account_code: string | null;
     pay_from_name: string | null;
     narration: string | null;
     created_at: string;
@@ -519,6 +932,27 @@ export interface PaymentVoucherDocument {
     ap_account_code: string;
     amount_applied: ApMoney;
   }>;
+  /** 0681: the supplier debit notes it pays. Absent before 0681 is applied. */
+  debit_notes?: Array<{
+    debit_note_id: string;
+    note_no: string | null;
+    supplier_note_no: string;
+    note_date: string;
+    due_date: string | null;
+    note_total: ApMoney;
+    ap_account_code: string;
+    amount_applied: ApMoney;
+  }>;
+  /** 0705: the opening bills it pays. Absent before 0705 is applied. */
+  opening_bills?: Array<{
+    opening_item_id: string;
+    doc_no: string;
+    doc_date: string;
+    due_date: string | null;
+    bill_total: ApMoney;
+    ap_account_code: string;
+    amount_applied: ApMoney;
+  }>;
   /** 0485: null when the voucher carries no advance. */
   advance: PaymentVoucherAdvance | null;
   files: ApFile[];
@@ -539,3 +973,172 @@ export interface PaymentVoucherDocument {
     cancel_money_back: boolean;
   };
 }
+
+// ── credit and debit notes to follow up (0676; Chew 2026-10-06/07/09, Finance MASTER §3.2) ──
+/**
+ * A credit or debit note a supplier still owes, followed up by Finance. A
+ * reminder only: it posts nothing. PRICE comes from a confirmed bill's line
+ * priced off its PO price; RETURN is added by a purchase return on billed
+ * goods; OTHER is typed by hand.
+ */
+export type SupplierNoteKind = "CREDIT" | "DEBIT";
+export type SupplierNoteReason = "PRICE" | "RETURN" | "OTHER";
+/** waiting: nothing settled · part: some settled · settled: all · closed: closed with a reason. */
+export type SupplierNoteStatus = "waiting" | "part" | "settled" | "closed";
+
+export interface SupplierNoteFollowup {
+  id: string;
+  supplier_id: string;
+  supplier_name: string;
+  kind: SupplierNoteKind;
+  reason: SupplierNoteReason;
+  amount: ApMoney;
+  settled: ApMoney;
+  left: ApMoney;
+  status: SupplierNoteStatus;
+  remark: string | null;
+  noted_on: string;
+  next_follow_up_on: string | null;
+  last_contact: { contacted_on: string; said: string } | null;
+  bill_id: string | null;
+  bill_no: string | null;
+  supplier_invoice_no: string | null;
+  bill_status: "draft" | "confirmed" | "cancelled" | null;
+  line_no: number | null;
+  line_item: string | null;
+  line_qty: ApMoney | null;
+  line_unit_price: ApMoney | null;
+  po_unit_cost: ApMoney | null;
+  grn_no: string | null;
+  po_id: string | null;
+  purchase_return_id: string | null;
+  pr_no: string | null;
+  closed_at: string | null;
+  closed_by_name: string | null;
+  close_reason: string | null;
+  created_at: string;
+  /** Null when a purchase return added it by itself. */
+  created_by_name: string | null;
+}
+
+export interface SupplierNoteFollowupList {
+  today: string;
+  rows: SupplierNoteFollowup[];
+}
+
+export interface SupplierNoteContact {
+  id: string;
+  contacted_on: string;
+  said: string;
+  created_at: string;
+  created_by_name: string | null;
+}
+
+export interface SupplierNoteSettlement {
+  id: string;
+  /** One of the two is set: a credit note settles a credit note owed, a debit
+   *  note (0681) a debit note owed. */
+  credit_note_id: string | null;
+  debit_note_id?: string | null;
+  note_no: string | null;
+  supplier_note_no: string;
+  note_date: string;
+  note_status: "draft" | "confirmed" | "cancelled";
+  amount: ApMoney;
+  /** On, and its credit note confirmed. */
+  counts: boolean;
+  created_at: string;
+  created_by_name: string | null;
+  taken_off_at: string | null;
+  taken_off_by_name: string | null;
+  take_off_reason: string | null;
+}
+
+export interface SupplierNoteFollowupDocument {
+  today: string;
+  followup: SupplierNoteFollowup;
+  contacts: SupplierNoteContact[];
+  settlements: SupplierNoteSettlement[];
+}
+
+/** A bill's lines and their notes owed. */
+export interface SupplierBillLineFollowup {
+  line_no: number;
+  id: string;
+  kind: SupplierNoteKind;
+  status: SupplierNoteStatus;
+  amount: ApMoney;
+  left: ApMoney;
+}
+
+/** A credit note's settlements, and its supplier's credit notes still owed. */
+export interface SupplierCreditNoteFollowups {
+  settled: ApMoney;
+  left_to_settle: ApMoney;
+  settlements: Array<{
+    id: string;
+    followup_id: string;
+    amount: ApMoney;
+    reason: SupplierNoteReason;
+    remark: string | null;
+    bill_no: string | null;
+    pr_no: string | null;
+    created_at: string;
+    created_by_name: string | null;
+    taken_off_at: string | null;
+    taken_off_by_name: string | null;
+    take_off_reason: string | null;
+  }>;
+  owed: SupplierNoteFollowup[];
+}
+
+/** 0681: a debit note's settlements, and its supplier's debit notes still owed. */
+export type SupplierDebitNoteFollowups = SupplierCreditNoteFollowups;
+
+/** What a supplier still owes, for the voucher's reminder. */
+export interface SupplierNotesOwed {
+  credit_count: number;
+  credit_left: ApMoney;
+  debit_count: number;
+  debit_left: ApMoney;
+}
+
+/** A note owed: from a confirmed bill's line (PRICE) or by hand (OTHER). */
+export const supplierNoteFollowupAddInput = z.discriminatedUnion("reason", [
+  z.object({
+    reason: z.literal("PRICE"),
+    kind: z.enum(["CREDIT", "DEBIT"]),
+    billId: z.string().uuid(),
+    lineNo: z.number().int().positive(),
+    amount: moneyAbove0,
+    remark: z.string().trim().max(500).nullable().optional(),
+    nextOn: isoDate.nullable().optional(),
+  }).strict(),
+  z.object({
+    reason: z.literal("OTHER"),
+    kind: z.enum(["CREDIT", "DEBIT"]),
+    supplierId: z.string().uuid(),
+    amount: moneyAbove0,
+    remark: z.string().trim().min(1, "Say what the note is for").max(500),
+    nextOn: isoDate.nullable().optional(),
+  }).strict(),
+]);
+export type SupplierNoteFollowupAddInput = z.infer<typeof supplierNoteFollowupAddInput>;
+
+/** A follow-up: the day, what the supplier said, the next day (none ends it). */
+export const supplierNoteContactInput = z
+  .object({
+    contactedOn: isoDate,
+    said: z.string().trim().min(1, "Say what the supplier said").max(1000),
+    nextOn: isoDate.nullable(),
+  })
+  .strict();
+export type SupplierNoteContactInput = z.infer<typeof supplierNoteContactInput>;
+
+/** A confirmed credit note settling a credit note owed, or (0681) a confirmed
+ *  debit note settling a debit note owed. */
+export const supplierNoteSettleInput = z
+  .object({ creditNoteId: z.string().uuid().optional(), debitNoteId: z.string().uuid().optional(), amount: moneyAbove0 })
+  .strict()
+  .refine((s) => (s.creditNoteId ? 1 : 0) + (s.debitNoteId ? 1 : 0) === 1, "Choose a credit note or a debit note");
+export type SupplierNoteSettleInput = z.infer<typeof supplierNoteSettleInput>;

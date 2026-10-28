@@ -5,9 +5,11 @@ import { dirname, join } from "node:path";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
 const apiFetch = vi.fn();
+const invalidateQueries = vi.fn().mockResolvedValue(undefined);
+vi.mock("@/lib/query-client", () => ({ queryClient: { invalidateQueries: (...args: unknown[]) => invalidateQueries(...args) } }));
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
-  return { ...actual, apiFetch: (...a: unknown[]) => apiFetch(...a) };
+  return { ...actual, apiFetch: (...a: unknown[]) => String(a[0]).endsWith("/send-evidence-policy") ? Promise.resolve({ required: false, available: true }) : apiFetch(...a) };
 });
 
 import PoIssueEvidence, {
@@ -77,6 +79,7 @@ const renderIt = (
 
 beforeEach(() => {
   apiFetch.mockReset();
+  invalidateQueries.mockClear();
   onConfirmed.mockClear();
 });
 
@@ -182,11 +185,11 @@ describe("persisted evidence survives a reload", () => {
 });
 
 describe("the form opens on the supplier's RECORDED channel (Jess's send lines, 2026-09-25)", () => {
-  it("an email-only supplier opens on Email with its address — the Work line says Click Email", async () => {
+  it.each([false, true])("email default prefills its address with a saved WhatsApp group: %s", async (hasGroup) => {
     apiFetch.mockResolvedValue({ ok: true });
     render(
       <PoIssueEvidence
-        po={{ ...PO, whatsappGroupUrl: null, contact: null, contactEmail: "buy@hooka.my" }}
+        po={{ ...PO, whatsappGroupUrl: hasGroup ? "https://chat.whatsapp.com/KeepHistory" : null, contact: null, contactEmail: "buy@hooka.my", poSendChannel: "email" }}
         version={1}
         evidence={[]}
         doors={DOORS}
@@ -195,6 +198,7 @@ describe("the form opens on the supplier's RECORDED channel (Jess's send lines, 
       />,
     );
     expect(screen.getByTestId("so-batch-evidence-recipient")).toHaveValue("buy@hooka.my");
+    await waitFor(() => expect(screen.getByTestId("so-batch-evidence-confirm")).toBeEnabled());
     fireEvent.click(screen.getByTestId("so-batch-evidence-confirm"));
     await waitFor(() => expect(apiFetch).toHaveBeenCalled());
     expect(JSON.parse((apiFetch.mock.calls[0]![1] as { body: string }).body)).toMatchObject({ channel: "email", recipient: "buy@hooka.my" });
@@ -208,6 +212,7 @@ describe("the confirmation declares the version it is looking at", () => {
     fireEvent.change(screen.getByTestId("so-batch-evidence-recipient"), {
       target: { value: "Hooka Purchasing Group" },
     });
+    await waitFor(() => expect(screen.getByTestId("so-batch-evidence-confirm")).toBeEnabled());
     fireEvent.click(screen.getByTestId("so-batch-evidence-confirm"));
     await waitFor(() => expect(apiFetch).toHaveBeenCalled());
     const [path, init] = apiFetch.mock.calls[0]!;
@@ -217,6 +222,9 @@ describe("the confirmation declares the version it is looking at", () => {
       recipient: "Hooka Purchasing Group",
       poVersion: 3,
     });
+    expect(invalidateQueries.mock.calls.map(([args]) => args.queryKey)).toEqual([
+      ["operation", "pos"], ["operation", "work"], ["operation", "purchase", "today"],
+    ]);
   });
 
   it("a stale version is reported in the approved two lines", async () => {
@@ -233,12 +241,14 @@ describe("the confirmation declares the version it is looking at", () => {
     fireEvent.change(screen.getByTestId("so-batch-evidence-recipient"), {
       target: { value: "Hooka" },
     });
+    await waitFor(() => expect(screen.getByTestId("so-batch-evidence-confirm")).toBeEnabled());
     fireEvent.click(screen.getByTestId("so-batch-evidence-confirm"));
     const err = await screen.findByTestId("so-batch-evidence-error");
     expect(err).toHaveTextContent("Purchase order changed");
     expect(err).toHaveTextContent("Open the latest PDF and send it again.");
     // Nothing was completed.
     expect(onConfirmed).not.toHaveBeenCalled();
+    expect(invalidateQueries).not.toHaveBeenCalled();
   });
 
   it("the tools still complete nothing — they open, and the act stays open", () => {
@@ -283,13 +293,24 @@ describe("PO sent to supplier — only the person's press records it (Jess 2026-
     expect(recipient).not.toHaveAttribute("placeholder");
   });
 
-  it("with nothing on file the person types the recipient", () => {
+  it("refreshes Work and PO-window reads after the recorded-channel card confirmation", async () => {
+    apiFetch.mockResolvedValue({ ok: true });
+    render(<PoIssueEvidence po={{ ...PO, contact: "+60123456789", poSendChannel: "whatsapp" }} version={3} layout="card" onConfirmed={onConfirmed} />);
+    await waitFor(() => expect(screen.getByTestId("so-batch-evidence-confirm")).toBeEnabled());
+    fireEvent.click(screen.getByTestId("so-batch-evidence-confirm"));
+    await waitFor(() => expect(onConfirmed).toHaveBeenCalled());
+    expect(invalidateQueries.mock.calls.map(([args]) => args.queryKey)).toEqual([
+      ["operation", "pos"], ["operation", "work"], ["operation", "purchase", "today"],
+    ]);
+  });
+
+  it("with nothing on file the person types the recipient", async () => {
     renderIt(1);
     const recipient = screen.getByTestId("so-batch-evidence-recipient");
     expect(recipient).toHaveValue("");
     expect(screen.getByTestId("so-batch-evidence-confirm")).toBeDisabled();
     fireEvent.change(recipient, { target: { value: "Hooka Purchasing Group" } });
-    expect(screen.getByTestId("so-batch-evidence-confirm")).not.toBeDisabled();
+    await waitFor(() => expect(screen.getByTestId("so-batch-evidence-confirm")).not.toBeDisabled());
   });
 });
 
@@ -309,14 +330,9 @@ describe("both surfaces use THIS component — one law, not two", () => {
   // an unrendered legacy copy below it — so they guarded code nobody saw.
   const PO_PAGE = ["..", "purchase-orders", "PurchaseOrdersPage.tsx"];
 
-  it("Purchase Order detail mounts it too", () => {
-    const src = readFileSync(join(HERE, ...PO_PAGE), "utf8");
-    expect(src).toMatch(/import PoIssueEvidence\b[^;]*from "\.\.\/components\/PoIssueEvidence"/);
-    expect(src).toContain("<PoIssueEvidence");
-    // It reads the PERSISTED rows and the PO's current version.
-    expect(src).toContain("evidence={po.sends ?? []}");
-    expect(src).toContain("version={po.version ?? 1}");
-  });
+  // The PO page now uses the shared supplier-send presentation (same
+  // confirm-sent writer plus unknown Email recovery). Its runtime mount and
+  // exact PO/version scope are covered by PurchaseOrdersPage.test.tsx.
 
   it("Purchase Order detail no longer claims there is no `I've sent` action", () => {
     const src = readFileSync(join(HERE, ...PO_PAGE), "utf8");

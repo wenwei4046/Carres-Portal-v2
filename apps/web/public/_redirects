@@ -1,1 +1,5 @@
+# Compatibility for the retired Delivery-only reference link (owner 2026-10-04):
+# the old address answers with a permanent redirect to the shared module card.
+/ui-kit/delivery-card.html  /ui-kit/module-card  301
+/ui-kit/delivery-card       /ui-kit/module-card  301
 /*    /index.html   200

@@ -133,7 +133,7 @@ function workResponse(items: OperationWorkItem[]): OperationWorkResponse {
     // Mon 14 Sep — a working day, so the focus day is generatedOn itself.
     generatedOn: "2026-09-14",
     closureReceipt: null,
-    sources: (["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"] as const).map((key) => ({
+    sources: (["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker", "workspace"] as const).map((key) => ({
       key,
       state: "healthy",
       observedAt: "2026-09-13T01:00:00.000Z",
@@ -263,7 +263,7 @@ describe("one cache key per read — both mounting orders, real QueryClient", ()
     await waitFor(() => expect(screen.getByTestId("work-feed")).toHaveTextContent("items:2"));
     expect(screen.getByTestId("legacy-tasks")).toHaveTextContent("tasks:1");
     // The Quick Rail counted MY late item from the feed, not from `{ tasks }`.
-    expect(within(screen.getByTestId("my-work-panel")).getByText("Missed").nextElementSibling).toHaveTextContent("1");
+    expect(within(screen.getByTestId("my-work-panel")).getByText("Late").nextElementSibling).toHaveTextContent("1");
     expectIsolatedShapes(qc);
     expect(state.workCalls).toBe(1);
     expect(state.tasksCalls).toBe(1);
@@ -288,7 +288,7 @@ describe("one cache key per read — both mounting orders, real QueryClient", ()
     mount(client(), <TasksPanel />);
     const panel = await screen.findByTestId("my-work-panel");
     // The panel renders while loading (count placeholders), so wait for the counts.
-    expect(await within(panel).findByRole("link", { name: "Open My Work · Missed · 1 action" }))
+    expect(await within(panel).findByRole("link", { name: "Open My Work · Late · 1 action" }))
       .toHaveAttribute("href", "/operation?tab=work&scope=mine&day=missed");
     expect(within(panel).getByRole("link", { name: "Open My Work · Today · 1 action" }))
       .toHaveAttribute("href", "/operation?tab=work&scope=mine&day=2026-09-14");
@@ -330,7 +330,7 @@ describe("one cache key per read — both mounting orders, real QueryClient", ()
     const timing = await screen.findByTestId("monitor-timing-1302");
     await waitFor(() => expect(within(timing).getByTestId("monitor-owner-unassigned")).toBeInTheDocument());
     expect(timing).toHaveTextContent("Ask customer to pay");
-    expect(within(screen.getByTestId("my-work-panel")).getByText("Missed").nextElementSibling).toHaveTextContent("1");
+    expect(within(screen.getByTestId("my-work-panel")).getByText("Late").nextElementSibling).toHaveTextContent("1");
     expectIsolatedShapes(qc);
     expect(state.workCalls).toBe(1);
     expect(state.tasksCalls).toBe(1);
@@ -360,10 +360,10 @@ describe("one cache key per read — both mounting orders, real QueryClient", ()
     mount(qc, <PaymentMonitor />);
     const timing = await screen.findByTestId("monitor-timing-1302");
     const exception = await within(timing).findByTestId("monitor-owner-unassigned");
-    // Owner instruction 2026-09-16: the door is the Sales Orders Team, never Staff & Duties.
+    // Owner ruling 2026-09-26: a manager assigns in Settings → Staff & Duties.
     expect(exception).toHaveTextContent("Not assigned");
-    expect(exception).toHaveAccessibleName("Nobody is assigned to this order. Assign it in Sales Orders → Team");
-    expect(exception).toHaveAttribute("href", "/operation/orders");
+    expect(exception).toHaveAccessibleName("Nobody assigned to this order · Manager assigns in Settings → Staff & Duties");
+    expect(exception).toHaveAttribute("href", "/operation/settings/staff-duties");
     expect(timing).toHaveTextContent("Payment should have been received");
     expect(timing).toHaveTextContent("Ask customer to pay");
     expect(screen.queryByTestId("monitor-owner-avatar")).not.toBeInTheDocument();

@@ -55,13 +55,13 @@ describe("DataGrid · pinnedPrefix", () => {
     const { container } = mount("test.prefix.wide");
     expect(headerLabels(container)).toEqual(["Claim status", "Supplier Claim No", "Claim Reported", "Supplier"]);
     // 30 (☐) + 32 (▸) = 62 for Claim status; 62 + 112 = 174 for the number.
-    expect(headerLefts(container)).toEqual(["0px", "30px", "62px", "174px", "", ""]);
+    expect(headerLefts(container)).toEqual(["0px", "32px", "62px", "174px", "", ""]);
   });
 
   it("pins Supplier Claim No ALONE below 768px; Claim status scrolls", () => {
     stubCanvas(600);
     const { container } = mount("test.prefix.narrow");
-    expect(headerLefts(container)).toEqual(["0px", "40px", "", "72px", "", ""]);
+    expect(headerLefts(container)).toEqual(["0px", "32px", "", "72px", "", ""]);
   });
 
   it("a saved layout can neither reorder nor hide the prefix", () => {

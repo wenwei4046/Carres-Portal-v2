@@ -35,7 +35,7 @@ export default function TasksPanel() {
   } = useOpenWorkSet();
   const { missed, today } = myMissedAndToday(items, myUserId, myFocus);
   const rows = [
-    { label: "Missed", count: missed, href: "/operation?tab=work&scope=mine&day=missed", danger: true },
+    { label: "Late", count: missed, href: "/operation?tab=work&scope=mine&day=missed", danger: true },
     { label: "Today", count: today, href: `/operation?tab=work&scope=mine&day=${myFocus?.to ?? ""}`, danger: false },
   ];
 

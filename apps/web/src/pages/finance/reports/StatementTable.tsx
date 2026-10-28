@@ -7,7 +7,26 @@
  *
  * Every figure printed here is one the ledger summed and the API served.
  * This file adds nothing up.
+ *
+ * FINANCE LOOK (Chew 2026-10-13): the table reads like Finance's grids, from
+ * finance-look.module.css: a light blue header, a hairline between columns,
+ * each section band and heading line a subtotal row (light grey, 600) and the
+ * bottom line the total (the same, with a heavy rule above). An account at
+ * RM 0.00 already prints no line. A heading's subtotal, a section's total and
+ * the bottom line still print RM 0.00: on a statement that zero is the answer.
+ * An account's code and its name are two columns, the code alone the link, and
+ * the name wraps rather than being cut (Chew 2026-10-14, 「A」). The Account
+ * column takes the width the code and the amount leave, so the table fills its
+ * box, and a header edge drags to resize, remembered per person per statement
+ * (Chew 2026-10-14).
+ *
+ * REPORT DRILL-DOWN (Chew 2026-10-21): with `drill`, an account line the page
+ * allows gets the kit's disclosure; opening it shows, right under the line,
+ * what `drill.render` draws (the ledger entries behind it, ReportDrill.tsx).
+ * A second click folds it. A band, a heading, `Net result not yet closed`
+ * and the `No …` line never drill. Without `drill` the table is as before.
  */
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { isZeroMoney, ledgerKindWord } from "@carres/shared/finance-ledger";
 import Button from "@/components/kit/Button";
@@ -15,6 +34,8 @@ import DataTable, { type Column, type GroupRowCell } from "@/components/kit/Data
 import Tooltip from "@/components/kit/Tooltip";
 import { rm } from "@/lib/format-currency";
 import type { StatementLine, StatementSection } from "./report-queries";
+import look from "../finance-look.module.css";
+import { FINANCE_WIDTH, fillSizing, useSavedWidths } from "../finance-widths";
 
 // The line under a section where every account is at RM 0.00 (YH, 14 Sep
 // 2026). Reports and the month-end pack print the same words.
@@ -28,6 +49,17 @@ const NOTHING_ON_DAY: Record<string, string> = {
   EQUITY: "No equity on this day.",
 };
 /** Profit and Loss: `No income in this period.` · `No expenses in this period.` */
+/** A statement line's account link: one line, cut with … when it is long. */
+export const STATEMENT_LINK = "min-w-0 truncate underline underline-offset-2";
+/** The Finance look's code link (Chew 2026-10-13): the code alone, dotted. */
+export const CODE_LINK = "underline decoration-dotted underline-offset-[3px]";
+
+/** The statement's columns, in pixels: Code, the name (its least), Amount. */
+const NAME_WIDTH = 320;
+/** The disclosure column a drill adds: the kit's 24px button in its padding. */
+const DRILL_WIDTH = 42;
+const STATEMENT_WIDTHS = { code: FINANCE_WIDTH.code, account: NAME_WIDTH, amount: FINANCE_WIDTH.amount } as const;
+
 export const nothingInPeriod = (section: string): string => NOTHING_IN_PERIOD[section] ?? NOTHING_IN_PERIOD.INCOME!;
 /** Balance Sheet: `No assets on this day.` · `No liabilities …` · `No equity …` */
 export const nothingOnDay = (section: string): string => NOTHING_ON_DAY[section] ?? NOTHING_ON_DAY.ASSET!;
@@ -53,10 +85,23 @@ export const paidBeforeInvoiceNote = (line: Pick<StatementLine, "reclassified" |
       return added
         ? `Includes ${money} paid to suppliers before their bill.`
         : `Leaves out ${money} paid to suppliers before their bill.`;
+    // 0688: the stock line shows the stock on hand from Stock's Units, not what the books hold on it.
+    case "STOCK":
+      return `Shows the stock on hand from Stock's Units, ${money} ${added ? "more" : "less"} than the books hold. It is provisional until Stock confirms the month.`;
     default:
       return null;
   }
 };
+
+/** 0688: under a statement, where its stock figures come from. Under All the
+ *  stock is worked out from Stock's Units; under a department there is none,
+ *  because stock on hand is not split by channel. */
+export function stockNote(statement: "pl" | "bs", byDepartment: boolean): string {
+  if (byDepartment) return "Stock on hand is shown under All only: it is not split by channel.";
+  return statement === "pl"
+    ? "Stock at the start and at the end of the period is worked out from Stock's Units. It is provisional until Stock confirms the month, and a Unit with no cost recorded is not counted. Stock value under Reports lists the Units."
+    : "Stock is worked out from Stock's Units on this day. It is provisional until Stock confirms the month, and a Unit with no cost recorded is not counted. Stock value under Reports lists the Units.";
+}
 
 export type StatementRow =
   | { id: string; section: string; kind: "group"; name: string; amount: number; depth: number }
@@ -158,6 +203,9 @@ export function statementRows(sections: readonly StatementSection[]): StatementR
   return out;
 }
 
+/** An account line, as a drill reads it. */
+export type StatementAccountLine = Extract<StatementRow, { kind: "line" }>;
+
 /** Left padding by depth: a header at depth 1 sits flush, each level in one step. */
 const INDENT = ["", "", "pl-4", "pl-8", "pl-12"] as const;
 export const indent = (depth: number): string => INDENT[Math.min(depth, INDENT.length - 1)]!;
@@ -172,6 +220,7 @@ export default function StatementTable({
   accountHref,
   lineNote,
   bottomLine,
+  drill,
 }: {
   /** What the table is, for a screen reader. */
   label: string;
@@ -184,32 +233,49 @@ export default function StatementTable({
   nothing: (section: string) => string;
   accountHref: (code: string) => string;
   /** A note about an account, or null for none. It shows in the tooltip of a
-   *  small mark after the account name, so the row stays one line. */
+   *  small mark after the account name. */
   lineNote?: (line: Pick<StatementLine, "code" | "reclassified" | "reclassifiedFor">) => string | null;
   /** The strip under the last row. Null: no strip. */
   bottomLine: { label: string; amount: number } | null;
+  /** Report drill-down: which account lines open, and what opens under them. */
+  drill?: {
+    drillable: (line: StatementAccountLine) => boolean;
+    render: (line: StatementAccountLine) => ReactNode;
+  };
 }) {
   const bySection = new Map(sections.map((s) => [s.kind, s]));
   const rows = statementRows(sections);
+  const saved = useSavedWidths(`carres.finance.widths.${testId}.v1`, `finance_${testId.replace(/-/g, "_")}`);
+  const size = fillSizing(drill ? { ...STATEMENT_WIDTHS, drill: DRILL_WIDTH } : STATEMENT_WIDTHS, saved.widths, "account");
+  const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set());
+  const canDrill = (r: StatementRow): r is StatementAccountLine => r.kind === "line" && (drill?.drillable(r) ?? false);
 
+  // Every column is the width of what it holds (the Finance look): the code,
+  // and the amount, which fits RM 1,234,567.89. The name wraps rather than
+  // being cut and takes the rest of the width.
   const columns: Column<StatementRow>[] = [
+    {
+      key: "code",
+      label: "Code",
+      width: size.width("code"),
+      cell: (r) => (r.kind === "line"
+        ? <Link className={CODE_LINK} to={accountHref(r.code)}>{r.code}</Link>
+        : null),
+    },
     {
       key: "account",
       label: "Account",
-      width: 70,
+      width: size.width("account"),
       cell: (r) => {
         switch (r.kind) {
           case "group":
-            return <span className={`font-semibold ${indent(r.depth)}`}>{r.name}</span>;
+            return <span data-fin-tone="subtotal" className={`whitespace-normal font-semibold ${indent(r.depth)}`}>{r.name}</span>;
           case "line": {
-            // The account link, then (only when there is a note) a mark that
-            // shows the note on hover or keyboard focus. A long name cuts off
-            // with "…"; the mark never does.
+            // The name, then (only when there is a note) a mark that shows the
+            // note on hover or keyboard focus. The name wraps; the mark stays.
             const note = lineNote?.(r) ?? null;
             return <span className={`flex items-center ${indent(r.depth)}`}>
-              <Link className="min-w-0 truncate underline underline-offset-2" to={accountHref(r.code)}>
-                {r.code} {r.name ?? "Account name not available"}
-              </Link>
+              <span className="min-w-0 whitespace-normal">{r.name ?? "Account name not available"}</span>
               {note && <Tooltip content={note}>
                 <Button variant="ghost" size="sm" icon="help" aria-label={note} />
               </Tooltip>}
@@ -218,14 +284,14 @@ export default function StatementTable({
           case "unclosed":
             return "Net result not yet closed";
           case "nothing":
-            return <span className="text-kit-slate-11">{nothing(r.section)}</span>;
+            return <span className="whitespace-normal text-kit-slate-11">{nothing(r.section)}</span>;
         }
       },
     },
     {
       key: "amount",
       label: "Amount",
-      width: 30,
+      width: size.width("amount"),
       align: "right",
       numeric: true,
       cell: (r) => {
@@ -235,15 +301,16 @@ export default function StatementTable({
     },
   ];
 
+  // A band and the bottom line read across the code and the name.
   const band = (r: StatementRow): readonly GroupRowCell[] => {
     const s = bySection.get(r.section);
     return [
-      { content: <span className="font-semibold">{ledgerKindWord(r.section)}</span> },
+      { span: 2, content: <span className="font-semibold">{ledgerKindWord(r.section)}</span> },
       { align: "right", content: s ? <span className="font-semibold tabular-nums">{rm(s.total)}</span> : null },
     ];
   };
 
-  return <DataTable
+  return <div className={look.statement} style={size.style} {...size.data}><DataTable
     label={label}
     testId={testId}
     rowTestId={`${testId}-row`}
@@ -253,12 +320,26 @@ export default function StatementTable({
     loading={loading}
     empty={empty}
     group={{ keyOf: (r) => r.section, cells: band }}
+    resizable={saved}
+    expansion={drill ? {
+      // Only a line that can drill shows open, even if it was open before the page changed.
+      expanded: new Set(rows.filter((r) => canDrill(r) && open.has(r.id)).map((r) => r.id)),
+      onToggle: (id) => setOpen((before) => {
+        const next = new Set(before);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        return next;
+      }),
+      expandable: canDrill,
+      label: () => "Show entries",
+      render: (r) => (canDrill(r) ? drill.render(r) : null),
+      width: `${DRILL_WIDTH}px`,
+    } : undefined}
     totals={bottomLine ? {
       label: bottomLine.label,
       cells: () => [
-        { content: <span className="font-semibold">{bottomLine.label}</span> },
+        { span: 2, content: <span className="font-semibold">{bottomLine.label}</span> },
         { align: "right", content: <span className="font-semibold tabular-nums">{rm(bottomLine.amount)}</span> },
       ],
     } : undefined}
-  />;
+  /></div>;
 }

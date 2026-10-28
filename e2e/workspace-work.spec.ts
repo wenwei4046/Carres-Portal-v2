@@ -36,7 +36,7 @@ const FIXTURE = {
     workItem("delivery:do-2041:review_proof", "DO-2041", "delivery", "2026-09-17", "on_day"),
     workItem("payment:invoice-2041:collect_balance", "INV-2041", "payment", "2026-09-17", "on_day"),
   ],
-  sources: ["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"].map((key) => ({ key, state: "healthy", observedAt: "2026-09-17T01:42:00.000Z", lastSuccessfulAt: "2026-09-17T01:42:00.000Z", errorLabel: null })),
+  sources: ["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker", "workspace"].map((key) => ({ key, state: "healthy", observedAt: "2026-09-17T01:42:00.000Z", lastSuccessfulAt: "2026-09-17T01:42:00.000Z", errorLabel: null })),
 };
 
 async function useGovernedFixture(page: Page) {
@@ -60,39 +60,37 @@ async function openWork(page: Page) {
   const feed = page.waitForResponse((response) => response.url().includes("/api/operation/work"));
   await page.goto("/operation?tab=work");
   await feed;
-  await expect(page.getByTestId("operation-work")).toBeVisible();
-  await expect(page.getByTestId("work-view-mine")).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByTestId("work-loading")).toHaveCount(0);
+  await expect(page.getByTestId("workspace-tasks")).toBeVisible();
+  await expect(page.getByRole("tab", { name: "My Task" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByTestId("workspace-loading")).toHaveCount(0);
 }
 
-test("manager opens the governed Work composition", async ({ page }) => {
+test("manager opens the Workspace table", async ({ page }) => {
   await login(page, "principal@carres.com", "111");
   await useGovernedFixture(page);
   await openWork(page);
-  await expect(page.getByTestId("work-view-team")).toBeVisible();
-  await page.getByTestId("work-view-team").click();
+  await page.getByRole("tab", { name: "Team Work" }).click();
   await expect(page).toHaveURL(/scope=team/);
 });
 
-test("operation user opens the governed Work composition", async ({ page }) => {
+test("operation user opens the Workspace table", async ({ page }) => {
   test.skip(!process.env.WORK_OPERATION_EMAIL || !process.env.WORK_OPERATION_PASSWORD, "A live non-manager acceptance account is required");
   await login(page, process.env.WORK_OPERATION_EMAIL!, process.env.WORK_OPERATION_PASSWORD!);
   await useGovernedFixture(page);
   await openWork(page);
-  await expect(page.getByTestId("work-view-team")).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Team Work" })).toBeVisible();
 });
 
-test("selection has a descriptive name and the owning-object door preserves browser Back", async ({ page }) => {
+test("a row opens its task in the address, and the owning-object door preserves browser Back", async ({ page }) => {
   await login(page, "principal@carres.com", "111");
   await useGovernedFixture(page);
   await openWork(page);
-  await page.getByTestId("work-view-team").click();
-  const row = page.locator('[data-testid^="work-row-"]').first();
+  await page.getByRole("tab", { name: "Team Work" }).click();
+  const row = page.locator('[data-testid^="workspace-row-"]').first();
   if (await row.count()) {
-    await expect(row).toHaveAccessibleName(/SO-1318.*No delivery date.*Ask customer for a delivery date/);
-    await row.focus();
-    await page.keyboard.press("Enter");
-    await expect(page).toHaveURL(/selected=/);
+    await row.click();
+    await expect(page).toHaveURL(/task=/);
+    await expect(page.locator('[data-testid="workspace-task"] [data-kit="task-view"]')).toBeVisible();
     const open = page.getByRole("button", { name: /^Open / }).first();
     await expect(open).toBeVisible();
     const workUrl = page.url();
@@ -108,13 +106,13 @@ for (const size of [
   { width: 820, height: 900, name: "820x900" },
   { width: 390, height: 844, name: "390x844" },
 ]) {
-  test(`responsive Work evidence ${size.name}`, async ({ page }) => {
+  test(`responsive Workspace evidence ${size.name}`, async ({ page }) => {
     await page.setViewportSize({ width: size.width, height: size.height });
     await login(page, "principal@carres.com", "111");
     await useGovernedFixture(page);
     await openWork(page);
-    await page.getByTestId("work-view-team").click();
-    await expect(page.getByTestId("work-split-shell")).toBeVisible();
+    await page.getByRole("tab", { name: "Team Work" }).click();
+    await expect(page.getByTestId("workspace-table")).toBeVisible();
     await expect(page.locator("body")).not.toHaveCSS("overflow-x", "scroll");
     await page.screenshot({ path: `${EVIDENCE}/${size.name}.png`, fullPage: true });
   });

@@ -43,7 +43,9 @@ export const MISSION_ROUTE_COPY = {
   inStock: "In stock",
   due: "Due",
   unavailable: "Unavailable",
-  missed: "Missed",
+  /* The Contact point's own date has gone by: `Contact · {date} · Passed`
+     (owner time-word ruling 12 Oct 2026). */
+  missed: "Passed",
   delivered: "Delivered",
   scheduled: "Scheduled",
   requested: "Requested",

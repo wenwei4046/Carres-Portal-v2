@@ -11,7 +11,10 @@ import type { AppEnv } from "../../types";
  * Every read and write runs as the CALLER (`userClient` with their JWT): RLS
  * returns only their own rows, and the two SQL doors act only on `auth.uid()`.
  * No route accepts a user id, so no request can read or change another
- * person's layouts. Purchase Orders is the only admitted listing.
+ * person's layouts. Admitted listings: Purchase Orders (the pilot) and, since
+ * migration 0704 (Chew 2026-10-21, a Finance exception), every Finance table
+ * as `finance_<name>` — lower-case letters, digits and `_`, 1 to 60 after the
+ * prefix. SQL asks the same answer (`register_layout_listing_ok`).
  *
  * A layout is order, widths, visibility and sort — the schema below is
  * `.strict()`, and SQL refuses any other key as well, so search, filters and
@@ -21,6 +24,13 @@ const router = new Hono<AppEnv>();
 
 export const REGISTER_LAYOUT_LISTINGS = ["purchase_orders"] as const;
 export const REGISTER_LAYOUT_LIMIT = 10;
+/** A Finance table's listing (0704): `finance_bills`, `finance_general_ledger` … */
+export const FINANCE_LAYOUT_LISTING = /^finance_[a-z0-9_]{1,60}$/;
+
+export function isRegisterLayoutListing(listing: string | null | undefined): listing is string {
+  return typeof listing === "string"
+    && ((REGISTER_LAYOUT_LISTINGS as readonly string[]).includes(listing) || FINANCE_LAYOUT_LISTING.test(listing));
+}
 
 const layoutSchema = z
   .object({
@@ -33,7 +43,7 @@ const layoutSchema = z
 
 const saveSchema = z
   .object({
-    listing: z.enum(REGISTER_LAYOUT_LISTINGS),
+    listing: z.string().refine(isRegisterLayoutListing, "unknown listing"),
     name: z.string().trim().min(1).max(60),
     layout: layoutSchema,
   })
@@ -41,14 +51,14 @@ const saveSchema = z
 
 router.get("/", async (c) => {
   const listing = c.req.query("listing");
-  if (!REGISTER_LAYOUT_LISTINGS.includes(listing as (typeof REGISTER_LAYOUT_LISTINGS)[number])) {
+  if (!isRegisterLayoutListing(listing)) {
     return c.json({ error: "invalid_query", code: "invalid_param", message: "unknown listing" }, 422);
   }
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb
     .from("register_personal_layouts")
     .select("id, name, layout, is_default, updated_at")
-    .eq("listing", listing!)
+    .eq("listing", listing)
     .order("name", { ascending: true });
   if (error) return fail(c, error);
   return c.json({ layouts: data ?? [], limit: REGISTER_LAYOUT_LIMIT });

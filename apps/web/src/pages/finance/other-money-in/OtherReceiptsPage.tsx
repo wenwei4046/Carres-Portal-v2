@@ -13,6 +13,10 @@
  * debtors for each invoice paid), so the form asks first. The form carries ONE
  * idempotency key per opening: a double press returns the first receipt
  * instead of recording the money twice.
+ *
+ * FINANCE LOOK (Chew 2026-10-13): the money account's code and its name are
+ * two columns (Code, Received into), the party and What for wrap rather than
+ * being cut, and a zero amount is a blank cell.
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -40,7 +44,10 @@ import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { toast } from "sonner";
-import { otherReceiptDoc } from "@/lib/pdf/other-money-in-docs";
+import { printOtherReceipt, printOtherReceiptById } from "../preview/row-print";
+import { useQueryClient } from "@tanstack/react-query";
+import { documentRowMenu } from "@/components/register/row-menu";
+import { OtherReceiptPreview } from "../preview/previews";
 import {
   useCancelReceipt,
   useMoneyInAccounts,
@@ -67,7 +74,9 @@ import {
 } from "./parts";
 import { DepartmentFilter, DepartmentName, useDepartmentParam } from "../department";
 import { useSaveKey } from "../save-key";
+import { amountCell, FINANCE_WIDTH } from "../finance-widths";
 import { FieldError } from "@/components/kit/FieldFrame";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const NO_PARTY = "none";
@@ -129,6 +138,10 @@ export default function OtherReceiptsPage() {
 /* ── the Register ──────────────────────────────────────────────────────────── */
 
 function ReceiptRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNew: () => void }) {
+  const personalLayouts = useFinancePersonalLayouts("finance_other_receipts");
+  const qc = useQueryClient();
+  // Double-click previews the receipt (Chew 2026-10-21); View opens its page.
+  const [peek, setPeek] = useState<string | null>(null);
   const [dept, setDept] = useDepartmentParam();
   const query = useOtherReceipts(dept);
   const columns = useMemo<DataGridColumn<OtherReceiptRow>[]>(
@@ -154,7 +167,8 @@ function ReceiptRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
       {
         key: "from",
         label: "Received from",
-        width: 220,
+        width: FINANCE_WIDTH.party,
+        wrap: true,
         accessor: receivedFrom,
         searchValue: (r) => [r.party_name, r.payer_name].filter(Boolean).join(" "),
         filterType: "enum",
@@ -163,22 +177,32 @@ function ReceiptRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
         key: "what",
         label: "What for",
         width: 260,
+        wrap: true,
+        defaultHidden: true,
         accessor: (r) => r.what ?? "Not available",
         searchValue: (r) => [r.what, r.reference, r.narration].filter(Boolean).join(" "),
       },
       {
+        key: "code",
+        label: "Code",
+        width: FINANCE_WIDTH.code,
+        accessor: (r) => r.money_account_code,
+      },
+      {
         key: "into",
         label: "Received into",
-        width: 200,
-        accessor: (r) => accountLabel({ code: r.money_account_code, name: r.money_account_name }),
+        width: 180,
+        wrap: true,
+        accessor: (r) => r.money_account_name,
+        searchValue: (r) => accountLabel({ code: r.money_account_code, name: r.money_account_name }),
         filterType: "enum",
       },
       {
         key: "amount",
         label: "Amount",
-        width: 130,
+        width: FINANCE_WIDTH.amount,
         align: "right",
-        accessor: (r) => rm(Number(r.total_amount)),
+        accessor: (r) => amountCell(r.total_amount),
         numberValue: (r) => Number(r.total_amount),
         filterType: "number",
         exportValue: (r) => Number(r.total_amount),
@@ -219,8 +243,9 @@ function ReceiptRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
         rows={query.data ?? []}
         columns={columns}
         rowKey={(r) => r.receipt_id}
-        storageKey="carres.finance.other-receipts.v1"
+        storageKey="carres.finance.other-receipts.v3"
         appearance="reference"
+        look="finance" personalLayouts={personalLayouts} fillColumn="from"
         exportName="Other receipts"
         groupBanner={false}
         stickyIdentity
@@ -236,7 +261,11 @@ function ReceiptRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
         }
         emptyMessage="No other receipt yet. Press New receipt to record a loan in, other income, or money against an invoice."
         expandTitle="Inspect receipt"
-        onRowDoubleClick={(r) => onOpen(r.receipt_id)}
+        onRowDoubleClick={(r) => setPeek(r.receipt_id)}
+        contextMenu={(r) => documentRowMenu({
+          view: () => onOpen(r.receipt_id),
+          print: () => void printOtherReceiptById(qc, r.receipt_id),
+        })}
         expandable={{
           renderExpansion: (r) => (
             <div className="p-4 text-body flex flex-col items-start gap-1">
@@ -261,6 +290,7 @@ function ReceiptRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
           </span>
         )}
       />
+      <OtherReceiptPreview id={peek} onClose={() => setPeek(null)} onView={(id) => { setPeek(null); onOpen(id); }} />
     </ListPageShell>
   );
 }
@@ -603,10 +633,7 @@ function ReceiptFacts({ detail, onBack }: { detail: OtherReceiptDetail; onBack: 
   const downloadPdf = async () => {
     setPrinting(true);
     try {
-      const { renderReceiptPdf } = await import("@/lib/pdf/render");
-      window.open(URL.createObjectURL(await renderReceiptPdf(otherReceiptDoc(detail))), "_blank", "noopener");
-    } catch (e) {
-      toast.error(`The receipt could not be opened: ${(e as Error).message}`);
+      await printOtherReceipt(detail);
     } finally {
       setPrinting(false);
     }

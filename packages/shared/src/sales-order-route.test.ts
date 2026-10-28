@@ -848,6 +848,34 @@ describe("PAYMENT speaks in two lines (owner ruling 2026-09-26)", () => {
     expect(node(map, "money").lines.slice(-2)).toEqual(["Customer must pay by", "2026-09-26"]);
   });
 
+  it("the deadline reads the stored Collection timing and the Office holidays (9 Oct 2026)", () => {
+    // Scheduled Wed 30 Sep, outstation. A stored outstation deadline of 4 → Fri 25.
+    const outstation = {
+      logistics: { partnerName: "AL" },
+      booking: { confirmedDate: "2026-09-30", slot: null, scope: null },
+      attempts: [],
+      outstation: true,
+    };
+    const stored = resolveSalesOrderRoute(input({
+      delivery: outstation,
+      paymentClock: { timing: { askDaysBefore: 3, deadlineDaysBefore: 2, outstationAskDaysBefore: 5, outstationDeadlineDaysBefore: 4 } },
+    }));
+    expect(node(stored, "money").lines.slice(-2)).toEqual(["Customer must pay by", "2026-09-25"]);
+    // An Office holiday on Sat 26 moves the 3-day outstation deadline to Fri 25.
+    const holiday = resolveSalesOrderRoute(input({ delivery: outstation, paymentClock: { holidays: ["2026-09-26"] } }));
+    expect(node(holiday, "money").lines.slice(-2)).toEqual(["Customer must pay by", "2026-09-25"]);
+  });
+
+  it("an unassigned LOGISTICS node prints the one `Assign logistics by` date when the lead was read", () => {
+    // Requested Thu 24 Sep; lead 3 on the Mon–Sat week → Mon 21. PO issued earlier opens it only.
+    const read = resolveSalesOrderRoute(input({ delivery: { logistics: null, booking: null, attempts: [], assignLeadWorkingDays: 3 } }));
+    expect(node(read, "logistics").lines).toEqual(["Logistics not assigned", "Assign logistics by", "2026-09-21"]);
+    const five = resolveSalesOrderRoute(input({ delivery: { logistics: null, booking: null, attempts: [], assignLeadWorkingDays: 5 } }));
+    expect(node(five, "logistics").lines.slice(1)).toEqual(["Assign logistics by", "2026-09-18"]);
+    // A caller that did not read the setting says nothing about it.
+    expect(node(resolveSalesOrderRoute(input()), "logistics").lines).toEqual(["Logistics not assigned"]);
+  });
+
   it("paid: one word, and the gate line agrees", () => {
     const map = resolveSalesOrderRoute(input({ money: { known: true, outstanding: 0 } }));
     expect(node(map, "money").lines).toEqual(["Customer paid in full"]);

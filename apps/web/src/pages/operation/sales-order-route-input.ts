@@ -10,11 +10,12 @@
 import {
   deliveryReasonLabel,
   lineKind,
-  myHolidaySet,
   receivingRecordNo,
+  deliveryHolidaySet,
   routeDeliveryScopesOf,
   routeGoodsLinesOf,
   supplierClaimStatusLabel,
+  type CollectionTiming,
   type SalesOrderRouteInput,
 } from "@carres/shared";
 import { appTodayIso } from "@/lib/fmt-date";
@@ -35,8 +36,18 @@ export interface SalesOrderRouteInputArgs {
   deliverToLines: NonNullable<ReturnType<typeof useSalesOrderExpansion>["data"]>["lines"] | undefined;
   cancelledLines: NonNullable<SalesOrderRouteInput["cancelledLines"]>;
   money: { known: boolean; outstanding: number };
-  /** The assigned company is not a Klang Valley default. */
+  /** The assigned company is not a Klang Valley default (`isOutstation`). */
   outstation: boolean;
+  /** The stored Collection timing this order's clock runs under
+   *  (`useOrderCollectionTiming`). Absent ⇒ the ruled default. */
+  paymentTiming?: CollectionTiming;
+  /** THE Delivery calendar's holidays (`useDeliveryDays().holidays`: the
+   *  stored Selangor calendar, else the built-in list) — the delivery-day
+   *  refusal, the goods chain's supplier-delivery days and the payment-due
+   *  FACT all count on it. Absent ⇒ the built-in list. */
+  deliveryHolidays?: ReadonlySet<string>;
+  /** DEL-04 · the stored `Assign logistics by` lead (`useDeliveryLeads`). */
+  assignLeadWorkingDays?: number;
   amendment: SalesOrderRouteInput["amendment"];
   amendmentFailed: boolean;
 }
@@ -68,7 +79,7 @@ export function salesOrderRouteInputOf(a: SalesOrderRouteInputArgs): SalesOrderR
         ? routeGoodsLinesOf({
             ...a.facts.goods,
             todayIso: appTodayIso(),
-            holidays: myHolidaySet(),
+            holidays: a.deliveryHolidays ?? deliveryHolidaySet(),
             lines: a.facts.goods.lines
               .filter((line) => lineKind(line.sku) !== "service")
               .map((line) => ({
@@ -122,10 +133,11 @@ export function salesOrderRouteInputOf(a: SalesOrderRouteInputArgs): SalesOrderR
               fallbackConfirmedTime: a.facts.brief?.appointment?.slot ?? null,
             })
           : undefined,
-        /* Payment must be complete 3 working days before an outstation
-           delivery, 2 in the Klang Valley — the Work panel's own reading of
-           the partner (Law D). */
+        /* The outstation pair of the stored Collection timing — the Work
+           panel's own reading of the company (`isOutstation`, Law D). */
         outstation: a.outstation,
+        /* `Assign logistics by` on an unassigned LOGISTICS node (DEL-04). */
+        ...(a.assignLeadWorkingDays !== undefined ? { assignLeadWorkingDays: a.assignLeadWorkingDays } : {}),
         /* The document's own number (0356/Law D) — the gate stops depending on
            an attempt existing before it can print the number the system
            already minted. */
@@ -208,8 +220,16 @@ export function salesOrderRouteInputOf(a: SalesOrderRouteInputArgs): SalesOrderR
         recordedAt: offer.recorded_at,
       })),
       /* Sunday and Malaysian public holidays are the two days no company runs
-         (§8) — the gate names the refused day instead of failing silently. */
-      publicHolidays: [...myHolidaySet()],
+         (§8) — the gate names the refused day instead of failing silently.
+         The Delivery calendar's holidays, never the Office list. */
+      publicHolidays: [...(a.deliveryHolidays ?? deliveryHolidaySet())],
+      /* Payment's own clock (one arithmetic with the Monitor): the stored
+         Collection timing; `Customer must pay by` is a FACT on the Delivery
+         calendar. */
+      paymentClock: {
+        ...(a.paymentTiming ? { timing: a.paymentTiming } : {}),
+        ...(a.deliveryHolidays ? { holidays: [...a.deliveryHolidays] } : {}),
+      },
       /* ⭐ A FAILED READ IS `unreadable`, NEVER A BUSINESS SENTENCE (owner
          ruling 2026-09-26). The group whose owner could not be read says so;
          every other group draws from its own read. */

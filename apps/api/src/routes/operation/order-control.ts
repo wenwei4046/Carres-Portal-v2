@@ -15,7 +15,7 @@ import {
   type BookingGateResult,
   partnerBookingWarnings,
   partnerDeliveryRules,
-  myHolidaySet,
+  deliveryHolidaySet,
   type PartnerBookingWarning,
   type PartnerDeliveryRules,
   deliveryGroupLabel,
@@ -50,6 +50,7 @@ import {
 import { requireDuty } from "../../lib/duties";
 import { mapPgError, fail } from "../../lib/route-helpers";
 import { adminClient, userClient } from "../../lib/supabase";
+import { readDeliveryCalendar } from "../../lib/delivery-calendar";
 import type { AppEnv } from "../../types";
 
 /**
@@ -486,7 +487,18 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
         (doc.delivery_date as string | null) === confirmedDate &&
         ((doc.time_slot as string | null) ?? null) ===
           (confirmedTimeSlot ?? null);
-      if (doc && !doc.voided_at && !sameBooking) {
+      if (doc && !doc.voided_at && doc.delivery_date === null) {
+        // An undated DO (opened by the office before the booking, 0710) gets
+        // its date filled in and KEEPS its number — the Houzs way (Weisiang
+        // 2026-10-22). Only a DO that already had a date is rebooked below.
+        // Follows Houzs-ERP backend/src/scm/routes/delivery-orders-mfg.ts:4081 (PATCH
+        // /:id edits the date on the same DO) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+        await sb.rpc("delivery_document_date_fill", {
+          p_do_id: doc.id,
+          p_date: confirmedDate,
+          p_time_slot: confirmedTimeSlot ?? null,
+        });
+      } else if (doc && !doc.voided_at && !sameBooking) {
         const { data: runs } = await sb
           .from("delivery_attempts")
           .select("result")
@@ -897,6 +909,8 @@ async function partnerBookingCheck(
     }).length;
   }
 
+  // The Delivery calendar's holidays (stored Selangor, else built-in).
+  const delivery = await readDeliveryCalendar(sb);
   return {
     partner: { id: partner.id as string, name: (partner.name as string) ?? "" },
     rules,
@@ -907,7 +921,7 @@ async function partnerBookingCheck(
       dateIso,
       todayIso: todayIsoMYT(),
       bookedOnDate,
-      holidays: myHolidaySet(),
+      holidays: deliveryHolidaySet(delivery.calendar),
     }),
   };
 }

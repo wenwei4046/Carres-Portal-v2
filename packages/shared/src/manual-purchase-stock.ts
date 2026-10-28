@@ -61,6 +61,8 @@ export type ManualPurchaseIntent = z.infer<typeof manualPurchaseIntentSchema>;
 export const manualPurchaseStockBlockSchema = z.enum([
   /** Waiting for a decision, sent back, refused or withdrawn. */
   "not_approved",
+  /** Modern deliberate purchase allocation has no approved Stock proposal. */
+  "stock_not_approved",
   /** The request records that it is buying EXTRA. */
   "additional_stock",
   /** The request never answered the question. */
@@ -82,6 +84,7 @@ export type ManualPurchaseStockBlock = z.infer<typeof manualPurchaseStockBlockSc
  * looking for a permission, and none of these is about permission.
  */
 export const MANUAL_PURCHASE_STOCK_BLOCK_WORDS: Record<ManualPurchaseStockBlock, string> = {
+  stock_not_approved: "No stock was approved for this line.",
   not_approved: "Stock can be chosen after this purchase is approved.",
   additional_stock:
     "This purchase buys extra stock. What is on the shelf does not reduce it.",

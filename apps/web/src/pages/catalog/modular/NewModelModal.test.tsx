@@ -22,6 +22,13 @@ vi.mock("@/lib/queries", () => ({
   useGenerateSkus: () => ({ mutate: vi.fn(), mutateAsync: generateSkusAsync, isPending: false }),
 }));
 
+// 0659 — the Finance item groups a new product can start in.
+const groups = vi.hoisted(() => ({
+  groups: [{ id: "g-mat", name: "MATTRESS" }, { id: "g-oth", name: "OTHERS" }, { id: "g-pil", name: "PILLOW" }],
+  starts: { mattress: "g-mat", accessory: "g-oth" } as Record<string, string>,
+}));
+vi.mock("@/lib/item-group-queries", () => ({ useItemGroupChoices: () => ({ data: groups }) }));
+
 beforeEach(() => {
   mockRole = "principal";
   createModelAsync.mockReset().mockResolvedValue({ model: { id: "m-new" } });
@@ -104,5 +111,42 @@ describe("NewModelModal", () => {
     fireEvent.click(screen.getByText("Create model + 1 SKU"));
     await waitFor(() => expect(generateSkusAsync).toHaveBeenCalledOnce());
     expect(generateSkusAsync.mock.calls[0][0].input.price).toBeUndefined();
+  });
+});
+
+describe("NewModelModal · item group (0659)", () => {
+  it("starts on the category's own group and sends none until another is picked", async () => {
+    render(<NewModelModal onClose={vi.fn()} />);
+    expect(screen.getByRole("combobox", { name: /Item group/ })).toHaveTextContent("MATTRESS");
+    fireEvent.change(screen.getByTestId("new-model-name"), { target: { value: "Bare Model" } });
+    fireEvent.click(screen.getByText("Create model"));
+    await waitFor(() => expect(createModelAsync).toHaveBeenCalledOnce());
+    expect(createModelAsync.mock.calls[0][0].itemGroupId).toBeUndefined();
+  });
+
+  it("sends the group picked, and a new category starts on its own group again", async () => {
+    render(<NewModelModal onClose={vi.fn()} />);
+    fireEvent.keyDown(screen.getByRole("combobox", { name: /Item group/ }), { key: "Enter" });
+    fireEvent.click(screen.getByRole("option", { name: "PILLOW" }));
+    fireEvent.change(screen.getByTestId("new-model-category"), { target: { value: "accessory" } });
+    expect(screen.getByRole("combobox", { name: /Item group/ })).toHaveTextContent("OTHERS");
+    fireEvent.keyDown(screen.getByRole("combobox", { name: /Item group/ }), { key: "Enter" });
+    fireEvent.click(screen.getByRole("option", { name: "PILLOW" }));
+    fireEvent.change(screen.getByTestId("new-model-name"), { target: { value: "Neck Pillow" } });
+    fireEvent.click(screen.getByText("Create model"));
+    await waitFor(() => expect(createModelAsync).toHaveBeenCalledOnce());
+    expect(createModelAsync.mock.calls[0][0]).toMatchObject({ category: "accessory", itemGroupId: "g-pil" });
+  });
+
+  it("says so when the database did not set the group; the product is still made", async () => {
+    createModelAsync.mockReset().mockResolvedValue({ model: { id: "m-new" }, itemGroupRefused: "PILLOW is not in use. Choose an item group in use." });
+    const onClose = vi.fn();
+    render(<NewModelModal onClose={onClose} />);
+    fireEvent.keyDown(screen.getByRole("combobox", { name: /Item group/ }), { key: "Enter" });
+    fireEvent.click(screen.getByRole("option", { name: "PILLOW" }));
+    fireEvent.change(screen.getByTestId("new-model-name"), { target: { value: "Bare Model" } });
+    fireEvent.click(screen.getByText("Create model"));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(toast.error).toHaveBeenCalledWith("PILLOW is not in use. Choose an item group in use.");
   });
 });

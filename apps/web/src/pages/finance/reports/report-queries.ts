@@ -22,6 +22,8 @@ export const BS_SECTIONS = ["ASSET", "LIABILITY", "EQUITY"] as const;
  *  what the Balance Sheet moved onto (plus) or off (minus) this line from
  *  money paid before its document (0506, 0507); the move is already inside
  *  `amount`. `reclassifiedFor` is whose money that was, as the database says.
+ *  Since 0688 it is also `STOCK` on the stock line: what the statement added
+ *  so the line shows the stock on hand worked out from Stock's Units.
  *  Both null when nothing was moved, or before 0506 is applied.
  *  `ordinal` is its place in the chart: the database's row number. */
 export interface StatementLine {
@@ -29,7 +31,7 @@ export interface StatementLine {
   name: string | null;
   amount: number;
   reclassified: number | null;
-  reclassifiedFor: "CUSTOMER" | "SUPPLIER" | null;
+  reclassifiedFor: "CUSTOMER" | "SUPPLIER" | "STOCK" | null;
   ordinal: number;
 }
 
@@ -131,12 +133,13 @@ function nameOf(v: unknown, bad: Fail): string | null {
   return v;
 }
 
-/** Whose money a moved amount is: 0507's `reclassified_for`. Rows from 0506
- *  have no such column, and 0506 moved only customers' money. */
+/** Whose money a moved amount is: 0507's `reclassified_for`, or (0688) the
+ *  stock on hand. Rows from 0506 have no such column, and 0506 moved only
+ *  customers' money. */
 function movedFor(r: Raw, moved: number | null, bad: Fail): StatementLine["reclassifiedFor"] {
   if (moved === null) return null;
   const v = r.reclassified_for === undefined ? "CUSTOMER" : r.reclassified_for;
-  if (v !== "CUSTOMER" && v !== "SUPPLIER") throw bad();
+  if (v !== "CUSTOMER" && v !== "SUPPLIER" && v !== "STOCK") throw bad();
   return v;
 }
 
