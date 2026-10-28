@@ -4853,3 +4853,18 @@ Workspace message availability: `Message not available` replaces a placeholder d
 | PO view (a PO serving two or more orders) | `{PO No} · {Supplier}` over `PO Delivery Date {date} · Expected arrival {date} · Related orders · {n}` · a related order line `{SO No} · {customer} · Requested {date}` · on the order it opens: `Back to {PO No}` | copying the PO's act onto each order |
 | Communication | `Communication` · tabs `Supplier` · `Warehouse` · `Logistics` · `Customer` · `To` (recorded channels only: `{party} · WhatsApp group` · `{party} · Email`) · `Template` · `Message` · `Message not available` · `Copy message` · `History {n}` | a typed recipient · a message with a missing field · a dash |
 | Empty and failure | `Nothing assigned to you` + `See Team Work` · `Nothing due on {date}` + `Open {date}` / `Open Missed` · `No missed work` · `No open work. Every track is clear.` · `Could not refresh {source}` · `Last updated {time}` · `Work could not be loaded. Try again.` | `0` for a failed source |
+
+### Cancelled orders holding money (migration 0690)
+
+**PROPOSAL, PENDING APPROVAL.** Every word below is new. Page: `Cancelled orders holding money` at
+`/finance/cancelled-money` (Finance sidebar, before `Card settlement`). Read only: no refund and no
+move is offered; Finance has not ruled which (Q15).
+
+| Word | Where, meaning |
+|---|---|
+| `Cancelled orders holding money` | Sidebar row, page header and export name. |
+| `SO No` · `Customer` · `Paid` · `Refunded` · `Cancelled` | Columns, all reused. `Cancelled` is the day the order was cancelled. |
+| `Money held` | Column: paid minus refunds already paid out. |
+| `Search cancelled orders…` | Search placeholder. |
+| `No cancelled order is holding customer money.` | Empty state. |
+| `Cancelled orders holding money are for Finance.` | Database refusal. |

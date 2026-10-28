@@ -627,6 +627,8 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "other-receipts", label: "Other receipts", icon: HandCoins, financePath: "/finance/other-receipts" },
       // 0529 — Finance moving its own money: bank transfers and card payouts.
       { key: "money-moves", label: "Money moves", icon: ArrowLeftRight, financePath: "/finance/money-moves" },
+      // 0690 — cancelled orders whose customer money is still held. Read only.
+      { key: "cancelled-money", label: "Cancelled orders holding money", icon: Undo2, financePath: "/finance/cancelled-money" },
       // 0572 — the card companies' files, matched to the recorded card payments.
       { key: "card-settlement", label: "Card settlement", icon: CreditCard, financePath: "/finance/card-settlement" },
       // 0543 — Finance keeps the dealer master (code, state, address, contact)

@@ -16,6 +16,7 @@ import OtherDebtorsPage from "./other-money-in/OtherDebtorsPage";
 import PrincipalDealers from "../principal/PrincipalDealers";
 import OtherReceiptsPage from "./other-money-in/OtherReceiptsPage";
 import MoneyMovesPage from "./money-moves/MoneyMovesPage";
+import CancelledMoneyPage from "./cancelled-money/CancelledMoneyPage";
 import CardSettlementPage from "./card-settlement/CardSettlementPage";
 // The read-only Finance Ledger — three destinations, three nav rows.
 import LedgerJournal from "./ledger/LedgerJournal";
@@ -113,6 +114,8 @@ export default function FinanceApp() {
           <Route path="other-receipts" element={financeOnly(<OtherReceiptsPage />)} />
           {/* 0529 — bank transfers and card payouts between Finance's own accounts. */}
           <Route path="money-moves" element={financeOnly(<MoneyMovesPage />)} />
+          {/* 0690 — cancelled orders whose customer money is still held. Read only. */}
+          <Route path="cancelled-money" element={financeOnly(<CancelledMoneyPage />)} />
           {/* 0572 — card settlement files matched to the recorded card payments. */}
           <Route path="card-settlement" element={financeOnly(<CardSettlementPage />)} />
           {/* The principal also reaches this page from the Finance rail, and
