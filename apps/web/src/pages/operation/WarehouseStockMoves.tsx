@@ -10,9 +10,11 @@ import Select from "@/components/kit/Select";
 import Textarea from "@/components/kit/Textarea";
 import { FieldError } from "@/components/kit/FieldFrame";
 import ConfirmActionDialog from "@/pages/operation/components/ConfirmActionDialog";
+import LoadError from "@/pages/operation/components/LoadError";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
+import { useCatalog } from "@/lib/queries";
 
 /**
  * Stock Adjustment · Stock Transfer · Stock Take (migration 0714).
@@ -71,7 +73,7 @@ function UnitPicker({ siteId, picked, onChange, allowReserved }: {
   return (
     <div className="flex flex-col gap-2">
       <Input id="find-unit" label="Find Unit" value={find} onChange={(e) => setFind(e.target.value)} />
-      {q.isError && <FieldError>The Units could not be loaded. Try again.</FieldError>}
+      {q.isError && <LoadError message="The Units could not be loaded." onRetry={() => void q.refetch()} />}
       <div className="max-h-64 overflow-auto rounded-control border border-c-line p-2" aria-label="Units">
         {q.isSuccess && units.length === 0 && <p className="text-body text-c-muted">No Units here.</p>}
         {units.map((u) => {
@@ -96,12 +98,20 @@ function UnitPicker({ siteId, picked, onChange, allowReserved }: {
 
 /** Lines of goods that get NEW Unit IDs (Stock Adjustment plus, Stock Take extras). */
 function PlusLines({ lines, onChange }: { lines: PlusLine[]; onChange: (l: PlusLine[]) => void }) {
+  // The same catalogue the Goods Receipt form picks from, so a typo cannot reach the server.
+  const catalog = useCatalog();
+  const models = new Map((catalog.data?.models ?? []).map((m) => [m.id, m.name]));
+  const skuOptions = (catalog.data?.skus ?? []).filter((x) => !x.discontinuedAt)
+    .map((x) => ({ value: x.sku, label: `${x.sku} · ${models.get(x.modelId) ?? ""} ${x.variant}`.trim() }));
+  // A SKU already on the sheet that is no longer in the catalogue stays pickable.
+  for (const l of lines) if (l.sku && !skuOptions.some((o) => o.value === l.sku)) skuOptions.push({ value: l.sku, label: l.sku });
   const set = (i: number, patch: Partial<PlusLine>) => onChange(lines.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   return (
     <div className="flex flex-col gap-2">
       {lines.map((l, i) => (
         <div key={i} className="grid grid-cols-[1fr_6rem_auto] items-end gap-2">
-          <Input id={`plus-sku-${i}`} label="Item" value={l.sku} onChange={(e) => set(i, { sku: e.target.value })} />
+          <Select id={`plus-sku-${i}`} label="Item" value={l.sku || undefined} onValueChange={(sku) => set(i, { sku })}
+            placeholder={catalog.isError ? "SKUs could not be loaded" : "Select"} options={skuOptions} />
           <Input id={`plus-qty-${i}`} label="Qty" type="number" min={1} value={l.qty} onChange={(e) => set(i, { qty: e.target.value })} />
           <Button variant="ghost" onClick={() => onChange(lines.filter((_, j) => j !== i))}>Remove</Button>
         </div>
@@ -143,6 +153,9 @@ export function StockAdjustments() {
       void qc.invalidateQueries({ queryKey: ["stock-moves"] });
     },
   });
+  const adjustHint = !siteId ? "Pick a Site."
+    : !reason.trim() ? "Write the reason."
+    : minus.length === 0 && plusPayload(plus).length === 0 ? "Pick Units to write off, or add an item." : null;
   const columns = useMemo<DataGridColumn<AdjustmentRow>[]>(() => [
     { key: "no", label: "Adjustment No", width: 170, accessor: (r) => r.adjustment_no },
     { key: "date", label: "Date", width: 110, accessor: (r) => fmtDate(r.created_at), dateValue: (r) => r.created_at, filterType: "date" },
@@ -155,7 +168,7 @@ export function StockAdjustments() {
 
   return (
     <Page word="Stock Adjustment" testId="stock-adjustments">
-      {list.isError ? <p role="alert" className="p-4 text-body">The stock adjustments could not be loaded. Try again.</p> : (
+      {list.isError ? <LoadError message="The stock adjustments could not be loaded." onRetry={() => void list.refetch()} /> : (
         <ListPageShell register>
           <DataGrid rows={list.data?.adjustments ?? []} columns={columns} rowKey={(r) => r.id}
             storageKey="carres.warehouse.stock-adjustments.v1" appearance="reference" exportName="Stock Adjustment"
@@ -177,6 +190,7 @@ export function StockAdjustments() {
           <UnitPicker siteId={siteId} picked={minus} onChange={setMinus} allowReserved={false} />
           <p className="text-body font-semibold">Add</p>
           <PlusLines lines={plus} onChange={setPlus} />
+          {adjustHint && <p className="text-body text-c-muted" role="status">Save is off: {adjustHint}</p>}
           {!confirming && save.isError && <FieldError>{errorText(save.error)}</FieldError>}
         </div>
       </Modal>
@@ -215,6 +229,10 @@ export function StockTransfers() {
     mutationFn: () => post(`/transfers/${cancelling?.id}/cancel`, { reason: cancelReason }),
     onSuccess: () => { setCancelling(null); setCancelReason(""); done(); },
   });
+  const transferHint = !from ? "Pick the Pickup Location."
+    : !to ? "Pick the Delivery Location."
+    : from === to ? "Pickup and Delivery Location must differ."
+    : units.length === 0 ? "Pick at least one Unit." : null;
   const columns = useMemo<DataGridColumn<TransferRow>[]>(() => [
     { key: "no", label: "Transfer No", width: 170, accessor: (r) => r.transfer_no },
     { key: "date", label: "Date", width: 110, accessor: (r) => fmtDate(r.created_at), dateValue: (r) => r.created_at, filterType: "date" },
@@ -223,11 +241,14 @@ export function StockTransfers() {
     { key: "units", label: "Units", width: 280, accessor: (r) => unitCodes(r.stock_transfer_units) },
     { key: "status", label: "Status", width: 120, accessor: (r) => (r.status === "posted" ? "Posted" : "Cancelled"), filterType: "enum" },
     { key: "reason", label: "Reason", width: 220, accessor: (r) => r.cancel_reason ?? r.note ?? "" },
+    { key: "act", label: "", width: 150, exportValue: () => "",
+      accessor: (r) => r.status === "posted"
+        ? <Button variant="neutral" onClick={() => setCancelling(r)}>Cancel transfer</Button> : null },
   ], [sites.data]);
 
   return (
     <Page word="Stock Transfer" testId="stock-transfers">
-      {list.isError ? <p role="alert" className="p-4 text-body">The stock transfers could not be loaded. Try again.</p> : (
+      {list.isError ? <LoadError message="The stock transfers could not be loaded." onRetry={() => void list.refetch()} /> : (
         <ListPageShell register>
           <DataGrid rows={list.data?.transfers ?? []} columns={columns} rowKey={(r) => r.id}
             storageKey="carres.warehouse.stock-transfers.v1" appearance="reference" exportName="Stock Transfer"
@@ -248,6 +269,7 @@ export function StockTransfers() {
           <SiteSelect id="tr-to" label="Delivery Location" value={to} onChange={setTo} sites={(sites.data?.sites ?? []).filter((s) => s.id !== from)} />
           <Textarea id="tr-note" label="Reason" rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
           <UnitPicker siteId={from} picked={units} onChange={setUnits} allowReserved />
+          {transferHint && <p className="text-body text-c-muted" role="status">Save is off: {transferHint}</p>}
           {save.isError && <FieldError>{errorText(save.error)}</FieldError>}
         </div>
       </Modal>
@@ -304,7 +326,7 @@ function CountSheet({ id, onClose }: { id: string; onClose: () => void }) {
         {isOpen && <Button variant="neutral" loading={record.isPending && record.variables === false} onClick={() => record.mutate(false)}>Save</Button>}
         {isOpen && <Button variant="primary" loading={record.isPending && record.variables === true} onClick={() => setConfirmingPost(true)}>Post</Button>}
       </>}>
-      {q.isError && <FieldError>The Stock Take could not be loaded. Try again.</FieldError>}
+      {q.isError && <LoadError message="The Stock Take could not be loaded." onRetry={() => void q.refetch()} />}
       {c && (
         <div className="flex flex-col gap-3">
           {c.blind && isOpen ? (
@@ -364,7 +386,7 @@ export function StockTakes() {
 
   return (
     <Page word="Stock Take" testId="stock-takes">
-      {list.isError ? <p role="alert" className="p-4 text-body">The stock takes could not be loaded. Try again.</p> : (
+      {list.isError ? <LoadError message="The stock takes could not be loaded." onRetry={() => void list.refetch()} /> : (
         <ListPageShell register>
           <DataGrid rows={list.data?.counts ?? []} columns={columns} rowKey={(r) => r.id}
             storageKey="carres.warehouse.stock-takes.v1" appearance="reference" exportName="Stock Take"

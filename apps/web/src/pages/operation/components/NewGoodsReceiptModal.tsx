@@ -52,7 +52,16 @@ export default function NewGoodsReceiptModal({ open, onOpenChange, suppliers, de
   const [saveKey, setSaveKey] = useState(() => crypto.randomUUID());
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  // The uploaded file is filed under the DO number, so editing the number drops it; say so.
+  const [fileDropped, setFileDropped] = useState(false);
+  const [uploadKey, setUploadKey] = useState(0);
   const body = newGoodsReceiptBody(draft, saveKey);
+  const missing = [
+    !draft.supplierId && "a Supplier", !draft.destinationId && "where it was received",
+    draft.doNumber.trim().length < 3 && "a DO number of 3 or more characters",
+    !draft.doFilePath && "the uploaded DO file",
+    draft.lines.some((l) => !l.sku || !(Number(l.qty) >= 1)) && "an item and quantity on every line",
+  ].filter(Boolean);
   const skuOptions = useMemo(
     () => skus.filter((s) => s.supplierId === draft.supplierId).map((s) => ({ value: s.sku, label: s.label })),
     [skus, draft.supplierId],
@@ -94,9 +103,14 @@ export default function NewGoodsReceiptModal({ open, onOpenChange, suppliers, de
           <DatePicker id="new-grn-date" label="Goods Received Date" value={draft.receivedAt}
             onChange={(receivedAt) => setDraft((d) => ({ ...d, receivedAt }))} />
           <Input id="new-grn-do" label="DO Number" required value={draft.doNumber}
-            onChange={(e) => setDraft((d) => ({ ...d, doNumber: e.target.value, doFilePath: null }))} />
+            onChange={(e) => {
+              if (draft.doFilePath) { setFileDropped(true); setUploadKey((k) => k + 1); }
+              setDraft((d) => ({ ...d, doNumber: e.target.value, doFilePath: null }));
+            }} />
           <div className="md:col-span-2">
-            <DOFileUploadField poId="NO-PO" doNumber={draft.doNumber} onUploaded={(doFilePath) => setDraft((d) => ({ ...d, doFilePath }))} />
+            <DOFileUploadField key={uploadKey} poId="NO-PO" doNumber={draft.doNumber}
+              onUploaded={(doFilePath) => { setFileDropped(false); setDraft((d) => ({ ...d, doFilePath })); }} />
+            {fileDropped && <p role="status" className="mt-1 text-body text-kit-red-11">DO number changed, upload the file again.</p>}
           </div>
         </div>
         {draft.lines.map((line, i) => (
@@ -116,6 +130,7 @@ export default function NewGoodsReceiptModal({ open, onOpenChange, suppliers, de
           onClick={() => setDraft((d) => ({ ...d, lines: [...d.lines, blankLine()] }))}>Add item</Button></div>
         <Textarea id="new-grn-note" label="Note" rows={2} maxLength={500} value={draft.note}
           onChange={(e) => setDraft((d) => ({ ...d, note: e.target.value }))} />
+        {!body && missing.length > 0 && <p role="status" className="text-body text-c-muted">Post is off: still needs {missing.join(", ")}.</p>}
         {problem && <p role="alert" className="text-body text-kit-red-11">{problem}</p>}
       </div>
     </Modal>
