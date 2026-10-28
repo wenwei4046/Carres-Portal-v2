@@ -140,6 +140,7 @@ import activityRouter from "./routes/operation/activity";
 import stripeCheckoutRouter from "./routes/stripe-checkout";
 import stripeWebhookRouter from "./routes/stripe-webhook";
 import rentalRouter from "./routes/rental";
+import itSupportRouter from "./routes/it-support";
 import { runContactByCron, runFollowUpMaintenanceCron } from "./cron/contact-by";
 import type { AppEnv, Bindings } from "./types";
 
@@ -207,6 +208,7 @@ api.route("/hr/comp", hrCompRouter);
 api.route("/hr", hrRouter);
 api.route("/staff", staffRouter);
 api.route("/account", accountRouter);
+api.route("/it-support", itSupportRouter);
 // Guarantee packages (0261-0263) — terms config + the claim/track-back desk.
 api.route("/guarantees", guaranteesRouter);
 api.route("/operation/badges", operationBadgesRouter);

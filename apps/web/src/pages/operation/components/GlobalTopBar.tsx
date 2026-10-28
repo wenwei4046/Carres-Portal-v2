@@ -22,7 +22,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Bell, GraduationCap, HelpCircle, Settings } from "lucide-react";
+import { Bell, GraduationCap, HelpCircle, LifeBuoy, Settings } from "lucide-react";
+import ReportProblemModal from "./ReportProblemModal";
 import { useOperationOrders, type operationOrderListRow } from "@/lib/queries";
 import { apiFetch } from "@/lib/api";
 import { buildInfo, checkForUpdate, shortCommit, type UpdateCheck } from "@/lib/build-info";
@@ -140,6 +141,7 @@ export function TopBarIcons() {
   const [open, setOpen] = useState<null | "alerts" | "help" | "settings">(null);
   /* 0430 — the Help menu's version check. null = not asked this open. */
   const [update, setUpdate] = useState<UpdateCheck | null>(null);
+  const [reporting, setReporting] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -268,6 +270,20 @@ export function TopBarIcons() {
                 </span>
               </span>
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(null);
+                setReporting(true);
+              }}
+              data-testid="help-report-problem"
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-hovertint"
+            >
+              <LifeBuoy size={16} className="shrink-0 text-base-400" />
+              <span className="min-w-0">
+                <span className="text-body text-base-800 block">Report a problem to IT</span>
+              </span>
+            </button>
             {/* 0430 — the running version is IDENTIFIABLE, and updating is the
                 operator's own safe click: nothing reloads on its own, so an
                 unfinished form is never thrown away by a version check. */}
@@ -370,6 +386,7 @@ export function TopBarIcons() {
           </div>
         )}
       </div>
+      <ReportProblemModal open={reporting} onClose={() => setReporting(false)} />
     </div>
   );
 }

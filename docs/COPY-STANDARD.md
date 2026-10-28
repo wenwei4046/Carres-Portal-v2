@@ -4853,3 +4853,7 @@ Workspace message availability: `Message not available` replaces a placeholder d
 | PO view (a PO serving two or more orders) | `{PO No} · {Supplier}` over `PO Delivery Date {date} · Expected arrival {date} · Related orders · {n}` · a related order line `{SO No} · {customer} · Requested {date}` · on the order it opens: `Back to {PO No}` | copying the PO's act onto each order |
 | Communication | `Communication` · tabs `Supplier` · `Warehouse` · `Logistics` · `Customer` · `To` (recorded channels only: `{party} · WhatsApp group` · `{party} · Email`) · `Template` · `Message` · `Message not available` · `Copy message` · `History {n}` | a typed recipient · a message with a missing field · a dash |
 | Empty and failure | `Nothing assigned to you` + `See Team Work` · `Nothing due on {date}` + `Open {date}` / `Open Missed` · `No missed work` · `No open work. Every track is clear.` · `Could not refresh {source}` · `Last updated {time}` · `Work could not be loaded. Try again.` | `0` for a failed source |
+
+### Report a problem to IT (Help menu)
+
+The Help menu row and its dialog send a request to the Houzs IT Hub (`/api/it-support/tickets`, Worker secrets `IT_HUB_URL` and `IT_HUB_API_KEY`). Words: **`Report a problem to IT`** · **`What went wrong?`** · **`Tell IT more`** · **`How urgent is it?`** (`Can wait` · `Soon` · `Blocking my work`) · **`Send to IT`** · **`Sent to IT. Your request number is {code}.`** · **`Done`**. This is IT's request, not a Service Case: do not mix it with the Unit and Service `Report a problem`.

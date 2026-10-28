@@ -16,6 +16,11 @@ export type Bindings = {
   STRIPE_WEBHOOK_SECRET?: string;
   // Where Checkout lands after paying (wrangler.toml [vars]).
   PUBLIC_WEB_URL?: string;
+  // IT Support (routes/it-support.ts) — the Houzs IT Hub's origin and Carres'
+  // own key there. Worker secrets (`wrangler secret put`); either unset =>
+  // the route answers 501. Never reach the browser bundle.
+  IT_HUB_URL?: string;
+  IT_HUB_API_KEY?: string;
 };
 
 export type AuthContext = {
