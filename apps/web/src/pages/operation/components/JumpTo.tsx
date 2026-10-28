@@ -320,7 +320,7 @@ export default function JumpTo({ pill = false }: {
           title={`Search SO, PO, supplier, customer (${hint})`}
           aria-keyshortcuts="Meta+K Control+K"
           data-testid="jump-to-trigger"
-          className="flex h-[34px] w-[300px] min-w-[140px] shrink items-center gap-2 rounded-full bg-c-search-bg px-3 text-left text-[13px] text-c-muted"
+          className="flex h-[34px] w-[300px] min-w-[140px] shrink items-center gap-2 rounded-full bg-c-search-bg px-3 text-left text-[13px] text-c-menu"
         >
           <MIcon name="search" size={18} />
           <span className="min-w-0 flex-1 truncate">Search SO, PO, supplier, customer</span>

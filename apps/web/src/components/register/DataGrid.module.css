@@ -788,12 +788,12 @@ div:first-child > .columnsMenuGroup {
   font-variant-numeric: tabular-nums;
 }
 
-/* Hover: the person's focus outline (Settings → Appearance), the fill stays
-   white (UI-KIT "Focus outline … hovered row"). An opened expansion is not a
-   row and never lights. */
-.tr:not(.trExpansion):hover {
-  outline: var(--c-focus);
-  outline-offset: -2px;
+/* Hover: a soft row tint, so a hovered row is not mistaken for the keyboard-
+   focused row, which keeps the person's focus outline below. An opened
+   expansion is not a row and never lights. */
+.tr:not(.trExpansion):hover,
+.tr:not(.trExpansion):hover .stickyCell {
+  background: var(--c-row-hover);
 }
 /* A focused row shows the same outline for the keyboard. */
 .tr:focus {
