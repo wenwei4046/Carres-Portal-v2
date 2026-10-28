@@ -134,9 +134,9 @@ const row = (over: Record<string, unknown> = {}) => ({
   qty: 1,
   detailDescription: "Breeze FirmCare-B1201F-K",
   poDocNo: "PO/2604-006",
-  debtorName: "Felix Koh",
-  phone: "012-6399285",
-  addr1: "18 Jalan Cempaka",
+  debtorName: "TEST customer 002",
+  phone: "012-0000002",
+  addr1: "2, Jalan TEST 2",
   deliveryLocation: "Muar, Johor",
   balance: "RM3322 Paid",
   ...over,
@@ -633,13 +633,13 @@ describe("GET /api/orders/inbox", () => {
       {
         id: "11111111-1111-1111-1111-000000000001",
         so: 1252,
-        customer_name: "Felix Koh",
+        customer_name: "TEST customer 002",
         ops_assigned_logistic: null,
       },
       {
         id: "11111111-1111-1111-1111-000000000002",
         so: 1253,
-        customer_name: "Tan Win Shen",
+        customer_name: "TEST customer 900",
         ops_assigned_logistic: null,
       },
     ];

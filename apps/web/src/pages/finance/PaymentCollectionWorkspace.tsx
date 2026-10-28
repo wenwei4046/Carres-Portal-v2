@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { InvoiceRegisterRow } from "@carres/shared/payment-invoice-register";
 import {
   deliveryWords,
@@ -9,19 +9,21 @@ import {
   invoicePaymentTiming,
   soRemaining,
 } from "@carres/shared/payment-invoice-register";
-import { collectionTimingFor, type CollectionTimingRule } from "@carres/shared/collection-clock";
+import { collectionTimingFor, type CollectionTimingRule, type OwnerCalendar } from "@carres/shared/collection-clock";
+import type { WorkingDayOptions } from "@carres/shared/working-days";
 import { COLLECTION_OUTCOME_NEXT, COLLECTION_OUTCOME_WORD } from "@carres/shared/payment-collection-outcome";
-import { myHolidaySet } from "@carres/shared/my-holidays";
 import InvoiceRecordPayment from "./InvoiceRecordPayment";
 import InvoiceAskToPay from "./InvoiceAskToPay";
 import InvoicePaymentLink from "./InvoicePaymentLink";
 import InvoiceStorage from "./InvoiceStorage";
+import InvoiceBackdateRequests from "./InvoiceBackdateRequests";
 import InvoiceCollectionResult from "./InvoiceCollectionResult";
 import InvoiceVoidReplace from "./InvoiceVoidReplace";
 import InvoiceCollectionOwner from "./InvoiceCollectionOwner";
 import CustomerStatement from "./CustomerStatement";
 import { useAuth } from "@/lib/auth";
-import { useCollectionOutcomes } from "@/lib/queries";
+import { useDeliveryDays, usePersonOwnerCalendars } from "@/lib/deadline-queries";
+import { useCollectionOutcomes, useCollectionOwner } from "@/lib/queries";
 import { apiFetch } from "@/lib/api";
 import { renderInvoicePdf } from "@/lib/pdf/render";
 import type { InvoiceTemplateData } from "@/lib/pdf/types";
@@ -49,15 +51,19 @@ export function collectionFactsOf(
   row: InvoiceRegisterRow,
   rows: InvoiceRegisterRow[],
   today: string,
-  opts: { holidays?: Set<string> },
+  /** THE Delivery calendar — the payment facts count on it. */
+  opts: WorkingDayOptions,
   timingRules?: readonly CollectionTimingRule[] | null,
+  /** The responsible person's calendar (their working days, Office weekdays
+   *  when none are recorded) — moves only the action day. */
+  owner?: OwnerCalendar,
 ) {
   const money = soRemaining(rows, row.order_id);
   const goodsMoney = invoiceNeeded(row);
   const goods = invoiceGoodsFacts(row);
   const delivery = invoiceCustomerDelivery(row);
   const timingRule = collectionTimingFor(timingRules, row.issued_at?.slice(0, 10) ?? today);
-  const { timing } = invoicePaymentTiming(row, today, opts, rows, timingRule);
+  const { timing } = invoicePaymentTiming(row, today, opts, rows, timingRule, owner);
   const neededWord = money.known ? rm(money.outstanding) : "Value not recorded";
   /* The SAME words the Monitor row prints (Law D). This used to throw the
      status away and print a bare date, so a day the customer had NOT confirmed
@@ -104,8 +110,14 @@ export default function PaymentCollectionWorkspace({ invoice, rows, timingRules,
   embedded?: EmbeddedWorkspace;
 }) {
   const today = appTodayIso();
-  const opts = useMemo(() => ({ holidays: myHolidaySet() }), []);
+  /* The payment FACTS count on THE Delivery calendar; the ask/action day
+     steps back on the responsible person's own working days (Office weekdays
+     when none are recorded). */
+  const opts = useDeliveryDays().opts;
   const role = useAuth((s) => s.role);
+  const ownerQ = useCollectionOwner(invoice.order_id, role === "operation" || role === "principal");
+  const actor = ownerQ.data?.owner?.acting_user_id ?? ownerQ.data?.owner?.normal_user_id ?? null;
+  const ownerOf = usePersonOwnerCalendars([actor]);
   const [recording, setRecording] = useState(false);
   const [asking, setAsking] = useState(false);
   const [linking, setLinking] = useState(false);
@@ -115,7 +127,12 @@ export default function PaymentCollectionWorkspace({ invoice, rows, timingRules,
   const money = soRemaining(rows, invoice.order_id);
   const canRecord = (role === "operation" || role === "principal")
     && invoice.status !== "voided" && money.known && money.outstanding > 0;
-  const facts = collectionFactsOf(invoice, rows, today, opts, timingRules);
+  // Finance records a payment (an old one with no request). Follows Houzs
+  // backend/src/services/backdateRequestNotify.ts:5-8 per Weisiang's ruling
+  // (2026-10-22): clear Carres rules, implement Houzs (YH 2026-10-26, Q14).
+  const canRecordPayment = canRecord
+    || (role === "finance" && invoice.status !== "voided" && money.known && money.outstanding > 0);
+  const facts = collectionFactsOf(invoice, rows, today, opts, timingRules, ownerOf(actor));
   // The ask door exists only when the shared clock says the money is
   // genuinely askable: never while Wait, never with no anchor, never when paid.
   const canAsk = canRecord && (facts.timing.kind === "due" || facts.timing.kind === "late");
@@ -144,12 +161,12 @@ export default function PaymentCollectionWorkspace({ invoice, rows, timingRules,
       <button className="btn-secondary" disabled={printing} onClick={() => void printInvoice()}>Print</button>}
     {canRecord && !composing &&
       <button className="btn-secondary" onClick={() => setLinking(true)}>Create payment link</button>}
-    {canRecord && !composing &&
+    {canRecordPayment && !composing &&
       <button className="btn-primary" onClick={() => setRecording(true)}>Record payment</button>}
   </>;
   const body = statement
     ? <CustomerStatement orderId={invoice.order_id} onClose={() => setStatement(false)} />
-    : recording && canRecord
+    : recording && canRecordPayment
     ? <InvoiceRecordPayment invoice={invoice} rows={rows} onClose={() => setRecording(false)} />
     : linking && canRecord
       ? <InvoicePaymentLink invoice={invoice} rows={rows} onClose={() => setLinking(false)} />
@@ -265,20 +282,20 @@ function InvoiceObject({ invoice, facts: f, onAsk, onResult, correctionInFlight,
         {f.timing.kind === "paid" ? <p>The money is in. Nothing to do.</p>
         : f.timing.kind === "wait" ? <>
           <p>Wait</p>
-          <p className="text-label font-normal">Goods are not ready and arrival is not confirmed. Do not ask the customer to pay yet.</p>
+          <p className="text-meta">Goods are not ready and arrival is not confirmed. Do not ask the customer to pay yet.</p>
         </> : f.timing.kind === "no_date" ? <>
           <p>No delivery date</p>
-          <p className="text-label font-normal">The clock starts when the customer has a delivery date.</p>
+          <p className="text-meta">The clock starts when the customer has a delivery date.</p>
         </> : f.timing.kind === "late" ? <>
           <p>{rm(f.money.outstanding)} should have been paid</p>
-          <p className="text-label font-normal">Ask customer to pay · Record the result.</p>
+          <p className="text-meta">Ask customer to pay · Record the result.</p>
           <span className="mt-2 flex flex-wrap gap-2">
             {onAsk && <button className="btn-primary" onClick={onAsk}>Ask customer to pay</button>}
             {onResult && <button className="btn-secondary" onClick={onResult}>Record the result</button>}
           </span>
         </> : <>
           <p>{rm(f.money.outstanding)} needed by {fmtDate(f.timing.dueIso)}</p>
-          <p className="text-label font-normal">Ask customer to pay · Record the result.</p>
+          <p className="text-meta">Ask customer to pay · Record the result.</p>
           <span className="mt-2 flex flex-wrap gap-2">
             {onAsk && <button className="btn-primary" onClick={onAsk}>Ask customer to pay</button>}
             {onResult && <button className="btn-secondary" onClick={onResult}>Record the result</button>}
@@ -302,6 +319,8 @@ function InvoiceObject({ invoice, facts: f, onAsk, onResult, correctionInFlight,
         {canCorrect && invoice.status === "issued" && invoice.invoice_no &&
           <InvoiceVoidReplace invoiceId={invoice.id} invoiceNo={invoice.invoice_no} />}
       </Facts>
+      {/* 0707 — a payment with an old paid date, waiting for the Payment Approver. */}
+      <InvoiceBackdateRequests orderId={invoice.order_id} />
       <Facts title="Related Payments">
         {payments.length ? payments.map((p) => <p key={p.id}>
           {p.receipt_no ?? "Receipt number missing"} · {rm(p.amount)} · {fmtDate(p.paid_on)}
@@ -342,19 +361,19 @@ function Communications({ invoice }: { invoice: InvoiceRegisterRow }) {
     {rows.map((row) => row.kind === "message"
       ? <details key={row.key}>
           <summary className="cursor-pointer">
-            <span className="font-semibold">{MESSAGE_KIND_WORD[row.m.kind] ?? "Message sent"}</span>
+            <span className="font-medium">{MESSAGE_KIND_WORD[row.m.kind] ?? "Message sent"}</span>
             <span className="ml-2 text-meta font-normal">{fmtDate(row.m.recorded_at, { time: true })}</span>
           </summary>
-          <pre className="mt-1 whitespace-pre-wrap font-sans text-label font-normal">{row.m.message_text}</pre>
+          <pre className="mt-1 whitespace-pre-wrap font-sans text-meta">{row.m.message_text}</pre>
         </details>
       : <div key={row.key} data-testid="communication-outcome">
           <p>
-            <span className="font-semibold">{COLLECTION_OUTCOME_WORD[row.o.outcome] ?? "Result recorded"}</span>
+            <span className="font-medium">{COLLECTION_OUTCOME_WORD[row.o.outcome] ?? "Result recorded"}</span>
             {row.o.promised_date && <span> · promised {fmtDate(row.o.promised_date)}</span>}
             <span className="ml-2 text-meta font-normal">{fmtDate(row.o.recorded_at, { time: true })}{row.o.recorded_by_user?.name ? ` · ${row.o.recorded_by_user.name}` : ""}</span>
           </p>
-          {row.o.note && <p className="text-label font-normal">{row.o.note}</p>}
-          <p className="text-label font-normal">Next: {COLLECTION_OUTCOME_NEXT[row.o.outcome] ?? "Ask again."}</p>
+          {row.o.note && <p className="text-meta">{row.o.note}</p>}
+          <p className="text-meta">Next: {COLLECTION_OUTCOME_NEXT[row.o.outcome] ?? "Ask again."}</p>
         </div>)}
   </div>;
 }

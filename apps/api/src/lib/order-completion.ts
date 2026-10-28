@@ -24,7 +24,7 @@ export interface CompletionOrderRow {
   so: number;
   status: string;
   paid: number | string | null;
-  /** 0627 — issued credit notes; lowers what the order is worth. */
+  /** 0729 — issued credit notes; lowers what the order is worth. */
   credited?: number | string | null;
   delivery_date: string | null;
   order_lines?: Array<{ sku: string; qty: number; unit_price: number | string | null }> | null;

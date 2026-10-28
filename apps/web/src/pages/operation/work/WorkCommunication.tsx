@@ -30,7 +30,8 @@ import { moneyOfOrder } from "../sales-order-facts";
 import { useGoodsName } from "./goods-name";
 import { useLogisticsMessage, useLogisticsModel } from "./LogisticsCard";
 import { useSupplierCard } from "./SupplierCard";
-import type { CommParty } from "./work-stops";
+/** The outside parties a message can go to. */
+export type CommParty = "supplier" | "warehouse" | "logistics" | "customer";
 
 export const COMM_COPY = {
   title: "Communication",
@@ -274,7 +275,7 @@ function CommunicationPane({
             />
           ) : null}
           <div className="flex flex-col gap-1">
-            <span className="text-label text-kit-slate-11">{COMM_COPY.message}</span>
+            <span className="text-meta text-kit-slate-11">{COMM_COPY.message}</span>
             <p className="whitespace-pre-wrap break-words rounded-control border border-kit-slate-5 px-3 py-2 text-body text-kit-slate-12" data-testid="work-comm-message">
               {message ?? COMM_COPY.notAvailable}
             </p>

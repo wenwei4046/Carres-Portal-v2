@@ -104,7 +104,7 @@ function EvidenceFileView({
   const word = file.kind === "video" ? DOR_COPY.videos : file.kind === "document" ? DOR_COPY.signedDo : DOR_COPY.photos;
   if (!file.url) {
     return (
-      <span className="text-label text-kit-slate-11" data-testid="do-evidence-unsigned">
+      <span className="text-meta text-kit-slate-11" data-testid="do-evidence-unsigned">
         {word} {index + 1} · {fmtDate(file.at)}
       </span>
     );
@@ -119,7 +119,7 @@ function EvidenceFileView({
           onLoad={() => onReadState?.(file.path, true)}
           onError={() => onReadState?.(file.path, false)}
         />
-        <span className="mt-1 block text-label text-kit-slate-11">{fmtDate(file.at)}</span>
+        <span className="mt-1 block text-meta text-kit-slate-11">{fmtDate(file.at)}</span>
       </a>
     );
   }
@@ -128,7 +128,7 @@ function EvidenceFileView({
       href={file.url}
       target="_blank"
       rel="noreferrer"
-      className="text-label font-medium text-blue-700 underline-offset-2 hover:underline"
+      className="text-body font-medium text-blue-700 underline-offset-2 hover:underline"
       data-testid={file.kind === "video" ? "do-evidence-video" : "do-evidence-document"}
     >
       {word} · {fmtDate(file.at)}
@@ -205,19 +205,19 @@ function SignedDoAttachForm({
       }}
     >
       <div>
-        <label className="text-label text-kit-slate-11" htmlFor={`do-signed-do-file-${doNumber}`}>
+        <label className="text-meta text-kit-slate-11" htmlFor={`do-signed-do-file-${doNumber}`}>
           {EVIDENCE_COPY.signedDoFile}
         </label>
         <input
           id={`do-signed-do-file-${doNumber}`}
           type="file"
           accept=".pdf,image/jpeg,image/png"
-          className="mt-1 block w-full text-meta"
+          className="mt-1 block w-full text-body"
           onChange={(e) => void pick(e)}
           disabled={uploading || attach.isPending}
           data-testid="do-signed-do-file"
         />
-        <span className="mt-1 block text-label text-kit-slate-11">
+        <span className="mt-1 block text-meta text-kit-slate-11">
           {uploadError ? (
             <span className="text-kit-red-11" data-testid="do-signed-do-error">{uploadError}</span>
           ) : fileName ? (
@@ -332,9 +332,9 @@ export default function DeliveryEvidencePanel({
         ) : undefined
       }
     >
-      <p className="text-label text-kit-slate-11">{EVIDENCE_COPY.meaning}</p>
+      <p className="text-meta text-kit-slate-11">{EVIDENCE_COPY.meaning}</p>
       {arrivalOnly ? (
-        <p className="mt-1 text-label text-kit-slate-11" data-testid="do-evidence-arrival-only">
+        <p className="mt-1 text-meta text-kit-slate-11" data-testid="do-evidence-arrival-only">
           {EVIDENCE_COPY.arrivalOnly}
         </p>
       ) : null}
@@ -392,7 +392,7 @@ export default function DeliveryEvidencePanel({
 
       {/* ── The signed paper ─────────────────────────────────────────────── */}
       {!arrivalOnly || signedDo.present ? <div className="mt-3 border-t border-kit-slate-4 pt-3">
-        <span className="text-label font-semibold uppercase tracking-wide text-kit-slate-11">{EVIDENCE_COPY.signedDo}</span>
+        <span className="text-label uppercase tracking-[0.06em] text-kit-slate-11">{EVIDENCE_COPY.signedDo}</span>
         <div className="mt-1 flex flex-wrap items-center gap-2 text-body">
           {signedDo.present ? (
             <>
@@ -414,14 +414,14 @@ export default function DeliveryEvidencePanel({
       {/* ── The review ───────────────────────────────────────────────────── */}
       {latestReached ? (
         <div className="mt-3 border-t border-kit-slate-4 pt-3" data-testid="do-proof-review">
-          <span className="text-label font-semibold uppercase tracking-wide text-kit-slate-11">{EVIDENCE_COPY.review}</span>
+          <span className="text-label uppercase tracking-[0.06em] text-kit-slate-11">{EVIDENCE_COPY.review}</span>
           <p className={`mt-1 text-body ${stateLine?.tone ?? "text-kit-slate-9"}`} data-testid="do-proof-review-state">
             {stateLine?.text ?? EVIDENCE_COPY.notReviewed}
           </p>
           {reviewsNewestFirst.length > 0 ? (
             <ul className="mt-2 flex flex-col gap-1" data-testid="do-proof-review-history">
               {reviewsNewestFirst.map((r) => (
-                <li key={r.id} className="text-label text-kit-slate-11">
+                <li key={r.id} className="text-meta text-kit-slate-11">
                   {proofDecisionLabel(r.decision)}
                   {r.reason ? ` · ${r.reason}` : ""} · {fmtDate(r.reviewed_at)}
                   {r.reviewed_by_name ? ` · ${r.reviewed_by_name}` : ""}

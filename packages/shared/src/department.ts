@@ -5,8 +5,12 @@ import { z } from "zod";
  * to one: a Showroom (an outlet), a Dealer, Subscription or Office. The list
  * itself lives in the database (`fin_departments()`); this file is the wire
  * shape and the two rules the screen can check before a round-trip.
+ *
+ * 0683 (Chew ruling 2): STOCK, "Not yet in a channel", is the goods on a bill
+ * that no order has taken yet. Only a bill's goods line gets it, worked out
+ * from its orders; no form offers it, and reports can filter by it.
  */
-export const DEPARTMENT_TYPES = ["SHOWROOM", "DEALER", "SUBSCRIPTION", "OFFICE"] as const;
+export const DEPARTMENT_TYPES = ["SHOWROOM", "DEALER", "SUBSCRIPTION", "OFFICE", "STOCK"] as const;
 export type DepartmentType = (typeof DEPARTMENT_TYPES)[number];
 
 /** Showroom and Dealer name one outlet or dealer; Subscription and Office are one each. */

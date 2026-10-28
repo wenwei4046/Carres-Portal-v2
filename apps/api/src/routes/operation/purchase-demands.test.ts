@@ -51,12 +51,10 @@ async function makeJwt(role: string) {
  * placed a known number of working days from the expected ARRIVAL, and the
  * test asserts the state that distance must produce.
  *
- * THE ANCHOR IS ARRIVAL, NOT COMPLETION (owner correction, 2026-09-09). The
- * Safety period is the gap between the goods being HERE and the customer's
- * date, so it is measured from `READY + transit`, not from the day the factory
- * puts the goods down. These dates hung off `READY` until the transit leg was
- * added to the planner; the distances below are unchanged, only what they are
- * measured from.
+ * THE ANCHOR IS ARRIVAL. The Safety period is the gap between the goods being
+ * HERE and the customer's date. Since the supplier transit leg was removed
+ * (owner ruling 2026-09-29) arrival is the production completion day itself;
+ * the distances below are unchanged, only the anchor moved one day earlier.
  */
 const TODAY = "2026-09-02";
 const HOLIDAYS = myHolidaySet();
@@ -66,8 +64,8 @@ const NICE_WEEK = { offDays: [0] as number[], holidays: HOLIDAYS };
 const OFFICE = { offDays: [0, 6] as number[], holidays: HOLIDAYS };
 /** Expected production completion of a Nice Future mattress ordered today. */
 const READY = addWorkingDays(TODAY, 7, NICE_WEEK);
-/** …and when it reaches Carres: the fixture's Nice Future carries 1 transit day. */
-const ARRIVAL = addWorkingDays(READY, 1, OFFICE);
+/** …which is also when it reaches Carres — no transit leg (owner 2026-09-29). */
+const ARRIVAL = READY;
 const DELIVERY_EARLY = addWorkingDays(ARRIVAL, 40, OFFICE);
 const DELIVERY_FULL = addWorkingDays(ARRIVAL, 14, OFFICE);
 const DELIVERY_LOW = addWorkingDays(ARRIVAL, 5, OFFICE);
@@ -119,7 +117,7 @@ const TABLES = () => ({
     error: null,
   },
   purchasing_supplier_settings: {
-    data: [{ supplier_id: NICE, off_days: [0], transit_days: 1 }],
+    data: [{ supplier_id: NICE, off_days: [0] }],
     error: null,
   },
   purchasing_setting_changes: { data: [], error: null },
@@ -360,6 +358,17 @@ function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
   const from = vi.fn((table: string) => {
     if (table === "app_users") {
       return usersBuilder((tables.app_users?.data as { id: string }[]) ?? []);
+    }
+    /* A configured Catalog row always carries its Stock identity (0442); a
+       fixture that wants `Not set` writes `stock_identity_mode: null`. */
+    if (table === "product_skus") {
+      const t = tables.product_skus ?? { data: [], error: null };
+      return builder(table, {
+        ...t,
+        data: Array.isArray(t.data)
+          ? (t.data as Record<string, unknown>[]).map((r) => ({ stock_identity_mode: "unit", ...r }))
+          : t.data,
+      });
     }
     return builder(table, tables[table] ?? { data: [], error: null });
   });
@@ -771,7 +780,17 @@ describe("the guard, and the promise not to write", () => {
  * destinations a buy may be sent to.
  */
 describe("the buying facts SO Batch Purchase needs", () => {
-  it("blocks a missing Catalog cost before Issue review", async () => {
+  it("does not disclose Catalog costs to Operation while preserving goods and quantities", async () => {
+    const { rows } = await rowsOf(TABLES());
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) for (const part of row.parts) {
+      expect(part.unitCost).toBeNull();
+      expect(part.sku).toBeTruthy();
+      expect(part.qty).toBeGreaterThan(0);
+    }
+  });
+
+  it("⭐ ONE COST RULE: an unrecorded Catalog cost stays buyable, like the issue door", async () => {
     const t = TABLES() as unknown as Record<string, { data: unknown; error: unknown }>;
     const sku = (t.product_skus.data as Record<string, unknown>[]).find(
       (r) => r.sku === "B1201S-K",
@@ -780,7 +799,35 @@ describe("the buying facts SO Batch Purchase needs", () => {
 
     const { rows } = await rowsOf(t);
     const row = bySku(rows, "B1201S-K")!;
-    expect(row.state).toBe("no_cost");
+    /* `/to-order/issue` issues it with no commercial claim (0573), so the row
+       may not refuse it. */
+    expect(row.state).not.toBe("no_cost");
+    expect(row.issueRef).not.toBeNull();
+  });
+
+  it.each([0, -1])("keeps a non-positive Catalog cost buyable without accepting its price: %s", async (cost) => {
+    const t = TABLES() as unknown as Record<string, { data: unknown; error: unknown }>;
+    const sku = (t.product_skus.data as Record<string, unknown>[]).find(
+      (r) => r.sku === "B1201S-K",
+    )!;
+    sku.cost = cost;
+
+    const { rows } = await rowsOf(t);
+    const row = bySku(rows, "B1201S-K")!;
+    expect(row.state).not.toBe("no_cost");
+    expect(row.issueRef).not.toBeNull();
+  });
+
+  it("names a SKU whose Stock identity is Not set before Issue (0443)", async () => {
+    const t = TABLES() as unknown as Record<string, { data: unknown; error: unknown }>;
+    const sku = (t.product_skus.data as Record<string, unknown>[]).find(
+      (r) => r.sku === "B1201S-K",
+    )!;
+    sku.stock_identity_mode = null;
+
+    const { rows } = await rowsOf(t);
+    const row = bySku(rows, "B1201S-K")!;
+    expect(row.state).toBe("no_stock_identity");
     expect(row.issueRef).toBeNull();
   });
 
@@ -791,7 +838,6 @@ describe("the buying facts SO Batch Purchase needs", () => {
       data: [{
         supplier_id: NICE,
         off_days: [0],
-        transit_days: 1,
         fixed_destination_id: KLANG_DEST,
         collected_by_partner_id: "p-nets",
       }],
@@ -829,7 +875,6 @@ describe("the buying facts SO Batch Purchase needs", () => {
       data: [{
         supplier_id: NICE,
         off_days: [0],
-        transit_days: 1,
         fixed_destination_id: KLANG_DEST,
         collected_by_partner_id: "p-nets",
       }],
@@ -1212,6 +1257,17 @@ const registerRow = (body: SoBatchPurchaseResponse, orderId: string) =>
   body.registerRows.find((r) => r.orderId === orderId);
 
 describe("Card 02-B · one permanent row per proceeded Sales Order", () => {
+  it("displays revision 1 separately without changing purchasing's current request", async () => {
+    const tables = registerTables();
+    const order = (tables.orders.data as Record<string, unknown>[]).find(row => row.id === "o1")!;
+    order.original_request = [{ revision: 2, snapshot: { header: { delivery_date: "2026-12-01" } } },
+      { revision: 1, snapshot: { header: { delivery_date: "2026-08-01", delivery_date_tbd: false } } }];
+    const { body } = await rowsOf(tables);
+    expect(registerRow(body, "o1")).toMatchObject({ originalRequestedDeliveryDate: "2026-08-01", requestedDeliveryDate: order.delivery_date });
+    expect(registerRow(body, "o2")!.originalRequestedDeliveryDate).toBeNull();
+    expect(body.rows.find(row => row.orderId === "o1")!.customerDelivery).toBe(order.delivery_date);
+  });
+
   it("only `proceed_order` orders get a row — `place` does not, Service-only does not", async () => {
     const { body } = await rowsOf(registerTables());
     const ids = body.registerRows.map((r) => r.orderId);
@@ -1243,6 +1299,20 @@ describe("Card 02-B · one permanent row per proceeded Sales Order", () => {
     expect(o1.status).toBe("blank");
     expect(o1.pos).toEqual([]);
     expect(o1.outstandingSuppliers).toEqual(["Nice Future"]);
+  });
+
+  it("keeps a completed historical round navigable with zero unfinished orders", async () => {
+    const tables = registerTables();
+    Object.assign(tables.purchasing_settings.data as Record<string, unknown>, {
+      po_window_first: "11:30:00", po_window_second: "16:00:00", po_window_second_enabled: true,
+    });
+    const orders = tables.orders.data as Record<string, unknown>[];
+    Object.assign(orders.find(order => order.id === "o8")!, { proceeded_at: "2026-09-01T08:00:00+08:00" });
+    const { body } = await rowsOf(tables);
+    expect(registerRow(body, "o8")!.status).toBe("ordered");
+    const key = body.registerRows.find(order => order.orderId === "o8")!.pos[0].poWindow;
+    expect(key).toBeTruthy();
+    expect(body.poRounds?.find(round => round.key === key)?.unfinishedSoCount).toBe(0);
   });
 
   it("a received PO with current-version confirmed-send stays Ordered — and the row stays", async () => {
@@ -1468,7 +1538,7 @@ describe("the daily PO window of every demand line (Purchasing §5.6.1, owner ru
       error: null,
     };
     t.purchasing_supplier_settings = {
-      data: [{ supplier_id: NICE, off_days: [0], transit_days: 1, po_cutoff: cutoff }],
+      data: [{ supplier_id: NICE, off_days: [0], po_cutoff: cutoff }],
       error: null,
     };
     const proceeded: Record<string, string> = {
@@ -1499,6 +1569,7 @@ describe("the daily PO window of every demand line (Purchasing §5.6.1, owner ru
     // No Proceed time on record → no window is guessed.
     expect(stamped.o3).toEqual([null]);
     expect(body.poWindowsUnavailable).toBeUndefined();
+    expect(body.poCutoffTimes).toEqual(["11:30", "16:00"]);
   });
 
   it("a supplier's earlier cut-off is that supplier's own window; other suppliers keep theirs", async () => {
@@ -1519,6 +1590,16 @@ describe("the daily PO window of every demand line (Purchasing §5.6.1, owner ru
     expect(body.registerRows.map((r) => r.orderId)).toEqual(["o5"]);
   });
 
+  it("keeps complete dated round navigation when the register is scoped", async () => {
+    const { body: all } = await rowsOf(windowTables());
+    const { res } = await getDemands(windowTables(), "operation", "/api/operation/purchase/demands?window=2026-09-02T16:00");
+    const scoped = await res.json() as SoBatchPurchaseResponse;
+    expect(scoped.poRounds).toEqual(all.poRounds);
+    expect(all.poRounds?.find(r => r.key === "2026-09-02T11:30")?.unfinishedSoCount).toBe(1);
+    expect(all.poRounds?.some(r => r.key.startsWith("2026-09-03T"))).toBe(false);
+    expect(all.poRounds?.some(r => r.key === "2026-09-04T11:30")).toBe(true);
+  });
+
   it("refuses a malformed window", async () => {
     const { res } = await getDemands(windowTables(), "operation", "/api/operation/purchase/demands?window=today");
     expect(res.status).toBe(400);
@@ -1527,6 +1608,7 @@ describe("the daily PO window of every demand line (Purchasing §5.6.1, owner ru
   it("unreadable window settings stamp nothing and SAY so — buying still works", async () => {
     const { body } = await rowsOf();
     expect(body.poWindowsUnavailable).toBe(true);
+    expect(body.poCutoffTimes).toBeUndefined();
     expect(body.rows.every((r) => r.poWindow == null)).toBe(true);
     expect(body.rows.length).toBeGreaterThan(0);
   });
@@ -1584,6 +1666,29 @@ describe("0600 · RESERVE GOODS ALREADY ON A PO (owner ruling 2026-09-28)", () =
     const lined = bySku(exact.rows, "COV-K")!;
     expect(lined.poolOnly).toBeUndefined();
     expect(isSelectableForOrder(lined, "blank")).toBe(false);
+  });
+
+  it.each([
+    { status: "incoming", qty: 1, poLine: "pol-2051", poStatus: "open", remaining: 2 },
+    { status: "reserved", qty: 1, poLine: "pol-2051", poStatus: "open", remaining: 2 },
+    { status: "sold", qty: 1, poLine: "pol-2051", poStatus: "open", remaining: 2 },
+    { status: "incoming", qty: 2, poLine: "pol-2051", poStatus: "open", remaining: 1 },
+    { status: "reserved", qty: 1, poLine: "other-po-line", poStatus: "open", remaining: 1 },
+    { status: "reserved", qty: 1, poLine: "pol-2051", poStatus: "cancelled", remaining: 2 },
+  ])("counts source coverage once: $status / $qty / $poLine / $poStatus", async ({ status, qty, poLine, poStatus, remaining }) => {
+    const t = TABLES() as Record<string, { data: unknown; error: unknown }>;
+    t.purchase_orders = { data: [{ id: "PO-2051", status: poStatus, version: 1 }], error: null };
+    t.po_line_sources = { data: [{ id: "s1", po_id: "PO-2051", po_line_id: "pol-2051", order_id: "o4", order_line_id: "l7", qty: 1, purchase_orders: { status: poStatus } }], error: null };
+    t.ops_stock_items = { data: [{ id: "u1", unit_code: "U1-123-456", qty, status, po_no: "PO-2051", po_line_id: poLine, reserved_order_line_id: "l7" }], error: null };
+    // A received partial PO no longer contributes to the anonymous pool.
+    t.purchase_order_lines = { data: [{ id: "pol-2051", po_id: "PO-2051", sku: "COV-K", qty: 1, received_qty: status === "incoming" ? 0 : 1, purchase_orders: { status: poStatus } }], error: null };
+    const { body } = await rowsOf(t);
+    expect(l7(body).qty).toBe(3);
+    expect(l7(body).pos).toHaveLength(poStatus === "cancelled" ? 0 : 1);
+    expect(soBatchOrderLineOutstandingQty(l7(body))).toBe(remaining);
+    if (poStatus === "open" && poLine === "pol-2051" && qty === 1) {
+      expect(bySku(body.rows, "COV-K")?.toBuy).toBe(2);
+    }
   });
 
   it("a Unit reserved on its PO covers exactly its line, is not Ready Stock, and leaves the pool", async () => {

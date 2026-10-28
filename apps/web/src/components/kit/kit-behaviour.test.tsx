@@ -8,7 +8,7 @@
  * field that speaks ISO and prints `fmtDate()`.
  *
  * NEGATIVE CONTROLS (run by hand when touching this file):
- *   · delete `onSelect` from `DropdownMenu`'s item → the "runs the command"
+ *   · delete `onSelect` from `CMenu`'s item → the "runs the command"
  *     test goes red and nothing else moves.
  *   · make `Tabs` call `onValueChange` on every click → exactly the stage-picker
  *     test goes red.
@@ -22,11 +22,9 @@ import Button from "./Button";
 import Checkbox from "./Checkbox";
 import DataTable from "./DataTable";
 import DatePicker from "./DatePicker";
-import GridToolbar from "./GridToolbar";
 import Drawer from "./Drawer";
-import DropdownMenu from "./DropdownMenu";
+import CPopover, { CMenu } from "@/components/carres/CPopover";
 import Modal from "./Modal";
-import Popover from "./Popover";
 import Select from "./Select";
 import Tabs from "./Tabs";
 import Toast from "./Toast";
@@ -255,9 +253,10 @@ describe("Select", () => {
   it("wears the field skin, not a second one", () => {
     render(<Select id="carrier" options={OPTIONS} onValueChange={() => {}} />);
     const trigger = document.querySelector('[data-kit="select"]');
+    // v4 (01 §3): 32px field, 8px corner, the input hairline.
     expect(trigger).toHaveClass("h-8");
-    expect(trigger).toHaveClass("rounded-control");
-    expect(trigger).toHaveClass("border-kit-slate-5");
+    expect(trigger).toHaveClass("rounded-lg");
+    expect(trigger).toHaveClass("border-c-input-border");
   });
 
   it("is disabled when told to be", () => {
@@ -267,10 +266,10 @@ describe("Select", () => {
 });
 
 /* ───────────────────────────────────────────────────────────────────────────
- * DropdownMenu — the ⋮ menu
+ * CMenu — the ⋮ menu (the one menu: CPopover as a menu, items as data)
  * ────────────────────────────────────────────────────────────────────────── */
 
-describe("DropdownMenu", () => {
+describe("CMenu", () => {
   const items = (onSelect: () => void) => [
     { key: "print", label: "Print", icon: "print" as const, onSelect },
     { key: "copy", label: "Copy reference", icon: "copy" as const, onSelect: () => {}, separatorBefore: true },
@@ -279,7 +278,7 @@ describe("DropdownMenu", () => {
 
   it("shows nothing until it is opened", () => {
     render(
-      <DropdownMenu label="Row actions" trigger={<Button icon="overflow" aria-label="More" />} items={items(() => {})} />,
+      <CMenu label="Row actions" trigger={<Button icon="overflow" aria-label="More" />} items={items(() => {})} />,
     );
     expect(screen.queryByText("Print")).not.toBeInTheDocument();
   });
@@ -287,23 +286,32 @@ describe("DropdownMenu", () => {
   it("opens, runs the command, and closes itself", () => {
     const onSelect = vi.fn();
     render(
-      <DropdownMenu label="Row actions" trigger={<Button icon="overflow" aria-label="More" />} items={items(onSelect)} />,
+      <CMenu label="Row actions" trigger={<Button icon="overflow" aria-label="More" />} items={items(onSelect)} />,
     );
     openMenu(screen.getByRole("button", { name: "More" }));
     expect(screen.getByText("Print")).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("Print"));
     expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Print")).not.toBeInTheDocument();
+  });
+
+  it("opens from the keyboard with ↓, on the first command", async () => {
+    render(
+      <CMenu label="Row actions" trigger={<Button icon="overflow" aria-label="More" />} items={items(() => {})} />,
+    );
+    const button = screen.getByRole("button", { name: "More" });
+    expect(button).toHaveAttribute("aria-haspopup", "menu");
+    fireEvent.keyDown(button, { key: "ArrowDown" });
+    await waitFor(() => expect(screen.getByRole("menuitem", { name: "Print" })).toHaveFocus());
   });
 
   it("refuses a disabled command", () => {
     render(
-      <DropdownMenu label="Row actions" trigger={<Button icon="overflow" aria-label="More" />} items={items(() => {})} />,
+      <CMenu label="Row actions" trigger={<Button icon="overflow" aria-label="More" />} items={items(() => {})} />,
     );
     openMenu(screen.getByRole("button", { name: "More" }));
-    expect(screen.getByText("Cancel order").closest('[data-kit="dropdown-item"]')).toHaveAttribute(
-      "data-disabled",
-    );
+    expect(screen.getByRole("menuitem", { name: "Cancel order" })).toBeDisabled();
   });
 });
 
@@ -314,9 +322,9 @@ describe("DropdownMenu", () => {
 describe("Popover", () => {
   it("opens beside the control and does not trap the page", () => {
     render(
-      <Popover label="Filters" trigger={<Button icon="filter">Filter</Button>}>
+      <CPopover label="Filters" trigger={<Button icon="filter">Filter</Button>}>
         <p>panel</p>
-      </Popover>,
+      </CPopover>,
     );
     expect(screen.queryByText("panel")).not.toBeInTheDocument();
     openPopover(screen.getByRole("button", { name: /Filter/ }));
@@ -332,9 +340,9 @@ describe("Popover", () => {
 
   it("sits on §4.4's floating layer, below a dialog", () => {
     render(
-      <Popover label="Filters" trigger={<Button>Filter</Button>}>
+      <CPopover label="Filters" trigger={<Button>Filter</Button>}>
         <p>panel</p>
-      </Popover>,
+      </CPopover>,
     );
     openPopover(screen.getByRole("button", { name: "Filter" }));
     expect(document.querySelector('[data-kit="popover"]')).toHaveClass("z-30");
@@ -429,6 +437,20 @@ describe("Checkbox", () => {
  * ────────────────────────────────────────────────────────────────────────── */
 
 describe("DatePicker", () => {
+  it("starts on the selected day, moves by keyboard, and returns the chosen ISO date and focus", async () => {
+    const onChange = vi.fn();
+    render(<DatePicker id="d" label="Delivery date" value="2026-07-19" onChange={onChange} />);
+    const trigger = screen.getByRole("button", {name:"Delivery date"});
+    trigger.focus(); openPopover(trigger);
+    const selected = screen.getByRole("button", {name:/Sunday, July 19th, 2026, selected/});
+    await waitFor(()=>expect(selected).toHaveFocus());
+    fireEvent.keyDown(selected, {key:"ArrowRight"});
+    const next = screen.getByRole("button", {name:"Monday, July 20th, 2026"});
+    await waitFor(()=>expect(next).toHaveFocus());
+    fireEvent.click(next);
+    expect(onChange).toHaveBeenCalledWith("2026-07-20");
+    await waitFor(()=>expect(trigger).toHaveFocus());
+  });
   it("prints the canonical §2.4 date, never the locale's", () => {
     render(<DatePicker id="d" label="Delivery date" value="2026-07-19" onChange={() => {}} />);
     // Through `fmtDate`, never a literal: THE YEAR RULE (owner ruling
@@ -440,7 +462,7 @@ describe("DatePicker", () => {
 
   it("shows the placeholder when there is no date, and says so in the placeholder's own ink", () => {
     render(<DatePicker id="d" label="Delivery date" value={null} onChange={() => {}} placeholder="Pick a date" />);
-    expect(screen.getByText("Pick a date")).toHaveClass("text-kit-slate-9");
+    expect(screen.getByText("Pick a date")).toHaveClass("text-c-muted");
   });
 
   it("hands back a YYYY-MM-DD string, not a Date, and closes", () => {
@@ -482,7 +504,8 @@ describe("Toast", () => {
     render(<Toast kind="success" message="Delivery order issued" />);
     const toast = document.querySelector('[data-kit="toast"]');
     expect(toast).toHaveAttribute("data-tone", "success");
-    expect(toast).toHaveClass("bg-white");
+    // v4 (01 §3): the white card surface token.
+    expect(toast).toHaveClass("bg-c-card");
     expect(document.querySelector('[data-icon="ready"]')).toBeInTheDocument();
   });
 
@@ -751,27 +774,12 @@ describe("DataTable sort + filter", () => {
 });
 
 describe("Button pill shape", () => {
-  it("pill rounds fully; the default keeps the control radius — shape, never a variant", () => {
+  it("pill rounds fully; the default keeps the v4 8px corner — shape, never a variant", () => {
     const { rerender } = render(<Button shape="pill">Issue Purchase Orders</Button>);
     expect(screen.getByRole("button").className).toContain("rounded-full");
     rerender(<Button>Issue Purchase Orders</Button>);
-    expect(screen.getByRole("button").className).toContain("rounded-control");
+    expect(screen.getByRole("button").className).toContain("rounded-lg");
     expect(screen.getByRole("button").className).not.toContain("rounded-full");
-  });
-});
-
-describe("GridToolbar", () => {
-  it("holds its three slots and spells no word of its own", () => {
-    render(
-      <GridToolbar
-        search={<input aria-label="s" />}
-        right={<span>28 selected</span>}
-        meta={<span>Updated 10:32 AM</span>}
-      />,
-    );
-    const bar = document.querySelector('[data-kit="grid-toolbar"]')!;
-    expect(bar.textContent).toContain("28 selected");
-    expect(bar.textContent).toContain("Updated 10:32 AM");
   });
 });
 

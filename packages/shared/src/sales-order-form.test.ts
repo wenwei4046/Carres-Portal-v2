@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import * as shared from "./index";
 import {
   composeEmergencyContact,
   isKnownEmergencyRelationship,
@@ -92,5 +93,65 @@ describe("emergency contact — three fields, one column", () => {
     expect(isKnownEmergencyRelationship("Spouse")).toBe(true);
     expect(isKnownEmergencyRelationship("Sister-in-law")).toBe(false);
     expect(isKnownEmergencyRelationship("")).toBe(false);
+  });
+});
+
+/**
+ * ⭐ TWO DATES, TWO NAMES — owner ruling 2026-10-06 (Jess; Orders MASTER
+ * § Two dates, two names; COPY-STANDARD). `orders.proceed_date` is the day Sales
+ * PLANS production to start and reads `Planned production start` on every
+ * surface; `Proceed Date` is only the actual hand-off (`orders.proceeded_at`).
+ * The expected words are written out here, not read from the constants, so the
+ * old name cannot come back through a constant nobody re-read.
+ */
+describe("Planned production start — the shared words", () => {
+  const posBody = {
+    outletId: "00000000-0000-0000-0000-00000000ee01",
+    salespersonId: "00000000-0000-0000-0000-00000000ff01",
+    customer: { name: "Tan", phone: "012-3456789", address: "1 Jalan A, KL", addressUnknown: false, addressState: "Kuala Lumpur", billing: null, billingSame: true, emergency: "" },
+    delivery: { date: "2026-10-01", proceedDate: "2026-09-15", dateTbd: false, floor: 1, hasLift: false },
+    lines: [{ sku: "mattress:carres-classic:queen", qty: 1, attrs: null, unitPrice: 1500 }],
+    addons: [], paid: 100, signaturePath: "orders-attachments/d1/w1/signature.png", paymentSlipPath: null,
+    termsAccepted: true as const, depositPct: 10, paymentMethod: "cash", approvalCode: "ABC123",
+    installmentMonths: null, entryData: { fields: { building_type: "Condo" } },
+  };
+  const messages = (r: { success: boolean; error?: { issues: Array<{ message: string }> } }) =>
+    r.success ? [] : (r.error?.issues ?? []).map((i) => i.message);
+
+  it("names the planned date `Planned production start` on every shared surface", () => {
+    expect(shared.PLANNED_PRODUCTION_START).toBe("Planned production start");
+    expect(shared.TO_ORDER_WORDS.proceedDate).toBe("Planned production start");
+    expect(shared.POS_FORM_BUILTINS.find((f) => f.key === "proceedDate")?.label).toBe("Planned production start");
+    expect(shared.SO_GRID_COLUMNS.find((c) => c.key === "proceed_date")?.label).toBe("Planned production start");
+  });
+
+  it("every door refuses with the governed sentences", () => {
+    const missing = shared.createOrderInputSchema.safeParse({ ...posBody, delivery: { ...posBody.delivery, proceedDate: null } });
+    expect(messages(missing)).toContain("Planned production start: pick the day production should start");
+    const late = shared.createOrderInputSchema.safeParse({ ...posBody, delivery: { ...posBody.delivery, proceedDate: "2026-10-02" } });
+    expect(messages(late)).toContain("Planned production start: must be on or before the delivery date");
+    const dateLate = shared.setOrderDateInputSchema.safeParse({ date: "2026-10-01", proceedDate: "2026-10-02" });
+    expect(messages(dateLate)).toEqual(["Planned production start: must be on or before the delivery date"]);
+    expect(shared.plannedProductionStartInPast("2026-10-06")).toBe("Planned production start: can't be in the past (earliest 2026-10-06)");
+  });
+
+  it("maps every database refusal by its DETAIL code, and leaves other codes alone", () => {
+    expect(shared.plannedProductionStartRefusal("proceed_date_required")).toBe("Planned production start: pick the day production should start");
+    expect(shared.plannedProductionStartRefusal("invalid_proceed_date")).toBe("Planned production start: pick the day production should start");
+    expect(shared.plannedProductionStartRefusal("proceed_after_delivery")).toBe("Planned production start: must be on or before the delivery date");
+    expect(shared.plannedProductionStartRefusal("proceed_date_recorded")).toBe("The planned production start is already recorded and cannot be changed here");
+    expect(shared.plannedProductionStartRefusal("proceed_date_passed")).toBe("The planned production start has passed");
+    expect(shared.plannedProductionStartRefusal("proceed_locked_fields")).toBeNull();
+    expect(shared.plannedProductionStartRefusal(null)).toBeNull();
+  });
+
+  it("no shared word for the planned date still says `Proceed`", () => {
+    const words = [
+      shared.TO_ORDER_WORDS.proceedDate,
+      shared.POS_FORM_BUILTINS.find((f) => f.key === "proceedDate")?.label,
+      shared.SO_GRID_COLUMNS.find((c) => c.key === "proceed_date")?.label,
+      ...Object.values(shared.PLANNED_PRODUCTION_START_REFUSALS),
+    ];
+    for (const w of words) expect(w).not.toMatch(/proceed/i);
   });
 });

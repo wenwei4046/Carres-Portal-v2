@@ -1,0 +1,71 @@
+{
+  "draft": "output/forecast-mpr-delivery/service-case-remedy-approval.draft.sql",
+  "sha256": "667a43d1a981dc6c29a1eb38fbdaa50190afd8feabb36acbc2fa598a316a508d",
+  "fileMd5": "d258692e945dad4e66d8f7f5d06f722e",
+  "functions": [
+    {
+      "signature": "_service_case_remedy_history_guard()",
+      "bodyMd5": "6a58eea7ec64f0b3ed065e5c96cef090",
+      "definer": false
+    },
+    {
+      "signature": "_service_case_remedy_approval_guard()",
+      "bodyMd5": "bf5c2ce3bec9405be93bed70dfcbe10c",
+      "definer": false
+    },
+    {
+      "signature": "_service_case_remedy_scope(uuid,uuid)",
+      "bodyMd5": "c0ab7b01695423375a511662807f9bf4",
+      "definer": false
+    },
+    {
+      "signature": "_service_case_remedy_actor()",
+      "bodyMd5": "71ae3a0ead4127e6997bdf8121ac35ef",
+      "definer": false
+    },
+    {
+      "signature": "service_case_remedy_read(uuid)",
+      "bodyMd5": "cb6805c74f8fa3154dcaa746e29d7e18",
+      "definer": true
+    },
+    {
+      "signature": "service_case_remedy_propose(uuid,jsonb)",
+      "bodyMd5": "74c84bedc1fc4e68c71adf4bf41fb75e",
+      "definer": true
+    },
+    {
+      "signature": "service_case_remedy_decide(uuid,jsonb)",
+      "bodyMd5": "91a05885cd188d5355fca8291a732bdb",
+      "definer": true
+    },
+    {
+      "signature": "_purchasing_context_execution_admission(uuid)",
+      "bodyMd5": "de8e074d7720f1e2e6a93eef7117bc73",
+      "definer": false
+    },
+    {
+      "signature": "_purchasing_request_context_state(uuid)",
+      "bodyMd5": "1f9ad7f64e4b2718a419e1963b0e3876",
+      "definer": false
+    },
+    {
+      "signature": "purchasing_request_context_release()",
+      "bodyMd5": "4252ef9a59d535251dae92978e642d98",
+      "definer": true
+    }
+  ],
+  "column": "service_cases.remedy_approval_events jsonb NOT NULL DEFAULT []",
+  "triggers": [
+    "service_cases.service_case_remedy_history_guard",
+    "approvals.service_case_remedy_approval_guard"
+  ],
+  "restrictiveSelectPolicy": "approvals.service_case_remedy_approval_visibility",
+  "authenticatedNewExecute": [
+    "service_case_remedy_read(uuid)",
+    "service_case_remedy_propose(uuid,jsonb)",
+    "service_case_remedy_decide(uuid,jsonb)"
+  ],
+  "existingAuthenticatedExecute": [
+    "purchasing_request_context_release()"
+  ]
+}

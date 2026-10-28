@@ -12,7 +12,9 @@
  */
 import { z } from "zod";
 import { collectionClock, type CollectionClock, type CollectionTiming, type OwnerCalendar } from "./collection-clock";
+import { customerLegDeliveryOf } from "./delivery-calendar";
 import { orderMoney } from "./order-money";
+import { isOutstation } from "./outstation";
 import { paymentCollectionReadiness } from "./payment-collection";
 import type { WorkingDayOptions } from "./working-days";
 
@@ -53,6 +55,13 @@ export interface InvoiceRegisterRow {
   replaces_invoice_id: string | null;
   created_at: string;
   order_id: string;
+  /** The invoice's own goods lines from its issue snapshot (0429); absent or
+   *  null when the snapshot holds none (dispatch-issued / pre-0429). */
+  snapshot_lines?: Array<{ order_line_id?: string; sku?: string | null; qty: number | string; unit_price: number | string | null }> | null;
+  /** 0712 office invoices: the add-ons this invoice bills (may be empty). */
+  snapshot_addons?: Array<{ addon_key?: string | null; qty: number | string; unit_price: number | string | null }> | null;
+  /** 'office' for a 0712 office part invoice. */
+  snapshot_from?: string | null;
   orders: {
     id: string;
     so: number;
@@ -61,7 +70,7 @@ export interface InvoiceRegisterRow {
     source_ref?: string[] | string | null;
     status: string;
     paid: number | string | null;
-    /** 0627 — the sum of the order's issued credit notes. */
+    /** 0729 — the sum of the order's issued credit notes. */
     credited?: number | string | null;
     delivery_date: string | null;
     delivery_date_tbd: boolean | null;
@@ -69,7 +78,9 @@ export interface InvoiceRegisterRow {
     /** When the order was placed (timestamptz). */
     placed_at?: string | null;
     ops_assigned_logistic?: string | null;
-    delivery_partners?: { name: string; contact: string | null } | null;
+    /** The order's own company (fallback for an order Delivery has not
+     *  arranged). `kv_default` decides outstation (`invoiceOutstation`). */
+    delivery_partners?: { name: string; contact: string | null; kv_default?: boolean | null } | null;
     order_payments?: Array<{
       id: string; receipt_no: string | null; amount: number;
       paid_on: string; voided_at: string | null;
@@ -88,7 +99,7 @@ export interface InvoiceRegisterRow {
      *  today` reads the same ledger the Work feed does. */
     latest_promise?: { promised_date: string; recorded_at: string } | null;
     order_lines: Array<{ sku?: string; qty: number; unit_price: number | string | null }>;
-    order_addons: Array<{ qty: number; unit_price: number | string | null }>;
+    order_addons: Array<{ addon_key?: string | null; qty: number; unit_price: number | string | null }>;
     ops_order_control: Array<{
       balance: number | string | null;
       confirmed_date: string | null;
@@ -106,6 +117,10 @@ export interface InvoiceRegisterRow {
       leg: number;
       confirmed_date: string | null;
       confirmed_time: string | null;
+      /** The company Delivery assigned to this leg, and whether it is the
+       *  Klang Valley default — the outstation fact (`invoiceOutstation`). */
+      partner_id?: string | null;
+      delivery_partners?: { kv_default: boolean | null } | null;
     }>;
     /** Delivery Orders per leg — the issued snapshot outranks everything. */
     ops_delivery_orders?: Array<{
@@ -285,24 +300,30 @@ export function invoiceConfirmedDelivery(row: InvoiceRegisterRow): {
   dateIso: string | null;
   time: string | null;
 } {
+  /* Delivery's ONE delivery-day reader for an order-level surface
+     (`customerLegDeliveryOf`) — the Work feed and the rail Calendar ask it
+     too. An older read that did not select `booking_stage` keeps its
+     confirmed reading. */
   const order = row.orders;
-  const docs = (order?.ops_delivery_orders ?? []).filter((d) => !d.voided_at);
-  const arrangements = order?.ops_delivery_arrangements ?? [];
-  const leg = Math.max(0, ...docs.map((d) => d.leg ?? 0), ...arrangements.map((a) => a.leg ?? 0));
-  const doc = docs
-    .filter((d) => (d.leg ?? 0) === leg && d.delivery_date && ISO_DATE.test(d.delivery_date.slice(0, 10)))
-    .sort((a, b) => (b.issued_at ?? "").localeCompare(a.issued_at ?? ""))[0];
-  if (doc) return { dateIso: doc.delivery_date!.slice(0, 10), time: doc.time_slot ?? null };
-  const arrangement = arrangements.find((a) => (a.leg ?? 0) === leg);
-  const arranged = arrangement?.confirmed_date?.slice(0, 10) ?? null;
-  if (arranged && ISO_DATE.test(arranged)) return { dateIso: arranged, time: arrangement!.confirmed_time ?? null };
   const ctrl = ctrlOf(row);
-  const booked = ctrl?.confirmed_date?.slice(0, 10) ?? null;
-  const stageAllows = ctrl?.booking_stage === undefined || ctrl.booking_stage === "confirmed";
-  if (booked && ISO_DATE.test(booked) && stageAllows) {
-    return { dateIso: booked, time: ctrl?.confirmed_time_slot ?? null };
-  }
-  return { dateIso: null, time: null };
+  const day = customerLegDeliveryOf({
+    documents: (order?.ops_delivery_orders ?? [])
+      .filter((d) => !d.voided_at)
+      .map((d) => ({ leg: d.leg, deliveryDate: d.delivery_date, timeSlot: d.time_slot, issuedAt: d.issued_at })),
+    arrangements: (order?.ops_delivery_arrangements ?? []).map((a) => ({
+      leg: a.leg,
+      confirmedDate: a.confirmed_date,
+      confirmedTime: a.confirmed_time,
+    })),
+    booking: ctrl
+      ? {
+          stage: ctrl.booking_stage === undefined ? "confirmed" : (ctrl.booking_stage as "confirmed" | null),
+          confirmedDate: ctrl.confirmed_date ?? null,
+          confirmedSlot: ctrl.confirmed_time_slot ?? null,
+        }
+      : null,
+  });
+  return { dateIso: day.iso, time: day.time };
 }
 
 /** The Customer Delivery cell fact: the customer-confirmed day, else the
@@ -349,6 +370,47 @@ export function deliveryWords(d: { dateIso: string | null; word: CustomerDeliver
   }
 }
 
+/**
+ * Is this invoice's delivery OUTSTATION? — the shared `isOutstation` over the
+ * ONE assignment reader's answer: the customer leg's arrangement company
+ * (Delivery owns it), else the order's own company. A company whose
+ * `kv_default` was not read is never guessed outstation; no company ⇒ the
+ * ordinary pair.
+ */
+export function invoiceOutstation(row: InvoiceRegisterRow): boolean {
+  const order = row.orders;
+  if (!order) return false;
+  const legs = order.ops_delivery_arrangements ?? [];
+  const customerLeg = Math.max(0, ...legs.map((a) => Number(a.leg ?? 0) || 0),
+    ...(order.ops_delivery_orders ?? []).map((d) => Number(d.leg ?? 0) || 0));
+  const arrangement = legs.find((a) => (Number(a.leg ?? 0) || 0) === customerLeg && a.partner_id);
+  if (arrangement) {
+    const kv = arrangement.delivery_partners?.kv_default;
+    return typeof kv === "boolean" ? isOutstation({ kv_default: kv }) : false;
+  }
+  const kv = order.delivery_partners?.kv_default;
+  return typeof kv === "boolean" ? isOutstation({ kv_default: kv }) : false;
+}
+
+/**
+ * The day an ORDER's collection clock started — the rule in force on it is
+ * the one the clock runs under (`collectionTimingFor`). The Monitor's own
+ * door rule: the live Sales Invoice's issue day, else the first live paper's,
+ * else today (nothing issued yet: the clock has not started, so today's rule
+ * answers). The Work feed and the Order Route read THIS, so an order's
+ * deadline cannot follow two different rules.
+ */
+export function orderCollectionClockStartIso(
+  rows: ReadonlyArray<Pick<InvoiceRegisterRow, "order_id" | "kind" | "status" | "issued_at">>,
+  orderId: string,
+  todayIso: string,
+): string {
+  const live = rows.filter((r) => r.order_id === orderId && r.status !== "voided");
+  const door = live.find((r) => r.kind === "sales") ?? live[0];
+  const issued = door?.issued_at?.slice(0, 10) ?? null;
+  return issued && ISO_DATE.test(issued) ? issued : todayIso.slice(0, 10);
+}
+
 export type InvoiceTiming =
   | { kind: "paid" }
   | { kind: "wait" }
@@ -370,8 +432,9 @@ export function invoicePaymentTiming(
   /** `Settings → Payments → Collection timing` — the effective pair for this
    *  invoice's clock (owner ruling 2026-09-12). Absent ⇒ the ruled default. */
   timing?: CollectionTiming,
-  /** The action owner's governed working days (owner ruling 2026-09-13).
-   *  Absent ⇒ the Operation week — the collection owner is Operation staff. */
+  /** The action owner's governed working days (owner ruling 2026-09-13) —
+   *  the stored Office calendar (`officeOwnerCalendar`). Absent ⇒ the
+   *  Operation week default. */
   owner?: OwnerCalendar,
 ): { timing: InvoiceTiming; clock: CollectionClock } {
   const goods = invoiceGoodsFacts(row);
@@ -379,6 +442,8 @@ export function invoicePaymentTiming(
     {
       confirmedDateIso: invoiceConfirmedDelivery(row).dateIso,
       promisedDateIso: row.orders?.delivery_date_tbd ? null : row.orders?.delivery_date ?? null,
+      // An outstation delivery counts the outstation pair (PAY-04).
+      outstation: invoiceOutstation(row),
     },
     todayIso,
     opts,

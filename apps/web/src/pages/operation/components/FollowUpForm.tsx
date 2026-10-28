@@ -20,9 +20,13 @@ import { TASKS_KEY } from "./rail/TasksPanel";
 /** Preset follow-ups — UI-only starter list, all English (Jess to edit freely).
  *  Action naming law (docs/COPY-STANDARD.md, re-ruled 2026-07-27): verb + named
  *  party + measurable object. "Chase" is banned; the party is the role word here
- *  because a preset cannot know a name. */
-const PRESET_FOLLOWUPS = [
-  "Call customer to book delivery date",
+ *  because a preset cannot know a name.
+ *
+ *  No preset books the delivery date with the customer: the assigned Logistics
+ *  company contacts the customer and agrees the date (Delivery MASTER §5.2,
+ *  owner correction 2026-09-25). Carres contacts the customer only for a known
+ *  delay, a company-reported date change or refusal, or wrong contact details. */
+export const PRESET_FOLLOWUPS = [
   "Call logistics to confirm delivery date",
   "Customer wants to change address",
   "Customer wants to postpone",

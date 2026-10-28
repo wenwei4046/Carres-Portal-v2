@@ -53,7 +53,7 @@ export default function OperationStock() {
   return (
     <div className="px-9 py-8 pb-14">
       <div className="mb-[22px]">
-        <div className="kicker">HQ · Operations</div>
+        <div className="text-label uppercase tracking-[0.06em] text-primary">HQ · Operations</div>
         <h1 className="text-page font-display mt-1.5">
           Stock across the network
         </h1>
@@ -75,7 +75,7 @@ export default function OperationStock() {
             onClick={() => setView(o.k)}
             className={`px-3.5 py-1.5 text-meta rounded cursor-pointer ${
               view === o.k
-                ? "bg-white text-base-900 font-semibold"
+                ? "bg-white text-base-900 font-medium"
                 : "text-base-600 font-medium"
             }`}
           >
@@ -118,7 +118,7 @@ export default function OperationStock() {
                 <tr key={s.sku} className="border-t border-base-100">
                   <td className="px-4 py-2.5">
                     <div className="font-semibold">{s.name}</div>
-                    <div className="text-label text-base-400 font-mono">{s.sku}</div>
+                    <div className="text-meta text-base-400 font-mono">{s.sku}</div>
                   </td>
                   {warehouses.map((w) => {
                     const b = s.perWarehouse[w.id] ?? { qty: 0, reserved: 0 };
@@ -128,7 +128,7 @@ export default function OperationStock() {
                       </td>
                     );
                   })}
-                  <td className={`px-4 py-2.5 text-right font-semibold font-mono ${isLow ? "text-primary" : "text-base-900"}`}>
+                  <td className={`px-4 py-2.5 text-right font-medium font-mono ${isLow ? "text-primary" : "text-base-900"}`}>
                     {s.available}
                   </td>
                   <td className="px-4 py-2.5 text-right text-base-600 font-mono">
@@ -149,7 +149,7 @@ export default function OperationStock() {
 
 function Th({ children, right }: { children: React.ReactNode; right?: boolean }) {
   return (
-    <th className={`px-4 py-2.5 text-label font-semibold uppercase tracking-[0.05em] text-base-500 ${right ? "text-right" : "text-left"}`}>
+    <th className={`px-4 py-2.5 text-meta font-medium text-base-500 ${right ? "text-right" : "text-left"}`}>
       {children}
     </th>
   );

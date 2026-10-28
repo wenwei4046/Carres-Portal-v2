@@ -1905,7 +1905,7 @@ describe("orders export", () => {
     const csv = buildOrdersCsv(rows, new Map());
     const lines = csv.split("\n");
     expect(lines[0]).toBe(
-      "SO,Customer,Phone,Address,Units,Items,Deadline,Proceed,Location,Logistics,Status",
+      "SO,Customer,Phone,Address,Units,Items,Deadline,Planned production start,Location,Logistics,Status",
     );
     expect(lines).toHaveLength(2);
     expect(lines[1]).toContain("SO-1001");
@@ -3511,7 +3511,7 @@ describe("The imported archive is excluded from WORK, never from the record (C13
     // C14 removed the drift by removing the second home: two renders of one
     // filter is the duplication this card exists to end, so the stronger
     // assertion is now that there is exactly ONE of them.
-    const overdues = screen.getAllByRole("button", { name: /^Overdue/ });
+    const overdues = screen.getAllByRole("button", { name: /^Late/ });
     expect(overdues).toHaveLength(1);
     // 1 = the native miss. 3 = what the page said before C13.
     expect(queueCount(overdues[0])).toBe(1);
@@ -3519,7 +3519,7 @@ describe("The imported archive is excluded from WORK, never from the record (C13
     // future window, and QUEUES is where the page keeps its alarm.
     expect(
       within(screen.getByTestId("filter-deadline")).queryByRole("button", {
-        name: /^Overdue/,
+        name: /^Late/,
       }),
     ).toBeNull();
   });
@@ -3573,7 +3573,7 @@ describe("The imported archive is excluded from WORK, never from the record (C13
     wrap(<OperationOrdersControl />);
     // C14 — `Overdue` now has one home (QUEUES), so this is no longer scoped
     // to the DEADLINE band. The law under test is unchanged.
-    fireEvent.click(screen.getByRole("button", { name: /^Overdue/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Late/ }));
     // The portal's own law: a facet must never print a number its own click
     // cannot produce. 1 on the row → 1 row on the click.
     expect(rowsBySo()).toEqual(["2001"]);
@@ -3592,7 +3592,7 @@ describe("The imported archive is excluded from WORK, never from the record (C13
     wrap(<OperationOrdersControl />);
     expect(screen.queryByTestId("orders-archive-note")).toBeNull();
     // …and the real work is untouched: the one genuine miss still counts.
-    for (const b of screen.getAllByRole("button", { name: /^Overdue/ }))
+    for (const b of screen.getAllByRole("button", { name: /^Late/ }))
       expect(queueCount(b)).toBe(1);
   });
 });

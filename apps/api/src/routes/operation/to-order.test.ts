@@ -69,7 +69,7 @@ const TABLES = (): Tbl => ({
     error: null,
   },
   purchasing_supplier_settings: {
-    data: [{ supplier_id: OHANA, off_days: [0], transit_days: 1 }],
+    data: [{ supplier_id: OHANA, off_days: [0] }],
     error: null,
   },
   purchasing_setting_changes: { data: [], error: null },
@@ -245,6 +245,15 @@ function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
     tables.product_skus?.data ??
     []) as { sku: string }[];
 
+  /* A configured Catalog row carries its Stock identity (0442), and a
+     configured Deliver To its address; a fixture that wants either missing
+     writes it as `null`. */
+  const withIdentity = (t: { data: unknown; error: unknown }) => ({
+    ...t,
+    data: Array.isArray(t.data)
+      ? (t.data as Record<string, unknown>[]).map((r) => ({ stock_identity_mode: "unit", ...r }))
+      : t.data,
+  });
   const from = vi.fn((table: string) => {
     tableCalls[table] = (tableCalls[table] ?? 0) + 1;
     if (table === "product_skus") {
@@ -261,13 +270,15 @@ function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
         Promise.resolve(
           existenceRead
             ? { data: fullCatalog.map((r) => ({ sku: r.sku })), error: null }
-            : (tables.product_skus ?? { data: [], error: null }),
+            : withIdentity(tables.product_skus ?? { data: [], error: null }),
         ).then(res, rej);
       return b;
     }
     if (table === "purchasing_destinations") {
       return destBuilder(
-        (tables.purchasing_destinations.data as { id: string; name: string }[]) ?? [],
+        ((tables.purchasing_destinations.data as { id: string; name: string }[]) ?? []).map(
+          (r) => ({ address: "1 Test Road", ...r }),
+        ),
       );
     }
     return builder(table, tables[table] ?? { data: [], error: null });
@@ -585,7 +596,7 @@ describe("the reads are chunked", () => {
  * been bought, and a hand-written request cannot invent a line.
  */
 describe("a purchase order is born with its expected arrival", () => {
-  it("stamps eta_date = PO Date + n Settings working days, with NO transit added", async () => {
+  it("stamps eta_date = PO Date + n Settings working days", async () => {
     const sb = makeSb(TABLES());
     vi.mocked(userClient).mockReturnValue(sb as never);
     await postBatch({
@@ -603,11 +614,8 @@ describe("a purchase order is born with its expected arrival", () => {
 
     // ⭐ OWNER CORRECTION 2026-09-22, converged across both buying doors on
     // 2026-09-23: the PO's own delivery date is the SETTINGS date — 14
-    // production days on Ohana's week (Sunday off) — and the transit day is
-    // NOT added. Transit answers a different question (when the goods reach
-    // Carres) and stays behind `Order By` and the register's timing facts.
-    // Printing the arrival under a `PO {n}-Day` label promised the supplier a
-    // day the Settings number never said.
+    // production days on Ohana's week (Sunday off). The supplier transit leg
+    // was removed by owner ruling 2026-09-29, so this is also the arrival.
     //
     // THE HOLIDAY SET IS PART OF THE ARITHMETIC, not a detail: a naive
     // recomputation is only equal on the days no Malaysian public holiday
@@ -616,10 +624,6 @@ describe("a purchase order is born with its expected arrival", () => {
     const holidays = myHolidaySet();
     const settingsDate = addWorkingDays(todayIsoMYT(), 14, { offDays: [0], holidays });
     expect(pos.every((po) => po.eta_date === settingsDate)).toBe(true);
-    /* And it is NOT the arrival date: that one is a transit day later. */
-    expect(settingsDate).not.toBe(
-      addWorkingDays(settingsDate, 1, { offDays: [0, 6], holidays }),
-    );
   });
 
   it("NEVER writes expected_ready_date — that column is the factory's promise", async () => {
@@ -637,35 +641,7 @@ describe("a purchase order is born with its expected arrival", () => {
     }
   });
 
-  it("a missing TRANSIT number no longer withholds the PO date — transit is not in it", async () => {
-    /* ⭐ THE CONSEQUENCE OF THE 2026-09-22 CORRECTION. This test used to pin
-       `eta_date === null` when transit was unset, because the date was
-       production PLUS transit. The PO's own delivery date is now the Settings
-       date alone, so a missing transit number cannot withhold it — transit
-       still matters to `Order By` and the arrival facts, which are read
-       elsewhere. */
-    const t = TABLES();
-    t.purchasing_supplier_settings = {
-      data: [{ supplier_id: OHANA, off_days: [0] }], // no transit_days
-      error: null,
-    };
-    const sb = makeSb(t);
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    const res = await postBatch({
-      selections: allTo(await readyDemands(sb), KLANG),
-      documentDecisions: pricedAll(await readyDemands(sb), KLANG),
-    });
-
-    expect(res.status).toBe(200);
-    const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args.p_pos as {
-      eta_date: string | null;
-    }[];
-    const holidays = myHolidaySet();
-    const settingsDate = addWorkingDays(todayIsoMYT(), 14, { offDays: [0], holidays });
-    expect(pos.every((po) => po.eta_date === settingsDate)).toBe(true);
-  });
-
-  /* ⛔ AND THE OTHER HALF OF THAT RULE IS NOT TESTABLE HERE, WHICH IS WORTH
+  /* ⛔ A MISSING PRODUCTION NUMBER IS NOT TESTABLE HERE, WHICH IS WORTH
      SAYING: a demand with no production number never becomes ready to order in
      this lane, so the missing-production case cannot reach this door at all
      (the route answers 400 before it). Manual Purchase's own door does admit
@@ -1210,6 +1186,21 @@ describe("POST …/to-order/issue-batch — one door, one transaction", () => {
     expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(1);
   });
 
+  it("an authenticated ordinary caller sees the locked-source refusal after a stale read", async()=>{
+    const sb=makeSb(TABLES());
+    const demands=await readyDemands(sb);
+    const original=sb.rpc.getMockImplementation()!;
+    sb.rpc.mockImplementation(async (fn,args)=>fn === "purchasing_issue_pos_batch"
+      ? {data:null,error:{code:"P0001",message:"Source requirement changed",details:"unknown_demand"}} as never
+      : original(fn,args));
+    const res=await postBatch({selections:allTo(demands,KLANG)});
+    expect(res.status).toBe(422);
+    const body=await res.json() as Record<string,unknown>;
+    expect(body).toMatchObject({code:"unknown_demand"});
+    expect(JSON.stringify(body)).toContain("Go back to buying and tick the lines again.");
+    expect(body).not.toHaveProperty("pos");
+  });
+
   it("derives Catalog cost and the fixed collection partner from governed data", async () => {
     const tables = TABLES();
     (tables.suppliers.data as Record<string, unknown>[])[0]!.kind = "factory_pickup";
@@ -1217,7 +1208,6 @@ describe("POST …/to-order/issue-batch — one door, one transaction", () => {
       data: [{
         supplier_id: OHANA,
         off_days: [0],
-        transit_days: 1,
         fixed_destination_id: KLANG,
         collected_by_partner_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
       }],
@@ -1446,6 +1436,55 @@ describe("the batch issue refuses before it creates anything", () => {
     expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
   });
 
+  it("⭐ a Deliver To with no address is refused BEFORE the PO exists", async () => {
+    const tables = TABLES();
+    tables.purchasing_destinations = {
+      data: [
+        { id: KLANG, name: "Carres Klang", is_default: true, active: true, address: null },
+      ],
+      error: null,
+    };
+    const sb = makeSb(tables);
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const first = demands[0]!;
+    const res = await postBatch({
+      selections: [
+        { demandId: first.demandId, allocations: [{ destinationId: KLANG, qty: first.qty }] },
+      ],
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string; message?: string };
+    expect(body.code).toBe("destination_address_missing");
+    expect(body.message).toContain("Carres Klang has no address on file.");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("⭐ a SKU whose Stock identity is Not set is refused by name before the PO exists", async () => {
+    const tables = TABLES();
+    tables.product_skus = {
+      data: (tables.product_skus.data as Record<string, unknown>[]).map((r) => ({
+        ...r,
+        stock_identity_mode: null,
+      })),
+      error: null,
+    };
+    const sb = makeSb(tables);
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const first = demands[0]!;
+    const res = await postBatch({
+      selections: [
+        { demandId: first.demandId, allocations: [{ destinationId: KLANG, qty: first.qty }] },
+      ],
+      documentDecisions: [],
+    });
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code?: string }).code).toBe("catalog_identity_mode_missing");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
   it("a destination nobody has heard of", async () => {
     const sb = makeSb(TABLES());
     const demands = await readyDemands(sb);
@@ -1587,7 +1626,7 @@ describe("the commercial laws still hold on the batch door", () => {
       documentDecisions: decisionsForAll(demands, KLANG, { orderId: "o1", procurementPartnerId: null, lineDecisions: [
             { sku: "5539-CNR", treatment: "free_of_charge", reason: "Supplier replacement" },
           ] }),
-    });
+    }, "principal");
     expect(res.status).toBe(200);
     const batch = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!;
     const pos = batch.args.p_pos as { lines: Record<string, unknown>[] }[];
@@ -1673,7 +1712,7 @@ describe("the retired door's laws, re-asked of the batch door", () => {
    *     the ABSENCE (no cost, no source, no treatment).
    *   · A DECLARED catalog price that Catalog no longer has → still refused:
    *     the operator reviewed a figure that is gone, which is not an unknown.
-   *   · A RECORDED price that is not positive → still refused. Filling it with
+   *   · A non-positive price carries no commercial claim. Filling it with
    *     RM0 would put a number nobody agreed on a supplier's paper.
    */
   it("⭐ an UNPRICED SKU nobody declared is ISSUED, carrying the absence — never RM0", async () => {
@@ -1711,18 +1750,19 @@ describe("the retired door's laws, re-asked of the batch door", () => {
     expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
   });
 
-  it("⛔ a RECORDED zero is not an absence — it stops the batch rather than becoming RM0", async () => {
+  it.each([0, -1])("a Catalog price issue (%s) permits issue without approving a price", async (cost) => {
     const tables = TABLES();
     (tables.product_skus.data as Record<string, unknown>[]).forEach((r) => {
-      if (r.sku === "5539-CNR") r.cost = 0;
+      if (r.sku === "5539-CNR") r.cost = cost;
     });
     const { sb, demands } = await ready(tables);
     const res = await postBatch({ selections: allTo(demands, KLANG) });
-    expect(res.status).toBe(422);
-    const body = (await res.json()) as { code?: string; sku?: string };
-    expect(body.code).toBe("cost_required");
-    expect(body.sku).toBe("5539-CNR");
-    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+    expect(res.status).toBe(200);
+    const lines = (batchArgs(sb) as unknown as { lines: Record<string, unknown>[] }[]).flatMap((po) => po.lines);
+    expect(lines.find((l) => l.sku === "5539-CNR")).toMatchObject({
+      cost: null, cost_source: null, commercial_treatment: null, expected_catalog_cost: null,
+    });
+    expect((tables.product_skus.data as Record<string, unknown>[]).find((r) => r.sku === "5539-CNR")?.cost).toBe(cost);
   });
 
   it("the whole batch stops — a priced document is not quietly issued alone", async () => {
@@ -1744,7 +1784,7 @@ describe("the retired door's laws, re-asked of the batch door", () => {
       documentDecisions: decisionsForAll(demands, KLANG, { orderId: "o1", procurementPartnerId: null, lineDecisions: [
             { sku: "5539-CNR", treatment: "normal", unitCost: 1234, costSource: "hand_entered" },
           ] }),
-    });
+    }, "principal");
     expect(res.status).toBe(200);
     const line = (batchArgs(sb) as unknown as { lines: Record<string, unknown>[] }[])
       .flatMap((p) => p.lines)
@@ -2054,7 +2094,7 @@ describe("closure §1 · one governed PO actor authority", () => {
     const body = (await res.json()) as { code?: string; message?: string; action?: string };
     expect(body.code).toBe("not_po_duty");
     /* ⭐ THE TWO LINES (closure §9): the fact, then the act, naming the person. */
-    expect(body.message).toBe("You do not hold PO duty today.");
+    expect(body.message).toBe("Only Operation staff may issue a purchase order.");
     expect(body.action).toBe("Ask Li Ching to issue this purchase order.");
     expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
   });
@@ -2098,7 +2138,7 @@ describe("closure §1 · one governed PO actor authority", () => {
     expect(res.status).toBe(403);
     const body = (await res.json()) as { code?: string; message?: string; action?: string };
     expect(body.code).toBe("not_po_duty");
-    expect(body.message).toBe("You do not hold PO duty today.");
+    expect(body.message).toBe("Only Operation staff may issue a purchase order.");
     expect(body.action?.length).toBeGreaterThan(0);
   });
 
@@ -2199,7 +2239,7 @@ describe("closure §2 · commercial authority", () => {
           },
         ],
       }),
-    });
+    }, "principal");
     expect(res.status).toBe(200);
     const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args
       .p_pos as { lines: Record<string, unknown>[] }[];
@@ -2224,7 +2264,7 @@ describe("closure §2 · commercial authority", () => {
           { sku: "5539-CNR", treatment: "free_of_charge", reason: "Replacement for a claim" },
         ],
       }),
-    });
+    }, "principal");
     expect(res.status).toBe(200);
     const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args
       .p_pos as { lines: Record<string, unknown>[] }[];
@@ -2501,5 +2541,22 @@ describe("Card 02-C · a `place` order is refused at every door", () => {
     const body = (await res.json()) as { code?: string };
     expect(body.code).toBe("unknown_demand");
     expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+});
+
+
+describe("Operation cannot edit commercial terms through legacy issue inputs", () => {
+  it.each([
+    { sku: "5539-CNR", treatment: "normal", unitCost: 1234, costSource: "hand_entered" },
+    { sku: "5539-CNR", treatment: "free_of_charge", reason: "Supplier replacement" },
+  ])("refuses $treatment before a PO or approval is consumed", async (line) => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({ selections: allTo(demands, KLANG),
+      documentDecisions: decisionsForAll(demands, KLANG, { orderId: "o1", procurementPartnerId: null, lineDecisions: [line] }),
+    });
+    expect(res.status).toBe(403);
+    expect(sb.rpcCalls.some(call => call.fn === "purchasing_issue_pos_batch")).toBe(false);
   });
 });

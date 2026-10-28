@@ -34,15 +34,21 @@ import { MONITOR_COPY, operatingWeekOf, scheduleSplitSentence, type MonthDayCoun
    heading grammar (SEPTEMBER 2026), per the owner's sketch. */
 const RAIL_CALENDAR_CLASSNAMES = {
   ...CALENDAR_CLASSNAMES,
-  month_caption: "flex items-center justify-center h-7",
+  /* pr-2 keeps the longest caption (SEPTEMBER 2026) clear of the next-month
+     arrow, which sits 36px in from the edge (see `nav`). */
+  month_caption: "flex items-center justify-center h-7 pr-2",
   caption_label:
-    "text-label font-semibold uppercase tracking-wide text-kit-slate-9",
+    "text-label uppercase tracking-[0.06em] text-kit-slate-9",
   /* pr-9 keeps the next-month arrow clear of the rail's own Hide-filters
      button, which floats at the header's top-right corner. */
   nav: "absolute inset-x-0 top-0 flex items-center justify-between pr-9",
   root: `${CALENDAR_CLASSNAMES.root} relative`,
-  weekday: "p-0.5 font-normal uppercase",
+  /* A caps label (01 §2): 11 / 500, tracking .06em. */
+  weekday: "p-0.5 text-label uppercase tracking-[0.06em]",
   today: "[&>button]:ring-1 [&>button]:ring-inset [&>button]:ring-kit-blue-9",
+  /* The kit skin's selected state, at the scale's 500 (12 / 600 is not a
+     pair, 01 §2); every colour stays the skin's. */
+  selected: CALENDAR_CLASSNAMES.selected.replace("[&>button]:font-semibold", "[&>button]:font-medium"),
   day_button:
     "relative h-7 w-7 rounded-control text-meta text-kit-slate-12 hover:bg-kit-slate-3 " +
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9",
@@ -125,7 +131,7 @@ export default function MonitorMonthCalendar({
           },
         }}
       />
-      <div className="flex items-center justify-center gap-3 pt-1 text-label text-kit-slate-11">
+      <div className="flex items-center justify-center gap-3 pt-1 text-meta text-kit-slate-11">
         <span className="inline-flex items-center gap-1"><span aria-hidden className="h-1 w-1 rounded-full bg-current" />{MONITOR_COPY.cellDeliveries}</span>
         <span className="inline-flex items-center gap-1"><span aria-hidden className="h-1 w-1 bg-current" />{MONITOR_COPY.cellTransfers}</span>
       </div>

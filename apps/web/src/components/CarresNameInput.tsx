@@ -22,7 +22,7 @@ export default function CarresNameInput({
 }) {
   return (
     <div className="flex items-stretch w-full border border-base-200 rounded bg-white overflow-hidden focus-within:border-base-700">
-      <span className="flex items-center px-3 text-body font-semibold text-base-500 bg-base-50 border-r border-base-200 select-none">
+      <span className="flex items-center px-3 text-body font-medium text-base-500 bg-base-50 border-r border-base-200 select-none">
         {CARRES_NAME_PREFIX}
       </span>
       <input

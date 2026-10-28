@@ -3,33 +3,41 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import FinanceSettings from "./FinanceSettings";
-import { addAccountSaveGap } from "./ChartOfAccounts";
 
 type Code = { code: string };
 const net = vi.hoisted(() => ({
   rows: [] as Array<{ code: string }>,
   routes: [] as Array<{ holding_code: string; channel: string; bank_code: string }>,
-  chart: [] as Array<{ code: string; parent_code: string | null; kind: string }>,
+  chart: [] as Array<{ code: string; parent_code: string | null; kind: string; section?: string }>,
   failList: false,
   refuse: null as string | null,
   /** One write refused: its key, the sentence, and the door's tag (sent up as `code`). */
   refuseOn: null as { key: string; message: string; tag?: string } | null,
   calls: [] as Array<{ key: string; body: unknown }>,
+  closed: null as string | null,
+  role: "finance",
 }));
 vi.mock("@/lib/api", () => ({
   apiFetch: vi.fn(async (path: string, init?: RequestInit) => {
     const key = `${init?.method ?? "GET"} ${path.replace("/api/finance/ledger/money-accounts", "") || "/"}`;
     const body = init?.body ? JSON.parse(String(init.body)) : undefined;
     net.calls.push({ key, body });
-    if (key === "GET /api/finance/ledger/accounts") return { go_live_on: "2026-09-10", accounts: net.chart };
+    if (key === "GET /api/finance/ledger/accounts") {
+      return { go_live_on: "2026-09-10", accounts: net.chart, sections: [{ section: "CURRENT LIABILITIES", kind: "LIABILITY", sort_order: 60 }] };
+    }
     if (key === "GET /") {
       if (net.failList) throw new Error("boom");
       return net.rows;
     }
     if (key === "GET /card-routes") return net.routes;
+    if (key === "GET /api/finance/ledger/books-closed") return { closedThrough: net.closed };
     if (net.refuse) throw new Error(net.refuse);
     if (net.refuseOn?.key === key) {
       throw Object.assign(new Error(net.refuseOn.message), { body: { code: net.refuseOn.tag, message: net.refuseOn.message } });
+    }
+    if (key === "PUT /api/finance/ledger/books-closed") {
+      net.closed = body.closedThrough;
+      return body;
     }
     // The chart's door renumbers: like the database's cascade, every list
     // that names the old number reads the new one from here on.
@@ -57,6 +65,9 @@ vi.mock("@/lib/api", () => ({
   }),
 }));
 vi.mock("@/pages/operation/components/GlobalTopBar", () => ({ TopBarIcons: () => null }));
+vi.mock("@/lib/auth", () => ({
+  useAuth: (sel: (s: { role: string }) => unknown) => sel({ role: net.role }),
+}));
 
 const ROWS = [
   { code: "1110", name: "Cash on hand", money_kind: "CASH", is_active: true },
@@ -73,8 +84,20 @@ const CHART = [
   acc("2000", "Liabilities", null, true),
   acc("2100", "Payables", "2000", true),
   acc("1100", "Bank and cash", null, true, "ASSET"),
+  // 0692: the money accounts are rows of the chart.
+  acc("1110", "Cash on hand", "1100", false, "ASSET"),
   acc("1121", "Public Bank", "1100", false, "ASSET"),
+  acc("1124", "RHB", "1100", false, "ASSET"),
+  acc("1131", "GHL", "1100", false, "ASSET"),
 ];
+
+/** The chart's ⋮ menu (Chew 2026-10-14): Add a money account and Import from AutoCount sit in it. */
+async function pickFromMore(name: string) {
+  const trigger = await screen.findByTestId("chart-more");
+  trigger.focus();
+  fireEvent.keyDown(trigger, { key: "ArrowDown" });
+  fireEvent.click(await screen.findByRole("menuitem", { name }));
+}
 
 beforeEach(() => {
   net.rows = ROWS;
@@ -84,9 +107,13 @@ beforeEach(() => {
   net.refuse = null;
   net.refuseOn = null;
   net.calls = [];
+  net.closed = null;
+  net.role = "finance";
   localStorage.clear();
 });
 
+/* 0692 (Chew 2026-10-13): the money accounts are kept on Chart of accounts,
+   the first tab, at the plain address. */
 function show(path = "/finance/settings") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -100,20 +127,39 @@ function show(path = "/finance/settings") {
 
 const writes = () => net.calls.filter((c) => !c.key.startsWith("GET"));
 
-describe("Finance Settings — the money accounts", () => {
-  it("lists every money account with its kind and whether it is in use", async () => {
+describe("Finance Settings — the money accounts, on Chart of accounts (0692)", () => {
+  it("marks each money account with its kind under Type; Show not active adds the rest", async () => {
     show();
     expect(screen.getByTestId("finance-settings-destination-header")).toHaveTextContent("Finance Settings");
     await screen.findByText("Public Bank");
-    expect(screen.getByText("Online payment")).toBeInTheDocument();
-    expect(screen.getAllByText("Bank transfer")).toHaveLength(2);
+    // The kind reads under Type, once a row.
+    expect(await screen.findAllByText("Card and online holding")).toHaveLength(1);
+    expect(screen.getAllByText("Bank account")).toHaveLength(1);
+    expect(screen.queryByText("RHB")).not.toBeInTheDocument();
+    expect(screen.queryByText("Not active")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Show not active" }));
+    expect(await screen.findByText("RHB")).toBeInTheDocument();
+    expect(screen.getAllByText("Bank account")).toHaveLength(2);
     expect(screen.getByText("Not active")).toBeInTheDocument();
+    /* The kind has its own word, not a pay method's (YH, 1 Oct 2026). */
+    expect(screen.queryByText("Online payment")).not.toBeInTheDocument();
+    expect(screen.queryByText("Bank transfer")).not.toBeInTheDocument();
+  });
+
+  it("has no Money accounts tab: an old link lands on Chart of accounts, which adds them (Chew 2026-10-13)", async () => {
+    show("/finance/settings?tab=money");
+    const tabs = screen.getAllByRole("tab").map((t) => t.textContent);
+    expect(tabs).not.toContain("Money accounts");
+    expect(tabs[0]).toBe("Chart of accounts");
+    expect(screen.getByRole("tab", { name: "Chart of accounts" })).toHaveAttribute("aria-selected", "true");
+    await pickFromMore("Add a money account");
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 
   it("adds a bank: the name and the kind, never a code", async () => {
     show();
     await screen.findByText("Public Bank");
-    fireEvent.click(screen.getByRole("button", { name: "Add a money account" }));
+    await pickFromMore("Add a money account");
     const dialog = await screen.findByRole("dialog");
     const save = within(dialog).getByRole("button", { name: "Save" });
     expect(save).toBeDisabled();
@@ -123,14 +169,15 @@ describe("Finance Settings — the money accounts", () => {
     expect(writes()[0]).toEqual({ key: "POST /", body: { name: "CIMB", kind: "BANK" } });
   });
 
-  it("adds a holding account when the kind is Online payment", async () => {
+  it("adds a holding account when the kind is Card and online holding", async () => {
     show();
     await screen.findByText("Public Bank");
-    fireEvent.click(screen.getByRole("button", { name: "Add a money account" }));
+    await pickFromMore("Add a money account");
     const dialog = await screen.findByRole("dialog");
     fireEvent.change(within(dialog).getByLabelText(/Name/), { target: { value: "Stripe" } });
     fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Kind/ }), { key: "Enter" });
-    fireEvent.click(await screen.findByRole("option", { name: "Online payment" }));
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual(["Bank account", "Card and online holding"]);
+    fireEvent.click(await screen.findByRole("option", { name: "Card and online holding" }));
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
     await waitFor(() => expect(writes()).toHaveLength(1));
     expect(writes()[0]).toEqual({ key: "POST /", body: { name: "Stripe", kind: "HOLDING" } });
@@ -139,7 +186,7 @@ describe("Finance Settings — the money accounts", () => {
   it("takes an account out of use, and shows the database's refusal when it still holds money", async () => {
     net.refuse = "1121 Public Bank is not at RM 0.00 in the ledger. It stays in use until it is.";
     show();
-    fireEvent.click(await screen.findByText("Public Bank"));
+    fireEvent.doubleClick(await screen.findByText("Public Bank"));
     const dialog = await screen.findByRole("dialog");
     fireEvent.click(within(dialog).getByRole("checkbox", { name: "Active" }));
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
@@ -151,24 +198,24 @@ describe("Finance Settings — the money accounts", () => {
   it("a list that could not be read says so, never an empty list", async () => {
     net.failList = true;
     show();
-    expect(await screen.findByText("The accounts could not be loaded. Try again.")).toBeInTheDocument();
+    expect(await screen.findByText("The money accounts could not be loaded. Try again.")).toBeInTheDocument();
   });
 });
 
 describe("Finance Settings — a money account's number, changed on its own form (24 Sep)", () => {
   const CHART_DOOR = "PATCH /api/finance/ledger/accounts/1121";
   const openPublicBank = async () => {
-    fireEvent.click(await screen.findByText("Public Bank"));
+    fireEvent.doubleClick(await screen.findByText("Public Bank"));
     return screen.findByRole("dialog");
   };
   const numberField = (dialog: HTMLElement) => within(dialog).getByRole("textbox", { name: /Number/ });
 
-  it("renumbers through the chart's own door, and the list, the payout banks and the chart read the new number", async () => {
+  it("renumbers through the chart's own door, and the payout banks and the chart read the new number", async () => {
     // The chart is read first and kept, so only a refresh after the save can
     // put the new number on it.
-    show("/finance/settings?tab=chart");
-    expect(await screen.findByText("1121 Public Bank")).toBeInTheDocument();
-    fireEvent.mouseDown(screen.getByRole("tab", { name: "Money accounts" }), { button: 0, ctrlKey: false });
+    show();
+    const chartRow = (code: string) => document.querySelector(`tr[data-row-key="${code}"]`);
+    await waitFor(() => expect(chartRow("1121")).toHaveTextContent("Public Bank"));
 
     const dialog = await openPublicBank();
     expect(numberField(dialog)).toHaveValue("1121");
@@ -179,15 +226,15 @@ describe("Finance Settings — a money account's number, changed on its own form
     // One write, the Chart of accounts form's own request; the letter goes up in capitals.
     expect(writes()).toEqual([{ key: CHART_DOOR, body: { name: "Public Bank", code: "310-A000" } }]);
 
-    expect(await screen.findByText("310-A000")).toBeInTheDocument();
+    await waitFor(() => expect(chartRow("310-A000")).toHaveTextContent("Public Bank"));
     // The payout banks live on their own tab.
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Card payout banks" }), { button: 0, ctrlKey: false });
     await waitFor(() =>
-      expect(screen.getByTestId("card-route-1131-dealer")).toHaveTextContent("1131 · GHL · Dealer → 310-A000 · Public Bank"),
+      expect(screen.getByTestId("card-route-1131-dealer")).toHaveTextContent(/1131 · GHL.*Dealer.*310-A000 · Public Bank/),
     );
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Chart of accounts" }), { button: 0, ctrlKey: false });
-    expect(await screen.findByText("310-A000 Public Bank")).toBeInTheDocument();
-    expect(screen.queryByText("1121 Public Bank")).not.toBeInTheDocument();
+    await waitFor(() => expect(chartRow("310-A000")).toHaveTextContent("Public Bank"));
+    expect(chartRow("1121")).toBeNull();
   });
 
   it("a number another account has: the database's sentence under the Number field, and the form stays open", async () => {
@@ -269,6 +316,8 @@ describe("Finance Settings — a money account's number, changed on its own form
   it("Active changed with a new name and number: Active is saved under the old name first, then the chart's door takes the name and number", async () => {
     net.rows = ROWS.map((r) => (r.code === "1121" ? { ...r, is_active: false } : r));
     show();
+    // An account out of use is listed once Show not active is ticked.
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Show not active" }));
     const dialog = await openPublicBank();
     fireEvent.click(within(dialog).getByRole("checkbox", { name: "Active" }));
     fireEvent.change(within(dialog).getByLabelText(/Name/), { target: { value: "Public Bank Berhad" } });
@@ -330,9 +379,16 @@ describe("Finance Settings — card payout banks (0541)", () => {
   it("shows each route and saves a new bank for it", async () => {
     show("/finance/settings?tab=card");
     const row = await screen.findByTestId("card-route-1131-dealer");
-    expect(row).toHaveTextContent("1131 · GHL · Dealer → 1121 · Public Bank");
-    fireEvent.click(row);
+    expect(row).toHaveTextContent(/1131 · GHL.*Dealer.*1121 · Public Bank/);
+    fireEvent.doubleClick(row);
     const dialog = await screen.findByRole("dialog");
+    /* An opened route's card account and machine are fixed facts, read as
+       text under the kind's word, never a disabled field (Chew 2026-10-14). */
+    const facts = within(dialog).getByTestId("card-route-facts");
+    expect(facts).toHaveTextContent(/Card and online holdings*1131 · GHL/);
+    expect(facts).toHaveTextContent(/Machine ats*Dealer/);
+    expect(within(dialog).queryByRole("combobox", { name: /Card and online holding/ })).toBeNull();
+    expect(within(dialog).queryByText("Card account")).not.toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
     await waitFor(() => expect(writes()).toHaveLength(1));
     expect(writes()[0]).toEqual({ key: "POST /card-routes", body: { holding_code: "1131", channel: "dealer", bank_code: "1121" } });
@@ -340,118 +396,75 @@ describe("Finance Settings — card payout banks (0541)", () => {
 });
 
 describe("Finance Settings — the chart of accounts", () => {
-  it("lists the chart as a tree, headings in bold, and renames an account by its code", async () => {
+  /* The chart screen itself is ChartOfAccounts.test.tsx. Here: the tab opens
+     it, grouped by AutoCount's section (0656), and a double click on a row opens the account. */
+  it("opens the chart grouped by section, and a double click opens the account", async () => {
+    net.chart = [
+      acc("2000", "Liabilities", null, true),
+      { ...acc("2100", "Payables", "2000", true), section: "CURRENT LIABILITIES" },
+      { ...acc("2130", "Accrued expenses", "2100"), section: "CURRENT LIABILITIES" },
+    ];
     show("/finance/settings?tab=chart");
-    const accrued = await screen.findByText("2130 Accrued expenses");
-    expect(screen.getByText("2000 Liabilities")).toHaveClass("font-semibold");
-    expect(accrued).not.toHaveClass("font-semibold");
-    fireEvent.click(accrued);
+    const accrued = await screen.findByText(/Accrued expenses/);
+    expect(screen.getByTestId("grid-group-toggle-CURRENT LIABILITIES")).toHaveTextContent("CURRENT LIABILITIES · Liability");
+    expect(screen.queryByText("Liabilities")).toBeNull();
+    fireEvent.doubleClick(accrued);
     const dialog = await screen.findByRole("dialog");
-    fireEvent.change(within(dialog).getByLabelText(/Name/), { target: { value: " Accruals " } });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(writes()).toHaveLength(1));
-    expect(writes()[0]).toEqual({ key: "PATCH /api/finance/ledger/accounts/2130", body: { name: "Accruals" } });
+    expect(within(dialog).getByLabelText(/^Name/)).toHaveValue("Accrued expenses");
+  });
+});
+
+/** Open the calendar and pick the chosen day again, which clears it
+ *  (react-day-picker single mode). The trigger's name is its label. */
+function clearTheDay(trigger: HTMLElement) {
+  fireEvent.click(trigger);
+  const cell = screen.getAllByRole("gridcell").find((c) => c.getAttribute("aria-selected") === "true");
+  fireEvent.click(cell!.querySelector("button") ?? cell!);
+}
+
+describe("Finance Settings — closed months (0622)", () => {
+  it("is its own tab and says when no month is closed", async () => {
+    show();
+    await screen.findByText("Public Bank");
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Closed months" }), { button: 0, ctrlKey: false });
+    expect(await screen.findByText("No month is closed")).toBeInTheDocument();
   });
 
-  it("Add account: a disabled Save names the first field still missing (YH, 25 Sep)", async () => {
-    show("/finance/settings?tab=chart");
-    await screen.findByText("2130 Accrued expenses");
-    fireEvent.click(screen.getByRole("button", { name: "Add account" }));
-    const dialog = await screen.findByRole("dialog");
-    fireEvent.click(within(dialog).getByLabelText("It is a heading"));
-    expect(within(dialog).getByRole("button", { name: "Save: pick Under" })).toBeDisabled();
-
-    const f = { parent: "2000", code: "2140", name: "Deposits held", isHeading: true };
-    expect(addAccountSaveGap({ ...f, code: " " })).toBe("Save: type the heading number");
-    expect(addAccountSaveGap({ ...f, name: "" })).toBe("Save: type the heading name");
-    expect(addAccountSaveGap({ ...f, isHeading: false, code: " " })).toBe("Save: type the number");
-    expect(addAccountSaveGap({ ...f, isHeading: false, name: "" })).toBe("Save: type the name");
-    expect(addAccountSaveGap(f)).toBeNull();
-    expect(addAccountSaveGap({ ...f, parent: "top" })).toBe("Save: pick the kind");
-    expect(addAccountSaveGap({ ...f, parent: "top", kind: "INCOME" })).toBeNull();
+  it("finance reads the closed day and has no field to change it", async () => {
+    net.closed = "2026-08-31";
+    show("/finance/settings?tab=closed");
+    expect(await screen.findByText(/^Books closed up to Mon, 31 Aug/)).toBeInTheDocument();
+    expect(screen.getByText("The ledger takes nothing dated on or before this day.")).toBeInTheDocument();
+    expect(screen.getByText("Only the principal can change this.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
   });
 
-  it("Add account: a heading goes at the top of the chart with the kind Finance picks; an account never does (0608)", async () => {
-    show("/finance/settings?tab=chart");
-    await screen.findByText("2130 Accrued expenses");
-    fireEvent.click(screen.getByRole("button", { name: "Add account" }));
-    const dialog = await screen.findByRole("dialog");
-    const openUnder = () => fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Under/ }), { key: "Enter" });
-
-    // An account: no top of the chart, and no Kind.
-    openUnder();
-    await screen.findByRole("option", { name: "2000 Liabilities" });
-    expect(screen.queryByRole("option", { name: "Top of the chart" })).toBeNull();
-    fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
-    expect(within(dialog).queryByRole("combobox", { name: /Kind/ })).toBeNull();
-
-    fireEvent.click(within(dialog).getByLabelText("It is a heading"));
-    openUnder();
-    fireEvent.click(await screen.findByRole("option", { name: "Top of the chart" }));
-    expect(within(dialog).getByRole("button", { name: "Save: pick the kind" })).toBeDisabled();
-    fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Kind/ }), { key: "Enter" });
-    fireEvent.click(await screen.findByRole("option", { name: "Income" }));
-    fireEvent.change(within(dialog).getByLabelText(/^Heading number/), { target: { value: "8000" } });
-    fireEvent.change(within(dialog).getByLabelText(/^Heading name/), { target: { value: "Other income" } });
-
-    // Unticking takes the top of the chart away again; ticking brings the choice back.
-    fireEvent.click(within(dialog).getByLabelText("It is a heading"));
-    expect(within(dialog).getByRole("button", { name: "Save: pick Under" })).toBeDisabled();
-    fireEvent.click(within(dialog).getByLabelText("It is a heading"));
-    openUnder();
-    fireEvent.click(await screen.findByRole("option", { name: "Top of the chart" }));
-
-    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(writes()).toHaveLength(1));
-    expect(writes()[0]).toEqual({
-      key: "POST /api/finance/ledger/accounts",
-      body: { parentCode: null, code: "8000", name: "Other income", isHeading: true, kind: "INCOME" },
-    });
-    expect(await screen.findByText("8000 Other income")).toBeInTheDocument();
+  it("the principal gets the field, and Save waits for a different day", async () => {
+    net.role = "principal";
+    net.closed = "2026-08-31";
+    show("/finance/settings?tab=closed");
+    await screen.findByText(/^Books closed up to/);
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(screen.queryByText("Only the principal can change this.")).not.toBeInTheDocument();
   });
 
-  it("Add account: a heading is added on its own, with no first account, and is offered under Under at once (0608)", async () => {
-    show("/finance/settings?tab=chart");
-    await screen.findByText("2130 Accrued expenses");
-    fireEvent.click(screen.getByRole("button", { name: "Add account" }));
-    let dialog = await screen.findByRole("dialog");
-    fireEvent.click(within(dialog).getByLabelText("It is a heading"));
-    expect(within(dialog).queryByLabelText(/First account/)).toBeNull();
-    fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Under/ }), { key: "Enter" });
-    fireEvent.click(await screen.findByRole("option", { name: "2000 Liabilities" }));
-    fireEvent.change(within(dialog).getByLabelText(/^Heading number/), { target: { value: "2800" } });
-    fireEvent.change(within(dialog).getByLabelText(/^Heading name/), { target: { value: "testhead" } });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(writes()).toHaveLength(1));
-    expect(writes()[0]).toEqual({
-      key: "POST /api/finance/ledger/accounts",
-      body: { parentCode: "2000", code: "2800", name: "testhead", isHeading: true },
-    });
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-
-    // The chart is read again, and the new empty heading is one to add under.
-    fireEvent.click(await screen.findByRole("button", { name: "Add account" }));
-    dialog = await screen.findByRole("dialog");
-    fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Under/ }), { key: "Enter" });
-    expect(await screen.findByRole("option", { name: "2800 testhead" })).toBeInTheDocument();
+  it("the principal clears the day and saves: every month reopens", async () => {
+    net.role = "principal";
+    net.closed = "2026-08-31";
+    show("/finance/settings?tab=closed");
+    clearTheDay(await screen.findByRole("button", { name: "Close up to" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(writes()).toEqual([{ key: "PUT /api/finance/ledger/books-closed", body: { closedThrough: null } }]));
+    expect(await screen.findByText("No month is closed")).toBeInTheDocument();
   });
 
-  it("Add account: F3 or Ctrl+S saves, and does nothing while Save names a gap", async () => {
-    show("/finance/settings?tab=chart");
-    await screen.findByText("2130 Accrued expenses");
-    fireEvent.click(screen.getByRole("button", { name: "Add account" }));
-    const dialog = await screen.findByRole("dialog");
-    fireEvent.keyDown(window, { key: "s", ctrlKey: true });
-    fireEvent.keyDown(window, { key: "F3" });
-    expect(within(dialog).getByRole("button", { name: "Save: pick Under" })).toBeDisabled();
-    expect(writes()).toHaveLength(0);
-
-    fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Under/ }), { key: "Enter" });
-    fireEvent.click(await screen.findByRole("option", { name: "2100 Payables" }));
-    fireEvent.change(within(dialog).getByLabelText(/^Number/), { target: { value: "2140" } });
-    fireEvent.change(within(dialog).getByLabelText(/^Name/), { target: { value: "Deposits held" } });
-    fireEvent.keyDown(window, { key: "s", ctrlKey: true });
-    await waitFor(() => expect(writes()).toHaveLength(1));
-    expect(writes()[0]).toEqual({ key: "POST /api/finance/ledger/accounts", body: { parentCode: "2100", code: "2140", name: "Deposits held" } });
+  it("a refusal from the database is shown as its sentence", async () => {
+    net.role = "principal";
+    net.closed = "2026-08-31";
+    net.refuseOn = { key: "PUT /api/finance/ledger/books-closed", message: "Choose a day that has ended. 30 Sep 2026 has not ended yet.", tag: "books_closed_not_ended" };
+    show("/finance/settings?tab=closed");
+    clearTheDay(await screen.findByRole("button", { name: "Close up to" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("Choose a day that has ended. 30 Sep 2026 has not ended yet.")).toBeInTheDocument();
   });
 });

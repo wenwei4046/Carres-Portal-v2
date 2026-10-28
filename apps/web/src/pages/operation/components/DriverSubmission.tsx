@@ -94,7 +94,7 @@ export function DeliveryProofUploadButton({
           event.stopPropagation();
           inputRef.current?.click();
         }}
-        className="inline-flex h-7 max-w-full items-center gap-1.5 rounded-control border border-kit-slate-6 bg-white px-2 text-label font-medium text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12 disabled:opacity-60"
+        className="inline-flex h-7 max-w-full items-center gap-1.5 rounded-control border border-kit-slate-6 bg-white px-2 text-body font-medium text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12 disabled:opacity-60"
       >
         <Upload size={13} strokeWidth={1.75} aria-hidden />
         <span className="truncate">{upload.isPending ? "Uploading…" : label}</span>
@@ -143,7 +143,7 @@ export function DriverSubmissionViewer({
       width="viewer"
     >
       <div className="grid gap-3" data-testid="driver-submission-viewer">
-        <p className="text-label text-kit-slate-11">{DOR_COPY.submissionMeaning}</p>
+        <p className="text-meta text-kit-slate-11">{DOR_COPY.submissionMeaning}</p>
         {query.isLoading ? (
           <p className="text-body text-kit-slate-11" data-testid="driver-submission-loading">
             {DOR_COPY.loading}
@@ -171,7 +171,7 @@ export function DriverSubmissionViewer({
                    recorded fact — it is named, not hidden. */
                 <span
                   key={file.path}
-                  className="text-label text-base-600"
+                  className="text-meta text-base-600"
                   data-testid="driver-submission-unsigned"
                 >
                   {kind === "photo" ? DOR_COPY.photos : DOR_COPY.videos} {index + 1} ·{" "}
@@ -191,7 +191,7 @@ export function DriverSubmissionViewer({
                     alt={`${DOR_COPY.photos} ${index + 1}`}
                     className="h-36 w-36 rounded-md border border-base-200 object-cover"
                   />
-                  <span className="mt-1 block text-label text-base-600">
+                  <span className="mt-1 block text-meta text-base-600">
                     {fmtDate(file.at)}
                   </span>
                 </a>
@@ -203,7 +203,7 @@ export function DriverSubmissionViewer({
                     preload="metadata"
                     className="h-44 w-72 rounded-md border border-base-200 bg-black"
                   />
-                  <span className="mt-1 block text-label text-base-600">
+                  <span className="mt-1 block text-meta text-base-600">
                     {fmtDate(file.at)}
                   </span>
                 </span>
@@ -243,7 +243,7 @@ export function SignedDeliveryDocumentLink({
   if (!present) return <Absent>{DOR_COPY.noSignedDo}</Absent>;
   if (state === "missing" || state === "failed") {
     return (
-      <span className="text-label text-danger" data-testid="signed-do-failed">
+      <span className="text-meta text-danger" data-testid="signed-do-failed">
         {state === "missing" ? DOR_COPY.signedDoMissing : DOR_COPY.signedDoFailed}
       </span>
     );
@@ -283,7 +283,7 @@ export function SignedDeliveryDocumentLink({
   return (
     <button
       type="button"
-      className="text-label font-medium text-blue-700 underline-offset-2 hover:underline"
+      className="text-meta font-medium text-blue-700 underline-offset-2 hover:underline"
       title={DOR_COPY.openSignedDo}
       data-testid="signed-do-link"
       disabled={state === "opening"}

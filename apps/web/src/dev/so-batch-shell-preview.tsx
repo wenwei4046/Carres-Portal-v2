@@ -11,16 +11,26 @@
  * `?state=empty` · `?state=nothing` (everything needs no purchase) ·
  * default: 27 orders with long names, blocked, pool-covered, partly bought,
  * Ready-Stock-only and fully ordered records.
+ *
+ * Ready Stock is answered too: SO-1301 and SO-1302 each have TEST Units free
+ * at Carres Klang, so `Use stock` shows on the selection bar when their lines
+ * are ticked, and pressing it takes the Units here in the page (nothing is
+ * written anywhere).
  */
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { PurchaseDemandRow, SoBatchOrderRow, SoBatchPurchaseResponse } from "@carres/shared";
+import type { PurchaseDemandRow, ReadyStockResponse, SoBatchOrderRow, SoBatchPurchaseResponse } from "@carres/shared";
 import { useAuth } from "@/lib/auth";
 import OperationApp from "@/pages/operation/OperationApp";
+import { testTaskPo, testTaskSuppliers, testInternalTask, testTasksFeed } from "./tasks-feed-fixture";
+import { appTodayIso } from "@/lib/fmt-date";
 import "@/index.css";
 
+/* The preview person. A UUID, as every account id is: the Tasks panel
+   matches work to the signed-in person by it. */
+const ME = "00000000-0000-4000-8000-0000000000aa";
 const KLANG = "11111111-1111-4111-8111-111111111111";
 const BULOH = "22222222-2222-4222-8222-222222222222";
 const params = new URLSearchParams(window.location.search);
@@ -59,7 +69,7 @@ if (state !== "empty") {
   for (let i = 1; i <= 27; i += 1) {
     const [city, st] = CITIES[i % CITIES.length]!;
     const kind = state === "nothing" ? (i % 2 ? "stock" : "ordered")
-      : i <= 12 ? "buy" : i <= 14 ? "blocked" : i === 15 ? "pool" : i <= 17 ? "partial" : i <= 21 ? "stock" : "ordered";
+      : i <= 12 ? "buy" : i === 13 ? "blocked" : i === 14 ? "pool" : i === 15 ? "offer" : i <= 17 ? "partial" : i <= 21 ? "stock" : "ordered";
     const po = { poId: `PO-202609${String(10 + (i % 18)).padStart(2, "0")}-${4000 + i}`, status: "open" as const,
       supplierId: "s1", supplierName: SUPPLIERS[i % SUPPLIERS.length]!, destinationId: i % 3 ? KLANG : BULOH,
       officialDeliveryDate: `2026-10-${String(1 + (i % 27)).padStart(2, "0")}`, sentCurrentVersion: true };
@@ -70,18 +80,23 @@ if (state !== "empty") {
       status: kind === "ordered" ? "ordered" : kind === "partial" ? "partial" : "blank",
       proceededAt: `2026-09-${String(1 + (i % 15)).padStart(2, "0")}T09:00:00+08:00`,
       requestedDeliveryDate: i % 5 ? `2026-${i % 4 ? "10" : "12"}-${String(1 + (i % 27)).padStart(2, "0")}` : null,
+      originalRequestedDeliveryDate: i % 5 ? `2026-${i % 4 ? "10" : "12"}-${String(1 + (i % 27)).padStart(2, "0")}` : null,
       deliveryCity: city, deliveryState: st,
       pos: linked ? [po] : [],
       lines: [{ orderLineId: `l${i}`, sku: "B1201S-K", qty, stockTaken: kind === "stock" ? 2 : 0,
         item: "Booqit", variant: "King", category: "mattress",
+        /* SO-1315: an open PO holds free goods of this item. The line can
+           still be bought, and offers `Use this PO` beside its editor. */
+        ...(kind === "offer" ? { poOffer: { poId: "PO-20260926-4099", qty: 2 } } : {}),
         pos: linked ? [{ poId: po.poId, qty: linked }] : [] }],
-      outstandingSuppliers: kind === "buy" || kind === "blocked" || kind === "partial" || kind === "pool" ? [SUPPLIERS[i % SUPPLIERS.length]!] : [],
+      outstandingSuppliers: kind === "buy" || kind === "blocked" || kind === "partial" || kind === "pool" || kind === "offer" ? [SUPPLIERS[i % SUPPLIERS.length]!] : [],
     });
     const orderBy = `2026-09-${String(16 + (i % 14)).padStart(2, "0")}`;
     if (kind === "buy") rows.push(leaf(i, { orderBy, state: i % 4 ? "can_order_early" : "safety_days_low" }));
     if (kind === "partial") rows.push(leaf(i, { orderBy, toBuy: 1, onPo: 1, poNumbers: [po.poId] }));
     if (kind === "blocked") rows.push(leaf(i, { state: "no_production_days", toBuy: null, issueRef: null, goodsMustArrive: null }));
     if (kind === "pool") rows.push(leaf(i, { orderBy, fullyOnPo: true }));
+    if (kind === "offer") rows.push(leaf(i, { orderBy, poolOnly: true }));
   }
 }
 
@@ -92,30 +107,93 @@ const payload: SoBatchPurchaseResponse = {
     { id: BULOH, name: "AL Sungai Buloh", address: "20 Example Warehouse Road, Sungai Buloh", isDefault: false, active: true },
   ],
   defaultDestinationId: KLANG,
-  currentPoDuty: { userId: "u-duty", name: "Yu Jun" }, actingPoDuty: null,
+  currentPoDuty: { userId: ME, name: "Yu Jun" }, actingPoDuty: null,
   poDutyNameUnavailable: false, poDutyUnavailable: false, mayIssue: true,
   procurementPartners: [], safetyDays: 14,
 };
+
+/* TEST Units on the shelf: two for SO-1301's line, one for SO-1302's. */
+const shelf: Array<{ itemId: string; unitCode: string; lineId: string; heldFor: string | null }> = [
+  { itemId: "aaaaaaaa-0000-4000-8000-000000000001", unitCode: "TEST-B1201S-K-001", lineId: "l1", heldFor: null },
+  { itemId: "aaaaaaaa-0000-4000-8000-000000000002", unitCode: "TEST-B1201S-K-002", lineId: "l1", heldFor: null },
+  { itemId: "aaaaaaaa-0000-4000-8000-000000000003", unitCode: "TEST-B1201S-K-003", lineId: "l2", heldFor: null },
+];
+function readyStockOf(orderId: string): ReadyStockResponse {
+  const order = registerRows.find((row) => row.orderId === orderId);
+  const lines = (order?.lines ?? []).map((line) => {
+    const held = shelf.filter((unit) => unit.heldFor === line.orderLineId);
+    const onPo = line.pos.reduce((sum, po) => sum + po.qty, 0);
+    return { orderLineId: line.orderLineId, sku: line.sku, item: line.item, qty: line.qty, reservedQty: held.length,
+      reservedUnitCodes: held.map((unit) => unit.unitCode), onPoQty: onPo, remainingQty: Math.max(0, line.qty - line.stockTaken - onPo) };
+  });
+  const lineIds = new Set(lines.map((line) => line.orderLineId));
+  return {
+    orderId, so: order?.so ?? null, reference: order?.so == null ? null : `SO-${order.so}`, lines,
+    units: shelf.filter((unit) => lineIds.has(unit.lineId)).map((unit) => ({
+      itemId: unit.itemId, unitCode: unit.unitCode, identityScope: "unit", sku: "B1201S-K", condition: "new",
+      siteName: "Carres Klang", warehouseId: KLANG, holderName: null, ownership: "carres_owned", supplier: null,
+      qty: 1, dateIn: "2026-09-01", matchingLineIds: unit.heldFor ? [] : [unit.lineId], lineIds: [unit.lineId],
+      blocked: null, reservedForLineId: unit.heldFor,
+    })),
+  } as ReadyStockResponse;
+}
+/* `Use stock`: the picked Units are held for their line, and the line has
+   that much less to buy, as the real door would answer on the next read. */
+function reserve(body: { orderId: string; picks: Array<{ itemId: string; orderLineId: string }> }) {
+  for (const pick of body.picks) {
+    const unit = shelf.find((candidate) => candidate.itemId === pick.itemId);
+    if (unit) unit.heldFor = pick.orderLineId;
+    const line = registerRows.find((row) => row.orderId === body.orderId)?.lines.find((candidate) => candidate.orderLineId === pick.orderLineId);
+    if (line) line.stockTaken += 1;
+    const demand = rows.find((row) => row.orderId === body.orderId && row.lineIds.includes(pick.orderLineId));
+    if (demand) { demand.toBuy = Math.max(0, (demand.toBuy ?? 0) - 1); demand.takenFromStock = (demand.takenFromStock ?? 0) + 1; }
+  }
+  const order = registerRows.find((row) => row.orderId === body.orderId);
+  return { reserved: body.picks.length, reference: `SO-${order?.so}`, units: body.picks };
+}
+
+const poOf = (url: string) => (url.includes("/api/operation/pos?") ? new URL(url).searchParams.get("poId") : null);
+const PREVIEW_PERSON = { id: ME, name: "TEST · Staff A", email: "preview@carres.local" };
+const internalTaskOf = (url: string) => /\/api\/operation\/internal-tasks\/([0-9a-f-]{36})$/.exec(url.split("?")[0]!)?.[1] ?? null;
 
 const realFetch = window.fetch.bind(window);
 window.fetch = async (input, init) => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
   if (!url.includes("127.0.0.1:88")) return realFetch(input, init);
-  const body = url.includes("/api/operation/purchase/demands") ? payload : url.includes("/rest/") ? [] : {};
+  const stock = /\/purchase\/demands\/([^/]+)\/ready-stock$/.exec(url.split("?")[0]!);
+  const body = url.includes("/ready-stock/reserve") ? reserve(JSON.parse(String(init?.body ?? "{}")))
+    : stock ? readyStockOf(decodeURIComponent(stock[1]!))
+    : url.includes("/api/operation/purchase/demands") ? { ...payload, rows: rows.filter((row) => row.toBuy == null || row.toBuy > 0) }
+    /* The shell's Tasks panel reads the one Work feed: TEST work for the preview person. */
+    : /\/api\/operation\/work(\?|$)/.test(url) ? testTasksFeed(PREVIEW_PERSON)
+    /* An opened TEST internal task reads its own record; adding or finishing one answers like the door. */
+    : internalTaskOf(url) ? testInternalTask(internalTaskOf(url)!, PREVIEW_PERSON) ?? {}
+    : url.includes("/api/operation/internal-tasks") ? { id: "00000000-0000-4000-8000-0000000000c9" }
+    /* An opened TEST task reads its Purchase Order and its supplier. */
+    : poOf(url) ? testTaskPo(poOf(url)!)
+    : url.includes("/api/operation/suppliers") ? testTaskSuppliers()
+    : url.includes("/api/operation/orders?") ? { orders: [] }
+    : url.includes("/rest/") ? [] : {};
   return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
 };
 
 useAuth.setState({
   role: "operation", hydrated: true, loading: false,
-  user: { id: "u-duty", email: "preview@carres.local" } as never,
-  session: { access_token: "preview", user: { id: "u-duty", email: "preview@carres.local" } } as never,
+  user: { id: ME, email: "preview@carres.local" } as never,
+  session: { access_token: "preview", user: { id: ME, email: "preview@carres.local" } } as never,
 });
+
+/* The first-entry `Pending work` reminder is its own surface: it shows here
+   only when asked for (`?reminder=1`), so the page under it can be walked. */
+if (params.get("reminder") !== "1") {
+  try { window.localStorage.setItem(`carres.pendingWork.shownOn.${ME}`, appTodayIso()); } catch { /* a private window: the reminder shows */ }
+}
 
 const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[`/operation?tab=purchase${params.get("so") ? `&so=${params.get("so")}` : ""}`]}>
+      <MemoryRouter initialEntries={[`/operation?tab=purchase${params.get("so") ? `&so=${params.get("so")}` : ""}${params.get("view") ? `&view=${params.get("view")}` : ""}`]}>
         <Routes>
           <Route path="/operation/*" element={<OperationApp />} />
         </Routes>

@@ -234,7 +234,7 @@ export default function AssignLogisticsDialog({
     >
       <div className="w-full max-w-md rounded-control border border-kit-slate-6 bg-white shadow-lg">
         <div className="border-b border-kit-slate-5 px-4 py-3">
-          <h2 className="text-body font-semibold text-kit-slate-12">
+          <h2 className="text-strong text-kit-slate-12">
             {needsReason ? AL_WORDS.changeTitle : AL_WORDS.title}
           </h2>
           <p className="mt-0.5 text-meta text-kit-slate-11">
@@ -246,7 +246,7 @@ export default function AssignLogisticsDialog({
 
         <div className="flex flex-col gap-3 px-4 py-3">
           <label className="flex flex-col gap-1">
-            <span className="text-meta font-medium text-kit-slate-12">{AL_WORDS.partner}</span>
+            <span className="text-meta text-kit-slate-12">{AL_WORDS.partner}</span>
             <select
               className="h-8 rounded-control border border-kit-slate-6 px-2 text-body"
               value={chosen ?? ""}
@@ -260,7 +260,7 @@ export default function AssignLogisticsDialog({
                 </option>
               ))}
             </select>
-            <span className="text-label text-kit-slate-9">{AL_WORDS.coverageHint}</span>
+            <span className="text-meta text-kit-slate-9">{AL_WORDS.coverageHint}</span>
           </label>
 
           {candidates.length === 0 && (
@@ -278,7 +278,7 @@ export default function AssignLogisticsDialog({
                 <p key={r.so}>
                   {scopes.length > 1 ? `SO ${r.so} · ` : ""}
                   {AL_WORDS.pickupOn(chosenRow.name, fmtDate(r.pickupDay))}.{" "}
-                  {AL_WORDS.readyBy}: <span className="font-semibold">{fmtDate(r.readyBy)}</span>
+                  {AL_WORDS.readyBy}: <span className="font-medium">{fmtDate(r.readyBy)}</span>
                 </p>
               ))}
             </div>
@@ -299,7 +299,7 @@ export default function AssignLogisticsDialog({
                 {AL_WORDS.changeWarn(changing)}
               </p>
               <label className="flex flex-col gap-1">
-                <span className="text-meta font-medium text-kit-slate-12">{AL_WORDS.reason}</span>
+                <span className="text-meta text-kit-slate-12">{AL_WORDS.reason}</span>
                 <select
                   className="h-8 rounded-control border border-kit-slate-6 px-2 text-body"
                   value={reason}
@@ -318,7 +318,7 @@ export default function AssignLogisticsDialog({
           )}
 
           <label className="flex flex-col gap-1">
-            <span className="text-meta font-medium text-kit-slate-12">{AL_WORDS.note}</span>
+            <span className="text-meta text-kit-slate-12">{AL_WORDS.note}</span>
             <input
               className="h-8 rounded-control border border-kit-slate-6 px-2 text-body"
               value={note}
@@ -331,14 +331,14 @@ export default function AssignLogisticsDialog({
         <div className="flex justify-end gap-2 border-t border-kit-slate-5 px-4 py-3">
           <button
             type="button"
-            className="h-8 rounded-control border border-kit-slate-6 bg-white px-3 text-meta font-medium text-kit-slate-12 hover:bg-kit-slate-3"
+            className="h-8 rounded-control border border-kit-slate-6 bg-white px-3 text-body font-medium text-kit-slate-12 hover:bg-kit-slate-3"
             onClick={() => onOpenChange(false)}
           >
             {AL_WORDS.cancel}
           </button>
           <button
             type="button"
-            className="h-8 rounded-control bg-kit-blue-9 px-3 text-meta font-semibold text-white hover:opacity-90 disabled:opacity-40"
+            className="h-8 rounded-control bg-kit-blue-9 px-3 text-body font-semibold text-white hover:opacity-90 disabled:opacity-40"
             disabled={!chosen || (needsReason && !reason) || assign.isPending}
             onClick={submit}
             data-testid="assign-logistics-submit"

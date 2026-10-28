@@ -3,8 +3,10 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import ModuleHeader from "./components/ModuleHeader";
 import DutyCatalogue from "./staff-duties/DutyCatalogue";
 import DutyDetail, { DutyHistory } from "./staff-duties/DutyDetail";
+import LeaveAndOnCall from "./staff-duties/LeaveAndOnCall";
 import type { DutyStateFilter } from "./staff-duties/staff-duties-model";
 import Button from "@/components/kit/Button";
+import { useAuth } from "@/lib/auth";
 import { readReturnTo } from "@/lib/return-to";
 import Loading from "@/components/kit/Loading";
 import { appTodayIso } from "@/lib/fmt-date";
@@ -29,8 +31,12 @@ import { useWorkspaceDuties } from "@/lib/queries";
  * `can_assign` fact and never offers a control the server would refuse: a
  * reader gets the quiet sentence, not a disabled form.
  */
-export default function StaffDuties({ settingsNavigation }: { settingsNavigation?: ReactNode } = {}) {
+export default function StaffDuties({ settingsNavigation, activitySettings }: { settingsNavigation?: ReactNode; activitySettings?: ReactNode } = {}) {
   const dutiesQ = useWorkspaceDuties();
+  /* `Manage staff` goes to whoever may manage People records — the same
+     principal-or-HR gate the People API (`requireHr`) applies (owner-approved
+     2026-09-29; Workspace §4.2). */
+  const personnelManager = useAuth(s => s.role === "principal" || s.role === "hr");
   const navigate = useNavigate();
   const location = useLocation();
   const focusOnReturn = useRef<string | null>(null);
@@ -89,7 +95,7 @@ export default function StaffDuties({ settingsNavigation }: { settingsNavigation
      A healthy response with zero duties is therefore a CONFIGURATION failure,
      not an empty list — `No duties yet` would tell the reader that Carres has
      no duties, which is never true (§4.5). */
-  const broken = dutiesQ.isError || (!dutiesQ.isLoading && duties.length === 0);
+  const broken = !dutiesQ.isLoading && duties.length === 0;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -98,11 +104,18 @@ export default function StaffDuties({ settingsNavigation }: { settingsNavigation
         word="Staff & Duties"
         docTitle="Staff & Duties · Settings · Carres"
         destinationHeader
+        right={personnelManager ? <Button onClick={() => navigate("/hr?tab=people", { state: { returnTo: `${location.pathname}${location.search}` } })}>Manage staff</Button> : undefined}
       />
-      <div className="min-h-0 flex-1 bg-white" data-testid="staff-duties">
+      <div className="flex min-h-0 flex-1 flex-col bg-white" data-testid="staff-duties">
         {(settingsNavigation || workOrigin) ? <div className="flex flex-wrap items-center gap-3 px-6 pt-3">
           {settingsNavigation}
           {workOrigin ? <Button onClick={() => navigate(workOrigin)}>Back to work</Button> : null}
+        </div> : null}
+        {activitySettings}
+        <LeaveAndOnCall />
+        {dutiesQ.isError && duties.length > 0 ? <div role="alert" className="flex flex-wrap items-center gap-3 px-6 pt-3">
+          <p className="text-meta">Staff &amp; Duties could not be opened</p>
+          <Button onClick={() => void dutiesQ.refetch()}>Try again</Button>
         </div> : null}
         {dutiesQ.isLoading ? (
           /* Skeletons keep the page's geometry, so nothing jumps when the read
@@ -148,7 +161,7 @@ export default function StaffDuties({ settingsNavigation }: { settingsNavigation
         ) : (
           <div className="flex min-h-0 flex-1 flex-col">
             <p className="px-6 pt-3 text-meta text-kit-slate-11">
-              Who holds each company duty today and who covers an absence.
+              Who is assigned to each duty.
             </p>
             <div
               data-testid="staff-duties-split"
@@ -174,12 +187,13 @@ export default function StaffDuties({ settingsNavigation }: { settingsNavigation
                 {selected ? (
                   <>
                     <DutyDetail
+                      key={`detail-${selected.key}`}
                       duty={selected}
                       canAssign={canAssign}
                       today={today}
                       onBack={explicit ? back : undefined}
                     />
-                    <DutyHistory duty={selected} />
+                    <DutyHistory key={`history-${selected.key}`} duty={selected} />
                   </>
                 ) : null}
               </div>

@@ -46,7 +46,9 @@ const REGISTRY = {
 };
 
 /** Every read and write, routed by URL — the page makes several. */
+let canEdit = true;
 function route(url: string) {
+  if (url === "/api/operation/settings/can-edit/payment") return { canEdit };
   if (url === "/api/finance/payment-settings") return PAYLOAD;
   if (url === "/api/finance/payment-settings/methods") return REGISTRY;
   if (url.includes("/templates")) return { templates: [] };
@@ -63,11 +65,27 @@ function show() {
 }
 
 beforeEach(() => {
+  canEdit = true;
   state.fetch.mockReset();
   state.fetch.mockImplementation(async (url: string) => route(url));
 });
 
 describe("Settings → Payment (§16)", () => {
+  it("someone not named for Payment reads the page with every control disabled (TEAM-02)", async () => {
+    canEdit = false;
+    show();
+    expect(await screen.findByTestId("payment-settings-read-only")).toBeInTheDocument();
+    const fieldset = screen.getByTestId("payment-settings").querySelector("fieldset")!;
+    expect(fieldset).toBeDisabled();
+  });
+
+  it("a named editor gets the controls", async () => {
+    show();
+    await waitFor(() => expect(screen.getAllByText(/PJ own-showroom order/).length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getByTestId("payment-settings").querySelector("fieldset")).not.toBeDisabled());
+    expect(screen.queryByTestId("payment-settings-read-only")).toBeNull();
+  });
+
   it("shows readable summaries: routing, methods, numbering and the storage cards", async () => {
     show();
     await waitFor(() => expect(screen.getAllByText(/PJ own-showroom order/).length).toBeGreaterThan(0));
@@ -187,7 +205,38 @@ describe("Settings → Payment (§16)", () => {
       expect.objectContaining({ method: "POST" }),
     ));
     const call = state.fetch.mock.calls.find((c) => c[0] === "/api/finance/payment-settings/collection-timing")!;
-    expect(JSON.parse(call[1].body)).toMatchObject({ askDaysBefore: 4, deadlineDaysBefore: 2, reason: "Try" });
+    // 0672 — the outstation pair rides with the ordinary pair (defaults 4 · 3).
+    expect(JSON.parse(call[1].body)).toMatchObject({
+      askDaysBefore: 4, deadlineDaysBefore: 2, outstationAskDaysBefore: 4, outstationDeadlineDaysBefore: 3, reason: "Try",
+    });
+  });
+  it("Collection timing shows and edits the outstation pair (PAY-04, 0672)", async () => {
+    show();
+    const card = await screen.findByTestId("payment-settings-collection-timing");
+    expect(card).toHaveTextContent("Outstation delivery");
+    expect(card).toHaveTextContent("4 working days before Scheduled delivery");
+    // The Office calendar sentence replaces the retired Saturday sentence.
+    expect(card).not.toHaveTextContent("Operation does not work on Saturday");
+    // The facts never move for the customer; the action follows the person
+    // responsible (Office working days when none are recorded).
+    expect(screen.getByTestId("collection-timing-calendar")).toHaveTextContent("These dates never move for the customer.");
+    expect(screen.getByTestId("collection-timing-calendar")).toHaveTextContent("working day of the person responsible");
+    expect(screen.getByTestId("collection-timing-calendar")).toHaveTextContent("else the Office working days in Settings, Office");
+    fireEvent.click(within(card).getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByLabelText(/Outstation: start asking/), { target: { value: "3" } });
+    fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "Outstation" } });
+    expect(within(card).getByRole("button", { name: /outstation customer must start earlier/ })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(/Outstation: start asking/), { target: { value: "6" } });
+    fireEvent.change(screen.getByLabelText(/Outstation: payment must be complete/), { target: { value: "5" } });
+    fireEvent.click(within(card).getByRole("button", { name: "Review changes" }));
+    expect(screen.getByTestId("collection-timing-review")).toHaveTextContent("Outstation payment must be complete: 3 → 5");
+    fireEvent.click(within(card).getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(state.fetch).toHaveBeenCalledWith(
+      "/api/finance/payment-settings/collection-timing",
+      expect.objectContaining({ method: "POST" }),
+    ));
+    const call = state.fetch.mock.calls.find((c) => c[0] === "/api/finance/payment-settings/collection-timing")!;
+    expect(JSON.parse(call[1].body)).toMatchObject({ outstationAskDaysBefore: 6, outstationDeadlineDaysBefore: 5 });
   });
   it("Collection timing's Effective from is today at Edit, not at page open", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date("2026-09-15T04:00:00Z") });

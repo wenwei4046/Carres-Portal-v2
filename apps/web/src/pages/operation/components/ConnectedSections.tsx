@@ -3,9 +3,8 @@
  * (owner correction 2026-09-11; `docs/ui/MASTER.md` — the shared expansion
  * grammar).
  *
- * An expanded register row has grown from one child table into three sections,
- * and three boxes stacked with air between them do not say which record they
- * belong to. The owner asked for the line the portal's left navigation already
+ * An expanded register row can hold more than one section, and boxes stacked
+ * with air between them do not say which record they belong to. The owner asked for the line the portal's left navigation already
  * draws between a module and its pages — the same subtle curve — so this file
  * composes `components/tree-connector` into the section stack and nothing more.
  *
@@ -14,9 +13,7 @@
  *     │
  *     ├─ Goods on this order        ← actionable demand
  *     │
- *     ├─ ▸ Ready Stock              ← what is on the shelf for it
- *     │
- *     ╰─ Purchase order details     ← the read-only record
+ *     ╰─ ▸ Ready Stock              ← what is on the shelf for it
  *
  *   ▸ SO-1302                       ← the line NEVER reaches this row
  * ```

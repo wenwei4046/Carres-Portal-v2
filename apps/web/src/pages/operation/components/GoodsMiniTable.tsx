@@ -23,8 +23,8 @@ import { fmtDate } from "@/lib/fmt-date";
  *   begins is the engine's job — `DataGrid` indents the expansion row by the
  *   ☐ · ▸ gutter so the box's left edge is the `SO No` column's left edge.)
  *
- * ② TWO TYPE LEVELS, NEVER THREE. The header is 11px grey in the parent
- *   header's own treatment; EVERY value is 13px. The old table had four sizes
+ * ② TWO TYPE LEVELS, NEVER THREE. The header is 12/500 grey in the parent
+ *   header's own treatment; EVERY value is 13px, a second line 12px. The old table had four sizes
  *   in six columns — an 11px `Category`, a 12px mono `SKU`, a 13px `Item` and
  *   a 12px configuration line — and four sizes in one box read as four ranks
  *   of importance that the data does not have. `Unit ID` and `SKU` keep the
@@ -50,7 +50,7 @@ import { fmtDate } from "@/lib/fmt-date";
 // would draw a second page chrome inside one table cell.
 import { Fragment, type ReactNode } from "react";
 import Button from "@/components/kit/Button";
-import Popover from "@/components/kit/Popover";
+import CPopover from "@/components/carres/CPopover";
 import { REGISTER_FIELD_WIDTH } from "@/components/register/register-field-widths";
 import { OverflowText } from "@/components/register/DataGrid";
 import { GOODS_ABSENCE_WORDS, lineClass } from "@carres/shared";
@@ -523,6 +523,7 @@ export default function GoodsMiniTable({
   soBatchGoodsLayout = false,
   manualPurchaseGoodsLayout = false,
   showStatus = false,
+  statusLabel = "Status",
   detailRow,
   showSku = true,
   showFromStock = false,
@@ -569,6 +570,7 @@ export default function GoodsMiniTable({
   manualPurchaseGoodsLayout?: boolean;
   /** `Need PO` / `No PO needed` — the need for a new document, not permission. */
   showStatus?: boolean;
+  statusLabel?: string;
   /**
    * ⭐ THE ROW THAT OPENS UNDER AN ITEM — owner ruling 2026-09-18.
    *
@@ -731,7 +733,7 @@ export default function GoodsMiniTable({
     orderedQty: { ...ORDERED_QTY_COLUMN },
     toBuy: { ...TO_BUY_COLUMN },
     orderBy: { key: "orderBy", label: "Order By", width: 104 },
-    status: { key: "status", label: "Status", width: 112 },
+    status: { key: "status", label: statusLabel, width: 112 },
     sourceUnit: { ...SOURCE_UNIT_COLUMN },
     receivedQty: { ...RECEIVED_QTY_COLUMN },
     damagedQty: { ...DAMAGED_QTY_COLUMN },
@@ -746,8 +748,8 @@ export default function GoodsMiniTable({
    * FIVE COLUMNS LEFT, and none of the facts did.
    *   · `SKU` — the item and its configuration already identify the goods, and
    *     a code nobody types on this page took the width the item needs.
-   *   · `Ordered Qty` and `PO Safety Days` — `Purchase order details` below is
-   *     the table that is ABOUT documents, and the parent carries the margin.
+   *   · `Ordered Qty` and `PO Safety Days` — the row listing's `PO No` opens
+   *     each document's own page, and the parent carries the margin.
    *   · `To buy` — the remaining purchasing quantity belongs where the act is:
    *     the selection bar and the issue review, on the AUTHORITATIVE
    *     recomputation. Removing the column removed no coverage arithmetic and
@@ -928,8 +930,8 @@ export default function GoodsMiniTable({
         </colgroup>
         {/* LEVEL ONE — the parent header's own treatment. ⭐ S5 (owner
             follow-up 2026-09-16): the parent Registers moved to DataGrid's
-            `palette="slate"` header — slate-3 fill, slate-11 ink, 11px, 600,
-            NORMAL casing — so this child header follows them. The eye should
+            `palette="slate"` header — slate-3 fill, slate-11 ink, 12/500
+            (01 §2), NORMAL casing — so this child header follows them. The eye should
             not have to learn a second header style eight pixels below the
             first. */}
         <thead className="border-b border-kit-slate-5 bg-kit-slate-3">
@@ -941,15 +943,9 @@ export default function GoodsMiniTable({
               <th
                 key={c.key}
                 scope="col"
-                /* The parent header's treatment, spelled in TOKENS: `text-label`
-                   is the 11px the owner named, `text-base-500` its grey. The
-                   parent's 0.06em tracking is a CSS-module value with no token
-                   behind it, and inventing an arbitrary one here to chase the
-                   last hundredth of an em would put a new literal into a scale
-                   `01-design-tokens.md` has locked. Size, colour and case carry
-                   the match — and the weight is 600, because §2.2 deleted 700
-                   into 600 and the CSS module's own 700 predates that ruling. */
-                className={`px-2 py-1.5 text-label font-semibold text-kit-slate-11${
+                /* A table header is 12/500 in the label grey, sentence case
+                   (01 §2 and §5), the same pair as the parent list's header. */
+                className={`px-2 py-1.5 text-meta font-medium text-kit-slate-11${
                   purchasingGoodsLayout ? " align-bottom" : ""
                 }`}
                 /* ⭐ ONE HEADER HEIGHT FOR EVERY TABLE IN THE EXPANSION (§6.8).
@@ -1005,7 +1001,7 @@ export default function GoodsMiniTable({
                     return (
                       <div className="min-w-0" data-testid="so-goods-item">
                         <div className="truncate text-kit-slate-12" title={line.item}>{line.item}</div>
-                        <div className="mt-0.5 h-[14px] min-w-0 text-[11px] leading-[14px] text-kit-slate-11">
+                        <div className="mt-0.5 h-4 min-w-0 text-meta text-kit-slate-11">
                           {line.itemDetail ? <OverflowText text={line.itemDetail} label={line.item} /> : null}
                         </div>
                       </div>
@@ -1013,9 +1009,9 @@ export default function GoodsMiniTable({
                   }
                   return (
                     <>
-                      <div className="font-medium text-base-900">{line.item}</div>
+                      <div className="text-base-900">{line.item}</div>
                       {line.itemDetail ? (
-                        <div className="mt-0.5 text-base-600">{line.itemDetail}</div>
+                        <div className="mt-0.5 text-meta text-kit-slate-11">{line.itemDetail}</div>
                       ) : null}
                     </>
                   );
@@ -1120,7 +1116,7 @@ export default function GoodsMiniTable({
                 case "poUnit":
                   /* ⭐ ONE IDENTITY, TWO LINES. The document first, at the
                      box's 13px; the pieces it minted underneath at the
-                     governed 11px second-line treatment (ui MASTER §6.8).
+                     governed 12px second-line treatment (01 §2).
                      Whatever the owning page put in `unitNode` — a governed
                      absence, an integrity refusal, a read failure — is printed
                      as it stands: this box never decides what a missing Unit
@@ -1321,12 +1317,12 @@ export function UnitEvidence({ ids, unverified, mismatch, singleLineCodes = fals
   if (ids.length === 0 && unverified.length === 0) return <span data-absence="true" className="text-kit-slate-11">Not allocated</span>;
   if (ids.length === 1 && unverified.length === 0 && !mismatch) return <span className={singleLineCodes ? "block max-w-full overflow-x-auto whitespace-nowrap" : undefined} tabIndex={singleLineCodes ? 0 : undefined} title={singleLineCodes ? ids[0] : undefined}>{ids[0]}</span>;
   return <div>
-    <Popover label="Unit ID" trigger={<Button size="sm" variant="ghost">Unit ID ({ids.length + unverified.length})</Button>}>
+    <CPopover label="Unit ID" trigger={<Button size="sm" variant="ghost">Unit ID ({ids.length + unverified.length})</Button>}>
       <div className="max-h-64 overflow-y-auto text-body">
         {ids.map((id) => <div className={singleLineCodes ? "whitespace-nowrap" : undefined} key={id}>{id}</div>)}
         {unverified.length > 0 && <><p className="text-kit-amber-11">Unit ID link not verified</p>{unverified.map((id) => <div className={singleLineCodes ? "whitespace-nowrap" : undefined} key={id}>{id}</div>)}</>}
       </div>
-    </Popover>
+    </CPopover>
     {mismatch && <p className="text-meta text-kit-amber-11">Unit ID count exceeds order quantity</p>}
     {unverified.length > 0 && <p className="text-meta text-kit-amber-11">Unit ID link not verified</p>}
   </div>;

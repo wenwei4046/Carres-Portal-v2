@@ -557,7 +557,9 @@ describe("step3DateValid — delivery date gate (2026-05-22, Loo)", () => {
     d.delivery.date = isoToday(21);
     d.delivery.proceedDate = "";
     expect(step3DateValid(d, 14, TODAY)).toBe(false);
-    expect(step3DateFirstIssue(d, 14, TODAY)).toContain("Proceed date");
+    // Two dates, two names (owner ruling 2026-10-06): the planned date is
+    // `Planned production start`, never `Proceed date`.
+    expect(step3DateFirstIssue(d, 14, TODAY)).toBe("Planned production start: pick the day production should start");
   });
 
   it("rejects when proceed date is after the delivery date", () => {
@@ -565,7 +567,7 @@ describe("step3DateValid — delivery date gate (2026-05-22, Loo)", () => {
     d.delivery.date = isoToday(14);
     d.delivery.proceedDate = isoToday(20);
     expect(step3DateValid(d, 14, TODAY)).toBe(false);
-    expect(step3DateFirstIssue(d, 14, TODAY)).toContain("on or before");
+    expect(step3DateFirstIssue(d, 14, TODAY)).toBe("Planned production start: must be on or before the delivery date");
   });
 
   it("rejects when proceed date is in the past", () => {
@@ -574,6 +576,7 @@ describe("step3DateValid — delivery date gate (2026-05-22, Loo)", () => {
     d.delivery.proceedDate = isoToday(-3);
     expect(step3DateValid(d, 14, TODAY)).toBe(false);
     expect(step3DateFirstIssue(d, 14, TODAY)).toContain("past");
+    expect(step3DateFirstIssue(d, 14, TODAY)).toMatch(/^Planned production start: can't be in the past \(earliest /);
   });
 
   // 17 Sep 2026 — the gate counted from the UTC day. Before 08:00 in KL that is

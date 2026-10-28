@@ -1,26 +1,6 @@
-/**
- * Button — UI-KIT §6 Box Dictionary, card D0.5a.
- *
- * THREE variants, and the ladder is a colour law, not a taste:
- *   primary  — `blue-9` filled. Blue is §3.3's ONE job "action · clickable",
- *              and §3.4 bans two blue actions in one block, so a block gets
- *              exactly one of these.
- *   neutral  — white surface + `slate-5` hairline. Every other action.
- *   ghost    — no box at all. Tertiary (cancel, + add …).
- *
- * There is NO danger variant. §3.3 gives red one job — "late · act now" — and
- * §3.4 bans colour as decoration; a red button paints intent onto a control
- * instead of onto the state that earned it. A destructive action is a neutral
- * button whose WORD says what it does (COPY-STANDARD owns the word).
- *
- * **No `className`, no `style`, and that is the enforcement.** UI-KIT §0.1 says
- * a chat may not invent component styles; the way to make that true is to give
- * it nowhere to put one. Layout around the button is the caller's wrapper.
- *
- * HOVER follows §3.5 exactly: a colour-filled surface keeps its own colour and
- * darkens (`brightness-95`); an uncoloured one takes the single faint blue tint
- * — never grey, which is the RULE I ratchet in `check-design-standard.mjs`.
- */
+/** Shared Button. Appearance follows current 01 §3; callers retain action,
+ * permission, busy state and accessible names. Icon-only controls use the same
+ * semantic Icon adapter and forward their ref for menu/dialog focus return. */
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 import Icon, { type IconName } from "./Icon";
 import Loading from "./Loading";
@@ -28,30 +8,34 @@ import Loading from "./Loading";
 type Variant = "primary" | "neutral" | "ghost";
 type Size = "md" | "sm" | "touch";
 
+/* The main button is the `--c-main` token (01 §1, owner 11 Oct 2026): one per
+ * area, white text. A normal button is white with the grey input edge. */
 const VARIANT: Record<Variant, string> = {
-  primary: "bg-kit-blue-9 text-white border border-kit-blue-9 hover:brightness-95",
-  neutral: "bg-white text-kit-slate-12 border border-kit-slate-5 hover:bg-kit-slate-3",
-  ghost: "bg-transparent text-kit-slate-11 border border-transparent hover:bg-kit-slate-3",
+  primary: "bg-c-main text-white border border-c-main enabled:hover:brightness-125",
+  neutral: "bg-white text-c-ink border border-c-btn-border enabled:hover:bg-c-btn-hover",
+  ghost: "bg-transparent text-kit-slate-11 border border-transparent enabled:hover:bg-c-btn-hover",
 };
 
-/** 32px is the live control height every form row already aligns to; 24px is
- *  the dense band. Both are heights, not spacing — Q1 does not reach them.
+/** Keep the existing md32 toolbar contract during consumer migration; the
+ *  small role is28 per current01 §3.
  *  `touch` is the Work party-card button (owner density ruling 2026-09-25):
- *  36px from 768px, 40px below, where a finger presses it. */
+ *  36px from 768px, 44px below, where a finger presses it. */
 const SIZE: Record<Size, string> = {
-  md: "h-8 px-3 gap-2",
-  sm: "h-6 px-2 gap-1",
-  touch: "h-10 px-3 gap-1.5 min-[768px]:h-9",
+  md: "h-11 px-3 gap-2 min-[768px]:h-8",
+  sm: "h-11 px-2 gap-1 min-[768px]:h-7",
+  touch: "h-11 px-3 gap-1.5 min-[768px]:h-9",
 };
 
-const ICON_SIZE: Record<Size, 14 | 16> = { md: 16, sm: 14, touch: 14 };
+/* Icon legacy prop16 renders18; prop18 renders20. Preserve the adapter API. */
 
 export type ButtonProps = {
+  /** Page-tools trigger: 32px desktop, 44px touch, with an accessible name. */
+  iconOnly?: boolean;
   variant?: Variant;
   size?: Size;
   /**
    * `pill` = fully rounded ends (Jess, 2026-08-01 — the 2990 toolbar
-   * language). The default stays `rounded-control`; a pill is a SHAPE, never
+   * language). The default is the v4 8px corner (`rounded-lg`); a pill is a SHAPE, never
    * a fourth variant: colour and behaviour are untouched.
    */
   shape?: "control" | "pill";
@@ -64,7 +48,7 @@ export type ButtonProps = {
 
 /**
  * **It forwards its ref, and that is load-bearing rather than tidiness**
- * (added by D0.5b). `Modal`, `DropdownMenu`, `Popover` and `Tooltip` take a
+ * (added by D0.5b). `Modal`, `CMenu`, `Popover` and `Tooltip` take a
  * Button as their trigger and hand it Radix's behaviour through `asChild`,
  * which anchors the overlay on the trigger's own DOM node. A Button that eats
  * the ref makes every one of those open in the wrong place — silently, because
@@ -72,6 +56,7 @@ export type ButtonProps = {
  */
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   {
+    iconOnly = false,
     variant = "neutral",
     size = "md",
     shape = "control",
@@ -92,18 +77,19 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
       aria-busy={loading || undefined}
       data-kit="button"
       className={
-        `inline-flex items-center justify-center whitespace-nowrap ${shape === "pill" ? "rounded-full" : "rounded-control"} text-body font-medium ` +
+        `inline-flex items-center justify-center whitespace-nowrap ${iconOnly || shape === "pill" ? "rounded-full" : "rounded-lg"} text-body ${variant === "primary" ? "font-semibold" : "font-medium"} ` +
         "transition-[filter,background-color] " +
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 focus-visible:ring-offset-1 " +
-        "disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100 " +
-        `${VARIANT[variant]} ${SIZE[size]}`
+        "focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:2px] " +
+        "disabled:opacity-[0.45] disabled:cursor-not-allowed " +
+        `${iconOnly ? "border-0 bg-transparent text-c-body enabled:hover:bg-[var(--c-icon-hover)] enabled:active:bg-[var(--c-icon-press)] data-[state=open]:bg-[var(--c-icon-press)] data-[state=open]:enabled:hover:bg-[var(--c-icon-press)] h-11 w-11 p-0 min-[768px]:h-8 min-[768px]:w-8" : `${VARIANT[variant]} ${SIZE[size]}`}`
       }
       {...rest}
+      title={rest.title ?? (iconOnly ? rest["aria-label"] : undefined)}
     >
       {loading ? (
-        <Loading size={ICON_SIZE[size]} />
+        <Loading size={16} />
       ) : (
-        icon && <Icon name={icon} size={ICON_SIZE[size]} />
+        icon && <Icon name={icon} size={iconOnly ? 18 : 16} />
       )}
       {children}
     </button>

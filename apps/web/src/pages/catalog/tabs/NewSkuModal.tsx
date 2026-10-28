@@ -32,6 +32,7 @@ import {
 } from "@/lib/queries";
 import { INPUT_CLS, Modal, ModalActions } from "@/pages/operation/components/Modal";
 import { CATEGORY_LABEL, CodeChip } from "../components/atoms";
+import { ItemGroupField, useItemGroupPick } from "../components/ItemGroupField";
 import GuaranteeScopeFields, {
   EMPTY_GUARANTEE_SCOPE,
   type GuaranteeScopeValue,
@@ -222,6 +223,8 @@ export default function NewSkuModal({
     : null;
   // new-product fields
   const [category, setCategory] = useState<ProductCategory>("mattress");
+  // 0659 — the Finance item group a new product starts in (Finance MASTER §1).
+  const itemGroup = useItemGroupPick(category);
   /* 0442 — Catalog states how Stock identifies the new SKU: `exact_unit`
      (one permanent Unit ID per piece, born with the official PO) or
      `quantity` (counted goods, no Unit IDs). Saved EXPLICITLY with the SKU. */
@@ -777,8 +780,10 @@ export default function NewSkuModal({
             modelKey,
             name: name.trim(),
             sofaMode: "custom",
+            itemGroupId: itemGroup.itemGroupId,
           });
           sofaModelId = res.model.id;
+          if (res.itemGroupRefused) toast.error(res.itemGroupRefused);
           setCreatedModelId(sofaModelId); // lock identity; a retry only re-offers
         }
         const ids = compPool.filter((c) => selectedComps.has(c.id)).map((c) => c.id);
@@ -838,8 +843,10 @@ export default function NewSkuModal({
             modelKey,
             name: name.trim(),
             allowedOptions: { sizes },
+            itemGroupId: itemGroup.itemGroupId,
           });
           sizeModelId = res.model.id;
+          if (res.itemGroupRefused) toast.error(res.itemGroupRefused);
           setCreatedModelId(sizeModelId); // lock identity; a retry only re-generates
         }
         const r = await generateSkus.mutateAsync({
@@ -903,8 +910,10 @@ export default function NewSkuModal({
           category,
           modelKey,
           name: name.trim(),
+          itemGroupId: itemGroup.itemGroupId,
         });
         targetModelId = res.model.id;
+        if (res.itemGroupRefused) toast.error(res.itemGroupRefused);
         kind = variantKindFor(category);
       } else {
         targetModelId = existingModel!.id;
@@ -987,6 +996,10 @@ export default function NewSkuModal({
                 ))}
               </select>
             </label>
+            {/* 0659 — a guarantee always starts in its own group; it has no pick. */}
+            {!guaranteeFlow && (
+              <ItemGroupField pick={itemGroup} disabled={createdModelId !== null} id="new-sku-item-group" />
+            )}
             {guaranteeFlow ? (
               <>
                 {/* WHAT it covers — the whole point of a guarantee (Loo

@@ -1,7 +1,7 @@
 import SearchInput from "@/components/kit/SearchInput";
 import Select from "@/components/kit/Select";
 import {
-  dutyDisplayState,
+  currentDutyPerson,
   matchesDutySearch,
   matchesDutyState,
   type DutyStateFilter,
@@ -25,8 +25,6 @@ type Duty = WorkspaceDutiesResponse["duties"][number];
 /** COPY-STANDARD's four State words, in the order the rail reads them. */
 const STATE_OPTIONS: { value: DutyStateFilter; label: string }[] = [
   { value: "all", label: "All duties" },
-  { value: "covered_today", label: "Covered today" },
-  { value: "cover_scheduled", label: "Cover scheduled" },
   { value: "not_assigned", label: "Not assigned" },
 ];
 
@@ -108,7 +106,7 @@ export default function DutyCatalogue({
       ) : (
         <ul className="min-h-0 flex-1 overflow-y-auto py-1">
           {visible.map((d) => {
-            const note = dutyDisplayState(d, today);
+            const person = currentDutyPerson(d);
             const current = d.key === selectedKey;
             return (
               <li key={d.key}>
@@ -126,13 +124,9 @@ export default function DutyCatalogue({
                   </span>
                   <span className="mt-0.5 flex flex-wrap items-baseline gap-x-2">
                     <span className="text-meta text-kit-slate-11">
-                      {d.resolution.normal_user_name ?? "Not assigned"}
+                      {person ? `Assigned to ${person.name}` : "Not assigned"}
                     </span>
-                    {note.word && note.kind !== "not_assigned" ? (
-                      <span className="text-label text-kit-slate-9">
-                        {note.word}
-                      </span>
-                    ) : null}
+
                   </span>
                 </button>
               </li>

@@ -116,6 +116,39 @@ describe("ARDrawer", () => {
     expect(typeof body.idempotencyKey).toBe("string");
   });
 
+  it("0660 — Merchant asks the card machine, and the machine is the method sent", async () => {
+    vi.mocked(apiFetch).mockImplementation(async (url: string) => {
+      if (url.includes("/payment-settings/methods")) return { money_accounts: [], methods: [
+        { method: "bank", label: "Online transfer", account_code: "310-2000", account_name: "Bank", active: true, sort: 1 },
+        { method: "cash", label: "Cash", account_code: "320-0000", account_name: "Cash", active: true, sort: 2 },
+        { method: "merchant_pbb", label: "Merchant · PBB", account_code: "315-1000", account_name: "PBB", active: true, sort: 4 },
+        { method: "merchant_ghl", label: "Merchant · GHL", account_code: "315-2000", account_name: "GHL", active: true, sort: 5 },
+      ] };
+      if (url.includes("/order-receipt")) return { id: "p1" };
+      return [];
+    });
+    render(wrap(drawer()));
+    fireEvent.click(screen.getByRole("button", { name: "Record receipt" }));
+    const values = (label: string) => Array.from(screen.getByLabelText(label).querySelectorAll("option"))
+      .map((o) => [o.getAttribute("value"), o.textContent]);
+    // The registry's list, once it has loaded (Chew's list stands in before).
+    await waitFor(() => expect(values("Method"))
+      .toEqual([["bank", "Online transfer"], ["cash", "Cash"], ["merchant", "Merchant"]]));
+    expect(screen.queryByLabelText("Card machine")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Method"), { target: { value: "merchant" } });
+    expect(values("Card machine")).toEqual([["", "Card machine"], ["merchant_pbb", "PBB"], ["merchant_ghl", "GHL"]]);
+    // No machine yet: nothing to record.
+    expect(screen.getByRole("button", { name: "Confirm" })).toBeDisabled();
+    expect(screen.getByText("Approval code")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Card machine"), { target: { value: "merchant_ghl" } });
+    fireEvent.change(screen.getByLabelText("Reference"), { target: { value: "472019" } });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    await waitFor(() => expect(receiptBodies()).toHaveLength(1));
+    expect(receiptBodies()[0]).toMatchObject({ method: "merchant_ghl", reference: "472019", amount: 2500 });
+  });
+
   it("opens with the form closed, and with it showing when startRecording is set", () => {
     vi.mocked(apiFetch).mockResolvedValue(REGISTRY);
     const closed = render(wrap(drawer()));

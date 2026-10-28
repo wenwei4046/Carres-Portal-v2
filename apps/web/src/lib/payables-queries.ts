@@ -4,9 +4,12 @@ import {
   AP_FILE_MIME,
   type AdvanceApplyInput,
   type ApAccountChoice,
+  type BillForeignAmountInput,
   type ApBillOutstandingRow,
+  type ApOpeningBillRow,
   type ApCreditor,
   type ApOutstandingRow,
+  type BillDeliveryPartner,
   type GrnCandidateRow,
   type GrnLineRow,
   type MoneyBackInput,
@@ -18,6 +21,23 @@ import {
   type SupplierBillDocument,
   type SupplierBillDraftInput,
   type SupplierBillRegisterRow,
+  type SupplierCreditNoteDocument,
+  type SupplierCreditNoteDraftInput,
+  type SupplierCreditNoteRegisterRow,
+  type SupplierDebitNoteDocument,
+  type SupplierDebitNoteDraftInput,
+  type SupplierDebitNoteFollowups,
+  type SupplierDebitNoteRegisterRow,
+  type SupplierFinanceFormInput,
+  type SupplierFinanceRow,
+  type SupplierBillLineFollowup,
+  type SupplierCreditNoteFollowups,
+  type SupplierNoteContactInput,
+  type SupplierNoteFollowupAddInput,
+  type SupplierNoteFollowupDocument,
+  type SupplierNoteFollowupList,
+  type SupplierNoteSettleInput,
+  type SupplierNotesOwed,
 } from "@carres/shared/schemas/finance-ap";
 import { apiFetch, ApiError } from "./api";
 import { withDepartment } from "@/pages/finance/department";
@@ -42,15 +62,34 @@ export const payablesKeys = {
   outstanding: () => ["finance", "payables", "outstanding"] as const,
   billOutstanding: (supplierId: string | null) =>
     ["finance", "payables", "bill-outstanding", supplierId ?? "all"] as const,
+  /** 0705: a supplier's posted opening bills. */
+  openingBills: (supplierId: string | null) =>
+    ["finance", "payables", "opening-bills", supplierId ?? "all"] as const,
   bills: () => ["finance", "payables", "bills"] as const,
   bill: (id: string) => ["finance", "payables", "bill", id] as const,
   grnCandidates: (supplierId: string | null) =>
     ["finance", "payables", "grn-candidates", supplierId ?? "all"] as const,
   grnLines: (receiptId: string) => ["finance", "payables", "grn-lines", receiptId] as const,
+  /** 0689: each logistics partner's delivery orders a bill can still charge for. */
+  billDeliveryOrders: (billId: string | null) => ["finance", "payables", "bill-delivery-orders", billId ?? "new"] as const,
   vouchers: () => ["finance", "payables", "vouchers"] as const,
   voucher: (id: string) => ["finance", "payables", "voucher", id] as const,
   advances: (supplierId: string | null) =>
     ["finance", "payables", "advances", supplierId ?? "all"] as const,
+  /** 0636: Finance's own tax and bank details per supplier. */
+  supplierFinance: () => ["finance", "payables", "supplier-finance"] as const,
+  creditNotes: () => ["finance", "payables", "credit-notes"] as const,
+  creditNote: (id: string) => ["finance", "payables", "credit-note", id] as const,
+  /** 0681: supplier debit notes. */
+  debitNotes: () => ["finance", "payables", "debit-notes"] as const,
+  debitNote: (id: string) => ["finance", "payables", "debit-note", id] as const,
+  debitNoteNotes: (noteId: string) => ["finance", "payables", "debit-note-notes", noteId] as const,
+  /** 0676: the credit and debit notes suppliers still owe. */
+  notes: () => ["finance", "payables", "notes-to-follow-up"] as const,
+  note: (id: string) => ["finance", "payables", "note-to-follow-up", id] as const,
+  billNotes: (billId: string) => ["finance", "payables", "bill-notes", billId] as const,
+  creditNoteNotes: (noteId: string) => ["finance", "payables", "credit-note-notes", noteId] as const,
+  notesOwed: (supplierId: string) => ["finance", "payables", "notes-owed", supplierId] as const,
 };
 
 type Rows<T> = { rows: T[] };
@@ -85,6 +124,19 @@ export function useApBillOutstanding(supplierId: string | null, enabled = true) 
     queryFn: async () =>
       (await apiFetch<Rows<ApBillOutstandingRow>>(
         `${BASE}/bill-outstanding${supplierId ? `?supplierId=${encodeURIComponent(supplierId)}` : ""}`,
+      )).rows,
+    enabled,
+    staleTime: 15_000,
+  });
+}
+
+/** 0705: a supplier's posted opening bills (Opening balances), paid by voucher like a bill. */
+export function useApOpeningBills(supplierId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: payablesKeys.openingBills(supplierId),
+    queryFn: async () =>
+      (await apiFetch<Rows<ApOpeningBillRow>>(
+        `${BASE}/opening-bill-outstanding${supplierId ? `?supplierId=${encodeURIComponent(supplierId)}` : ""}`,
       )).rows,
     enabled,
     staleTime: 15_000,
@@ -128,11 +180,28 @@ export function usePaymentVouchers(dept = "") {
   });
 }
 
-export function usePaymentVoucher(id: string | undefined) {
-  return useQuery({
-    queryKey: payablesKeys.voucher(id ?? ""),
+/** One voucher's read — also fetched by the Payment Vouchers row menu's Print. */
+export function voucherQuery(id: string) {
+  return {
+    queryKey: payablesKeys.voucher(id),
     queryFn: () => apiFetch<PaymentVoucherDocument>(`${BASE}/vouchers/${id}`),
-    enabled: !!id,
+  };
+}
+
+export function usePaymentVoucher(id: string | undefined) {
+  return useQuery({ ...voucherQuery(id ?? ""), enabled: !!id });
+}
+
+/** 0689: each logistics partner and its delivery orders a bill can still
+ *  charge for; `billId` keeps the ones already on the bill being edited. */
+export function useBillDeliveryOrders(billId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: payablesKeys.billDeliveryOrders(billId),
+    queryFn: async () =>
+      (await apiFetch<Rows<BillDeliveryPartner>>(
+        `${BASE}/bills/delivery-orders${billId ? `?billId=${encodeURIComponent(billId)}` : ""}`,
+      )).rows,
+    enabled,
   });
 }
 
@@ -167,6 +236,40 @@ export function useBillAct() {
       apiFetch<{ id: string }>(`${BASE}/bills/${id}/${act}`, {
         method: "POST",
         body: act === "cancel" ? JSON.stringify({ reason }) : undefined,
+      }),
+    onSuccess: () => { void refresh(); },
+  });
+}
+
+/** 0636: every supplier with Finance's own tax and bank details (Chew 2026-10-03). */
+export function useSupplierFinance() {
+  return useQuery({
+    queryKey: payablesKeys.supplierFinance(),
+    queryFn: async () => (await apiFetch<Rows<SupplierFinanceRow>>(`${BASE}/supplier-finance`)).rows,
+  });
+}
+
+export function useSaveSupplierFinance() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ id: string }, ApiError, { supplierId: string; input: SupplierFinanceFormInput }>({
+    mutationFn: ({ supplierId, input }) =>
+      apiFetch<{ id: string }>(`${BASE}/supplier-finance/${supplierId}`, {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => { void refresh(); },
+  });
+}
+
+/** 0691 (Chew 2026-10-12): Finance changes a supplier's or other creditor's
+ *  code. Every payables read refreshes, so pickers and AP Aging show it. */
+export function useSaveCreditorCode() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ code: string }, ApiError, { supplierId: string; code: string }>({
+    mutationFn: ({ supplierId, code }) =>
+      apiFetch<{ code: string }>(`${BASE}/supplier-finance/${supplierId}/code`, {
+        method: "PUT",
+        body: JSON.stringify({ code }),
       }),
     onSuccess: () => { void refresh(); },
   });
@@ -247,6 +350,125 @@ export function useTakeAdvanceOff() {
   });
 }
 
+// ── supplier credit notes (0642; Chew 2026-10-03) ───────────────────────────
+
+export function useSupplierCreditNotes() {
+  return useQuery({
+    queryKey: payablesKeys.creditNotes(),
+    queryFn: async () => (await apiFetch<Rows<SupplierCreditNoteRegisterRow>>(`${BASE}/credit-notes`)).rows,
+    staleTime: 15_000,
+  });
+}
+
+export function useSupplierCreditNote(id: string | undefined) {
+  return useQuery({
+    queryKey: payablesKeys.creditNote(id ?? ""),
+    queryFn: () => apiFetch<SupplierCreditNoteDocument>(`${BASE}/credit-notes/${id}`),
+    enabled: !!id,
+  });
+}
+
+export function useSaveCreditNote() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ id: string }, ApiError, { id?: string; input: SupplierCreditNoteDraftInput }>({
+    mutationFn: ({ id, input }) =>
+      apiFetch<{ id: string }>(id ? `${BASE}/credit-notes/${id}` : `${BASE}/credit-notes`, {
+        method: id ? "PUT" : "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => { void refresh(); },
+  });
+}
+
+export function useCreditNoteAct() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ id: string }, ApiError, { id: string; act: BillAct; reason?: string }>({
+    mutationFn: ({ id, act, reason }) =>
+      apiFetch<{ id: string }>(`${BASE}/credit-notes/${id}/${act}`, {
+        method: "POST",
+        body: act === "cancel" ? JSON.stringify({ reason }) : undefined,
+      }),
+    onSuccess: () => { void refresh(); },
+  });
+}
+
+/** Knock part of a confirmed credit note off one of the supplier's bills. Posts nothing. */
+export function useApplyCredit() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ id: string }, ApiError, { noteId: string; input: AdvanceApplyInput }>({
+    mutationFn: ({ noteId, input }) =>
+      apiFetch<{ id: string }>(`${BASE}/credit-notes/${noteId}/applications`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => { void refresh(); },
+  });
+}
+
+export function useTakeCreditOff() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ id: string }, ApiError, { applicationId: string; reason: string }>({
+    mutationFn: ({ applicationId, reason }) =>
+      apiFetch<{ id: string }>(`${BASE}/credit-note-applications/${applicationId}/cancel`, {
+        method: "POST",
+        body: JSON.stringify({ reason }),
+      }),
+    onSuccess: () => { void refresh(); },
+  });
+}
+
+/** 0682: record, change or remove the currency a supplier invoiced in. A record only. */
+export function useSetBillForeignAmount() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ id: string }, ApiError, { id: string; input: BillForeignAmountInput }>({
+    mutationFn: ({ id, input }) =>
+      apiFetch<{ id: string }>(`${BASE}/bills/${id}/foreign-amount`, { method: "PUT", body: JSON.stringify(input) }),
+    onSuccess: () => { void refresh(); },
+  });
+}
+
+// ── supplier debit notes (0681; Chew 2026-10-03) ────────────────────────────
+
+export function useSupplierDebitNotes() {
+  return useQuery({
+    queryKey: payablesKeys.debitNotes(),
+    queryFn: async () => (await apiFetch<Rows<SupplierDebitNoteRegisterRow>>(`${BASE}/debit-notes`)).rows,
+    staleTime: 15_000,
+  });
+}
+
+export function useSupplierDebitNote(id: string | undefined) {
+  return useQuery({
+    queryKey: payablesKeys.debitNote(id ?? ""),
+    queryFn: () => apiFetch<SupplierDebitNoteDocument>(`${BASE}/debit-notes/${id}`),
+    enabled: !!id,
+  });
+}
+
+export function useSaveDebitNote() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ id: string }, ApiError, { id?: string; input: SupplierDebitNoteDraftInput }>({
+    mutationFn: ({ id, input }) =>
+      apiFetch<{ id: string }>(id ? `${BASE}/debit-notes/${id}` : `${BASE}/debit-notes`, {
+        method: id ? "PUT" : "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => { void refresh(); },
+  });
+}
+
+export function useDebitNoteAct() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ id: string }, ApiError, { id: string; act: BillAct; reason?: string }>({
+    mutationFn: ({ id, act, reason }) =>
+      apiFetch<{ id: string }>(`${BASE}/debit-notes/${id}/${act}`, {
+        method: "POST",
+        body: act === "cancel" ? JSON.stringify({ reason }) : undefined,
+      }),
+    onSuccess: () => { void refresh(); },
+  });
+}
+
 export function useRecordMoneyBack() {
   const refresh = useInvalidatePayables();
   return useMutation<{ id: string }, ApiError, { voucherId: string; input: MoneyBackInput }>({
@@ -271,7 +493,7 @@ export function useCancelMoneyBack() {
   });
 }
 
-export type ApDocKind = "bills" | "vouchers";
+export type ApDocKind = "bills" | "vouchers" | "credit-notes" | "debit-notes";
 
 /**
  * Attach one file to a bill or a voucher — the repo's signed-upload pattern:
@@ -313,4 +535,106 @@ export function useUploadApFile(kind: ApDocKind, id: string) {
 export async function openApFile(path: string): Promise<void> {
   const { url } = await apiFetch<{ url: string }>(`${BASE}/files/url?path=${encodeURIComponent(path)}`);
   window.open(url, "_blank", "noopener");
+}
+
+// ── credit and debit notes to follow up (0676) ──────────────────────────────
+
+export function useNotesToFollowUp() {
+  return useQuery({
+    queryKey: payablesKeys.notes(),
+    queryFn: () => apiFetch<SupplierNoteFollowupList>(`${BASE}/notes-to-follow-up`),
+    staleTime: 15_000,
+  });
+}
+
+export function useNoteToFollowUp(id: string | undefined) {
+  return useQuery({
+    queryKey: payablesKeys.note(id ?? ""),
+    queryFn: () => apiFetch<SupplierNoteFollowupDocument>(`${BASE}/notes-to-follow-up/${id}`),
+    enabled: !!id,
+  });
+}
+
+/** A confirmed bill's lines and their notes owed. */
+export function useBillNotesToFollowUp(billId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: payablesKeys.billNotes(billId ?? ""),
+    queryFn: async () => (await apiFetch<Rows<SupplierBillLineFollowup>>(`${BASE}/bills/${billId}/notes-to-follow-up`)).rows,
+    enabled: !!billId && enabled,
+  });
+}
+
+/** A credit note's settlements, and its supplier's credit notes still owed. */
+export function useCreditNoteNotesToFollowUp(noteId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: payablesKeys.creditNoteNotes(noteId ?? ""),
+    queryFn: () => apiFetch<SupplierCreditNoteFollowups>(`${BASE}/credit-notes/${noteId}/notes-to-follow-up`),
+    enabled: !!noteId && enabled,
+  });
+}
+
+/** 0681: a debit note's settlements, and its supplier's debit notes still owed. */
+export function useDebitNoteNotesToFollowUp(noteId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: payablesKeys.debitNoteNotes(noteId ?? ""),
+    queryFn: () => apiFetch<SupplierDebitNoteFollowups>(`${BASE}/debit-notes/${noteId}/notes-to-follow-up`),
+    enabled: !!noteId && enabled,
+  });
+}
+
+/** What a supplier still owes, for the voucher's reminder. */
+export function useSupplierNotesOwed(supplierId: string | null) {
+  return useQuery({
+    queryKey: payablesKeys.notesOwed(supplierId ?? ""),
+    queryFn: () => apiFetch<SupplierNotesOwed>(`${BASE}/notes-to-follow-up/owed?supplierId=${supplierId}`),
+    enabled: !!supplierId,
+    staleTime: 15_000,
+  });
+}
+
+export function useAddNoteToFollowUp() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ id: string }, ApiError, SupplierNoteFollowupAddInput>({
+    mutationFn: (input) =>
+      apiFetch<{ id: string }>(`${BASE}/notes-to-follow-up`, { method: "POST", body: JSON.stringify(input) }),
+    onSuccess: () => { void refresh(); },
+  });
+}
+
+export function useAddNoteContact() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ id: string }, ApiError, { id: string; input: SupplierNoteContactInput }>({
+    mutationFn: ({ id, input }) =>
+      apiFetch<{ id: string }>(`${BASE}/notes-to-follow-up/${id}/contacts`, { method: "POST", body: JSON.stringify(input) }),
+    onSuccess: () => { void refresh(); },
+  });
+}
+
+export function useCloseNoteToFollowUp() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ id: string }, ApiError, { id: string; reason: string }>({
+    mutationFn: ({ id, reason }) =>
+      apiFetch<{ id: string }>(`${BASE}/notes-to-follow-up/${id}/close`, { method: "POST", body: JSON.stringify({ reason }) }),
+    onSuccess: () => { void refresh(); },
+  });
+}
+
+/** A confirmed credit note settles a credit note owed, or (0681) a confirmed
+ *  debit note a debit note owed. Posts nothing. */
+export function useSettleNoteToFollowUp() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ id: string }, ApiError, { id: string; input: SupplierNoteSettleInput }>({
+    mutationFn: ({ id, input }) =>
+      apiFetch<{ id: string }>(`${BASE}/notes-to-follow-up/${id}/settlements`, { method: "POST", body: JSON.stringify(input) }),
+    onSuccess: () => { void refresh(); },
+  });
+}
+
+export function useTakeNoteSettlementOff() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ id: string }, ApiError, { settlementId: string; reason: string }>({
+    mutationFn: ({ settlementId, reason }) =>
+      apiFetch<{ id: string }>(`${BASE}/note-settlements/${settlementId}/take-off`, { method: "POST", body: JSON.stringify({ reason }) }),
+    onSuccess: () => { void refresh(); },
+  });
 }

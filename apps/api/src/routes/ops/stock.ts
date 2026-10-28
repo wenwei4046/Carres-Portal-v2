@@ -36,12 +36,16 @@ import {
   unitAvailability,
   unitLifecycleOutcome,
   canonicalUnitIdFrom,
+  stockCardLines,
 } from "@carres/shared";
+import { z } from "zod";
 import {
   buildIssueEnglish,
   unitCountAgainAction,
   unitProblemAction,
   unitProblemChoice,
+  deliveryHolidaySet,
+  warehouseAddOperatingDays,
   unitProblemIntake,
   unitProblemReportInputSchema,
   type UnitProblemUnit,
@@ -54,6 +58,8 @@ import { attemptDeliveryOrderIssue, todayIsoMYT } from "../../lib/delivery-order
 import { myDuties } from "../../lib/duties";
 import { skuCategories } from "../../lib/sku-categories";
 import { userClient } from "../../lib/supabase";
+import { readWarehouseReceivingSettings } from "../../lib/warehouse-receiving-calendar";
+import { readDeliveryCalendar } from "../../lib/delivery-calendar";
 import type { AppEnv } from "../../types";
 import { parseBody } from "../../lib/route-helpers";
 import { resolveActorNames } from "../../lib/actor-names";
@@ -202,7 +208,7 @@ opsStockRouter.get("/inventory", requireOperationOrPrincipal, async (c) => {
 opsStockRouter.get("/register", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
 
-  const { data, error } = await sb
+  let query = sb
     .from("stock_unit_register_v")
     .select(
       "id, unit_code, sku, category, warehouse_id, site_name, holder_party_id, " +
@@ -211,6 +217,11 @@ opsStockRouter.get("/register", requireOperationOrPrincipal, async (c) => {
         "availability, lifecycle_outcome, last_event_at, last_event, identity_scope",
     )
     .order("unit_code", { ascending: true });
+  // Internal readers retain their existing role/RLS boundary. Narrow before
+  // enrichment/export so a Showroom surface receives its owning Site only.
+  const site = c.req.query("site");
+  if (site) query = query.eq("site_name", site);
+  const { data, error } = await query;
   if (error) throw mapErr(error);
 
   const units = (data ?? []).map((r) => {
@@ -389,7 +400,7 @@ const UNIT_ACTION_SELECT =
   "hold_reason, reserved_ref, sold_order_id, availability, identity_scope";
 
 /** The exact Unit behind a `⋮` act — by its permanent ID, never a counted row. */
-async function unitForAction(sb: ReturnType<typeof userClient>, unitCode: string): Promise<UnitProblemUnit & { needsRepair: boolean }> {
+async function unitForAction(sb: ReturnType<typeof userClient>, unitCode: string): Promise<UnitProblemUnit & { needsRepair: boolean; siteId: string | null }> {
   const code = unitCode.replace(/([\\%_])/g, "\\$1");
   const { data: found, error } = await sb.from("stock_unit_register_v").select(UNIT_ACTION_SELECT).ilike("unit_code", code).maybeSingle();
   if (error) throw mapErr(error);
@@ -407,8 +418,27 @@ async function unitForAction(sb: ReturnType<typeof userClient>, unitCode: string
     reservedRef: (data.reserved_ref as string | null) ?? null,
     soldOrderId: (data.sold_order_id as string | null) ?? null,
     siteName: (data.site_name as string | null) ?? null,
+    siteId: (data.warehouse_id as string | null) ?? null,
     needsRepair: Boolean(data.needs_repair),
   };
+}
+
+/**
+ * A Unit check is GRN Duty's work AT the Unit's Site, so it is due the next
+ * day that Site works — on the Site's own calendar (Warehouse Settings
+ * hours, special dates, holiday policy). A day nobody configured falls back,
+ * explicitly, to the governed Warehouse week: Sunday off + the Selangor
+ * holidays (the stored Warehouse calendar the Delivery calendar reads, else
+ * the built-in list). Never the Office calendar.
+ */
+async function siteWorkingDayStep(sb: ReturnType<typeof userClient>, siteId: string | null) {
+  const [siteSettings, delivery] = await Promise.all([
+    readWarehouseReceivingSettings(sb, siteId ? [siteId] : []),
+    readDeliveryCalendar(sb),
+  ]);
+  const settings = siteId ? siteSettings.get(siteId) ?? null : null;
+  const fallback = deliveryHolidaySet(delivery.calendar);
+  return (from: string, n: number) => warehouseAddOperatingDays(from, n, "receiving", settings, fallback);
 }
 
 /** The open Issues that name this Unit, with their current action. */
@@ -473,7 +503,7 @@ opsStockRouter.post("/register/:unitCode/report-problem", requireOperationOrPrin
   const names = await resolveActorNames(sb, [c.var.auth.id]);
   const foundByName = names.get(c.var.auth.id) ?? c.var.auth.email ?? "Warehouse";
   const intake = unitProblemIntake(unit, parsed, foundByName, observedOn);
-  const action = unitProblemAction(unit, parsed.problem, today);
+  const action = unitProblemAction(unit, parsed.problem, today, await siteWorkingDayStep(sb, unit.siteId));
   const { data, error } = await sb.rpc("stock_unit_report_problem", {
     p_request_id: parsed.requestId,
     p_item_id: unit.id,
@@ -528,7 +558,7 @@ opsStockRouter.post("/register/:unitCode/count-again", requireOperationOrPrincip
   if (!notFound?.currentAction) {
     throw new HTTPException(409, { message: "No open Not found report names this Unit" });
   }
-  const next = unitCountAgainAction(unit, todayIsoMYT());
+  const next = unitCountAgainAction(unit, todayIsoMYT(), await siteWorkingDayStep(sb, unit.siteId));
   const { data, error } = await sb.rpc("issue_record_action_result", {
     p_issue_id: notFound.id,
     p_action_id: notFound.currentAction.id,
@@ -566,7 +596,8 @@ opsStockRouter.get("/supplier-returns", requireOperationOrPrincipal, async (c) =
   const { data: docs, error: docErr } = await sb
     .from("purchase_returns")
     .select("id, pr_no, pr_doc_date, confirmed_pickup_date, supplier_id")
-    .in("id", open);
+    .in("id", open)
+    .is("cancelled_at", null);
   if (docErr) throw mapErr(docErr);
   const supplierIds = [...new Set((docs ?? []).map((d) => d.supplier_id as string))];
   const { data: suppliers, error: supErr } = supplierIds.length
@@ -1418,6 +1449,7 @@ function nextMonth(period: string): string {
 function mapErr(error: { code?: string; message?: string }): HTTPException {
   if (error.code === "42501") return new HTTPException(403, { message: error.message ?? "Forbidden" });
   if (error.code === "22023") return new HTTPException(400, { message: error.message ?? "Invalid" });
+  if (error.code === "23505") return new HTTPException(409, { message: error.message ?? "Already exists" });
   // 0366 — P0001 is how EVERY governed door on this router says no: the unit is
   // not free, it is not in repair, a bulk record cannot carry one customer's
   // promise, that Site does not exist, a total is derived and never written.
@@ -1433,5 +1465,124 @@ function mapErr(error: { code?: string; message?: string }): HTTPException {
   }
   return new HTTPException(500, { message: error.message ?? "ops_stock RPC failed" });
 }
+
+// =====================================================================
+// HOUZS-WAY WAREHOUSE VIEWS — Weisiang's decision (Mr Lim, WhatsApp
+// 2026-10-22): "just clear Carress rules and Implement Houzs inside". Jess was
+// not part of this decision. Racks and Bins per Site (0718), and a Stock Card
+// per item replayed from the existing Unit lineage. Still ONE ledger: a Bin is
+// a column on the Unit and the Stock Card is read from `stock_unit_events`.
+// =====================================================================
+
+/** GET /bins?site=<warehouseId> — every Bin at a Site with the Units in it now. */
+// Follows Houzs backend/src/scm/routes/warehouse.ts:429-432 (Racks per warehouse)
+// per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+opsStockRouter.get("/bins", requireOperationOrPrincipal, async (c) => {
+  const site = c.req.query("site");
+  if (!site) throw new HTTPException(400, { message: "Choose a Site" });
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const [binsR, unitsR] = await Promise.all([
+    sb.from("warehouse_bins").select("id, rack, bin").eq("warehouse_id", site).order("rack").order("bin"),
+    // ponytail: a Unit that left the Site keeps its old bin_id; only Units
+    // still on hand at this Site are counted, so a stale bin never shows.
+    sb.from("ops_stock_items")
+      .select("unit_code, sku, status, needs_repair, hold_reason, bin_id")
+      .eq("warehouse_id", site)
+      .not("bin_id", "is", null),
+  ]);
+  if (binsR.error) throw mapErr(binsR.error);
+  if (unitsR.error) throw mapErr(unitsR.error);
+  const inBin = new Map<string, Array<{ unitCode: string; sku: string; availability: string }>>();
+  for (const u of (unitsR.data ?? []) as Array<Record<string, unknown>>) {
+    const availability = unitAvailability({
+      status: u.status as string,
+      needsRepair: Boolean(u.needs_repair),
+      holdReason: (u.hold_reason as string | null) ?? null,
+    });
+    if (availability === "ended" || availability === "incoming" || availability === "in_transit") continue;
+    const list = inBin.get(u.bin_id as string) ?? [];
+    list.push({ unitCode: u.unit_code as string, sku: u.sku as string, availability });
+    inBin.set(u.bin_id as string, list);
+  }
+  return c.json({
+    bins: ((binsR.data ?? []) as Array<{ id: string; rack: string; bin: string }>).map((b) => ({
+      ...b,
+      units: inBin.get(b.id) ?? [],
+    })),
+  });
+});
+
+const binAddInput = z.object({
+  siteId: z.string().uuid(),
+  rack: z.string().trim().min(1, "give a rack"),
+  bin: z.string().trim().min(1, "give a bin"),
+});
+
+/** POST /bins — add a Bin on a Rack at a Site (Warehouse Settings people). */
+opsStockRouter.post("/bins", requireOperationOrPrincipal, async (c) => {
+  const body = await parseBody(c, binAddInput);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("warehouse_bin_add", {
+    p_warehouse_id: body.siteId,
+    p_rack: body.rack,
+    p_bin: body.bin,
+  });
+  if (error) throw mapErr(error);
+  return c.json({ id: data as string });
+});
+
+const unitBinInput = z.object({ binId: z.string().uuid().nullable() });
+
+/** POST /register/:unitCode/bin — put a Unit in a Bin, or take it out (null). */
+opsStockRouter.post("/register/:unitCode/bin", requireOperationOrPrincipal, async (c) => {
+  const body = await parseBody(c, unitBinInput);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.rpc("stock_unit_set_bin", {
+    p_unit_code: canonicalUnitIdFrom(c.req.param("unitCode")) ?? c.req.param("unitCode"),
+    p_bin_id: body.binId,
+  });
+  if (error) throw mapErr(error);
+  return c.json({ ok: true });
+});
+
+/** GET /stock-card?sku=&site= — one item's Stock Card from the Unit lineage. */
+// Follows Houzs frontend/src/pages/scm-v2/StockCard.tsx:2-4 (per-SKU ledger,
+// optional warehouse scope) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+opsStockRouter.get("/stock-card", requireOperationOrPrincipal, async (c) => {
+  const sku = c.req.query("sku");
+  if (!sku) throw new HTTPException(400, { message: "Choose an item" });
+  const site = c.req.query("site") || null;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data: unitRows, error } = await sb
+    .from("stock_unit_register_v")
+    .select("id, unit_code, warehouse_id, qty, identity_scope")
+    .eq("sku", sku);
+  if (error) throw mapErr(error);
+  const units = ((unitRows ?? []) as Array<Record<string, unknown>>).map((u) => ({
+    id: u.id as string,
+    unitCode: u.identity_scope === "quantity" ? null : (u.unit_code as string),
+    qty: (u.qty as number | null) ?? 1,
+    siteId: (u.warehouse_id as string | null) ?? null,
+  }));
+  if (units.length === 0) return c.json({ sku, lines: [] });
+  // ponytail: one `in` list of every Unit of the item; page it when an item
+  // passes a few hundred Units.
+  const { data: evRows, error: evErr } = await sb
+    .from("stock_unit_events")
+    .select("unit_id, seq, event, from_value, to_value, event_at")
+    .in("unit_id", units.map((u) => u.id))
+    .in("event", ["unit_born", "status_changed", "site_changed"])
+    .order("seq", { ascending: true });
+  if (evErr) throw mapErr(evErr);
+  const events = ((evRows ?? []) as Array<Record<string, unknown>>).map((e) => ({
+    unitId: e.unit_id as string,
+    seq: Number(e.seq),
+    event: e.event as string,
+    fromValue: (e.from_value as string | null) ?? null,
+    toValue: (e.to_value as string | null) ?? null,
+    eventAt: e.event_at as string,
+  }));
+  return c.json({ sku, lines: stockCardLines(units, events, site) });
+});
 
 export default opsStockRouter;

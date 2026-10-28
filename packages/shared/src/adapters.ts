@@ -258,6 +258,18 @@ export const catalogFabricFromRow = (r: DB.CatalogFabricRow): D.CatalogFabric =>
   active: r.active,
   sortOrder: Number(r.sort_order),
   cost: r.cost == null ? null : Number(r.cost),
+  stock: {
+    priceSen: Number(r.price_sen ?? 0),
+    sohSen: Number(r.soh_sen ?? 0),
+    poOutstandingSen: Number(r.po_outstanding_sen ?? 0),
+    lastMonthUsageSen: Number(r.last_month_usage_sen ?? 0),
+    oneWeekUsageSen: Number(r.one_week_usage_sen ?? 0),
+    twoWeeksUsageSen: Number(r.two_weeks_usage_sen ?? 0),
+    oneMonthUsageSen: Number(r.one_month_usage_sen ?? 0),
+    shortageSen: Number(r.shortage_sen ?? 0),
+    reorderPointSen: Number(r.reorder_point_sen ?? 0),
+    leadTimeDays: Number(r.lead_time_days ?? 0),
+  },
 });
 
 const FABRIC_TIERS: readonly D.FabricTier[] = ["PRICE_1", "PRICE_2", "PRICE_3"];

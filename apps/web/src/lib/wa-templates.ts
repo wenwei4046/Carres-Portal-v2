@@ -163,7 +163,7 @@ export function buildLogisticChase(i: LogisticChaseInput): string {
     factLine("REF", i.ref) +
     factLine("Customer", i.customer, i.region ? ` (${i.region})` : "") +
     factLine("Item", itemsBlock(i.lines)) +
-    `Deadline: ${i.deadline}${i.overdue ? " (overdue)" : ""}\n` +
+    `Deadline: ${i.deadline}${i.overdue ? " · passed" : ""}\n` +
     `\n` +
     `Please confirm the delivery date + time slot with the customer today. Thank you!`
   );
@@ -347,7 +347,7 @@ export function buildPartnerGroupMessage(
       const who = r.customer ? `${r.customer}${r.region ? ` (${r.region})` : ""}` : "";
       const head = [r.ref ? `_${r.ref}_` : "", who].filter(Boolean).join(" · ");
       const items = itemsBlock(r.items);
-      const when = `by ${r.deadline}${r.overdue ? " (overdue)" : ""}`;
+      const when = `by ${r.deadline}${r.overdue ? " · passed" : ""}`;
       return [head, items, when].filter(Boolean).join("\n");
     })
     .join("\n\n");

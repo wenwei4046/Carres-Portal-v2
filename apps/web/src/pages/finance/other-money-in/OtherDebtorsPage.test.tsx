@@ -64,9 +64,13 @@ describe("Other debtors — the invoice Register", () => {
     await screen.findByText("ARI-20260915-4821");
     expect(screen.getByTestId("other-debtors-destination-header")).toHaveTextContent("Other debtors");
     const table = screen.getByRole("table");
-    for (const label of ["Invoice No", "Invoice Date", "Party", "What for", "Total", "Outstanding", "Due Date", "Status"]) {
+    for (const label of ["Invoice No", "Invoice Date", "Party", "Total", "Outstanding", "Due Date", "Status"]) {
       expect(within(table).getAllByText(label).length).toBeGreaterThan(0);
     }
+    // What for waits in Columns at first (Chew 2026-10-14).
+    expect(screen.queryByText("Office rent September and 1 more")).not.toBeInTheDocument();
+    (fireEvent.click(screen.getByRole("button", { name: "Page tools" })), fireEvent.click(screen.getByRole("menuitem", { name: "Columns" })));
+    fireEvent.click(screen.getByRole("checkbox", { name: "What for" }));
     expect(screen.getByText("Draft, no number yet")).toBeInTheDocument();
     expect(screen.getByText("Not issued yet")).toBeInTheDocument();
     expect(screen.getByText("RM 900.00")).toBeInTheDocument();
@@ -95,6 +99,24 @@ describe("Other debtors — the invoice Register", () => {
     expect(screen.getByRole("button", { name: "Issue invoice" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save draft" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Cancel invoice" })).not.toBeInTheDocument();
+  });
+
+  it("the switch is the shared one: this list is the current page, the other is a link", async () => {
+    show("/finance/other-debtors");
+    await screen.findByText("ARI-20260915-4821");
+    const nav = screen.getByRole("navigation", { name: "Other debtors" });
+    expect(within(nav).getByText("Invoices")).toHaveAttribute("aria-current", "page");
+    expect(within(nav).queryByRole("link", { name: "Invoices" })).not.toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: "Parties" })).toHaveAttribute("href", "/finance/other-debtors?view=parties");
+  });
+
+  it("with no party on file the Party control is shut, so no empty list opens", async () => {
+    net.routes["GET /parties"] = [];
+    show("/finance/other-debtors?invoice=new");
+    await screen.findByTestId("other-debtor-invoice-form");
+    const party = await screen.findByRole("combobox", { name: /Party/ });
+    await waitFor(() => expect(party).toHaveTextContent("No party yet. Add one on Parties"));
+    expect(party).toBeDisabled();
   });
 
   it("refuses an empty new invoice before any round trip", async () => {
@@ -187,13 +209,42 @@ describe("Other debtors — the party Register", () => {
     show("/finance/other-debtors?view=parties");
     await screen.findByText("Example Director");
     expect(screen.getByText("Example Sister Sdn Bhd")).toBeInTheDocument();
+    // SSM or IC number and Phone wait in Columns at first (Chew 2026-10-14).
+    expect(screen.queryByText("No number on file")).not.toBeInTheDocument();
+    (fireEvent.click(screen.getByRole("button", { name: "Page tools" })), fireEvent.click(screen.getByRole("menuitem", { name: "Columns" })));
+    expect(screen.getByRole("checkbox", { name: "Phone" })).not.toBeChecked();
+    fireEvent.click(screen.getByRole("checkbox", { name: "SSM or IC number" }));
     expect(screen.getByText("No number on file")).toBeInTheDocument();
+    (fireEvent.click(screen.getByRole("button", { name: "Page tools" })), fireEvent.click(screen.getByRole("menuitem", { name: "Columns" })));
     expect(screen.getByTestId("other-debtor-parties-summary")).toHaveTextContent("2 parties · RM 900.00 outstanding");
+    const nav = screen.getByRole("navigation", { name: "Other debtors" });
+    expect(within(nav).getByText("Parties")).toHaveAttribute("aria-current", "page");
+    expect(within(nav).getByRole("link", { name: "Invoices" })).toHaveAttribute("href", "/finance/other-debtors");
     fireEvent.click(screen.getByRole("button", { name: "New party" }));
     const dialog = await screen.findByRole("dialog");
     fireEvent.change(within(dialog).getByLabelText(/Name/), { target: { value: "Example Landlord Sdn Bhd" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Save party" }));
     await waitFor(() => expect(sent("POST /parties")).toHaveLength(1));
     expect(sent("POST /parties")[0].body).toMatchObject({ name: "Example Landlord Sdn Bhd", kind: "company" });
+  });
+
+  /* 0691 (Chew 2026-10-12, 「A 可以」): a party's code, first; Finance may change it. */
+  it("shows each party's code first, and a changed code is sent before the party", async () => {
+    net.routes["GET /parties"] = PARTIES.map((p, i) => ({ ...p, code: i === 0 ? "305-E001" : "305-E002" }));
+    net.routes[`PUT /parties/${P1}/code`] = { code: "305-S001" };
+    net.routes[`PATCH /parties/${P1}`] = { id: P1 };
+    show("/finance/other-debtors?view=parties");
+    await screen.findByText("Example Sister Sdn Bhd");
+    const heads = screen.getAllByRole("columnheader").map((h) => h.textContent?.trim()).filter(Boolean);
+    expect(heads[0]).toBe("Code");
+    expect(screen.getByText("305-E001")).toBeInTheDocument();
+    fireEvent.doubleClick(screen.getByText("Example Sister Sdn Bhd"));
+    const dialog = await screen.findByRole("dialog");
+    const code = within(dialog).getByLabelText("Code");
+    expect(code).toHaveValue("305-E001");
+    fireEvent.change(code, { target: { value: "305-s001" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save party" }));
+    await waitFor(() => expect(sent(`PATCH /parties/${P1}`)).toHaveLength(1));
+    expect(sent(`PUT /parties/${P1}/code`)[0].body).toEqual({ code: "305-S001" });
   });
 });

@@ -14,11 +14,13 @@
  *   style expectations below stop erroring and `tsc` reports six unused
  *   `@ts-expect-error` directives. Nothing else moves.
  */
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import Badge from "./Badge";
 import Button from "./Button";
-import Card from "./Card";
 import EmptyState from "./EmptyState";
 import Icon, { ICON_NAMES } from "./Icon";
 import Input from "./Input";
@@ -27,7 +29,7 @@ import Panel from "./Panel";
 import SearchInput from "./SearchInput";
 import StatusPill from "./StatusPill";
 import Textarea from "./Textarea";
-import { TONE_CLASS, TONES, TYPE_TOKENS } from "./tokens";
+import { STATUS_PILL_CLASS, TONE_CLASS, TONES, TYPE_TOKENS } from "./tokens";
 
 /* ───────────────────────────────────────────────────────────────────────────
  * 1 · Component API — a chat cannot restyle a kit component (UI-KIT §0.1)
@@ -50,8 +52,6 @@ describe("no kit component accepts a style override", () => {
     // @ts-expect-error — className is not a prop of a kit component
     void <Badge className="bg-black">1</Badge>;
     // @ts-expect-error — className is not a prop of a kit component
-    void <Card className="p-10">x</Card>;
-    // @ts-expect-error — className is not a prop of a kit component
     void <Panel title="t" className="p-10">x</Panel>;
     // @ts-expect-error — className is not a prop of a kit component
     void <EmptyState title="t" className="p-10" />;
@@ -73,7 +73,7 @@ describe("closed sets", () => {
     void <Icon name="edit" size={20} />;
     // @ts-expect-error — §3.6 lists a sixth "money" tone; OrderActionTone has five (reported)
     void <StatusPill tone="money">RM 2,000</StatusPill>;
-    // @ts-expect-error — a pill takes a STATUS glyph, not an action one
+    // @ts-expect-error — solid status pills do not accept decorative icons
     void <StatusPill tone="info" icon="add">x</StatusPill>;
     // @ts-expect-error — Badge has no tone: a coloured badge is a status in disguise
     void <Badge tone="danger">3</Badge>;
@@ -84,13 +84,17 @@ describe("closed sets", () => {
     expect(true).toBe(true);
   });
 
-  it("carries the 40 original meanings plus seven registered additions, and renders the mapped glyph", () => {
+  it("carries the admitted icon meanings and renders the mapped glyph", () => {
     // 40 = §5.3 verbatim; +3 = mattress · bedframe · sofa (Loo, 2026-07-31,
     // the To Order rail); +1 = columnFilter (Jess, 2026-08-01, the Excel ▼).
     // +2 = pillow · protector for the owner-approved line-by-line calendar cards.
     // +1 = mail, the Email door in Work's Communication (Workspace §5.10
     // BUILD SHEET, Jess 2026-09-28).
-    expect(ICON_NAMES).toHaveLength(51);
+    // Table and Cards are admitted by the owner-approved2026-10-01 template amendment.
+    expect(ICON_NAMES).toHaveLength(54);
+    expect(ICON_NAMES).toContain("jump");
+    expect(ICON_NAMES).toContain("table");
+    expect(ICON_NAMES).toContain("cards");
     expect(ICON_NAMES).toContain("mail");
     expect(ICON_NAMES).toContain("panelToggle");
     expect(ICON_NAMES).toContain("pillow");
@@ -110,7 +114,7 @@ describe("closed sets", () => {
   // 2026-09-25 — an eighth still means editing this line.
   it("has seven type tokens and no eighth", () => {
     expect(TYPE_TOKENS).toHaveLength(7);
-    expect(TYPE_TOKENS.map((t) => t.px)).toEqual([24, 20, 15, 13, 12, 11, 14]);
+    expect(TYPE_TOKENS.map((t) => t.px)).toEqual([20, 20, 15, 13, 12, 11, 14]);
   });
 
   it("has one class pair per tone and no more", () => {
@@ -187,11 +191,40 @@ describe("Textarea and SearchInput", () => {
 });
 
 describe("StatusPill", () => {
+  it("keeps every v4 soft pair at WCAG AA contrast, without icons and without white text", () => {
+    /* The pairs are the `--c-*` variables (01 §1); read them from the one token
+     * file so this contrast check and the screen cannot disagree. */
+    const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "..", "styles", "carres-tokens.css"), "utf8");
+    const value = (name: string) => css.match(new RegExp(`--c-${name}:\\s*(#[0-9A-Fa-f]{6})`))![1]!;
+    const luminance = (hex: string) => {
+      const [r, g, b] = hex.slice(1).match(/../g)!.map(v => parseInt(v, 16) / 255)
+        .map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+      return r! * 0.2126 + g! * 0.7152 + b! * 0.0722;
+    };
+    const contrast = (a: string, b: string) => {
+      const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+      return (hi! + 0.05) / (lo! + 0.05);
+    };
+    render(<>{TONES.map(tone => <StatusPill key={tone} tone={tone}>{tone}</StatusPill>)}<StatusPill tone="neutral" hold>Hold</StatusPill></>);
+    for (const tone of TONES) {
+      const [bg, fg] = [STATUS_PILL_CLASS[tone].match(/bg-c-([a-z]+-bg)/)![1]!, STATUS_PILL_CLASS[tone].match(/text-c-([a-z]+-fg)/)![1]!];
+      expect(contrast(value(bg), value(fg)), tone).toBeGreaterThanOrEqual(4.5);
+      const pill = screen.getByText(tone).closest('[data-kit="status-pill"]')!;
+      expect(pill).not.toHaveClass("text-white");
+      expect(pill).toHaveClass("whitespace-nowrap");
+      expect(pill.querySelector("svg,[data-icon]")).toBeNull();
+    }
+    // Hold is the ONE dark pill (01 §1).
+    expect(contrast(value("hold-bg"), value("hold-fg"))).toBeGreaterThanOrEqual(4.5);
+    expect(screen.getByText("Hold").closest('[data-kit="status-pill"]')).toHaveClass("bg-c-hold-bg");
+    expect(TONE_CLASS.warning).toBe("bg-c-warn-bg text-c-warn-fg");
+  });
+
   it("paints the tone the engine computed and says which one it was", () => {
     render(<StatusPill tone="danger">Late</StatusPill>);
     const pill = screen.getByText("Late").closest('[data-kit="status-pill"]');
     expect(pill).toHaveAttribute("data-tone", "danger");
-    for (const cls of TONE_CLASS.danger.split(" ")) expect(pill).toHaveClass(cls);
+    for (const cls of STATUS_PILL_CLASS.danger.split(" ")) expect(pill).toHaveClass(cls);
   });
 
   it("renders every tone without a page choosing a colour", () => {
@@ -229,12 +262,7 @@ describe("EmptyState and Loading", () => {
   });
 });
 
-describe("Card and Panel", () => {
-  it("lets a table-bodied card drop its padding, and nothing else", () => {
-    const { container } = render(<Card padding="none">x</Card>);
-    expect(container.querySelector('[data-kit="card"]')).not.toHaveClass("p-4");
-  });
-
+describe("Panel", () => {
   it("gives a Panel a real heading, so a screen reader finds the section", () => {
     render(<Panel title="Items ordered">x</Panel>);
     expect(screen.getByRole("heading", { name: "Items ordered" })).toBeInTheDocument();

@@ -16,6 +16,7 @@ import {
   type SoBatchRailFilter,
   SO_BATCH_ORDER_STATUS_WORDS,
   soBatchOrderStatusOf,
+  soBatchPurchaseStatus,
   soBatchCellSummary,
   soBatchOrderSelection,
   soBatchOrderPlanning,
@@ -190,14 +191,16 @@ describe("the rail — latest Owner ruling 2026-08-30", () => {
       "Proceed Date",
       "SO No",
       "PO Safety Days",
-      "Customer Requested Delivery Date",
+      "Customer’s original requested delivery",
       "Customer Delivery Location",
       "Customer",
       "Items",
       "Supplier",
       "Supplier Deliver To",
       "PO No",
-      "PO Default Delivery Date",
+      /* Owner correction 2026-09-22: `PO Default Delivery Date` is retired
+         portal-wide; the PO's own date is `PO Delivery Date`. */
+      "PO Delivery Date",
     ]);
   });
 
@@ -230,12 +233,16 @@ describe("the rail — latest Owner ruling 2026-08-30", () => {
        check is on the WHOLE head, not on a substring: the replacements say the
        same fact with the owner in front of it, so `Customer Delivery Location`
        legitimately contains the retired spelling. */
-    for (const gone of ["PO Delivery Date", "Delivery Location", "Requested Delivery Date", "Deliver To"]) {
+    for (const gone of ["PO Default Delivery Date", "Delivery Location", "Requested Delivery Date", "Deliver To"]) {
       expect(Object.values(W), gone).not.toContain(gone);
     }
     expect(W).not.toHaveProperty("buy");
     expect(W).not.toHaveProperty("colWork");
     expect(W).not.toHaveProperty("goodsMustArrive");
+    /* ⛔ No second PO table under the row or in the Quick View (Jess,
+       2026-10-06): the PO facts are on the row listing. */
+    expect(W).not.toHaveProperty("poDetails");
+    expect(Object.values(W), "Purchase order details").not.toContain("Purchase order details");
   });
 
   it("no banned or retired Purchasing word is spelt anywhere in the dictionary or the rail", () => {
@@ -779,6 +786,19 @@ describe("validateAllocations — the arrangement must add back to the server's 
     ).toEqual({ ok: true });
   });
 
+  it("names a Deliver To with no address on the row, before Issue", () => {
+    const noAddress = { ...KLANG, address: null };
+    const v = validateAllocations(
+      r,
+      [{ destinationId: KLANG.id, qty: 11 }],
+      [noAddress, ...DESTINATIONS.filter((d) => d.id !== KLANG.id)],
+    );
+    expect(v).toEqual({
+      ok: false,
+      message: `${KLANG.name} has no address on file. Ask Purchasing to add the address of ${KLANG.name} in Settings.`,
+    });
+  });
+
   it("refuses a short total and says both numbers", () => {
     const v = validateAllocations(r, [{ destinationId: KLANG.id, qty: 10 }], DESTINATIONS);
     expect(v.ok).toBe(false);
@@ -967,6 +987,7 @@ describe("the selection bar counts lines, units and documents", () => {
     expect(summary.units).toBe(7);
     expect(summary.documents).toBe(3);
     expect(summary.text).toBe("2 Sales Orders · 2 items · 7 units · Issue 3 POs");
+    expect(summary.compactText).toBe("2 SO · 2 items · 7 units · 3 PO");
   });
 
   it("says nothing at all when nothing is selected", () => {
@@ -1382,5 +1403,24 @@ describe("the Use this PO offer never blocks buying (owner ruling 2026-09-28)", 
     expect(isSelectableForBuying(pool)).toBe(true);
     expect(isSelectableForOrder(pool, "blank")).toBe(true);
     expect(soBatchToBuyState(pool, "blank")).toEqual({ kind: "buy", qty: 1 });
+  });
+});
+
+
+describe("approved purchase-task status across supplier lines", () => {
+  const order = (lines: SoBatchOrderRow["lines"]): SoBatchOrderRow => ({ orderId: "so", so: 1, customer: "Customer", status: "blank", proceededAt: null, requestedDeliveryDate: null, deliveryCity: null, deliveryState: null, pos: [], outstandingSuppliers: [], lines });
+  const line = (qty: number, stockTaken = 0, pos: Array<{ poId: string; qty: number }> = []) => ({ orderLineId: "line", sku: "SKU", item: "Item", variant: null, category: "mattress" as const, qty, stockTaken, pos });
+  it("one purchased supplier does not complete another supplier's demand", () => {
+    expect(soBatchPurchaseStatus(order([line(2, 0, [{ poId: "PO", qty: 2 }]), line(1)]), [])).toBe("Partial");
+  });
+  it("unconfirmed stock offers do not count; committed stock does", () => {
+    expect(soBatchPurchaseStatus(order([line(2)]), [])).toBe("Pending");
+    expect(soBatchPurchaseStatus(order([line(2, 2)]), [])).toBe("Done");
+  });
+  it("exact PO lineage completes quantities irrespective of communication", () => {
+    expect(soBatchPurchaseStatus(order([line(2, 0, [{ poId: "PO", qty: 2 }])]), [])).toBe("Done");
+  });
+  it("missing line facts cannot complete purchase work", () => {
+    expect(soBatchPurchaseStatus(order([]), [])).toBe("Pending");
   });
 });

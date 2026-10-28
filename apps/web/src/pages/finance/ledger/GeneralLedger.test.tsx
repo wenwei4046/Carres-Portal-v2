@@ -1,0 +1,272 @@
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { generalLedgerBlocks, type GeneralLedgerAnswer, type GeneralLedgerWireRow } from "@carres/shared/general-ledger";
+import { itSaysNoBannedWord } from "@/test/banned-words";
+import GeneralLedger, { GENERAL_LEDGER_WIDTHS_KEY, generalLedgerSheet } from "./GeneralLedger";
+import look from "../finance-look.module.css";
+
+/* Finance → Ledger → General Ledger (0639; Chew 2026-10-03). The reads are
+   answered by URL; names and figures are invented. */
+const api = vi.hoisted(() => ({
+  answer: null as unknown,
+  calls: [] as string[],
+  fail: null as null | { status: number },
+  /* The person's layouts on the server (0704). Null: the read fails. */
+  layouts: null as null | unknown[],
+  layoutWrites: [] as { url: string; body: unknown }[],
+  layoutReads: 0,
+}));
+vi.mock("@/lib/api", () => ({
+  apiFetch: vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.startsWith("/api/operation/register-layouts")) {
+      if (init?.method === "POST") {
+        const body = init.body ? JSON.parse(String(init.body)) : null;
+        api.layoutWrites.push({ url, body });
+        if (url.endsWith("/default")) return { layout: { id: "w1", is_default: true } };
+        return { layout: { id: "w1", name: body.name, layout: body.layout, is_default: false } };
+      }
+      api.layoutReads += 1;
+      if (!api.layouts) throw Object.assign(new Error("boom"), { status: 500, body: {} });
+      return { layouts: api.layouts, limit: 10 };
+    }
+    api.calls.push(url);
+    if (url.startsWith("/api/finance/ledger/departments")) return [];
+    if (api.fail) throw Object.assign(new Error("boom"), { status: api.fail.status, body: {} });
+    if (!url.startsWith("/api/finance/ledger/general-ledger?")) throw new Error(`unexpected read ${url}`);
+    return api.answer;
+  }),
+  ApiError: class ApiError extends Error {},
+}));
+vi.mock("@/pages/operation/components/GlobalTopBar", () => ({ TopBarIcons: () => null }));
+vi.mock("@/lib/fmt-date", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/fmt-date")>()),
+  appTodayIso: () => "2026-10-03",
+}));
+
+const row = (over: Partial<GeneralLedgerWireRow>): GeneralLedgerWireRow => ({
+  row_kind: "LINE", account_code: "1121", account_name: "Public Bank", kind: "ASSET",
+  entry_date: "2026-10-02", entry_no: "JE-202610-0001", source_type: "CUSTOMER_PAYMENT", source_doc_no: "OR-2610-0001",
+  narration: "Deposit", memo: null, debit: 0, credit: 0, running_balance: 0, ...over,
+});
+const edge = (kind: "OPENING" | "CLOSING", over: Partial<GeneralLedgerWireRow>) =>
+  row({ row_kind: kind, entry_date: null, entry_no: null, source_type: null, source_doc_no: null, debit: null, credit: null, ...over });
+
+const ANSWER: GeneralLedgerAnswer = {
+  status: "OK", go_live_on: "2026-09-01", from: "2026-10-01", to: "2026-10-31",
+  accounts: [
+    { account_code: "1121", rows: [
+      edge("OPENING", { running_balance: 1000 }),
+      row({ debit: 250.5, running_balance: 1250.5 }),
+      row({ entry_no: "JE-202610-0002", source_type: "PAYMENT_VOUCHER", source_doc_no: "PV-2610-0003", memo: "Lumen sofa bills", credit: 1500, running_balance: -249.5 }),
+      edge("CLOSING", { running_balance: -249.5 }),
+    ] },
+    { account_code: "2110", rows: [
+      edge("OPENING", { account_code: "2110", account_name: "Trade payables", kind: "LIABILITY", running_balance: 1500 }),
+      row({ account_code: "2110", account_name: "Trade payables", kind: "LIABILITY", entry_no: "JE-202610-0002",
+        source_type: "PAYMENT_VOUCHER", source_doc_no: "PV-2610-0003", debit: 1500, running_balance: 0 }),
+      edge("CLOSING", { account_code: "2110", account_name: "Trade payables", kind: "LIABILITY", running_balance: 0 }),
+    ] },
+  ],
+};
+
+beforeEach(() => {
+  window.localStorage.clear();
+  api.answer = ANSWER;
+  api.calls = [];
+  api.fail = null;
+  api.layouts = null;
+  api.layoutWrites = [];
+  api.layoutReads = 0;
+});
+
+function show(at = "/finance/ledger/general-ledger") {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter initialEntries={[at]}>
+        <Routes><Route path="/finance/ledger/general-ledger" element={<GeneralLedger />} /></Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+describe("General Ledger (0639)", () => {
+  it("reads this month for every account", async () => {
+    show();
+    await screen.findByTestId("general-ledger");
+    expect(api.calls).toContain("/api/finance/ledger/general-ledger?from=2026-10-01&to=2026-10-31");
+  });
+
+  it("prints a block per account: brought forward, each line with its balance, the totals", async () => {
+    show();
+    const table = await screen.findByTestId("general-ledger");
+    expect(table).toHaveTextContent("1121 Public Bank · Asset");
+    expect(table).toHaveTextContent("Brought forward");
+    expect(table).toHaveTextContent("RM 1,000.00 Debit");
+    expect(table).toHaveTextContent("RM 1,250.50 Debit");
+    // The bank went over: the balance turns to the other side, never a minus.
+    expect(table).toHaveTextContent("RM 249.50 Credit");
+    expect(table).toHaveTextContent("Lumen sofa bills");
+    expect(table).toHaveTextContent("2110 Trade payables · Liability");
+    expect(table).toHaveTextContent("RM 1,500.00 Credit");
+    expect(screen.getByTestId("general-ledger-summary")).toHaveTextContent("2 accounts");
+  });
+
+  /* FINANCE LOOK (Chew 2026-10-14, 「A」). */
+  it("wears the Finance look: Brought forward and each Total marked, a zero total blank, a zero balance kept", async () => {
+    show();
+    const table = await screen.findByTestId("general-ledger");
+    expect(table.parentElement).toHaveClass(look.statement);
+    // At least as wide as its columns: 110 + 130 + 140 + 170 + 180 + 128 + 128 + 150.
+    expect(table.parentElement!.style.getPropertyValue("--fin-table-width")).toBe("1156px");
+    const rows = within(table).getAllByTestId("general-ledger-row");
+    const cells = (tr: HTMLElement) => Array.from(tr.children).map((td) => td.textContent?.trim() ?? "");
+    const brought = rows.filter((tr) => tr.querySelector('[data-fin-tone="brought"]'));
+    const totals = rows.filter((tr) => tr.querySelector('[data-fin-tone="total"]'));
+    expect(brought).toHaveLength(2);
+    expect(totals).toHaveLength(2);
+    expect(cells(brought[0]!)).toEqual(["", "", "", "", "Brought forward", "", "", "RM 1,000.00 Debit"]);
+    expect(cells(totals[0]!)).toEqual(["", "", "", "", "Total", "RM 250.50", "RM 1,500.00", "RM 249.50 Credit"]);
+    // Trade payables credited nothing: its Total's Credit is blank, its balance at zero prints.
+    expect(cells(totals[1]!)).toEqual(["", "", "", "", "Total", "RM 1,500.00", "", "RM 0.00"]);
+  });
+
+  /* Fill and resize (Chew 2026-10-14): Description takes the rest of the
+     width; a dragged width is remembered per person and read back. */
+  it("fills its box with Description, the other columns at their pixels", async () => {
+    show();
+    const table = await screen.findByTestId("general-ledger");
+    expect(table.parentElement).toHaveAttribute("data-fin-fill");
+    const widths = Array.from(table.querySelectorAll("col")).map((c) => c.style.width);
+    expect(widths).toEqual(["110px", "150px", "140px", "170px", "auto", "128px", "128px", "150px"]);
+    expect(within(table).getByRole("separator", { name: "Resize Description" })).toBeInTheDocument();
+  });
+
+  it("reads a saved width back from storage, and a drag saves a new one", async () => {
+    window.localStorage.setItem(GENERAL_LEDGER_WIDTHS_KEY, JSON.stringify({ description: 300, debit: 140 }));
+    show();
+    const table = await screen.findByTestId("general-ledger");
+    const widths = () => Array.from(table.querySelectorAll("col")).map((c) => c.style.width);
+    expect(widths()).toEqual(["110px", "150px", "140px", "170px", "300px", "140px", "128px", "150px"]);
+    // A dragged Description keeps its width: no fill, the table as wide as its columns.
+    expect(table.parentElement).not.toHaveAttribute("data-fin-fill");
+    expect(table.parentElement!.style.getPropertyValue("--fin-table-width")).toBe("1288px");
+    fireEvent.mouseDown(within(table).getByTestId("table-resize-balance"), { clientX: 900, button: 0 });
+    fireEvent.mouseMove(window, { clientX: 930 });
+    fireEvent.mouseUp(window);
+    expect(widths()[7]).toBe("180px");
+    expect(JSON.parse(window.localStorage.getItem(GENERAL_LEDGER_WIDTHS_KEY)!)).toEqual({ description: 300, debit: 140, balance: 180 });
+  });
+
+  /* Server widths (0704, Chew 2026-10-21): the person's `Column widths`
+     layout on finance_general_ledger. */
+  it("reads the widths from the person's Column widths layout on the server", async () => {
+    window.localStorage.setItem(GENERAL_LEDGER_WIDTHS_KEY, JSON.stringify({ description: 300 }));
+    api.layouts = [{ id: "w1", name: "Column widths", is_default: true,
+      layout: { order: [], hidden: [], widths: { description: 320, balance: 200 }, sort: null } }];
+    show();
+    const table = await screen.findByTestId("general-ledger");
+    const widths = () => Array.from(table.querySelectorAll("col")).map((c) => c.style.width);
+    await waitFor(() => expect(widths()).toEqual(["110px", "150px", "140px", "170px", "320px", "128px", "128px", "200px"]));
+    // The browser's copy follows the server.
+    expect(JSON.parse(window.localStorage.getItem(GENERAL_LEDGER_WIDTHS_KEY)!)).toEqual({ description: 320, balance: 200 });
+  });
+
+  it("a drag saves Column widths once it stops, and makes it the person's Default once", async () => {
+    api.layouts = [];
+    show();
+    const table = await screen.findByTestId("general-ledger");
+    fireEvent.mouseDown(within(table).getByTestId("table-resize-balance"), { clientX: 900, button: 0 });
+    fireEvent.mouseMove(window, { clientX: 910 });
+    fireEvent.mouseMove(window, { clientX: 920 });
+    fireEvent.mouseMove(window, { clientX: 930 });
+    fireEvent.mouseUp(window);
+    // Nothing is sent per move.
+    expect(api.layoutWrites).toEqual([]);
+    await waitFor(() => expect(api.layoutWrites).toHaveLength(2), { timeout: 2000 });
+    expect(api.layoutWrites[0]).toEqual({
+      url: "/api/operation/register-layouts",
+      body: { listing: "finance_general_ledger", name: "Column widths", layout: { order: [], hidden: [], widths: { balance: 180 }, sort: null } },
+    });
+    expect(api.layoutWrites[1]!.url).toBe("/api/operation/register-layouts/w1/default");
+  });
+
+  it("draws the browser's widths when the server read fails", async () => {
+    window.localStorage.setItem(GENERAL_LEDGER_WIDTHS_KEY, JSON.stringify({ description: 300, debit: 140 }));
+    api.layouts = null;
+    show();
+    const table = await screen.findByTestId("general-ledger");
+    await waitFor(() => expect(api.layoutReads).toBe(1));
+    const widths = Array.from(table.querySelectorAll("col")).map((c) => c.style.width);
+    expect(widths).toEqual(["110px", "150px", "140px", "170px", "300px", "140px", "128px", "150px"]);
+  });
+
+  it("draws its own widths when storage refuses", async () => {
+    const get = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("blocked"); });
+    try {
+      show();
+      const table = await screen.findByTestId("general-ledger");
+      expect(table.parentElement).toHaveAttribute("data-fin-fill");
+    } finally {
+      get.mockRestore();
+    }
+  });
+
+  it("an entry number opens the entry on the Journal", async () => {
+    show();
+    const table = await screen.findByTestId("general-ledger");
+    expect(within(table).getAllByRole("link", { name: "JE-202610-0002" })[0]).toHaveAttribute("href", "/finance/ledger?entry=JE-202610-0002");
+  });
+
+  it("a search narrows the accounts, never the lines", async () => {
+    show();
+    await screen.findByTestId("general-ledger");
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search accounts" }), { target: { value: "payables" } });
+    await waitFor(() => expect(screen.getByTestId("general-ledger")).not.toHaveTextContent("1121 Public Bank"));
+    expect(screen.getByTestId("general-ledger")).toHaveTextContent("2110 Trade payables");
+    expect(screen.getByTestId("general-ledger-summary")).toHaveTextContent("1 account of 2");
+  });
+
+  it("a period before the ledger started says so", async () => {
+    api.answer = { ...ANSWER, status: "BEFORE_GO_LIVE", accounts: [] };
+    show("/finance/ledger/general-ledger?from=2026-08-01&to=2026-08-31");
+    expect(await screen.findByTestId("general-ledger-before-start")).toHaveTextContent("The ledger started on Tue, 1 Sep. Pick a day from then on.");
+  });
+
+  it("a failed read, and a block that does not hold together, show the fix and never a zero", async () => {
+    api.fail = { status: 500 };
+    const { unmount } = show();
+    expect(await screen.findByRole("alert")).toHaveTextContent("The General Ledger could not be loaded. Try again.");
+    unmount();
+    api.fail = null;
+    const broken = structuredClone(ANSWER);
+    broken.accounts[0]!.rows[1]!.running_balance = 1250.49;
+    api.answer = broken;
+    show();
+    expect(await screen.findByRole("alert")).toHaveTextContent("The General Ledger could not be loaded. Try again.");
+  });
+
+  it("a ledger with no start date says so", async () => {
+    api.fail = { status: 409 };
+    show();
+    expect(await screen.findByRole("alert")).toHaveTextContent("The ledger has no start date yet. Nothing can be totalled.");
+  });
+});
+
+describe("the General Ledger sheet", () => {
+  it("writes every line under its account, with the screen's balance words", () => {
+    const { sheet, stem } = generalLedgerSheet(generalLedgerBlocks(ANSWER), "2026-10-01", "2026-10-31", "2026-09-01", null);
+    expect(stem).toBe("General Ledger Oct 2026");
+    expect(sheet.rows[3]).toEqual(["Account", "Date", "Entry No", "Source", "Document", "Description", "Debit", "Credit", "Balance"]);
+    expect(sheet.rows).toContainEqual(["1121 Public Bank", "", "", "", "", "Brought forward", "", "", "RM 1,000.00 Debit"]);
+    expect(sheet.rows).toContainEqual(["1121 Public Bank", "", "", "", "", "Total", 250.5, 1500, "RM 249.50 Credit"]);
+  });
+});
+
+describe("no banned word reaches the screen", () => {
+  itSaysNoBannedWord(join(dirname(fileURLToPath(import.meta.url)), "GeneralLedger.tsx"), { minStrings: 15, expectString: "Brought forward" });
+});

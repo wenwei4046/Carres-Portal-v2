@@ -11,7 +11,7 @@ import { rm } from "@/lib/format-currency";
 import { renderCreditNotePdf } from "@/lib/pdf/render";
 
 /**
- * Finance · Credit Notes (migration 0627).
+ * Finance · Credit Notes (migration 0729).
  *
  * A credit note is issued against ONE Sales Invoice, posts its own journal
  * (Dr the income the invoice credited / Cr receivables) and comes off what the

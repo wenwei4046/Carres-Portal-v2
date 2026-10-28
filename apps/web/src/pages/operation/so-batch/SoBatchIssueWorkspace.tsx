@@ -1,10 +1,12 @@
+import { poReviewDraftLines } from "./po-review-draft";
 import layoutStyles from "./SoBatchRegister.module.css";
+import PoSupplierBundle from "./PoSupplierBundle";
 // design-standard: not-a-list-page — this is the 50/50 ISSUE surface
 // (CARD-2026-08-22-purchasing-02 §5), not a Register. Its table is the lines of
 // ONE purchase order being checked before it is sent, sitting beside that
 // document's own preview; a ListPageShell would wrap a second page chrome
 // around a surface whose whole point is document + work, side by side.
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   purchasingRefusal,
   SO_BATCH_PURCHASE_WORDS as W,
@@ -66,8 +68,15 @@ export interface SoBatchIssueWorkspaceProps {
    * that follows is the same one for both lanes.
    */
   onIssue?: () => Promise<{ pos: IssuedPo[] }>;
+  /** Source lane's scoped fields within this SAME work/PDF review. */
+  reviewFields?: (document: SoBatchDocument) => ReactNode;
+  sourceBlocker?: { wrong: string; todo: string } | null;
   /** The way back to the list this journey started from. Absent: SO Batch's. */
   backLabel?: string;
+  supplierBundle?: boolean;
+  roundWindow?: string;
+  /** SO result handoff: the retained register opens the same issued POs in its side panel. */
+  onIssued?: (pos: IssuedPo[]) => void;
 }
 
 type Mode = "review" | "evidence";
@@ -78,9 +87,15 @@ export default function SoBatchIssueWorkspace({
   onBack,
   onDone,
   onIssue,
+  reviewFields,
+  sourceBlocker,
   backLabel,
+  supplierBundle = false,
+  roundWindow,
+  onIssued,
 }: SoBatchIssueWorkspaceProps) {
   const [at, setAt] = useState(0);
+  const [bundlePreview, setBundlePreview] = useState<IssuedPo | null>(null);
   const [mode, setMode] = useState<Mode>("review");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<{ wrong: string; todo: string } | null>(null);
@@ -154,13 +169,7 @@ export default function SoBatchIssueWorkspace({
       delivery_method: current.deliveryMethod ?? (current.supplierKind === "factory_pickup" ? "we_collect" : current.supplierKind === "own_logistics" ? "supplier_delivers" : null),
       terms: null,
       so_refs: [...new Set(current.lines.flatMap((line) => line.so == null ? [] : [line.so]))],
-      lines: current.lines.flatMap((line) => line.parts.map((part) => ({
-        sku: part.sku,
-        description: [line.item, line.variant].filter(Boolean).join(" · "),
-        qty: part.qty,
-        unit: "unit",
-        sources: [{ so: line.so, qty: part.qty }],
-      }))),
+      lines: poReviewDraftLines(current),
     };
   }, [current, destinations]);
   const [draftPdf, setDraftPdf] = useState<{ data: PoTemplateData; url?: string; error?: string } | null>(null);
@@ -193,6 +202,7 @@ export default function SoBatchIssueWorkspace({
    * fixing them is one pass.
    */
   const blocker = useMemo<{ wrong: string; todo: string } | null>(() => {
+    if (sourceBlocker) return sourceBlocker;
     for (const doc of documents) {
       if (doc.supplierKind === "factory_pickup" && !doc.supplierCollection) {
         return purchasingRefusal("pickup_partner_required", {
@@ -220,7 +230,7 @@ export default function SoBatchIssueWorkspace({
       }
     }
     return null;
-  }, [documents, destinationName]);
+  }, [documents, destinationName, sourceBlocker]);
 
   /**
    * ONE REQUEST FOR EVERY DOCUMENT (§7.3), carrying selections only. The
@@ -260,6 +270,7 @@ export default function SoBatchIssueWorkspace({
             },
           );
       setPos(res.pos ?? []);
+      if (onIssued && res.pos?.length) { onIssued(res.pos); return; }
       setMode("evidence");
       setAt(0);
     } catch (e) {
@@ -307,6 +318,7 @@ export default function SoBatchIssueWorkspace({
       const po = await apiFetch<IssuedPo>(
         `/api/operation/pos/${encodeURIComponent(poId)}/issue-context`,
       );
+      if (onIssued) { onIssued([po]); return; }
       setPos([po]);
       setConfirmed(new Set());
       setAt(0);
@@ -348,8 +360,8 @@ export default function SoBatchIssueWorkspace({
       void loadEvidence(poId);
       setConfirmed((prev) => {
         const next = new Set(prev).add(poId);
-        if (next.size >= pos.length && pos.length > 0) onDone();
-        else {
+        if (!supplierBundle && next.size >= pos.length && pos.length > 0) onDone();
+        else if (!supplierBundle) {
           /* Move to the next document the supplier has not received. */
           const nextIdx = pos.findIndex((p) => !next.has(p.id));
           if (nextIdx >= 0) setAt(nextIdx);
@@ -357,12 +369,12 @@ export default function SoBatchIssueWorkspace({
         return next;
       });
     },
-    [pos, onDone, loadEvidence],
+    [pos, onDone, loadEvidence, supplierBundle],
   );
 
   const total = mode === "evidence" ? pos.length : documents.length;
   const idx = Math.min(at, Math.max(total - 1, 0));
-  const currentPo = mode === "evidence" ? pos[idx] : undefined;
+  const currentPo = mode === "evidence" ? bundlePreview ?? pos[idx] : undefined;
 
   const currentPoId = currentPo?.id ?? null;
   const [officialAttempt, setOfficialAttempt] = useState(0);
@@ -419,18 +431,18 @@ export default function SoBatchIssueWorkspace({
               <button
                 type="button"
                 data-testid="so-batch-issue-prev"
-                className="h-7 rounded-control border border-kit-slate-6 px-2 text-meta disabled:opacity-40"
+                className="h-7 rounded-control border border-kit-slate-6 px-2 text-body font-medium disabled:opacity-40"
                 disabled={idx === 0}
-                onClick={() => setAt((i) => Math.max(0, i - 1))}
+                onClick={() => { setBundlePreview(null); setAt((i) => Math.max(0, i - 1)); }}
               >
                 Previous
               </button>
               <button
                 type="button"
                 data-testid="so-batch-issue-next"
-                className="h-7 rounded-control border border-kit-slate-6 px-2 text-meta disabled:opacity-40"
+                className="h-7 rounded-control border border-kit-slate-6 px-2 text-body font-medium disabled:opacity-40"
                 disabled={idx >= total - 1}
-                onClick={() => setAt((i) => Math.min(total - 1, i + 1))}
+                onClick={() => { setBundlePreview(null); setAt((i) => Math.min(total - 1, i + 1)); }}
               >
                 Next
               </button>
@@ -452,7 +464,7 @@ export default function SoBatchIssueWorkspace({
           {mode === "review" && current ? (
             <>
               <h2
-                className="text-body font-semibold"
+                className="text-strong"
                 data-testid="so-batch-issue-title"
               >
                 {current.supplierName ?? "Supplier"} → {destinationName(current.destinationId)}
@@ -463,6 +475,7 @@ export default function SoBatchIssueWorkspace({
                   then the goods. Boxed like the Sales Order page — the
                   owner chose that LOOK for every Purchasing page ("got box …
                   I want follow", 2026-09-26). */}
+              {reviewFields?.(current)}
               <div className="mt-3">
               <Block title="Purchase order">
                 <div className="grid grid-cols-1 gap-3 min-[560px]:grid-cols-2" data-testid="so-batch-issue-facts">
@@ -495,7 +508,7 @@ export default function SoBatchIssueWorkspace({
               <div className="overflow-x-auto">
               <table className="w-full text-body">
                 <thead>
-                  <tr className="border-b border-kit-slate-5 text-label uppercase text-kit-slate-11">
+                  <tr className="border-b border-kit-slate-5 text-meta text-kit-slate-11 [&>th]:font-medium">
                     <th className="py-1 text-left">Item</th>
                     <th className="w-24 py-1 text-left">Source</th>
                     <th className="w-14 py-1 pr-3 text-right">Qty</th>
@@ -578,12 +591,14 @@ export default function SoBatchIssueWorkspace({
             </>
           ) : currentPo ? (
             <>
+              {supplierBundle && <PoSupplierBundle pos={pos} roundWindow={roundWindow} onPreview={(_id, po) => setBundlePreview(po)} />}
               {/* The form appears only once the official document has rendered:
                  until then there is no version to declare, and a confirmation
                  without one is the defect 0378 closes. */}
               {pdfVersion != null && pdfUrl != null && paintedUrl === pdfUrl ? (
                 <PoIssueEvidence
                   po={currentPo}
+                  hidePreparationTools={supplierBundle}
                   version={pdfVersion}
                   /* PERSISTED rows, never this tab's memory (closure §8). */
                   evidence={evidence[currentPo.id] ?? []}

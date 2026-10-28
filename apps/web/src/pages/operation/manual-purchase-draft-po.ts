@@ -21,6 +21,7 @@
  * requester sees the gap before sending rather than after.
  */
 import { GOODS_ABSENCE_WORDS } from "@carres/shared";
+import { requestAttrsKey } from "./purchase-request/purchase-request-draft";
 import type { PoTemplateData } from "@/lib/pdf/types";
 
 export interface ManualPurchaseDraftLine {
@@ -98,4 +99,36 @@ export function manualPurchaseDraftPos(input: {
     };
     return { key: supplierName, supplierName, data };
   });
+}
+
+/** New context uses the SAME paper builder, scoped to actual To-buy allocation
+ * groups. Full need and Stock proposals never inflate supplier-paper quantities;
+ * requested dates never become official issue or PO delivery dates. */
+export function contextPurchaseDraftPos(input: {
+  context: import("@carres/shared").PurchaseRequestContext;
+  items: ReadonlyArray<{ sku: string; label: string; supplier?: string | null }>;
+  destinations: ReadonlyArray<{ id: string; name: string; address?: string | null }>;
+  suppliers: readonly { name: string; address?: string | null }[];
+  plan: ReadonlyArray<{ sku: string; category: string | null; supplierId?: string | null }>;
+  collectedSupplierNames: ReadonlySet<string>;
+}): ManualPurchaseDraftPo[] {
+  const groups = new Map<string, { destination: { name: string; address: string | null } | null; lines: ManualPurchaseDraftLine[] }>();
+  for (const line of input.context.lines) {
+    const item = input.items.find(item => item.sku === line.sku);
+    if (!item) continue;
+    for (const allocation of line.allocations) {
+      if (allocation.qty <= 0) continue;
+      const source = input.plan.find(p => p.sku === line.sku);
+      const key = JSON.stringify([source?.supplierId ?? item.supplier ?? null, source?.category ?? null,
+        allocation.destinationId, input.context.purpose, allocation.supplierDeliveryDate]);
+      const site = input.destinations.find(d => d.id === allocation.destinationId);
+      const group = groups.get(key) ?? { destination: site ? { name: site.name, address: site.address ?? null } : null, lines: [] };
+      const physical = group.lines.find(existing => existing.sku === line.sku && requestAttrsKey(existing.attrs) === requestAttrsKey(line.attrs));
+      if (physical) physical.qty += allocation.qty;
+      else group.lines.push({ key: allocation.id, sku: line.sku, item: item.label, supplierName: item.supplier ?? null, qty: allocation.qty, attrs: line.attrs });
+      groups.set(key, group);
+    }
+  }
+  const purposeLabel = input.context.purpose === "ready_stock" ? "Ready Stock" : input.context.purpose === "service_case" ? "Service Case" : "General Purchase";
+  return [...groups].flatMap(([key, group]) => manualPurchaseDraftPos({ ...input, ...group, purposeLabel }).map(po => ({ ...po, key })));
 }

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fileURLToPath } from "node:url";
@@ -7,11 +7,26 @@ import { dirname, join } from "node:path";
 import { itSaysNoBannedWord } from "@/test/banned-words";
 import { appTodayIso, fmtDate, fmtMonth } from "@/lib/fmt-date";
 import FinanceReports from "./FinanceReports";
+import { rm } from "@/lib/format-currency";
+import { statementExport } from "./month-end-pack";
+import { parseBalanceSheet, parseProfitAndLoss } from "./reports/report-queries";
 import { paidBeforeInvoiceNote } from "./reports/StatementTable";
+import look from "./finance-look.module.css";
+import { lastMonths } from "./reports/by-month";
 
 const api = vi.hoisted(() => ({ fetch: vi.fn() }));
 vi.mock("@/lib/api", () => ({ apiFetch: api.fetch }));
 vi.mock("@/pages/operation/components/GlobalTopBar", () => ({ TopBarIcons: () => null }));
+/** What Export Excel handed to xlsx: the one sheet's rows and the file name. */
+const xlsx = vi.hoisted(() => ({ rows: [] as unknown[][], file: "" }));
+vi.mock("xlsx", () => ({
+  utils: {
+    book_new: () => ({}),
+    aoa_to_sheet: (rows: unknown[][]) => { xlsx.rows = rows; return {}; },
+    book_append_sheet: () => undefined,
+  },
+  writeFile: (_wb: unknown, file: string) => { xlsx.file = file; },
+}));
 
 // ── dates, from the same business clock the page reads ─────────────────────
 
@@ -108,22 +123,44 @@ function serve(over: { pl?: (from: string, to: string) => unknown; bs?: (asOf: s
   });
 }
 
-function show(at = "/finance/reports") {
+// Two pages, one rail row each under Reports (Chew, 2026-10-03).
+const PL_AT = "/finance/reports/profit-and-loss";
+const BS_AT = "/finance/reports/balance-sheet";
+
+function show(at = PL_AT) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={qc}>
-    <MemoryRouter initialEntries={[at]}><FinanceReports /><Address /></MemoryRouter>
+    <MemoryRouter initialEntries={[at]}>
+      <Routes>
+        <Route path={PL_AT} element={<FinanceReports statement="pl" />} />
+        <Route path={BS_AT} element={<FinanceReports statement="bs" />} />
+      </Routes>
+      <Address />
+    </MemoryRouter>
   </QueryClientProvider>);
 }
+
+/** The ledger reads asked for so far, by statement. */
+const asked = (path: "profit-and-loss" | "balance-sheet") =>
+  api.fetch.mock.calls.map(([u]) => String(u)).filter((u) => u.startsWith(`/api/finance/ledger/${path}`));
 
 /** The address bar's query, for tests that check what the page wrote there. */
 function Address() {
   return <output data-testid="address">{useLocation().search}</output>;
 }
 
-/** Each band, line and bottom strip of one statement, cells joined by ` | `. */
+/** Each band, line and bottom strip of one statement, cells joined by ` | `.
+ *  A line's Code and Account cells (Chew 2026-10-14) read as one, `4100 Furniture sales`,
+ *  as the export writes them; a band and the bottom strip already span the two. */
 function lines(table: HTMLElement): string[] {
-  return Array.from(table.querySelectorAll('tr[data-kit="data-group"], tr[data-kit="data-row"], tr[data-kit="data-totals"]'))
-    .map((tr) => Array.from(tr.children).map((td) => (td.textContent ?? "").trim()).join(" | ").trim());
+  return Array.from(table.querySelectorAll(':scope > table > * > tr[data-kit="data-group"], :scope > table > * > tr[data-kit="data-row"], :scope > table > * > tr[data-kit="data-totals"]'))
+    .map((tr) => {
+      // The drill's disclosure cell (Chew 2026-10-21) holds no word.
+      const cells = Array.from(tr.children).filter((td) => td.getAttribute("data-kit") !== "data-expand")
+        .map((td) => (td.textContent ?? "").trim());
+      const read = tr.getAttribute("data-kit") === "data-row" ? [cells.slice(0, 2).filter(Boolean).join(" "), ...cells.slice(2)] : cells;
+      return read.join(" | ").trim();
+    });
 }
 
 const failure = (status: number, message = "boom") => Object.assign(new Error(message), { status });
@@ -134,19 +171,30 @@ beforeEach(() => {
 });
 
 describe("Reports — the statements read the ledger", () => {
-  it("reads this month's Profit and Loss and today's Balance Sheet, and names the ledger's first day", async () => {
+  it("the Profit and Loss page reads this month, names the ledger's first day and reads no Balance Sheet", async () => {
     show();
-    expect(screen.getByTestId("reports-destination-header")).toBeInTheDocument();
+    expect(screen.getByTestId("profit-and-loss-destination-header")).toHaveTextContent("Profit and Loss");
     expect(await screen.findByTestId("reports-go-live")).toHaveTextContent(`Since ${fmtDate(GO_LIVE)} · No opening balances`);
     expect(api.fetch).toHaveBeenCalledWith(`/api/finance/ledger/profit-and-loss?from=${FROM}&to=${TO}`);
-    expect(api.fetch).toHaveBeenCalledWith(`/api/finance/ledger/balance-sheet?asOf=${TODAY}`);
     expect(screen.getByRole("combobox", { name: "Month" })).toHaveTextContent(fmtMonth(YM));
+    expect(asked("balance-sheet")).toEqual([]);
+    expect(screen.queryByTestId("balance-sheet")).not.toBeInTheDocument();
+  });
+
+  it("the Balance Sheet page reads today, names the ledger's first day and reads no Profit and Loss", async () => {
+    show(BS_AT);
+    expect(screen.getByTestId("balance-sheet-destination-header")).toHaveTextContent("Balance Sheet");
+    expect(await screen.findByTestId("reports-go-live")).toHaveTextContent(`Since ${fmtDate(GO_LIVE)} · No opening balances`);
+    expect(api.fetch).toHaveBeenCalledWith(`/api/finance/ledger/balance-sheet?asOf=${TODAY}`);
+    expect(asked("profit-and-loss")).toEqual([]);
+    expect(screen.queryByTestId("profit-and-loss")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pl-trend")).not.toBeInTheDocument();
   });
 
   it("prints the Profit and Loss as served: section totals, header subtotals, the accounts that moved and the net result", async () => {
     show();
     const table = screen.getByTestId("profit-and-loss");
-    await within(table).findByRole("link", { name: "4100 Furniture sales" });
+    await within(table).findByRole("link", { name: "4100" });
     expect(lines(table)).toEqual([
       "Income | RM 12,850.00",
       "4100 Furniture sales | RM 12,500.00",
@@ -158,6 +206,29 @@ describe("Reports — the statements read the ledger", () => {
       "6200 Rent and utilities | RM 1,800.00",
       "Net result | RM 4,050.00",
     ]);
+    // FINANCE LOOK (Chew 2026-10-13): the table sits in the Finance look, and a
+    // heading line is marked as a subtotal row; an account line is not.
+    expect(look.statement).toBeTruthy();
+    expect(table.parentElement).toHaveClass(look.statement);
+    const heading = within(table).getByText("Cost of sales");
+    expect(heading).toHaveAttribute("data-fin-tone", "subtotal");
+    const account = within(table).getByRole("link", { name: "5100" }).closest("tr")!;
+    expect(account.querySelector("[data-fin-tone]")).toBeNull();
+    // The code and the name are two columns; the code alone is the link, and
+    // the table is at least as wide as its three columns (Chew 2026-10-14).
+    // The first header is the drill's disclosure column (Chew 2026-10-21), which holds no word.
+    expect(within(table).getAllByRole("columnheader").map((h) => h.textContent?.trim())).toEqual(["", "Code", "Account", "Amount"]);
+    const [code, name] = Array.from(account.children).filter((td) => td.getAttribute("data-kit") !== "data-expand") as HTMLElement[];
+    expect(code).toHaveTextContent(/^5100$/);
+    expect(within(code!).getByRole("link")).toHaveClass("decoration-dotted");
+    expect(name).toHaveTextContent(/^Cost of goods sold$/);
+    expect(within(name!).queryByRole("link")).not.toBeInTheDocument();
+    // 96 + 320 + 128, and the drill's 42.
+    expect(table.parentElement!.style.getPropertyValue("--fin-table-width")).toBe("586px");
+    // The Account column takes the rest of the width (Chew 2026-10-14).
+    expect(table.parentElement).toHaveAttribute("data-fin-fill");
+    expect(Array.from(table.querySelectorAll("col")).map((c) => c.style.width)).toEqual(["42px", "96px", "auto", "128px"]);
+    expect(within(table).getByRole("separator", { name: "Resize Account" })).toBeInTheDocument();
   });
 
   it("prints the total the ledger served, never a sum of its own", async () => {
@@ -165,15 +236,15 @@ describe("Reports — the statements read the ledger", () => {
       r.row_kind === "SECTION_TOTAL" && r.section === "INCOME" ? { ...r, amount: 99.99 } : r)) });
     show();
     const table = screen.getByTestId("profit-and-loss");
-    await within(table).findByRole("link", { name: "4100 Furniture sales" });
+    await within(table).findByRole("link", { name: "4100" });
     expect(lines(table)[0]).toBe("Income | RM 99.99");
     expect(within(table).queryByText("RM 12,850.00")).not.toBeInTheDocument();
   });
 
   it("prints the Balance Sheet as served, with the result not yet closed inside equity", async () => {
-    show();
+    show(BS_AT);
     const table = screen.getByTestId("balance-sheet");
-    await within(table).findByRole("link", { name: "1120 Bank — current account" });
+    await within(table).findByRole("link", { name: "1120" });
     expect(lines(table)).toEqual([
       "Asset | RM 6,850.00",
       "Cash and bank | RM 5,200.00",
@@ -219,9 +290,9 @@ describe("Reports — the statements read the ledger", () => {
 
   it("shows customers who paid before their invoice under Customer deposits held, as the ledger served it", async () => {
     serve({ bs: (a) => bs(a, reclassedBody()) });
-    show();
+    show(BS_AT);
     const table = screen.getByTestId("balance-sheet");
-    await within(table).findByRole("link", { name: "2210 Customer deposits held" });
+    await within(table).findByRole("link", { name: "2210" });
     // Each account stays one line: the note is not printed in the row.
     expect(lines(table)).toEqual([
       "Asset | RM 8,000.00",
@@ -236,18 +307,18 @@ describe("Reports — the statements read the ledger", () => {
     ]);
     // The note is on a mark in the same row as its account, named by the sentence.
     const rowOf = (account: string) => within(table).getByRole("link", { name: account }).closest("tr")!;
-    expect(within(rowOf("2210 Customer deposits held")).getByRole("button", { name: INCLUDES }))
+    expect(within(rowOf("2210")).getByRole("button", { name: INCLUDES }))
       .toHaveAttribute("type", "button");
-    expect(within(rowOf("1210 Trade receivables — customers")).getByRole("button", { name: LEAVES_OUT }))
+    expect(within(rowOf("1210")).getByRole("button", { name: LEAVES_OUT }))
       .toHaveAttribute("type", "button");
     expect(within(table).getAllByRole("button", { name: /paid before their invoice/ })).toHaveLength(2);
-    expect(within(rowOf("1120 Bank — current account")).queryByRole("button")).not.toBeInTheDocument();
+    expect(within(rowOf("1120")).queryByRole("button")).not.toBeInTheDocument();
     expect(screen.queryByTestId("balance-sheet-differs")).not.toBeInTheDocument();
   });
 
   it("the mark shows its note on keyboard focus and on hover", async () => {
     serve({ bs: (a) => bs(a, reclassedBody()) });
-    show();
+    show(BS_AT);
     const table = screen.getByTestId("balance-sheet");
     const includes = await within(table).findByRole("button", { name: INCLUDES });
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
@@ -261,7 +332,7 @@ describe("Reports — the statements read the ledger", () => {
 
   it("a reclassified amount that is not a number is refused as a whole", async () => {
     serve({ bs: (a) => bs(a, reclassedBody().map((r) => r.account_code === "2210" ? { ...r, reclassified: "lots" } : r)) });
-    show();
+    show(BS_AT);
     expect(await screen.findByTestId("balance-sheet-failed"))
       .toHaveTextContent("The balance sheet could not be loaded. Try again.");
   });
@@ -294,9 +365,9 @@ describe("Reports — the statements read the ledger", () => {
 
   it("shows suppliers paid before their bill under Advances to suppliers, beside the customer notes", async () => {
     serve({ bs: (a) => bs(a, advancedBody()) });
-    show();
+    show(BS_AT);
     const table = screen.getByTestId("balance-sheet");
-    await within(table).findByRole("link", { name: "1230 Advances to suppliers" });
+    await within(table).findByRole("link", { name: "1230" });
     expect(lines(table)).toEqual([
       "Asset | RM 8,000.00",
       "Cash and bank | RM 5,900.00",
@@ -313,10 +384,10 @@ describe("Reports — the statements read the ledger", () => {
       "Net result not yet closed | RM 4,685.00",
     ]);
     const rowOf = (account: string) => within(table).getByRole("link", { name: account }).closest("tr")!;
-    expect(within(rowOf("1230 Advances to suppliers")).getByRole("button", { name: ADVANCES })).toHaveAttribute("type", "button");
-    expect(within(rowOf("2110 Trade payables — suppliers")).getByRole("button", { name: PAYABLES })).toHaveAttribute("type", "button");
-    expect(within(rowOf("2210 Customer deposits held")).getByRole("button", { name: INCLUDES })).toBeInTheDocument();
-    expect(within(rowOf("1210 Trade receivables — customers")).getByRole("button", { name: LEAVES_OUT })).toBeInTheDocument();
+    expect(within(rowOf("1230")).getByRole("button", { name: ADVANCES })).toHaveAttribute("type", "button");
+    expect(within(rowOf("2110")).getByRole("button", { name: PAYABLES })).toHaveAttribute("type", "button");
+    expect(within(rowOf("2210")).getByRole("button", { name: INCLUDES })).toBeInTheDocument();
+    expect(within(rowOf("1210")).getByRole("button", { name: LEAVES_OUT })).toBeInTheDocument();
     expect(table.querySelectorAll('tr[data-kit="data-row"] button')).toHaveLength(4);
     fireEvent.focus(within(table).getByRole("button", { name: ADVANCES }));
     expect(await screen.findByRole("tooltip")).toHaveTextContent(ADVANCES);
@@ -324,7 +395,7 @@ describe("Reports — the statements read the ledger", () => {
 
   it("a moved amount that names nobody it belongs to is refused as a whole", async () => {
     serve({ bs: (a) => bs(a, advancedBody().map((r) => r.account_code === "1230" ? { ...r, reclassified_for: "BANK" } : r)) });
-    show();
+    show(BS_AT);
     expect(await screen.findByTestId("balance-sheet-failed"))
       .toHaveTextContent("The balance sheet could not be loaded. Try again.");
   });
@@ -337,11 +408,13 @@ describe("Reports — the statements read the ledger", () => {
   });
 
   it("opens each account in the Journal, narrowed to that account and the statement's dates", async () => {
-    show();
-    const plLink = await within(screen.getByTestId("profit-and-loss")).findByRole("link", { name: "4100 Furniture sales" });
+    const view = show();
+    const plLink = await within(screen.getByTestId("profit-and-loss")).findByRole("link", { name: "4100" });
     expect(plLink).toHaveAttribute("href", `/finance/ledger?account=4100&from=${FROM}&to=${TO}`);
+    view.unmount();
+    show(BS_AT);
     const bsTable = screen.getByTestId("balance-sheet");
-    const bsLink = await within(bsTable).findByRole("link", { name: "1120 Bank — current account" });
+    const bsLink = await within(bsTable).findByRole("link", { name: "1120" });
     expect(bsLink).toHaveAttribute("href", `/finance/ledger?account=1120&from=${GO_LIVE}&to=${TODAY}`);
     // A header line is a subtotal, not an account: it opens nothing.
     expect(within(bsTable).queryByRole("link", { name: /Cash and bank/ })).not.toBeInTheDocument();
@@ -354,7 +427,7 @@ describe("Reports — the statements read the ledger", () => {
     fireEvent.click(await screen.findByRole("option", { name: fmtMonth(PREV) }));
     await waitFor(() => expect(api.fetch)
       .toHaveBeenCalledWith(`/api/finance/ledger/profit-and-loss?from=${PREV}-01&to=${lastDay(PREV)}`));
-    const link = await within(screen.getByTestId("profit-and-loss")).findByRole("link", { name: "4100 Furniture sales" });
+    const link = await within(screen.getByTestId("profit-and-loss")).findByRole("link", { name: "4100" });
     expect(link).toHaveAttribute("href", `/finance/ledger?account=4100&from=${PREV}-01&to=${lastDay(PREV)}`);
   });
 
@@ -383,20 +456,23 @@ describe("Reports — the statements read the ledger", () => {
   });
 
   it("an Up to before From is read as From", async () => {
-    show(`/finance/reports?from=${YM}-20&to=${YM}-05`);
+    show(`${PL_AT}?from=${YM}-20&to=${YM}-05`);
     await waitFor(() => expect(api.fetch)
       .toHaveBeenCalledWith(`/api/finance/ledger/profit-and-loss?from=${YM}-20&to=${YM}-20`));
   });
 
-  it("keeps the door to Reports → Payment", async () => {
-    show();
+  /* Every report is its own row under Reports on the rail (Chew, 2026-10-03),
+     Reports → Payment among them, so neither page keeps a list of doors. */
+  it.each([PL_AT, BS_AT])("%s lists no doors to the other reports", async (at) => {
+    show(at);
     await screen.findByTestId("reports-go-live");
-    expect(screen.getByTestId("reports-payment-door")).toHaveAttribute("href", "/finance/reports/payment");
+    expect(document.querySelectorAll('a[href^="/finance/reports"]')).toHaveLength(0);
+    expect(screen.queryByText("Open →")).not.toBeInTheDocument();
   });
 
   it("prints none of the old invented figures and asks for none of the old reads", async () => {
     show();
-    await within(screen.getByTestId("profit-and-loss")).findByRole("link", { name: "4100 Furniture sales" });
+    await within(screen.getByTestId("profit-and-loss")).findByRole("link", { name: "4100" });
     const text = document.body.textContent ?? "";
     expect(text).not.toMatch(/55\s?%/);
     expect(text).not.toMatch(/42,?000/);
@@ -416,16 +492,19 @@ describe("Reports — when there is nothing, or no answer", () => {
       pl: (from, to) => ({ rows: [{ ...notice, period_from: from, period_to: to }] }),
       bs: (asOf) => ({ rows: [{ ...notice, as_of: asOf, equation_balances: null, equation_difference: null }] }),
     });
-    show(`/finance/reports?from=${shiftMonth(YM, -2)}-01&to=${early}&asOf=${early}`);
+    const view = show(`${PL_AT}?from=${shiftMonth(YM, -2)}-01&to=${early}`);
     const sentence = `The ledger started on ${fmtDate(GO_LIVE)}. Pick a day from then on.`;
     expect(await within(screen.getByTestId("profit-and-loss")).findByText(sentence)).toBeInTheDocument();
+    expect(screen.queryByText(/RM /)).not.toBeInTheDocument();
+    view.unmount();
+    show(`${BS_AT}?asOf=${early}`);
     expect(await within(screen.getByTestId("balance-sheet")).findByText(sentence)).toBeInTheDocument();
     expect(screen.queryByText(/RM /)).not.toBeInTheDocument();
   });
 
   it("a section with every account at RM 0.00 names what it has none of, and keeps the served totals", async () => {
     serve({ pl: (f, t) => pl(f, t, zero(PL_BODY)), bs: (a) => bs(a, zero(bsBody(0))) });
-    show();
+    const view = show();
     const plTable = screen.getByTestId("profit-and-loss");
     await within(plTable).findByText("No income in this period.");
     expect(lines(plTable)).toEqual([
@@ -435,6 +514,10 @@ describe("Reports — when there is nothing, or no answer", () => {
       "No expenses in this period. |",
       "Net result | RM 0.00",
     ]);
+    expect(screen.queryByText(/Every account is at/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/No entries/)).not.toBeInTheDocument();
+    view.unmount();
+    show(BS_AT);
     const bsTable = screen.getByTestId("balance-sheet");
     await within(bsTable).findByText("No assets on this day.");
     expect(lines(bsTable)).toEqual([
@@ -454,7 +537,7 @@ describe("Reports — when there is nothing, or no answer", () => {
       : r.row_kind === "NET" ? { ...r, amount: 12850 } : r)) });
     show();
     const table = screen.getByTestId("profit-and-loss");
-    await within(table).findByRole("link", { name: "4100 Furniture sales" });
+    await within(table).findByRole("link", { name: "4100" });
     expect(lines(table).slice(3)).toEqual([
       "Expense | RM 0.00",
       "No expenses in this period. |",
@@ -464,7 +547,7 @@ describe("Reports — when there is nothing, or no answer", () => {
 
   it("raises the band only while the Balance Sheet does not balance", async () => {
     serve({ bs: (a) => bs(a, bsBody(25.5), { balances: false, difference: 25.5 }) });
-    show();
+    show(BS_AT);
     const band = await screen.findByTestId("balance-sheet-differs");
     expect(band).toHaveTextContent("Assets differ from liabilities plus equity by RM 25.50.");
     expect(within(band).getByRole("link", { name: "Open Self-check" })).toHaveAttribute("href", "/finance/ledger/self-check");
@@ -472,16 +555,17 @@ describe("Reports — when there is nothing, or no answer", () => {
     expect(within(screen.getByTestId("balance-sheet")).queryByText("Difference")).not.toBeInTheDocument();
   });
 
-  it("a ledger with no start date says so once and prints no statement", async () => {
-    const notStarted = () => { throw failure(409, "The ledger has no start date yet."); };
-    serve({ pl: notStarted, bs: notStarted });
-    show();
-    expect(await screen.findByRole("alert")).toHaveTextContent("The ledger has no start date yet. Nothing can be totalled.");
-    expect(screen.queryByText("Profit and Loss")).not.toBeInTheDocument();
-    expect(screen.queryByText("Balance Sheet")).not.toBeInTheDocument();
-    expect(screen.queryByText(/RM /)).not.toBeInTheDocument();
-    expect(screen.getByTestId("reports-payment-door")).toBeInTheDocument();
-  });
+  it.each([[PL_AT, "profit-and-loss"], [BS_AT, "balance-sheet"]])(
+    "%s: a ledger with no start date says so once and prints no statement", async (at, table) => {
+      const notStarted = () => { throw failure(409, "The ledger has no start date yet."); };
+      serve({ pl: notStarted, bs: notStarted });
+      show(at);
+      expect(await screen.findByRole("alert")).toHaveTextContent("The ledger has no start date yet. Nothing can be totalled.");
+      expect(screen.getAllByRole("alert")).toHaveLength(1);
+      expect(screen.queryByTestId(table)).not.toBeInTheDocument();
+      expect(screen.queryByTestId("reports-go-live")).not.toBeInTheDocument();
+      expect(screen.queryByText(/RM /)).not.toBeInTheDocument();
+    });
 
   it("a failed read says so with Try again and never a zero, and Try again reads again", async () => {
     let down = true;
@@ -492,13 +576,10 @@ describe("Reports — when there is nothing, or no answer", () => {
     expect(alert).toHaveTextContent("The profit and loss could not be loaded. Try again.");
     expect(within(alert.closest("section")!).queryByText(/RM /)).not.toBeInTheDocument();
     expect(screen.queryByText("Net result")).not.toBeInTheDocument();
-    // The Balance Sheet reads on its own.
-    expect(await within(screen.getByTestId("balance-sheet")).findByRole("link", { name: "1120 Bank — current account" }))
-      .toBeInTheDocument();
     down = false;
     fireEvent.click(within(alert).getByRole("button", { name: "Try again" }));
     const table = await screen.findByTestId("profit-and-loss");
-    expect(await within(table).findByRole("link", { name: "4100 Furniture sales" })).toBeInTheDocument();
+    expect(await within(table).findByRole("link", { name: "4100" })).toBeInTheDocument();
   });
 
   it.each<[string, (rows: Row[]) => Row[]]>([
@@ -518,15 +599,396 @@ describe("Reports — when there is nothing, or no answer", () => {
 
   it("a balance sheet whose check did not arrive is refused as a whole", async () => {
     serve({ bs: (a) => ({ rows: bs(a, bsBody(0)).rows.filter((r) => r.row_kind !== "EQUATION") }) });
-    show();
+    show(BS_AT);
     expect(await screen.findByTestId("balance-sheet-failed"))
       .toHaveTextContent("The balance sheet could not be loaded. Try again.");
     expect(screen.queryByText("RM 6,850.00")).not.toBeInTheDocument();
   });
 });
 
+describe("Reports — Export writes the statement on screen", () => {
+  /** A sheet's body (under the blank row and the Account | Amount header) spelled as the table prints it. */
+  const asPrinted = (rows: (string | number)[][]) => rows.slice(rows.findIndex((r) => r.length === 0) + 2)
+    .map((r) => [String(r[0]).trim(), typeof r[1] === "number" ? rm(r[1]) : ""].join(" | ").trim());
+
+  it("Profit and Loss for a department: the same headings, accounts, subtotals and net result as the table", async () => {
+    show(`${PL_AT}?dept=SHOWROOM&from=${FROM}&to=${TO}`);
+    const table = screen.getByTestId("profit-and-loss");
+    await within(table).findByRole("link", { name: "4100" });
+    const { sheet, stem } = statementExport(parseProfitAndLoss(pl(FROM, TO, PL_BODY), FROM, TO), "Showroom");
+    expect(asPrinted(sheet.rows)).toEqual(lines(table));
+    expect(sheet.rows[1]).toEqual(["Department", "Showroom"]);
+    expect(stem).toBe(`Profit and Loss ${fmtMonth(YM)} Showroom`);
+    expect(within(screen.getByTestId("profit-and-loss-export")).getByRole("button", { name: "Export Excel" })).toBeEnabled();
+  });
+
+  it("Balance Sheet: the same bands, headings, accounts and unclosed result as the table", async () => {
+    show(`${BS_AT}?asOf=${TODAY}`);
+    const table = screen.getByTestId("balance-sheet");
+    await within(table).findByRole("link", { name: "1120" });
+    const { sheet, stem } = statementExport(parseBalanceSheet(bs(TODAY, bsBody(0)), TODAY), null);
+    expect(asPrinted(sheet.rows)).toEqual(lines(table));
+    expect(stem).toBe(`Balance Sheet as of ${fmtDate(TODAY, { year: "always" })}`);
+  });
+
+  it("keeps the characters a file name cannot hold out of a department's name", () => {
+    const { stem } = statementExport(parseBalanceSheet(bs(TODAY, bsBody(0)), TODAY), 'KL\\North/2: "A"');
+    expect(stem).toBe(`Balance Sheet as of ${fmtDate(TODAY, { year: "always" })} KL-North-2- -A-`);
+  });
+});
+
+describe("Reports — By month", () => {
+  const PREV2 = shiftMonth(YM, -2);
+  /** Months from `from`'s month back to this one: 0 is this month. */
+  const back = (from: string) => {
+    const [y, m] = from.split("-").map(Number) as [number, number];
+    const [ty, tm] = YM.split("-").map(Number) as [number, number];
+    return ty * 12 + tm - (y * 12 + m);
+  };
+  const H1 = { header_depth: 1, parent_header_code: null };
+  const H2 = { header_depth: 2, parent_header_code: "6000" };
+  /** Different money each month; Rent at RM 0.00 last month; Staff costs a heading two deep, under 6000. */
+  const monthBody = (k: number): Row[] => {
+    const sales = 1000 * (k + 1), rent = k === 1 ? 0 : 100, wages = 50 * (k + 1);
+    return [
+      account("INCOME", "4000", "Income", "4100", "Furniture sales", sales),
+      { ...subtotal("INCOME", "4000", "Income", sales), ...H1 },
+      total("INCOME", sales),
+      account("EXPENSE", "6000", "Operating expenses", "6200", "Rent and utilities", rent),
+      account("EXPENSE", "6T10", "Staff costs", "6T12", "Wages", wages),
+      { ...subtotal("EXPENSE", "6T10", "Staff costs", wages), ...H2 },
+      { ...subtotal("EXPENSE", "6000", "Operating expenses", rent + wages), ...H1 },
+      total("EXPENSE", rent + wages),
+      { section: "NET", row_kind: "NET", header_name: "Net result for the period", amount: sales - rent - wages },
+    ];
+  };
+  beforeEach(() => serve({ pl: (from, to) => pl(from, to, monthBody(back(from))) }));
+
+  /** Each row of a By month table, its cells' text. */
+  const cells = (t: HTMLElement) => Array.from(t.querySelectorAll("tbody tr"))
+    .map((tr) => Array.from(tr.children).map((td) => (td.textContent ?? "").trim()));
+  const loaded = async (testId: string) => {
+    const t = await screen.findByTestId(testId);
+    await within(t).findAllByRole("row");
+    return t;
+  };
+  const reads = (path: string) => api.fetch.mock.calls.map(([u]) => new URL(u as string, "http://portal.test"))
+    .filter((u) => u.pathname === `/api/finance/ledger/${path}`);
+
+  it("each month's column shows what the Profit and Loss shows for that month, line by line", async () => {
+    const view = show(`${PL_AT}?plView=month&plMonths=3`);
+    const byMonth = cells(await loaded("profit-and-loss-by-month"));
+    view.unmount();
+    for (const [i, ym] of [YM, PREV, PREV2].entries()) {
+      const one = show(`${PL_AT}?from=${ym}-01&to=${lastDay(ym)}`);
+      const table = screen.getByTestId("profit-and-loss");
+      await within(table).findByRole("link", { name: "4100" });
+      const single = lines(table).map((l) => l.split(" | "));
+      const column = byMonth.map((r) => [r[0], r[i + 1]]);
+      // Every band, heading, account and the net result the statement prints, with its amount.
+      for (const printed of single) expect(column).toContainEqual(printed);
+      // A row the statement leaves out is an account at RM 0.00 that month.
+      for (const [label, amount] of column) {
+        if (!single.some(([l]) => l === label)) expect([label, amount]).toEqual([label, rm(0)]);
+      }
+      one.unmount();
+    }
+  });
+
+  it("latest month first, a heading two deep with its own subtotal every month, in chart order", async () => {
+    show(`${PL_AT}?plView=month&plMonths=3`);
+    const t = await loaded("profit-and-loss-by-month");
+    expect(Array.from(t.querySelectorAll("th")).map((th) => th.textContent))
+      .toEqual(["Account", fmtMonth(YM), fmtMonth(PREV), fmtMonth(PREV2)]);
+    expect(cells(t)).toEqual([
+      ["Income", rm(1000), rm(2000), rm(3000)],
+      ["4100 Furniture sales", rm(1000), rm(2000), rm(3000)],
+      ["Expense", rm(150), rm(100), rm(250)],
+      ["Operating expenses", rm(150), rm(100), rm(250)],
+      ["6200 Rent and utilities", rm(100), rm(0), rm(100)],
+      ["Staff costs", rm(50), rm(100), rm(150)],
+      ["6T12 Wages", rm(50), rm(100), rm(150)],
+      ["Net result", rm(850), rm(1900), rm(2750)],
+    ]);
+    expect(within(t).getByText("Staff costs")).toHaveClass("pl-4");
+    expect(within(t).getByText("6T12 Wages")).toHaveClass("pl-8");
+  });
+
+  it("carries the department picked into every month's read, on both statements", async () => {
+    const view = show(`${PL_AT}?dept=SHOWROOM&plView=month&plMonths=12`);
+    await loaded("profit-and-loss-by-month");
+    view.unmount();
+    show(`${BS_AT}?dept=SHOWROOM&bsView=month&bsMonths=12`);
+    await loaded("balance-sheet-by-month");
+    const all = [...reads("profit-and-loss"), ...reads("balance-sheet")];
+    expect(all.length).toBeGreaterThanOrEqual(24);
+    for (const u of all) expect(u.searchParams.get("departmentType")).toBe("SHOWROOM");
+  });
+
+  it("reads each month once and never more than twelve", async () => {
+    const view = show(`${PL_AT}?plView=month&plMonths=12`);
+    await loaded("profit-and-loss-by-month");
+    view.unmount();
+    show(`${BS_AT}?bsView=month&bsMonths=12`);
+    await loaded("balance-sheet-by-month");
+    expect(new Set(reads("profit-and-loss").map(String)).size).toBe(12);
+    expect(new Set(reads("balance-sheet").map(String)).size).toBe(12);
+    // Each Balance Sheet column is as of its month's last day; this month's is today.
+    expect(reads("balance-sheet").map((u) => u.searchParams.get("asOf"))).toContain(TODAY);
+    expect(lastMonths(TODAY, 24)).toHaveLength(12);
+  });
+
+  it("a Months value the page does not offer reads six", async () => {
+    show(`${PL_AT}?plView=month&plMonths=24`);
+    const t = await loaded("profit-and-loss-by-month");
+    expect(t.querySelectorAll("th")).toHaveLength(7);
+  });
+
+  it("a month before go-live prints no figures, and the page says when the ledger started", async () => {
+    const notice = (from: string, to: string) => ({ rows: [{ ordinal: 1, ...BLANK, row_kind: "NOTICE",
+      report_status: "BEFORE_GO_LIVE", go_live_on: GO_LIVE, period_from: from, period_to: to }] });
+    serve({ pl: (from, to) => (to < GO_LIVE ? notice(from, to) : pl(from, to, monthBody(back(from)))) });
+    show(`${PL_AT}?plView=month&plMonths=6`);
+    const t = await loaded("profit-and-loss-by-month");
+    expect(screen.getByTestId("profit-and-loss-by-month-go-live"))
+      .toHaveTextContent(`The ledger started on ${fmtDate(GO_LIVE)}. Months before then have no figures.`);
+    // Months three, four and five back ended before go-live: every cell empty, never RM 0.00.
+    for (const r of cells(t)) expect(r.slice(4)).toEqual(["", "", ""]);
+  });
+
+  it("Export Excel writes the table on screen, numbers as numbers", async () => {
+    show(`${PL_AT}?dept=SHOWROOM&plView=month&plMonths=3`);
+    const t = await loaded("profit-and-loss-by-month");
+    fireEvent.click(within(screen.getByTestId("profit-and-loss-by-month-export")).getByRole("button", { name: "Export Excel" }));
+    await waitFor(() => expect(xlsx.file).toBe(`Profit and Loss by month ${fmtMonth(PREV2)} to ${fmtMonth(YM)} Showroom.xlsx`));
+    expect(xlsx.rows.slice(0, 2)).toEqual([["Profit and Loss by month"], ["Department", "Showroom"]]);
+    const body = xlsx.rows.slice(xlsx.rows.findIndex((r) => r.length === 0) + 1);
+    expect(body[0]).toEqual(["Account", fmtMonth(YM), fmtMonth(PREV), fmtMonth(PREV2)]);
+    expect(body[4]).toEqual(["Operating expenses", 150, 100, 250]);
+    expect(body.slice(1).map((r) => r.map((c) => (typeof c === "number" ? rm(c) : String(c).trim())))).toEqual(cells(t));
+  });
+});
+
+// 0688 (Chew 2026-10-12, Finance MASTER §3.5): the statements show stock on
+// hand worked out from Stock's Units, provisional until Stock confirms a month.
+describe("Reports — stock on hand", () => {
+  const stockedBody = (): Row[] => [
+    account("ASSET", "1100", "Cash and bank", "1120", "Bank — current account", 5200),
+    subtotal("ASSET", "1100", "Cash and bank", 5200),
+    { ...account("ASSET", "1300", "Stock", "330-0000", "STOCK", 1500), reclassified: 1500, reclassified_for: "STOCK" },
+    subtotal("ASSET", "1300", "Stock", 1500),
+    total("ASSET", 6700),
+    account("LIABILITY", "2100", "Payables", "2110", "Trade payables — suppliers", 2800),
+    subtotal("LIABILITY", "2100", "Payables", 2800),
+    total("LIABILITY", 2800),
+    account("EQUITY", "3000", "Equity", "3100", "Share capital", 0),
+    subtotal("EQUITY", "3000", "Equity", 0),
+    { section: "EQUITY", row_kind: "DERIVED", header_name: "Result not yet closed to equity", amount: 3900 },
+    total("EQUITY", 3900),
+    { section: "CHECK", row_kind: "EQUATION", amount: 0 },
+  ];
+  const STOCK_LINE = "Shows the stock on hand from Stock's Units, RM 1,500.00 more than the books hold. It is provisional until Stock confirms the month.";
+
+  it("the stock line says it shows the stock on hand from Stock's Units", async () => {
+    serve({ bs: (a) => bs(a, stockedBody()) });
+    show(BS_AT);
+    const table = screen.getByTestId("balance-sheet");
+    const row = (await within(table).findByRole("link", { name: "330-0000" })).closest("tr")!;
+    expect(row).toHaveTextContent("RM 1,500.00");
+    expect(within(row).getByRole("button", { name: STOCK_LINE })).toBeInTheDocument();
+    expect(paidBeforeInvoiceNote({ reclassified: -200, reclassifiedFor: "STOCK" }))
+      .toBe("Shows the stock on hand from Stock's Units, RM 200.00 less than the books hold. It is provisional until Stock confirms the month.");
+  });
+
+  it("under each statement, says where its stock comes from and where its Units are listed", async () => {
+    serve();
+    show(PL_AT);
+    const plNote = await screen.findByTestId("profit-and-loss-stock-note");
+    expect(plNote).toHaveTextContent("Stock at the start and at the end of the period is worked out from Stock's Units. It is provisional until Stock confirms the month");
+    expect(plNote).toHaveTextContent("Stock value under Reports lists the Units.");
+  });
+
+  it("under a department, says stock on hand is in All only", async () => {
+    serve();
+    show(`${BS_AT}?dept=OFFICE`);
+    const note = await screen.findByTestId("balance-sheet-stock-note");
+    expect(note).toHaveTextContent("Stock on hand is shown under All only: it is not split by channel.");
+    expect(within(note).queryByRole("link")).toBeNull();
+  });
+});
+
+// ── Report drill-down (Chew 2026-10-21) ─────────────────────────────────────
+
+describe("Reports — an account line opens the entries behind it", () => {
+  const chartAccount = (code: string, special: string | null = null) => ({
+    code, name: code, kind: "ASSET", parent_code: null, is_control: false, control_for: null,
+    is_active: true, is_header: false, sort_order: 0, section: null, special,
+  });
+  const line = (entryNo: string, debit: number, credit: number, over: Row = {}) => ({
+    entryDate: FROM, entryNo, sourceType: "SALES_INVOICE", docNo: `INV-${entryNo}`, description: "Sale",
+    debit, credit, balance: 0, partyType: null, partyName: null, ...over,
+  });
+  const drillAnswer = (account: string, kind: string, lines: ReturnType<typeof line>[], opening = 0) => ({
+    status: "OK", go_live_on: GO_LIVE, from: FROM, to: TO, account,
+    block: { code: account, name: account, kind, opening, lines, totalDebit: 0, totalCredit: 0, closing: 0 },
+  });
+
+  /** The statements as `serve` answers them, the chart, and one drill answer per account. */
+  function serveDrill(drills: Record<string, unknown>, specials: Record<string, string> = {}, bsRows: Row[] = bsBody(0)) {
+    api.fetch.mockImplementation(async (url: string) => {
+      const u = new URL(url, "http://portal.test");
+      if (u.pathname === "/api/finance/ledger/profit-and-loss") return pl(u.searchParams.get("from")!, u.searchParams.get("to")!, PL_BODY);
+      if (u.pathname === "/api/finance/ledger/balance-sheet") return bs(u.searchParams.get("asOf")!, bsRows);
+      if (u.pathname === "/api/finance/ledger/accounts") {
+        return { go_live_on: GO_LIVE, accounts: ["4100", "4300", "5100", "6200", "1120", "1210", "2110", "2210"].map((c) => chartAccount(c, specials[c] ?? null)) };
+      }
+      if (u.pathname === "/api/finance/ledger/report-drill") {
+        const a = drills[u.searchParams.get("account")!];
+        if (!a) throw new Error(`unexpected drill ${url}`);
+        return a;
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    });
+  }
+  const drillReads = () => api.fetch.mock.calls.map(([u]) => new URL(u as string, "http://portal.test"))
+    .filter((u) => u.pathname === "/api/finance/ledger/report-drill");
+
+  it("a Profit and Loss account line opens its entries for the same period and department; they add up to the line; a second click folds it", async () => {
+    const CUST = { partyType: "CUSTOMER", partyName: "Test Customer" };
+    serveDrill({ "4100": drillAnswer("4100", "INCOME", [line("JE-1", 0, 12000, CUST), line("JE-2", 0, 600), line("JE-3", 100, 0)]) });
+    show(`${PL_AT}?dept=SHOWROOM&from=${FROM}&to=${TO}`);
+    const toggle = await screen.findByTestId("table-expand-INCOME:line:4100");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(toggle);
+    const drill = await screen.findByTestId("profit-and-loss-drill-4100");
+    const read = drillReads()[0]!;
+    expect(Object.fromEntries(read.searchParams)).toEqual({ account: "4100", from: FROM, to: TO, departmentType: "SHOWROOM" });
+    const rows = within(drill).getAllByTestId("profit-and-loss-drill-4100-row");
+    expect(rows.map((r) => Array.from(r.children).map((td) => (td.textContent ?? "").trim()))).toEqual([
+      [fmtDate(FROM), "JE-1", "Sale", "INV-JE-1", "Test Customer", "RM 12,000.00"],
+      [fmtDate(FROM), "JE-2", "Sale", "INV-JE-2", "", "RM 600.00"],
+      // A debit on an income account takes off the line.
+      [fmtDate(FROM), "JE-3", "Sale", "INV-JE-3", "", rm(-100)],
+    ]);
+    expect(within(drill).getByRole("link", { name: "JE-1" })).toHaveAttribute("href", "/finance/ledger?entry=JE-1");
+    // 12,000 + 600 - 100 = 12,500, the line's figure: no difference is said.
+    expect(screen.queryByTestId("profit-and-loss-drill-4100-differs")).not.toBeInTheDocument();
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(toggle);
+    expect(screen.queryByTestId("profit-and-loss-drill-4100")).not.toBeInTheDocument();
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("entries that do not add up to the line say the difference in red, never a silent total", async () => {
+    serveDrill({ "4100": drillAnswer("4100", "INCOME", [line("JE-1", 0, 12000)]) });
+    show(`${PL_AT}?from=${FROM}&to=${TO}`);
+    fireEvent.click(await screen.findByTestId("table-expand-INCOME:line:4100"));
+    const differs = await screen.findByTestId("profit-and-loss-drill-4100-differs");
+    expect(differs).toHaveTextContent("Entries add up to RM 12,000.00; the line shows RM 12,500.00.");
+    expect(differs).toHaveClass("text-kit-red-11");
+  });
+
+  it("a heading, a band and the bottom line do not drill; under All the stock accounts do not either", async () => {
+    serveDrill({}, { "5100": "SCS" });
+    show(`${PL_AT}?from=${FROM}&to=${TO}`);
+    const table = screen.getByTestId("profit-and-loss");
+    await within(table).findByTestId("table-expand-INCOME:line:4100");
+    expect(within(table).getByTestId("table-expand-EXPENSE:line:6200")).toBeInTheDocument();
+    // Headings print with no disclosure; the closing stock account carries live stock, not entries.
+    expect(within(table).queryByTestId("table-expand-EXPENSE:group:5000")).not.toBeInTheDocument();
+    expect(within(table).queryByTestId("table-expand-EXPENSE:group:6000")).not.toBeInTheDocument();
+    expect(within(table).queryByTestId("table-expand-EXPENSE:line:5100")).not.toBeInTheDocument();
+    expect(drillReads()).toEqual([]);
+  });
+
+  it("under a department, a stock account's line is the books' own and drills", async () => {
+    serveDrill({ "5100": drillAnswer("5100", "EXPENSE", [line("JE-9", 7000, 0)]) }, { "5100": "SCS" });
+    show(`${PL_AT}?dept=SHOWROOM&from=${FROM}&to=${TO}`);
+    fireEvent.click(await screen.findByTestId("table-expand-EXPENSE:line:5100"));
+    expect(await screen.findByTestId("profit-and-loss-drill-5100")).toHaveTextContent("RM 7,000.00");
+  });
+
+  it("the Balance Sheet drills from the ledger's first day to the as-of day; its stock line does not drill", async () => {
+    serveDrill({ "1210": drillAnswer("1210", "ASSET", [line("JE-4", 2000, 0), line("JE-5", 0, 350)]) }, { "1120": "SBS" });
+    show(`${BS_AT}?asOf=${TODAY}`);
+    const table = screen.getByTestId("balance-sheet");
+    fireEvent.click(await within(table).findByTestId("table-expand-ASSET:line:1210"));
+    expect(within(table).queryByTestId("table-expand-ASSET:line:1120")).not.toBeInTheDocument();
+    expect(within(table).queryByTestId("table-expand-EQUITY:unclosed")).not.toBeInTheDocument();
+    const drill = await screen.findByTestId("balance-sheet-drill-1210");
+    expect(Object.fromEntries(drillReads()[0]!.searchParams)).toEqual({ account: "1210", from: GO_LIVE, to: TODAY });
+    // 2,000 - 350 = 1,650, the line's figure.
+    expect(within(drill).getAllByTestId("balance-sheet-drill-1210-row")).toHaveLength(2);
+    expect(screen.queryByTestId("balance-sheet-drill-1210-differs")).not.toBeInTheDocument();
+  });
+
+  // 0506: customers paid RM 2,815.00 before their invoices. The database prints
+  // 1210 as its booked RM -815.00 less the moved RM -2,815.00, and 2210 as its
+  // booked RM 0.00 plus RM 2,815.00 (Chew 2026-10-21: shown as rows, not red).
+  const movedBody = (): Row[] => [
+    account("ASSET", "1100", "Cash and bank", "1120", "Bank — current account", 5200),
+    subtotal("ASSET", "1100", "Cash and bank", 5200),
+    { ...account("ASSET", "1200", "Receivables", "1210", "Trade receivables — customers", 2000), reclassified: -2815, reclassified_for: "CUSTOMER" },
+    subtotal("ASSET", "1200", "Receivables", 2000),
+    total("ASSET", 7200),
+    { ...account("LIABILITY", "2200", "Customer money held", "2210", "Customer deposits held", 2815), reclassified: 2815, reclassified_for: "CUSTOMER" },
+    subtotal("LIABILITY", "2200", "Customer money held", 2815),
+    total("LIABILITY", 2815),
+    account("EQUITY", "3000", "Equity", "3100", "Share capital", 0),
+    subtotal("EQUITY", "3000", "Equity", 0),
+    { section: "EQUITY", row_kind: "DERIVED", header_name: "Result not yet closed to equity", amount: 4385 },
+    total("EQUITY", 4385),
+    { section: "CHECK", row_kind: "EQUATION", amount: 0 },
+  ];
+  const description = (drill: HTMLElement, testId: string) => within(drill).getAllByTestId(testId)
+    .map((r) => Array.from(r.children).map((td) => (td.textContent ?? "").trim()))
+    .map((c) => [c[2], c[5]]);
+
+  it("the debtor line money was moved off drills to its entries and a Moved to row, adding up to the line with no red", async () => {
+    serveDrill({ "1210": drillAnswer("1210", "ASSET", [line("JE-4", 3000, 0), line("JE-5", 0, 3815)]) }, {}, movedBody());
+    show(`${BS_AT}?asOf=${TODAY}`);
+    fireEvent.click(await screen.findByTestId("table-expand-ASSET:line:1210"));
+    const drill = await screen.findByTestId("balance-sheet-drill-1210");
+    // 3,000 - 3,815 + 2,815 = 2,000, the line's figure.
+    expect(description(drill, "balance-sheet-drill-1210-row")).toEqual([
+      ["Sale", "RM 3,000.00"],
+      ["Sale", rm(-3815)],
+      ["Moved to Customer deposits held", "RM 2,815.00"],
+    ]);
+    expect(screen.queryByTestId("balance-sheet-drill-1210-differs")).not.toBeInTheDocument();
+  });
+
+  it("the line the money was moved onto shows Moved from, adding up to the line", async () => {
+    serveDrill({ "2210": { status: "OK", go_live_on: GO_LIVE, from: GO_LIVE, to: TODAY, account: "2210", block: null } }, {}, movedBody());
+    show(`${BS_AT}?asOf=${TODAY}`);
+    fireEvent.click(await screen.findByTestId("table-expand-LIABILITY:line:2210"));
+    const drill = await screen.findByTestId("balance-sheet-drill-2210");
+    expect(description(drill, "balance-sheet-drill-2210-row")).toEqual([
+      ["Moved from Trade receivables — customers", "RM 2,815.00"],
+    ]);
+    expect(screen.queryByTestId("balance-sheet-drill-2210-differs")).not.toBeInTheDocument();
+  });
+
+  it("a gap the moves do not explain still shows red", async () => {
+    serveDrill({ "1210": drillAnswer("1210", "ASSET", [line("JE-4", 3000, 0), line("JE-5", 0, 3900)]) }, {}, movedBody());
+    show(`${BS_AT}?asOf=${TODAY}`);
+    fireEvent.click(await screen.findByTestId("table-expand-ASSET:line:1210"));
+    expect(await screen.findByTestId("balance-sheet-drill-1210-differs"))
+      .toHaveTextContent("Entries add up to RM 1,915.00; the line shows RM 2,000.00.");
+  });
+
+  it("nothing drills until the chart is read", async () => {
+    serve();
+    show(`${PL_AT}?from=${FROM}&to=${TO}`);
+    await within(screen.getByTestId("profit-and-loss")).findByRole("link", { name: "4100" });
+    expect(screen.queryByTestId("table-expand-INCOME:line:4100")).not.toBeInTheDocument();
+  });
+});
+
 describe("Reports words", () => {
   const here = dirname(fileURLToPath(import.meta.url));
-  itSaysNoBannedWord(join(here, "FinanceReports.tsx"), { minStrings: 12, expectString: "No opening balances" });
+  itSaysNoBannedWord(join(here, "FinanceReports.tsx"), { minStrings: 12, expectString: "Months before then have no figures." });
+  itSaysNoBannedWord(join(here, "reports", "by-month.ts"), { minStrings: 3, expectString: "Net result not yet closed" });
   itSaysNoBannedWord(join(here, "reports", "StatementTable.tsx"), { minStrings: 3, expectString: "Net result not yet closed" });
+  itSaysNoBannedWord(join(here, "reports", "ReportDrill.tsx"), { minStrings: 3, expectString: "Name not available" });
 });

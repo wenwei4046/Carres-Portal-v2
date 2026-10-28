@@ -10,6 +10,30 @@
 
 ---
 
+**Preserved older checkouts:** fetch `origin/main` before UI work and read `git show origin/main:docs/ui/MASTER.md` if the local checkout still contains older UI drafts. Preserve uncommitted work; the current main MASTER is the authority, not an older local specimen or chat memory. PR #2087 published the consolidated baseline; publication alone does not prove runtime adoption.
+
+## Shared Blueprint reading entry — Claude, Codex and ChatGPT
+
+Use the current repository files, not a remembered chat answer or frozen restart copy.
+Before ERP work, read `docs/ERP-ARCHITECTURE.md`, the owning `docs/<module>/MASTER.md`,
+and the relevant upstream/downstream authority. `Carres Settings List.md` is the single
+Settings inventory; `Carres-Business-Blueprint-RESTART-2026-10-07/26-BLUEPRINT-AUDIT-BACKLOG.md`
+is the existing completion/gap audit, not another business authority.
+
+Independent checkouts must fetch `origin/main` and compare their governing files before
+continuing; preserve local work and reconcile newer authority instead of overwriting it.
+A chat can read current remote authority with `git show origin/main:<path>` without changing
+its application branch. Claude and Codex follow this same entry. ChatGPT needs repository
+access or the current supplied files; chat memory alone is not repository access.
+Document publication does not turn proposals into approved law, authorise application builds,
+or prove production implementation. Keep FACT, PROPOSAL, APPROVED, BUILT and VERIFIED separate.
+
+**Design / IT ownership — owner 22 Oct 2026:** read UI MASTER **How design and IT work**.
+Design/specification and IT Houzs reuse/integration proceed in parallel; IT owns backend testing.
+Design reviews the integrated UI without duplicating backend tests. Keep existing release and
+SQL approval gates; record each verification state separately in the existing module authority.
+
+
 ## 1 · Mission
 
 Carres sells furniture. This portal runs the business end to end — a customer order is taken,
@@ -22,8 +46,14 @@ number, the party and the date already worked out, and one obvious button.
 
 ---
 
+**Owner15Oct2026 · one physical UI/UX MASTER:** `docs/ui/MASTER.md` alone contains the values/measurements, component contracts, UX and page compositions. Former 01/02/03 rule bodies have moved into its named parts; old paths redirect only. Any later reference in this constitution to01/02/03 means those parts of the same MASTER. Never recreate their old independent rule bodies. Preserve conforming parts; fix specific deviations through the shared component. Owner delegated common engineering defaults to be set once, then visually corrected in this same MASTER. Business law and explicit approved design remain binding.
+
 **Mandatory UI cold-start:** before any listing/UI proposal or build, read `docs/ui/MASTER.md`
-§6.7–6.10, the owning module's listing section, and its `docs/COPY-STANDARD.md` entries.
+**§0 Current kit index first** (one current source per thing on screen; anything not listed is not a
+pattern to copy), then §0.1–§0.3 (page anatomy, shared module page flow, every-new-chat procedure),
+§6.0 and the section for the part being built, the values/component/pattern parts of that same MASTER, the owning
+module listing section and COPY entries. Module cards use the kit `CompactModuleCard` (§4.3), never a
+copy of its reference HTML. Reuse the kit and complete the §2.2 full-page checks before delivery.
 Approved goods/Ready Stock flows: Purchasing §9.1 SO Batch and §9.2 Manual Purchase (Jess
 2026-09-18, both BUILT 2026-09-18 — the authenticated production walk is owed for both, and
 Manual Purchase's migrations 0545–0547 + 0549 are APPLIED 2026-09-20 and only the authenticated walk
@@ -42,23 +72,23 @@ On a conflict, Business wins.
 
 - **The current page is Version N, never automatically final.** Studying it, finding it wrong
   and proposing better is your DUTY. Building before approval is the only thing forbidden.
+- **Current kit adoption — owner 12 Oct 2026 · supplied 12 Oct, 5:35 PM:** the `design_handoff_sales_order_ui_kit` folder of 12 Oct 5:35 PM is the shared visual target, consolidated into the existing 01/02/03 and UI MASTER. **Every kit the owner hands over replaces the kit** (owner 12 Oct 2026: "I only want one version"): update 01/02/03, UI MASTER, `docs/ui/carres-tokens.css` and the specimen together, and delete whatever the new kit contradicts. Runtime migration and complete-page verification are still owed for most pages, so much of the running app still draws the previous kit; say which parts follow the kit instead of implying it. Imported HTML under `docs/ui-reference/sales-order-design/` is a specimen only, shown with TEST customer details. Where the package conflicts with COPY-STANDARD or a module MASTER its value is PROPOSAL / NOT LAW (01 §10). Do not import its mock business rules or clone its page CSS.
 - **Token VALUES are locked** — spacing, colour, typography, icons live in
-  `docs/01-design-tokens.md` and are not design opinions. **Composition is yours.**
+  the values part of `docs/ui/MASTER.md` and are not design opinions. **Composition is yours.**
 - **A component that does not exist: STOP and ask for it to join the kit.** Never draw one
   inline "just this once".
 - **THE ONE KIT LAW — owner ruling 2026-09-27 (Jess: "every page must follow · delete the old UI
   kit, update the new · chats don't read and create new").** There is ONE UI kit:
-  `docs/01-design-tokens.md` · `docs/02-components.md` · `docs/03-page-patterns.md` ·
-  `docs/ui/MASTER.md` §6.0. Every page, every module, every chat follows it; a page that differs
+  `docs/ui/MASTER.md` alone, including its values, components, page patterns and §6.0. Every page, every module, every chat follows it; a page that differs
   is a defect, never a "page style". Before ANY UI proposal, mock or build, read §6.0 and the
   tokens — a chat that has not read them may not draw. Never create a new component, colour, type
   size, word, rail, table or guide document; when a kit gap is real, admit the thing to the kit
   (with its `/ui` example) and every page gets it. When an old rule is found, DELETE it and update
   the kit in the same change — never leave two versions. The old kit files are gone
-  (`UI-KIT-NEW-CHAT`, `archive/UI-KIT-*`, `ui-reference/`, the `carres-design` skill); do not
-  recreate them. Portal-wide standards ruled the same day: **no dash anywhere on a screen** ·
-  **card titles are black bold `text-strong`, never blue** · **column separators by column
-  count** · **rail = icon + title only; every group closed until clicked, its chosen value on the header; two views are a tab bar (owner ruling 2026-09-28, overwrites 2026-09-27)** · **header filter icons on hover only**.
+  (`UI-KIT-NEW-CHAT`, `archive/UI-KIT-*`, the `carres-design` skill, the old `ui-reference/` mocks);
+  do not recreate them. `docs/ui-reference/` holds the current Sales Order visual specimen plus compact-card behaviour evidence, and `components/retired-components.test.ts` blocks new use of
+  the retired `Btn`, `Field` and `PageHeader`. Portal-wide standards ruled the same day: **no dash anywhere on a screen** ·
+  **card titles use current 01 typography and ink** · **table separators follow current 01** · **contextual Summary/Tasks and module views follow current 03/UI MASTER; do not revive the superseded SO rail composition** · **header filter icons on hover only**.
 - **Content decides column width**, never the table width. **Expand has exactly one job.**
   **An inline second line is the only exception.**
 - **Copy the POWER of the tools the team already uses, never their ASSUMPTIONS.** AutoCount's
@@ -95,27 +125,31 @@ still requires delivery/production proof. A proposal never becomes authority thr
 | Module / responsibility | Canonical current authority | State | Resume execution at |
 |---|---|---|---|
 | Catalog | No module MASTER yet; boundary in `docs/ERP-ARCHITECTURE.md` | **PROPOSAL / authority gap** | PLAN a complete Catalog Blueprint; do not infer rules from other modules |
-| Sales Orders / Customer Order | `docs/orders/MASTER.md` | **PRODUCTION-VERIFIED / LOCKED · Blueprint 2026-09-26 PLAN COMPLETE** | §0.0 READY scopes A–F (APPROVED TARGET / NOT BUILT); preserve verified register/object truth |
+| Sales Orders / Customer Order | `docs/orders/MASTER.md` | **LOCKED business law · consolidated Blueprint 2026-10-01 PLAN COMPLETE; implementation partial** | §0.0 approved handoff scopes and acceptance boundaries; #1834 scoped amendment implementation is for review, not deployment proof; preserve verified register/object truth |
 | Purchasing / Purchase Orders | `docs/purchasing/MASTER.md` | **APPROVED / LOCKED** | Its measured current blocks and Approved Evolution; do not revive old queues |
 | PO windows + supplier delay/day-before evidence | `docs/purchasing/MASTER.md` §§5.6.1, 5.7; Workspace §6.2; Orders charter; Stock §2; Delivery §1; COPY | **DEPLOYED — PO window Work card + storage; migrations 0584/0585 APPLIED 2026-09-25; per-line `Record supplier answer` + day-before check per batch DEPLOYED 2026-09-26 with 0587 APPLIED (Purchasing §5.7 production record); owner walk owed; Settings screen for window times BUILT 2026-09-28 (supplier earlier cut-off still has no screen)** | Batch demand into editable 11:30 and optional 16:00 standard windows on the days ticked in the `PO Days` setting (Jess 2026-09-25; she sets it to every Office working day); supplier earlier cut-off wins. Default PO date is not confirmation. Supplier answers are recorded per PO goods line in one `Record supplier answer` form (Confirmed / New date / Split delivery; photo, video, PDF evidence; eight governed delay reasons — Jess 2026-09-25); one-working-day-before asks for Supplier DO or exact-date confirmation per batch. Workspace §5.10/§6.1 mirror this; Purchasing owns the write doors. Preserve module boundaries. |
 | Chase answer link (all modules) + outstation release | `docs/ERP-ARCHITECTURE.md` §§6.4–6.5; Delivery §14.1; Payment "Collection timing" | **OWNER-APPROVED 2026-09-24 / NOT BUILT** | Every remind/chase to an outside party links to its scoped Portal answer surface; answers write the owning module's record; NETS first, each party's login rollout needs owner authorisation. Outstation: customer WhatsApp confirmation with proof before the first leg leaves Klang; payment complete 3 working days before Confirmed Delivery. |
 | Manual Purchase create / returned-request edit | `docs/purchasing/MASTER.md` §9.2; COPY; UI MASTER split rule | **BUILT (Cards 13/13-B); authenticated saved-request and issue lifecycle still owed** | Sales Order composition; `Request Details → Delivery → Items`, 50/50 internal MPR preview. §9.2 also owns MPR → PO review reuse and five-fact grouping. Owner selected A: retain request approval, no financial placement gate; PO date follows Settings, not the MPR requested date. |
+| Forecast Purchase · Outright | `docs/purchasing/MASTER.md` §9.14; COPY "Forecast Purchase · Outright"; 01 §5 | **Approval RULING 14 Oct 2026 (A) · page = design handoff 13 Oct 2026 · algorithm and stock models PROPOSAL / NOT LAW · BUILT · 0695 APPLIED · DEPLOYED 14 Oct 2026 (`7e9d3d147`); signed-in production walk 14 Oct 2026 PASS at three widths, one narrowing defect fixed in #2058** | Weekly stock suggestion under SO Batch Purchase. The page asks and never issues: `Send for approval` goes through the forecast's submit door (0695: one at a time, retry-safe, calls the existing request door); the Purchasing Approver decides on the request; PO Duty issues and sends there, and that door rechecks a forecast request against today's forecast. A request in progress is never stock. The 14-day formula and the list of stock models come from the handoff only and are not law. Not approved, not built: Skip, timed Undo, a weekly task. |
 | Purchase Returns | `docs/purchasing/MASTER.md` §9.6 + `docs/COPY-STANDARD.md` | **Register BUILT + DEPLOYED 2026-09-19 (`7e9e7c37`), 0548 APPLIED; creation door (Record what Carres does next · Issue Purchase Return · send · pickup Work) BUILT ON BRANCH 2026-09-29, 0609 NOT APPLIED** | Deliver the creation-door PR; its named dependencies (Supplier Master return address editor, Stock Outbound `Return to supplier` handover, Supplier Received Date) are listed in §9.6. Preserve PR Doc Date / PR No, Category before PO No + Unit ID, the Supplier Claims-style supplier rail, `Sending not confirmed`, and no Finance |
 | Repair Orders — business scope and register UI | `docs/purchasing/MASTER.md` §9.7; Stock §12.8; Workspace §6; COPY; UI §6.7–6.8 | **APPROVED TARGET / NOT BUILT — UI confirmed 2026-09-20** | Direct inventory or Claim-linked RO; Warehouse/Showroom/Dealer including Display; actual Units and ownership facts required. Supplier Claim optional. Owner ruling B (2026-09-19): missing non-Carres owner consent permits Issue with an outstanding consent follow-up in existing Work. Owner ruling 2026-09-19: optional price in create/detail; no financial placement/Issue gate; any required approval is Jess-only. **Owner correction 2026-09-20:** no backdated RO Doc Date; automatic 14 working days from Supplier receipt of the RO document, separate Supplier return reply; show all Unit IDs directly. See §9.7 for calendar/admission gaps. **Register UI confirmed 2026-09-20:** the 17-column order, the per-Unit expansion with `Problem` and `Evidence` separate, and a five-group rail with NO quotation/approval facet. Read §9.7 before resuming; the page is still `Coming soon` and two structural conflicts (0490 mints `RO No` on the return leg; no shared Issue engine) are named there and must be resolved before build. |
 | Purchasing confirmed UI handoff — all six reviewed pages | `docs/purchasing/MASTER.md` §9.1–9.6; COPY and UI MASTER | **Confirmed decisions recorded on main; build status remains per page** | SO Batch #1459 merged; Manual design #1457 merged, build #1464 merged (`55ee52e7`) with migrations **0546 + 0547 APPLIED 2026-09-20** (§9.2 records the governed application evidence); PO #1462 merged, its listing BUILT and DEPLOYED 2026-09-18 (`6de125c1`) with the authenticated walk still owed; Receiving #1461 merged, its listing BUILT and DEPLOYED 2026-09-19 (#1467, `896a7b12`); a rendered walk 2026-09-19 found and fixed a 🔴 pinning defect (missing `min-w-0`), leaving only the real-data walk owed; Supplier Claims specification synced from #1463; Returns #1465 merged. Read current sections; do not restart design or revive older PR text. |
 | Receiving | `docs/purchasing/MASTER.md` §§7.3, 9.4 | **APPROVED / LOCKED** | Receipt facts and source-linked supplier claim reporting; no Service Case prerequisite |
 | Supplier Claims | `docs/purchasing/MASTER.md` §9.5 | **APPROVED / LOCKED** | Purchasing-owned stock claims from Stock/PO/receipt evidence; customer Service Cases are separate |
 | Stock / Warehouse | `docs/stock/MASTER.md` | **LOCKED** | Measured Stock implementation and explicit approved gaps in that MASTER |
-| Delivery | `docs/delivery/MASTER.md` | **APPROVED / LOCKED** | The approved top-to-toe target; current implementation may lag |
+| Delivery | `docs/delivery/MASTER.md` | **APPROVED / LOCKED** | §2.1 assignment timing (2026-09-29) and §6 actual-date/time precision (2026-09-30) are APPROVED TARGET / NOT BUILT: assignment opens early with a configurable cut-off; actual delivery date required, exact time optional and never guessed. Preserve the approved operating model; implementation may lag |
 | Payment / Money In | `docs/payment/MASTER.md` | **APPROVED / LOCKED** | Its approved-target/not-built convergence work; Payment remains customer money only |
+| Showroom / Dealer — page and request journey | `docs/purchasing/MASTER.md` §9.8; `docs/stock/MASTER.md` §3; `docs/service/MASTER.md` §1.1 | **APPROVED TARGET / NOT BUILT — owner 2026-10-02** | Current location goods from owning Warehouse/asset facts; orders/requests and actual movement history; normal new-purchase rules with optional outgoing goods; existing-item service; meaningful external facts, internal Work ownership. PJ database has 36 IDs, not a physical-audit claim. Receiver-applied labels; counted goods have no Unit ID. No approved 5/7/3 service timetable or blanket Dealer14day guarantee. |
 | Service Cases | `docs/service/MASTER.md` | **APPROVED / LOCKED** | Implement the approved 2026-08-14 Case/playbook rulings; no new business interview |
 | Guarantee / Service Package | `docs/guarantee/MASTER.md` | **APPROVED / LOCKED** | Preserve shipped entitlement baseline; implement the dated policy/playbook rulings |
-| Rental / Subscription | `docs/rental/MASTER.md`; cross-module pointer `docs/ERP-ARCHITECTURE.md` §6.3 | **Existing Rental law LOCKED; scoped new owner targets APPROVED / NOT BUILT; remaining design PROPOSAL / NOT LAW** | Read §4 and §§5.6, 5.8–5.9 for advance supply, Diglant holding, NETS Klang Valley, regional logistics evidence and service lifecycle. All connected Portal tasks must preserve these boundaries; do not infer full-blueprint or build approval. |
+| Rental / Subscription | `docs/rental/MASTER.md`; cross-module pointer `docs/ERP-ARCHITECTURE.md` §6.3 | **§0 Subscription rules (Chew, 2026-10-07) APPROVED / NOT BUILT; Jess's supply, logistics and service targets APPROVED / NOT BUILT; remaining design PROPOSAL / NOT LAW** | Read §0 first (billing, invoices, interest, paying off, default, termination, commission, Diglant, agreement), then §4 and §§5.6, 5.8–5.9 for advance supply, Diglant holding, NETS Klang Valley, regional logistics evidence and service lifecycle. All connected Portal tasks must preserve these boundaries; do not infer full-blueprint or build approval. |
+| Chew's modules — Finance, Dealer, Subscription | `docs/finance/MASTER.md`; `docs/rental/MASTER.md` §0 | **Owner: Chew. Finance since 2026-10-03; Dealer (records, commission, renovation rebate, KPI, statements) and Subscription after signing since 2026-10-07** | Chew rules these modules. Order placement (including signing a subscription at the POS) and Operation stay Jess's. |
 | People / HR | `docs/hr/MASTER.md` | **LOCKED** | Measured current implementation and explicit gaps in that MASTER |
-| Issue Tracker | `docs/issue-tracker/MASTER.md` | **BUILD — business law APPROVED / LOCKED** | Verify/deliver the committed Issue Tracker implementation; do not re-plan the operating model |
-| Work right panel — Logistics party card + external logistics link | `docs/workspace/MASTER.md` §§5.5, 5.9; Delivery §5.5; ERP-ARCHITECTURE §6.4; COPY "The Work Logistics card" | **OWNER-APPROVED 2026-09-24 / BUILT (0581)** | Requested / Scheduled / Delivered · time optional · three fixed checks · Logistics not assigned · no-portal partners answer through one company-level link (Copy/Revoke while active, Create otherwise). Open architecture items are Workspace §5.9's gap list — `Collected from supplier`, partner-Site receiving, the legacy leg-0 booking slot, DO download through the link. |
-| Work right panel — complete mission composition | `docs/workspace/MASTER.md` §5.10; COPY "The complete Work right panel words"; §5.9 for deployed Logistics | **OWNER-APPROVED 2026-09-25 / NOT BUILT except Logistics** | Preserve left/middle/density and §5.9 Logistics. Build compact summary → one-line concurrent Order Route → Logistics → Customer → multi-supplier Supplier → audit disclosure; 72px collapsed party cards; 743×704 acceptance. **Customer boundary:** Logistics normally contacts/agrees the date; Carres acts only for known delay, partner-reported date change/refusal or wrong phone (plus the separate governed outstation-release exception). Do not revive a routine Carres customer-scheduling workflow. |
-| Workspace — Staff & Duties + Work + Dashboard | `docs/workspace/MASTER.md` | **APPROVED / LOCKED architecture; staged delivery** | Staff & Duties final Blueprint §§3–4 owner-approved 2026-09-29 / NOT BUILT: global Settings; Duty + current name + plain dates; `Next`, collapsed `History`, manager `⋯`, `Manage staff` to People. Automatic monthly rota, next-month newcomer allocation, all active Operation staff may execute ordinary work, recorded-leave cover, bounded manual exceptions; People-owned one-confirmation departure and restricted former-profile lookup. Design approved; document merge/verification completes PLAN handoff. No application-build authorisation. Other Work/Dashboard scope remains separately governed. |
+| Issue Tracker | `docs/issue-tracker/MASTER.md` | **PLAN — business law APPROVED / LOCKED; final UI/UX NOT APPROVED; implementation NOT AUTHORISED** | Read §12 current authority status. Align each active module's Issue handoff during its Blueprint/build, then run the final whole-domain audit. Do not author Cards, build or deploy Issue Tracker until cross-module Blueprint review and explicit Owner approval; later deployment also requires the Owner's explicit `UI/UX approved` after the complete real-data localhost flow. |
+| Logistics party model + external logistics link | `docs/workspace/MASTER.md` §5.9; Delivery §5.5; ERP-ARCHITECTURE §6.4; COPY "The Work Logistics card" | **OWNER-APPROVED 2026-09-24 · rules, model and API BUILT (0581) · the card is on NO screen (measured 13 Oct 2026)** | Requested / Scheduled / Delivered · time optional · three fixed checks · Logistics not assigned · no-portal partners answer through one company-level link. FACT: the card that offers `Create link` · `Copy link` · `Revoke link` has no screen that mounts it (it had none before the 13 Oct Workspace rebuild either), so the link cannot be made from the Portal today; its model still feeds the Order Route. Giving the card a place in the one task view is open work. Open architecture items are Workspace §5.9's gap list. |
+| Workspace page — one task table with the one task view | `docs/workspace/MASTER.md` §5.10; COPY "The Workspace page words"; UI MASTER §5; 03 §8 | **Owner's round 3 brief, 13 Oct 2026 (points 3 and 4) · BUILT; deployment and the production check are recorded in Workspace §5.10, re-measure before quoting** | `Module` rail, `My Task` · `Team Work`, `To do` · `Waiting` · `Done`, one table, and a chosen row opens the ONE task view (`Steps` · `Route` · `History` · `Files`) with `Communication` under it. It reads the one Work read with the Tasks panel's own arithmetic. Internal tasks (`+ Task`, owner 2026-10-14) and `Record as sent` are built: Workspace §1 "Employee-created internal tasks" and §5.10. Not built: a person as a scope and `Take over` (Workspace §§3, 5 forbid them), `@` notes. **Customer boundary:** Logistics normally contacts/agrees the date; Carres acts only for known delay, partner-reported date change/refusal or wrong phone (plus the separate governed outstation-release exception). Do not revive a routine Carres customer-scheduling workflow. |
+| Customer Service / shared customer communication | `docs/customer-service/MASTER.md` | **BLUEPRINT / PLAN ONLY — approved boundaries; lifecycle/presentation proposals await review** | Read the complete enquiry journey, answer laws, one-hour Office response clock, shared Tasks/duty/source contracts and connected-rollout gate. No second inbox, fake SO, new unpaid-delivery approval door or application build is authorised; remaining decisions are explicit in §16. |
+| Workspace — Staff & Duties + Work + Dashboard | `docs/workspace/MASTER.md` | **APPROVED / LOCKED architecture; staged delivery** | Staff & Duties final Blueprint §§3–4 owner-approved 2026-09-29 / PARTIALLY DELIVERED: global Settings; Duty + current name + plain dates; `Next`, collapsed `History`, manager `⋯`, `Manage staff` to People. Automatic monthly rota, next-month newcomer allocation, all active Operation staff may execute ordinary work, recorded-leave cover, bounded manual exceptions; People-owned one-confirmation departure and restricted former-profile lookup. BUILD/DELIVERY authorised by Jess; Settings relocation production verified (#1791), two-period activity checks, current-person UI and assignment movements deployed (#1798). Read Workspace §4.4 for measured evidence and remaining target work. Other Work/Dashboard scope remains separately governed. |
 | Shared ERP UI | `docs/ui/MASTER.md` | **PRODUCTION-VERIFIED / LOCKED** | Apply the governed templates/tokens and the latest locked owner/action presentation law |
 
 `docs/issue-tracker/MASTER.md` is the one current Issue Tracker path. The former
@@ -503,7 +537,10 @@ production data must be modified irreversibly · long-term architecture must cha
 **BUILD/DELIVERY DEFAULT AUTONOMY.** A BUILD takeover of an approved `READY FOR CARD` scope owns the
 full vertical slice: inspect current `origin/main` and authority → implement → run targeted tests
 during development → pass the authoritative release gate → push/PR/merge → deploy → authenticated
-production verification → close the owning MASTER. If the mission says continuous build, continue
+production verification → close the owning MASTER. Before calling a module complete, proactively offer
+how to complete its Settings — every setting it needs to run, its Settings door, current value or
+default, which are still empty, and who sets it (owner ruling 2026-10-05); never wait for the owner to ask.
+If the mission says continuous build, continue
 to the next approved READY scope without asking *“what next?”* or saying *“waiting for your next
 instruction.”* Never ask Jess to choose subagent-driven vs inline execution, technical-layer order,
 test batching, branch/worktree strategy, migration numbering, PR sequence, CI strategy, deployment
@@ -614,7 +651,7 @@ Never create an empty master for symmetry.
 |---|---|
 | [`docs/COPY-STANDARD.md`](docs/COPY-STANDARD.md) | every visible word — the dictionary, the seven verbs, the banned words |
 | [`docs/ACTION-FLOW-STANDARD.md`](docs/ACTION-FLOW-STANDARD.md) | how actions are computed, appear, close, and which shows first |
-| [`docs/01-design-tokens.md`](docs/01-design-tokens.md) · [`02-components.md`](docs/02-components.md) · [`03-page-patterns.md`](docs/03-page-patterns.md) | the design system — token values and components |
+| [`docs/ui/MASTER.md`](docs/ui/MASTER.md) | the ONE physical UI/UX master: values, measurements, components, UX and page patterns |
 | [`docs/pdf/DOCUMENT-KIT.md`](docs/pdf/DOCUMENT-KIT.md) | **every printed document** — the shared shape, the owner's review rulings, which documents exist and where each one's rules live. Read it BEFORE designing any PDF |
 | [`docs/ENGINEERING.md`](docs/ENGINEERING.md) | the stack, the repo, RLS performance, deployment, testing, current production state |
 

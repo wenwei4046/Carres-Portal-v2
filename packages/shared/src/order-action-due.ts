@@ -46,9 +46,11 @@ import {
 /**
  * Law 2A's OFFICE calendar: Sunday AND Saturday off (0=Sun … 6=Sat).
  *
- * Not a default and not an option — the two delay clocks are office work, and
- * `working-days.ts` still defaults to the warehouse week. Exported so the same
- * three numbers are never typed twice.
+ * The owner-confirmed DEFAULT of the stored Office calendar (Settings →
+ * Office, OFF-01, 9 Oct 2026). Callers that read the stored calendar pass its
+ * off days (`officeOffDays(cal)`); this constant is what they fall back to.
+ * The two delay clocks are office work, and `working-days.ts` still defaults
+ * to the warehouse week.
  */
 export const OFFICE_OFF_DAYS: readonly number[] = [0, 6];
 
@@ -104,8 +106,8 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 /** Holidays only — the week is this module's, never the caller's. */
 export type OfficeHolidays = ReadonlySet<IsoDate> | readonly IsoDate[];
 
-function officeOpts(holidays?: OfficeHolidays) {
-  return { holidays, offDays: OFFICE_OFF_DAYS };
+function officeOpts(holidays?: OfficeHolidays, offDays: readonly number[] = OFFICE_OFF_DAYS) {
+  return { holidays, offDays };
 }
 
 /**
@@ -117,8 +119,8 @@ function officeOpts(holidays?: OfficeHolidays) {
  * Monday, so `Delay planning` is never handed a deadline that was already
  * running while nobody could act on it.
  */
-function clockStart(anchor: IsoDate, holidays?: OfficeHolidays): IsoDate {
-  const opts = officeOpts(holidays);
+function clockStart(anchor: IsoDate, holidays?: OfficeHolidays, offDays?: readonly number[]): IsoDate {
+  const opts = officeOpts(holidays, offDays);
   return isWorkingDay(anchor, opts) ? anchor : addWorkingDays(anchor, 1, opts);
 }
 
@@ -134,15 +136,17 @@ export function orderActionDueIso(
   key: OrderActionKey,
   anchorIso: string | null | undefined,
   holidays?: OfficeHolidays,
+  /** The stored Office calendar's off days (`officeOffDays`); default Sat + Sun. */
+  offDays: readonly number[] = OFFICE_OFF_DAYS,
 ): IsoDate | null {
   const def = orderActionDueDef(key);
   if (!def || !anchorIso) return null;
   const anchor = anchorIso.slice(0, 10);
   if (!ISO_DATE.test(anchor)) return null;
-  const start = clockStart(anchor, holidays);
+  const start = clockStart(anchor, holidays, offDays);
   return def.workingDays === 0
     ? start
-    : addWorkingDays(start, def.workingDays, officeOpts(holidays));
+    : addWorkingDays(start, def.workingDays, officeOpts(holidays, offDays));
 }
 
 /**
@@ -160,10 +164,11 @@ export function orderActionOverdue(
   anchorIso: string | null | undefined,
   todayIso: string,
   holidays?: OfficeHolidays,
+  offDays: readonly number[] = OFFICE_OFF_DAYS,
 ): boolean {
-  const due = orderActionDueIso(key, anchorIso, holidays);
+  const due = orderActionDueIso(key, anchorIso, holidays, offDays);
   if (!due || !todayIso) return false;
   const today = todayIso.slice(0, 10);
   if (!ISO_DATE.test(today) || today <= due) return false;
-  return countWorkingDays(due, today, officeOpts(holidays)) >= 1;
+  return countWorkingDays(due, today, officeOpts(holidays, offDays)) >= 1;
 }

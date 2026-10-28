@@ -1,6 +1,8 @@
+import PoSendProofFields, { usePoSendProof, PoSendEvidenceButton } from "./PoSendEvidence";
 import { useMemo, useState } from "react";
-import { purchasingRefusal } from "@carres/shared";
+import { purchasingRefusal, poSendChannelOf } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
+import { queryClient } from "@/lib/query-client";
 import { fmtDate } from "@/lib/fmt-date";
 import { renderPoPdf } from "@/lib/pdf/render";
 import type { PoTemplateData } from "@/lib/pdf/types";
@@ -55,6 +57,8 @@ import Select from "@/components/kit/Select";
  * instead of offering a button that opens nothing.
  */
 export interface IssuedPo {
+  version?: number;
+  placedAt?: string;
   id: string;
   supplierId: string;
   supplierName: string | null;
@@ -63,6 +67,7 @@ export interface IssuedPo {
   /** The supplier's own doors, as `issue-batch` returns them (closure §7). */
   whatsappGroupUrl?: string | null;
   contactEmail?: string | null;
+  poSendChannel?: string | null;
   contact?: string | null;
 }
 
@@ -141,6 +146,12 @@ export function confirmedSendFor(
   );
 }
 
+export function refreshPurchasingReads() {
+  void queryClient.invalidateQueries({ queryKey: ["operation", "pos"] });
+  void queryClient.invalidateQueries({ queryKey: ["operation", "work"] });
+  void queryClient.invalidateQueries({ queryKey: ["operation", "purchase", "today"] });
+}
+
 function sendActorContext(evidence: PoSendEvidence): string {
   const actor = evidence.sent_by_name ? ` by ${evidence.sent_by_name}` : "";
   const assigned = evidence.acting_name ?? evidence.duty_name;
@@ -172,6 +183,9 @@ export default function PoIssueEvidence({
   layout = "panel",
   documentNo,
   onCancel,
+  hidePreparationTools = false,
+  mayConfirm = true,
+  recordedRecipient = false,
 }: {
   po: IssuedPo;
   /** The version of the document rendered beside this form. */
@@ -196,14 +210,18 @@ export default function PoIssueEvidence({
   /** The ruled document number (`PO260903-4316`), for the card's PO fact. */
   documentNo?: string;
   onCancel?: () => void;
+  /** A supplier bundle owns the one channel-preparation area; keep individual PDF and evidence. */
+  hidePreparationTools?: boolean;
+  /** Current document must have been reviewed; history remains readable beforehand. */
+  mayConfirm?: boolean;
+  /** Supplier result scope uses saved contacts; it cannot invent a recipient. */
+  recordedRecipient?: boolean;
 }) {
   /* The supplier's RECORDED channel is the default — the Work send line says
      `Click Email, send …` for an email-only supplier, so the form must not
      open on an empty WhatsApp recipient (Jess's send lines, 2026-09-25). */
   const [channel, setChannel] = useState<SendChannel>(() =>
-    !po.whatsappGroupUrl?.trim() && !(po.contact ?? "").replace(/\D/g, "") && po.contactEmail?.trim()
-      ? "email"
-      : "whatsapp",
+    poSendChannelOf(po) ?? "whatsapp",
   );
   /* `null` until the person types: the recipient then prefills from the
      Supplier Master record for the chosen channel (group link or chat number
@@ -216,6 +234,8 @@ export default function PoIssueEvidence({
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
+  const proof = usePoSendProof();
+  const proofDocuments = [{ id: po.id, version }];
   const supplier = po.supplierName ?? "the supplier";
   const confirmed = useMemo(
     () => confirmedSendFor(evidence, version),
@@ -233,8 +253,8 @@ export default function PoIssueEvidence({
       : channel === "email"
         ? po.contactEmail?.trim() || ""
         : "";
-  const recipient = typedRecipient ?? prefill;
-  const ready = recipient.trim().length > 0 && !saving && !confirmed;
+  const recipient = recordedRecipient ? prefill : typedRecipient ?? prefill;
+  const ready = proof.ready(channel, proofDocuments) && mayConfirm && recipient.trim().length > 0 && !saving && !confirmed;
   const wa = doors?.whatsapp ?? null;
 
   async function copyMessage() {
@@ -296,8 +316,9 @@ export default function PoIssueEvidence({
     try {
       await apiFetch(`/api/operation/pos/${encodeURIComponent(po.id)}/confirm-sent`, {
         method: "POST",
-        body: JSON.stringify({ channel, recipient: recipient.trim(), poVersion: version }),
+        body: JSON.stringify({ channel, recipient: recipient.trim(), poVersion: version, ...(channel === "whatsapp" && proof.path(proofDocuments[0]) ? { evidencePath: proof.path(proofDocuments[0]) } : {}) }),
       });
+      refreshPurchasingReads();
       onConfirmed();
     } catch (e) {
       /* ⭐ THE TWO LINES, WHEREVER THEY COME FROM (closure §9). The API sends
@@ -329,7 +350,7 @@ export default function PoIssueEvidence({
       ...(mail ? [{ value: "email" as const, label: "Email", recipient: mail, shown: mail }] : []),
     ];
     const chosen = recorded.find((c) => c.value === channel) ?? recorded[0] ?? null;
-    const canSave = Boolean(chosen) && !saving && !confirmed;
+    const canSave = proof.ready(chosen?.value ?? "whatsapp", proofDocuments) && mayConfirm && Boolean(chosen) && !saving && !confirmed;
     const confirmRecorded = async () => {
       if (!chosen || !canSave) return;
       setSaving(true);
@@ -338,8 +359,9 @@ export default function PoIssueEvidence({
       try {
         await apiFetch(`/api/operation/pos/${encodeURIComponent(po.id)}/confirm-sent`, {
           method: "POST",
-          body: JSON.stringify({ channel: chosen.value, recipient: chosen.recipient, poVersion: version }),
+          body: JSON.stringify({ channel: chosen.value, recipient: chosen.recipient, poVersion: version, ...(chosen.value === "whatsapp" && proof.path(proofDocuments[0]) ? { evidencePath: proof.path(proofDocuments[0]) } : {}) }),
         });
+        refreshPurchasingReads();
         onConfirmed();
       } catch (e) {
         const body = (e as { body?: { message?: string; action?: string; code?: string } }).body;
@@ -377,12 +399,14 @@ export default function PoIssueEvidence({
             </span>
           </FieldFrame>
         </div>
+        {confirmed && <PoSendEvidenceButton poId={po.id} note={confirmed.note} context={`${po.id} · V${version}`} />}
         {error ? (
           <span className="flex flex-col" data-testid="so-batch-evidence-error">
             <span className="text-meta text-kit-red-11">{error}</span>
             {action ? <span className="text-meta text-kit-slate-11">{action}</span> : null}
           </span>
         ) : null}
+        <PoSendProofFields proof={proof} documents={proofDocuments} channel={chosen?.value ?? "whatsapp"} disabled={saving} />
         <div className="flex items-center gap-2">
           <Button variant="primary" size="touch" disabled={!canSave} loading={saving} onClick={() => void confirmRecorded()} data-testid="so-batch-evidence-confirm">
             PO sent to supplier
@@ -413,10 +437,12 @@ export default function PoIssueEvidence({
         </p>
       ) : null}
 
+      {confirmed && <PoSendEvidenceButton poId={po.id} note={confirmed.note} context={`${po.id} · V${version}`} />}
       {/* ── THE ONE COMMUNICATION AREA (closure §7) ─────────────────────
           Every door out of the Portal for this document lives here. They OPEN
           things; they record nothing and they complete nothing. */}
       <div className="mt-3 flex flex-wrap items-center gap-2">
+        {!hidePreparationTools && <>
         {wa ? (
           <a
             data-testid="po-open-whatsapp"
@@ -459,6 +485,7 @@ export default function PoIssueEvidence({
             Copy message
           </button>
         ) : null}
+        </>}
         {/* ⭐ A REAL PDF, NOT THE PAYLOAD BEHIND IT (closure §6). This link used
             to point at `/print-data`, so `Download PDF` handed the operator —
             and any supplier they forwarded it to — a JSON response. The same
@@ -493,7 +520,7 @@ export default function PoIssueEvidence({
           >
             <option value="whatsapp">WhatsApp</option>
             <option value="email">Email</option>
-            <option value="print">Printed</option>
+            {!recordedRecipient && <option value="print">Printed</option>}
           </select>
         </label>
         <label className="flex items-center justify-between gap-3 text-meta">
@@ -501,6 +528,7 @@ export default function PoIssueEvidence({
           <input
             className="h-7 min-w-[200px] rounded-control border border-kit-slate-6 px-1.5 text-meta"
             data-testid="so-batch-evidence-recipient"
+            readOnly={recordedRecipient}
             value={confirmed ? (confirmed.recipient ?? "") : recipient}
             disabled={!!confirmed}
             onChange={(e) => setTypedRecipient(e.target.value)}
@@ -513,6 +541,7 @@ export default function PoIssueEvidence({
             {action ? <span className="text-meta text-kit-slate-11">{action}</span> : null}
           </span>
         ) : null}
+        {confirmed ? null : <PoSendProofFields proof={proof} documents={proofDocuments} channel={channel} disabled={saving} />}
         {confirmed ? null : (
           <button
             type="button"
@@ -549,6 +578,7 @@ export default function PoIssueEvidence({
                   }`}
               {" · "}
               {fmtDate(e.sent_at, { time: true })}
+              <PoSendEvidenceButton poId={po.id} note={e.note} context={`${po.id} · V${e.po_version}`} />
             </span>
           ))}
         </div>

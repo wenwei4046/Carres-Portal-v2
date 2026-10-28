@@ -78,7 +78,8 @@ describe("the Supplier card is one card for every supplier (§5.10)", () => {
     expect(m.status.text).toBe("1 of 2 received · 1 arriving 4 Nov");
     expect(supplierCardModel({ todayIso: "2026-10-30", pos: [po({ grnIso: "2026-10-20", orderedQty: 2, receivedQty: 1 })], spell }).rows[0].stateText).toBe("Short received");
     const missed = supplierCardModel({ todayIso: "2026-10-22", pos: [po({ effectiveIso: "2026-10-20" })], spell });
-    expect(missed.rows[0].stateText).toBe("Arrival missed · Follow up supplier");
+    expect(missed.rows[0].stateText).toBe("Arrival date passed · Follow up supplier");
+    expect(missed.status.text).toContain("1 arrival date passed");
     expect(missed.status.tone).toBe("missed");
   });
 });

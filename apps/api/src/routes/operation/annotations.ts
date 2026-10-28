@@ -3,7 +3,7 @@ import { z } from "zod";
 import { fail } from "../../lib/route-helpers";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { userClient } from "../../lib/supabase";
-import { resolveActorNames } from "../../lib/actor-names";
+import { actorKindOf, actorRoleWord, resolveActorIdentities, resolveActorNames } from "../../lib/actor-names";
 import type { AppEnv } from "../../types";
 
 /**
@@ -57,7 +57,27 @@ annotationsRouter.get("/:id/timeline", requireOperationOrPrincipal, async (c) =>
     p_order_id: orderId,
   });
   if (error) return fail(c, error);
-  return c.json(data ?? []);
+  const rows = (data ?? []) as Array<{ id: string; kind: string; detail?: unknown }>;
+  if (!rows.length) return c.json([]);
+  // The merged RPC drops actor ids. Recover only these order-scoped records,
+  // then use the same identity classification as Order History and Revisions.
+  const [activities, notes] = await Promise.all([
+    rows.some(row => row.kind === "activity") ? sb.from("ops_activity_log").select("id, actor_id").eq("order_id", orderId).in("id", rows.filter(row => row.kind === "activity").map(row => row.id)) : Promise.resolve({ data: [], error: null }),
+    rows.some(row => row.kind === "annotation") ? sb.from("order_annotations").select("id, created_by").eq("order_id", orderId).in("id", rows.filter(row => row.kind === "annotation").map(row => row.id)) : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (activities.error) return fail(c, activities.error);
+  if (notes.error) return fail(c, notes.error);
+  const ids = new Map<string, string | null>();
+  for (const row of activities.data ?? []) ids.set(row.id, row.actor_id);
+  for (const row of notes.data ?? []) ids.set(row.id, row.created_by);
+  const identities = await resolveActorIdentities(sb, [...ids.values()]);
+  return c.json(rows.map(row => {
+    const actorId = ids.get(row.id);
+    const identity = actorId ? identities.get(actorId) : null;
+    const actor_kind = actorKindOf(actorId, identity, row.detail);
+    return { ...row, actor_kind, actor_role: actorRoleWord(identity),
+      actor_name: actor_kind === "human" ? identity?.name : actor_kind === "system" ? "System" : "Staff identity not recorded" };
+  }));
 });
 
 export default annotationsRouter;

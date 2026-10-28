@@ -44,6 +44,18 @@ let hookState: {
 
 const useDeliveryOrdersRegisterSpy = vi.fn((..._args: unknown[]) => hookState);
 
+const apiFetchSpy = vi.hoisted(() => vi.fn(async (_path: string, _init?: RequestInit): Promise<unknown> => ({})));
+vi.mock("@/lib/api", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
+  return { ...actual, apiFetch: (path: string, init?: RequestInit) => apiFetchSpy(path, init) };
+});
+
+const printDeliveryOrderSpy = vi.hoisted(() => vi.fn(async (_orderId: string, _doNumber: string) => {}));
+vi.mock("./record-print", async () => {
+  const actual = await vi.importActual<typeof import("./record-print")>("./record-print");
+  return { ...actual, printDeliveryOrder: printDeliveryOrderSpy };
+});
+
 vi.mock("@/lib/queries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
   return {
@@ -130,6 +142,25 @@ beforeEach(() => {
 });
 
 describe("DeliveryOrdersRegister", () => {
+  /* ONE ROW MENU — owner ruling 2026-10-05: `View · Print`, then this
+     register's own doors after one divider. */
+  it("the row menu reads View · Print · ─ Open SO-n · Open Order Route", () => {
+    printDeliveryOrderSpy.mockClear();
+    const { locations } = mount([doRow()]);
+    const row = screen.getAllByText("DO-180826-3035")[0]!.closest("tr")!;
+    fireEvent.contextMenu(row);
+    const menu = screen.getByRole("menu", { name: "Row actions" });
+    expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent)).toEqual([
+      "View", "Print", "Open SO-1322", "Open Order Route",
+    ]);
+    expect(within(menu).getAllByRole("separator")).toHaveLength(1);
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "Print" }));
+    expect(printDeliveryOrderSpy).toHaveBeenCalledWith("00000000-0000-0000-0000-0000000a0001", "DO-180826-3035");
+    fireEvent.contextMenu(row);
+    fireEvent.click(screen.getByRole("menuitem", { name: "View" }));
+    expect(locations.at(-1)).toBe("/operation/delivery-orders/DO-180826-3035");
+  });
+
   it.each([false, true])("an intermediate arrival owes no customer proof and preserves recorded photos (%s)", (hasPhoto) => {
     const row = doRow({ leg: 1, orders: { ...doRow().orders,
       do_number: "DO-FINAL", do_file_path: "final-signed.pdf",
@@ -757,10 +788,45 @@ describe("DeliveryOrdersRegister", () => {
     );
   });
 
-  it("the register offers no create, issue, release or approve control", () => {
+  /* OVERTURNED 2026-10-22 by Weisiang (Mr Lim): office staff may open a
+     Delivery Order from SO lines (Houzs way). Jess's earlier rule (no create
+     control) is kept in Delivery MASTER for history. Still no Issue, Release
+     or Approve control. */
+  it("the register offers New Delivery Order and still no issue, release or approve control", () => {
     mount([doRow()]);
-    for (const banned of [/new delivery order/i, /issue/i, /release/i, /approve/i]) {
+    expect(screen.getByRole("button", { name: "New Delivery Order" })).toBeTruthy();
+    for (const banned of [/issue/i, /release/i, /approve/i]) {
       expect(screen.queryByText(banned)).toBeNull();
     }
+  });
+
+  it("New Delivery Order finds the SO, offers only its free lines and creates through the API", async () => {
+    const calls: Array<{ path: string; init?: RequestInit }> = [];
+    apiFetchSpy.mockImplementation(async (path: string, init?: RequestInit) => {
+      calls.push({ path, init });
+      if (path.startsWith("/api/operation/delivery-orders/offer/")) {
+        return {
+          order: { id: "00000000-0000-0000-0000-0000000a0710", so: 1710, customer_name: "TEST 0710" },
+          offer: { groups: ["sofa"], whole: false, journey: false },
+          lines: [{ id: "l2", sku: "SF03 Muro 2 Seater", qty: 1, attrs: null, group: "sofa" }],
+        };
+      }
+      return { doNumber: "DO2610-1234" };
+    });
+    mount([doRow()]);
+    fireEvent.click(screen.getByRole("button", { name: "New Delivery Order" }));
+    fireEvent.change(screen.getByLabelText("SO No"), { target: { value: "SO-1710" } });
+    fireEvent.click(screen.getByRole("button", { name: "Find" }));
+    expect(await screen.findByText("SF03 Muro 2 Seater · Qty 1")).toBeTruthy();
+    expect(screen.queryByText("Bed set")).toBeNull();
+    const create = screen.getByRole("button", { name: "Create Delivery Order" }) as HTMLButtonElement;
+    expect(create.disabled).toBe(true);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Sofa" }));
+    fireEvent.click(create);
+    await vi.waitFor(() => expect(calls.at(-1)?.path).toBe("/api/operation/delivery-orders"));
+    expect(JSON.parse(String(calls.at(-1)?.init?.body))).toEqual({
+      orderId: "00000000-0000-0000-0000-0000000a0710",
+      groups: ["sofa"],
+    });
   });
 });

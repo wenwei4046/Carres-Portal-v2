@@ -8,7 +8,8 @@
  * delivery, this says, word for word.
  */
 import { useMemo } from "react";
-import { deliveryQueueLeads, myHolidaySet, type DeliveryArrangementRow } from "@carres/shared";
+import { deliveryQueueLeads, type DeliveryArrangementRow } from "@carres/shared";
+import { useDeliveryDays } from "../../lib/deadline-queries";
 import { appTodayIso } from "@/lib/fmt-date";
 import {
   useCatalog,
@@ -17,6 +18,7 @@ import {
   useDeliveryPartners,
   useOperationOrders,
   usePurchasingSettings,
+  type operationOrderListRow,
 } from "@/lib/queries";
 import { buildDeliveryMonitorCards, type DeliveryMonitorCard } from "./delivery-monitor";
 
@@ -45,17 +47,18 @@ export function useOrderIdFromRef(ref: { orderId?: string | null; soLabel?: stri
   }, [ref.orderId, ref.soLabel, ref.doNumber, ordersQ.data, docsQ.data]);
 }
 
-export function useDeliveryScopeCard(orderId: string | null, leg = 0): DeliveryScopeCardState {
+export function useDeliveryScopeCard(orderId: string | null, leg = 0, knownOrder?: operationOrderListRow): DeliveryScopeCardState {
   const ordersQ = useOperationOrders();
   const partnersQ = useDeliveryPartners();
-  const docsQ = useDeliveryOrdersRegister();
+  const docsQ = useDeliveryOrdersRegister(knownOrder ? { orderId: orderId ?? undefined, enabled: Boolean(orderId) } : undefined);
   const arrangementsQ = useDeliveryArrangements();
   const settingsQ = usePurchasingSettings();
   const catalogQ = useCatalog();
   const today = appTodayIso();
+  const deliveryHolidays = useDeliveryDays().holidays;
 
   const card = useMemo(() => {
-    const order = (ordersQ.data?.orders ?? []).find((o) => o.id === orderId);
+    const order = knownOrder ?? (ordersQ.data?.orders ?? []).find((o) => o.id === orderId);
     if (!orderId || !order) return null;
     const arrangements = new Map<string, DeliveryArrangementRow>();
     for (const a of arrangementsQ.data?.arrangements ?? []) {
@@ -66,6 +69,7 @@ export function useDeliveryScopeCard(orderId: string | null, leg = 0): DeliveryS
     const addonNameByKey = new Map<string, string>();
     for (const a of catalogQ.data?.addons ?? []) if (a.key && a.name) addonNameByKey.set(a.key, a.name);
     const cards = buildDeliveryMonitorCards({
+      includeCompleted: Boolean(knownOrder),
       orders: [order],
       deliveryOrders: (docsQ.data?.deliveryOrders ?? []).filter((d) => d.order_id === orderId),
       attempts: docsQ.data?.attempts ?? [],
@@ -76,16 +80,19 @@ export function useDeliveryScopeCard(orderId: string | null, leg = 0): DeliveryS
       partnerNameById,
       arrangements,
       queueLeads: settingsQ.data ? deliveryQueueLeads(settingsQ.data) : undefined,
-      holidays: myHolidaySet(),
+      holidays: deliveryHolidays,
       addonNameByKey,
       todayIso: today,
     });
-    return cards.find((c) => (c.leg ?? 0) === leg) ?? cards[0] ?? null;
-  }, [orderId, leg, ordersQ.data, docsQ.data, arrangementsQ.data, partnersQ.data, settingsQ.data, catalogQ.data, today]);
+    const selected = cards.find((c) => (c.leg ?? 0) === leg) ?? cards[0] ?? null;
+    return selected && (order.status === "delivered" || order.delivered_at)
+      ? { ...selected, settled: true }
+      : selected;
+  }, [orderId, leg, knownOrder, ordersQ.data, docsQ.data, arrangementsQ.data, partnersQ.data, settingsQ.data, catalogQ.data, today, deliveryHolidays]);
 
   return {
     card,
-    loading: ordersQ.isLoading || arrangementsQ.isLoading || docsQ.isLoading,
-    failed: Boolean(ordersQ.isError || arrangementsQ.isError),
+    loading: (!knownOrder && ordersQ.isLoading) || arrangementsQ.isLoading || docsQ.isLoading || (Boolean(knownOrder) && (partnersQ.isLoading || catalogQ.isLoading)),
+    failed: Boolean((!knownOrder && ordersQ.isError) || arrangementsQ.isError || (knownOrder && (docsQ.isError || partnersQ.isError || catalogQ.isError))),
   };
 }

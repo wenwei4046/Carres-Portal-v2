@@ -52,8 +52,10 @@ describe("PurchasingTabs — the destination word", () => {
   it("every other page keeps the word it already had", () => {
     for (const [path, word] of [
       ["/operation?tab=purchase", "SO Batch Purchase"],
+      ["/operation?tab=forecast-purchase", "Forecast Purchase"],
       ["/operation/procurement", "Purchase Orders"],
       ["/operation?tab=claims", "Supplier Claims"],
+      ["/operation?tab=consignment-returns", "Consignment Returns"],
       // The hidden legacy page keeps its own word — this Card retired its rail
       // row, not the page (`docs/cards/CARD-2026-08-22-...` §4).
       ["/operation?tab=purchase-demands", "SO Batch Purchase"],

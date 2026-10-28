@@ -248,7 +248,7 @@ export default function WarehouseWorkspace({
           linking to a filtered register, because the register cannot ask for
           "undated" without inventing a filter word, while these exact records
           are already in this page's own result. */}
-      <UnplacedWork cards={earlier} label="Earlier work still overdue" testId="ws-earlier" />
+      <UnplacedWork cards={earlier} label="Earlier work still late" testId="ws-earlier" />
       <UnplacedWork cards={offDays} label="Scheduled on other dates in this period" testId="ws-off-days" />
       {stranded.length > 0 && (
         <details
@@ -403,7 +403,7 @@ export function ScheduleBoard({
  * facts. One glance should answer "which day is this" — the number carries
  * that, and the two small labels qualify it without competing for the height
  * the CARDS need. Every size here is a governed token: `text-page` is exactly
- * 24px/32px at weight 600 and `text-label` exactly 11px/14px, so nothing in
+ * 20px/28px at weight 600 and `text-meta` exactly 12px/16px, so nothing in
  * this heading is a hand-typed pixel.
  */
 function DateHeading({
@@ -441,10 +441,14 @@ function DateHeading({
       {/* `min-w-0` so a long month abbreviation wraps inside its own stack
           rather than pushing the number out of a 240px column. */}
       <div className="min-w-0">
-        <div className={`text-label ${isToday ? "text-kit-blue-11" : "text-kit-slate-11"}`}>
-          {isToday ? "Today" : weekday}
+        {/* The weekday ALWAYS prints (COPY-STANDARD: actual days, never
+            `Today`); today is found by its blue ink and underline, and a
+            screen reader still hears that this column is today. */}
+        <div className={`text-meta ${isToday ? "text-kit-blue-11" : "text-kit-slate-11"}`}>
+          {weekday}
+          {isToday ? <span className="sr-only"> · Today</span> : null}
         </div>
-        <div className={`text-label ${isToday ? "text-kit-blue-11" : "text-kit-slate-11"}`}>
+        <div className={`text-meta ${isToday ? "text-kit-blue-11" : "text-kit-slate-11"}`}>
           {month}
         </div>
       </div>

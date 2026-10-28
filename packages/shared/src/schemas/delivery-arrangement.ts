@@ -295,6 +295,11 @@ export interface PartnerDeliveryCard {
   /** True once this partner has reported Cannot Deliver on the scope and
    *  Operations has not yet re-arranged it. */
   cannotDeliverReported: boolean;
+  /** `Hold delivery` (owner ruling 2026-09-25, Delivery MASTER §3): a
+   *  Scheduled delivery exists for this scope AND the DO money gate holds
+   *  (`deliveryMoneyHolds`). A yes/no only — the partner never sees an
+   *  amount or the Finance reason. */
+  holdDelivery: boolean;
 }
 
 /** POST /:orderId/cannot-deliver?leg= — Operation records the partner's

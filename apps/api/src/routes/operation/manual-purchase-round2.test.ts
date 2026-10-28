@@ -92,7 +92,9 @@ function makeSb(tables: Tables, rpc: ReturnType<typeof vi.fn> = vi.fn()) {
       }
       if (fn === "purchasing_actor_may_issue") return { data: true, error: null };
       const out = rpc(fn, args);
-      return out ?? { data: null, error: null };
+      if (out != null) return out;
+      if (fn === "purchasing_po_cancellations") return { data: [], error: null };
+      return { data: null, error: null };
     }),
   } as unknown as ReturnType<typeof userClient>;
 }
@@ -493,4 +495,58 @@ describe("D4 / D5 / R3 / R4 · the object's facts", () => {
     expect(body.canWithdraw).toBe(true);
     expect(body.canEditAndSendAgain).toBe(true);
   });
+});
+
+describe("context source readback across merged and partial POs", () => {
+  const sources = [{ po_line_id: "pl-context-a", purchase_demand_id: LINE, qty: 1 }, { po_line_id: "pl-context-b", purchase_demand_id: LINE, qty: 1 }];
+  const physical = [{ id: "pl-context-a", po_id: "PO-CONTEXT-A", demand_id: null, sku: "5539-2NA", qty: 4, received_qty: 4, destination_id: DEST },
+    { id: "pl-context-b", po_id: "PO-CONTEXT-B", demand_id: null, sku: "5539-2NA", qty: 4, received_qty: 3, destination_id: DEST }];
+  function tables(sourceResult: unknown = sources) {
+    return { purchase_requests: [request({ request_version: 1 })],
+      purchase_demands: [line({ request_line_id: LINE, fulfilment_kind: "purchase", qty: 2, approved_qty: 2, issued_qty: 2, po_id: "PO-CONTEXT-A" })],
+      purchase_order_lines: physical, po_line_sources: sourceResult,
+      purchase_orders: [{ id: "PO-CONTEXT-A", version: 1, status: "open" }, { id: "PO-CONTEXT-B", version: 1, status: "open" }],
+      product_skus: [{ sku: "5539-2NA", variant: "Q", variant_kind: "size", product_models: { name: "TEST model", category: "mattress" } }], app_users: USERS };
+  }
+  it("counts only this demand's source1+1 and waits for all its physical lines to be received", async () => {
+    vi.mocked(userClient).mockReturnValue(makeSb(tables()));
+    const res = await call(""); expect(res.status).toBe(200);
+    const body = await res.json() as { linesUnavailable: boolean; lines: Array<{ received: boolean; allocations: Array<{ poId: string; qty: number }> }> };
+    expect(body.linesUnavailable).toBe(false);
+    expect(body.lines[0]!.allocations).toEqual([{ poId: "PO-CONTEXT-A", qty: 1, originalQty: 1, cancelledQty: 0, destinationId: DEST }, { poId: "PO-CONTEXT-B", qty: 1, originalQty: 1, cancelledQty: 0, destinationId: DEST }]);
+    expect(body.lines[0]!.received).toBe(false);
+  });
+  it("preserves cancelled PO lineage while counting only active coverage for remainder and Work", async () => {
+    const data = tables(); data.purchase_orders[0]!.status = "cancelled";
+    data.purchase_demands = [line({ request_line_id: LINE, fulfilment_kind: "purchase", qty: 2, approved_qty: 2, issued_qty: 1, po_id: "PO-CONTEXT-B" })];
+    vi.mocked(userClient).mockReturnValue(makeSb(data));
+    const response = await call(""); expect(response.status).toBe(200);
+    const body = await response.json() as { linesUnavailable: boolean; lines: Array<{ po_ids: string[]; active_po_ids: string[]; received: boolean }> };
+    expect(body.linesUnavailable).toBe(false);
+    expect(body.lines[0]!.po_ids).toEqual(["PO-CONTEXT-A", "PO-CONTEXT-B"]);
+    expect(body.lines[0]!.active_po_ids).toEqual(["PO-CONTEXT-B"]);
+    expect(body.lines[0]!.received).toBe(false);
+  });
+  it("keeps failed cancellation source unavailable rather than claiming zero cancellation",async()=>{
+    const rpc=vi.fn().mockResolvedValue({data:null,error:{code:"57014",message:"TEST cancellation read unavailable"}});
+    vi.mocked(userClient).mockReturnValue(makeSb(tables(),rpc));
+    const response=await call("");const body=await response.json() as {linesUnavailable:boolean;lines:unknown[]};
+    expect(body.linesUnavailable).toBe(true);expect(body.lines).toEqual([]);
+  });
+  it("keeps missing attribution unknown rather than borrowing the physical line's whole quantity", async () => {
+    vi.mocked(userClient).mockReturnValue(makeSb(tables({ error: { code: "57014", message: "TEST source read unavailable" } })));
+    const res = await call(""); const body = await res.json() as { linesUnavailable: boolean; lines: unknown[] };
+    expect(body.linesUnavailable).toBe(true); expect(body.lines).toEqual([]);
+  });
+  it("retains a legacy stored PO residual beside a new generic source without assigning the full total to each PO", async () => {
+    const data = tables([{ po_line_id: "pl-context-b", purchase_demand_id: LINE, qty: 1 }]);
+    data.purchase_requests = [request({ request_version: 0, approval_scope: null })];
+    data.purchase_demands = [line({ request_line_id: null, fulfilment_kind: "purchase", qty: 3, approved_qty: 3, issued_qty: 3, po_id: "PO-CONTEXT-A" })];
+    data.purchase_order_lines = [physical[1]!];
+    vi.mocked(userClient).mockReturnValue(makeSb(data));
+    const res = await call(""); const body = await res.json() as { linesUnavailable: boolean; lines: Array<{ allocations: Array<{ poId: string; qty: number }> }> };
+    expect(body.linesUnavailable).toBe(false);
+    expect(body.lines[0]!.allocations).toEqual([{ poId: "PO-CONTEXT-B", qty: 1, originalQty: 1, cancelledQty: 0, destinationId: DEST }, { poId: "PO-CONTEXT-A", qty: 2, destinationId: DEST }]);
+  });
+
 });

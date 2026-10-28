@@ -386,6 +386,256 @@ export const ledgerAccountAddInput = z.object({
 }).strict();
 export type LedgerAccountAddInput = z.infer<typeof ledgerAccountAddInput>;
 
+const accountName = z.string().trim().min(1, 'Type the account name.').max(60, 'Keep the name to 60 characters.');
+const sectionName = z.string().trim().min(1, 'Choose the section.').max(40, 'Choose the section.');
+const headingCode = z.string().trim().regex(ledgerAccountCodeShape, 'That account is not in the chart.');
+
+/** Edit one account on Finance Settings → Chart of accounts (0656,
+ *  gl_account_edit): its name and number, its section, and the heading it sits
+ *  under. `under: null` puts it at the top of its section. Which heading and
+ *  section fit is the database's to judge. */
+export const ledgerAccountEditInput = z.object({
+  name: accountName,
+  code: ledgerAccountCodeInput,
+  section: sectionName,
+  under: headingCode.nullable(),
+}).strict();
+export type LedgerAccountEditInput = z.infer<typeof ledgerAccountEditInput>;
+
+/** Add an account or a heading in one of AutoCount's sections (0656,
+ *  gl_account_add_in_section). `parentCode: null` puts it at the top of the
+ *  section; otherwise it goes under that heading, which must be in the section. */
+export const ledgerAccountAddInSectionInput = z.object({
+  section: sectionName,
+  parentCode: headingCode.nullable(),
+  code: ledgerAccountCodeInput,
+  name: accountName,
+  isHeading: z.boolean(),
+}).strict();
+export type LedgerAccountAddInSectionInput = z.infer<typeof ledgerAccountAddInSectionInput>;
+
+/** Retire an account, or bring one back (0656, gl_account_set_active). */
+export const ledgerAccountActiveInput = z.object({ active: z.boolean() }).strict();
+export type LedgerAccountActiveInput = z.infer<typeof ledgerAccountActiveInput>;
+
+/**
+ * Import AutoCount's printed chart (0655). The rows are what
+ * `readAutocountChart` read, in AutoCount's order; the database checks every
+ * one. The shape here only keeps a body the database could not read from
+ * reaching it: the number's shape, a name and a section are its to judge, so a
+ * bad row comes back as a row the screen can print rather than a 422.
+ * `apply: false` asks what the import would do; `true` makes the accounts.
+ */
+export const ledgerChartImportInput = z.object({
+  rows: z.array(z.object({
+    code: z.string().max(20),
+    name: z.string().max(200),
+    parentCode: z.string().max(20).nullable(),
+    section: z.string().max(80),
+    special: z.string().max(10).nullable(),
+  }).strict()).min(1, 'There is no account to import. Pick AutoCount\'s chart of accounts.').max(2000, 'A chart of more than 2,000 accounts is not imported in one go.'),
+  apply: z.boolean(),
+}).strict();
+export type LedgerChartImportInput = z.infer<typeof ledgerChartImportInput>;
+
+/** One row of gl_chart_import's answer. `parentCode` is where a new account
+ *  goes, or where an existing one already sits; `chartName` is the name the
+ *  chart already holds for an existing number. `fills` (0656): an account
+ *  already in the chart whose empty section or special type the import fills. */
+export interface LedgerChartImportRow {
+  code: string;
+  name: string;
+  parentCode: string | null;
+  status: 'create' | 'exists' | 'problem';
+  reason: string | null;
+  chartName: string | null;
+  fills?: boolean;
+}
+
+export interface LedgerChartImportResult {
+  applied: boolean;
+  created: number;
+  existing: number;
+  /** 0656: accounts already in the chart whose section or special type is filled. */
+  filled?: number;
+  problems: number;
+  rows: LedgerChartImportRow[];
+}
+
+/**
+ * Finance Settings → Posting accounts (0657): change the account one posting
+ * goes to. `what` INCOME keys an income map row as `GOODS/*`, `ADDON/<key>` or
+ * `STORAGE/*`; ROLE keys a role; PAYMENT (0658) keys a way of being paid as
+ * `{method}/{source channel}` (`bank/*`, `online/stripe_checkout`) and takes a
+ * money account. `was` is the account the screen showed (null
+ * for an add-on with no account yet): the database refuses with 409 when
+ * someone has changed it since. Which accounts fit is the database's to judge.
+ */
+export const ledgerPostingAccountSetInput = z.object({
+  what: z.enum(['INCOME', 'ROLE', 'PAYMENT']),
+  key: z.string().trim().min(1).max(120),
+  accountCode: z.string().trim().regex(ledgerAccountCodeShape, 'That account is not in the chart.'),
+  was: z.string().trim().max(20).nullable(),
+}).strict();
+export type LedgerPostingAccountSetInput = z.infer<typeof ledgerPostingAccountSetInput>;
+
+/** One income posting: an invoice component and the income account it credits.
+ *  An add-on's `name` is the add-on list's own; `accountCode` is null when an
+ *  add-on has no account yet (its invoices cannot be issued). */
+export interface LedgerIncomePosting {
+  type: 'GOODS' | 'ADDON' | 'STORAGE';
+  key: string;
+  name: string | null;
+  active: boolean | null;
+  accountCode: string | null;
+  accountName: string | null;
+  changedAt: string | null;
+  changedBy: string | null;
+}
+
+/** One role posting. `changeable` is false for the accounts the system keeps. */
+export interface LedgerRolePosting {
+  role: string;
+  changeable: boolean;
+  accountCode: string;
+  accountName: string;
+  changedAt: string | null;
+  changedBy: string | null;
+}
+
+export interface LedgerPostingChange {
+  /** A posting change's number, or `P` and Payment settings' record number (0658). */
+  id: string;
+  what: 'INCOME' | 'ROLE' | 'PAYMENT';
+  key: string;
+  name: string | null;
+  fromCode: string | null;
+  fromName: string | null;
+  toCode: string;
+  toName: string | null;
+  changedAt: string;
+  changedBy: string | null;
+}
+
+/** When a way of being paid last changed its money account (0658). `key` is
+ *  `method/*` for a manual method, `method/channel` for POS card and Online. */
+export interface LedgerPaymentPostingChanged {
+  key: string;
+  changedAt: string;
+  changedBy: string | null;
+}
+
+export interface LedgerPostingAccounts {
+  income: LedgerIncomePosting[];
+  roles: LedgerRolePosting[];
+  changes: LedgerPostingChange[];
+  /** Absent until 0658 is applied. */
+  payments?: LedgerPaymentPostingChanged[];
+}
+
+/**
+ * 0659 — Finance Settings → Item groups (Chew 2026-10-07, MASTER §0).
+ *
+ * Each catalog product is in an item group; each group binds four accounts.
+ * An empty account means that posting is not bound yet: a bill of such a
+ * group is not confirmed, a sale goes to the goods account and is listed.
+ * `was` is the group as the screen showed it; a change made since is refused.
+ */
+const itemGroupAccount = z.string().trim().regex(ledgerAccountCodeShape, 'That account is not in the chart.').nullable();
+const itemGroupState = z.object({
+  name: z.string(),
+  purchaseAccount: z.string().nullable(),
+  salesAccount: z.string().nullable(),
+  salesReturnAccount: z.string().nullable(),
+  purchaseReturnAccount: z.string().nullable(),
+  active: z.boolean(),
+}).strict();
+export const ledgerItemGroupSaveInput = z.object({
+  name: z.string().trim().min(1, 'Give the item group a name.').max(40, 'Keep the name to 40 characters.'),
+  purchaseAccount: itemGroupAccount,
+  salesAccount: itemGroupAccount,
+  salesReturnAccount: itemGroupAccount,
+  purchaseReturnAccount: itemGroupAccount,
+  active: z.boolean(),
+  was: itemGroupState.nullable(),
+}).strict();
+export type LedgerItemGroupSaveInput = z.infer<typeof ledgerItemGroupSaveInput>;
+
+/** Move a product into an item group; `was` is the group the screen showed. */
+export const ledgerItemGroupPlaceInput = z.object({
+  modelId: z.string().uuid(),
+  groupId: z.string().uuid(),
+  was: z.string().uuid().nullable(),
+}).strict();
+export type LedgerItemGroupPlaceInput = z.infer<typeof ledgerItemGroupPlaceInput>;
+
+export interface LedgerItemGroup {
+  id: string;
+  name: string;
+  active: boolean;
+  purchaseAccount: string | null;
+  purchaseName: string | null;
+  salesAccount: string | null;
+  salesName: string | null;
+  salesReturnAccount: string | null;
+  salesReturnName: string | null;
+  purchaseReturnAccount: string | null;
+  purchaseReturnName: string | null;
+  /** The catalog categories whose products start in this group. */
+  categories: string[];
+  /** Products in the group now, not counting discontinued ones. */
+  products: number;
+}
+
+export interface LedgerItemGroupProduct {
+  modelId: string;
+  name: string;
+  category: string;
+  skus: number;
+  groupId: string | null;
+  /** Finance moved it here; otherwise it is in its category's group. */
+  placed: boolean;
+  discontinued: boolean;
+}
+
+/** An invoice's goods that went to the goods account (0659). `groupId` null:
+ *  the SKU is not in the catalog. */
+export interface LedgerItemGroupUnboundSale {
+  id: number;
+  invoiceNo: string;
+  so: number | null;
+  issuedAt: string | null;
+  groupId: string | null;
+  skus: string[];
+  amount: number | string;
+  accountCode: string;
+  accountName: string | null;
+}
+
+export interface LedgerItemGroupChange {
+  id: string;
+  what: 'ADDED' | 'NAME' | 'ACTIVE' | 'PURCHASE' | 'SALES' | 'SALES_RETURN' | 'PURCHASE_RETURN' | 'PRODUCT';
+  groupId: string;
+  groupName: string;
+  modelName: string | null;
+  fromGroupName: string | null;
+  fromCode: string | null;
+  fromName: string | null;
+  toCode: string | null;
+  toName: string | null;
+  fromText: string | null;
+  toText: string | null;
+  changedAt: string;
+  changedBy: string | null;
+}
+
+export interface LedgerItemGroups {
+  groups: LedgerItemGroup[];
+  products: LedgerItemGroupProduct[];
+  unbound: LedgerItemGroupUnboundSale[];
+  changes: LedgerItemGroupChange[];
+}
+
 /**
  * Move accounts within ONE heading on Finance Settings → Chart of accounts (0557).
  *
@@ -465,3 +715,13 @@ export const ledgerAccountLedgerQuery = z.object({
   message: departmentFilterMessage, path: ['departmentId'],
 });
 export type LedgerAccountLedgerQuery = z.infer<typeof ledgerAccountLedgerQuery>;
+
+/** 0622 — the last closed day (`gl_config.books_closed_through`). The ledger
+ *  refuses every entry dated on or before it; null means no month is closed. */
+export const ledgerBooksClosedInput = z.object({
+  closedThrough: ledgerIsoDate
+    .refine((v) => { const d = new Date(`${v}T00:00:00Z`); return !Number.isNaN(d.getTime()) && d.toISOString().startsWith(v); },
+      'Use a date like 2026-09-10')
+    .nullable(),
+}).strict();
+export type LedgerBooksClosed = z.infer<typeof ledgerBooksClosedInput>;

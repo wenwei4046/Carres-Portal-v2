@@ -1,0 +1,589 @@
+{
+ "source": "docs/ui-reference/module-card-reference.html (owner handoff 2026-10-04, sha256 fca84f58d7a4687f…)",
+ "measured": "Chromium via scripts/compact-card-states.mjs, viewport height 900; card height and header height in CSS px",
+ "widths": {
+  "1146": 560,
+  "480": 440,
+  "440": 416,
+  "420": 396,
+  "390": 366
+ },
+ "states": {
+  "Info · default": {
+   "390": {
+    "card": 306.2,
+    "header": 64,
+    "component": 306.2,
+    "approvedDeviation": "Info strip keeps the Paid | Outstanding divider on narrow cards (reference drops it through a Delivery-only rule)"
+   },
+   "420": {
+    "card": 299.2,
+    "header": 57,
+    "component": 299.2,
+    "approvedDeviation": "Info strip keeps the Paid | Outstanding divider on narrow cards (reference drops it through a Delivery-only rule)"
+   },
+   "440": {
+    "card": 302,
+    "header": 57,
+    "component": 302,
+    "approvedDeviation": null
+   },
+   "480": {
+    "card": 302,
+    "header": 57,
+    "component": 302,
+    "approvedDeviation": null
+   },
+   "1146": {
+    "card": 302,
+    "header": 57,
+    "component": 302,
+    "approvedDeviation": null
+   }
+  },
+  "Info · sales closed": {
+   "390": {
+    "card": 248.8,
+    "header": 64,
+    "component": 248.8,
+    "approvedDeviation": "Info strip keeps the Paid | Outstanding divider on narrow cards (reference drops it through a Delivery-only rule)"
+   },
+   "420": {
+    "card": 241.8,
+    "header": 57,
+    "component": 241.8,
+    "approvedDeviation": "Info strip keeps the Paid | Outstanding divider on narrow cards (reference drops it through a Delivery-only rule)"
+   },
+   "440": {
+    "card": 244.6,
+    "header": 57,
+    "component": 244.6,
+    "approvedDeviation": null
+   },
+   "480": {
+    "card": 244.6,
+    "header": 57,
+    "component": 244.6,
+    "approvedDeviation": null
+   },
+   "1146": {
+    "card": 244.6,
+    "header": 57,
+    "component": 244.6,
+    "approvedDeviation": null
+   }
+  },
+  "Info · address closed": {
+   "390": {
+    "card": 246.4,
+    "header": 64,
+    "component": 246.4,
+    "approvedDeviation": "Info strip keeps the Paid | Outstanding divider on narrow cards (reference drops it through a Delivery-only rule)"
+   },
+   "420": {
+    "card": 239.4,
+    "header": 57,
+    "component": 239.4,
+    "approvedDeviation": "Info strip keeps the Paid | Outstanding divider on narrow cards (reference drops it through a Delivery-only rule)"
+   },
+   "440": {
+    "card": 242.2,
+    "header": 57,
+    "component": 242.2,
+    "approvedDeviation": null
+   },
+   "480": {
+    "card": 242.2,
+    "header": 57,
+    "component": 242.2,
+    "approvedDeviation": null
+   },
+   "1146": {
+    "card": 242.2,
+    "header": 57,
+    "component": 242.2,
+    "approvedDeviation": null
+   }
+  },
+  "Info · items": {
+   "390": {
+    "card": 457.5,
+    "header": 64,
+    "component": 457.5,
+    "approvedDeviation": "Info strip keeps the Paid | Outstanding divider on narrow cards (reference drops it through a Delivery-only rule)"
+   },
+   "420": {
+    "card": 450.5,
+    "header": 57,
+    "component": 450.5,
+    "approvedDeviation": "Info strip keeps the Paid | Outstanding divider on narrow cards (reference drops it through a Delivery-only rule)"
+   },
+   "440": {
+    "card": 453.3,
+    "header": 57,
+    "component": 453.3,
+    "approvedDeviation": null
+   },
+   "480": {
+    "card": 461.7,
+    "header": 57,
+    "component": 461.7,
+    "approvedDeviation": null
+   },
+   "1146": {
+    "card": 461.7,
+    "header": 57,
+    "component": 461.7,
+    "approvedDeviation": null
+   }
+  },
+  "Info · long name": {
+   "390": {
+    "card": 396.2,
+    "header": 154,
+    "component": 396.2,
+    "approvedDeviation": "Info strip keeps the Paid | Outstanding divider on narrow cards (reference drops it through a Delivery-only rule)"
+   },
+   "420": {
+    "card": 353.2,
+    "header": 111,
+    "component": 353.2,
+    "approvedDeviation": "Info strip keeps the Paid | Outstanding divider on narrow cards (reference drops it through a Delivery-only rule)"
+   },
+   "440": {
+    "card": 356,
+    "header": 111,
+    "component": 356,
+    "approvedDeviation": null
+   },
+   "480": {
+    "card": 338,
+    "header": 93,
+    "component": 338,
+    "approvedDeviation": null
+   },
+   "1146": {
+    "card": 338,
+    "header": 93,
+    "component": 338,
+    "approvedDeviation": null
+   }
+  },
+  "Delivery · default": {
+   "390": {
+    "card": 237.2,
+    "header": 64,
+    "component": 237.2,
+    "approvedDeviation": null
+   },
+   "420": {
+    "card": 230.2,
+    "header": 57,
+    "component": 230.2,
+    "approvedDeviation": null
+   },
+   "440": {
+    "card": 227,
+    "header": 57,
+    "component": 227,
+    "approvedDeviation": null
+   },
+   "480": {
+    "card": 210.2,
+    "header": 57,
+    "component": 210.2,
+    "approvedDeviation": null
+   },
+   "1146": {
+    "card": 178,
+    "header": 57,
+    "component": 178,
+    "approvedDeviation": null
+   }
+  },
+  "Delivery · sales open": {
+   "390": {
+    "card": 294.6,
+    "header": 64,
+    "component": 294.6,
+    "approvedDeviation": null
+   },
+   "420": {
+    "card": 287.6,
+    "header": 57,
+    "component": 287.6,
+    "approvedDeviation": null
+   },
+   "440": {
+    "card": 284.4,
+    "header": 57,
+    "component": 284.4,
+    "approvedDeviation": null
+   },
+   "480": {
+    "card": 267.6,
+    "header": 57,
+    "component": 267.6,
+    "approvedDeviation": null
+   },
+   "1146": {
+    "card": 235.4,
+    "header": 57,
+    "component": 235.4,
+    "approvedDeviation": null
+   }
+  },
+  "Delivery · Logistics editor": {
+   "390": {
+    "card": 366.4,
+    "header": 64,
+    "component": 366.4,
+    "approvedDeviation": null
+   },
+   "420": {
+    "card": 359.4,
+    "header": 57,
+    "component": 359.4,
+    "approvedDeviation": null
+   },
+   "440": {
+    "card": 356.2,
+    "header": 57,
+    "component": 356.2,
+    "approvedDeviation": null
+   },
+   "480": {
+    "card": 339.4,
+    "header": 57,
+    "component": 339.4,
+    "approvedDeviation": null
+   },
+   "1146": {
+    "card": 307.2,
+    "header": 57,
+    "component": 307.2,
+    "approvedDeviation": null
+   }
+  },
+  "Delivery · Confirmed Delivery editor": {
+   "390": {
+    "card": 536.1,
+    "header": 64,
+    "component": 536.1,
+    "approvedDeviation": null
+   },
+   "420": {
+    "card": 529.1,
+    "header": 57,
+    "component": 529.1,
+    "approvedDeviation": null
+   },
+   "440": {
+    "card": 525.9,
+    "header": 57,
+    "component": 525.9,
+    "approvedDeviation": null
+   },
+   "480": {
+    "card": 416.1,
+    "header": 57,
+    "component": 416.1,
+    "approvedDeviation": null
+   },
+   "1146": {
+    "card": 384,
+    "header": 57,
+    "component": 384,
+    "approvedDeviation": null
+   }
+  },
+  "Delivery · DO conditions": {
+   "390": {
+    "card": 366.5,
+    "header": 64,
+    "component": 366.5,
+    "approvedDeviation": "DO: one condition per line (reference shows two per line on wide cards)"
+   },
+   "420": {
+    "card": 359.5,
+    "header": 57,
+    "component": 359.5,
+    "approvedDeviation": "DO: one condition per line (reference shows two per line on wide cards)"
+   },
+   "440": {
+    "card": 356.3,
+    "header": 57,
+    "component": 356.3,
+    "approvedDeviation": "DO: one condition per line (reference shows two per line on wide cards)"
+   },
+   "480": {
+    "card": 313.1,
+    "header": 57,
+    "component": 339.5,
+    "approvedDeviation": "DO: one condition per line (reference shows two per line on wide cards)"
+   },
+   "1146": {
+    "card": 281,
+    "header": 57,
+    "component": 307.3,
+    "approvedDeviation": "DO: one condition per line (reference shows two per line on wide cards)"
+   }
+  },
+  "Delivery · Stock opens items": {
+   "390": {
+    "card": 354,
+    "header": 64,
+    "component": 354,
+    "approvedDeviation": null
+   },
+   "420": {
+    "card": 347,
+    "header": 57,
+    "component": 347,
+    "approvedDeviation": null
+   },
+   "440": {
+    "card": 343.8,
+    "header": 57,
+    "component": 343.8,
+    "approvedDeviation": null
+   },
+   "480": {
+    "card": 327,
+    "header": 57,
+    "component": 327,
+    "approvedDeviation": null
+   },
+   "1146": {
+    "card": 294.8,
+    "header": 57,
+    "component": 294.8,
+    "approvedDeviation": null
+   }
+  },
+  "Delivery · items": {
+   "390": {
+    "card": 354,
+    "header": 64,
+    "component": 354,
+    "approvedDeviation": null
+   },
+   "420": {
+    "card": 347,
+    "header": 57,
+    "component": 347,
+    "approvedDeviation": null
+   },
+   "440": {
+    "card": 343.8,
+    "header": 57,
+    "component": 343.8,
+    "approvedDeviation": null
+   },
+   "480": {
+    "card": 327,
+    "header": 57,
+    "component": 327,
+    "approvedDeviation": null
+   },
+   "1146": {
+    "card": 294.8,
+    "header": 57,
+    "component": 294.8,
+    "approvedDeviation": null
+   }
+  },
+  "Communication · WhatsApp": {
+   "390": {
+    "card": 618.2,
+    "header": 64,
+    "component": 618.2,
+    "approvedDeviation": "Info strip keeps the Paid | Outstanding divider on narrow cards (reference drops it through a Delivery-only rule)"
+   },
+   "420": {
+    "card": 611.2,
+    "header": 57,
+    "component": 611.2,
+    "approvedDeviation": "Info strip keeps the Paid | Outstanding divider on narrow cards (reference drops it through a Delivery-only rule)"
+   },
+   "440": {
+    "card": 614,
+    "header": 57,
+    "component": 614,
+    "approvedDeviation": null
+   },
+   "480": {
+    "card": 614,
+    "header": 57,
+    "component": 614,
+    "approvedDeviation": null
+   },
+   "1146": {
+    "card": 614,
+    "header": 57,
+    "component": 614,
+    "approvedDeviation": null
+   }
+  },
+  "Communication · Email": {
+   "390": {
+    "card": 658.2,
+    "header": 64,
+    "component": 658.2,
+    "approvedDeviation": "Info strip keeps the Paid | Outstanding divider on narrow cards (reference drops it through a Delivery-only rule)"
+   },
+   "420": {
+    "card": 651.2,
+    "header": 57,
+    "component": 651.2,
+    "approvedDeviation": "Info strip keeps the Paid | Outstanding divider on narrow cards (reference drops it through a Delivery-only rule)"
+   },
+   "440": {
+    "card": 654,
+    "header": 57,
+    "component": 654,
+    "approvedDeviation": null
+   },
+   "480": {
+    "card": 654,
+    "header": 57,
+    "component": 654,
+    "approvedDeviation": null
+   },
+   "1146": {
+    "card": 654,
+    "header": 57,
+    "component": 654,
+    "approvedDeviation": null
+   }
+  },
+  "Communication · ⋯ menu": {
+   "390": {
+    "card": 618.2,
+    "header": 64,
+    "component": 618.2,
+    "approvedDeviation": "Info strip keeps the Paid | Outstanding divider on narrow cards (reference drops it through a Delivery-only rule)"
+   },
+   "420": {
+    "card": 611.2,
+    "header": 57,
+    "component": 611.2,
+    "approvedDeviation": "Info strip keeps the Paid | Outstanding divider on narrow cards (reference drops it through a Delivery-only rule)"
+   },
+   "440": {
+    "card": 614,
+    "header": 57,
+    "component": 614,
+    "approvedDeviation": null
+   },
+   "480": {
+    "card": 614,
+    "header": 57,
+    "component": 614,
+    "approvedDeviation": null
+   },
+   "1146": {
+    "card": 614,
+    "header": 57,
+    "component": 614,
+    "approvedDeviation": null
+   }
+  },
+  "Communication · Find template": {
+   "390": {
+    "card": 752.2,
+    "header": 64,
+    "component": 752.2,
+    "approvedDeviation": "Info strip keeps the Paid | Outstanding divider on narrow cards (reference drops it through a Delivery-only rule)"
+   },
+   "420": {
+    "card": 745.2,
+    "header": 57,
+    "component": 745.2,
+    "approvedDeviation": "Info strip keeps the Paid | Outstanding divider on narrow cards (reference drops it through a Delivery-only rule)"
+   },
+   "440": {
+    "card": 748,
+    "header": 57,
+    "component": 748,
+    "approvedDeviation": null
+   },
+   "480": {
+    "card": 748,
+    "header": 57,
+    "component": 748,
+    "approvedDeviation": null
+   },
+   "1146": {
+    "card": 748,
+    "header": 57,
+    "component": 748,
+    "approvedDeviation": null
+   }
+  },
+  "Communication · Manage templates": {
+   "390": {
+    "card": 698.4,
+    "header": 64,
+    "component": 698.4,
+    "approvedDeviation": "Info strip keeps the Paid | Outstanding divider on narrow cards (reference drops it through a Delivery-only rule)"
+   },
+   "420": {
+    "card": 691.4,
+    "header": 57,
+    "component": 691.4,
+    "approvedDeviation": "Info strip keeps the Paid | Outstanding divider on narrow cards (reference drops it through a Delivery-only rule)"
+   },
+   "440": {
+    "card": 694.2,
+    "header": 57,
+    "component": 694.2,
+    "approvedDeviation": null
+   },
+   "480": {
+    "card": 694.2,
+    "header": 57,
+    "component": 694.2,
+    "approvedDeviation": null
+   },
+   "1146": {
+    "card": 694.2,
+    "header": 57,
+    "component": 694.2,
+    "approvedDeviation": null
+   }
+  },
+  "Timeline": {
+   "390": {
+    "card": 427.8,
+    "header": 64,
+    "component": 427.8,
+    "approvedDeviation": "Info strip keeps the Paid | Outstanding divider on narrow cards (reference drops it through a Delivery-only rule)"
+   },
+   "420": {
+    "card": 420.8,
+    "header": 57,
+    "component": 420.8,
+    "approvedDeviation": "Info strip keeps the Paid | Outstanding divider on narrow cards (reference drops it through a Delivery-only rule)"
+   },
+   "440": {
+    "card": 423.6,
+    "header": 57,
+    "component": 423.6,
+    "approvedDeviation": null
+   },
+   "480": {
+    "card": 423.6,
+    "header": 57,
+    "component": 423.6,
+    "approvedDeviation": null
+   },
+   "1146": {
+    "card": 423.6,
+    "header": 57,
+    "component": 423.6,
+    "approvedDeviation": null
+   }
+  }
+ }
+}

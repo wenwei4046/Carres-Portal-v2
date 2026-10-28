@@ -15,7 +15,9 @@ import type { QueryClient } from "@tanstack/react-query";
 import type { TrialBalanceReport } from "@carres/shared/finance-ledger";
 import { ledgerKindWord } from "@carres/shared/finance-ledger";
 import { fmtDate, fmtMonth } from "@/lib/fmt-date";
+import { rm } from "@/lib/format-currency";
 import { trialBalanceQuery } from "./ledger/ledger-queries";
+import { openingWords, readOpeningPosted } from "./ledger/opening-balances-queries";
 import { trialBalanceLabel, trialBalanceLines } from "./ledger/LedgerTrialBalance";
 import { nothingInPeriod, nothingOnDay, paidBeforeInvoiceNote, statementRows } from "./reports/StatementTable";
 import {
@@ -29,7 +31,7 @@ import {
 
 type Cell = string | number;
 export interface PackSheet {
-  name: "Trial Balance" | "Profit and Loss" | "Balance Sheet";
+  name: "Trial Balance" | "Profit and Loss" | "Balance Sheet" | "Cash Flow" | "General Ledger";
   rows: Cell[][];
 }
 
@@ -87,10 +89,11 @@ export function packPeriod(ym: string, today: string): { from: string; to: strin
 // A workbook is filed and re-read in a later year, so its dates always carry the year (fmt-date's document option).
 const day = (iso: string) => fmtDate(iso, { year: "always" });
 const beforeGoLive =(goLive: string) => `The ledger started on ${day(goLive)}. Pick a day from then on.`;
-const noOpening = (goLive: string) => `Since ${day(goLive)} · No opening balances`;
+/** Row 2 of every sheet: `Since {go-live} · No opening balances`, or `· Brought forward` once Finance has posted them (0705). */
+export const noOpening = (goLive: string, broughtForward = false) => `Since ${day(goLive)} · ${openingWords(broughtForward)}`;
 
-export function trialBalanceSheet(tb: TrialBalanceReport): PackSheet {
-  const head: Cell[][] = [["Trial Balance", `As of ${day(tb.as_of)}`], [noOpening(tb.go_live_on)], []];
+export function trialBalanceSheet(tb: TrialBalanceReport, broughtForward = false): PackSheet {
+  const head: Cell[][] = [["Trial Balance", `As of ${day(tb.as_of)}`], [noOpening(tb.go_live_on, broughtForward)], []];
   if (tb.status === "before_go_live") return { name: "Trial Balance", rows: [...head, [beforeGoLive(tb.go_live_on)]] };
   // The rows the page's Export Excel writes: headings by name with their Debit
   // and Credit left empty, and the accounts anything was posted to, so adding
@@ -139,8 +142,8 @@ function statementBody(
   return out;
 }
 
-export function profitAndLossSheet(pl: ProfitAndLoss): PackSheet {
-  const head: Cell[][] = [["Profit and Loss", `${day(pl.from)} to ${day(pl.to)}`], [noOpening(pl.goLiveOn)], []];
+export function profitAndLossSheet(pl: ProfitAndLoss, broughtForward = false): PackSheet {
+  const head: Cell[][] = [["Profit and Loss", `${day(pl.from)} to ${day(pl.to)}`], [noOpening(pl.goLiveOn, broughtForward)], []];
   if (pl.status === "before_go_live") return { name: "Profit and Loss", rows: [...head, [beforeGoLive(pl.goLiveOn)]] };
   return {
     name: "Profit and Loss",
@@ -148,8 +151,8 @@ export function profitAndLossSheet(pl: ProfitAndLoss): PackSheet {
   };
 }
 
-export function balanceSheetSheet(bs: BalanceSheet): PackSheet {
-  const head: Cell[][] = [["Balance Sheet", `As of ${day(bs.asOf)}`], [noOpening(bs.goLiveOn)], []];
+export function balanceSheetSheet(bs: BalanceSheet, broughtForward = false): PackSheet {
+  const head: Cell[][] = [["Balance Sheet", `As of ${day(bs.asOf)}`], [noOpening(bs.goLiveOn, broughtForward)], []];
   if (bs.status === "before_go_live") return { name: "Balance Sheet", rows: [...head, [beforeGoLive(bs.goLiveOn)]] };
   const rows = [...head, ...statementBody(bs.sections, nothingOnDay, paidBeforeInvoiceNote)];
   if (!bs.balances) rows.push([`Assets differ from liabilities plus equity by`, Math.abs(bs.difference)]);
@@ -166,15 +169,65 @@ export const packFileName = (ym: string) => `Month-end pack ${fmtMonth(ym)}.xlsx
  */
 export async function exportMonthEndPack(qc: QueryClient, ym: string, today: string): Promise<PackSheet[]> {
   const { from, to } = packPeriod(ym, today);
-  const [tb, pl, bs] = await Promise.all([
+  const [tb, pl, bs, posted] = await Promise.all([
     qc.fetchQuery(trialBalanceQuery(to)),
     qc.fetchQuery(profitAndLossQuery(from, to)),
     qc.fetchQuery(balanceSheetQuery(to)),
+    readOpeningPosted(qc),
   ]);
-  const sheets = [trialBalanceSheet(tb), profitAndLossSheet(pl), balanceSheetSheet(bs)];
+  const sheets = [trialBalanceSheet(tb, posted), profitAndLossSheet(pl, posted), balanceSheetSheet(bs, posted)];
   const XLSX = await import("xlsx");
   const wb = XLSX.utils.book_new();
   for (const s of sheets) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s.rows), s.name);
   XLSX.writeFile(wb, packFileName(ym));
   return sheets;
+}
+
+/**
+ * Reports → Export Excel / Export PDF: the one statement on screen, as the
+ * same rows its sheet in the pack has, plus the department picked (null: All).
+ * `stem` is the file name without its extension:
+ * `Profit and Loss Sep 2026 Showroom` · `Balance Sheet as of 30 Sep 2026`.
+ */
+export function statementExport(report: ProfitAndLoss | BalanceSheet, department: string | null, broughtForward = false): { sheet: PackSheet; stem: string } {
+  const sheet = "asOf" in report ? balanceSheetSheet(report, broughtForward) : profitAndLossSheet(report, broughtForward);
+  if (department) sheet.rows.splice(1, 0, ["Department", department]);
+  const ym = "asOf" in report ? null : report.from.slice(0, 7);
+  const when = "asOf" in report ? `as of ${day(report.asOf)}`
+    : report.from === `${ym}-01` && report.to === monthEnd(ym!) ? fmtMonth(ym) : `${day(report.from)} to ${day(report.to)}`;
+  // A department name is typed by a person; keep the characters a file name cannot hold out of it.
+  const stem = [sheet.name, when, department].filter(Boolean).join(" ").replace(/[\\/:*?"<>|]/g, "-");
+  return { sheet, stem };
+}
+
+export async function writeStatementExcel({ sheet, stem }: ReturnType<typeof statementExport>): Promise<void> {
+  const XLSX = await import("xlsx");
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sheet.rows), sheet.name);
+  XLSX.writeFile(wb, `${stem}.xlsx`);
+}
+
+/** The same rows through the PDF every list's Export → PDF prints: the lines
+ *  above the first blank row are the title and the note under the table. */
+export async function writeStatementPdf({ sheet, stem }: ReturnType<typeof statementExport>): Promise<void> {
+  const blank = sheet.rows.findIndex((r) => r.length === 0);
+  const head = sheet.rows.slice(0, blank);
+  const [headers, ...body] = sheet.rows.slice(blank + 1);
+  const text = (c: Cell | undefined) =>
+    typeof c === "number" ? rm(c) : (c ?? "").replace(/^ +/, (s) => " ".repeat(s.length * 2));
+  const { renderRegisterListPdf } = await import("@/lib/pdf/render");
+  const blob = await renderRegisterListPdf({
+    title: head[0]!.join(" · "),
+    summary: head.slice(1).map((r) => r.join(" ")).join(" · "),
+    headers: headers!.map(String),
+    // As many columns as the sheet heads (Cash Flow has Code · Account · Amount).
+    rows: body.map((r) => headers!.map((_, i) => text(r[i]))),
+    printedAt: new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }),
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${stem}.pdf`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }

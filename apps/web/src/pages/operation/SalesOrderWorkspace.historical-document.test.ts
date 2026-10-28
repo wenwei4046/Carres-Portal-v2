@@ -142,3 +142,16 @@ describe("a historical Sales Order version's document", () => {
     expect(today.paid).toBe(1999.5);
   });
 });
+
+describe("historical delivery access is never inferred", () => {
+  it.each([{}, { delivery_floor: null, delivery_has_lift: null }])("keeps missing floor and lift null in the document", (header) => {
+    const document = snapshotTemplateData({ ...REV2_SNAPSHOT, header: { ...REV2_SNAPSHOT.header, ...header } }, SIGNED_BASE);
+    expect(document.delivery.floor).toBeNull();
+    expect(document.delivery.has_lift).toBeNull();
+  });
+  it("preserves recorded no-lift and floor one as actual facts", () => {
+    const document = snapshotTemplateData({ ...REV2_SNAPSHOT, header: { ...REV2_SNAPSHOT.header, delivery_floor: 1, delivery_has_lift: false } }, SIGNED_BASE);
+    expect(document.delivery.floor).toBe(1);
+    expect(document.delivery.has_lift).toBe(false);
+  });
+});

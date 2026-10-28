@@ -4,6 +4,8 @@ import {
   EMERGENCY_RELATIONSHIP_OTHER,
   minDeliveryDateISO,
   ORDER_ENTRY_TABS,
+  PLANNED_PRODUCTION_START_REFUSALS,
+  plannedProductionStartInPast,
   resolveFormTab,
   resolvePaymentMethods,
   STRIPE_METHOD_KEY,
@@ -607,16 +609,18 @@ export function step3DateFirstIssue(
   // Phase 11.1 (Loo) — the salesperson must ALSO commit a proceed
   // (production-start) date whenever a delivery date is set. It can't be in the
   // past and can't be after the delivery date (you don't start building after
-  // you've promised delivery).
+  // you've promised delivery). Since 2026-10-06 the planned date is named
+  // `Planned production start` (owner ruling: two dates, two names); the
+  // refusals are the shared ones every door uses.
   if (!d.delivery.proceedDate) {
-    return "Proceed date: pick the day production should start";
+    return PLANNED_PRODUCTION_START_REFUSALS.required;
   }
   const todayIso = minDeliveryDateISO(0, today);
   if (d.delivery.proceedDate < todayIso) {
-    return `Proceed date: can't be in the past (earliest ${todayIso})`;
+    return plannedProductionStartInPast(todayIso);
   }
   if (d.delivery.proceedDate > d.delivery.date) {
-    return "Proceed date: must be on or before the delivery date";
+    return PLANNED_PRODUCTION_START_REFUSALS.afterDelivery;
   }
   return null;
 }

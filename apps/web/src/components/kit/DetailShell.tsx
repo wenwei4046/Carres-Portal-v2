@@ -49,7 +49,7 @@
  */
 import type { ReactNode } from "react";
 import type { OrderActionTrack } from "@carres/shared";
-import Icon from "./Icon";
+import MIcon from "@/components/carres/MIcon";
 
 /** L4: Evidence and Detail live inside a slot's own content, not as slots. */
 export type Depth = "answer" | "context";
@@ -132,7 +132,11 @@ export interface DetailShellProps {
   onSectionChange?: (id: string) => void;
 }
 
-const TRACK_ICON = { goods: "goods", delivery: "delivery", money: "money" } as const;
+/** One glyph per business track, in Material Symbols (v4 icons, `MIcon`). */
+const TRACK_ICON = { goods: "inventory_2", delivery: "local_shipping", money: "payments" } as const;
+
+/* v4 card (01 §3): white, 1px card border, radius 8, padding 14 × 16, no shadow. */
+const CARD = "rounded-lg border border-c-card-border bg-c-card px-4 py-3.5";
 
 export default function DetailShell({
   identity,
@@ -148,45 +152,37 @@ export default function DetailShell({
     sections.find((s) => s.id === activeSectionId) ?? sections[0] ?? null;
 
   return (
-    <div data-kit="detail-shell" className="flex h-full min-h-0 flex-col gap-4 bg-kit-slate-3 p-4">
+    <div data-kit="detail-shell" className="flex h-full min-h-0 flex-col gap-3 bg-c-ground p-3">
       {/* ① IDENTITY — whose record is this. Values only. */}
-      <section data-kit="detail-identity" className="flex shrink-0 flex-col gap-2">
-        <div className="text-title text-kit-slate-12">{identity.primary}</div>
+      <section data-kit="detail-identity" className={`flex shrink-0 flex-col gap-2 ${CARD}`}>
+        <div className="text-strong text-c-ink">{identity.primary}</div>
         <dl className="flex flex-wrap items-baseline gap-6">
           {identity.persistentFacts.map((f) => (
             <div key={f.label} data-kit="detail-fact" className="flex flex-col">
-              <dt className="text-label text-kit-slate-11">{f.label}</dt>
-              <dd className="text-body text-kit-slate-12">{f.value}</dd>
+              <dt className="text-meta text-c-secondary">{f.label}</dt>
+              <dd className="text-body text-c-ink">{f.value}</dd>
             </div>
           ))}
         </dl>
       </section>
 
       {/* ② CURRENT ACTION — ALWAYS visible. No collapsible, no hidden. */}
-      <section
-        data-kit="detail-current-action"
-        className="shrink-0 rounded-card border border-kit-slate-5 bg-white p-4"
-      >
-        <div className="text-strong text-kit-slate-12">{currentAction.answer}</div>
+      <section data-kit="detail-current-action" className={`shrink-0 ${CARD}`}>
+        <div className="text-strong text-c-ink">{currentAction.answer}</div>
         {currentAction.context && (
-          <div className="text-meta text-kit-slate-11">{currentAction.context}</div>
+          <div className="text-meta text-c-secondary">{currentAction.context}</div>
         )}
       </section>
 
       {/* ③ CURRENT ISSUES — the block does not exist when there is nothing
        *  wrong. No "✓ None", no empty card, no reassuring tick. */}
       {currentIssues.length > 0 && (
-        <section
-          data-kit="detail-current-issues"
-          className="shrink-0 rounded-card border border-kit-slate-5 bg-white p-4"
-        >
+        <section data-kit="detail-current-issues" className={`shrink-0 ${CARD}`}>
           <ul className="flex flex-col gap-2">
             {currentIssues.map((i) => (
               <li key={i.id} data-kit="detail-issue" data-track={i.track} className="flex items-center gap-2">
-                <span className="text-kit-slate-9">
-                  <Icon name={TRACK_ICON[i.track]} size={14} />
-                </span>
-                <span className="text-body text-kit-slate-12">{i.text}</span>
+                <MIcon name={TRACK_ICON[i.track]} size={16} className="text-c-muted" />
+                <span className="text-body text-c-ink">{i.text}</span>
               </li>
             ))}
           </ul>
@@ -194,24 +190,24 @@ export default function DetailShell({
       )}
 
       {/* ④ PROGRESS — a VIEW of ②. Steps and their state, and nothing else. */}
-      <section data-kit="detail-progress" className="flex shrink-0 flex-wrap items-center gap-4">
+      <section data-kit="detail-progress" className="flex shrink-0 flex-wrap items-center gap-4 px-1">
         {progress.steps.map((s) => (
           <span
             key={s.id}
             data-kit="detail-step"
             data-state={s.state}
             className={`flex items-center gap-2 text-meta ${
-              s.state === "todo" ? "text-kit-slate-9" : "text-kit-slate-12"
+              s.state === "todo" ? "text-c-muted" : "text-c-ink"
             }`}
           >
             <span
               aria-hidden="true"
               className={`h-2 w-2 rounded-full ${
                 s.state === "done"
-                  ? "bg-kit-green-11"
+                  ? "bg-c-ok-fg"
                   : s.state === "current"
-                    ? "bg-kit-blue-9"
-                    : "bg-kit-slate-9"
+                    ? "bg-c-select-fg"
+                    : "bg-c-muted"
               }`}
             />
             {s.label}
@@ -219,10 +215,14 @@ export default function DetailShell({
         ))}
       </section>
 
-      {/* ⑤⑥ BUSINESS SECTIONS — the detail, opened on demand. */}
+      {/* ⑤⑥ BUSINESS SECTIONS — the detail, opened on demand. One card: the
+       *  v4 tab bar on top, the open section under the thin section line. */}
       {sections.length > 0 && active && (
-        <section data-kit="detail-sections" className="flex min-h-0 flex-1 flex-col gap-2">
-          <div className="flex shrink-0 items-center gap-4 border-b border-kit-slate-5">
+        <section
+          data-kit="detail-sections"
+          className="flex min-h-0 flex-1 flex-col rounded-lg border border-c-card-border bg-c-card"
+        >
+          <div className="flex shrink-0 flex-wrap items-center gap-0.5 border-b border-c-section-line px-3 py-2">
             {sections.map((s) => (
               <button
                 key={s.id}
@@ -230,11 +230,13 @@ export default function DetailShell({
                 data-kit="detail-section-tab"
                 data-active={s.id === active.id || undefined}
                 onClick={() => onSectionChange?.(s.id)}
-                className={`flex items-center gap-2 px-1 py-2 text-body ${
-                  s.id === active.id ? "text-kit-slate-12" : "text-kit-slate-11 hover:text-kit-slate-12"
+                className={`flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-[5px] text-body ${
+                  s.id === active.id
+                    ? "bg-c-select-bg font-semibold text-c-select-fg"
+                    : "font-medium text-c-tab hover:bg-c-hover"
                 }`}
               >
-                {s.track && <Icon name={TRACK_ICON[s.track]} size={14} />}
+                {s.track && <MIcon name={TRACK_ICON[s.track]} size={16} />}
                 {s.label}
               </button>
             ))}
@@ -242,20 +244,20 @@ export default function DetailShell({
               <a
                 href={active.detailHref}
                 data-kit="detail-href"
-                className="ml-auto flex items-center gap-1 text-meta text-kit-blue-11"
+                className="ml-auto flex items-center gap-1 rounded-lg px-2 py-1 text-meta font-medium text-c-body hover:bg-c-hover"
               >
-                <Icon name="open" size={14} />
+                <MIcon name="open_in_new" size={16} />
                 {active.label}
               </a>
             )}
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">{active.children}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3.5">{active.children}</div>
         </section>
       )}
 
       {/* ⑦ ACTIVITY — who did what, when. Absent renders nothing. */}
       {activity && (
-        <section data-kit="detail-activity" className="shrink-0">
+        <section data-kit="detail-activity" className={`shrink-0 ${CARD}`}>
           {activity.children}
         </section>
       )}

@@ -31,12 +31,20 @@ import { useState } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import StaffDuties from "./StaffDuties";
+import ActivitySettings from "./staff-duties/ActivitySettings";
 import OperationPurchasingSettings from "./OperationPurchasingSettings";
 import SalesOrderSettings from "./SalesOrderSettings";
 import IssueTrackerSettings from "./IssueTrackerSettings";
+import ServiceSettings from "./ServiceSettings";
 import PaymentSettings from "./PaymentSettings";
 import WarehouseSettings, { WAREHOUSE_SETTINGS_SECTIONS } from "./WarehouseSettings";
 import DeliverySettings from "./DeliverySettings";
+import AppearanceSettings from "./AppearanceSettings";
+import LunchTimeSettings from "./LunchTimeSettings";
+import CompanySettings from "./settings-core/CompanySettings";
+import OfficeSettings from "./settings-core/OfficeSettings";
+import SettingsEditors from "./settings-core/SettingsEditors";
+import AddressListsSettings from "./settings-core/AddressListsSettings";
 import { DELIVERY_SETTINGS_SECTIONS } from "@carres/shared";
 
 /**
@@ -50,11 +58,39 @@ import { DELIVERY_SETTINGS_SECTIONS } from "@carres/shared";
  * but the navigation between them.
  */
 const SECTIONS = [
+  /* Personal · Appearance — each person's own theme and focus outline (01 §9,
+     COPY "Personal Appearance"). Personal · Lunch time — each person's own
+     lunch start, read by the activity check (owner order 9 Oct 2026, 0677;
+     COPY "Settings → Personal → Lunch time"). */
+  {
+    group: "Personal",
+    items: [
+      { slug: "appearance", label: "Appearance" },
+      { slug: "lunch-time", label: "Lunch time" },
+    ],
+  },
+  /* Carres Settings List COM · OFF · TEAM-02 (owner confirmed 9 Oct 2026):
+     the company identity, the one Office calendar, and who may edit which
+     section. */
+  { group: "Company", items: [{ slug: "company", label: "Company" }] },
+  { group: "Office", items: [{ slug: "office", label: "Office" }] },
+  { group: "Team and access", items: [{ slug: "settings-editors", label: "Settings editors" }] },
   { group: "Staff & Duties", items: [{ slug: "staff-duties", label: "Staff & Duties" }] },
-  { group: "Sales Orders", items: [{ slug: "sales-orders", label: "Sales Order Settings" }] },
+  /* Address lists (0722): Weisiang's decision (Mr Lim, WhatsApp 2026-10-22;
+     Jess was not part of it) — office staff edit the State, City and
+     Postcode lists, Houzs SO Maintenance way. */
+  {
+    group: "Sales Orders",
+    items: [
+      { slug: "sales-orders", label: "Sales Order Settings" },
+      { slug: "address-lists", label: "Address lists" },
+    ],
+  },
   { group: "Purchasing", items: [{ slug: "purchasing", label: "Purchasing Settings" }] },
   { group: "Payment", items: [{ slug: "payment", label: "Payment Settings" }] },
   { group: "Issue Tracker", items: [{ slug: "issue-tracker", label: "Issue Tracker Settings" }] },
+  // 0711 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): Houzs Service Maintenance.
+  { group: "Service", items: [{ slug: "service", label: "Service Settings" }] },
   {
     group: "Warehouse",
     items: WAREHOUSE_SETTINGS_SECTIONS.map((s) => ({
@@ -73,6 +109,18 @@ const SECTIONS = [
     })),
   },
 ] as const;
+
+/** The section a Settings address names, for the shell header's
+ *  `Settings / {section}` (Layout Standard §1). */
+export function settingsSectionLabel(pathname: string): string | null {
+  const rest = pathname.replace(/^\/operation\/settings\/?/, "");
+  for (const group of SECTIONS) {
+    for (const item of group.items) {
+      if (rest === item.slug || rest.startsWith(`${item.slug}/`)) return item.label;
+    }
+  }
+  return null;
+}
 
 /** One browser's own choice. Never a server preference — it is a view state. */
 const SETTINGS_RAIL_STORAGE_KEY = "ops-settings-rail";
@@ -120,7 +168,7 @@ export default function SettingsWorkspace() {
 
           <div>
             <div className="flex items-center px-1.5">
-              <span className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">
+              <span className="text-label uppercase tracking-wide text-kit-slate-9">
                 Settings
               </span>
             </div>
@@ -133,7 +181,7 @@ export default function SettingsWorkspace() {
                     text — the shipped navigation test selects on it. */}
                 <span
                   data-settings-group
-                  className="text-label font-semibold uppercase tracking-wide text-kit-slate-9"
+                  className="text-label uppercase tracking-wide text-kit-slate-9"
                 >
                   {s.group}
                 </span>
@@ -148,20 +196,14 @@ export default function SettingsWorkspace() {
                     [
                       "relative flex min-h-[36px] w-full items-start gap-2 rounded-control px-2 py-[9px] text-left text-body",
                       isActive
-                        ? "bg-kit-blue-3 text-kit-slate-12 font-semibold"
+                        ? "bg-c-select-bg text-c-select-fg font-semibold"
                         : "text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12",
                     ].join(" ")
                   }
                   data-testid={`settings-section-${item.slug.replace("/", "-")}`}
                 >
-                  {({ isActive }) => (
+                  {() => (
                     <>
-                      {isActive && (
-                        <span
-                          aria-hidden
-                          className="absolute left-0 top-1 bottom-1 w-0.5 bg-kit-blue-9"
-                        />
-                      )}
                       <span className="min-w-0 flex-1">{item.label}</span>
                     </>
                   )}
@@ -188,7 +230,7 @@ export default function SettingsWorkspace() {
           </div>
         )}
         <Routes>
-          <Route path="staff-duties" element={<StaffDuties settingsNavigation={!railOpen ? (
+          <Route path="staff-duties" element={<StaffDuties activitySettings={<ActivitySettings />} settingsNavigation={!railOpen ? (
             <button type="button" aria-label="Show settings" title="Show settings" data-testid="settings-show-rail"
               className="grid h-7 w-7 shrink-0 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
               onClick={() => setRailVisible(true)}>
@@ -196,10 +238,17 @@ export default function SettingsWorkspace() {
             </button>
           ) : undefined} />} />
           <Route index element={<Navigate to="sales-orders" replace />} />
+          <Route path="appearance" element={<AppearanceSettings />} />
+          <Route path="lunch-time" element={<LunchTimeSettings />} />
+          <Route path="company" element={<CompanySettings />} />
+          <Route path="office" element={<OfficeSettings />} />
+          <Route path="settings-editors" element={<SettingsEditors />} />
           <Route path="sales-orders" element={<SalesOrderSettings />} />
+          <Route path="address-lists" element={<AddressListsSettings />} />
           <Route path="purchasing" element={<OperationPurchasingSettings embedded />} />
           <Route path="payment" element={<PaymentSettings />} />
           <Route path="issue-tracker" element={<IssueTrackerSettings />} />
+          <Route path="service" element={<ServiceSettings />} />
           <Route path="warehouse" element={<Navigate to="details" replace />} />
           <Route path="warehouse/:section" element={<WarehouseSettings />} />
           <Route path="delivery" element={<Navigate to="partners" replace />} />

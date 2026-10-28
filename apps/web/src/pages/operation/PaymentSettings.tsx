@@ -18,6 +18,7 @@ import {
   usePaymentMethodRegistry,
 } from "@/lib/payment-methods";
 import { qk, usePaymentSettings, type PaymentSettingsPayload } from "@/lib/queries";
+import { useCanEditSettings } from "@/lib/settings-queries";
 
 /**
  * Settings → Payments (payment/MASTER.md §12 · §16; owner ruling 2026-09-12;
@@ -62,7 +63,7 @@ function Section({ title, lead, children, testId }: {
   title: string; lead?: string; children: React.ReactNode; testId?: string;
 }) {
   return <section className="rounded-card border border-kit-slate-5 bg-white p-5" data-testid={testId}>
-    <h2 className="text-section">{title}</h2>
+    <h2 className="text-strong">{title}</h2>
     {lead && <p className="mt-1 text-body text-kit-slate-11">{lead}</p>}
     {children}
   </section>;
@@ -71,6 +72,7 @@ function Section({ title, lead, children, testId }: {
 export default function PaymentSettings() {
   const qc = useQueryClient();
   const query = usePaymentSettings();
+  const canEdit = useCanEditSettings("payment");
   const [editing, setEditing] = useState<BankAccount["route_source"] | null>(null);
   const [accountName, setAccountName] = useState("");
   const [accountNo, setAccountNo] = useState("");
@@ -105,6 +107,12 @@ export default function PaymentSettings() {
   const timing = data?.collection_timing?.[0] ?? null;
   return <PageShell variant="settings" title="Payment Settings">
     <div className="mx-auto grid w-full max-w-4xl gap-5 overflow-auto p-5" data-testid="payment-settings">
+      {/* TEAM-02 (0674): only the owner or a person named for Payment changes
+          these settings; everyone else reads them. */}
+      {!canEdit && <p className="text-meta text-kit-slate-11" data-testid="payment-settings-read-only">
+        You can read these settings. Only the owner and the people named in Settings editors can change them.
+      </p>}
+      <fieldset disabled={!canEdit} className="m-0 grid min-w-0 gap-5 border-0 p-0">
 
       <Section title="Receiving bank accounts"
         lead="The system picks the bank from the order source. Staff never choose or type an account.">
@@ -112,8 +120,8 @@ export default function PaymentSettings() {
           {(data?.bank_accounts ?? []).map((a) => <div key={a.route_source} className="text-body">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="font-semibold">{SOURCE_WORD[a.route_source]} → {a.bank_name}</div>
-                <div className="text-label font-normal">
+                <div className="font-medium">{SOURCE_WORD[a.route_source]} → {a.bank_name}</div>
+                <div className="text-meta text-kit-slate-11">
                   {a.account_name && a.account_no
                     ? `${a.account_name} · ${a.account_no}`
                     : "The account is not entered yet. Ask a manager to add it."}
@@ -148,7 +156,7 @@ export default function PaymentSettings() {
           {(data?.bank_accounts ?? []).map((a) => <p key={a.route_source}>
             {SOURCE_WORD[a.route_source]} → {a.bank_name}
           </p>)}
-          <p className="text-label font-normal text-kit-slate-11">
+          <p className="text-meta text-kit-slate-11">
             The bank follows the order source automatically. It is not chosen at posting time.
           </p>
         </div>
@@ -169,7 +177,7 @@ export default function PaymentSettings() {
         <div className="mt-2 text-body space-y-1">
           <p>Next invoice looks like: {nextNumberExample("INV")}</p>
           <p>Next receipt looks like: {nextNumberExample("RC")}</p>
-          <p className="font-semibold">Numbers are created automatically.</p>
+          <p className="font-medium">Numbers are created automatically.</p>
         </div>
       </Section>
 
@@ -187,27 +195,37 @@ export default function PaymentSettings() {
           <p>{data?.online_provider
             ? `${data.online_provider.name} · ${data.online_provider.configured ? "Connected" : "Not connected"}`
             : "Provider status not available"}</p>
-          <p className="text-label font-normal text-kit-slate-11">
+          <p className="text-meta text-kit-slate-11">
             The provider key is a server secret. It is not entered or shown here.
           </p>
         </div>
       </Section>
 
       <ChangeLog changes={data?.setting_changes ?? []} />
+      </fieldset>
     </div>
   </PageShell>;
 }
 
 /**
- * Collection timing (0486) — `Start asking the customer to pay {n} working
- * days before Scheduled delivery` · `Payment must be complete {m} working
- * days before`. Asking must start earlier than the deadline. A new rule
- * applies to new clocks from its effective date; running clocks keep theirs.
+ * Collection timing (0486 · 0672) — `Start asking the customer to pay {n}
+ * working days before Scheduled delivery` · `Payment must be complete {m}
+ * working days before`, and the same pair for an outstation delivery (PAY-04:
+ * deadline 3, ask 4). Asking must start earlier than the deadline in each
+ * pair. A new rule applies to new clocks from its effective date; running
+ * clocks keep theirs.
  */
+const OUTSTATION_DEFAULT = { ask: 4, deadline: 3 } as const;
+const dayWord = (n: number) => (n === 1 ? "1 working day before Scheduled delivery" : `${n} working days before Scheduled delivery`);
+
 function CollectionTimingCard({ current, onSaved }: { current: TimingRule | null; onSaved: () => void }) {
   const [step, setStep] = useState<"view" | "edit" | "review">("view");
+  const outAskNow = current?.outstation_ask_days_before ?? OUTSTATION_DEFAULT.ask;
+  const outDeadlineNow = current?.outstation_deadline_days_before ?? OUTSTATION_DEFAULT.deadline;
   const [ask, setAsk] = useState(String(current?.ask_days_before ?? 3));
   const [deadline, setDeadline] = useState(String(current?.deadline_days_before ?? 2));
+  const [outAsk, setOutAsk] = useState(String(outAskNow));
+  const [outDeadline, setOutDeadline] = useState(String(outDeadlineNow));
   const [effectiveFrom, setEffectiveFrom] = useState(appTodayIso());
   const [reason, setReason] = useState("");
   const save = useMutation({
@@ -215,6 +233,7 @@ function CollectionTimingCard({ current, onSaved }: { current: TimingRule | null
       method: "POST",
       body: JSON.stringify({
         askDaysBefore: Number(ask), deadlineDaysBefore: Number(deadline),
+        outstationAskDaysBefore: Number(outAsk), outstationDeadlineDaysBefore: Number(outDeadline),
         effectiveFrom, reason: reason.trim(),
       }),
     }),
@@ -222,24 +241,36 @@ function CollectionTimingCard({ current, onSaved }: { current: TimingRule | null
     onError: (e: Error) => toast.error(e.message),
   });
   const askN = Number(ask), deadlineN = Number(deadline);
-  const gap = !Number.isInteger(askN) || !Number.isInteger(deadlineN) || askN < 0 || deadlineN < 0
+  const outAskN = Number(outAsk), outDeadlineN = Number(outDeadline);
+  const whole = (n: number) => Number.isInteger(n) && n >= 0 && n <= 60;
+  const gap = ![askN, deadlineN, outAskN, outDeadlineN].every(whole)
     ? "enter whole days"
     : askN <= deadlineN ? "asking must start earlier than the payment deadline"
+    : outAskN <= outDeadlineN ? "asking an outstation customer must start earlier than the outstation payment deadline"
     : !effectiveFrom ? "choose the effective date"
     : !reason.trim() ? "give a reason"
     : null;
   return <Section title="Collection timing" testId="payment-settings-collection-timing">
     <div className="mt-2 text-body space-y-1">
-      <p><span className="font-semibold">Start asking the customer to pay</span><br />
-        {current ? `${current.ask_days_before} working days before Scheduled delivery` : "3 working days before Scheduled delivery (the ruled default)"}</p>
-      <p><span className="font-semibold">Payment must be complete</span><br />
-        {current ? `${current.deadline_days_before} working days before Scheduled delivery` : "2 working days before Scheduled delivery (the ruled default)"}</p>
-      {current && <p className="text-label font-normal text-kit-slate-11">
-        In effect from {fmtDate(current.effective_from)}{current.reason ? ` · ${current.reason}` : ""}. An action that lands on a Saturday, Sunday or public holiday moves to the previous working day. Operation does not work on Saturday.
-      </p>}
+      <p><span className="font-medium">Start asking the customer to pay</span><br />
+        {current ? dayWord(current.ask_days_before) : `${dayWord(3)} (the ruled default)`}</p>
+      <p><span className="font-medium">Payment must be complete</span><br />
+        {current ? dayWord(current.deadline_days_before) : `${dayWord(2)} (the ruled default)`}</p>
+      <p className="pt-1 font-medium" data-testid="collection-timing-outstation">Outstation delivery</p>
+      <p className="text-meta text-kit-slate-11">
+        A delivery whose logistics company is not the Klang Valley default.
+      </p>
+      <p><span className="font-medium">Start asking the customer to pay</span><br />{dayWord(outAskNow)}</p>
+      <p><span className="font-medium">Payment must be complete</span><br />{dayWord(outDeadlineNow)}</p>
+      <p className="text-meta text-kit-slate-11" data-testid="collection-timing-calendar">
+        {current ? `In effect from ${fmtDate(current.effective_from)}${current.reason ? ` · ${current.reason}` : ""}. ` : ""}
+        Days are counted Monday to Saturday, skipping the public holidays set in Settings, Warehouse. These dates never move for the customer. If that day is not a working day of the person responsible, they act on their working day before it: their working days in People, else the Office working days in Settings, Office.
+      </p>
       {step === "view" && <Button variant="neutral" onClick={() => {
         setAsk(String(current?.ask_days_before ?? 3));
         setDeadline(String(current?.deadline_days_before ?? 2));
+        setOutAsk(String(outAskNow));
+        setOutDeadline(String(outDeadlineNow));
         // Read today again: the page may have been open since yesterday.
         setEffectiveFrom(appTodayIso());
         setStep("edit");
@@ -250,16 +281,22 @@ function CollectionTimingCard({ current, onSaved }: { current: TimingRule | null
         value={ask} onChange={(e) => setAsk(e.target.value)} disabled={step === "review"} />
       <Input id="timing-deadline" label="Payment must be complete (working days before Scheduled delivery)" type="number" min={0} max={60}
         value={deadline} onChange={(e) => setDeadline(e.target.value)} disabled={step === "review"} />
+      <Input id="timing-outstation-ask" label="Outstation: start asking (working days before Scheduled delivery)" type="number" min={0} max={60}
+        value={outAsk} onChange={(e) => setOutAsk(e.target.value)} disabled={step === "review"} />
+      <Input id="timing-outstation-deadline" label="Outstation: payment must be complete (working days before Scheduled delivery)" type="number" min={0} max={60}
+        value={outDeadline} onChange={(e) => setOutDeadline(e.target.value)} disabled={step === "review"} />
       <DatePicker id="timing-effective" label="Effective from" value={effectiveFrom} minDate={appTodayIso()}
         onChange={(iso) => setEffectiveFrom(iso ?? "")} disabled={step === "review"} />
       <Input id="timing-reason" label="Reason" value={reason} maxLength={500}
         onChange={(e) => setReason(e.target.value)} disabled={step === "review"} />
       {step === "review" && <div className="col-span-2 text-body" data-testid="collection-timing-review">
-        <p className="font-semibold">Review changes</p>
+        <p className="font-medium">Review changes</p>
         <p>Start asking: {current?.ask_days_before ?? 3} → {askN} working days before</p>
         <p>Payment must be complete: {current?.deadline_days_before ?? 2} → {deadlineN} working days before</p>
+        <p>Outstation start asking: {outAskNow} → {outAskN} working days before</p>
+        <p>Outstation payment must be complete: {outDeadlineNow} → {outDeadlineN} working days before</p>
         <p>Effective from {fmtDate(effectiveFrom)} · {reason.trim()}</p>
-        <p className="text-label font-normal text-kit-slate-11">Clocks already running keep their current rule. New clocks from the effective date use the new one.</p>
+        <p className="text-meta text-kit-slate-11">Clocks already running keep their current rule. New clocks from the effective date use the new one.</p>
       </div>}
       <div className="col-span-2 flex gap-2">
         {step === "edit"
@@ -315,7 +352,7 @@ function StorageRuleCard({ group, rule, onSaved }: {
     onError: (e: Error) => toast.error(e.message),
   });
   return <div className="rounded-card border border-kit-slate-5 p-4 text-body" data-testid={`storage-card-${group}`}>
-    <h3 className="font-semibold">{GROUP_WORD[group]}</h3>
+    <h3 className="text-strong">{GROUP_WORD[group]}</h3>
     {rule ? <div className="mt-1 space-y-0.5">
       <p>Free storage {rule.free_days} calendar days</p>
       <p>Charge {rm(Number(rule.charge_amount))}</p>
@@ -326,7 +363,7 @@ function StorageRuleCard({ group, rule, onSaved }: {
         ? <p>Approver may approve until Day {rule.waiver_limit_day}</p> : null}
       {!rule.extra_free_allowed && <p>Extra free storage Not allowed</p>}
       <p>Check stored goods every {rule.inspection_days} calendar days</p>
-      <p className="text-label font-normal text-kit-slate-11">In effect from {fmtDate(rule.effective_from)}</p>
+      <p className="text-meta text-kit-slate-11">In effect from {fmtDate(rule.effective_from)}</p>
     </div> : <p className="mt-1">No rule on record yet.</p>}
     {step === "view" && <Button variant="neutral" onClick={() => { setDraft(fromRule()); setStep("edit"); }}>Edit</Button>}
     {step !== "view" && <div className="mt-3 grid grid-cols-2 gap-3" data-testid={`storage-rule-form-${group}`}>
@@ -354,10 +391,10 @@ function StorageRuleCard({ group, rule, onSaved }: {
       <Input id={`sr-reason-${group}`} label="Reason" value={draft.reason} maxLength={500}
         onChange={(e) => set("reason", e.target.value)} disabled={step === "review"} />
       {step === "review" && <div className="col-span-2" data-testid={`storage-rule-review-${group}`}>
-        <p className="font-semibold">Review changes</p>
+        <p className="font-medium">Review changes</p>
         <p>Free storage {rule?.free_days ?? ""} → {free} calendar days · Charge {rule ? rm(Number(rule.charge_amount)) : ""} → {rm(charge ?? 0)} every {cycle} days</p>
         <p>Effective from {fmtDate(draft.effectiveFrom)} · {draft.reason.trim()}</p>
-        <p className="text-label font-normal text-kit-slate-11">Existing storage cases keep the rule they started under.</p>
+        <p className="text-meta text-kit-slate-11">Existing storage cases keep the rule they started under.</p>
       </div>}
       <div className="col-span-2 flex gap-2">
         {step === "edit"
@@ -388,7 +425,7 @@ function changeWord(what: string): string {
 
 function valueSummary(v: Record<string, unknown> | null): string {
   if (!v) return "none";
-  const keep = ["ask_days_before", "deadline_days_before", "free_days", "charge_amount", "cycle_days",
+  const keep = ["ask_days_before", "deadline_days_before", "outstation_ask_days_before", "outstation_deadline_days_before", "free_days", "charge_amount", "cycle_days",
     "operation_limit_day", "waiver_limit_day", "extra_free_allowed", "inspection_days", "account_no", "active", "label", "account_code"];
   const parts = keep.filter((k) => k in v && v[k] != null).map((k) => `${k.replaceAll("_", " ")} ${String(v[k])}`);
   return parts.length ? parts.join(" · ") : "recorded";
@@ -404,12 +441,12 @@ function ChangeLog({ changes }: { changes: PaymentSettingsPayload["setting_chang
         {changes.map((c) => {
           const actor = Array.isArray(c.actor) ? c.actor[0] : c.actor;
           return <div key={c.id} className="text-body">
-            <p className="font-semibold">{changeWord(c.what)}</p>
-            <p className="text-meta font-normal text-kit-slate-11">
+            <p className="font-medium">{changeWord(c.what)}</p>
+            <p className="text-meta text-kit-slate-11">
               {actor?.name ?? "Staff identity not recorded"} · {fmtDate(c.changed_at, { time: true })}
               {c.effective_from ? ` · effective from ${fmtDate(c.effective_from)}` : ""}
             </p>
-            <p className="text-label font-normal">
+            <p className="text-meta text-kit-slate-11">
               {valueSummary(c.old_value)} → {valueSummary(c.new_value)}{c.reason ? ` · ${c.reason}` : ""}
             </p>
           </div>;
@@ -516,7 +553,7 @@ function PaymentMethodsCard() {
   </div>;
 
   return <section className="rounded-card border border-kit-slate-5 bg-white p-5">
-    <h2 className="text-section">Payment methods</h2>
+    <h2 className="text-strong">Payment methods</h2>
     <p className="mt-1 text-body text-kit-slate-11">
       Only Active methods can be chosen when recording money. Each method lands in one money
       account. Online payment is recorded by the provider and is never a manual method.
@@ -536,9 +573,9 @@ function PaymentMethodsCard() {
                 onChange={(e) => toggle.mutate({ method: m.method, active: e.target.checked })}
                 aria-label={`${m.label} — ${spec.evidence}`} />
               <span>
-                <span className="font-semibold">{m.label}</span>: {spec.evidence}
-                {!m.active && <span className="ml-2 text-label">Inactive</span>}
-                <span className="block text-label font-normal">
+                <span className="font-medium">{m.label}</span>: {spec.evidence}
+                {!m.active && <span className="ml-2 text-meta font-medium">Inactive</span>}
+                <span className="block text-meta text-kit-slate-11">
                   Money account: {m.account_code ? `${m.account_code} · ${m.account_name ?? ""}` : "Not configured"}
                 </span>
               </span>
@@ -559,8 +596,8 @@ function PaymentMethodsCard() {
         return <div key={key} className="text-body" data-testid={`system-row-${key}`}>
           <div className="flex items-center justify-between gap-3">
             <span>
-              <span className="font-semibold">{systemMethodWord(r.method, r.source_channel)}</span>
-              <span className="block text-label font-normal">Money account: {r.account_code} · {name}</span>
+              <span className="font-medium">{systemMethodWord(r.method, r.source_channel)}</span>
+              <span className="block text-meta text-kit-slate-11">Money account: {r.account_code} · {name}</span>
             </span>
             {!isMoving && <Button variant="neutral" onClick={() =>
               setMoving({ method: r.method, sourceChannel: r.source_channel, accountCode: r.account_code })}>Edit</Button>}

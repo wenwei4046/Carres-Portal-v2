@@ -107,19 +107,26 @@ describe("GET /api/operation/jump", () => {
     expect(or?.args[0]).toContain("and(so.gte.1300,so.lt.1400)");
   });
 
-  /* ⭐ THE BOUNDARY THE MASTER DRAWS. Register Search is page-owned and searches
-   * customer text; `Jump to…` does not, and must not start. */
-  it("never searches customer text — a name query asks orders for nothing", async () => {
-    const calls = wire({});
-    const res = await req("/api/operation/jump?q=Kimmy", await makeJwt("operation"));
+  /* ⭐ A NAME FINDS ITS CUSTOMER'S ORDERS AND ITS SUPPLIER'S POs (owner-
+   * confirmed handoff 2026-10-08: "Search SO, PO, supplier, customer"). The
+   * name never becomes a numeric range, and `%` / `_` / PostgREST grammar are
+   * stripped before `ilike`, so a typed name cannot widen the pattern. */
+  it("a name searches the customer and the supplier, never as a number", async () => {
+    const calls = wire({ orders: [{ id: ORDER_ID, so: 1307, customer_name: "Kimmy" }] });
+    const res = await req("/api/operation/jump?q=Kim%25my_(", await makeJwt("operation"));
     expect(res.status).toBe(200);
-    expect((await res.json()) as { documents: unknown[] }).toEqual({ documents: [] });
     expect(calls.some((c) => c.table === "orders" && c.method === "or")).toBe(false);
-    expect(
-      calls.some(
-        (c) => c.method === "ilike" && String(c.args[0]).includes("customer"),
-      ),
-    ).toBe(false);
+    const customer = calls.find((c) => c.table === "orders" && c.method === "ilike");
+    expect(customer?.args).toEqual(["customer_name", "%KIM MY%"]);
+    const supplier = calls.find((c) => c.table === "suppliers" && c.method === "ilike");
+    expect(supplier?.args).toEqual(["name", "%KIM MY%"]);
+  });
+
+  it("a document number never runs the name search", async () => {
+    const calls = wire({});
+    await req("/api/operation/jump?q=SO-1307", await makeJwt("operation"));
+    expect(calls.some((c) => c.method === "ilike" && String(c.args[0]).includes("customer"))).toBe(false);
+    expect(calls.some((c) => c.table === "suppliers")).toBe(false);
   });
 
   it("a purchase order is matched on its number and carries its supplier", async () => {

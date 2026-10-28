@@ -20,7 +20,7 @@ import { useAuth } from "@/lib/auth";
 import { appTodayIso } from "@/lib/fmt-date";
 import OperationSupplierClaims from "@/pages/operation/OperationSupplierClaims";
 import OperationPurchaseReturns from "@/pages/operation/OperationPurchaseReturns";
-import OperationWork from "@/pages/operation/OperationWork";
+import WorkspaceTasks from "@/pages/operation/tasks/WorkspaceTasks";
 import { IssueForm } from "@/pages/operation/components/PurchaseReturnIssue";
 import PreviewFrame from "./preview-frame";
 import "@/index.css";
@@ -71,7 +71,7 @@ const duty = { dutyKey: "po_duty", onDate: TODAY, normalOwner: { userId: ME, nam
 const FEED: OperationWorkResponse = {
   contractVersion: 2, complete: true, generatedOn: TODAY, closureReceipt: null,
   staff: [{ userId: ME, name: "Shasha", email: "sha@carres.co" }],
-  sources: (["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"] as const).map((key) => ({ key, state: "healthy" as const, observedAt: `${TODAY}T01:00:00.000Z`, lastSuccessfulAt: `${TODAY}T01:00:00.000Z`, errorLabel: null })),
+  sources: (["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker", "workspace"] as const).map((key) => ({ key, state: "healthy" as const, observedAt: `${TODAY}T01:00:00.000Z`, lastSuccessfulAt: `${TODAY}T01:00:00.000Z`, errorLabel: null })),
   items: projectPurchaseReturnWork({ pendingIssue: [{ id: "claim-4", claim_no: "SC-1022", supplier_name: "Laveo", carres_execution_at: `${day(-3)}T02:00:00Z` }], returns: RETURNS, poDuty: duty as never, today: TODAY, observedAt: `${TODAY}T01:00:00.000Z` }),
 };
 
@@ -103,7 +103,7 @@ const start = view === "register" ? "/operation?tab=purchase-returns"
 const body = view === "issue"
   ? <div className="h-full overflow-auto p-4"><IssueForm source={SOURCE} onClose={() => undefined} onIssued={() => undefined} /></div>
   : view === "register" || view === "record" || view === "receipt" ? <OperationPurchaseReturns />
-  : view === "work" ? <div className="flex h-full flex-col"><OperationWork /></div>
+  : view === "work" ? <div className="flex h-full flex-col"><WorkspaceTasks /></div>
   : <OperationSupplierClaims />;
 
 createRoot(document.getElementById("root")!).render(

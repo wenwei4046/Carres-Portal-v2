@@ -10,7 +10,7 @@ import type { PaymentTemplateRow } from "@carres/shared/payment-templates";
 import { MoreHorizontal } from "lucide-react";
 import ListPageShell from "@/components/ListPageShell";
 import Button from "@/components/kit/Button";
-import DropdownMenu from "@/components/kit/DropdownMenu";
+import { CMenu } from "@/components/carres/CPopover";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import {
   qk,
@@ -115,10 +115,10 @@ export default function PaymentRecords() {
   const columns = useMemo<DataGridColumn<PaymentRegisterRow>[]>(() => [
     { key: "receipt", label: "Receipt No", width: 220, accessor: (r) => {
       const review = needsReviewOf(r, invoices);
-      return <button type="button" className="text-left hover:underline" onClick={() => open(r)}>
+      return <button type="button" className="text-left font-semibold hover:underline" onClick={() => open(r)}>
         {r.receipt_no ?? "Receipt number missing"}
-        {!isLivePayment(r) && <span className="ml-2 text-label">VOIDED</span>}
-        {isLivePayment(r) && review > 0 && <span className="ml-2 text-label" data-testid="payment-needs-review">{rm(review)} needs review</span>}
+        {!isLivePayment(r) && <span className="ml-2 text-label uppercase tracking-[0.06em]">VOIDED</span>}
+        {isLivePayment(r) && review > 0 && <span className="ml-2 text-meta" data-testid="payment-needs-review">{rm(review)} needs review</span>}
       </button>;
     }, searchValue: (r) => r.receipt_no ?? "", filterValue: (r) => r.receipt_no ?? "", filterType: "numbering",
       exportValue: (r) => `${r.receipt_no ?? "Receipt number missing"}${isLivePayment(r) ? "" : " · VOIDED"}` },
@@ -334,7 +334,7 @@ function PaymentRecordObject({ payment, onClose, onPrint, printing }: {
       navigation={<span className="text-body">{payment.orders ? `SO-${payment.orders.so}` : "SO not available"}</span>}
       right={!composing ? <span className="flex items-center gap-2">
         {payment.receipt_no && <Button variant="neutral" disabled={printing} onClick={onPrint}>Print</Button>}
-        {overflow.length > 0 && <DropdownMenu label="More actions" items={overflow}
+        {overflow.length > 0 && <CMenu label="More actions" items={overflow}
           trigger={<Button variant="ghost" aria-label="More actions" data-testid="payment-record-overflow">
             <MoreHorizontal size={16} aria-hidden /></Button>} />}
       </span> : undefined}
@@ -397,7 +397,7 @@ function PaymentRecordObject({ payment, onClose, onPrint, printing }: {
         <Facts title="Actions">
           {canSendReceipt
             ? <button className="btn-primary" onClick={() => setSending(true)}>Send receipt</button>
-            : <p className="text-label font-normal">{!live ? "A voided Receipt cannot be sent as a valid Receipt."
+            : <p className="text-meta">{!live ? "A voided Receipt cannot be sent as a valid Receipt."
               : !payment.receipt_no ? "This payment has no receipt number, so there is no Receipt to send."
               : receiptTemplates.length === 0 ? "No receipt template yet. Ask a manager to add the approved wording in Settings."
               : "Sending a Receipt is done by Operation."}</p>}
@@ -433,7 +433,7 @@ function ReasonForm({ testId, title, sentence, label, action, pending, onCancel,
     <Facts title={title}>
       <p>{sentence}</p>
       <label className="mt-2 block">
-        <span className="text-label">{label}</span>
+        <span className="text-meta text-kit-slate-11">{label}</span>
         <textarea className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body"
           rows={3} value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)}
           aria-label={label} />

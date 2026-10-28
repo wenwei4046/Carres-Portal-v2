@@ -16,6 +16,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OperationWorkItem, OperationWorkResponse } from "@carres/shared";
+import { fmtDate } from "@/lib/fmt-date";
 import { qk } from "@/lib/queries";
 
 const ME = "11111111-1111-4111-8111-111111111111";
@@ -39,7 +40,8 @@ vi.mock("@/lib/api", async () => {
   return {
     ...actual,
     apiFetch: vi.fn(async (path: string) => {
-      if (path !== "/api/operation/work") throw new Error(`unexpected ${path}`);
+      /* The one Work feed, asked with the modules this build knows. */
+      if (path !== "/api/operation/work?include=workspace") throw new Error(`unexpected ${path}`);
       if (net.mode === "pending") return new Promise(() => {});
       if (net.mode === "fail") throw new TypeError("Failed to fetch");
       return structuredClone(net.work);
@@ -53,7 +55,7 @@ vi.mock("../../work/WorkActionPanel", () => ({ default: () => null }));
 
 import OperationRightRail from "../OperationRightRail";
 import TasksPanel from "./TasksPanel";
-import OperationWork from "../../OperationWork";
+import WorkspaceTasks from "../../tasks/WorkspaceTasks";
 
 function timing(actionOn: string | null, missedDays = 0): OperationWorkItem["timing"] {
   return {
@@ -112,7 +114,7 @@ function item(so: number, actionOn: string | null, missedDays = 0, ownerId = ME)
   };
 }
 
-const SOURCE_KEYS = ["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"] as const;
+const SOURCE_KEYS = ["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker", "workspace"] as const;
 
 function response(
   items: OperationWorkItem[],
@@ -168,12 +170,12 @@ function mount(ui: React.ReactNode, qc = client(), url = "/operation?tab=work") 
   return { ...view, qc };
 }
 
-const railButton = () => screen.getByRole("button", { name: /^My Work/ });
+const railButton = () => screen.getByRole("button", { name: /^Tasks/ });
 
-/** `My Work · {n} missed · {n} today` → [missed, today]. */
+/** `Tasks · {n} late · {n} today` → [late, today]. */
 function badgeCounts(): [number, number] {
   const name = railButton().getAttribute("aria-label") ?? "";
-  const match = /^My Work · (\d+) missed · (\d+) today$/.exec(name);
+  const match = /^Tasks · (\d+) late · (\d+) today$/.exec(name);
   if (!match) throw new Error(`badge accessible name does not state the counts: "${name}"`);
   return [Number(match[1]), Number(match[2])];
 }
@@ -184,22 +186,18 @@ function badgeNumber(): number | null {
   return text === null ? null : Number(text);
 }
 
-function panelCount(label: "Missed" | "Today"): number {
+function panelCount(label: "Late" | "Today"): number {
   const panel = screen.getByTestId("my-work-panel");
   const row = within(panel).queryByRole("link", { name: new RegExp(`^Open My Work · ${label} · `) });
   return row ? Number(/ · (\d+) action/.exec(row.getAttribute("aria-label") ?? "")?.[1]) : 0;
 }
 
-/** The Work page's focus list (Workspace §5.10): its `Missed` row plus the
- *  focus day's count on the month — one choice at a time on screen, the same
- *  two numbers the badge adds. */
-function workFocusRows(): number {
-  const missed = Number(/(\d+)$/.exec(screen.getByTestId("work-rail-missed").textContent ?? "")?.[1] ?? 0);
-  const focus = screen.getByTestId("work-rail-month").getAttribute("data-focus-day") ?? "";
-  const tile = screen.queryByTestId(`work-rail-day-${focus}`);
-  const today = Number(/ (\d+) actions?$/.exec(tile?.getAttribute("aria-label") ?? "")?.[1] ?? 0);
-  return missed + today;
-}
+/** The Workspace table's late rows: the amber Status pills (13 Oct 2026). */
+const workspaceLateRows = () => screen.getAllByTestId(/^workspace-status-/).filter((cell) => cell.querySelector('[data-tone="warn"]')).length;
+
+/** The Tasks list's cards on screen, and those with the one amber (late) row. */
+const taskCards = () => [...screen.getByTestId("task-list").querySelectorAll<HTMLElement>("[data-task-card]")];
+const lateCards = () => taskCards().filter((card) => card.querySelector('[data-warn="true"]')).length;
 
 beforeEach(() => {
   net.mode = "ok";
@@ -238,32 +236,52 @@ describe("HF-3 · one count definition", () => {
     ["a public holiday", "2026-09-16", WEEK.map((i) => i.object.label === "SO-1301" ? item(1301, "2026-09-15", 1) : i), [1, 1]],
     // Sat 19 Sep with nothing due that Saturday: the focus day is Mon 21 Sep.
     ["a Saturday with nothing due", "2026-09-19", [item(1301, "2026-09-17", 2), item(1306, "2026-09-21"), item(1303, "2026-09-24"), item(1304, null)], [1, 1]],
-  ] as const)("2 · badge = panel Missed + Today = Work focus list on %s", async (_label, generatedOn, items, expected) => {
+  ] as const)("2 · badge = panel Missed + Today, and the Tasks list and the Workspace table carry the same Missed on %s", async (_label, generatedOn, items, expected) => {
     net.work = response([...items], { generatedOn });
     const qc = client();
-    const rail = mount(<OperationRightRail />, qc);
+    const rail = mount(<><OperationRightRail /><TasksPanel /></>, qc);
     await waitFor(() => expect(badgeNumber()).not.toBeNull());
     expect(badgeNumber()).toBe(expected[0] + expected[1]);
     expect(badgeCounts()).toEqual(expected);
     const [missed, today] = badgeCounts();
 
-    fireEvent.click(railButton());
     await screen.findByTestId("my-work-panel");
-    expect([panelCount("Missed"), panelCount("Today")]).toEqual([missed, today]);
+    expect([panelCount("Late"), panelCount("Today")]).toEqual([missed, today]);
+    /* The rail's Tasks door opens the ONE Tasks list. It has no Missed
+       section since 13 Oct 2026: late work sits in today's `To do`, each card
+       with its one amber row. Those cards are the badge's own Missed number. */
+    fireEvent.click(railButton());
+    await screen.findByTestId("tasks-list");
+    await waitFor(() => expect(lateCards()).toBe(missed));
     rail.unmount();
 
-    mount(<OperationWork />, qc);
-    await waitFor(() => expect(workFocusRows()).toBe(missed + today));
+    /* The Workspace table reads the same record: its late rows are the same
+       Missed number, and its `To do` tab is the Tasks panel's own number. */
+    mount(<WorkspaceTasks />, qc);
+    await waitFor(() => expect(workspaceLateRows()).toBe(missed));
+    expect(today).toBeGreaterThanOrEqual(0);
+  });
+
+  it("2b · the Tasks list's cards due today, not late, are the badge's today number", async () => {
+    mount(<OperationRightRail />);
+    await waitFor(() => expect(badgeCounts()).toEqual([1, 1]));
+    fireEvent.click(railButton());
+    await screen.findByTestId("tasks-list");
+    /* Today's `To do` also holds late work and work with no date; the cards
+       whose deadline IS today, with no amber row, are the badge's Today. */
+    await waitFor(() => expect(taskCards().filter((card) => !card.querySelector("[data-warn]") && card.textContent?.includes(fmtDate("2026-09-17")))).toHaveLength(1));
+    expect(lateCards()).toBe(1);
   });
 
   it("3 · a staff email different from the login email is still the same person in the rail and in My Work", async () => {
     signIn("shasha.personal@gmail.com");
     net.work = response(WEEK, { staffEmail: "me@carres.test" });
     const qc = client();
-    const work = mount(<OperationWork />, qc);
-    await waitFor(() => expect(screen.queryByTestId("work-rail-month")).not.toBeNull());
-    expect(screen.queryByText("Nothing assigned to you")).toBeNull();
-    expect(workFocusRows()).toBe(2);
+    const work = mount(<WorkspaceTasks />, qc);
+    /* My Task holds my late act, today's and the one with no date. */
+    await waitFor(() => expect(screen.queryAllByTestId(/^workspace-row-/)).toHaveLength(3));
+    expect(screen.getByRole("tab", { name: "To do 3" })).toBeInTheDocument();
+    expect(workspaceLateRows()).toBe(1);
     work.unmount();
 
     mount(<OperationRightRail />, qc);
@@ -275,7 +293,7 @@ describe("HF-3 · one count definition", () => {
 describe("HF-3 · failure and loading are never zero", () => {
   it("4 · success, then a refresh failure keeps the previous counts and says so", async () => {
     const { qc } = mount(<TasksPanel />);
-    await waitFor(() => expect(panelCount("Missed")).toBe(1));
+    await waitFor(() => expect(panelCount("Late")).toBe(1));
     expect(panelCount("Today")).toBe(1);
 
     net.mode = "fail";
@@ -285,7 +303,7 @@ describe("HF-3 · failure and loading are never zero", () => {
 
     await screen.findByText(/My Work could not be refreshed/);
     expect(screen.getByText(/^Last updated /)).toBeTruthy();
-    expect(panelCount("Missed")).toBe(1);
+    expect(panelCount("Late")).toBe(1);
     expect(panelCount("Today")).toBe(1);
     expect(screen.queryByText("My Work could not be loaded.")).toBeNull();
     expect(screen.queryByText("No work due now")).toBeNull();
@@ -300,7 +318,7 @@ describe("HF-3 · failure and loading are never zero", () => {
       </>,
     );
     const panel = await screen.findByTestId("my-work-panel");
-    expect(within(panel).getByText("Missed")).toBeTruthy();
+    expect(within(panel).getByText("Late")).toBeTruthy();
     expect(within(panel).getByText("Today")).toBeTruthy();
     expect(within(panel).queryByText("0")).toBeNull();
     expect(screen.queryByText("No work due now")).toBeNull();

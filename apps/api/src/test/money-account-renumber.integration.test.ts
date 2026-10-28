@@ -192,7 +192,7 @@ describe.skipIf(!URL)("a money account renumbered from its own form (real Postgr
     )).rows[0].t);
     expect(totalAfter).toBe(totalBefore);
 
-    // The card payout bank, and the list the Money accounts tab reads.
+    // The card payout bank, and the list Chart of accounts reads for its money accounts.
     expect((await q("select bank_code from card_settlement_routes where holding_code = $1 and channel = 'showroom'", [holding])).rows[0].bank_code)
       .toBe(fresh);
     const listed = (await q("select code, name, money_kind, is_active from public.gl_money_accounts_list() where code in ($1, $2)", [bank.code, fresh])).rows;

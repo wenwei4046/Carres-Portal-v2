@@ -155,7 +155,7 @@ describe("orderMoney — a released storage fee is owed and does not hold", () =
   });
 });
 
-describe("orderMoney — credit notes (0627)", () => {
+describe("orderMoney — credit notes (0729)", () => {
   it("a credit lowers what the order is worth and what it still owes", () => {
     const m = orderMoney({ lineSum: 1000, paid: 400, credited: 250 });
     expect(m.total).toBe(750);

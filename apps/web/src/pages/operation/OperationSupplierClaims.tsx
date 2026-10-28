@@ -23,6 +23,7 @@ import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "r
 import { Link, useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
+  documentDisplayNumber,
   SUPPLIER_CLAIM_ABSENT,
   SUPPLIER_CLAIM_COLUMN_LABEL as L,
   SUPPLIER_CLAIM_IN_PROGRESS_TOOLTIP,
@@ -118,20 +119,20 @@ export function supplierClaimColumns(open: (row: SupplierClaimListRow) => void, 
       accessor: (row) => {
         const line = supplierClaimUnitLine(row.units ?? null);
         return <>
-          {row.po_id ? <Link className="text-kit-blue-11 hover:underline" onClick={(event) => event.stopPropagation()} to={`/operation/procurement/${encodeURIComponent(row.po_id)}`}>{row.po_id}</Link> : <Absence />}
+          {row.po_id ? <Link className="text-kit-blue-11 hover:underline" onClick={(event) => event.stopPropagation()} to={`/operation/procurement/${encodeURIComponent(row.po_id)}`}>{documentDisplayNumber(row.po_id ?? "")}</Link> : <Absence />}
           {/^\d+ Units$/.test(line) ? <div><UnitsDisclosure row={row} label={line} /></div> : <SecondLine>{line}</SecondLine>}
         </>;
       },
-      searchValue: (row) => `${row.po_id || ""} ${(row.units ?? []).map((u) => u.unit_code ?? "").join(" ")}`,
-      exportValue: (row) => `${row.po_id || ""} ${supplierClaimUnitLine(row.units ?? null)}`.trim(),
+      searchValue: (row) => `${documentDisplayNumber(row.po_id ?? "")} ${row.po_id || ""} ${(row.units ?? []).map((u) => u.unit_code ?? "").join(" ")}`,
+      exportValue: (row) => `${documentDisplayNumber(row.po_id ?? "")} ${supplierClaimUnitLine(row.units ?? null)}`.trim(),
     },
     {
       key: "grn", label: L.grn, width: W.documentNo,
       accessor: (row) => row.grn_no && row.warehouse_receipt_id
-        ? <Link className="text-kit-blue-11 hover:underline" onClick={(event) => event.stopPropagation()} to={`/operation?tab=receiving&session=${encodeURIComponent(row.warehouse_receipt_id)}`}>{row.grn_no}</Link>
-        : row.grn_no || null,
-      searchValue: (row) => row.grn_no || "",
-      exportValue: (row) => row.grn_no || "",
+        ? <Link className="text-kit-blue-11 hover:underline" onClick={(event) => event.stopPropagation()} to={`/operation?tab=receiving&session=${encodeURIComponent(row.warehouse_receipt_id)}`}>{documentDisplayNumber(row.grn_no ?? "")}</Link>
+        : documentDisplayNumber(row.grn_no ?? "") || null,
+      searchValue: (row) => `${documentDisplayNumber(row.grn_no ?? "")} ${row.grn_no || ""}`,
+      exportValue: (row) => documentDisplayNumber(row.grn_no ?? ""),
     },
     {
       key: "items", label: L.items, width: W.items,

@@ -187,10 +187,10 @@ export default function PrincipalAccounts() {
             <button
               key={k}
               onClick={() => setStatusFilter(k)}
-              className={`px-3 py-1.5 text-meta rounded cursor-pointer ${
+              className={`px-3 py-1.5 text-body rounded cursor-pointer ${
                 statusFilter === k
-                  ? "bg-white text-base-900 font-semibold"
-                  : "text-base-600 font-medium"
+                  ? "bg-white text-base-900 font-medium"
+                  : "text-base-600"
               }`}
             >
               {k === "all" ? "All" : k.charAt(0).toUpperCase() + k.slice(1)}
@@ -296,7 +296,7 @@ export function EmailChangeRequestsPanel() {
       className="rounded-md border border-warning/40 bg-warning-soft/40 p-5 mb-[22px]"
       data-testid="email-change-panel"
     >
-      <h2 className="text-meta uppercase tracking-[0.16em] text-base-700 font-semibold mb-3">
+      <h2 className="text-label uppercase tracking-[0.06em] text-base-700 mb-3">
         Store email change requests ({pending.length})
       </h2>
       <ul className="divide-y divide-border">
@@ -309,7 +309,7 @@ export function EmailChangeRequestsPanel() {
             <div className="min-w-0 text-body">
               <div className="font-medium">
                 {r.dealerName ?? ""}
-                <span className="ml-2 text-label text-muted-foreground font-normal">
+                <span className="ml-2 text-meta text-muted-foreground">
                   by {r.requestedByName ?? "Store owner"} ·{" "}
                   {new Date(r.createdAt).toLocaleDateString("en-MY", {
                     day: "numeric",
@@ -327,7 +327,7 @@ export function EmailChangeRequestsPanel() {
                 onClick={() => approve(r)}
                 disabled={decide.isPending}
                 data-testid={`email-change-approve-${r.id}`}
-                className="text-meta font-semibold text-white bg-base-900 hover:bg-base-800 rounded px-3 py-1.5 disabled:opacity-50"
+                className="text-body font-semibold text-white bg-base-900 hover:bg-base-800 rounded px-3 py-1.5 disabled:opacity-50"
               >
                 Approve
               </button>
@@ -336,7 +336,7 @@ export function EmailChangeRequestsPanel() {
                 onClick={() => reject(r)}
                 disabled={decide.isPending}
                 data-testid={`email-change-reject-${r.id}`}
-                className="text-meta font-semibold text-destructive hover:bg-base-100 rounded px-3 py-1.5 disabled:opacity-50"
+                className="text-body font-medium text-destructive hover:bg-base-100 rounded px-3 py-1.5 disabled:opacity-50"
               >
                 Reject
               </button>
@@ -350,7 +350,7 @@ export function EmailChangeRequestsPanel() {
 
 function Th({ children, right }: { children: React.ReactNode; right?: boolean }) {
   return (
-    <th className={`px-4 py-2.5 text-label font-semibold uppercase tracking-[0.05em] text-base-500 ${right ? "text-right" : "text-left"}`}>
+    <th className={`px-4 py-2.5 text-meta font-medium text-base-500 ${right ? "text-right" : "text-left"}`}>
       {children}
     </th>
   );
@@ -367,7 +367,7 @@ function KpiTile({ label, value, sub, tone }: { label: string; value: number; su
       <div className={`font-display text-page font-semibold mt-1.5 tracking-[-0.02em] ${valueClass}`}>
         {value}
       </div>
-      <div className="text-label text-base-500 mt-0.5">{sub}</div>
+      <div className="text-meta text-base-500 mt-0.5">{sub}</div>
     </div>
   );
 }
@@ -400,34 +400,34 @@ function UserRow({ user }: { user: AccountRow }) {
       <td className="px-4 py-2.5">
         <div className="flex items-center gap-2.5">
           <div
-            className="w-[30px] h-[30px] rounded-full text-white grid place-items-center text-label font-semibold flex-shrink-0"
+            className="w-[30px] h-[30px] rounded-full text-white grid place-items-center text-label font-bold flex-shrink-0"
             style={{ background: roleColor }}
           >
             {initials}
           </div>
           <div className="min-w-0">
             <div className="font-semibold text-base-900">{user.name}</div>
-            <div className="text-label text-base-500">{user.email}</div>
+            <div className="text-meta text-base-500">{user.email}</div>
           </div>
         </div>
       </td>
       <td className="px-4 py-2.5">
         <div
-          className="inline-block px-2.5 py-[2px] rounded bg-base-100 text-label font-semibold uppercase tracking-[0.05em]"
+          className="inline-block px-2.5 py-[2px] rounded bg-base-100 text-label uppercase tracking-[0.06em]"
           style={{ color: roleColor }}
         >
           {roleLabel}
         </div>
         {user.orgName && (
-          <div className="text-label text-base-500 mt-[3px]">{user.orgName}</div>
+          <div className="text-meta text-base-500 mt-[3px]">{user.orgName}</div>
         )}
       </td>
       <td className="px-4 py-2.5 text-base-700">{user.title || ""}</td>
       <td className="px-4 py-2.5"><StatusPill status={user.status} /></td>
-      <td className="px-4 py-2.5 font-mono text-label text-base-600">
+      <td className="px-4 py-2.5 font-mono text-body text-base-600">
         {user.createdAt?.slice(0, 10) ?? ""}
       </td>
-      <td className="px-4 py-2.5 text-label text-base-500">
+      <td className="px-4 py-2.5 text-body text-base-500">
         {user.lastSeenAt ? user.lastSeenAt.slice(0, 10) : ""}
       </td>
       <td className="px-4 py-2.5 text-right whitespace-nowrap">
@@ -482,7 +482,7 @@ function RowAction({
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`ml-0.5 px-2.5 py-[5px] text-label font-semibold rounded hover:bg-base-100 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${colorClass}`}
+      className={`ml-0.5 px-2.5 py-[5px] text-body font-medium rounded hover:bg-base-100 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${colorClass}`}
     >
       {children}
     </button>
@@ -497,7 +497,7 @@ function StatusPill({ status }: { status: AccountRow["status"] }) {
   } as const;
   const m = map[status];
   return (
-    <span className={`inline-block px-2.5 py-[2px] rounded text-label font-semibold uppercase tracking-[0.05em] ${m.bg} ${m.c}`}>
+    <span className={`inline-block px-2.5 py-[2px] rounded text-label uppercase tracking-[0.06em] ${m.bg} ${m.c}`}>
       {m.label}
     </span>
   );
@@ -528,7 +528,7 @@ function ResetPasswordModal({ user, onClose }: { user: AccountRow; onClose: () =
       >
         <div className="px-6 pt-5 pb-4 border-b border-base-100">
           <div className="kicker text-label">HQ · Admin</div>
-          <h2 className="font-display text-title mt-1 tracking-[-0.02em] font-semibold">
+          <h2 className="font-display text-strong mt-1 tracking-[-0.02em]">
             Reset password
           </h2>
           {/* min-w-0 + break-words: long emails must wrap, never clip/overlap. */}
@@ -557,7 +557,7 @@ function ResetPasswordModal({ user, onClose }: { user: AccountRow; onClose: () =
           <button
             onClick={onClose}
             disabled={reset.isPending}
-            className="px-4 py-[9px] text-body font-semibold text-base-600 rounded hover:bg-base-100 cursor-pointer disabled:opacity-50"
+            className="px-4 py-[9px] text-body font-medium text-base-600 rounded hover:bg-base-100 cursor-pointer disabled:opacity-50"
           >
             Cancel
           </button>
@@ -871,7 +871,7 @@ function CreateAccountModal({
       >
         <div className="px-6 pt-5 pb-4 border-b border-base-100">
           <div className="kicker text-label">HQ · Admin</div>
-          <h2 className="font-display text-title mt-1 tracking-[-0.02em] font-semibold">
+          <h2 className="font-display text-strong mt-1 tracking-[-0.02em]">
             New account
           </h2>
           <div className="text-meta text-base-600 mt-1">
@@ -900,12 +900,12 @@ function CreateAccountModal({
                     } : undefined}
                   >
                     <div
-                      className="text-meta font-semibold"
+                      className="text-body font-medium"
                       style={{ color: isActive ? ROLE_COLORS[r.value] : undefined }}
                     >
                       {r.label}
                     </div>
-                    <div className="text-label text-base-500">{r.hint}</div>
+                    <div className="text-meta text-base-500">{r.hint}</div>
                   </button>
                 );
               })}
@@ -923,7 +923,7 @@ function CreateAccountModal({
                   type="button"
                   onClick={() => setOrgMode(m)}
                   data-testid={`acct-orgmode-${m}`}
-                  className={`px-3 py-2 rounded border-[1.5px] text-meta font-semibold cursor-pointer transition-colors ${
+                  className={`px-3 py-2 rounded border-[1.5px] text-body font-medium cursor-pointer transition-colors ${
                     orgMode === m
                       ? "border-base-900 bg-base-900 text-white"
                       : "border-base-200 bg-white text-base-600 hover:bg-base-50"
@@ -937,7 +937,7 @@ function CreateAccountModal({
 
           {existingMode && (
             <div className="p-3.5 bg-base-50 border border-base-200 rounded flex flex-col gap-3">
-              <div className="text-label font-semibold uppercase tracking-[0.08em] text-base-700">
+              <div className="text-label uppercase tracking-[0.06em] text-base-700">
                 Existing organisation
               </div>
               <Field
@@ -977,7 +977,7 @@ function CreateAccountModal({
                 </select>
               </Field>
               {existingDealerId && existingStaffQ.data && (
-                <div className="text-label text-base-500">
+                <div className="text-meta text-base-500">
                   {existingStaffQ.data.storeKind === "showroom" ? "Showroom" : "Dealer"} ·{" "}
                   {existingStaffQ.data.staff.filter((s) => s.active).length} existing staff
                 </div>
@@ -1022,7 +1022,7 @@ function CreateAccountModal({
 
           {needsOrg && !existingMode && (
             <div className="p-3.5 bg-base-50 border border-base-200 rounded flex flex-col gap-3">
-              <div className="text-label font-semibold uppercase tracking-[0.08em] text-base-700">
+              <div className="text-label uppercase tracking-[0.06em] text-base-700">
                 {/* 2026-07-19 (Loo) — a showroom is Carres' own store, not an
                     external organisation: one name field, no SSM/PIC. */}
                 {draft.role === "showroom"
@@ -1108,10 +1108,10 @@ function CreateAccountModal({
               {dealerLike && (
                 <>
                   <div>
-                    <div className="text-label uppercase tracking-wider text-base-500 font-semibold mb-1">
+                    <div className="text-label uppercase tracking-[0.06em] text-base-500 mb-1">
                       Business address
                     </div>
-                    <div className="text-label text-base-500 mb-2 leading-snug">
+                    <div className="text-meta text-base-500 mb-2 leading-snug">
                       Required · prints on Sales Order PDFs when no outlet is attached
                     </div>
                     <MYAddressFields
@@ -1128,7 +1128,7 @@ function CreateAccountModal({
                       errors.addressState ||
                       errors.addressCity ||
                       errors.addressPostcode) && (
-                      <div className="text-label text-destructive mt-1.5">
+                      <div className="text-meta text-destructive mt-1.5">
                         {errors.addressLine1 ||
                           errors.addressState ||
                           errors.addressCity ||
@@ -1138,7 +1138,7 @@ function CreateAccountModal({
                   </div>
                 </>
               )}
-              <div className="text-label text-base-500 leading-relaxed">
+              <div className="text-meta text-base-500 leading-relaxed">
                 {isShowroom
                   ? "Carres' own store. No company registration or contact person needed. The email above becomes its login."
                   : `A new ${draft.role} record will be created and this user will be the owner.`}
@@ -1153,7 +1153,7 @@ function CreateAccountModal({
               that's Carres itself). */}
           {dealerLike && (
             <div className="p-3.5 bg-base-50 border border-base-200 rounded flex flex-col gap-3">
-              <div className="text-label font-semibold uppercase tracking-[0.08em] text-base-700">
+              <div className="text-label uppercase tracking-[0.06em] text-base-700">
                 {existingMode ? "New staff · PIN sign-in" : "First staff · PIN sign-in"}
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -1253,7 +1253,7 @@ function CreateAccountModal({
                 </Field>
               </div>
               {draft.staffPinConfirm.length === 6 && draft.staffPin !== draft.staffPinConfirm && (
-                <div className="text-label text-destructive -mt-1.5">PINs don't match.</div>
+                <div className="text-meta text-destructive -mt-1.5">PINs don't match.</div>
               )}
             </div>
           )}
@@ -1298,7 +1298,7 @@ function CreateAccountModal({
           <button
             onClick={onClose}
             disabled={create.isPending || createStaff.isPending}
-            className="px-4 py-[9px] text-body font-semibold text-base-600 rounded hover:bg-base-100 cursor-pointer disabled:opacity-50"
+            className="px-4 py-[9px] text-body font-medium text-base-600 rounded hover:bg-base-100 cursor-pointer disabled:opacity-50"
           >
             Cancel
           </button>
@@ -1326,17 +1326,17 @@ function Field({ label, hint, error, children }: { label: string; hint?: string;
     <div>
       <div className="flex items-baseline justify-between mb-1.5">
         <FieldLabel>{label}</FieldLabel>
-        {error && <span className="text-label text-primary">{error}</span>}
+        {error && <span className="text-meta text-primary">{error}</span>}
       </div>
       {children}
-      {hint && !error && <div className="text-label text-base-500 mt-1">{hint}</div>}
+      {hint && !error && <div className="text-meta text-base-500 mt-1">{hint}</div>}
     </div>
   );
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <label className="text-label font-semibold uppercase tracking-[0.08em] text-base-700">
+    <label className="text-label uppercase tracking-[0.06em] text-base-700">
       {children}
     </label>
   );

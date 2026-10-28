@@ -29,7 +29,7 @@ import StatusPill from "@/components/kit/StatusPill";
 import Textarea from "@/components/kit/Textarea";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { toast } from "sonner";
-import { otherDebtorInvoiceDoc } from "@/lib/pdf/other-money-in-docs";
+import { printOtherDebtorInvoice } from "../preview/row-print";
 import {
   useCancelInvoice,
   useMoneyInAccounts,
@@ -50,6 +50,7 @@ import {
   typedTotal,
   type LineErrors,
   type TypedLine,
+  invoiceReceiptDoor,
 } from "./parts";
 import { DepartmentName, encodeDepartment } from "../department";
 import { useSaveKey } from "../save-key";
@@ -236,6 +237,7 @@ function InvoiceForm({
               onValueChange={setPartyId}
               options={partyOptions}
               placeholder={parties.isLoading ? "Loading parties…" : partyOptions.length ? "Choose a party" : "No party yet. Add one on Parties"}
+              disabled={!partyOptions.length}
               error={fieldErrors.party}
             />
             <Input
@@ -363,18 +365,13 @@ function InvoiceObject({ detail, onBack }: { detail: OtherDebtorInvoiceDetail; o
   const outstandingWord = otherDebtorOutstandingWord(inv);
   const liveReceipts = detail.receipts.filter((r) => r.status === "posted");
   const mayCancel = me.data?.mayCancel === true && inv.status === "issued";
-  const owes = inv.status === "issued" && (inv.outstanding ?? 0) > 0;
+  const receiptDoor = invoiceReceiptDoor(inv);
   const parties = useOtherDebtorParties();
   const [printing, setPrinting] = useState(false);
   const downloadPdf = async () => {
     setPrinting(true);
     try {
-      const doc = otherDebtorInvoiceDoc(detail, parties.data?.find((p) => p.party_id === inv.party_id));
-      if (!doc) return;
-      const { renderOtherDebtorInvoicePdf } = await import("@/lib/pdf/render");
-      window.open(URL.createObjectURL(await renderOtherDebtorInvoicePdf(doc)), "_blank", "noopener");
-    } catch (e) {
-      toast.error(`The invoice could not be opened: ${(e as Error).message}`);
+      await printOtherDebtorInvoice(detail, parties.data?.find((p) => p.party_id === inv.party_id));
     } finally {
       setPrinting(false);
     }
@@ -393,10 +390,10 @@ function InvoiceObject({ detail, onBack }: { detail: OtherDebtorInvoiceDetail; o
           <Button variant="neutral" loading={printing} disabled={parties.isLoading} onClick={downloadPdf}>
             Download PDF
           </Button>
-          {owes && (
+          {receiptDoor && (
             <Button
               variant="primary"
-              onClick={() => navigate(`/finance/other-receipts?receipt=new&party=${inv.party_id}&invoice=${inv.invoice_id}`)}
+              onClick={() => navigate(receiptDoor)}
             >
               Record receipt
             </Button>

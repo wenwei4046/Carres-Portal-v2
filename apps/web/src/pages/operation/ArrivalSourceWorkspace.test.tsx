@@ -37,3 +37,25 @@ describe("source Receiving journey",()=>{
   expect(screen.getByRole("option",{name:"Bed bugs or other pest evidence"})).toHaveValue("pests");
  });
 });
+
+
+describe("Showroom transfer handoff", () => {
+ it("carries the selected exact goods and origin without posting a movement", async () => {
+  const path = `/operation?tab=arrival-source&kind=transfer&source=showroom&unit=${id(1)}&unit=${id(2)}`;
+  render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><MemoryRouter initialEntries={[path]}><ArrivalSourceWorkspace/></MemoryRouter></QueryClientProvider>);
+  await waitFor(() => expect(screen.getByLabelText("From Site")).toHaveValue(id(20)));
+  expect(screen.getByRole("checkbox", {name:"U1-000-001 · Fixture"})).toBeChecked();
+  expect(screen.getByRole("checkbox", {name:"U1-000-002 · Fixture"})).toBeChecked();
+  expect(screen.getByRole("checkbox", {name:"U1-000-003 · Fixture"})).not.toBeChecked();
+  expect(screen.getByRole("link", {name:"Back to source"})).toHaveAttribute("href", "/operation?tab=showroom");
+  expect(vi.mocked(apiFetch).mock.calls.every(([, options]) => !options?.method || options.method === "GET")).toBe(true);
+  const optionUrl=vi.mocked(apiFetch).mock.calls.find(([url])=>String(url).includes("/options"))?.[0];
+  expect(new URL(String(optionUrl), "https://test.invalid").searchParams.getAll("unit")).toEqual([id(1),id(2)]);
+ });
+ it("does not guess the selection when a source Unit is no longer returned", async () => {
+  const path = `/operation?tab=arrival-source&kind=transfer&source=showroom&unit=${id(99)}`;
+  render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><MemoryRouter initialEntries={[path]}><ArrivalSourceWorkspace/></MemoryRouter></QueryClientProvider>);
+  await screen.findByText("Stock could not be loaded");
+  screen.getAllByRole("checkbox").forEach((input)=>expect(input).not.toBeChecked());
+ });
+});

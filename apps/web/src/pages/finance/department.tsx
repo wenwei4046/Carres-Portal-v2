@@ -14,6 +14,8 @@ export interface DepartmentChoice { departmentType?: DepartmentType; departmentI
 
 const TYPE_WORD: Record<DepartmentType, string> = {
   SHOWROOM: "Showroom", DEALER: "Dealer", SUBSCRIPTION: "Subscription", OFFICE: "Office",
+  // 0683 (Chew ruling 2): goods on a bill no order has taken yet. Reports filter by it; no form offers it.
+  STOCK: "Not yet in a channel",
 };
 
 export function useDepartments() {
@@ -43,6 +45,13 @@ export function departmentSearch(dept: string | null | undefined): Record<string
   if (c.departmentType) out.departmentType = c.departmentType;
   if (c.departmentId) out.departmentId = c.departmentId;
   return out;
+}
+
+/** The department picked, in words: `Showroom`, or one showroom's name. Null for All. */
+export function departmentWord(value: string, rows: readonly DepartmentRow[]): string | null {
+  const c = decodeDepartment(value);
+  if (!c.departmentType) return null;
+  return (c.departmentId && rows.find((d) => d.department_id === c.departmentId)?.name) || TYPE_WORD[c.departmentType];
 }
 
 /** The page's filter, kept in `?dept=`. */

@@ -12,9 +12,18 @@
  * Register shell per UI MASTER §6.7: the word alone in Row 1, the create
  * action and the sibling list in Row 2, the summary in the 32px footer, and
  * no KPI strip. Customer money is never here — it lives in Payments.
+ *
+ * FINANCE LOOK (Chew 2026-10-13), both lists: the party and What for wrap
+ * rather than being cut, and a zero amount is a blank cell. An invoice's
+ * Outstanding keeps its words (Paid in full, Not issued yet): they are the
+ * answer, not a zero.
  */
 import { useMemo, useState, type ReactNode } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { documentRowMenu } from "@/components/register/row-menu";
+import { OtherDebtorInvoicePreview } from "../preview/previews";
+import { printOtherDebtorInvoiceById } from "../preview/row-print";
 import {
   financePartyKindWord,
   otherDebtorInvoiceNumberWord,
@@ -25,6 +34,7 @@ import {
   type OtherDebtorPartyRow,
 } from "@carres/shared/other-money-in";
 import Button from "@/components/kit/Button";
+import { SegmentedLinks } from "@/components/Segmented";
 import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { fmtDate } from "@/lib/fmt-date";
@@ -34,7 +44,9 @@ import { useOtherDebtorInvoices, useOtherDebtorParties } from "./api";
 import { DepartmentFilter, useDepartmentParam } from "../department";
 import InvoicePage from "./InvoicePage";
 import PartyModal from "./PartyModal";
-import { LoadFailed } from "./parts";
+import { invoiceReceiptDoor, LoadFailed } from "./parts";
+import { amountCell, FINANCE_WIDTH } from "../finance-widths";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -104,29 +116,21 @@ export default function OtherDebtorsPage() {
 /* ── the two sibling lists, named in Row 2 ─────────────────────────────────── */
 
 function Siblings({ current }: { current: "invoices" | "parties" }) {
-  return (
-    <span className="flex items-center gap-3 text-body">
-      {current === "invoices" ? (
-        <span aria-current="page" className="font-semibold">
-          Invoices
-        </span>
-      ) : (
-        <Link to="/finance/other-debtors">Invoices</Link>
-      )}
-      {current === "parties" ? (
-        <span aria-current="page" className="font-semibold">
-          Parties
-        </span>
-      ) : (
-        <Link to="/finance/other-debtors?view=parties">Parties</Link>
-      )}
-    </span>
-  );
+  const views = [
+    { value: "invoices", to: "/finance/other-debtors", label: "Invoices" },
+    { value: "parties", to: "/finance/other-debtors?view=parties", label: "Parties" },
+  ] as const;
+  return <SegmentedLinks options={views} value={current} ariaLabel="Other debtors" testId="other-debtors-switch" />;
 }
 
 /* ── the invoice Register ──────────────────────────────────────────────────── */
 
 function InvoiceRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNew: () => void }) {
+  const personalLayouts = useFinancePersonalLayouts("finance_other_debtor_invoices");
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  // Double-click previews the invoice (Chew 2026-10-21); View opens its page.
+  const [peek, setPeek] = useState<string | null>(null);
   const [dept, setDept] = useDepartmentParam();
   const query = useOtherDebtorInvoices(dept);
   const columns = useMemo<DataGridColumn<OtherDebtorInvoiceRow>[]>(
@@ -153,7 +157,8 @@ function InvoiceRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
       {
         key: "party",
         label: "Party",
-        width: 220,
+        width: FINANCE_WIDTH.party,
+        wrap: true,
         accessor: (r) => r.party_name,
         searchValue: (r) => r.party_name,
         filterType: "enum",
@@ -162,6 +167,8 @@ function InvoiceRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
         key: "what",
         label: "What for",
         width: 240,
+        wrap: true,
+        defaultHidden: true,
         accessor: whatFor,
         searchValue: (r) => [r.first_line, r.reference, r.narration].filter(Boolean).join(" "),
         exportValue: whatFor,
@@ -169,9 +176,9 @@ function InvoiceRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
       {
         key: "total",
         label: "Total",
-        width: 130,
+        width: FINANCE_WIDTH.amount,
         align: "right",
-        accessor: (r) => rm(Number(r.total_amount)),
+        accessor: (r) => amountCell(r.total_amount),
         numberValue: (r) => Number(r.total_amount),
         filterType: "number",
         exportValue: (r) => Number(r.total_amount),
@@ -179,7 +186,7 @@ function InvoiceRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
       {
         key: "outstanding",
         label: "Outstanding",
-        width: 140,
+        width: FINANCE_WIDTH.amount,
         align: "right",
         accessor: invoiceOutstandingCell,
         numberValue: (r) => (r.status === "issued" ? Number(r.outstanding) : null),
@@ -222,8 +229,9 @@ function InvoiceRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
         rows={query.data ?? []}
         columns={columns}
         rowKey={(r) => r.invoice_id}
-        storageKey="carres.finance.other-debtor-invoices.v1"
+        storageKey="carres.finance.other-debtor-invoices.v3"
         appearance="reference"
+        look="finance" personalLayouts={personalLayouts} fillColumn="party"
         exportName="Other debtor invoices"
         groupBanner={false}
         stickyIdentity
@@ -231,16 +239,25 @@ function InvoiceRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
         searchPlaceholder="Search invoices…"
         toolbarStart={
           <span className="flex items-center gap-4">
+            <DepartmentFilter value={dept} onChange={setDept} />
             <Button variant="primary" size="sm" shape="pill" icon="add" onClick={onNew}>
               New invoice
             </Button>
             <Siblings current="invoices" />
-            <DepartmentFilter value={dept} onChange={setDept} />
           </span>
         }
         emptyMessage="No other debtor invoice yet. Press New invoice to bill a party that is not a customer."
         expandTitle="Inspect invoice"
-        onRowDoubleClick={(r) => onOpen(r.invoice_id)}
+        onRowDoubleClick={(r) => setPeek(r.invoice_id)}
+        contextMenu={(r) => {
+          const receipt = invoiceReceiptDoor(r);
+          return documentRowMenu({
+            view: () => onOpen(r.invoice_id),
+            // A draft is still a form: it has no paper until it is issued.
+            print: r.status === "draft" ? undefined : () => void printOtherDebtorInvoiceById(qc, r.invoice_id),
+            more: receipt ? [{ label: "Record receipt", onClick: () => navigate(receipt) }] : [],
+          });
+        }}
         expandable={{
           renderExpansion: (r) => (
             <div className="p-4 text-body flex flex-col items-start gap-1">
@@ -268,6 +285,7 @@ function InvoiceRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
           );
         }}
       />
+      <OtherDebtorInvoicePreview id={peek} onClose={() => setPeek(null)} onView={(id) => { setPeek(null); onOpen(id); }} />
     </ListPageShell>
   );
 }
@@ -275,15 +293,26 @@ function InvoiceRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
 /* ── the party Register ────────────────────────────────────────────────────── */
 
 function PartyRegister({ onNewInvoice }: { onNewInvoice: (partyId: string | null) => void }) {
+  const personalLayouts = useFinancePersonalLayouts("finance_other_debtor_parties");
   const query = useOtherDebtorParties();
   /* `undefined` = closed; `null` = a new party; a row = edit that party. */
   const [editing, setEditing] = useState<OtherDebtorPartyRow | null | undefined>(undefined);
   const columns = useMemo<DataGridColumn<OtherDebtorPartyRow>[]>(
     () => [
+      // 0691 (Chew 2026-10-12): Finance's AutoCount-style code, like 305-A001.
+      {
+        key: "code",
+        label: "Code",
+        width: FINANCE_WIDTH.code,
+        accessor: (r) => r.code ?? "",
+        searchValue: (r) => r.code ?? "",
+        exportValue: (r) => r.code ?? "",
+      },
       {
         key: "name",
         label: "Party",
-        width: 240,
+        width: FINANCE_WIDTH.party,
+        wrap: true,
         accessor: (r) => r.name,
         searchValue: (r) => [r.name, r.registration_no, r.phone, r.email].filter(Boolean).join(" "),
         exportValue: (r) => r.name,
@@ -299,12 +328,14 @@ function PartyRegister({ onNewInvoice }: { onNewInvoice: (partyId: string | null
         key: "registration",
         label: "SSM or IC number",
         width: 170,
+        defaultHidden: true,
         accessor: (r) => r.registration_no ?? "No number on file",
       },
       {
         key: "phone",
         label: "Phone",
         width: 140,
+        defaultHidden: true,
         accessor: (r) => r.phone ?? "No phone on file",
       },
       {
@@ -319,9 +350,9 @@ function PartyRegister({ onNewInvoice }: { onNewInvoice: (partyId: string | null
       {
         key: "outstanding",
         label: "Outstanding",
-        width: 140,
+        width: FINANCE_WIDTH.amount,
         align: "right",
-        accessor: (r) => rm(Number(r.outstanding)),
+        accessor: (r) => amountCell(r.outstanding),
         numberValue: (r) => Number(r.outstanding),
         filterType: "number",
         exportValue: (r) => Number(r.outstanding),
@@ -353,8 +384,9 @@ function PartyRegister({ onNewInvoice }: { onNewInvoice: (partyId: string | null
         rows={query.data ?? []}
         columns={columns}
         rowKey={(r) => r.party_id}
-        storageKey="carres.finance.other-debtor-parties.v1"
+        storageKey="carres.finance.other-debtor-parties.v3"
         appearance="reference"
+        look="finance" personalLayouts={personalLayouts} fillColumn="name"
         exportName="Other debtor parties"
         groupBanner={false}
         stickyIdentity

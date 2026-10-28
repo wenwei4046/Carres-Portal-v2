@@ -5,17 +5,34 @@ import {
   apFileAddInput,
   apFileSignInput,
   apReasonInput,
+  billForeignAmountInput,
   moneyBackInput,
   otherCreditorInput,
+  partyCodeInput,
   paymentVoucherDraftInput,
   supplierBillDraftInput,
+  supplierCreditNoteDraftInput,
+  supplierDebitNoteDraftInput,
+  supplierFinanceInput,
+  supplierNoteContactInput,
+  supplierNoteFollowupAddInput,
+  supplierNoteSettleInput,
+  type BillDeliveryPartner,
+  type GoodsLineChannel,
   type PaymentVoucherDraftInput,
   type SupplierBillDraftInput,
+  type SupplierCreditNoteDraftInput,
+  type SupplierDebitNoteDraftInput,
 } from "@carres/shared/schemas/finance-ap";
-import { requireFinance } from "../../lib/auth-guards";
+import { apAgingQuery, apAgingReport, type ApAgingAnswer } from "@carres/shared/ap-aging";
+import { billReadInput, matchSupplier, type BillReadAnswer } from "@carres/shared/bill-reading";
+import { requireFinance, requireFinanceOrPurchasing } from "../../lib/auth-guards";
+import { billReaderKey, billReaderModel, readBillWithModel } from "../../lib/finance-bill-reader";
+import { todayIsoMYT } from "../../lib/delivery-order-issue";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import { departmentQuery, keepByDepartment, tooManyDepartmentLines, withLineDepartments } from "../../lib/line-departments";
+import { readPartyCodes } from "../../lib/party-codes";
 import type { AppEnv } from "../../types";
 
 /**
@@ -23,21 +40,38 @@ import type { AppEnv } from "../../types";
  * (migration 0477).
  *
  *   Suppliers and accounts
- *     GET  /suppliers                   who can send a bill (suppliers + other creditors)
+ *     GET  /suppliers                   who can send a bill (suppliers + other creditors),
+ *                                       each with its code (0691, fin_party_codes)
  *     POST /other-creditors             supplier_other_creditor_create — a landlord, an advertiser
  *     GET  /accounts                    ap_account_choices — which account fits which box
  *     GET  /outstanding                 ap_outstanding — owed per supplier, zero included
  *     GET  /bill-outstanding            ap_bill_outstanding — owed per confirmed bill
+ *     GET  /opening-bill-outstanding    ap_opening_bill_outstanding — each posted opening bill (0705)
+ *     GET  /aging?asAt=                 fin_ap_aging — owed on a day, bill by bill, tied
+ *                                       to the payables control accounts (0640)
+ *     GET  /supplier-finance            finance_supplier_list — every supplier with Finance's
+ *                                       own tax and bank details (0636)
+ *     PUT  /supplier-finance/:supplierId  finance_supplier_profile_save (0636)
+ *     PUT  /supplier-finance/:supplierId/code  fin_party_code_set (0691) — Finance changes a code
  *
  *   Bills (a supplier's invoice, entered)
  *     GET  /bills                       supplier_bill_register
  *     GET  /bills/grn-candidates        supplier_bill_grn_candidates — GRNs with something left to bill
  *     GET  /bills/grn-lines/:receiptId  supplier_bill_grn_lines
+ *     GET  /bills/delivery-orders?billId=  fin_bill_delivery_orders (0689) — each logistics partner's
+ *                                       delivery orders a bill can still charge for
  *     GET  /bills/:id                   supplier_bill_document
- *     POST /bills                       supplier_bill_save_draft (new draft)
+ *     POST /bills                       supplier_bill_save_draft (new draft). 0721: this,
+ *                                       grn-candidates and grn-lines also admit operation
+ *                                       (Purchasing, Chew 2026-10-23); so do PUT /bills/:id (own
+ *                                       draft) and GET /accounts (YH 2026-10-26)
  *     PUT  /bills/:id                   supplier_bill_save_draft (rewrite a draft)
  *     POST /bills/:id/confirm           supplier_bill_confirm — posts the bill
  *     POST /bills/:id/cancel            supplier_bill_cancel — reverses it if confirmed
+ *     PUT  /bills/:id/foreign-amount    supplier_bill_foreign_amount_set (0682) — the currency the
+ *                                       supplier invoiced in, its amount and rate; a record only
+ *     POST /read-bill                   read a bill's pages with Claude to pre-fill a form;
+ *                                       writes nothing; 503 until ANTHROPIC_API_KEY is set
  *
  *   Payment vouchers (Draft → Prepared → Checked → Approved)
  *     GET  /vouchers                    payment_voucher_register
@@ -55,9 +89,41 @@ import type { AppEnv } from "../../types";
  *     POST /vouchers/:id/money-back     supplier_advance_money_back_record — the supplier sent money back
  *     POST /money-back/:id/cancel       supplier_advance_money_back_cancel — the approver reverses it
  *
- *   Files (supplier invoices, receipts, bank slips)
- *     POST /bills/:id/files/sign  · POST /vouchers/:id/files/sign    signed upload URL
- *     POST /bills/:id/files       · POST /vouchers/:id/files         record the uploaded file
+ *   Supplier credit notes (0642: the supplier takes money off what Carres owes)
+ *     GET  /credit-notes                supplier_credit_note_register
+ *     GET  /credit-notes/:id            supplier_credit_note_document
+ *     POST /credit-notes                supplier_credit_note_save_draft (new draft)
+ *     PUT  /credit-notes/:id            supplier_credit_note_save_draft (rewrite a draft)
+ *     POST /credit-notes/:id/confirm    supplier_credit_note_confirm — posts it
+ *     POST /credit-notes/:id/cancel     supplier_credit_note_cancel — reverses it if confirmed
+ *     POST /credit-notes/:id/applications       supplier_credit_note_apply — knock it off a bill; posts nothing
+ *     POST /credit-note-applications/:id/cancel supplier_credit_note_application_cancel — take it off again
+ *
+ *   Supplier debit notes (0681: the supplier charges more; a voucher pays them)
+ *     GET  /debit-notes                 supplier_debit_note_register
+ *     GET  /debit-notes/:id             supplier_debit_note_document
+ *     POST /debit-notes                 supplier_debit_note_save_draft (new draft)
+ *     PUT  /debit-notes/:id             supplier_debit_note_save_draft (rewrite a draft)
+ *     POST /debit-notes/:id/confirm     supplier_debit_note_confirm — posts it
+ *     POST /debit-notes/:id/cancel      supplier_debit_note_cancel — reverses it if confirmed
+ *     GET  /debit-notes/:id/notes-to-follow-up   supplier_note_followups_of_debit_note
+ *
+ *   Credit and debit notes to follow up (0676: what suppliers still owe; posts nothing)
+ *     GET  /notes-to-follow-up          supplier_note_followups_read (adds the purchase returns' own first)
+ *     GET  /notes-to-follow-up/owed?supplierId=   supplier_note_followups_owed — the voucher's reminder
+ *     GET  /notes-to-follow-up/:id      supplier_note_followup_document
+ *     POST /notes-to-follow-up          supplier_note_followup_add — from a bill line, or by hand
+ *     POST /notes-to-follow-up/:id/contacts      supplier_note_followup_contact_add
+ *     POST /notes-to-follow-up/:id/close         supplier_note_followup_close
+ *     POST /notes-to-follow-up/:id/settlements   supplier_note_followup_settle — a confirmed credit note settles it;
+ *                                       supplier_note_followup_settle_by_debit_note — a confirmed debit note (0681)
+ *     POST /note-settlements/:id/take-off        supplier_note_followup_settlement_take_off
+ *     GET  /bills/:id/notes-to-follow-up         supplier_note_followups_of_bill
+ *     GET  /credit-notes/:id/notes-to-follow-up  supplier_note_followups_of_credit_note
+ *
+ *   Files (supplier invoices, receipts, bank slips, credit and debit notes)
+ *     POST /bills/:id/files/sign  · POST /vouchers/:id/files/sign · POST /credit-notes/:id/files/sign · POST /debit-notes/:id/files/sign
+ *     POST /bills/:id/files       · POST /vouchers/:id/files      · POST /credit-notes/:id/files      · POST /debit-notes/:id/files
  *     GET  /files/url?path=                                          short-lived read URL
  *
  * Every call runs as the SIGNED-IN USER (userClient). The database functions
@@ -69,7 +135,7 @@ const payablesRouter = new Hono<AppEnv>();
 const AP_BUCKET = "ap-documents";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-type DocType = "SUPPLIER_BILL" | "PAYMENT_VOUCHER";
+type DocType = "SUPPLIER_BILL" | "PAYMENT_VOUCHER" | "SUPPLIER_CREDIT_NOTE" | "SUPPLIER_DEBIT_NOTE";
 
 /** mapPgError, but a 403 keeps the database's reason code (not_finance_approver,
  *  voucher_cancelled …) so the page can say which rule refused. */
@@ -103,6 +169,7 @@ function billLinesToJson(lines: SupplierBillDraftInput["lines"]) {
   return lines.map((l) => ({
     warehouse_receipt_id: l.warehouseReceiptId ?? null,
     po_line_id: l.poLineId ?? null,
+    delivery_order_id: l.deliveryOrderId ?? null,   // 0689
     account_code: l.accountCode ?? null,
     description: l.description ?? null,
     sku: l.sku ?? null,
@@ -142,7 +209,11 @@ function voucherArgs(voucherId: string | null, d: PaymentVoucherDraftInput) {
       department_type: l.departmentType ?? null,
       department_id: l.departmentId ?? null,
     })),
-    p_allocations: d.allocations.map((a) => ({ bill_id: a.billId, amount: a.amount })),
+    // 0681: an allocation pays a bill or a supplier debit note.
+    // 0705: or an opening bill (Opening balances).
+    p_allocations: d.allocations.map((a) =>
+      a.openingItemId ? { opening_item_id: a.openingItemId, amount: a.amount }
+        : a.debitNoteId ? { debit_note_id: a.debitNoteId, amount: a.amount } : { bill_id: a.billId, amount: a.amount }),
     p_pay_method: d.payMethod,
     p_pay_reference: d.payReference ?? null,
     p_narration: d.narration ?? null,
@@ -156,12 +227,16 @@ function voucherArgs(voucherId: string | null, d: PaymentVoucherDraftInput) {
 // ── suppliers, accounts, what is owed ───────────────────────────────────────
 
 payablesRouter.get("/suppliers", requireFinance, async (c) => {
-  const { data, error } = await sb(c)
+  const client = sb(c);
+  const { data, error } = await client
     .from("suppliers")
     .select("id, name, kind, terms_days")
     .order("name", { ascending: true });
   if (error) return pgFail(c, error);
-  return c.json({ rows: data ?? [] });
+  // 0691: each creditor's code, so a picker reads "400-A001 Armani".
+  const codes = await readPartyCodes(client);
+  const rows = (data ?? []).map((r) => ({ ...r, code: codes.bySupplier.get(r.id as string) ?? null }));
+  return c.json({ rows });
 });
 
 payablesRouter.post("/other-creditors", requireFinance, async (c) => {
@@ -176,7 +251,36 @@ payablesRouter.post("/other-creditors", requireFinance, async (c) => {
   return c.json({ id: data as string });
 });
 
-payablesRouter.get("/accounts", requireFinance, async (c) => {
+// ── reading a bill (Chew 2026-10-03, Finance MASTER §3.2 Bill scanning) ─────
+// The pages go to the model once; the answer pre-fills a form a person then
+// checks. Nothing is written here, and the supplier is matched by name only.
+payablesRouter.post("/read-bill", requireFinance, async (c) => {
+  const key = billReaderKey(c.env);
+  if (!key) {
+    return c.json({ error: "not_configured", code: "bill_reader_not_set_up",
+      message: "Reading bills is not set up yet. Type the bill in." }, 503);
+  }
+  const body = await parseJsonBody(c, billReadInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const read = await readBillWithModel({ key, model: billReaderModel(c.env), files: body.data.files });
+  if (!read.ok) {
+    const message = read.why === "refused" ? "These pages could not be read. Try a clearer photo, or the PDF."
+      : read.why === "timeout" ? "Reading the bill took too long. Try again."
+      : "The bill could not be read. Try again, or type it in.";
+    return c.json({ error: "read_failed", code: `bill_${read.why}`, message }, 502);
+  }
+  const { data, error } = await sb(c).from("suppliers").select("id, name, kind");
+  if (error) return pgFail(c, error);
+  const match = matchSupplier(read.reading.vendorName, (data ?? []) as Array<{ id: string; name: string; kind: string | null }>);
+  const answer: BillReadAnswer = {
+    reading: read.reading,
+    supplier: match ? { id: match.supplier.id, name: match.supplier.name, kind: match.supplier.kind, how: match.how } : null,
+  };
+  return c.json(answer);
+});
+
+// 2026-10-26 (YH, Houzs): Purchasing picks a no-GRN line's account from this list.
+payablesRouter.get("/accounts", requireFinanceOrPurchasing, async (c) => {
   const { data, error } = await sb(c).rpc("ap_account_choices");
   if (error) return pgFail(c, error);
   return c.json({ rows: data ?? [] });
@@ -190,10 +294,95 @@ payablesRouter.get("/outstanding", requireFinance, async (c) => {
   return c.json({ rows: data ?? [] });
 });
 
+// ── a supplier's finance details (0636; Chew 2026-10-03) ────────────────────
+// Finance's own record beside Purchasing's supplier: tax number, registration
+// number and the bank account a payment goes to.
+
+payablesRouter.get("/supplier-finance", requireFinance, async (c) => {
+  const client = sb(c);
+  const { data, error } = await client.rpc("finance_supplier_list");
+  if (error) return pgFail(c, error);
+  const codes = await readPartyCodes(client);
+  const rows = ((data ?? []) as Array<{ supplier_id: string }>)
+    .map((r) => ({ ...r, code: codes.bySupplier.get(r.supplier_id) ?? null }));
+  return c.json({ rows });
+});
+
+// 0691 (Chew 2026-10-12): Finance changes a supplier's or other creditor's
+// code. The database keeps it unique and never a chart account's number.
+payablesRouter.put("/supplier-finance/:supplierId/code", requireFinance, async (c) => {
+  const supplierId = c.req.param("supplierId");
+  if (!UUID_RE.test(supplierId)) return badId(c, "supplier");
+  const body = await parseJsonBody(c, partyCodeInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { data, error } = await sb(c).rpc("fin_party_code_set", {
+    p_supplier_id: supplierId,
+    p_party_id: null,
+    p_code: body.data.code,
+  });
+  if (error) return pgFail(c, error);
+  return c.json({ code: data as string });
+});
+
+payablesRouter.put("/supplier-finance/:supplierId", requireFinance, async (c) => {
+  const supplierId = c.req.param("supplierId");
+  if (!UUID_RE.test(supplierId)) return badId(c, "supplier");
+  const body = await parseJsonBody(c, supplierFinanceInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const d = body.data;
+  const { data, error } = await sb(c).rpc("finance_supplier_profile_save", {
+    p_supplier_id: supplierId,
+    p_tax_no: d.taxNo,
+    p_registration_no: d.registrationNo,
+    p_bank_name: d.bankName,
+    p_bank_account_no: d.bankAccountNo,
+    p_bank_account_holder: d.bankAccountHolder,
+  });
+  if (error) return pgFail(c, error);
+  return c.json({ id: data as string });
+});
+
+// ── AP aging (0640; Chew 2026-10-03) ────────────────────────────────────────
+// What was owed to suppliers on a day, bill by bill, tied to the payables
+// control accounts. Read once through the shared arithmetic, which refuses a
+// figure it cannot read; the answer passes through as it came.
+
+payablesRouter.get("/aging", requireFinance, async (c) => {
+  const q = apAgingQuery.safeParse(Object.fromEntries(new URL(c.req.url).searchParams));
+  if (!q.success) {
+    return c.json({ error: "invalid_query", code: "invalid_param", message: q.error.issues[0]?.message ?? "invalid query" }, 422);
+  }
+  const { data, error } = await sb(c).rpc("fin_ap_aging", { p_as_at: q.data.asAt ?? todayIsoMYT() });
+  if (error?.code === "55000") {
+    return c.json({ error: "ledger_not_started", code: "ledger_not_started", message: "The ledger has no start date yet." }, 409);
+  }
+  const failed = () => c.json({ error: "rpc_failed", code: "rpc_failed", message: "AP aging could not be loaded. Try again." }, 500);
+  if (error) return mapPgError(error).status === 500 ? failed() : pgFail(c, error);
+  const answer = data as ApAgingAnswer | null;
+  if (!answer || typeof answer.as_at !== "string" || !Array.isArray(answer.suppliers) || !Array.isArray(answer.controls)) return failed();
+  try {
+    apAgingReport(answer, "bill", "month");
+  } catch {
+    return failed();
+  }
+  // 0691: each creditor's code beside its name.
+  const codes = await readPartyCodes(sb(c));
+  return c.json({ ...answer, suppliers: answer.suppliers.map((s) => ({ ...s, code: codes.bySupplier.get(s.supplier_id) ?? null })) });
+});
+
 payablesRouter.get("/bill-outstanding", requireFinance, async (c) => {
   const f = supplierFilter(c);
   if (!f.ok) return badId(c, "supplier");
   const { data, error } = await sb(c).rpc("ap_bill_outstanding", { p_supplier_id: f.value });
+  if (error) return pgFail(c, error);
+  return c.json({ rows: data ?? [] });
+});
+
+// 0705: each posted opening bill, what is paid and held on it (Opening balances).
+payablesRouter.get("/opening-bill-outstanding", requireFinance, async (c) => {
+  const f = supplierFilter(c);
+  if (!f.ok) return badId(c, "supplier");
+  const { data, error } = await sb(c).rpc("ap_opening_bill_outstanding", { p_supplier_id: f.value });
   if (error) return pgFail(c, error);
   return c.json({ rows: data ?? [] });
 });
@@ -211,7 +400,9 @@ payablesRouter.get("/bills", requireFinance, async (c) => {
   return c.json({ rows: kept.rows });
 });
 
-payablesRouter.get("/bills/grn-candidates", requireFinance, async (c) => {
+// 0721 (Chew 2026-10-23): Purchasing enters a bill from goods received through
+// these three doors too. Confirm, cancel and every payment stay requireFinance.
+payablesRouter.get("/bills/grn-candidates", requireFinanceOrPurchasing, async (c) => {
   const f = supplierFilter(c);
   if (!f.ok) return badId(c, "supplier");
   const { data, error } = await sb(c).rpc("supplier_bill_grn_candidates", { p_supplier_id: f.value });
@@ -229,21 +420,43 @@ payablesRouter.get("/bills/grn-candidates", requireFinance, async (c) => {
   return c.json({ rows: rows.map((r) => ({ ...r, po_terms_days: terms.get(r.po_id) ?? null })) });
 });
 
-payablesRouter.get("/bills/grn-lines/:receiptId", requireFinance, async (c) => {
+payablesRouter.get("/bills/grn-lines/:receiptId", requireFinanceOrPurchasing, async (c) => {
   const receiptId = c.req.param("receiptId");
   if (!UUID_RE.test(receiptId)) return badId(c, "goods received note");
   const { data, error } = await sb(c).rpc("supplier_bill_grn_lines", { p_receipt_id: receiptId });
   if (error) return pgFail(c, error);
-  // 0540 (DEPT-6): each GRN line's default department, from its sales orders.
-  const rows = (data ?? []) as Array<{ po_line_id?: string | null }>;
-  const polIds = [...new Set(rows.map((r) => r.po_line_id).filter((x): x is string => !!x))];
-  const dept = new Map<string, Record<string, unknown>>();
-  if (polIds.length) {
-    const d = await sb(c).from("fin_po_line_departments").select("po_line_id, department_type, department_id").in("po_line_id", polIds);
-    if (d.error) return pgFail(c, d.error);
-    for (const r of d.data ?? []) dept.set(r.po_line_id, r);
+  // 0721: Purchasing does not see the channel split (Finance's reading); saving
+  // works each goods line's department out the same way for both.
+  if (c.var.auth.role === "operation") {
+    return c.json({ rows: ((data ?? []) as object[]).map((r) => ({ ...r, channels: [], department_type: null, department_id: null })) });
   }
-  return c.json({ rows: rows.map((r) => ({ department_type: null, department_id: null, ...r, ...dept.get(r.po_line_id ?? "") })) });
+  // 0683 (Chew ruling 2): where each GRN line's open quantity goes, from the
+  // orders it was bought for. Saving the bill splits it the same way.
+  const rows = (data ?? []) as Array<{ po_line_id?: string | null; open_qty?: number | string | null }>;
+  const want = rows.filter((r) => r.po_line_id).map((r) => ({ po_line_id: r.po_line_id, qty: Number(r.open_qty ?? 0) }));
+  const channels = new Map<string, GoodsLineChannel[]>();
+  if (want.length) {
+    const ch = await sb(c).rpc("fin_goods_lines_channels", { p_lines: want });
+    if (ch.error) return pgFail(c, ch.error);
+    for (const r of (ch.data ?? []) as Array<{ po_line_id: string; channels: GoodsLineChannel[] }>) channels.set(r.po_line_id, r.channels);
+  }
+  return c.json({
+    rows: rows.map((r) => {
+      const list = channels.get(r.po_line_id ?? "") ?? [];
+      const one = list.length === 1 ? list[0] : null;
+      return { ...r, channels: list, department_type: one?.department_type ?? null, department_id: one?.department_id ?? null };
+    }),
+  });
+});
+
+// 0689 (Chew ruling 5): each logistics partner and its delivery orders a bill
+// can still charge for. `billId` keeps the DOs already on the bill being edited.
+payablesRouter.get("/bills/delivery-orders", requireFinance, async (c) => {
+  const raw = c.req.query("billId");
+  if (raw !== undefined && raw !== "" && !UUID_RE.test(raw)) return badId(c, "bill");
+  const { data, error } = await sb(c).rpc("fin_bill_delivery_orders", { p_bill_id: raw ? raw : null });
+  if (error) return pgFail(c, error);
+  return c.json({ rows: (data ?? []) as BillDeliveryPartner[] });
 });
 
 payablesRouter.get("/bills/:id", requireFinance, async (c) => {
@@ -254,10 +467,30 @@ payablesRouter.get("/bills/:id", requireFinance, async (c) => {
   if (!data) return c.json({ error: "not_found", code: "bill_missing", message: "That bill does not exist." }, 404);
   const merged = await withLineDepartments(sb(c), BILL_LINES, id, data);
   if ("error" in merged) return pgFail(c, merged.error);
-  return c.json(merged.doc);
+  // 0682: the currency the supplier invoiced in, when not ringgit. A database
+  // without 0682 has no such table: the bill reads as before, with none.
+  const fx = await sb(c).from("supplier_bill_foreign_amounts")
+    .select("currency, foreign_amount, rate, set_at").eq("bill_id", id).maybeSingle();
+  if (fx.error && fx.error.code !== "42P01" && fx.error.code !== "PGRST205") return pgFail(c, fx.error);
+  return c.json({ ...(merged.doc as Record<string, unknown>), foreign_amount: fx.error ? null : (fx.data ?? null) });
 });
 
-payablesRouter.post("/bills", requireFinance, async (c) => {
+// 0682 (Chew 2026-10-03): record the currency a supplier invoiced in, its
+// amount and the rate. A record only: the bill stays in RM and nothing posts.
+payablesRouter.put("/bills/:id/foreign-amount", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "bill");
+  const body = await parseJsonBody(c, billForeignAmountInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const d = body.data;
+  const { error } = await sb(c).rpc("supplier_bill_foreign_amount_set", d.currency === null
+    ? { p_bill_id: id, p_currency: null, p_foreign_amount: null, p_rate: null }
+    : { p_bill_id: id, p_currency: d.currency, p_foreign_amount: d.foreignAmount, p_rate: d.rate });
+  if (error) return pgFail(c, error);
+  return c.json({ id });
+});
+
+payablesRouter.post("/bills", requireFinanceOrPurchasing, async (c) => {
   const body = await parseJsonBody(c, supplierBillDraftInput);
   if (!body.ok) return c.json(body.body, body.status);
   const { data, error } = await sb(c).rpc("supplier_bill_save_draft", billArgs(null, body.data));
@@ -265,7 +498,8 @@ payablesRouter.post("/bills", requireFinance, async (c) => {
   return c.json({ id: data as string }, 201);
 });
 
-payablesRouter.put("/bills/:id", requireFinance, async (c) => {
+// 2026-10-26 (YH, Houzs): Purchasing changes its OWN draft; the database refuses the rest.
+payablesRouter.put("/bills/:id", requireFinanceOrPurchasing, async (c) => {
   const id = c.req.param("id");
   if (!UUID_RE.test(id)) return badId(c, "bill");
   const body = await parseJsonBody(c, supplierBillDraftInput);
@@ -405,6 +639,308 @@ payablesRouter.post("/advance-applications/:id/cancel", requireFinance, async (c
   return c.json({ id });
 });
 
+// ── supplier credit notes (0642; Chew 2026-10-03) ───────────────────────────
+// The supplier's credit note, entered once. Confirming posts Dr the payables
+// account (party = the supplier) / Cr each line; a knock-off ties its credit
+// to one of the supplier's bills and posts nothing.
+
+function creditNoteArgs(noteId: string | null, d: SupplierCreditNoteDraftInput) {
+  return {
+    p_note_id: noteId,
+    p_supplier_id: d.supplierId,
+    p_supplier_note_no: d.supplierNoteNo,
+    p_note_date: d.noteDate,
+    p_lines: d.lines.map((l) => ({
+      account_code: l.accountCode,
+      description: l.description,
+      amount: l.amount,
+      department_type: l.departmentType ?? null,
+      department_id: l.departmentId ?? null,
+    })),
+    p_ap_account_code: d.apAccountCode ?? null,
+    p_narration: d.narration ?? null,
+  };
+}
+
+payablesRouter.get("/credit-notes", requireFinance, async (c) => {
+  const { data, error } = await sb(c).rpc("supplier_credit_note_register");
+  if (error) return pgFail(c, error);
+  return c.json({ rows: data ?? [] });
+});
+
+payablesRouter.get("/credit-notes/:id", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "credit note");
+  const { data, error } = await sb(c).rpc("supplier_credit_note_document", { p_note_id: id });
+  if (error) return pgFail(c, error);
+  if (!data) return c.json({ error: "not_found", code: "note_missing", message: "That credit note does not exist." }, 404);
+  return c.json(data);
+});
+
+payablesRouter.post("/credit-notes", requireFinance, async (c) => {
+  const body = await parseJsonBody(c, supplierCreditNoteDraftInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { data, error } = await sb(c).rpc("supplier_credit_note_save_draft", creditNoteArgs(null, body.data));
+  if (error) return pgFail(c, error);
+  return c.json({ id: data as string }, 201);
+});
+
+payablesRouter.put("/credit-notes/:id", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "credit note");
+  const body = await parseJsonBody(c, supplierCreditNoteDraftInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { data, error } = await sb(c).rpc("supplier_credit_note_save_draft", creditNoteArgs(id, body.data));
+  if (error) return pgFail(c, error);
+  return c.json({ id: data as string });
+});
+
+payablesRouter.post("/credit-notes/:id/confirm", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "credit note");
+  const { error } = await sb(c).rpc("supplier_credit_note_confirm", { p_note_id: id });
+  if (error) return pgFail(c, error);
+  return c.json({ id });
+});
+
+payablesRouter.post("/credit-notes/:id/cancel", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "credit note");
+  const body = await parseJsonBody(c, apReasonInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { error } = await sb(c).rpc("supplier_credit_note_cancel", { p_note_id: id, p_reason: body.data.reason });
+  if (error) return pgFail(c, error);
+  return c.json({ id });
+});
+
+payablesRouter.post("/credit-notes/:id/applications", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "credit note");
+  const body = await parseJsonBody(c, advanceApplyInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { data, error } = await sb(c).rpc("supplier_credit_note_apply", {
+    p_note_id: id,
+    p_bill_id: body.data.billId,
+    p_amount: body.data.amount,
+  });
+  if (error) return pgFail(c, error);
+  return c.json({ id: data as string }, 201);
+});
+
+payablesRouter.post("/credit-note-applications/:id/cancel", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "credit note on a bill");
+  const body = await parseJsonBody(c, apReasonInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { error } = await sb(c).rpc("supplier_credit_note_application_cancel", {
+    p_application_id: id,
+    p_reason: body.data.reason,
+  });
+  if (error) return pgFail(c, error);
+  return c.json({ id });
+});
+
+// ── supplier debit notes (0681; Chew 2026-10-03) ────────────────────────────
+// The supplier's debit note, entered once. Confirming posts Dr each line / Cr
+// the payables account (party = the supplier); a voucher pays it like a bill.
+
+function debitNoteArgs(noteId: string | null, d: SupplierDebitNoteDraftInput) {
+  return {
+    p_note_id: noteId,
+    p_supplier_id: d.supplierId,
+    p_supplier_note_no: d.supplierNoteNo,
+    p_note_date: d.noteDate,
+    p_lines: d.lines.map((l) => ({
+      account_code: l.accountCode,
+      description: l.description,
+      amount: l.amount,
+      department_type: l.departmentType ?? null,
+      department_id: l.departmentId ?? null,
+    })),
+    p_due_date: d.dueDate ?? null,
+    p_ap_account_code: d.apAccountCode ?? null,
+    p_narration: d.narration ?? null,
+  };
+}
+
+payablesRouter.get("/debit-notes", requireFinance, async (c) => {
+  const { data, error } = await sb(c).rpc("supplier_debit_note_register");
+  if (error) return pgFail(c, error);
+  return c.json({ rows: data ?? [] });
+});
+
+payablesRouter.get("/debit-notes/:id", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "debit note");
+  const { data, error } = await sb(c).rpc("supplier_debit_note_document", { p_note_id: id });
+  if (error) return pgFail(c, error);
+  if (!data) return c.json({ error: "not_found", code: "note_missing", message: "That debit note does not exist." }, 404);
+  return c.json(data);
+});
+
+payablesRouter.post("/debit-notes", requireFinance, async (c) => {
+  const body = await parseJsonBody(c, supplierDebitNoteDraftInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { data, error } = await sb(c).rpc("supplier_debit_note_save_draft", debitNoteArgs(null, body.data));
+  if (error) return pgFail(c, error);
+  return c.json({ id: data as string }, 201);
+});
+
+payablesRouter.put("/debit-notes/:id", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "debit note");
+  const body = await parseJsonBody(c, supplierDebitNoteDraftInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { data, error } = await sb(c).rpc("supplier_debit_note_save_draft", debitNoteArgs(id, body.data));
+  if (error) return pgFail(c, error);
+  return c.json({ id: data as string });
+});
+
+payablesRouter.post("/debit-notes/:id/confirm", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "debit note");
+  const { error } = await sb(c).rpc("supplier_debit_note_confirm", { p_note_id: id });
+  if (error) return pgFail(c, error);
+  return c.json({ id });
+});
+
+payablesRouter.post("/debit-notes/:id/cancel", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "debit note");
+  const body = await parseJsonBody(c, apReasonInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { error } = await sb(c).rpc("supplier_debit_note_cancel", { p_note_id: id, p_reason: body.data.reason });
+  if (error) return pgFail(c, error);
+  return c.json({ id });
+});
+
+payablesRouter.get("/debit-notes/:id/notes-to-follow-up", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "debit note");
+  const { data, error } = await sb(c).rpc("supplier_note_followups_of_debit_note", { p_note_id: id });
+  if (error) return pgFail(c, error);
+  if (!data) return c.json({ error: "not_found", code: "note_missing", message: "That debit note does not exist." }, 404);
+  return c.json(data);
+});
+
+// ── credit and debit notes to follow up (0676) ──────────────────────────────
+payablesRouter.get("/notes-to-follow-up", requireFinance, async (c) => {
+  const { data, error } = await sb(c).rpc("supplier_note_followups_read");
+  if (error) return pgFail(c, error);
+  return c.json(data);
+});
+
+payablesRouter.get("/notes-to-follow-up/owed", requireFinance, async (c) => {
+  const supplier = supplierFilter(c);
+  if (!supplier.ok || !supplier.value) return badId(c, "supplier");
+  const { data, error } = await sb(c).rpc("supplier_note_followups_owed", { p_supplier_id: supplier.value });
+  if (error) return pgFail(c, error);
+  return c.json(data);
+});
+
+payablesRouter.get("/notes-to-follow-up/:id", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "note to follow up");
+  const { data, error } = await sb(c).rpc("supplier_note_followup_document", { p_id: id });
+  if (error) return pgFail(c, error);
+  if (!data) return c.json({ error: "not_found", code: "followup_missing", message: "That note to follow up does not exist." }, 404);
+  return c.json(data);
+});
+
+payablesRouter.post("/notes-to-follow-up", requireFinance, async (c) => {
+  const body = await parseJsonBody(c, supplierNoteFollowupAddInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const d = body.data;
+  const { data, error } = await sb(c).rpc("supplier_note_followup_add", {
+    p_reason: d.reason,
+    p_kind: d.kind,
+    p_supplier_id: d.reason === "OTHER" ? d.supplierId : null,
+    p_bill_id: d.reason === "PRICE" ? d.billId : null,
+    p_line_no: d.reason === "PRICE" ? d.lineNo : null,
+    p_amount: d.amount,
+    p_remark: d.remark ?? null,
+    p_next_on: d.nextOn ?? null,
+  });
+  if (error) return pgFail(c, error);
+  return c.json(data, 201);
+});
+
+payablesRouter.post("/notes-to-follow-up/:id/contacts", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "note to follow up");
+  const body = await parseJsonBody(c, supplierNoteContactInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { data, error } = await sb(c).rpc("supplier_note_followup_contact_add", {
+    p_id: id,
+    p_contacted_on: body.data.contactedOn,
+    p_said: body.data.said,
+    p_next_on: body.data.nextOn,
+  });
+  if (error) return pgFail(c, error);
+  return c.json({ id: data as string }, 201);
+});
+
+payablesRouter.post("/notes-to-follow-up/:id/close", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "note to follow up");
+  const body = await parseJsonBody(c, apReasonInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { error } = await sb(c).rpc("supplier_note_followup_close", { p_id: id, p_reason: body.data.reason });
+  if (error) return pgFail(c, error);
+  return c.json({ id });
+});
+
+payablesRouter.post("/notes-to-follow-up/:id/settlements", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "note to follow up");
+  const body = await parseJsonBody(c, supplierNoteSettleInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  // 0681: a debit note settles a debit note owed through its own door.
+  const { data, error } = body.data.debitNoteId
+    ? await sb(c).rpc("supplier_note_followup_settle_by_debit_note", {
+        p_id: id,
+        p_debit_note_id: body.data.debitNoteId,
+        p_amount: body.data.amount,
+      })
+    : await sb(c).rpc("supplier_note_followup_settle", {
+        p_id: id,
+        p_credit_note_id: body.data.creditNoteId,
+        p_amount: body.data.amount,
+      });
+  if (error) return pgFail(c, error);
+  return c.json({ id: data as string }, 201);
+});
+
+payablesRouter.post("/note-settlements/:id/take-off", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "settlement");
+  const body = await parseJsonBody(c, apReasonInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { error } = await sb(c).rpc("supplier_note_followup_settlement_take_off", {
+    p_settlement_id: id,
+    p_reason: body.data.reason,
+  });
+  if (error) return pgFail(c, error);
+  return c.json({ id });
+});
+
+payablesRouter.get("/bills/:id/notes-to-follow-up", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "bill");
+  const { data, error } = await sb(c).rpc("supplier_note_followups_of_bill", { p_bill_id: id });
+  if (error) return pgFail(c, error);
+  return c.json({ rows: data ?? [] });
+});
+
+payablesRouter.get("/credit-notes/:id/notes-to-follow-up", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "credit note");
+  const { data, error } = await sb(c).rpc("supplier_note_followups_of_credit_note", { p_note_id: id });
+  if (error) return pgFail(c, error);
+  if (!data) return c.json({ error: "not_found", code: "note_missing", message: "That credit note does not exist." }, 404);
+  return c.json(data);
+});
+
 payablesRouter.post("/vouchers/:id/money-back", requireFinance, async (c) => {
   const id = c.req.param("id");
   if (!UUID_RE.test(id)) return badId(c, "payment voucher");
@@ -449,6 +985,8 @@ const EXT: Record<z.infer<typeof apFileSignInput>["mimeType"], string> = {
 const DOC_ROUTES: ReadonlyArray<{ prefix: string; type: DocType; what: string }> = [
   { prefix: "/bills", type: "SUPPLIER_BILL", what: "bill" },
   { prefix: "/vouchers", type: "PAYMENT_VOUCHER", what: "payment voucher" },
+  { prefix: "/credit-notes", type: "SUPPLIER_CREDIT_NOTE", what: "credit note" },
+  { prefix: "/debit-notes", type: "SUPPLIER_DEBIT_NOTE", what: "debit note" },
 ];
 
 for (const { prefix, type, what } of DOC_ROUTES) {
@@ -491,7 +1029,7 @@ for (const { prefix, type, what } of DOC_ROUTES) {
 const filePathQuery = z
   .string()
   .max(400)
-  .regex(/^(SUPPLIER_BILL|PAYMENT_VOUCHER)\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.(pdf|jpg|png|webp)$/i);
+  .regex(/^(SUPPLIER_BILL|PAYMENT_VOUCHER|SUPPLIER_CREDIT_NOTE|SUPPLIER_DEBIT_NOTE)\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.(pdf|jpg|png|webp)$/i);
 
 payablesRouter.get("/files/url", requireFinance, async (c) => {
   const parsed = filePathQuery.safeParse(c.req.query("path") ?? "");

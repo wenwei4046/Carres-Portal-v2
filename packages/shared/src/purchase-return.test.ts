@@ -103,6 +103,10 @@ describe("the visible PR- reference", () => {
     expect(purchaseReturnNo("PR-20260915-1042")).toBe("PR-20260915-1042");
   });
 
+  it("leaves a Consignment Return number (CRTN-) untouched, never PR-CRTN-", () => {
+    expect(purchaseReturnNo("CRTN-20261022-0042")).toBe("CRTN-20261022-0042");
+  });
+
   it("re-presents the retired PRTN- prefix without migrating the record", () => {
     expect(purchaseReturnNo("PRTN-1042")).toBe("PR-1042");
   });

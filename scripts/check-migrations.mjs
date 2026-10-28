@@ -5,6 +5,7 @@ import {
   staleBaselineEntries,
   collisionMessage,
 } from "./migration-collisions.mjs";
+import { isDestructiveSql } from "./migration-destructive.mjs";
 
 /* The directory is overridable so the gate's own regression test can run THE
    SHIPPED SCRIPT against a fixture instead of a copy of its logic. */
@@ -147,71 +148,34 @@ const isApprovedCorrection = (line) => {
 };
 const altered = changed.filter((line) => !line.startsWith("A\t") && !isApprovedCorrection(line));
 if (altered.length) throw new Error(`Committed migrations are immutable; only new files are allowed:\n${altered.join("\n")}`);
+/* What counts as destructive, and what is set aside as code a migration
+   defines (function bodies, function rewrites, comments), has one definition in
+   scripts/migration-destructive.mjs, which the gate's regression test reads too. */
 /**
- * A dollar-quoted body is CODE THIS MIGRATION DEFINES, not SQL it runs.
+ * DESTRUCTIVE, REVIEWED AND APPLIED BY THE GOVERNED PATH.
  *
- * The guard below exists to stop a migration from destroying production data
- * while it applies. A `delete from` inside `create function … $$ … $$` does
- * nothing at apply time: it is the application's own statement, guarded by its
- * own role checks, floors and transaction, and it runs when a user acts.
+ * 0692 drops the table gl_money_accounts (0512) after moving every row onto the
+ * chart (gl_accounts.special, money_in_use) and replaces it with a view of the
+ * same name and columns. It was probed on production in a rolled-back
+ * transaction, applied as the exact file (tracker md5
+ * a764b03cabe59f2910a55ed730e7f5b6), and the owner of Finance confirmed the
+ * DROP in the conversation (Chew 2026-10-13, 「确认，继续」;
+ * docs/finance/MASTER.md §0 "One place for the money accounts").
  *
- * Without this, the guard forbids ever AMENDING an RPC that prunes rows — and
- * the repository already ships several (`sales_order_save_revision` since 0340,
- * `sales_order_create` since 0327, the purchasing and rental writers). The
- * teeth are unchanged: a bare `drop table` / `truncate` / `delete from` at
- * migration level still fails, and so does one inside a `do $$ … $$` block,
- * which IS executed on apply.
+ * Pinned to the reviewed content (the git blob id), not the file name, so any
+ * edit to the file is refused again.
  */
-function stripFunctionBodies(sql) {
-  return sql
-    .replace(/\bdo\s+\$([A-Za-z_][A-Za-z0-9_]*)?\$[\s\S]*?\$\1?\$/gi, (m) => m)
-    .replace(
-      /\bcreate\s+(?:or\s+replace\s+)?function\b[\s\S]*?\$([A-Za-z_][A-Za-z0-9_]*)?\$[\s\S]*?\$\1?\$/gi,
-      "create function <body omitted>",
-    );
-}
-
-/**
- * A COMMENT EXECUTES NOTHING, so the guard must not read one.
- *
- * Measured 2026-08-20: migration 0367 was blocked by the sentence "it revoked
- * INSERT/UPDATE/ DELETE from `authenticated`" in its own header — prose
- * EXPLAINING a revoke, matched as `delete from`. A guard that fires on the
- * description of a change rather than the change teaches people to stop writing
- * descriptions, which is the opposite of what this repository wants.
- */
-function stripComments(sql) {
-  return sql
-    .replace(/\/\*[\s\S]*?\*\//g, " ")
-    .replace(/--[^\n]*/g, " ");
-}
-
-/**
- * REVOKING A PRIVILEGE IS NOT USING IT.
- *
- * `truncate` was matched as a bare word, so `revoke truncate on t from
- * authenticated` — which takes the power to empty a table AWAY — was read as
- * destroying data and blocked. Measured 2026-08-20 on migration 0367, whose
- * whole purpose is to remove write grants a new table inherits by default; the
- * TRUNCATE grant matters there precisely because TRUNCATE empties a table
- * WITHOUT firing the row trigger that refuses a delete.
- *
- * The guard now matches TRUNCATE only where it is a statement VERB — at the
- * start of a statement — so `revoke`/`grant` lists no longer trip it. Its teeth
- * are unchanged: `truncate t;` still fails, including inside a `do $$ … $$`
- * block, which IS executed on apply.
- */
-const DESTRUCTIVE = [
-  /\bdrop\s+(table|schema|column)\b/i,
-  /(^|;)\s*truncate\b/i,
-  /\bdelete\s+from\b/i,
-];
-
+const REVIEWED_DESTRUCTIVE = new Map([
+  ["0692_the_chart_marks_the_money_accounts.sql", "9bf5c9424e5ee11a0c46244d69fee1bd771ccbbe"],
+]);
+const isReviewedDestructive = (file) => {
+  const pinned = REVIEWED_DESTRUCTIVE.get(file.split("/").pop());
+  return !!pinned && execFileSync("git", ["rev-parse", `HEAD:${file}`], { encoding: "utf8" }).trim() === pinned;
+};
 for (const line of changed.filter((entry) => entry.startsWith("A\t"))) {
   const file = line.slice(2);
   const sql = await readFile(file, "utf8");
-  const scanned = stripComments(stripFunctionBodies(sql));
-  if (DESTRUCTIVE.some((re) => re.test(scanned))) {
+  if (isDestructiveSql(sql) && !isReviewedDestructive(file)) {
     throw new Error(`${file} contains destructive SQL and requires the governed manual review/apply path.`);
   }
 }

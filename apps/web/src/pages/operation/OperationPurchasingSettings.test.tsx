@@ -24,6 +24,9 @@ const setSupplierCollection = vi.fn();
 const setPoWindows = vi.fn();
 const setCutoff = vi.fn();
 const setAddress = vi.fn();
+const setChannel = vi.fn();
+const setPriority = vi.fn();
+const setRequestSettings = vi.fn();
 
 function mutation(mutateAsync: ReturnType<typeof vi.fn>) {
   return { mutateAsync, isPending: false, isError: false, error: null };
@@ -35,6 +38,7 @@ vi.mock("@/lib/queries", async () => {
     ...actual,
     usePurchasingSettings: () => settingsQuery(),
     useSetPurchasingNumber: () => mutation(setNumber),
+    useSetPurchaseRequestSettings: () => mutation(setRequestSettings),
     useSetPurchasingPoDays: () => mutation(setPoDays),
     useSetProductionDays: () => mutation(setProduction),
     useSetSupplierWorkWeek: () => mutation(setWorkWeek),
@@ -44,6 +48,8 @@ vi.mock("@/lib/queries", async () => {
     useSetPurchasingPoWindows: () => mutation(setPoWindows),
     useSetSupplierPoCutoff: () => mutation(setCutoff),
     useSetSupplierAddress: () => mutation(setAddress),
+    useSetSupplierChannel: () => mutation(setChannel),
+    useSetReadyStockPriority: () => mutation(setPriority),
   };
 });
 
@@ -70,8 +76,8 @@ function settings(over: Partial<PurchasingSettingsResponse> = {}): PurchasingSet
     poWindows: { first: "11:30", second: "16:00", secondEnabled: true },
     manualPurchaseMinDeliveryDays: 0,
     suppliers: [
-      { id: NICE, name: "Nice Future", categories: ["mattress"], offDays: [0, 6], transitDays: 1 },
-      { id: OHANA, name: "Ohana", categories: ["bedframe", "sofa"], offDays: [0], transitDays: 1 },
+      { id: NICE, name: "Nice Future", categories: ["mattress"], offDays: [0, 6] },
+      { id: OHANA, name: "Ohana", categories: ["bedframe", "sofa"], offDays: [0] },
     ],
     productionDays: [
       { supplierId: NICE, category: "mattress", workingDays: 7 },
@@ -138,6 +144,30 @@ beforeEach(() => {
   createDestination.mockResolvedValue(settings());
   updateDestination.mockResolvedValue(settings());
   setSupplierCollection.mockResolvedValue(settings());
+});
+
+describe("Purchasing Ready Stock priority", () => {
+  it("keeps the chosen priority after a refused save and retries the same value", async () => {
+    settingsQuery.mockReturnValue({ data: settings({ readyStockPriority: "customer_delivery" }), isLoading: false, error: null });
+    setPriority.mockRejectedValueOnce(new Error("refused")).mockResolvedValueOnce(settings({ readyStockPriority: "proceed_date" }));
+    render(wrap(<OperationPurchasingSettings />));
+    const section = within(screen.getByTestId("ready-stock-priority-settings"));
+    fireEvent.click(section.getByRole("combobox", { name: "Priority" }));
+    fireEvent.click(screen.getByRole("option", { name: "Proceed Date" }));
+    fireEvent.click(section.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(section.getByRole("alert")).toHaveTextContent("Not confirmed"));
+    expect(section.getByRole("combobox")).toHaveTextContent("Proceed Date");
+    fireEvent.click(section.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(setPriority).toHaveBeenCalledTimes(2));
+    expect(setPriority.mock.calls.map(call => call[0])).toEqual([{ priority: "proceed_date" }, { priority: "proceed_date" }]);
+  });
+  it("does not offer a writable priority when the source is unavailable", () => {
+    settingsQuery.mockReturnValue({ data: settings({ readyStockPriority: null }), isLoading: false, error: null });
+    render(wrap(<OperationPurchasingSettings />));
+    const section = within(screen.getByTestId("ready-stock-priority-settings"));
+    expect(section.getByRole("combobox")).toBeDisabled();
+    expect(section.getByRole("button", { name: "Save" })).toBeDisabled();
+  });
 });
 
 describe("Purchasing → Settings", () => {
@@ -533,8 +563,8 @@ describe("Last PO time for one supplier", () => {
     settingsQuery.mockReturnValue({
       data: settings({
         suppliers: [
-          { id: NICE, name: "Nice Future", categories: ["mattress"], offDays: [0, 6], transitDays: 1, poCutoff: "10:00" },
-          { id: OHANA, name: "Ohana", categories: ["sofa"], offDays: [0], transitDays: 1, poCutoff: null },
+          { id: NICE, name: "Nice Future", categories: ["mattress"], offDays: [0, 6], poCutoff: "10:00" },
+          { id: OHANA, name: "Ohana", categories: ["sofa"], offDays: [0], poCutoff: null },
         ],
       }),
       isLoading: false,
@@ -554,7 +584,7 @@ describe("Last PO time for one supplier", () => {
   it("clears a time back to the PO windows, and refuses one that is not earlier than the last window", async () => {
     settingsQuery.mockReturnValue({
       data: settings({
-        suppliers: [{ id: NICE, name: "Nice Future", categories: ["mattress"], offDays: [0, 6], transitDays: 1, poCutoff: "10:00" }],
+        suppliers: [{ id: NICE, name: "Nice Future", categories: ["mattress"], offDays: [0, 6], poCutoff: "10:00" }],
       }),
       isLoading: false,
       error: null,
@@ -629,7 +659,7 @@ describe("Supplier addresses (0611, Purchasing §9.6 Return To)", () => {
     settingsQuery.mockReturnValue({
       data: settings({
         suppliers: [
-          { id: OHANA, name: "Ohana", categories: ["bedframe"], offDays: [0], transitDays: 1, address: "Ohana HQ, Klang", returnAddress: null },
+          { id: OHANA, name: "Ohana", categories: ["bedframe"], offDays: [0], address: "Ohana HQ, Klang", returnAddress: null },
         ],
       }),
       isLoading: false,
@@ -640,6 +670,8 @@ describe("Supplier addresses (0611, Purchasing §9.6 Return To)", () => {
     expect(within(row).getByLabelText("Address")).toHaveValue("Ohana HQ, Klang");
     /* A blank Return address stays blank: the Address is never offered in its place. */
     expect(within(row).getByLabelText("Return address")).toHaveValue("");
+    /* Owner ruling 2026-09-29: one address; a blank Return address means the Address. */
+    expect(within(row).getByLabelText("Return address")).toHaveAttribute("placeholder", "Same as Address");
     expect(screen.getByTestId(`supplier-returnAddress-save-${OHANA}`)).toBeDisabled();
     fireEvent.change(within(row).getByLabelText("Return address"), { target: { value: "Ohana returns bay, Klang" } });
     fireEvent.click(screen.getByTestId(`supplier-returnAddress-save-${OHANA}`));
@@ -651,7 +683,7 @@ describe("Supplier addresses (0611, Purchasing §9.6 Return To)", () => {
     settingsQuery.mockReturnValue({
       data: settings({
         canEdit: false,
-        suppliers: [{ id: OHANA, name: "Ohana", categories: ["bedframe"], offDays: [0], transitDays: 1, address: null, returnAddress: "Returns bay" }],
+        suppliers: [{ id: OHANA, name: "Ohana", categories: ["bedframe"], offDays: [0], address: null, returnAddress: "Returns bay" }],
       }),
       isLoading: false,
       error: null,
@@ -660,5 +692,54 @@ describe("Supplier addresses (0611, Purchasing §9.6 Return To)", () => {
     const row = screen.getByTestId(`address-row-${OHANA}`);
     expect(within(row).getByLabelText("Return address")).toBeDisabled();
     expect(screen.queryByTestId(`supplier-address-save-${OHANA}`)).not.toBeInTheDocument();
+  });
+});
+
+describe("Supplier channels", () => {
+  it("saves an email independently of the WhatsApp group", async () => {
+    setChannel.mockReset().mockResolvedValue({});
+    settingsQuery.mockReturnValue({ data: settings({ suppliers: [{ id: OHANA, name: "Ohana", categories: ["bedframe"], offDays: [0], contactEmail: null, whatsappGroupUrl: "https://chat.whatsapp.com/AbC" }] }), isLoading: false, error: null });
+    render(wrap(<OperationPurchasingSettings />));
+    const section = screen.getByTestId("supplier-channel-settings");
+    const email = within(section).getByLabelText("Email");
+    fireEvent.change(email, { target: { value: "orders@example.com" } });
+    fireEvent.submit(email.closest("form")!);
+    await waitFor(() => expect(setChannel).toHaveBeenCalledWith({ supplierId: OHANA, kind: "contactEmail", text: "orders@example.com" }));
+    expect(within(section).getByLabelText("WhatsApp group")).toHaveValue("https://chat.whatsapp.com/AbC");
+  });
+  it("does not offer saving to a viewer", () => {
+    settingsQuery.mockReturnValue({ data: settings({ canEdit: false }), isLoading: false, error: null });
+    render(wrap(<OperationPurchasingSettings />));
+    const section = screen.getByTestId("supplier-channel-settings");
+    expect(within(section).queryByRole("button", { name: "Save" })).toBeNull();
+    for (const input of within(section).getAllByRole("textbox")) expect(input).toBeDisabled();
+  });
+});
+
+
+describe("purchase request Settings · guarded adoption", () => {
+  it("keeps all three edited values after a refusal and retries the same facts", async () => {
+    settingsQuery.mockReturnValue({ data: settings({ requestSettings: { normalDays: 30, serviceDays: 14, manualWhatsappScreenshotRequired: true } }), isLoading: false, error: null });
+    setRequestSettings.mockRejectedValueOnce(new Error("refused")).mockResolvedValueOnce(settings());
+    render(wrap(<OperationPurchasingSettings />));
+    const section = within(screen.getByTestId("purchase-request-settings"));
+    fireEvent.change(section.getByRole("spinbutton", { name: "Normal / Ready Stock" }), { target: { value: "31" } });
+    fireEvent.change(section.getByRole("spinbutton", { name: "Service Case" }), { target: { value: "15" } });
+    fireEvent.click(section.getByRole("combobox", { name: "Manual WhatsApp screenshot" }));
+    fireEvent.click(screen.getByRole("option", { name: /^Inactive$/ }));
+    fireEvent.click(section.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(section.getByRole("alert")).toHaveTextContent("Not confirmed"));
+    expect(section.getByRole("spinbutton", { name: "Normal / Ready Stock" })).toHaveValue(31);
+    expect(section.getByRole("spinbutton", { name: "Service Case" })).toHaveValue(15);
+    expect(section.getByRole("combobox")).toHaveTextContent("Inactive");
+    fireEvent.click(section.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(setRequestSettings).toHaveBeenCalledTimes(2));
+    expect(setRequestSettings.mock.calls.map((call) => call[0])).toEqual(Array(2).fill({ normalDays: 31, serviceDays: 15, manualWhatsappScreenshotRequired: false }));
+  });
+  it("offers no Save when these Settings could not be read", () => {
+    render(wrap(<OperationPurchasingSettings />));
+    const section = within(screen.getByTestId("purchase-request-settings"));
+    expect(section.getByText("Not available")).toBeVisible();
+    expect(section.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
   });
 });

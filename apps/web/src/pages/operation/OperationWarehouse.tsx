@@ -222,7 +222,7 @@ export default function OperationWarehouse({
     return (
       <div className="px-9 py-8 pb-14">
         <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-body">
-          <div className="text-destructive font-semibold mb-2">
+          <div className="text-destructive font-medium mb-2">
             Couldn&rsquo;t load warehouse
           </div>
           <div className="text-meta text-base-700 mb-3">
@@ -231,7 +231,7 @@ export default function OperationWarehouse({
           <button
             type="button"
             onClick={() => void warehouseQ.refetch()}
-            className="btn-secondary text-label py-1.5 px-3"
+            className="btn-secondary text-body font-medium py-1.5 px-3"
           >
             Retry
           </button>
@@ -247,13 +247,13 @@ export default function OperationWarehouse({
       {/* Header */}
       <div className="flex justify-between items-start mb-[22px] gap-4">
         <div>
-          <div className="kicker">Warehouse</div>
+          <div className="text-label uppercase tracking-[0.06em] text-primary">Warehouse</div>
           <h1 className="text-page font-display mt-1.5 text-base-900">
             Stock balance
           </h1>
           <div className="font-body text-body text-base-600 mt-1 max-w-[680px]">
             Auto-deducted on delivery, auto-incremented when supplier DO is
-            received. Use <strong>Adjust</strong> for damage / loss / one-off
+            received. Use <strong className="font-medium">Adjust</strong> for damage / loss / one-off
             corrections. Every change writes to the movement log.
           </div>
         </div>
@@ -268,7 +268,7 @@ export default function OperationWarehouse({
           />
           <button
             type="button"
-            className="btn-secondary text-meta py-2 px-3 whitespace-nowrap"
+            className="btn-secondary text-body font-medium py-2 px-3 whitespace-nowrap"
             onClick={() => {
               // Prefer the prefilled jump (scopes to this warehouse) when the
               // shell wired it; fall back to plain tab switch otherwise so
@@ -314,7 +314,7 @@ export default function OperationWarehouse({
               <div className="font-ui text-body font-semibold text-base-900">
                 {t.warehouse.name}
               </div>
-              <div className="font-body text-label text-base-500 mt-0.5">
+              <div className="font-body text-meta text-base-500 mt-0.5">
                 {t.warehouse.address ?? ""}
               </div>
               <div className="flex gap-[22px] mt-3">
@@ -322,13 +322,7 @@ export default function OperationWarehouse({
                   <div className="font-mono text-page font-semibold leading-none text-base-900">
                     {t.units}
                   </div>
-                  <div
-                    className="font-body text-label text-base-500 mt-0.5"
-                    style={{
-                      textTransform: "uppercase",
-                      letterSpacing: "0.1em",
-                    }}
-                  >
+                  <div className="font-body text-label uppercase tracking-[0.06em] text-base-500 mt-0.5">
                     units
                   </div>
                 </div>
@@ -336,13 +330,7 @@ export default function OperationWarehouse({
                   <div className="font-mono text-page font-semibold leading-none text-base-900">
                     {t.skuCount}
                   </div>
-                  <div
-                    className="font-body text-label text-base-500 mt-0.5"
-                    style={{
-                      textTransform: "uppercase",
-                      letterSpacing: "0.1em",
-                    }}
-                  >
+                  <div className="font-body text-label uppercase tracking-[0.06em] text-base-500 mt-0.5">
                     SKUs
                   </div>
                 </div>
@@ -376,7 +364,7 @@ export default function OperationWarehouse({
               className={[
                 "px-3.5 py-2 rounded-[4px] text-meta transition-colors border flex gap-2 items-center",
                 active
-                  ? "bg-base-900 text-white border-base-900 font-semibold"
+                  ? "bg-base-900 text-white border-base-900 font-medium"
                   : "bg-white text-base-700 border-base-200 font-medium hover:border-base-400",
               ].join(" ")}
             >
@@ -400,7 +388,7 @@ export default function OperationWarehouse({
           className={[
             "px-3.5 py-2 rounded-[4px] text-meta transition-colors border flex gap-2 items-center",
             activeCat === "alerts"
-              ? "bg-base-900 text-white border-base-900 font-semibold"
+              ? "bg-base-900 text-white border-base-900 font-medium"
               : "bg-white text-danger border-danger font-medium hover:bg-base-50",
           ].join(" ")}
         >
@@ -419,7 +407,7 @@ export default function OperationWarehouse({
           className={[
             "px-3.5 py-2 rounded-[4px] text-meta transition-colors border flex gap-2 items-center",
             activeCat === "reserved"
-              ? "bg-base-900 text-white border-base-900 font-semibold"
+              ? "bg-base-900 text-white border-base-900 font-medium"
               : "bg-white text-warning border-warning font-medium hover:bg-warning-soft",
           ].join(" ")}
         >
@@ -437,10 +425,10 @@ export default function OperationWarehouse({
               gridTemplateColumns: "minmax(0,2.4fr) 150px 150px 120px",
             }}
           >
-            <div className="label">Product</div>
-            <div className="label text-right">Reserved here</div>
-            <div className="label text-right">All warehouses</div>
-            <div className="label text-right" />
+            <div className="text-meta font-medium text-base-700">Product</div>
+            <div className="text-meta font-medium text-base-700 text-right">Reserved here</div>
+            <div className="text-meta font-medium text-base-700 text-right">All warehouses</div>
+            <div className="text-meta font-medium text-base-700 text-right" />
           </div>
           {!activeWarehouse ? (
             <div className="p-9 text-center text-base-500 text-body">
@@ -479,7 +467,7 @@ export default function OperationWarehouse({
                       {friendly}
                     </div>
                   </div>
-                  <div className="font-mono text-body text-right font-semibold">
+                  <div className="font-mono text-body text-right font-medium">
                     {row.reserved}
                   </div>
                   <div className="font-mono text-body text-right text-base-600">
@@ -488,7 +476,7 @@ export default function OperationWarehouse({
                   <div className="text-right">
                     <button
                       type="button"
-                      className="btn-secondary text-label py-1 px-2.5"
+                      className="btn-secondary text-body font-medium py-1 px-2.5"
                       onClick={() =>
                         setDrilldownTarget({
                           sku: row.sku,
@@ -519,11 +507,11 @@ export default function OperationWarehouse({
               gridTemplateColumns: "minmax(0,2.6fr) 120px 120px 96px 200px",
             }}
           >
-            <div className="label">Product</div>
-            <div className="label text-right">This warehouse</div>
-            <div className="label text-right">All warehouses</div>
-            <div className="label text-right">Status</div>
-            <div className="label text-right" />
+            <div className="text-meta font-medium text-base-700">Product</div>
+            <div className="text-meta font-medium text-base-700 text-right">This warehouse</div>
+            <div className="text-meta font-medium text-base-700 text-right">All warehouses</div>
+            <div className="text-meta font-medium text-base-700 text-right">Status</div>
+            <div className="text-meta font-medium text-base-700 text-right" />
           </div>
 
           {!activeWarehouse ? (
@@ -581,7 +569,7 @@ export default function OperationWarehouse({
                           {friendly}
                         </span>
                         <span
-                          className="block text-label text-base-400 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="block text-meta text-base-400 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                           aria-hidden="true"
                         >
                           view log →
@@ -591,7 +579,7 @@ export default function OperationWarehouse({
                       <div className="font-body text-body truncate">{friendly}</div>
                     )}
                   </div>
-                  <div className="font-mono text-body text-right font-semibold">
+                  <div className="font-mono text-body text-right font-medium">
                     {row.qty}
                   </div>
                   <div className="font-mono text-body text-right text-base-600">
@@ -599,7 +587,7 @@ export default function OperationWarehouse({
                   </div>
                   <div className="text-right">
                     <span
-                      className={`pill ${STATUS_PILL[aggStatus]}`}
+                      className={`pill text-meta font-medium ${STATUS_PILL[aggStatus]}`}
                       data-testid={`warehouse-badge-${row.sku}`}
                     >
                       {statusLabel(aggStatus)}
@@ -611,7 +599,7 @@ export default function OperationWarehouse({
                         renders empty inputs only when both are NULL). */}
                     <button
                       type="button"
-                      className="btn-secondary text-label py-1 px-2.5"
+                      className="btn-secondary text-body font-medium py-1 px-2.5"
                       onClick={() =>
                         setThresholdTarget({
                           sku: row.sku,

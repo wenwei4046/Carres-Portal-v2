@@ -226,7 +226,7 @@ describe("the receiving records", () => {
     mockData();
     render(wrap(<OperationReceivingReport />));
     expect(receiptsQuery).toHaveBeenCalledWith("all");
-    expect(screen.getByText("GRN-20260812-4417")).toBeTruthy();
+    expect(screen.getByText("GRN-260812-4417")).toBeTruthy();
     expect(screen.getByTestId("receiving-report-session-s1")).toHaveAttribute(
       "href",
       "/operation?tab=receiving&session=s1",
@@ -251,7 +251,7 @@ describe("the receiving records", () => {
       .closest("tr") as HTMLElement;
     expect(within(row).getByText("Cancelled")).toBeTruthy();
     // History never deletes — the voided GRN number still prints.
-    expect(within(row).getByText("GRN-20260810-9001")).toBeTruthy();
+    expect(within(row).getByText("GRN-260810-9001")).toBeTruthy();
   });
 
   it("a draft is not a receiving record, and the page says so", () => {
@@ -288,11 +288,11 @@ describe("the totals line and the month filter", () => {
     render(wrap(<OperationReceivingReport />));
     const select = screen.getByTestId("receiving-report-month") as HTMLSelectElement;
     expect([...select.options].map((o) => o.value)).toEqual(["2026-08", "2026-07"]);
-    expect(screen.queryByText("GRN-20260705-1111")).toBeNull();
+    expect(screen.queryByText("GRN-260705-1111")).toBeNull();
 
     fireEvent.change(select, { target: { value: "2026-07" } });
-    expect(screen.getByText("GRN-20260705-1111")).toBeTruthy();
-    expect(screen.queryByText("GRN-20260812-4417")).toBeNull();
+    expect(screen.getByText("GRN-260705-1111")).toBeTruthy();
+    expect(screen.queryByText("GRN-260812-4417")).toBeNull();
     expect(screen.getByTestId("receiving-report-totals").textContent).toBe(
       "1 receiving record · 3 received · 0 damaged · 0 wrong item · 0 extra",
     );

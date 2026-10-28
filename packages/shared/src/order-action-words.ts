@@ -684,11 +684,10 @@ export function checkedInDone(received: number, ordered: number): string {
  *
  * ⭐ THE VERB NAMES ARRIVAL, NOT SHIPPING (owner ruling 2026-09-10). The date
  * these answers carry is `purchase_orders.eta_date` — OUR predicted ARRIVAL,
- * `expectedArrivalOf`'s production-plus-transit result — and the call that
- * asks the question is anchored on that same field. The retired spelling
- * (`It ships on {date}`) put a shipping verb on an arrival date, which is the
- * one reading that makes somebody add the transit leg a second time and move
- * the arrival twice. A supplier answer that genuinely names a FACTORY-ready
+ * `expectedArrivalOf`'s production-days result (the supplier transit leg was
+ * removed by owner ruling 2026-09-29) — and the call that asks the question
+ * is anchored on that same field. The retired spelling (`It ships on {date}`)
+ * put a shipping verb on an arrival date. A supplier answer that genuinely names a FACTORY-ready
  * or dispatch day is a different fact with its own door (`Confirm ready
  * date` → `expected_ready_date`), and it becomes an arrival only by going
  * through `arrivalFromReadyDate`.

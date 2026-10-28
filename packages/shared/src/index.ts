@@ -1,6 +1,7 @@
 export const SHARED_VERSION = "0.0.0" as const;
 
 export * from "./issue-tracker";
+export * from "./internal-task";
 export * from "./unit-problem";
 export * from "./supplier-return-pickup";
 export * from "./repair-order";
@@ -53,6 +54,7 @@ export {
 export {
   MONTHLY_DEMAND_CATEGORIES,
   monthlyDemandOf,
+  monthlyDemandCategoryOf,
   monthlyDemandWindowOf,
   type MonthlyDemandCategory,
   type MonthlyDemandFilters,
@@ -60,6 +62,9 @@ export {
   type MonthlyDemandRow,
   type MonthlyDemandView,
 } from "./monthly-demand";
+export * from "./forecast-purchase";
+export * from "./purchase-request-context";
+export * from "./service-case-remedy";
 export { readFailureWords, type ReadFailureSurface, type ReadFailureWords } from "./read-failure";
 export { routeGoodsLinesOf, type RouteGoodsFacts, type RouteGoodsLine, type RouteGoodsSource } from "./sales-order-route-goods";
 export { routeDeliveryScopesOf, type RouteScopeFacts } from "./sales-order-route-scopes";
@@ -102,7 +107,6 @@ export {
   isPurchasingCategory,
   isPurchasingNumberKey,
   productionWorkingDaysFor,
-  transitDaysFor,
   workWeekOffDaysFor,
   purchasingUrgentWindowDays,
   unratedPairs,
@@ -117,17 +121,18 @@ export {
   purchasingUpdateDestinationInput,
   purchasingSetSupplierCollectionInput,
   purchasingSetNumberInput,
+  purchasingSetRequestSettingsInput,
   purchasingSetPoDaysInput,
+  purchasingSetReadyStockPriorityInput,
   purchasingSetPoWindowsInput,
   purchasingSetSupplierPoCutoffInput,
   clockWordOf,
   poWindowsHistoryLabel,
   purchasingSetProductionDaysInput,
-  purchasingSetTransitDaysInput,
   purchasingSetSupplierTermsDaysInput,
   purchasingSetSupplierAddressInput,
+  purchasingSetSupplierChannelInput,
   SUPPLIER_ADDRESS_MAX,
-  TRANSIT_DAYS_RANGE,
   purchasingSetWorkWeekInput,
   type PurchasingCategory,
   type PurchasingNumberKey,
@@ -143,13 +148,14 @@ export {
   type PurchasingUpdateDestinationInput,
   type PurchasingSetSupplierCollectionInput,
   type PurchasingSetNumberInput,
+  type PurchasingSetRequestSettingsInput,
   type PurchasingSetPoDaysInput,
   type PurchasingSetPoWindowsInput,
   type PurchasingSetSupplierPoCutoffInput,
   type PurchasingSetProductionDaysInput,
-  type PurchasingSetTransitDaysInput,
   type PurchasingSetSupplierTermsDaysInput,
   type PurchasingSetSupplierAddressInput,
+  type PurchasingSetSupplierChannelInput,
   type PurchasingSetWorkWeekInput,
 } from "./purchasing-settings";
 
@@ -267,6 +273,7 @@ export {
   productCategorySchema,
   variantKindSchema,
   productModelCreateInput,
+  productModelCreateBody,
   productModelPatchInput,
   productSkuCreateInput,
   productSkuPatchInput,
@@ -313,6 +320,7 @@ export {
   type ProductCategory,
   type VariantKind,
   type ProductModelCreateInput,
+  type ProductModelCreateBody,
   type ProductModelPatchInput,
   type ProductSkuCreateInput,
   type ProductSkuPatchInput,
@@ -365,6 +373,7 @@ export {
   // 0202 — global fabric master schemas + input/Dto types.
   fabricTierValueSchema,
   catalogFabricSchema,
+  FABRIC_STOCK_KEYS,
   catalogFabricEntryInput,
   catalogFabricsBatchSaveInput,
   catalogFabricCostInput,
@@ -533,10 +542,10 @@ export {
   recordReadyDateInput,
   recordSendInput,
   confirmPoSentInput,
+  supplierPoEmailInput,
   // PO Revisions (0364) — a sent PO keeps its number and mints a version.
   revisePoInput,
   setMessageTemplateInput,
-  setLineDestinationInput,
   setLineOpsRemarkInput,
   changePoDeliverToInput,
   recordBalanceDateInput,
@@ -557,6 +566,8 @@ export {
   ListOperationOrdersQuery,
   listPurchaseOrdersQuery,
   cancelPoInput,
+  decidePoChangeInput,
+  withdrawPoChangeInput,
   listMovementsQuery,
   confirmProceedRequestInputSchema,
   reselectPartnerInput,
@@ -644,6 +655,15 @@ export {
   ledgerAccountCode, ledgerSourceType, ledgerEntriesQuery, ledgerEntryRef,
   ledgerAsOfQuery, ledgerPeriodQuery, ledgerAccountLedgerQuery, ledgerAccountUpdateInput, ledgerAccountReorderInput,
   ledgerAccountCodeShape, LEDGER_ACCOUNT_CODE_MESSAGE, ledgerAccountCodeInput, ledgerAccountMoveInput, ledgerAccountAddInput,
+  ledgerBooksClosedInput, type LedgerBooksClosed,
+  ledgerChartImportInput, type LedgerChartImportInput, type LedgerChartImportRow, type LedgerChartImportResult,
+  ledgerAccountEditInput, type LedgerAccountEditInput, ledgerAccountAddInSectionInput, type LedgerAccountAddInSectionInput,
+  ledgerAccountActiveInput, type LedgerAccountActiveInput,
+  ledgerPostingAccountSetInput, type LedgerPostingAccountSetInput, type LedgerIncomePosting, type LedgerRolePosting,
+  type LedgerPostingChange, type LedgerPostingAccounts, type LedgerPaymentPostingChanged,
+  ledgerItemGroupSaveInput, type LedgerItemGroupSaveInput, ledgerItemGroupPlaceInput, type LedgerItemGroupPlaceInput,
+  type LedgerItemGroup, type LedgerItemGroupProduct, type LedgerItemGroupUnboundSale, type LedgerItemGroupChange,
+  type LedgerItemGroups,
   type LedgerAccountReorderInput, type LedgerAccountMoveInput, type LedgerAccountAddInput,
   type LedgerEntriesQuery, type LedgerAsOfQuery, type LedgerPeriodQuery, type LedgerAccountLedgerQuery,
 } from "./schemas/finance";
@@ -832,6 +852,12 @@ export {
   serviceCaseListResponseSchema,
   createServiceCaseInputSchema,
   updateServiceCaseInputSchema,
+  mayPickCaseOwner,
+  SERVICE_PICK_LISTS,
+  type ServicePickList,
+  serviceSettingsPatchSchema,
+  servicePickItemCreateSchema,
+  servicePickItemPatchSchema,
   caseLookupLineSchema,
   caseLookupOrderSchema,
   caseLookupResponseSchema,
@@ -1010,6 +1036,8 @@ export {
 // `Confirm balance delivery date` (per PO LINE). Pure; names its calendar.
 export {
   PURCHASING_OFFICE_OFF_DAYS,
+  purchasingOfficeDays,
+  type PurchasingOfficeDays,
   balanceDeliveryCallsOf,
   callCalendarBucketOf,
   purchasingCallCalendarDays,
@@ -1117,6 +1145,7 @@ export {
   deliveryStepDueIso,
   deliveryStepOverdue,
   deliveryQueueLeads,
+  assignLogisticsDueIso,
   type DeliveryQueueLeads,
   type DeliveryQueueDef,
   type DeliveryQueueKey,
@@ -1427,6 +1456,13 @@ export {
 // 2026-08-15) and a caller prints the actual weekday + date through `fmtDate`.
 export {
   bookingDayOf,
+  scheduledDeliveryOf,
+  customerLegDeliveryOf,
+  assignedLogisticsIdOf,
+  type CustomerLegArrangementRead,
+  type CustomerLegDocumentRead,
+  type ScheduledDelivery,
+  type ScheduledDeliveryRead,
   carrierDayLoads,
   carrierDayNote,
   daysInRange,
@@ -2124,9 +2160,18 @@ export {
 // own goods + money answers so the two surfaces cannot disagree.
 export {
   deliveryOrderIssueGate,
+  deliveryMoneyHolds,
   type DeliveryOrderIssueInput,
   type DeliveryOrderIssueResult,
 } from "./delivery-order";
+// New Delivery Order (Weisiang's decision, 2026-10-22): what an office DO may still carry.
+export {
+  deliveryOrderOffer,
+  deliveryOrderScopeOf,
+  type DeliveryOrderOffer,
+  type DeliveryOrderOfferDoc,
+  type DeliveryOrderScope,
+} from "./delivery-order-offer";
 // The DO DOCUMENT status — ONE arithmetic over the void stamp (0356) + the
 // attempt history (0344); nothing stored (blueprint card 2026-08-16).
 export {
@@ -2140,15 +2185,21 @@ export {
 } from "./delivery-order-status";
 // DELIVERY WORK's own status ladder — the OPERATION's progress, deliberately a
 // different vocabulary from the document's (owner correction 2026-08-24).
-// `Created` belongs to the Register and may never appear on the workspace.
+// ONE status function and ONE label function print every surface (Delivery
+// MASTER §8.4, owner ruling 2026-09-25).
 export {
   deliveryWorkStatusOf,
   deliveryJourneyProgressOf,
-  deliveryJourneyProgressFromStatus,
   deliveryWorkStatusLabelOf,
+  askForResultLine,
+  deliveryResultRecorded,
+  deliveryFailed,
+  deliveryGoodsMoved,
   DELIVERY_WORK_STATUS_KINDS,
   DELIVERY_WORK_STATUS_TONE,
   LOGISTICS_ROLE_WORD,
+  TRANSFER_STOP_ROLE_WORD,
+  type DeliveryStatusWords,
   type DeliveryWorkStatus,
   type DeliveryWorkStatusKind,
   type DeliveryWorkStatusInput,
@@ -2424,6 +2475,7 @@ export {
   purchaseDemandStateWords,
   purchaseDemandRailWords,
   purchaseDemandBlockerOf,
+  catalogCostBlocksIssue,
   purchaseDemandTimingOf,
   purchaseDemandSafetyDaysLeft,
   purchaseDemandQuantities,
@@ -2470,6 +2522,7 @@ export {
   soBatchCellSummary,
   soBatchOrderSelection,
   soBatchOrderPlanning,
+  soBatchPurchaseStatus,
   soBatchOrderUnselectableReason,
   soBatchOrderStatusWhy,
   soBatchLeafStatusWhy,
@@ -2488,6 +2541,8 @@ export {
   compareSoBatchPlanning,
   type SoBatchRegisterGroup,
   soBatchPurchaseResponseSchema,
+  SO_BATCH_PANEL_WORDS,
+  SO_BATCH_TASK_WORDS,
   type SoBatchOrderStatus,
   type SoBatchOrderPoFact,
   type SoBatchOrderLineFact,
@@ -3211,6 +3266,7 @@ export * from "./booking-brief";
 // CARD 4 — the collection clock: T−3 · T−2 · T−1 (final deadline) on working
 // days before the delivery, one arithmetic for every surface that presses.
 export * from "./collection-clock";
+export * from "./outstation";
 // DELIVERY MONITOR (2026-09-11) — when the goods reach us, as a delivery
 // surface must read it: the recorded purchase-order dates, the latest supplier
 // reply, the exact per-line shortage, and ONE arrival state over them. It
@@ -3262,6 +3318,10 @@ export * from "./payment-duplicate";
 export * from "./purchase-order-register";
 
 export { recordArrivalConfirmationInput, recordSupplierAnswersInput, recordSupplierReplyInput } from "./schemas/operation";
+export { newPurchaseOrderInput } from "./schemas/operation";
+export type { NewPurchaseOrderInput } from "./schemas/operation";
+export { officeReceiveWithoutPoInput } from "./schemas/operation";
+export type { OfficeReceiveWithoutPoInput } from "./schemas/operation";
 export type { RecordSupplierAnswersInput } from "./schemas/operation";
 
 export {
@@ -3335,3 +3395,95 @@ export * from "./supplier-card";
 export * from "./mission-route";
 
 export * from "./sales-order-register-filters";
+
+export {
+  workspaceActivitySettingsSchema,
+  workspaceActivitySettingsInput,
+  workspaceActivitySettingsResponseSchema,
+  type WorkspaceActivitySettingsResponse,
+  INITIAL_WORKSPACE_ACTIVITY_SETTINGS,
+  workspaceActivityOfficeHoursSchema,
+  type WorkspaceActivityOfficeHours,
+  workspaceActivityTimesFit,
+  workspaceActivityWindowSchema,
+  type WorkspaceActivityWindow,
+  workspaceStaffLunchSchema,
+  type WorkspaceStaffLunch,
+  workspaceStaffLunchInput,
+  type WorkspaceStaffLunchInput,
+  type WorkspaceActivitySettings,
+  TEAM_ONLINE_MINUTES,
+  teamMemberStateSchema,
+  type TeamMemberState,
+  teamTodayMemberSchema,
+  type TeamTodayMember,
+  teamTodayResponseSchema,
+  type TeamTodayResponse,
+  teamMemberState,
+} from "./workspace-activity";
+
+export { evaluateWorkspaceActivityCheck, type WorkspaceActivityEvidence, type WorkspaceActivityCheck } from "./workspace-activity-check";
+export type { OutrightOrderFacts, OutrightFactsFailed } from "./outright-order-facts";
+export {
+  DEFAULT_OFFICE_CALENDAR,
+  BUILT_IN_HOLIDAY_YEARS,
+  officeCalendarOf,
+  officeOffDays,
+  officeWorkingDayOptions,
+  officeOwnerCalendar,
+  personOwnerCalendar,
+  personWorkDaysOf,
+  officeHolidayName,
+  type OfficeCalendar,
+  type OfficeHoliday,
+} from "./office-calendar";
+export * from "./delivery-working-calendar";
+export {
+  SETTINGS_EDITOR_SECTIONS,
+  COMPANY_PROFILE_FIELDS,
+  VERIFIED_COMPANY_PROFILE,
+  companyAddressLines,
+  companyProfileValuesSchema,
+  companyProfileSaveInput,
+  companyProfileResponseSchema,
+  officeCalendarValuesSchema,
+  officeCalendarSaveInput,
+  officeHolidaysSaveInput,
+  officeCalendarResponseSchema,
+  settingsChangeSchema,
+  settingsEditorGrantInput,
+  settingsEditorsResponseSchema,
+  type SettingsEditorSection,
+  type CompanyProfileField,
+  type CompanyProfileValues,
+  type CompanyProfileSaveInput,
+  type CompanyProfileResponse,
+  type OfficeCalendarValues,
+  type OfficeHolidaysSaveInput,
+  type OfficeCalendarResponse,
+  type SettingsChange,
+  type SettingsEditorsResponse,
+} from "./settings-core";
+
+export { decideWorkspaceReassignment, type WorkspaceCheckpointIdentity, type WorkspaceReassignmentDecision } from "./workspace-reassignment";
+
+export { documentDisplayNumber } from "./document-display";
+
+export { dateMatchesPreset, matchesRegisterColumnFilters } from "./register-column-query";
+export type { DatePreset, RegisterColumnQuery, RegisterColumnFact } from "./register-column-query";
+export * from "./courier-dispatch";
+
+export { purchaseRequestReleaseSchema, type PurchaseRequestRelease } from "./purchase-request-context";
+
+export * from "./po-send-evidence";
+
+// Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): Houzs-way Stock Card and
+// Loading List, counted from Units. Jess was not part of this decision.
+export {
+  stockCardLines,
+  loadingListRows,
+  type StockCardUnit,
+  type StockCardEvent,
+  type StockCardLine,
+  type LoadingListRow,
+} from "./warehouse-houzs-views";

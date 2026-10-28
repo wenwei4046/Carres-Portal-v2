@@ -15,18 +15,19 @@
  * other models already gave — the Logistics card's `2 working days before`
  * check (Contact), `supplierCardModel` (PO · GRN), the Sales Order's loan
  * offer (`loanOfferStateOf`) and loan Unit, and Payment's one deadline
- * (`paymentDeadlineOf`). It stores nothing and writes nothing. Each point is a
+ * (`paymentDeadlineOf`, over the stored Collection timing and the Office
+ * holidays). It stores nothing and writes nothing. Each point is a
  * keyboard button that opens ONE compact detail row with its owner's door.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   MISSION_ROUTE_COPY as R,
+  isOutstation,
   loanOfferStateOf,
   missionRouteModel,
   moneyAffectsDelivery,
   mytDayOf,
-  myHolidaySet,
   paymentDeadlineOf,
   type MissionRoutePoint,
   type RoutePointKey,
@@ -75,11 +76,14 @@ export function useMissionRoute(orderId: string) {
        without it (PO · GRN `Unavailable`), never a wiped line. */
     if (!supplier && !factsQ.isError) return null;
     const today = appTodayIso();
-    const holidays = myHolidaySet();
+    /* Payment's own clock (Law D): the stored Collection timing for this
+       order; the deadline is a FACT on the Delivery calendar. */
+    const holidays = lm.deliveryDays.holidays;
+    const timing = lm.collectionTiming;
     const money = moneyOfOrder(o);
     const owed = money.known ? money.outstanding : 0;
     const anchor = card.confirmedDate ?? card.scope.customerDeliveryIso ?? null;
-    const outstation = lm.facts?.partner ? !lm.facts.partner.kvDefault : false;
+    const outstation = isOutstation(lm.facts?.partner);
     const loanUnits = o.ops_sofa_loans ?? [];
     const offer = loanOfferStateOf(loansQ.data?.offers ?? []);
     const loan = loanUnits.length
@@ -89,7 +93,9 @@ export function useMissionRoute(orderId: string) {
         : null;
     return missionRouteModel({
       todayIso: today,
-      proceededIso: o.proceeded_at ? mytDayOf(o.proceeded_at) : o.proceed_date ? o.proceed_date.slice(0, 10) : null,
+      /* `Proceed` is `proceeded_at` only (owner ruling 2026-10-06): never the
+         Planned production start (`proceed_date`), a different fact. */
+      proceededIso: o.proceeded_at ? mytDayOf(o.proceeded_at) : null,
       loan,
       supplier: supplier ?? null,
       /* From stock only when no goods still need a PO (owner decision 2026-09-25). */
@@ -100,13 +106,13 @@ export function useMissionRoute(orderId: string) {
       deliveredIso: o.delivered_at ? mytDayOf(o.delivered_at) : null,
       payment: {
         owedText: owed > 0 ? `RM ${RM.format(owed)}` : null,
-        deadlineIso: paymentDeadlineOf({ anchorIso: anchor, outstation, holidays }),
-        affects: moneyAffectsDelivery({ owed, anchorIso: anchor, todayIso: today, outstation, holidays }),
+        deadlineIso: paymentDeadlineOf({ anchorIso: anchor, outstation, holidays, timing }),
+        affects: moneyAffectsDelivery({ owed, anchorIso: anchor, todayIso: today, outstation, holidays, timing }),
         financeHold: (o.order_finance_exceptions ?? []).some((e) => e.status === "open"),
       },
       spell,
     });
-  }, [card, o, lm.model, lm.facts, supplier, factsQ.isError, loansQ.data]);
+  }, [card, o, lm.model, lm.facts, lm.deliveryDays, lm.collectionTiming, supplier, factsQ.isError, loansQ.data]);
   return { route, lm, supplier, customer, factsQ, loading: lm.scope.loading || factsQ.isLoading, failed: lm.scope.failed };
 }
 
@@ -170,10 +176,10 @@ export default function WorkOrderRoute({
   return (
     <WorkSection className="shrink-0 px-3 py-1.5 min-[768px]:px-4" data-testid="work-route" aria-label={R.heading}>
       {header ? <div className="-mx-3 mb-2 border-b border-kit-slate-4 px-3 pb-2.5 pt-1.5 min-[768px]:-mx-4 min-[768px]:px-4">{header}</div> : null}
-      {title === null ? null : <div className="flex h-[14px] items-center justify-between">
+      {title === null ? null : <div className="flex min-h-[22px] items-center justify-between">
         <SectionTitle>{title ?? R.heading}</SectionTitle>
         {route.header ? (
-          <span className={`text-[11px] font-semibold leading-[14px] ${STATUS_TEXT[route.header.tone]}`} data-testid="work-route-header">
+          <span className={`text-meta font-medium ${STATUS_TEXT[route.header.tone]}`} data-testid="work-route-header">
             {route.header.text}
           </span>
         ) : null}
@@ -199,7 +205,7 @@ export default function WorkOrderRoute({
         </ol>
       </div>
       {factsQ.isError ? (
-        <div className="flex flex-wrap items-center gap-2 text-[12px] leading-4 text-kit-amber-11" data-testid="work-route-supplier-failed" role="status">
+        <div className="flex flex-wrap items-center gap-2 text-meta text-kit-amber-11" data-testid="work-route-supplier-failed" role="status">
           <span>Some information could not be refreshed.</span>
           <Button size="touch" onClick={() => void factsQ.refetch()}>Try again</Button>
         </div>
@@ -207,7 +213,7 @@ export default function WorkOrderRoute({
       {exceptions.length > 0 ? (
         <ul className="mb-0.5 flex flex-col" data-testid="work-route-exceptions">
           {exceptions.map((e) => (
-            <li key={e.text} className={`flex items-center gap-1 text-[12px] leading-4 ${STATUS_TEXT[e.tone]}`}>
+            <li key={e.text} className={`flex items-center gap-1 text-meta ${STATUS_TEXT[e.tone]}`}>
               <Icon name="late" size={14} />
               <span>{e.text}</span>
             </li>
@@ -216,7 +222,7 @@ export default function WorkOrderRoute({
       ) : null}
       {detail ? (
         <div id={`route-detail-${detail.key}`} className="mb-1 mt-1 flex flex-col gap-1 rounded-control bg-kit-slate-2 p-2.5" data-testid={`work-route-detail-${detail.key}`}>
-          <div className="text-[12px] font-semibold leading-4 text-kit-slate-12">
+          <div className="text-body font-medium text-kit-slate-12">
             {detail.label} · {detail.status}
           </div>
           <RouteDetail point={detail} orderId={orderId} supplier={supplier} customerLine={customer.model?.status.text ?? null} logisticsLine={lm.partnerName ? [lm.partnerName, lm.model?.rows[1].fact].filter(Boolean).join(" · ") : "Logistics not assigned"} card={lm.card} onOpenParty={onOpenParty} />
@@ -237,7 +243,7 @@ function PointButton({
   refIfCurrent?: React.Ref<HTMLButtonElement>;
   onClick: () => void;
 }) {
-  const toneWord = point.tone === "done" ? "done" : point.tone === "current" ? "act now" : point.tone === "attention" ? "needs attention" : point.tone === "missed" ? "missed" : "not yet";
+  const toneWord = point.tone === "done" ? "done" : point.tone === "current" ? "act now" : point.tone === "attention" ? "needs attention" : point.tone === "missed" ? "late" : "not yet";
   return (
     <button
       ref={refIfCurrent}
@@ -249,7 +255,7 @@ function PointButton({
       className={`relative z-[1] flex min-w-[56px] flex-col items-center rounded-control px-0.5 text-center hover:bg-kit-slate-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-kit-blue-9 ${open ? "bg-kit-slate-2" : ""}`}
       data-testid={`work-route-point-${point.key}`}
     >
-      <span className={`h-4 whitespace-nowrap text-[11px] leading-4 tabular-nums ${point.final ? "font-semibold text-kit-slate-12" : "text-kit-slate-11"}`}>
+      <span className={`h-4 whitespace-nowrap text-meta tabular-nums ${point.final ? "font-medium text-kit-slate-12" : "text-kit-slate-11"}`}>
         {point.dateText ?? " "}
       </span>
       <span className="flex h-3 items-center justify-center" aria-hidden="true">
@@ -258,8 +264,8 @@ function PointButton({
         >
         </span>
       </span>
-      <span className="h-4 whitespace-nowrap text-[12px] font-semibold leading-4 text-kit-slate-12">{point.label}</span>
-      <span className={`h-4 whitespace-nowrap text-[11px] leading-4 ${STATUS_TEXT[point.tone]}`}>{point.status}</span>
+      <span className="h-4 whitespace-nowrap text-meta font-medium text-kit-slate-12">{point.label}</span>
+      <span className={`h-4 whitespace-nowrap text-meta ${STATUS_TEXT[point.tone]}`}>{point.status}</span>
     </button>
   );
 }
@@ -282,7 +288,7 @@ function RouteDetail({
   onOpenParty: (party: "logistics" | "customer" | "supplier") => void;
 }) {
   const link = (label: string, to: string) => (
-    <Link className="inline-flex min-h-10 items-center gap-1 self-start text-label text-kit-blue-11 hover:underline" to={to}>
+    <Link className="inline-flex min-h-10 items-center gap-1 self-start text-meta text-kit-blue-11 hover:underline" to={to}>
       {label}
       <Icon name="open" size={14} />
     </Link>
@@ -291,7 +297,7 @@ function RouteDetail({
     <Button size="touch" onClick={() => onOpenParty(party)}>{label}</Button>
   );
   const row = (left: string, right: string, key?: string) => (
-    <div key={key ?? left} className="flex flex-wrap items-baseline justify-between gap-x-3 text-[12px] leading-4">
+    <div key={key ?? left} className="flex flex-wrap items-baseline justify-between gap-x-3 text-meta">
       <span className="text-kit-slate-12">{left}</span>
       <span className="text-kit-slate-11">{right}</span>
     </div>

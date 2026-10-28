@@ -4,7 +4,7 @@
  * marked sent; the PO's supplier-reply Work closes on an evidenced answer
  * for its current version.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Hono } from "hono";
 import type { OperationWorkItem } from "@carres/shared";
 import type { AppEnv } from "../types";
@@ -12,6 +12,8 @@ import { withWorkCompletion, type CompletedWrite, type WorkCompletionDeps, type 
 import {
   arrivalConfirmationResult,
   poWindowResult,
+  manualPurchaseSendResult,
+  poSentWorkCompletion,
   supplierReplyResult,
   type ArrivalConfirmationFacts,
   type PoWindowSendFacts,
@@ -39,6 +41,15 @@ describe("Purchasing completion facts", () => {
     expect(poWindowResult("purchasing.po_window", { poIds: ["PO250925-1"], demandLeft: 2, allSent: true })).toBeNull();
     expect(poWindowResult("purchasing.po_window", { poIds: [], demandLeft: 0, allSent: false })).toBeNull();
     expect(poWindowResult("issue_po", { poIds: ["PO250925-1"], demandLeft: 0, allSent: true })).toBeNull();
+  });
+
+  it("a Manual Purchase closes only when demand is covered and every linked current PO is marked sent", () => {
+    const facts = { poIds: ["PO2", "PO1"], demandLeft: 0, allSent: true };
+    expect(manualPurchaseSendResult("manual_purchase.issue_po", facts)).toBe("po_sends=PO1,PO2");
+    expect(manualPurchaseSendResult("manual_purchase.issue_po", { ...facts, allSent: false })).toBeNull();
+    expect(manualPurchaseSendResult("manual_purchase.issue_po", { ...facts, demandLeft: 1 })).toBeNull();
+    expect(manualPurchaseSendResult("manual_purchase.issue_po", { ...facts, poIds: [] })).toBeNull();
+    expect(manualPurchaseSendResult("manual_purchase.approve", facts)).toBeNull();
   });
 
   it("a passed supplier date closes only on a governed answer to the current version — with its screenshot", () => {
@@ -125,6 +136,22 @@ describe("PO sent to supplier completes the window only when its last PO is sent
   });
 });
 
+describe("Manual Purchase current-version sending completion", () => {
+  it("records the actual sender only after the last linked PO closes the request's occurrence", async () => {
+    let probes = 0;
+    const spec: WorkCompletionSpec<PoWindowSendFacts> = {
+      owner: "Purchasing", rules: ["manual_purchase.issue_po"],
+      probe: async (_c, id) => ++probes === 1
+        ? [item(id, "manual_purchase.issue_po", "MPR260902-17", "2026-09-03")] : [],
+      readFacts: async () => ({ poIds: ["PO2", "PO1"], demandLeft: 0, allSent: true }),
+      result: manualPurchaseSendResult,
+    };
+    expect((await run(spec, ["request-17"])).recorded).toEqual([expect.objectContaining({
+      actorId: ME, objectLabel: "MPR260902-17", actionOn: "2026-09-03", resultReference: "po_sends=PO1,PO2",
+    })]);
+  });
+});
+
 describe("the supplier's answer completes the PO's reply Work, on its current generation", () => {
   it("records the answer against the occurrence the probe named", async () => {
     let call = 0;
@@ -147,5 +174,34 @@ describe("the supplier's answer completes the PO's reply Work, on its current ge
       objectLabel: "PO2609-4827",
       resultReference: "po_supplier_promises=ans-9@v3",
     })]);
+  });
+});
+
+
+describe("the existing PO send door also records Manual Purchase completion", () => {
+  it("uses linked requests and the same request projector, alongside windows", async () => {
+    const work = await import("../routes/operation/work");
+    const recorded: CompletedWrite[] = [];
+    let probes = 0;
+    const spies = [
+      vi.spyOn(work, "poWindowKeysServing").mockResolvedValue([]),
+      vi.spyOn(work, "manualPurchaseRequestsServing").mockResolvedValue(["request-17"]),
+      vi.spyOn(work, "probeManualPurchaseWork").mockImplementation(async (_c, id) =>
+        ++probes === 1 ? [item(id, "manual_purchase.issue_po", "MPR260902-17", "2026-09-03")] : []),
+      vi.spyOn(work, "manualPurchaseSendFacts").mockResolvedValue({ poIds: ["PO1", "PO2"], demandLeft: 0, allSent: true }),
+    ];
+    try {
+      const app = new Hono<AppEnv>();
+      app.use("*", async (c, next) => { c.set("auth", { id: ME } as never); await next(); });
+      app.post("/:id/confirm-sent", poSentWorkCompletion(() => ({
+        recordCompleted: async (_c, write) => { recorded.push(write); },
+        now: () => "2026-09-24T03:00:00.000Z", log: () => {},
+      })), (c) => c.json({ ok: true }));
+      expect((await app.request("/PO2/confirm-sent", { method: "POST" })).status).toBe(200);
+      expect(spies[1]).toHaveBeenCalledWith(expect.anything(), "PO2");
+      expect(recorded).toEqual([expect.objectContaining({
+        objectLabel: "MPR260902-17", actorId: ME, resultReference: "po_sends=PO1,PO2",
+      })]);
+    } finally { spies.forEach((spy) => spy.mockRestore()); }
   });
 });

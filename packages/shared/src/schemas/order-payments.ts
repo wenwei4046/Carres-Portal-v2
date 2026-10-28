@@ -116,13 +116,17 @@ export type RecordPaymentInput = z.infer<typeof recordPaymentInputSchema>;
  *  paperwork. Cash, online, other and a method a manager adds stay optional,
  *  exactly as the writer leaves them: this list is closed, never "anything
  *  not cash". THE one predicate — every form asks it, so no screen can drift
- *  from the database. */
+ *  from the database.
+ *
+ *  0660 — Merchant and each card machine (`merchant_pbb` …) are card
+ *  payments: `payment_is_card` in the writer. */
 export function requiredPaymentReference(
   method: string | null | undefined,
 ): "Approval code" | "Cheque number" | "Reference number" | null {
   const k = (method ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
   if (k === "cheque") return "Cheque number";
-  if (["card", "credit", "installment", "credit_card", "debit_card"].includes(k)) return "Approval code";
+  if (["card", "credit", "installment", "credit_card", "debit_card", "merchant"].includes(k)
+      || k.startsWith("merchant_")) return "Approval code";
   if (["bank", "bank_transfer", "duitnow_qr"].includes(k)) return "Reference number";
   return null;
 }

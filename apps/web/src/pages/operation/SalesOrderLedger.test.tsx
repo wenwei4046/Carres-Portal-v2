@@ -360,6 +360,27 @@ describe("History says what changed, not only which field", () => {
  * recorder is the real staff name from the authoritative identity source.
  */
 describe("Revisions are clear complete-version doors", () => {
+  it("opens a cut note whole without nesting buttons or selecting another version", async () => {
+    const note = "Customer asked for the recorded change after checking all delivery and contact details.";
+    const scroll = vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockImplementation(function (this: HTMLElement) {
+      return this.textContent === note ? 400 : 50;
+    });
+    const width = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(180);
+    const onView = vi.fn();
+    try {
+      const { container } = render(<SalesOrderLedger revisions={[{ ...revisions[0], note }]} history={[]} currentRevision={1} viewedRevision={null} onViewRevision={onView} view="revisions" showViewTabs={false} />);
+      expect(container.querySelector("button button")).toBeNull();
+      fireEvent.click(screen.getByTestId("revision-record-1"));
+      expect(onView).toHaveBeenCalledWith(null);
+      onView.mockClear();
+      fireEvent.click(screen.getByTestId("cell-overflow"));
+      expect(await screen.findByRole("dialog")).toHaveTextContent(note);
+      expect(onView).not.toHaveBeenCalled();
+    } finally {
+      scroll.mockRestore();
+      width.mockRestore();
+    }
+  });
   const twoRevs = [
     revisions[0],
     {
@@ -456,7 +477,7 @@ describe("Revisions are clear complete-version doors", () => {
     );
     const record = screen.getByTestId("revision-record-1");
     expect(record.tagName).toBe("BUTTON");
-    expect(record.className).toContain("focus-visible:ring-2");
+    expect(record.className).toContain("focus-visible:[outline:var(--c-focus)]");
     /* Current state is stated in TEXT, and marked for assistive tech. */
     expect(screen.getByTestId("revision-record-2").getAttribute("aria-current")).toBe("true");
   });

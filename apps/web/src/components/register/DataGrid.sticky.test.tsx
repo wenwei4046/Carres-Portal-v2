@@ -95,7 +95,7 @@ describe("DataGrid · stickyIdentity", () => {
 /* The ON case is asserted through the class + inline offset the engine writes,
    because jsdom computes no layout: `position: sticky` never resolves and a
    getComputedStyle assertion would pass on a broken grid. The offsets ARE the
-   contract — 30 (selection) + 32 (expand) = 62 for the first data column. */
+   contract — 32 (expand) + 30 (selection) = 62 for the first data column. */
 describe("DataGrid · stickyIdentity offsets", () => {
   it("pins both named identities at cumulative widths without pinning unrelated columns", () => {
     const { container } = render(<DataGrid<Row> rows={ROWS}
@@ -105,9 +105,9 @@ describe("DataGrid · stickyIdentity offsets", () => {
       selectable={{ selectedKeys: new Set(), onToggle: () => {}, onToggleAll: () => {} }}
       expandable={{ renderExpansion: () => <div>goods</div> }} />);
     expect([...container.querySelectorAll<HTMLElement>("thead th")].map((el) => el.style.left))
-      .toEqual(["0px", "30px", "62px", "147px", ""]);
+      .toEqual(["0px", "32px", "62px", "147px", ""]);
     expect([...container.querySelectorAll<HTMLElement>("tbody tr:first-child td")].map((el) => el.style.left))
-      .toEqual(["0px", "30px", "62px", "147px", ""]);
+      .toEqual(["0px", "32px", "62px", "147px", ""]);
   });
   it("pins the gutter and the FIRST data column at cumulative offsets", () => {
     const { container } = render(
@@ -122,12 +122,12 @@ describe("DataGrid · stickyIdentity offsets", () => {
       />,
     );
     const headCells = [...container.querySelectorAll<HTMLElement>("thead th")];
-    expect(headCells.map((el) => el.style.left)).toEqual(["0px", "30px", "62px", ""]);
+    expect(headCells.map((el) => el.style.left)).toEqual(["0px", "32px", "62px", ""]);
     // …and the LAST data column is emphatically not pinned.
     expect(headCells[3]!.style.left).toBe("");
 
     const firstRowCells = [...container.querySelectorAll<HTMLElement>("tbody tr:first-child td")];
-    expect(firstRowCells.map((el) => el.style.left)).toEqual(["0px", "30px", "62px", ""]);
+    expect(firstRowCells.map((el) => el.style.left)).toEqual(["0px", "32px", "62px", ""]);
   });
 
   /* ⭐ CARD 02-B (2026-08-27): a Register whose approved order does not put
@@ -152,10 +152,10 @@ describe("DataGrid · stickyIdentity offsets", () => {
       />,
     );
     const headCells = [...container.querySelectorAll<HTMLElement>("thead th")];
-    // __select__ · __expand__ · Status · SO No · Customer
-    expect(headCells.map((el) => el.style.left)).toEqual(["0px", "30px", "", "62px", ""]);
+    // __expand__ · __select__ · Status · SO No · Customer
+    expect(headCells.map((el) => el.style.left)).toEqual(["0px", "32px", "", "62px", ""]);
     const firstRowCells = [...container.querySelectorAll<HTMLElement>("tbody tr:first-child td")];
-    expect(firstRowCells.map((el) => el.style.left)).toEqual(["0px", "30px", "", "62px", ""]);
+    expect(firstRowCells.map((el) => el.style.left)).toEqual(["0px", "32px", "", "62px", ""]);
   });
 
   it("existing boolean callers keep the first-data-column behaviour, byte-identical", () => {
@@ -171,6 +171,6 @@ describe("DataGrid · stickyIdentity offsets", () => {
       />,
     );
     const headCells = [...container.querySelectorAll<HTMLElement>("thead th")];
-    expect(headCells.map((el) => el.style.left)).toEqual(["0px", "30px", "62px", ""]);
+    expect(headCells.map((el) => el.style.left)).toEqual(["0px", "32px", "62px", ""]);
   });
 });

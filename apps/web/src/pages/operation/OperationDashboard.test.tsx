@@ -179,7 +179,7 @@ describe("OperationDashboard", () => {
 
     expect(screen.getByText("Today")).toBeInTheDocument();
     expect(screen.getByText("Open POs")).toBeInTheDocument();
-    expect(screen.getByText("Overdue")).toBeInTheDocument();
+    expect(screen.getByText("Late")).toBeInTheDocument();
 
     // Each KPI value renders inside a `data-kpi-value` element.
     const values = document.querySelectorAll("[data-kpi-value]");
@@ -200,7 +200,7 @@ describe("OperationDashboard", () => {
     fireEvent.click(screen.getByLabelText(/Open POs: 7/));
     expect(setTab).toHaveBeenLastCalledWith("procurement");
 
-    fireEvent.click(screen.getByLabelText(/Overdue: 1/));
+    fireEvent.click(screen.getByLabelText(/Late: 1/));
     expect(setTab).toHaveBeenLastCalledWith("orders");
   });
 
@@ -318,7 +318,7 @@ describe("OperationDashboard", () => {
       screen.getByLabelText(/Open POs: 7, with suppliers/),
     ).toBeInTheDocument();
     expect(
-      screen.getByLabelText(/Overdue: 1, past delivery date/),
+      screen.getByLabelText(/Late: 1, past delivery date/),
     ).toBeInTheDocument();
   });
 

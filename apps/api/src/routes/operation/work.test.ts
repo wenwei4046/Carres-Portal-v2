@@ -1,3 +1,4 @@
+import { projectPurchaseOrderCancellationSendWork } from "./work";
 import { describe, expect, it } from "vitest";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
@@ -6,6 +7,7 @@ import {
   projectOverpaymentReviewWork,
   projectStorageCheckWork,
   composeOperationWorkResponse,
+  workResponseFor,
   createOperationWorkRouter,
   loadWorkSource,
   manualPurchaseWorkInputsFromRegister,
@@ -77,7 +79,7 @@ const base: OperationWorkItem = {
   broken: false,
 };
 
-const sourceKeys = ["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"] as const;
+const sourceKeys = ["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker", "workspace"] as const;
 const healthySources = (ordersItems: OperationWorkItem[] = []): OperationWorkSourceResult[] => sourceKeys.map((key) => ({
   health: {
     key,
@@ -120,6 +122,39 @@ describe("operation Work response composition", () => {
     expect(body.items).toHaveLength(1);
     expect(body.complete).toBe(true);
     expect(body.closureReceipt).toBeNull();
+  });
+
+  it("gives a reader that does not ask for it the six sources it knows, and none of the workspace module's work", () => {
+    const task: OperationWorkItem = {
+      ...base,
+      id: "workspace:00000000-0000-4000-8000-0000000000c1:internal_task",
+      module: "workspace",
+      ruleKey: "internal_task",
+      object: { kind: "internal_task", id: "00000000-0000-4000-8000-0000000000c1", label: "TEST · Get the new product photographs" },
+    };
+    const sources = healthySources([base]).map((source) => source.health.key === "workspace"
+      ? { health: { ...source.health, state: "failed" as const, observedAt: null, lastSuccessfulAt: null, errorLabel: "Could not refresh Staff tasks" }, items: [] }
+      : source);
+    const composed = composeOperationWorkResponse(sources, [], "2026-09-06");
+    const full: OperationWorkResponse = {
+      ...composed,
+      items: [...composed.items, task],
+      completed: [
+        { occurrenceId: "workspace:00000000-0000-4000-8000-0000000000c3:internal_task", module: "workspace", ruleKey: "internal_task", actionOn: "2026-09-06", objectLabel: "TEST · Print the price list", completedAt: "2026-09-06T03:00:00.000Z", completedBy: null, resultReference: "internal_task_done=x" },
+        { occurrenceId: "purchasing:PO-1:purchasing.po_window", module: "purchasing", ruleKey: "purchasing.po_window", actionOn: "2026-09-06", objectLabel: "PO-1", completedAt: "2026-09-06T02:00:00.000Z", completedBy: null, resultReference: "po_sends=1" },
+      ],
+    };
+    expect(full.complete).toBe(false);
+
+    const old = workResponseFor(full, undefined) as OperationWorkResponse;
+    expect(old.sources.map((source) => source.key)).toEqual(["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"]);
+    expect(old.items.map((item) => item.module)).toEqual(["orders"]);
+    expect(old.completed?.map((done) => done.module)).toEqual(["purchasing"]);
+    /* Its six sources are healthy: a failed source it never hears about must not make its read look incomplete. */
+    expect(old.complete).toBe(true);
+
+    expect(workResponseFor(full, "workspace")).toBe(full);
+    expect(workResponseFor(full, "everything")).toEqual(old);
   });
 
   it("returns one validated set and removes only duplicate stable identities", () => {
@@ -213,7 +248,6 @@ describe("operation Work response composition", () => {
           goods_received_at: "2026-09-05",
           submitted_at: "2026-09-05T09:00:00Z",
         }],
-        arrivalsDue: [],
       },
       duty: {
         dutyKey: "grn_duty",
@@ -287,7 +321,7 @@ describe("operation Work response composition", () => {
     expect(issuance[0]?.destination).toBe(
       "/operation?tab=manual-purchase&mp=request-1",
     );
-    expect(issuance[0]?.requiredResult).toBe("Purchase order issued");
+    expect(issuance[0]?.requiredResult).toBe("Current PO version marked as sent");
     /* Owner review 2026-09-25 (items 6/7): the document number is the
        reference; the composed context stands in only while none exists. */
     expect(issuance[0]?.object.label).toBe("Manual Purchase · Office use · Klang · Nice Future");
@@ -298,12 +332,7 @@ describe("operation Work response composition", () => {
     expect(numbered[0]?.object.label).toBe("MPR250924-4827");
   });
 
-  it("an ISSUED Manual Purchase raises no work for a missing send confirmation", () => {
-    /* ⭐ Owner ruling 2026-09-11, measured on production the same day: 62
-       purchase orders exist and 3 carry confirmed-sent evidence. The old rule
-       therefore raised an `Issue PO` task against 59 already-issued
-       documents. An existing numbered PO is an existing commitment, and the
-       absence of proof of sending is not a reason to buy again. */
+  it("an ordered Manual Purchase opens its existing unsent PO without buying again", () => {
     const items = projectManualPurchaseWork({
       requests: [
         {
@@ -314,13 +343,17 @@ describe("operation Work response composition", () => {
           orderBy: "2026-09-06",
           hasPos: true,
           posAllSent: false,
+          unsentPoId: "PO /2",
         },
       ],
       approver: { userId: "jess", name: "Jess" },
       poDuty: null,
       today: "2026-09-06",
     });
-    expect(items).toEqual([]);
+    expect(items).toHaveLength(1);
+    expect(items[0]?.action).toBe("Confirm PO sent to supplier");
+    expect(items[0]?.destination).toBe("/operation/procurement?po=PO%20%2F2");
+    expect(items[0]?.requiredResult).toBe("Current PO version marked as sent");
   });
 
   it("projects separate Sales Order actions with their own owner rules", () => {
@@ -405,6 +438,35 @@ describe("operation Work response composition", () => {
     expect(run?.action).not.toContain("Operation PIC");
   });
 
+  it("names the Logistics Partner, never the customer, as the party of a `Call {logistics}` task", () => {
+    const context = {
+      orderId: "order-2041",
+      so: 2041,
+      picName: "Operation PIC",
+      picUserId: "pic-1",
+      promisedDateIso: "2026-09-08",
+      confirmedDateIso: null,
+      deliveredAtIso: null,
+      delayDetectedAtIso: null,
+      delayDecisionAtIso: null,
+    };
+    const partyOf = (key: "confirm_delivery_date" | "arrange_new_delivery_date", logistics: string | null) => {
+      const [item] = projectSalesOrderWork({
+        open: [{ key, track: "delivery", tone: "warning" }],
+        context,
+        customer: "TEST Customer A",
+        logistics,
+        today: "2026-09-07",
+      });
+      return [item?.action, item?.recipient];
+    };
+
+    expect(partyOf("confirm_delivery_date", "TEST Logistics A")).toEqual(["Call TEST Logistics A", "TEST Logistics A"]);
+    expect(partyOf("arrange_new_delivery_date", "TEST Logistics A")).toEqual(["Call TEST Logistics A", "TEST Logistics A"]);
+    /* No partner recorded: the task names nobody, so nothing is asked of the customer by mistake. */
+    expect(partyOf("confirm_delivery_date", null)[1]).toBeNull();
+  });
+
   it("admits only Delivery proof review as an embedded Work action", () => {
     const context = {
       orderId: "order-2041",
@@ -438,6 +500,32 @@ describe("operation Work response composition", () => {
       mode: "open_module",
       fallbackDestination: "/operation/delivery-orders/DO-2041",
     });
+  });
+
+  it("does not require sending a cancelled historical PO again once active coverage is fully sent", () => {
+    const inputs = manualPurchaseWorkInputsFromRegister({
+      requests: [{ id: "TEST-r", purpose: "ready_stock", destination_id: "TEST-d", why: "", approval_required: true,
+        approved_at: "2026-10-18T00:00:00Z", refused_at: null, refuse_reason: null, for_service_case_id: null, for_staff_user_id: null, for_subsidiary_name: null }],
+      lines: [{ request_id: "TEST-r", qty: 2, approved_qty: 2, issued_qty: 2, cancelled_at: null, po_id: "TEST-active", po_ids: ["TEST-cancelled", "TEST-active"],
+        active_po_ids: ["TEST-active"], supplier_id: "TEST-s", order_by: "2026-11-01" }],
+      destinations: [], suppliers: [], users: [], serviceCases: [], pos: [{ id: "TEST-cancelled", sent: false }, { id: "TEST-active", sent: true }],
+    });
+    expect(inputs[0]?.poIds).toEqual(["TEST-active"]);
+    expect(inputs[0]?.posAllSent).toBe(true);
+    expect(inputs[0]?.remainingQty).toBe(0);
+  });
+
+  it("uses owning contextual To buy and refuses unknown coverage instead of completing work", () => {
+    const data = {
+      requests: [{ id: "TEST-r", purpose: "general_purchase", request_version: 2, destination_id: "TEST-d", why: "", approval_required: true,
+        approved_at: "2026-10-18T00:00:00Z", refused_at: null, refuse_reason: null, for_service_case_id: null, for_staff_user_id: null, for_subsidiary_name: null }],
+      lines: [{ request_id: "TEST-r", qty: 2, approved_qty: 2, issued_qty: 0, cancelled_at: null, po_id: null, supplier_id: "TEST-s", order_by: null, context_read_available: true, context_to_buy: 0 },
+        { request_id: "TEST-r", qty: 3, approved_qty: 3, issued_qty: 1, cancelled_at: null, po_id: "TEST-PO", supplier_id: "TEST-s", order_by: null, context_read_available: true, context_to_buy: 2 }],
+      destinations: [], suppliers: [], users: [], serviceCases: [], pos: [{ id: "TEST-PO", sent: true }],
+    };
+    expect(manualPurchaseWorkInputsFromRegister(data)[0]).toMatchObject({ remainingQty: 2, hasPos: true, posAllSent: true });
+    data.lines[0]!.context_read_available = false;
+    expect(() => manualPurchaseWorkInputsFromRegister(data)).toThrow("coverage could not be loaded");
   });
 
   it("derives Manual Purchase projector input from the module register facts", () => {
@@ -481,7 +569,7 @@ describe("operation Work response composition", () => {
     expect(inputs[0]?.context).toContain("Ready Stock");
   });
 
-  it("derives Receiving source only from submitted counts and open PO arrival facts", () => {
+  it("derives Receiving source only from actual submitted physical reports", () => {
     const source = receivingWorkSourceFromModuleFacts({
       receipts: [{
         id: "receipt-1",
@@ -498,43 +586,10 @@ describe("operation Work response composition", () => {
         goods_received_at: "2026-09-05",
         submitted_at: "2026-09-05T08:00:00Z",
       }],
-      pos: [{
-        id: "PO-3",
-        status: "open",
-        supplier_id: "supplier-3",
-        eta_date: "2026-09-06",
-        version: 1,
-        sends: [{ kind: "confirmed_sent", po_version: 1 }],
-        purchase_order_lines: [{ qty: 5, received_qty: 2 }],
-      }, {
-        /* Never marked sent: the supplier never got it, so it cannot arrive (segment 2). */
-        id: "PO-5",
-        status: "open",
-        supplier_id: "supplier-3",
-        eta_date: "2026-09-06",
-        version: 1,
-        sends: [],
-        purchase_order_lines: [{ qty: 5, received_qty: 0 }],
-      }, {
-        id: "PO-4",
-        status: "received",
-        supplier_id: "supplier-4",
-        eta_date: "2026-09-06",
-        purchase_order_lines: [{ qty: 5, received_qty: 0 }],
-      }],
-      suppliers: [
-        { id: "supplier-3", name: "Arrival Supplier" },
-        { id: "supplier-4", name: "Closed Supplier" },
-      ],
     });
 
     expect(source.submitted.map((row) => row.id)).toEqual(["receipt-1"]);
-    expect(source.arrivalsDue).toEqual([{
-      po_id: "PO-3",
-      supplier_name: "Arrival Supplier",
-      eta_date: "2026-09-06",
-      pending_qty: 3,
-    }]);
+    expect(Object.keys(source)).toEqual(["submitted"]);
   });
 
   it("projects an Orders route row through shared signals and per-action owners", () => {
@@ -954,7 +1009,7 @@ describe("payment.missed_promise — the promise outranks the window", () => {
     expect(item).toMatchObject({
       id: "payment:invoice-9:payment.missed_promise",
       module: "payment",
-      problem: "Customer promise was missed",
+      problem: "Customer's promised payment date passed",
       action: "Ask customer to pay",
       // Due on the promised day — not the delivery window's day.
       timing: { actionOn: "2026-09-05", placement: "missed" },
@@ -1245,11 +1300,18 @@ describe("the PO window card — one occurrence per window, never one per Sales 
     expect(item!.tone).toBe("warning");
   });
 
-  it("a received PO needs no sending, so its window owes nothing", () => {
-    expect(projectPoWindowWork({
-      read: read([], [{ poId: "PO250925-4827", status: "received", supplierId: "ohana", supplierName: "Ohana", destinationId: null, officialDeliveryDate: null, sentCurrentVersion: false, version: 1, poWindow: "2026-09-25T11:30" }]),
+  it("goods completion keeps the window's current sending obligation open until confirmed", () => {
+    const received = { poId: "PO250925-4827", status: "received", supplierId: "ohana", supplierName: "Ohana", destinationId: null, officialDeliveryDate: null, sentCurrentVersion: false, version: 2, poWindow: "2026-09-25T11:30" };
+    const project = (sentCurrentVersion: boolean) => projectPoWindowWork({
+      read: read([], [{ ...received, sentCurrentVersion }]),
       suppliers, poDuty, today: "2026-09-25", now: "2026-09-25T04:00:00.000Z",
-    })).toEqual([]);
+    });
+    const [item] = project(false);
+    expect(item?.problem).toBe("1 PO issued · 1 not sent yet");
+    expect(item?.action).toBe("Click WhatsApp, send PO250925-4827(2) to Ohana");
+    expect(item?.interaction).toMatchObject({ mode: "embedded", componentKey: "purchasing.po_issue_evidence" });
+    expect(project(true)).toEqual([]);
+    expect(received.status).toBe("received");
   });
 
   it("unreadable window settings fail the Purchasing source instead of showing an empty day", () => {
@@ -1261,5 +1323,53 @@ describe("the PO window card — one occurrence per window, never one per Sales 
 
   it("the per-Sales-Order issue_po and the retired confirm_ready_date are the window card's, not Work's", () => {
     expect([...PURCHASING_WINDOW_OWNED].sort()).toEqual(["confirm_ready_date", "issue_po"]);
+  });
+});
+
+
+describe("PO cancellation owns current sending after goods end",()=> {
+ it("keeps one current occurrence after cancelled goods, old send cannot close it",()=> {
+  const po={id:"PO261018-0001",supplier_id:"TEST supplier",status:"cancelled" as const,version:3,cancellation_version:3,cancellation_event_id:"TEST-event",purchase_order_lines:[{qty:2,received_qty:0,cancelled_qty:2}],sends:[{kind:"confirmed_sent" as const,po_version:1,sent_at:"2026-10-18T00:00:00Z",channel:"email"}]};
+  const input={pos:[po],suppliers:[],poDuty:null,today:"2026-10-18"};
+  const rows=projectPurchaseOrderCancellationSendWork(input);expect(rows).toHaveLength(1);expect(rows[0]).toMatchObject({ruleKey:"purchasing.cancellation_send",object:{id:po.id},interaction:{componentKey:"purchasing.po_issue_evidence"}});
+  expect(projectPurchaseOrderCancellationSendWork({...input,pos:[{...po,sends:[...po.sends,{...po.sends[0],po_version:3}]}]})).toHaveLength(0);
+  expect(projectPurchaseOrderCancellationSendWork({...input,pos:[{...po,cancellation_version:2}]})).toHaveLength(0);
+ });
+});
+
+// 0707 — a backdated payment waits for the Payment Approver.
+describe("payment.approve_backdated_payment", () => {
+  const approver = { userId: "payment-approver", name: "Jess" };
+  const duty = {
+    dutyKey: "payment_approver" as const, onDate: "2026-10-23", normalOwner: approver, buddy: null,
+    activeCover: null, actingPerson: approver, state: "primary" as const, assignmentId: "a-1",
+  };
+  const request = {
+    id: "req-1", order_id: "order-9", amount: 300, paid_on: "2026-09-01",
+    requested_at: "2026-10-22T03:00:00Z", requested_by: "recorder", orders: { so: 3001, customer_name: "Tan Qu Qu" },
+  };
+  it("raises one approval per waiting request, owned by the Payment Approver duty", async () => {
+    const { projectBackdatedPaymentWork } = await import("./work");
+    const [item] = projectBackdatedPaymentWork({ requests: [request], approver: duty, today: "2026-10-23" });
+    expect(item).toMatchObject({
+      id: "payment:req-1:payment.approve_backdated_payment",
+      action: "Approve RM 300.00 paid on Tue, 1 Sep",
+      destination: "/finance/monitor?order=3001",
+    });
+    expect(item?.owner.dutyKey).toBe("payment_approver");
+    expect(item?.owner.acting).toEqual(approver);
+  });
+  it("with nobody holding the duty the item stays, honestly ownerless", async () => {
+    const { projectBackdatedPaymentWork } = await import("./work");
+    const [item] = projectBackdatedPaymentWork({ requests: [request], approver: null, today: "2026-10-23" });
+    expect(item?.owner.state).toBe("not_assigned");
+  });
+  it("the approver's own request is not theirs to decide: it waits for a principal (Houzs own_request)", async () => {
+    const { projectBackdatedPaymentWork } = await import("./work");
+    const [item] = projectBackdatedPaymentWork({
+      requests: [{ ...request, requested_by: approver.userId }], approver: duty, today: "2026-10-23",
+    });
+    expect(item?.owner.acting).toBeNull();
+    expect(item?.owner.state).toBe("not_assigned");
   });
 });

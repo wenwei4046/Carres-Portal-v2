@@ -1,9 +1,9 @@
-import { GOODS_ABSENCE_WORDS } from "@carres/shared";
-import { useEffect, useMemo, useState } from "react";
+import { poLineReportable, GOODS_ABSENCE_WORDS } from "@carres/shared";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
-  grnDateMonths,
-  grnDateWeeks,
+  documentDisplayNumber,
+  type RegisterColumnQuery,
   receivingDisplayNo,
   receivingExtraQty,
   RECEIVING_CATEGORY_ROWS,
@@ -12,7 +12,9 @@ import {
   type WarehouseReceiptLine,
 } from "@carres/shared";
 import {
+  useCatalog,
   useOperationGrnRegister,
+  fetchGrnRegisterExport,
   useOperationPos,
   useOperationSuppliers,
   useOperationWarehouse,
@@ -21,13 +23,15 @@ import {
   type SupplierRow,
   type WarehouseReceiptQueueRow,
 } from "@/lib/queries";
-import { fmtDate, fmtDateShort, fmtMonth } from "@/lib/fmt-date";
-import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
-import { DateField } from "@/components/register/DateField";
+import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import { DataGrid, type DataGridColumn, type DataGridContextMenuItem } from "@/components/register/DataGrid";
+import { documentRowMenu } from "@/components/register/row-menu";
+import { toast } from "sonner";
+import { printGrn, receivingHasGrn } from "./record-print";
 import { REGISTER_FIELD_WIDTH } from "@/components/register/register-field-widths";
 import {
   FilterRail,
-  FilterRailExpandableRow,
+  RailItem,
   FilterRailGroup,
   FilterRailRow,
 } from "./components/workspace-rail";
@@ -36,70 +40,26 @@ import GoodsMiniTable, {
 } from "./components/GoodsMiniTable";
 import PoReceivingView from "./components/PoReceivingView";
 import ReceivingRecord from "./components/ReceivingRecord";
+import ReceivingCompactView from "./components/ReceivingCompactView";
+import CPopover from "@/components/carres/CPopover";
+import Button from "@/components/kit/Button";
+import NewGoodsReceiptModal from "./components/NewGoodsReceiptModal";
+import Tabs from "@/components/kit/Tabs";
+import Drawer from "@/components/kit/Drawer";
 import PurchasingTabs from "./PurchasingTabs";
+import Checkbox from "@/components/kit/Checkbox";
 import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
 // ⭐ HEADER PALETTE MATCHES THE PURCHASING REGISTERS (owner request 2026-09-15)
 // — the same approved light slate blue-grey table header as SO Batch
 // Purchase / Manual Purchase / Purchase Orders, so one colour means
 // "section header" everywhere in Operations (manual-purchase-create.css).
 
-/**
- * OperationReceiving — the ONE Receiving destination
- * (owner corrections 2026-09-06; owner rulings 2026-09-17 / 2026-09-18;
- * purchasing/MASTER.md §9.4; UI MASTER §6.7–§6.9; PURCHASING CARD 12).
- *
- * ```
- * My Work / Team Work   =  what staff must receive or review
- * Receiving             =  the complete GRN Register, beside its rail
- * ```
- *
- * ONE PAGE. No Receiving Monitor, no `Calendar View / GRN Register View`
- * switch, no permanent tabs, no second Receiving destination.
- *
- * THE REGISTER BOUNDARY: a row exists only once `Save Receiving` created the
- * GRN. A Warehouse count awaiting Carres action lives in My Work / Team Work
- * and deep-links (`?session=`) to its Receiving review; it never becomes a
- * Register row. Partial or completed RECEIPT PROGRESS belongs to the purchase
- * order, not to a GRN: a GRN is a document, and a document is not half saved.
- *
- * ⭐ NO DATE HAS TO BE CHOSEN TO SEE RECORDS (owner ruling 2026-09-18). The
- * page opens on every GRN the operator may see, newest first, server-paged.
- * The rail's `GRN Doc Date` group is an OPTIONAL narrowing, and its counts are
- * counts of GRN RECORDS — never outstanding work and never pieces of goods.
- *
- * THE RAIL — six groups, in the owner's order (§9.4, 2026-09-17). The month
- * Calendar is RETIRED; the expected-arrival view lives in Warehouse Arrival
- * Schedule.
- *
- *   GRN Doc Date          weeks · their days (the arrow opens, it never filters)
- *                     · months · `Choose dates…`
- *   Received with     `Damaged goods` · `Wrong items` · `Extra goods` — a
- *                     record of what was FOUND, and three OVERLAPPING counts
- *                     that are never added into a total
- *   Category · Goods arrived at · Supplier      the facts present in the set
- *   Cancelled GRNs    the last row
- *
- * One choice per group; pressing the chosen row again clears it. There is no
- * `Clear filters` button at the foot of the rail (owner correction
- * 2026-09-18) — the toolbar's active-condition chips clear what is on.
- *
- * THE REGISTER PAGINATES ON THE SERVER: `Showing 1–50 of {total}` with
- * Previous/Next — the browser never renders the whole history, and every
- * rail count is computed over the COMPLETE filtered result set by the one
- * shared arithmetic (`buildGrnRegisterView`, behind `?scope=grn`).
- *
- *   [Start Receiving]  →  Find PO or CO  →  pre-start object  →  Session
- *   `?session=` (Work) →  the count review (Save Receiving / Return count)
- *   a Register row     →  the formal GRN object (50/50, Amend / More ▾)
- *
- * THE REGISTER STAYS MOUNTED under an open object (`invisible`, never
- * display:none) so Back restores rail filters, search, sort and scroll — the
- * Manual Purchase / SO object law.
- *
- * No `Work` column, no owner avatar on rows, no local duty arithmetic: the
- * resolved GRN authority comes from the ONE shared resolver
- * (`useReceivingDuty` → 0425 `receiving_actor_context`), and it appears only
- * where an action needs it.
+/** Receiving's existing destination, governed by Purchasing MASTER §9.4.
+ * Formal GRNs share the DataGrid and CompactModuleCard presentations. The
+ * register stays mounted beneath its full object, preserving the user's view.
+ * Receipt quantities belong to this receipt, not cumulative PO completion.
+ * The rail selects GRN Records or Receiving Differences; non-column filters
+ * use the shared list Popover, while column facts use their own header controls.
  */
 
 // design-standard: not-a-list-page — the Receiving Register renders through
@@ -111,7 +71,7 @@ import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
 function poStillOwes(po: operationPoListRow): boolean {
   if (po.status !== "open") return false;
   const lines = po.purchase_order_lines ?? [];
-  return lines.some((l) => (l.received_qty ?? 0) < (l.qty ?? 0));
+  return lines.some((l) => poLineReportable(l)>0);
 }
 
 /** The three `Received with` rows, in the owner's order and words. */
@@ -132,8 +92,43 @@ function weekLabel(from: string, to: string): string {
     : `${left} to ${right}`;
 }
 
-export default function OperationReceiving() {
+/**
+ * ⭐ ONE DELIVERY, SEVERAL POs OF ONE SUPPLIER — Weisiang's decision (Mr Lim,
+ * WhatsApp 2026-10-22), overturning Jess's "no multi-PO receipt workflow";
+ * Jess was not part of it. `?queue=` holds the POs still to receive: each post
+ * opens the next PO in the same one Receiving engine.
+ * ponytail: one GRN per PO, received in turn; one combined GRN if asked.
+ */
+export function receivingAfterPost(params: URLSearchParams, receiptId: string): URLSearchParams {
+  const next = new URLSearchParams(params);
+  const [head, ...rest] = (params.get("queue") ?? "").split(",").filter(Boolean);
+  if (head) {
+    next.set("po", head);
+    if (rest.length) next.set("queue", rest.join(","));
+    else next.delete("queue");
+    return next;
+  }
+  for (const k of ["po", "find", "arrival", "queue"]) next.delete(k);
+  next.set("session", receiptId);
+  return next;
+}
+
+/** A PO joins the ticked set only when it is the same supplier's. */
+export function sameSupplierPick(picked: readonly operationPoListRow[], po: operationPoListRow): boolean {
+  return picked.every((p) => p.supplier_id === po.supplier_id);
+}
+
+/**
+ * `consignmentPage` — the Purchase Consignment Receive page (Showroom drawer): the SAME
+ * GRN register and receipt engine, locked to receipts of Consignment Orders.
+ * Follows Houzs frontend/src/components/Sidebar.tsx:552 and
+ * frontend/src/pages/scm-v2/PurchaseConsignmentReceives.tsx:1-16 (its own
+ * Purchase Consignment Receive list) per Weisiang's ruling (2026-10-22): clear
+ * Carres rules, implement Houzs.
+ */
+export default function OperationReceiving({ consignmentPage = false }: { consignmentPage?: boolean } = {}) {
   const [params, setParams] = useSearchParams();
+  const view = params.get("view") === "differences" ? "differences" : "records";
   const sessionId = params.get("session");
   const poId = params.get("po");
   const arrivalId = params.get("arrival");
@@ -159,14 +154,28 @@ export default function OperationReceiving() {
   const fromSel = params.get("from");
   const toSel = params.get("to");
   const cancelledSel = params.get("cancelled") === "1";
+  /** `Consignment goods` — the Consignment Receive entry, Houzs way: the same
+   *  Receiving, narrowed to Consignment Orders (Weisiang's decision, Mr Lim,
+   *  WhatsApp 2026-10-22; Jess was not part of it). */
+  const consignmentSel = consignmentPage || params.get("consignment") === "1";
   const [search, setSearch] = useState("");
   const [offset, setOffset] = useState(0);
+  const [presentation, setPresentation] = useState("table");
+  const registerSessionKey = useId();
+  const changePresentation = (value: string) => { setPresentation(value); setOffset(0); };
+  const [columnQuery, setColumnQuery] = useState<string>();
+  const changeColumns = useCallback((query: RegisterColumnQuery) => {
+    setColumnQuery(JSON.stringify(query)); setOffset(0);
+  }, []);
+  const changeSearch = useCallback((value: string) => { setSearch(value); setOffset(0); }, []);
+  const [quickReceipt, setQuickReceipt] = useState<WarehouseReceiptQueueRow | null>(null);
   /** `Choose dates…` opens its two fields in the rail; it is not a filter of
    *  its own until both ends are typed. */
-  const [choosing, setChoosing] = useState(false);
+
 
   // A changed filter or search term starts the result set over — page 1.
   const filterKey = [
+    view,
     categorySel,
     supplierSel,
     siteSel,
@@ -174,14 +183,18 @@ export default function OperationReceiving() {
     fromSel,
     toSel,
     cancelledSel ? "1" : "",
+    consignmentSel ? "c" : "",
     search,
   ].join("|");
   useEffect(() => {
     setOffset(0);
   }, [filterKey]);
 
-  const registerQ = useOperationGrnRegister({
+  const registerFilters = {
+    view: view as "records" | "differences",
     offset,
+    limit: presentation === "cards" ? 12 : 50,
+    columns: columnQuery,
     category: categorySel,
     supplier: supplierSel,
     site: siteSel,
@@ -189,8 +202,20 @@ export default function OperationReceiving() {
     from: fromSel,
     to: toSel,
     cancelled: cancelledSel,
+    consignment: consignmentSel,
     q: search,
-  });
+  };
+  const registerQ = useOperationGrnRegister(registerFilters);
+  /* New Goods Receipt with no PO (0728) — Follows Houzs grns.ts:1408 per
+     Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
+  const [newGrnOpen, setNewGrnOpen] = useState(false);
+  const catalogQ = useCatalog({ enabled: newGrnOpen });
+  const newGrnSkus = useMemo(() => {
+    const models = new Map((catalogQ.data?.models ?? []).map((m) => [m.id, m.name]));
+    return (catalogQ.data?.skus ?? [])
+      .filter((s) => !s.discontinuedAt)
+      .map((s) => ({ sku: s.sku, supplierId: s.supplierId, label: `${s.sku} · ${models.get(s.modelId) ?? ""} ${s.variant}`.trim() }));
+  }, [catalogQ.data]);
 
   const rows = useMemo(
     () => registerQ.data?.receipts ?? [],
@@ -244,18 +269,15 @@ export default function OperationReceiving() {
     setParams(next, { replace: true });
   }
 
-  const RAIL_KEYS = ["category", "supplier", "site", "received", "from", "to", "cancelled"];
+  const RAIL_KEYS = ["category", "supplier", "site", "received", "from", "to", "cancelled", "consignment"];
   function clearRail() {
     const next = new URLSearchParams(params);
     for (const key of RAIL_KEYS) next.delete(key);
     setParams(next, { replace: true });
-    setChoosing(false);
   }
 
   /** The rail's date ladder, folded from the SERVER's complete day counts —
    *  so a week's number is the truth about the whole filtered set. */
-  const weeks = useMemo(() => grnDateWeeks(facets.grnDate), [facets.grnDate]);
-  const months = useMemo(() => grnDateMonths(facets.grnDate), [facets.grnDate]);
   const dateChosen = Boolean(fromSel && toSel);
 
   /** Only the governed rows PRESENT in the result set appear (owner
@@ -268,16 +290,6 @@ export default function OperationReceiving() {
       ),
     [facets.category, categorySel],
   );
-  const supplierNames = useMemo(() => {
-    const names = new Set(Object.keys(facets.supplier));
-    if (supplierSel) names.add(supplierSel);
-    return [...names].sort((a, b) => a.localeCompare(b));
-  }, [facets.supplier, supplierSel]);
-  const siteNames = useMemo(() => {
-    const names = new Set(Object.keys(facets.site));
-    if (siteSel) names.add(siteSel);
-    return [...names].sort((a, b) => a.localeCompare(b));
-  }, [facets.site, siteSel]);
 
   /**
    * ⭐ THE APPROVED REGISTER COLUMNS — owner ruling 2026-09-18, in this order
@@ -325,19 +337,20 @@ export default function OperationReceiving() {
       },
       {
         key: "grn",
+        filterValue: receivingDisplayNo,
         label: "GRN No",
         width: REGISTER_FIELD_WIDTH.documentNo,
         sortable: true,
         /* Every Register row IS a GRN (the boundary above) — the formal
            number exists by construction (purchasing/MASTER.md §7.3). */
-        searchValue: (r) => receivingDisplayNo(r),
+        searchValue: (r) => `${r.grn_no ?? ""} ${receivingDisplayNo(r)}`,
         exportValue: (r) =>
           r.status === "voided"
             ? `${receivingDisplayNo(r)} · Cancelled`
             : receivingDisplayNo(r),
         accessor: (r) => (
           <span className="flex flex-col">
-            <span className="font-mono text-meta text-base-900">
+            <span className="font-mono text-body font-semibold text-base-900">
               {receivingDisplayNo(r)}
             </span>
             {r.status === "voided" && (
@@ -345,7 +358,7 @@ export default function OperationReceiving() {
                  number, and only when it is cancelled (owner ruling
                  2026-09-17). */
               <span
-                className="text-label text-kit-red-11"
+                className="text-meta text-kit-red-11"
                 data-testid={`grn-cancelled-${r.id}`}
               >
                 Cancelled
@@ -356,6 +369,7 @@ export default function OperationReceiving() {
       },
       {
         key: "source",
+        filterValue: r => (r.source_refs ?? []).map(ref => documentDisplayNumber(ref)).join(" · "),
         label: "SO No / MPR No / CO No / RO No",
         headerLines: ["SO No / MPR No", "CO No / RO No"],
         width: REGISTER_FIELD_WIDTH.mixedReferenceFourWay,
@@ -364,14 +378,14 @@ export default function OperationReceiving() {
            it has none. No word stands in for a missing number, and no PO is
            invented for a receipt that came back through an arrival source. */
         searchValue: (r) => (r.source_refs ?? []).join(" "),
-        exportValue: (r) => (r.source_refs ?? []).join(" · "),
+        exportValue: (r) => (r.source_refs ?? []).map(ref => documentDisplayNumber(ref)).join(" · "),
         sortFn: (a, b) =>
           (a.source_refs?.[0] ?? "").localeCompare(b.source_refs?.[0] ?? ""),
         accessor: (r) => (
           <span className="flex flex-col">
             {(r.source_refs ?? []).map((ref) => (
-              <span key={ref} className="font-mono text-meta text-base-900">
-                {ref}
+              <span key={ref} className="font-mono text-body text-base-900">
+                {documentDisplayNumber(ref)}
               </span>
             ))}
           </span>
@@ -379,15 +393,16 @@ export default function OperationReceiving() {
       },
       {
         key: "po",
+        filterValue: r => documentDisplayNumber(r.po_id ?? ""),
         label: "PO No",
         width: REGISTER_FIELD_WIDTH.documentNo,
         sortable: true,
         /* Its own column, and blank for a CO or RO receipt that has no
            purchase order — an absence, never a borrowed number. */
-        searchValue: (r) => r.po_id ?? "",
-        exportValue: (r) => r.po_id ?? "",
+        searchValue: (r) => `${r.po_id ?? ""} ${documentDisplayNumber(r.po_id ?? "")}`,
+        exportValue: (r) => documentDisplayNumber(r.po_id ?? ""),
         accessor: (r) => (
-          <span className="font-mono text-meta text-base-900">{r.po_id ?? ""}</span>
+          <span className="font-mono text-body text-base-900">{documentDisplayNumber(r.po_id ?? "")}</span>
         ),
       },
       {
@@ -521,13 +536,14 @@ export default function OperationReceiving() {
         searchValue: (r) => r.do_number ?? "",
         exportValue: (r) => r.do_number ?? "",
         accessor: (r) => (
-          <span className="font-mono text-meta text-base-900">
+          <span className="font-mono text-body text-base-900">
             {r.do_number}
           </span>
         ),
       },
       {
         key: "items",
+        filterValue: r => (r.product_labels ?? []).join(" · "),
         label: "Items",
         width: REGISTER_FIELD_WIDTH.items,
         sortable: true,
@@ -556,6 +572,8 @@ export default function OperationReceiving() {
       },
       {
         key: "receivedQty",
+        filterType: "number",
+        numberValue: r => warehouseReceiptTotals(r.lines).received,
         label: "Received Qty",
         headerLines: ["Received", "Qty"],
         width: REGISTER_FIELD_WIDTH.receiptQty,
@@ -574,6 +592,8 @@ export default function OperationReceiving() {
       },
       {
         key: "damagedQty",
+        filterType: "number",
+        numberValue: r => warehouseReceiptTotals(r.lines).damaged,
         label: "Damaged Qty",
         headerLines: ["Damaged", "Qty"],
         width: REGISTER_FIELD_WIDTH.receiptQty,
@@ -603,6 +623,8 @@ export default function OperationReceiving() {
       },
       {
         key: "wrongQty",
+        filterType: "number",
+        numberValue: r => warehouseReceiptTotals(r.lines).wrongItem,
         label: "Wrong Item Qty",
         headerLines: ["Wrong Item", "Qty"],
         width: REGISTER_FIELD_WIDTH.receiptQty,
@@ -632,6 +654,8 @@ export default function OperationReceiving() {
       },
       {
         key: "extraQty",
+        filterType: "number",
+        numberValue: r => receivingExtraQty(r.extra_lines ?? []),
         label: "Extra Qty",
         headerLines: ["Extra", "Qty"],
         width: REGISTER_FIELD_WIDTH.receiptQty,
@@ -658,13 +682,20 @@ export default function OperationReceiving() {
     [],
   );
 
+  const hasColumnFilters = useMemo(() => {
+    if (!columnQuery) return false;
+    const query: RegisterColumnQuery = JSON.parse(columnQuery);
+    return [query.filters, query.dateFilters, query.numberFilters, query.dateRangeFilters].some(values => Object.keys(values).length > 0);
+  }, [columnQuery]);
   const narrowed =
+    hasColumnFilters ||
     categorySel !== null ||
     supplierSel !== null ||
     siteSel !== null ||
     receivedSel !== null ||
     dateChosen ||
-    cancelledSel;
+    cancelledSel ||
+    (consignmentSel && !consignmentPage);
 
   /**
    * ⭐ THE ACTIVE CONDITIONS LIVE IN THE TOOLBAR — owner correction 2026-09-18.
@@ -734,6 +765,9 @@ export default function OperationReceiving() {
             onClear: () => setFacet("cancelled", null),
           },
         ]
+      : []),
+    ...(consignmentSel && !consignmentPage
+      ? [{ key: "consignment", label: "Consignment goods", onClear: () => setFacet("consignment", null) }]
       : []),
   ];
 
@@ -820,15 +854,28 @@ export default function OperationReceiving() {
     next.delete("arrival");
     next.delete("po");
     next.delete("find");
+    next.delete("queue");
     next.set("session", id);
     setParams(next);
   }
+  /* ONE ROW MENU (owner ruling 2026-10-05): `View · Print`. View opens the
+     receipt's read-first page (Amend stays a button there); Print is the GRN
+     paper, so a receipt not yet posted as a GRN has no Print. Click keeps the
+     quick card. */
+  const rowMenu = (r: WarehouseReceiptQueueRow): DataGridContextMenuItem[] =>
+    documentRowMenu({
+      view: () => openSession(r.id),
+      print: receivingHasGrn(r.status)
+        ? () => void printGrn(r.id).catch(() => toast.error("The GRN could not be opened"))
+        : undefined,
+    });
   function closeObject() {
     const next = new URLSearchParams(params);
     next.delete("arrival");
     next.delete("session");
     next.delete("po");
     next.delete("find");
+    next.delete("queue");
     setParams(next);
   }
 
@@ -838,6 +885,14 @@ export default function OperationReceiving() {
       data-testid="receiving-page"
     >
       <PurchasingTabs />
+      {quickReceipt && <Drawer variant="compact-card" open
+        title={receivingDisplayNo(quickReceipt) || "Receiving"}
+        onOpenChange={(open) => { if (!open) setQuickReceipt(null); }}>
+        <ReceivingCompactView row={quickReceipt}
+          items={(receipt) => <GoodsMiniTable label="Items & quantities" lines={expansionLines(receipt)} receivingLayout itemHeading="Items" />}
+          onOpen={() => { const id = quickReceipt.id; setQuickReceipt(null); openSession(id); }}
+          onClose={() => setQuickReceipt(null)} />
+      </Drawer>}
 
       {/* ── The open object takes the stage; the Register stays MOUNTED
              underneath (`invisible`, never display:none) so Back restores the
@@ -850,6 +905,7 @@ export default function OperationReceiving() {
         <p role="status" className="p-4 text-body">Loading…</p>
       ) : poId ? (
         <PoReceivingView
+          key={poId}
           poId={poId}
           pos={pos}
           suppliers={supplierById}
@@ -858,7 +914,7 @@ export default function OperationReceiving() {
           dutyKnown={!dutyQ.isLoading}
           backLabel="Receiving"
           onBack={closeObject}
-          onOpenSession={openSession}
+          onOpenSession={(id) => setParams(receivingAfterPost(params, id))}
         />
       ) : finding ? (
         <FindPoView
@@ -866,10 +922,12 @@ export default function OperationReceiving() {
           suppliers={supplierById}
           loading={posQ.isLoading}
           onBack={closeObject}
-          onPick={(id) => {
+          onPick={(ids) => {
             const next = new URLSearchParams(params);
             next.delete("find");
-            next.set("po", id);
+            next.set("po", ids[0]);
+            if (ids.length > 1) next.set("queue", ids.slice(1).join(","));
+            else next.delete("queue");
             setParams(next);
           }}
         />
@@ -883,157 +941,9 @@ export default function OperationReceiving() {
         data-testid="receiving-register"
       >
         <FilterRail testId="receiving-rail">
-          {/* ── GRN Doc Date — weeks, their days, months, and Choose dates… ─────
-              The date is the GRN's CREATION date. Nothing has to be chosen to
-              see records: this group NARROWS a listing that is already
-              complete. The arrow beside a week only opens it; pressing a
-              week, a month or a day is what filters. Only periods that HAVE
-              GRNs are listed — Sunday included, because a GRN can be created
-              on one. Every count is a count of GRN RECORDS. */}
-          <FilterRailGroup title="GRN Doc Date" icon="date">
-            {weeks.map((w) => (
-              <FilterRailExpandableRow
-                key={w.from}
-                label={weekLabel(w.from, w.to)}
-                count={w.count}
-                active={fromSel === w.from && toSel === w.to}
-                onClick={() => setGrnDate(w.from, w.to)}
-                expandLabel={`Show the days in ${weekLabel(w.from, w.to)}`}
-                testId={`rail-grn-week-${w.from}`}
-              >
-                {w.days.map((d) => (
-                  <FilterRailRow
-                    key={d.iso}
-                    label={fmtDateShort(d.iso)}
-                    count={d.count}
-                    active={fromSel === d.iso && toSel === d.iso}
-                    onClick={() => setGrnDate(d.iso, d.iso)}
-                    testId={`rail-grn-day-${d.iso}`}
-                  />
-                ))}
-              </FilterRailExpandableRow>
-            ))}
-            {months.map((m) => (
-              <FilterRailRow
-                key={m.period}
-                label={fmtMonth(m.period)}
-                count={m.count}
-                active={fromSel === m.from && toSel === m.to}
-                onClick={() => setGrnDate(m.from, m.to)}
-                testId={`rail-grn-month-${m.period}`}
-              />
-            ))}
-            <FilterRailRow
-              label="Choose dates…"
-              active={false}
-              onClick={() => setChoosing((v) => !v)}
-              testId="rail-grn-choose"
-            />
-            {choosing && (
-              /* Two real fields, both labelled: a range is not a filter until
-                 both ends exist, so nothing narrows while one is being
-                 typed. */
-              <div
-                className="flex flex-col gap-1 px-2 pb-1"
-                data-testid="rail-grn-range"
-              >
-                <span className="text-label text-kit-slate-11">From</span>
-                <DateField
-                  aria-label="GRN Doc Date from"
-                  value={fromSel ?? ""}
-                  fullWidth
-                  onChange={(iso) =>
-                    setGrnDate(iso || null, toSel ?? (iso || null))
-                  }
-                />
-                <span className="text-label text-kit-slate-11">To</span>
-                <DateField
-                  aria-label="GRN Doc Date to"
-                  value={toSel ?? ""}
-                  fullWidth
-                  onChange={(iso) =>
-                    setGrnDate(fromSel ?? (iso || null), iso || null)
-                  }
-                />
-              </div>
-            )}
-          </FilterRailGroup>
-
-          {/* ── Received with — a RECORD of what was found at receiving, not
-              a to-do list. Counted by GRN, and a GRN that carries two of them
-              appears in two rows: these three numbers OVERLAP and may never
-              be added into a total. */}
-          <FilterRailGroup title="Received with" icon="goods">
-            {RECEIVED_WITH_ROWS.map((row) => (
-              <FilterRailRow
-                key={row.key}
-                label={row.label}
-                count={facets.receivedWith[row.key] ?? 0}
-                active={receivedSel === row.key}
-                onClick={() => setFacet("received", row.key)}
-                testId={`rail-received-${row.key}`}
-              />
-            ))}
-          </FilterRailGroup>
-
-          {/* Only the governed category rows PRESENT in the result set, in
-              the shared ladder's order — no `Any`, no `All …`, no invented
-              category. Counts speak for the COMPLETE filtered result set;
-              re-clicking the active row clears the section. */}
-          <FilterRailGroup title="Category" icon="goods">
-            {categoryRows.map((word) => (
-              <FilterRailRow
-                key={word}
-                label={word}
-                count={facets.category[word] ?? 0}
-                active={categorySel === word}
-                onClick={() => setFacet("category", word)}
-                testId={`rail-category-${word}`}
-              />
-            ))}
-          </FilterRailGroup>
-
-          {/* The receiving locations actually present in the records —
-              where the goods PHYSICALLY arrived. */}
-          <FilterRailGroup title="Goods arrived at" icon="warehouse">
-            {siteNames.map((name) => (
-              <FilterRailRow
-                key={name}
-                label={name}
-                count={facets.site[name] ?? 0}
-                active={siteSel === name}
-                onClick={() => setFacet("site", name)}
-                testId={`rail-site-${name}`}
-              />
-            ))}
-          </FilterRailGroup>
-
-          {/* The suppliers actually present in Receiving records. */}
-          <FilterRailGroup title="Supplier" icon="supplier">
-            {supplierNames.map((name) => (
-              <FilterRailRow
-                key={name}
-                label={name}
-                count={facets.supplier[name] ?? 0}
-                active={supplierSel === name}
-                onClick={() => setFacet("supplier", name)}
-                testId={`rail-supplier-${name}`}
-              />
-            ))}
-          </FilterRailGroup>
-
-          {/* The last ROW, not a group of one: a cancelled GRN keeps its row
-              and its number in the register forever, and this narrows to
-              them. There is no `Clear filters` button beneath it. */}
-          <div className="border-t border-kit-slate-5 py-2">
-            <FilterRailRow
-              label="Cancelled GRNs"
-              count={facets.cancelled}
-              active={cancelledSel}
-              onClick={() => setFacet("cancelled", cancelledSel ? null : "1")}
-              testId="rail-cancelled"
-            />
-          </div>
+          {([['records', 'GRN Records'], ['differences', 'Receiving Differences']] as const).map(([key, label]) =>
+            <RailItem key={key} label={label} active={view === key} testId={`receiving-view-${key}`}
+              onClick={() => { const next = new URLSearchParams(params); next.set("view", key); if (key === "differences") next.delete("cancelled"); setOffset(0); setQuickReceipt(null); setParams(next); }} />)}
         </FilterRail>
 
         {/* ⭐ `min-w-0` IS LOAD-BEARING — measured on the 2026-09-19 walk.
@@ -1058,7 +968,7 @@ export default function OperationReceiving() {
               </p>
               <button
                 type="button"
-                className="rounded-control border border-base-200 bg-white px-3 py-1.5 text-meta font-medium text-base-700 hover:bg-hovertint"
+                className="rounded-control border border-base-200 bg-white px-3 py-1.5 text-body font-medium text-base-700 hover:bg-hovertint"
                 onClick={() => void registerQ.refetch()}
               >
                 Try again
@@ -1067,6 +977,18 @@ export default function OperationReceiving() {
           ) : (
             <DataGrid<WarehouseReceiptQueueRow>
               appearance="reference"
+              presentationTools
+              presentationKey={presentation}
+              sessionKey={registerSessionKey}
+              toolbarEnd={<Tabs variant="segmented" label="Receiving view" value={presentation} onValueChange={changePresentation}
+                tabs={[{ value: "table", label: "Table", icon: "table" }, { value: "cards", label: "Cards", icon: "cards" }]} />}
+              renderResults={presentation === "cards" ? visible => <div className="grid grid-cols-1 gap-3 p-3 xl:grid-cols-2" data-testid="receiving-cards">
+                {visible.map(receipt => <div key={receipt.id} data-row-key={receipt.id}>
+                  <ReceivingCompactView row={receipt}
+                    items={current => <GoodsMiniTable label="Items & quantities" lines={expansionLines(current)} receivingLayout itemHeading="Items" />}
+                    onOpen={() => openSession(receipt.id)} onClose={() => changePresentation("table")} />
+                </div>)}
+              </div> : undefined}
               rows={rows}
               columns={columns}
               /* v2 — the approved sixteen-column, date-first register
@@ -1075,15 +997,18 @@ export default function OperationReceiving() {
               storageKey="carres.receiving.register.v2"
               rowKey={(r) => r.id}
               exportName="Receiving"
+              loadExportRows={() => fetchGrnRegisterExport(registerFilters)}
               searchPlaceholder="GRN, PO, supplier or DO number…"
-              isLoading={registerQ.isLoading}
-              onSearchChange={setSearch}
+              isLoading={registerQ.isLoading || registerQ.isFetching}
+              onSearchChange={changeSearch}
+              serverColumns={{ values: registerQ.data?.column_values ?? {}, onChange: changeColumns }}
               /* GRN Doc Date and GRN No lead and pin at a canvas ≥768px; below it
                  the number pins alone. No column is hidden by width. */
               leadingColumns={{ date: "grnDate", identity: "grn" }}
               activeConditions={activeConditions}
               onClearConditions={clearRail}
               groupBanner={false}
+              allowColumnGrouping={false}
               /* Receiving is UNGROUPED — one sticky header, no business
                  groups. The group-local header pattern applies to registers
                  that HAVE groups; inventing GRN groups to use it would be a
@@ -1096,7 +1021,7 @@ export default function OperationReceiving() {
                 renderExpansion: (r) => (
                   <div className="px-2 py-3" data-testid={`grn-goods-${r.id}`}>
                     <GoodsMiniTable
-                      label={`Goods on ${receivingDisplayNo(r)}`}
+                      label={receivingDisplayNo(r) ? `Goods on ${receivingDisplayNo(r)}` : "Items & quantities"}
                       lines={expansionLines(r)}
                       receivingLayout
                       itemHeading="Items"
@@ -1104,8 +1029,9 @@ export default function OperationReceiving() {
                   </div>
                 ),
               }}
-              onRowClick={(r) => openSession(r.id)}
-              toolbarStart={
+              onRowClick={setQuickReceipt}
+              contextMenu={rowMenu}
+              toolbarStart={<>
                 <button
                   type="button"
                   data-testid="start-receiving-door"
@@ -1120,7 +1046,34 @@ export default function OperationReceiving() {
                 >
                   Start Receiving
                 </button>
-              }
+                <Button icon="add" onClick={() => setNewGrnOpen(true)} data-testid="grn-new-without-po">New Goods Receipt</Button>
+                <NewGoodsReceiptModal open={newGrnOpen} onOpenChange={setNewGrnOpen}
+                  suppliers={(suppliersQ.data?.suppliers ?? []).map((s) => ({ id: s.id, name: s.name }))}
+                  destinations={posQ.data?.destinations ?? []} skus={newGrnSkus}
+                  onPosted={() => { setNewGrnOpen(false); void registerQ.refetch(); }} />
+                <CPopover label="Filters" trigger={<Button>Filters</Button>}>
+                  <div data-testid="receiving-list-filters">
+                    <FilterRailGroup title="Received with" icon="goods">
+                      {RECEIVED_WITH_ROWS.map(row => <FilterRailRow key={row.key} label={row.label}
+                        count={facets.receivedWith[row.key] ?? 0} active={receivedSel === row.key}
+                        onClick={() => setFacet("received", row.key)} testId={`rail-received-${row.key}`} />)}
+                    </FilterRailGroup>
+                    <FilterRailGroup title="Category" icon="goods">
+                      {categoryRows.map(word => <FilterRailRow key={word} label={word}
+                        count={facets.category[word] ?? 0} active={categorySel === word}
+                        onClick={() => setFacet("category", word)} testId={`rail-category-${word}`} />)}
+                    </FilterRailGroup>
+                    {view === "records" && <div className="border-t border-kit-slate-5 py-2">
+                      <FilterRailRow label="Cancelled GRNs" count={facets.cancelled} active={cancelledSel}
+                        onClick={() => setFacet("cancelled", cancelledSel ? null : "1")} testId="rail-cancelled" />
+                    </div>}
+                    {!consignmentPage && <div className="border-t border-kit-slate-5 py-2">
+                      <FilterRailRow label="Consignment goods" count={facets.consignment ?? 0} active={consignmentSel}
+                        onClick={() => setFacet("consignment", consignmentSel ? null : "1")} testId="rail-consignment" />
+                    </div>}
+                  </div>
+                </CPopover>
+              </>}
               emptyMessage={
                 !narrowed && search.trim() === ""
                   ? // The record is what is empty — never "the goods have not
@@ -1146,7 +1099,7 @@ export default function OperationReceiving() {
                       onClick={() =>
                         setOffset(Math.max(0, offset - page.limit))
                       }
-                      className="rounded-control border border-kit-slate-5 bg-white px-2 py-0.5 text-meta text-kit-slate-11 hover:bg-kit-slate-3 disabled:text-kit-slate-11 disabled:bg-kit-slate-2 disabled:hover:bg-kit-slate-2"
+                      className="rounded-control border border-kit-slate-5 bg-white px-2 py-0.5 text-body font-medium text-kit-slate-11 hover:bg-kit-slate-3 disabled:text-kit-slate-11 disabled:bg-kit-slate-2 disabled:hover:bg-kit-slate-2"
                     >
                       Previous
                     </button>
@@ -1155,7 +1108,7 @@ export default function OperationReceiving() {
                       data-testid="grn-page-next"
                       disabled={to >= page.total}
                       onClick={() => setOffset(offset + page.limit)}
-                      className="rounded-control border border-kit-slate-5 bg-white px-2 py-0.5 text-meta text-kit-slate-11 hover:bg-kit-slate-3 disabled:text-kit-slate-11 disabled:bg-kit-slate-2 disabled:hover:bg-kit-slate-2"
+                      className="rounded-control border border-kit-slate-5 bg-white px-2 py-0.5 text-body font-medium text-kit-slate-11 hover:bg-kit-slate-3 disabled:text-kit-slate-11 disabled:bg-kit-slate-2 disabled:hover:bg-kit-slate-2"
                     >
                       Next
                     </button>
@@ -1183,9 +1136,11 @@ function FindPoView({
   suppliers: Map<string, SupplierRow>;
   loading: boolean;
   onBack: () => void;
-  onPick: (poId: string) => void;
+  onPick: (poIds: string[]) => void;
 }) {
   const [q, setQ] = useState("");
+  const [ticked, setTicked] = useState<string[]>([]);
+  const pickedPos = pos.filter((p) => ticked.includes(p.id));
   const candidates = useMemo(() => {
     const owing = pos.filter(poStillOwes);
     const needle = q.trim().toLowerCase();
@@ -1243,14 +1198,22 @@ function FindPoView({
               0,
             );
             return (
+              <div key={p.id} className="flex items-center gap-2">
+              <Checkbox
+                id={`receiving-tick-${p.id}`}
+                label=""
+                ariaLabel={`Tick ${p.id}`}
+                checked={ticked.includes(p.id)}
+                disabled={!ticked.includes(p.id) && !sameSupplierPick(pickedPos, p)}
+                onCheckedChange={(on) => setTicked((prev) => (on === true ? [...prev, p.id] : prev.filter((x) => x !== p.id)))}
+              />
               <button
-                key={p.id}
                 type="button"
-                onClick={() => onPick(p.id)}
+                onClick={() => onPick([p.id])}
                 data-testid={`receiving-find-${p.id}`}
-                className="flex items-center gap-3 py-2.5 text-left hover:bg-kit-slate-3"
+                className="flex min-w-0 flex-1 items-center gap-3 py-2.5 text-left hover:bg-kit-slate-3"
               >
-                <span className="w-44 shrink-0 font-mono text-meta text-base-900">
+                <span className="w-44 shrink-0 font-mono text-body text-base-900">
                   {p.id}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-body text-base-900">
@@ -1265,10 +1228,18 @@ function FindPoView({
                   </span>
                 ) : null}
               </button>
+              </div>
             );
           })
         )}
       </div>
+      {ticked.length > 0 ? (
+        <div className="mt-3">
+          <Button variant="primary" onClick={() => onPick(ticked)} data-testid="receiving-find-receive-selected">
+            {`Receive selected (${ticked.length})`}
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

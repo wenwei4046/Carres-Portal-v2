@@ -122,7 +122,7 @@ export default function InvoiceSendReceipt({ invoice, templates, receiptNo, amou
         <h2 className="text-strong mb-2">Send receipt</h2>
         <div className="space-y-2 text-body">
           {templates.length > 1 && <label className="block">
-            <span className="text-label">Template</span>
+            <span className="text-meta text-kit-slate-11">Template</span>
             <select value={chosen?.template_key ?? ""} aria-label="Change template"
               onChange={(e) => { setChosenKey(e.target.value || null); setText(null); }}
               className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body">
@@ -132,7 +132,7 @@ export default function InvoiceSendReceipt({ invoice, templates, receiptNo, amou
             </select>
           </label>}
           <label className="block">
-            <span className="text-label">Message</span>
+            <span className="text-meta text-kit-slate-11">Message</span>
             <textarea value={shown} onChange={(e) => setText(e.target.value)}
               rows={9} aria-label="Message"
               className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body" />
@@ -142,11 +142,11 @@ export default function InvoiceSendReceipt({ invoice, templates, receiptNo, amou
             <button className="btn-secondary" onClick={openWa}>Open WhatsApp</button>
           </div>
           <label className="block">
-            <span className="text-label">Sent screenshot</span>
+            <span className="text-meta text-kit-slate-11">Sent screenshot</span>
             <input type="file" accept="image/*"
               onChange={(e) => acceptFile(e.target.files?.[0])}
               aria-label="Sent screenshot" className="mt-0.5 block w-full text-meta" />
-            <span className="text-label font-normal">
+            <span className="text-meta">
               {file ? file.name : "Opening WhatsApp is not sent. Add the sent screenshot to record it."}
             </span>
           </label>

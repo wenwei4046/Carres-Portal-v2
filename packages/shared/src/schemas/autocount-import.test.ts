@@ -10,7 +10,7 @@ const validRow = {
   itemGroup: "Mattress",
   qty: 1,
   detailDescription: "Breeze FirmCare-B1201F-K",
-  debtorName: "Felix Koh",
+  debtorName: "TEST customer 002",
 };
 
 describe("autocountImportRowSchema", () => {

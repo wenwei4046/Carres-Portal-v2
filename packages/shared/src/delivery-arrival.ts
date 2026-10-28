@@ -16,12 +16,12 @@
  * ── WHAT IT DELIBERATELY DOES NOT OWN ───────────────────────────────────────
  *
  * It computes NO arrival date. `purchase_orders.eta_date` is already
- * `expectedArrivalOf`'s production-plus-transit result, counted on the
- * factory's own week and the office week (`purchasing-settings.ts`), and
+ * `expectedArrivalOf`'s production-days result, counted on the factory's own
+ * week (`purchasing-settings.ts`; transit leg removed 2026-09-29), and
  * `official_delivery_date` is the immutable date the supplier was actually
  * given (0428). Recomputing either here would be the second arithmetic Law D
  * exists to prevent — and the one that would silently disagree the first time
- * a supplier's transit days changed.
+ * a supplier's production days changed.
  *
  * It also invents nothing. No date, no confirmation, no "probably". A purchase
  * order with no date at all produces the governed absence, and the work that
@@ -69,7 +69,7 @@ export interface PoArrival {
   status: string | null;
   /** The SKUs this purchase order still OWES (qty > received). */
   owedSkus: string[];
-  /** OUR production-plus-transit prediction (`eta_date`). */
+  /** OUR production-days prediction (`eta_date`). */
   plannedIso: string | null;
   /** The immutable supplier-facing original (`official_delivery_date`). */
   originalIso: string | null;
@@ -468,8 +468,8 @@ export function deliveryArrivalStateOf(input: ArrivalStateInput): DeliveryArriva
  *
  * ONE word is new and is registered in COPY-STANDARD beside these:
  * `No expected arrival calculated` — nobody has asked the supplier and nobody
- * could compute a date either, because the production or transit time this
- * supplier and category need has never been set. Saying `The factory has not
+ * could compute a date either, because the production time this supplier and
+ * category need has never been set. Saying `The factory has not
  * given a date` there would blame a factory nobody contacted.
  */
 export const ARRIVAL_COPY = {

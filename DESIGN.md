@@ -21,6 +21,10 @@ copy, component, or business-rule system.
 
 ## Decisions
 
+- 2026-09-30 — Routine Delivery UI build reuses DeliveryBrief, DeliverySettings and the existing
+  Input/Select/Row/PageShell kit. ETA edits the existing arrangement fact; company contact and
+  success-proof minimum are fixed policy. No new component or token is introduced.
+
 - 2026-09-16 — Owner-approved Work is an execution workspace, not a read-only directory. My Work
   opens with `Missed` plus the actual current governed day (or next eligible day when a named public
   holiday admits no operation) while the full week remains visible. Panel 3 declares `embedded`,

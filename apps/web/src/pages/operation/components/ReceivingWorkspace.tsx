@@ -208,7 +208,7 @@ function ReadMode({
         </span>
       </div>
 
-      {/* RECEIVING SUMMARY — the five governed quantity words. Each fact
+      {/* RECEIVING SUMMARY — the governed quantity words, including effective cancellation. Each fact
           prints its own number; the operator never subtracts (owner
           correction 2026-08-29). */}
       <Section title="Receiving Summary">
@@ -238,6 +238,7 @@ function ReadMode({
             {summary.wrongItemQty}
           </span>
         </Prop>
+        {(summary.cancelledQty??0)>0 ? <Prop label="Cancelled Qty"><span className="tabular-nums" data-testid="summary-cancelled-qty">{summary.cancelledQty}</span></Prop> : null}
         <Prop label="Pending Delivery Qty">
           <span
             className={summary.pendingDeliveryQty > 0 ? "tabular-nums" : "tabular-nums text-kit-slate-9"}
@@ -263,12 +264,12 @@ function ReadMode({
           /* The same rule the SQL door holds (0601, owner 2026-09-25): every
              active Operation staff member may receive. A button the server
              would refuse is never offered. */
-          <div className="mt-2 text-label text-kit-slate-9" data-testid="receiving-duty-refusal">
+          <div className="mt-2 text-meta text-kit-slate-11" data-testid="receiving-duty-refusal">
             Only Operation staff may save a receiving.
           </div>
         )}
         {closed && (
-          <div className="mt-2 text-label text-kit-slate-9">
+          <div className="mt-2 text-meta text-kit-slate-11">
             This purchase order is closed.
           </div>
         )}
@@ -310,7 +311,7 @@ function ReadMode({
             {incoming.map((u) => (
               <span
                 key={u.id}
-                className="rounded-full border border-kit-slate-5 px-2 py-0.5 font-mono text-label text-kit-slate-11"
+                className="rounded-full border border-kit-slate-5 px-2 py-0.5 font-mono text-meta font-medium text-kit-slate-11"
               >
                 {u.unit_code}
               </span>
@@ -352,16 +353,16 @@ function ReadMode({
       {/* ACTIVITY reads the Event Ledger and nothing else (§6). */}
       <Section title="Activity">
         {loadingEvents ? (
-          <div className="text-label text-kit-slate-9">Loading…</div>
+          <div className="text-meta text-kit-slate-11">Loading…</div>
         ) : events.length === 0 ? (
-          <div className="text-label text-kit-slate-9" data-testid="receiving-activity-empty">
+          <div className="text-meta text-kit-slate-11" data-testid="receiving-activity-empty">
             No receiving activity yet.
           </div>
         ) : (
           <ul className="flex flex-col gap-1" data-testid="receiving-activity">
             {events.map((e) => (
               <li key={e.id} className="flex items-baseline gap-2 text-body">
-                <span className="text-label text-kit-slate-9 tabular-nums shrink-0 w-16">
+                <span className="text-meta text-kit-slate-11 tabular-nums shrink-0 w-16">
                   {fmtDateShort(e.event_at.slice(0, 10))}
                 </span>
                 <span className="min-w-0 text-kit-slate-12">
@@ -695,7 +696,7 @@ function ReceivingMode({
       {/* 2 · Receiving Details */}
       <Section title="Receiving Details">
         <div className="receiving-details-row flex items-center gap-2 text-body leading-6">
-          <span className="w-32 shrink-0 text-label text-kit-slate-9">
+          <span className="w-32 shrink-0 text-meta text-kit-slate-11">
             Goods Received Date
           </span>
           <input
@@ -709,13 +710,13 @@ function ReceivingMode({
           />
         </div>
         <div className="receiving-details-row mt-1 flex items-center gap-2 text-body leading-6">
-          <span className="w-32 shrink-0 text-label text-kit-slate-9">
+          <span className="w-32 shrink-0 text-meta text-kit-slate-11">
             Supplier Deliver To
           </span>
           <span className="text-body text-kit-slate-12">{warehouseName}</span>
         </div>
         <div className="receiving-details-row mt-1 flex items-center gap-2 text-body leading-6">
-          <span className="w-32 shrink-0 text-label text-kit-slate-9">
+          <span className="w-32 shrink-0 text-meta text-kit-slate-11">
             Goods arrived at
           </span>
           {/* Where the goods PHYSICALLY arrived. It never overwrites
@@ -741,7 +742,7 @@ function ReceivingMode({
              staff member at a Carres site — a grey automatic fact, never a
              field to type (UI MASTER: `Fact` `automatic`). */
           <div className="receiving-details-row mt-1 flex items-center gap-2 text-body leading-6">
-            <span className="w-32 shrink-0 text-label text-kit-slate-9">
+            <span className="w-32 shrink-0 text-meta text-kit-slate-11">
               Received by
             </span>
             <div
@@ -750,14 +751,14 @@ function ReceivingMode({
               aria-label="Received by"
               data-kit="automatic-field"
               data-testid="received-by"
-              className={`${CONTROL_BASE.replace("bg-white", "bg-kit-slate-3")} ${CONTROL_BORDER.rest} rounded-control min-h-8 min-w-0 break-words px-2 py-1`}
+              className={`${CONTROL_BASE.replace("bg-c-card ", "bg-c-search-bg ")} ${CONTROL_BORDER.rest} rounded-control min-h-8 min-w-0 break-words px-2 py-1`}
             >
               {receiver.name ?? "Staff identity not recorded"}
             </div>
           </div>
         ) : null}
         <div className="receiving-details-row mt-1 flex items-center gap-2 text-body leading-6">
-          <span className="w-32 shrink-0 text-label text-kit-slate-9">
+          <span className="w-32 shrink-0 text-meta text-kit-slate-11">
             Supplier DO No
           </span>
           <input
@@ -770,7 +771,7 @@ function ReceivingMode({
           />
         </div>
         <div className="receiving-details-row mt-1 flex items-start gap-2 text-body leading-6">
-          <span className="w-32 shrink-0 text-label text-kit-slate-9">
+          <span className="w-32 shrink-0 text-meta text-kit-slate-11">
             Signed DO photo
           </span>
           <span className="min-w-0 flex-1">
@@ -782,7 +783,7 @@ function ReceivingMode({
           </span>
         </div>
         <div className="receiving-details-row mt-1 flex items-start gap-2 text-body leading-6">
-          <span className="w-32 shrink-0 text-label text-kit-slate-9">
+          <span className="w-32 shrink-0 text-meta text-kit-slate-11">
             Arrival evidence
           </span>
           <span className="min-w-0 flex-1">
@@ -796,7 +797,7 @@ function ReceivingMode({
           </span>
         </div>
         <div className="receiving-details-row mt-1 flex items-center gap-2 text-body leading-6">
-          <span className="w-32 shrink-0 text-label text-kit-slate-9">
+          <span className="w-32 shrink-0 text-meta text-kit-slate-11">
             Note (optional)
           </span>
           <input
@@ -959,7 +960,7 @@ function ReceivingMode({
               {v.wrongItemQty > 0 && (
                 <div className="mt-1 pl-2 border-l-2 border-kit-red-9">
                   <div className="flex items-center gap-2 text-body leading-6">
-                    <span className="text-label text-kit-slate-9">
+                    <span className="text-meta text-kit-slate-11">
                       What kind of wrong?
                     </span>
                     <select
@@ -1000,7 +1001,7 @@ function ReceivingMode({
              pending arithmetic. First check whether they belong to another
              PO/CO (owner instruction §6). */}
       <Section title="Extra goods">
-        <p className="text-label text-kit-slate-9">
+        <p className="text-meta text-kit-slate-11">
           Goods that are not on this purchase order. Check another PO first.
           Extra goods never enter Inventory.
         </p>
@@ -1035,7 +1036,7 @@ function ReceivingMode({
             <button
               type="button"
               onClick={() => setExtraLines((xs) => xs.filter((_, j) => j !== i))}
-              className="text-label text-kit-slate-9 hover:text-kit-slate-12"
+              className="text-body font-medium text-kit-slate-11 hover:text-kit-slate-12"
             >
               Remove
             </button>
@@ -1069,7 +1070,7 @@ function ReceivingMode({
             {lineViews.reduce((s, v) => s + v.wrongItemQty, 0)}
           </span>
         </Prop>
-        <div className="mt-2 text-label text-kit-slate-9" data-testid="posting-consequences">
+        <div className="mt-2 text-meta text-kit-slate-11" data-testid="posting-consequences">
           Valid received Units enter Inventory at{" "}
           {warehouses.find((w) => w.id === (actualSiteId || po.warehouse_id))
             ?.name ?? warehouseName}
@@ -1087,7 +1088,7 @@ function ReceivingMode({
       </Section>
 
       {err && (
-        <div className="mt-2 text-label text-kit-red-11" data-testid="receiving-error">
+        <div className="mt-2 text-meta text-kit-red-11" data-testid="receiving-error">
           {err}
         </div>
       )}
@@ -1099,12 +1100,12 @@ function ReceivingMode({
           type="button"
           onClick={onDone}
           data-testid="receiving-cancel"
-          className="text-label text-kit-slate-9 hover:text-kit-slate-12"
+          className="text-body font-medium text-kit-slate-11 hover:text-kit-slate-12"
         >
           Cancel
         </button>
         <span
-          className="ml-auto text-label text-kit-slate-9 tabular-nums"
+          className="ml-auto text-meta text-kit-slate-11 tabular-nums"
           data-testid="pending-after-save"
         >
           Pending Delivery Qty after save: {pendingAfter}

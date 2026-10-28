@@ -11,8 +11,12 @@
  * The principal alone also sees `New journal entry` (ruling M), which opens
  * the manual journal form at `?entry=new`; for anyone else `new` is just a
  * number nobody has.
+ *
+ * FINANCE LOOK (Chew 2026-10-13): the narration wraps rather than being cut,
+ * and a zero amount is a blank cell. A running balance of nothing still reads
+ * RM 0.00: after an entry, a cleared account is the answer, not an empty cell.
  */
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { DepartmentFilter } from "../department";
 import type { LedgerEntryRow } from "@carres/shared/finance-ledger";
@@ -44,6 +48,10 @@ import {
   type JournalScope,
 } from "./ledger-queries";
 import ManualJournalForm from "./ManualJournalForm";
+import { amountCell, FINANCE_WIDTH } from "../finance-widths";
+import { useFinancePersonalLayouts } from "../finance-layouts";
+import { documentRowMenu } from "@/components/register/row-menu";
+import { EntryPreview } from "../preview/previews";
 
 const ALL_ACCOUNTS = "all";
 const NEW_ENTRY = "new";
@@ -110,6 +118,9 @@ function JournalRegister({ scope, search, onOpen, onPickDept, onPickAccount, onS
   /** Present only for the principal. */
   onNew?: () => void;
 }) {
+  const personalLayouts = useFinancePersonalLayouts("finance_journal");
+  // Double-click previews the entry (Chew 2026-10-21); View opens its page.
+  const [peek, setPeek] = useState<string | null>(null);
   const query = useLedgerEntries(scope);
   const chart = useLedgerChart();
   const accounts = useMemo(
@@ -122,8 +133,11 @@ function JournalRegister({ scope, search, onOpen, onPickDept, onPickAccount, onS
   // One account picked: each entry shows the account's balance after it. The
   // rows run in the ledger's own order (date, then entry number, newest first)
   // so the balances read down the page, and the column shows only while no
-  // column sort is on: sorted any other way, the figures would not follow on.
+  // column sort or grouping is on: in any other order the figures would not
+  // follow on.
   const [sort, setSort] = useState<{ key: string; dir: "asc" | "desc" } | null>(null);
+  const [grouped, setGrouped] = useState(false);
+  const onGroupByChange = useCallback((g: string[]) => setGrouped(g.length > 0), []);
   const loaded = query.data?.rows;
   const rows = useMemo(() => !loaded || !scope.account ? loaded ?? [] : [...loaded].sort((a, b) =>
     b.entry_date.localeCompare(a.entry_date) || (a.entry_no < b.entry_no ? 1 : a.entry_no > b.entry_no ? -1 : 0)),
@@ -132,25 +146,25 @@ function JournalRegister({ scope, search, onOpen, onPickDept, onPickAccount, onS
   const balanceData = scope.account ? balances.data : undefined;
 
   const columns = useMemo<DataGridColumn<LedgerEntryRow>[]>(() => [
-    { key: "entry", label: "Entry No", width: 150, accessor: (r) => r.entry_no,
+    { key: "entry", label: "Entry No", width: FINANCE_WIDTH.entryNo, accessor: (r) => r.entry_no,
       searchValue: (r) => r.entry_no, filterValue: (r) => r.entry_no, filterType: "numbering" },
-    { key: "date", label: "Date", width: 140, accessor: (r) => fmtDate(r.entry_date),
+    { key: "date", label: "Date", width: 120, accessor: (r) => fmtDate(r.entry_date),
       dateValue: (r) => r.entry_date, filterType: "date", exportValue: (r) => fmtDate(r.entry_date) },
     { key: "source", label: "Source", width: 190, accessor: (r) => ledgerSourceWord(r.source_type),
       searchValue: (r) => ledgerSourceWord(r.source_type), filterType: "enum" },
     { key: "document", label: "Document", width: 170, accessor: (r) => ledgerDocWord(r.source_doc_no),
       searchValue: (r) => ledgerDocWord(r.source_doc_no), filterValue: (r) => ledgerDocWord(r.source_doc_no),
       filterType: "numbering" },
-    { key: "narration", label: "Narration", width: 280, accessor: (r) => r.narration ?? "No narration",
+    { key: "narration", label: "Narration", width: 200, wrap: true, accessor: (r) => r.narration ?? "No narration",
       searchValue: (r) => r.narration ?? "" },
-    { key: "amount", label: "Amount", width: 140, align: "right", accessor: (r) => rm(r.total_debit),
+    { key: "amount", label: "Amount", width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.total_debit),
       numberValue: (r) => r.total_debit, filterType: "number", exportValue: (r) => r.total_debit },
-    { key: "reversal", label: "Reversal", width: 230,
+    { key: "reversal", label: "Reversal", width: 230, defaultHidden: true,
       accessor: (r) => <ReversalLink row={r} search={search} />,
       searchValue: (r) => ledgerReversalText(r), filterValue: (r) => ledgerReversalKind(r),
       filterType: "enum", exportValue: (r) => ledgerReversalText(r) },
-    ...(balanceData && !sort ? [balanceColumn(balanceData)] : []),
-  ], [search, balanceData, sort]);
+    ...(balanceData && !sort && !grouped ? [balanceColumn(balanceData)] : []),
+  ], [search, balanceData, sort, grouped]);
 
   const accountOptions = useMemo(() => [
     { value: ALL_ACCOUNTS, label: "All accounts" },
@@ -179,8 +193,8 @@ function JournalRegister({ scope, search, onOpen, onPickDept, onPickAccount, onS
         <button type="button" className="underline underline-offset-2" onClick={() => void balances.refetch()}>Try again</button>
       </div>}
       <ListPageShell register>
-        <DataGrid rows={rows} columns={columns} rowKey={(r) => r.id} onSortChange={setSort}
-          storageKey="carres.finance.journal.v1" appearance="reference" exportName="Journal"
+        <DataGrid rows={rows} columns={columns} rowKey={(r) => r.id} onSortChange={setSort} onGroupByChange={onGroupByChange}
+          storageKey="carres.finance.journal.v3" appearance="reference" look="finance" personalLayouts={personalLayouts} fillColumn="narration" exportName="Journal"
           groupBanner={false} stickyIdentity isLoading={!query.isSuccess}
           searchPlaceholder="Search entries…"
           toolbarStart={<span className="flex items-center gap-3 text-body">
@@ -198,13 +212,15 @@ function JournalRegister({ scope, search, onOpen, onPickDept, onPickAccount, onS
             </span>}
           </span>}
           emptyMessage={emptyWords(scope)}
-          expandTitle="Show lines" onRowDoubleClick={(r) => onOpen(r.entry_no)}
+          expandTitle="Show lines" onRowDoubleClick={(r) => setPeek(r.entry_no)}
+          contextMenu={(r) => documentRowMenu({ view: () => onOpen(r.entry_no) })}
           expandable={{ renderExpansion: (r) => <EntryExpansion row={r} onOpen={onOpen} /> }}
           statusSummary={(visible) => <span data-testid="journal-summary">
             {visible.length} {visible.length === 1 ? "entry" : "entries"}
           </span>}
         />
       </ListPageShell>
+      <EntryPreview entryNo={peek} onClose={() => setPeek(null)} onView={(no) => { setPeek(null); onOpen(no); }} />
     </>}
   </div>;
 }

@@ -110,38 +110,58 @@ soBatchReadyStockRouter.get("/:orderId/ready-stock", requireOperation, async (c)
      (0471), so neither number is a share of an order-level total. */
   const reservedByLine = new Map<string, { qty: number; codes: string[] }>();
   const onPoByLine = new Map<string, number>();
+  const remainingByLine = new Map<string, number>();
   if (lineIds.length > 0) {
     const [{ data: bound, error: boundErr }, { data: sources, error: srcErr }] =
       await Promise.all([
         sb
           .from("ops_stock_items")
-          .select("unit_code, qty, reserved_order_line_id")
+          .select("unit_code, qty, po_line_id, reserved_order_line_id")
           .in("reserved_order_line_id", lineIds)
           /* 0600 — a Unit reserved on its PO by `Use this PO` is saved
              against the line too, so `Change selection` can give it back. */
           .in("status", ["reserved", "sold", "incoming"]),
         sb
           .from("po_line_sources")
-          .select("order_line_id, qty, purchase_orders!inner(status)")
+          .select("order_line_id, po_line_id, qty, purchase_orders!inner(status)")
           .in("order_line_id", lineIds)
           .neq("purchase_orders.status", "cancelled"),
       ]);
     const readErr = boundErr ?? srcErr;
     if (readErr) return fail(c, readErr);
+    const sourceBudget = new Map<string, number>();
+    for (const r of (sources ?? []) as Record<string, unknown>[]) {
+      const id = r.order_line_id as string | null;
+      if (!id) continue;
+      const qty = Math.max(0, Number(r.qty ?? 0));
+      onPoByLine.set(id, (onPoByLine.get(id) ?? 0) + qty);
+      if (r.po_line_id) {
+        const key = `${id}::${r.po_line_id}`;
+        sourceBudget.set(key, (sourceBudget.get(key) ?? 0) + qty);
+      }
+    }
     for (const r of (bound ?? []) as Record<string, unknown>[]) {
       const id = r.reserved_order_line_id as string;
       const prev = reservedByLine.get(id) ?? { qty: 0, codes: [] };
       const code = (r.unit_code as string | null) ?? null;
+      const qty = Math.max(1, Number(r.qty ?? 1));
+      const key = `${id}::${r.po_line_id}`;
+      const overlap = r.po_line_id ? Math.min(qty, sourceBudget.get(key) ?? 0) : 0;
+      if (overlap) sourceBudget.set(key, (sourceBudget.get(key) ?? 0) - overlap);
       reservedByLine.set(id, {
-        qty: prev.qty + Math.max(1, Number(r.qty ?? 1)),
+        qty: prev.qty + qty - overlap,
         codes: code ? [...prev.codes, code] : prev.codes,
       });
     }
-    for (const r of (sources ?? []) as Record<string, unknown>[]) {
-      const id = r.order_line_id as string | null;
-      if (!id) continue;
-      onPoByLine.set(id, (onPoByLine.get(id) ?? 0) + Math.max(0, Number(r.qty ?? 0)));
-    }
+    // Use the same canonical SQL remainder that issue and reservation validate.
+    // A Unit on its own linked PO is one source of supply, not two.
+    const remainders = await Promise.all(lineIds.map(async id => {
+      const result = await sb.rpc("so_line_remaining_requirement", { p_order_line_id: id });
+      return { id, ...result };
+    }));
+    const unavailable = remainders.find(result => result.error || !Number.isInteger(result.data) || Number(result.data) < 0);
+    if (unavailable) return c.json({ error: "stock_coverage_unavailable", code: "stock_coverage_unavailable" }, 503);
+    for (const result of remainders) remainingByLine.set(result.id, Number(result.data));
   }
 
   /**
@@ -161,13 +181,15 @@ soBatchReadyStockRouter.get("/:orderId/ready-stock", requireOperation, async (c)
       reservedQty: reserved.qty,
       reservedUnitCodes: [...reserved.codes].sort(),
       onPoQty: onPo,
-      remainingQty: Math.max(0, (Number(l.qty) || 0) - reserved.qty - onPo),
+      remainingQty: remainingByLine.get(l.id) ?? 0,
     };
   });
 
   /* The offer, off the authoritative register view — every available Unit,
      at whatever site holds it. */
-  const { freeUnitsByKey } = await readFreeStock(sb);
+  let freeUnitsByKey: Awaited<ReturnType<typeof readFreeStock>>["freeUnitsByKey"];
+  try { ({ freeUnitsByKey } = await readFreeStock(sb, true)); }
+  catch { return c.json({ code: "stock_candidates_unavailable", error: "stock_candidates_unavailable" }, 503); }
 
   /**
    * ⭐ THE PROVENANCE THE PICKER PRINTS (owner ruling 2026-09-18).
@@ -216,7 +238,7 @@ soBatchReadyStockRouter.get("/:orderId/ready-stock", requireOperation, async (c)
     const { data: boundRows, error: boundReadErr } = await sb
       .from("stock_unit_register_v")
       .select(
-        "id, unit_code, sku, qty, date_in, condition, site_name, holder_name, ownership, supplier, identity_scope, po_no, reserved_order_line_id",
+        "id, unit_code, sku, qty, date_in, condition, site_name, warehouse_id, holder_name, ownership, supplier, identity_scope, po_no, reserved_order_line_id",
       )
       .in("reserved_order_line_id", lineIds);
     if (boundReadErr) return fail(c, boundReadErr);
@@ -230,6 +252,7 @@ soBatchReadyStockRouter.get("/:orderId/ready-stock", requireOperation, async (c)
         sku: r.sku as string,
         condition: (r.condition as string | null) ?? null,
         siteName: (r.site_name as string | null) ?? null,
+        warehouseId: (r.warehouse_id as string | null) ?? null,
         holderName: (r.holder_name as string | null) ?? null,
         ownership:
           (r.ownership as string | null) === "supplier_consignment"
@@ -267,6 +290,7 @@ soBatchReadyStockRouter.get("/:orderId/ready-stock", requireOperation, async (c)
         sku: u.sku,
         condition: u.condition,
         siteName: u.siteName,
+        warehouseId: u.warehouseId ?? null,
         holderName: u.holderName,
         ownership:
           u.ownership === "supplier_consignment" ? "supplier_consignment" : "carres_owned",
@@ -286,9 +310,11 @@ soBatchReadyStockRouter.get("/:orderId/ready-stock", requireOperation, async (c)
         blocked:
           u.identityScope !== "unit"
             ? "counted_stock"
-            : needing.length === 0
-              ? "no_line_needs_it"
-              : null,
+            : u.ownership === "supplier_consignment"
+              ? "supplier_owned"
+              : needing.length === 0
+                ? "no_line_needs_it"
+                : null,
       });
     }
   }

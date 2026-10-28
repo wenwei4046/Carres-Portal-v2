@@ -9,6 +9,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { SoBatchOrderRow, SoBatchPurchaseResponse } from "@carres/shared";
 import { soBatchAction } from "@carres/shared";
 
+// The shared Tasks host owns its Work query; isolate purchase read assertions.
+vi.mock("./use-open-work", () => ({ useOpenWorkSet: () => ({ items: [], hasData: false, error: false, generatedOn: null }) }));
 const navigate = vi.fn();
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
@@ -32,9 +34,14 @@ async function clickIssue() {
 }
 
 const apiFetch = vi.fn();
+const toastError = vi.hoisted(() => vi.fn());
+vi.mock("sonner", async () => {
+  const actual = await vi.importActual<typeof import("sonner")>("sonner");
+  return { ...actual, toast: Object.assign(actual.toast, { error: toastError }) };
+});
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
-  return { ...actual, apiFetch: (...a: unknown[]) => apiFetch(...a) };
+  return { ...actual, apiFetch: (...a: unknown[]) => String(a[0]).endsWith("/send-evidence-policy") ? Promise.resolve({ required: false, available: true }) : apiFetch(...a) };
 });
 vi.mock("./components/GlobalTopBar", () => ({ TopBarIcons: () => null }));
 /* The 50/50 renders the REAL PO template; @react-pdf is exercised in its own
@@ -44,6 +51,14 @@ vi.mock("@/lib/pdf/render", () => ({
 }));
 
 import OperationToOrder from "./OperationToOrder";
+
+// Each journey is a distinct browser session; remounts within it still retain
+// the real DataGrid's search, filters and presentation scroll state.
+vi.mock("./so-batch/SoBatchRegister", async () => {
+  const actual = await vi.importActual<typeof import("./so-batch/SoBatchRegister")>("./so-batch/SoBatchRegister");
+  return { ...actual, default: (props: React.ComponentProps<typeof actual.default>) =>
+    <actual.default {...props} sessionKey={`so-batch-page-test:${expect.getState().currentTestName}`} /> };
+});
 
 /**
  * SO BATCH PURCHASE — the whole page, end to end
@@ -58,6 +73,24 @@ import OperationToOrder from "./OperationToOrder";
 
 const KLANG = "11111111-1111-4111-8111-111111111111";
 const HERE = dirname(fileURLToPath(import.meta.url));
+function officialDocument(version = 1) {
+  return { po_number: "PO-2041", po_id: "PO-2041", version, lines: [],
+    supplier: { name: "Hooka", address: null, contact: null },
+    destination: { name: "Carres Klang", address: "Klang" }, issue_date: "2026-08-22",
+    delivery_instructions: null, eta_date: "2026-09-18", terms: null };
+}
+/** The issued result: its three steps, with the third (`PO sent to supplier`) ready. */
+async function openIssuedDocument() {
+  await screen.findByTestId("po-supplier-result-panel");
+  await waitFor(() => expect(screen.getByTestId("po-bundle-record")).toBeEnabled());
+}
+/** The one act: press the third step, then confirm what is recorded. */
+async function recordSent() {
+  expect(screen.getByLabelText("To")).toHaveAttribute("readonly");
+  fireEvent.click(screen.getByTestId("po-bundle-record"));
+  fireEvent.click(await screen.findByTestId("po-bundle-record-confirm"));
+}
+
 
 /** The o1 order row — Card 02-B: the parent grain the Register draws. */
 function orderRow(over: Partial<SoBatchOrderRow> = {}): SoBatchOrderRow {
@@ -145,7 +178,7 @@ function payload(over: Partial<SoBatchPurchaseResponse> = {}): SoBatchPurchaseRe
   };
 }
 
-function renderPage(initialEntry = "/operation?tab=purchase") {
+function renderPage(initialEntry: string | { pathname: string; search?: string; state?: unknown } = "/operation?tab=purchase&view=table") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
@@ -178,9 +211,25 @@ describe("the page reads the ONE projection and draws the Register", () => {
     expect(apiFetch.mock.calls[0]![0]).toBe("/api/operation/purchase/demands");
   });
 
+  it("selects a cutoff time without navigating to a historical dated occurrence", async () => {
+    apiFetch.mockResolvedValue({ ...payload(), poRounds: [
+      { key: "2026-10-05T10:15", unfinishedSoCount: 2 },
+      { key: "2026-10-05T16:00", unfinishedSoCount: 0 },
+    ] });
+    renderPage();
+    const round = await screen.findByText("10:15 AM");
+    expect(round).toHaveTextContent("10:15 AM");
+    fireEvent.click(round);
+    expect(apiFetch).toHaveBeenCalledWith("/api/operation/purchase/demands");
+    expect(apiFetch.mock.calls.some(call => String(call[0]).includes("?window="))).toBe(false);
+    expect(screen.getByText("4:00 PM")).toBeVisible();
+    expect(screen.queryByTestId("so-batch-product-select")).not.toBeInTheDocument();
+    expect(apiFetch.mock.calls.every(call => call[1] == null)).toBe(true);
+  });
+
   it("keeps the Sales Order scope when the direct to-order URL is reloaded", async () => {
     apiFetch.mockResolvedValue(payload());
-    renderPage("/operation/to-order?so=1204");
+    renderPage("/operation/to-order?so=1204&view=table");
     await screen.findByTestId("so-batch-page");
     expect(apiFetch.mock.calls[0]![0]).toBe("/api/operation/purchase/demands");
   });
@@ -218,6 +267,74 @@ describe("the page reads the ONE projection and draws the Register", () => {
 });
 
 describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
+  it("refuses unreadable PO scope and retries the same exact read without a write", async () => {
+    const po = { id: "PO-2041", supplierId: "s-hooka", supplierName: "Hooka", destinationId: KLANG, destination: "Carres Klang" };
+    const read = payload({ registerRows: [orderRow({ pos: [{
+      poId: po.id, status: "open", supplierId: po.supplierId, supplierName: po.supplierName,
+      destinationId: KLANG, officialDeliveryDate: "2026-09-18", sentCurrentVersion: false,
+    }] })] });
+    let readable = false;
+    apiFetch.mockImplementation(async (path: string) => {
+      if (path.endsWith("/issue-context")) { if (!readable) throw new Error("unavailable"); return po; }
+      return path.includes("print-data") ? officialDocument() : path.endsWith("/sends") ? { sends: [] }
+        : path.endsWith("email-capability") ? { configured: false } : read;
+    });
+    toastError.mockClear();
+    renderPage();
+    await screen.findByTestId("so-batch-row-o1");
+    fireEvent.keyDown(screen.getByRole("button", { name: "Page tools" }), { key: "Enter" });
+    fireEvent.click(screen.getByRole("menuitem", { name: "Purchase Orders" }));
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith("Supplier details could not be loaded.", expect.any(Object)));
+    expect(screen.queryByTestId("po-supplier-result-panel")).toBeNull();
+    readable = true;
+    toastError.mock.calls.at(-1)![1].action.onClick();
+    await screen.findByTestId("po-supplier-result-panel");
+    expect(apiFetch.mock.calls.filter(([path]) => String(path).endsWith("/issue-context"))).toHaveLength(2);
+    expect(apiFetch.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
+  });
+  it("reloads a retained SO's linked PO before opening supplier preparation", async () => {
+    const po = { id: "PO-2041", supplierId: "s-hooka", supplierName: "Hooka", destinationId: KLANG, destination: "Carres Klang" };
+    const read = payload({ registerRows: [orderRow({ status: "ordered", pos: [{
+      poId: po.id, status: "open", supplierId: po.supplierId, supplierName: po.supplierName,
+      destinationId: KLANG, officialDeliveryDate: "2026-09-18",
+      sentCurrentVersion: false,
+    }] })] });
+    apiFetch.mockImplementation(async (path: string) => path.endsWith("/issue-context") ? po
+      : path.includes("print-data") ? officialDocument() : path.endsWith("/sends") ? { sends: [] }
+      : path.endsWith("email-capability") ? { configured: false } : read);
+    renderPage();
+    await screen.findByTestId("so-batch-row-o1");
+    fireEvent.keyDown(screen.getByRole("button", { name: "Page tools" }), { key: "Enter" });
+    fireEvent.click(screen.getByRole("menuitem", { name: "Purchase Orders" }));
+    await screen.findByTestId("po-supplier-result-panel");
+    expect(apiFetch).toHaveBeenCalledWith("/api/operation/pos/PO-2041/issue-context");
+    await screen.findByRole("button", { name: "Open full page" });
+    expect(apiFetch.mock.calls.some(([path, options]) => String(path).includes("issue-batch") || options?.method === "POST")).toBe(false);
+  });
+  it("restores issued PO scope and carries the cutoff when opening its full page", async () => {
+    const pos = [{ id: "PO-2041", supplierId: "s-hooka", supplierName: "Hooka", destinationId: KLANG, destination: "Carres Klang" }];
+    apiFetch.mockImplementation(async (path: string) => path.includes("print-data") ? officialDocument()
+      : path.endsWith("/sends") ? { sends: [] } : path.endsWith("email-capability") ? { configured: false } : payload());
+    renderPage({ pathname: "/operation", search: "?tab=purchase&view=table&time=11%3A00", state: { soBatchIssuedPos: pos } });
+    await screen.findByTestId("po-supplier-result-panel");
+    fireEvent.click(screen.getByRole("button", { name: "Open full page" }));
+    expect(navigate).toHaveBeenCalledWith("/operation/procurement?po=PO-2041", {
+      state: { soBatchReturn: { path: "/operation?tab=purchase&view=table&time=11%3A00", pos,
+        preparation: expect.objectContaining({ supplierId: "s-hooka", selectedIds: ["PO-2041"], scope: "round" }) } },
+    });
+  });
+  it("restores the supplier preparation draft from the exact PO object return", async () => {
+    const pos = [{ id: "PO-2041", supplierId: "s-hooka", supplierName: "Hooka", destinationId: KLANG, destination: "Carres Klang" }];
+    const preparation = { supplierId: "s-hooka", selectedIds: ["PO-2041"], channel: "email", scope: "round", subject: "Prepared", messageIntroduction: "Please confirm." };
+    apiFetch.mockImplementation(async (path: string) => path.endsWith("/issue-context") ? pos[0] : path.includes("print-data") ? officialDocument()
+      : path.endsWith("/sends") ? { sends: [] } : path.endsWith("email-capability") ? { configured: false } : payload());
+    renderPage({ pathname: "/operation", search: "?tab=purchase&view=table&time=11%3A00", state: { soBatchIssuedPos: pos, soBatchPreparation: preparation } });
+    await screen.findByTestId("po-supplier-result-panel");
+    expect(screen.getByLabelText("Subject")).toHaveValue("Prepared");
+    expect(screen.getByLabelText("Message")).toHaveValue("Please confirm.");
+    await waitFor(() => expect(screen.getByLabelText("PO-2041-V1")).toBeChecked());
+    expect(apiFetch.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
+  });
   it("walks from a ticked line to confirmed supplier evidence", async () => {
     apiFetch.mockResolvedValue(payload());
     renderPage();
@@ -246,17 +363,19 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
                 supplierId: "s-hooka",
                 supplierName: "Hooka",
                 destinationId: KLANG,
-                destination: "Carres Klang",
+                destination: "Carres Klang", whatsappGroupUrl: "https://chat.whatsapp.com/test-supplier",
               },
             ],
           })
-        : Promise.resolve({ po_number: "PO-2041", po_id: "PO-2041", version: 1, lines: [] }),
+         : path.includes("print-data") ? Promise.resolve(officialDocument())
+          : path.endsWith("/sends") ? Promise.resolve({ sends: [] })
+          : path.endsWith("email-capability") ? Promise.resolve({ configured: false })
+          : Promise.resolve(payload()),
     );
     await clickIssue();
-    await screen.findByTestId("so-batch-evidence-PO-2041");
-    expect(screen.getByTestId("so-batch-evidence-PO-2041")).toHaveTextContent(
-      "PO-2041 · PO V1 · Sending not confirmed",
-    );
+    await openIssuedDocument();
+    expect(screen.getByLabelText("PO-2041-V1")).toBeChecked();
+    expect(screen.getByTestId("po-bundle-state-PO-2041")).toHaveTextContent("Sending not confirmed");
 
     /* The confirm answers `ok`, and the REFETCH that follows answers a real
        payload — the buy is now covered, so the line is gone. */
@@ -264,7 +383,8 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
       path.includes("confirm-sent")
         ? Promise.resolve({ ok: true })
         : path.includes("print-data")
-          ? Promise.resolve({ po_number: "PO-2041", po_id: "PO-2041", version: 1, lines: [] })
+          ? Promise.resolve(officialDocument())
+          : path.endsWith("/sends") ? Promise.resolve({ sends: [{ kind: "confirmed_sent", channel: "whatsapp", po_version: 1, recipient: "https://chat.whatsapp.com/test-supplier", sent_at: "2026-08-22T10:00:00Z", sent_by_name: "Sample staff" }] })
           : /* Card 02-B — the buy leaves the LEAF listing, but the Sales
                Order's row is PERMANENT: it comes back Ordered, with its PO. */
             Promise.resolve(
@@ -289,20 +409,21 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
               }),
             ),
     );
-    fireEvent.change(screen.getByTestId("so-batch-evidence-recipient"), {
-      target: { value: "Hooka Purchasing Group" },
-    });
-    fireEvent.click(screen.getByTestId("so-batch-evidence-confirm"));
-    // Confirmed → back to buying, and the Register re-reads the server. The
-    // ordered Sales Order REMAINS — one permanent row, now carrying its
-    // document. (`Status` was retired as a presentation on 2026-09-11: the
-    // document and the refused tick say what the word used to.)
+    await recordSent();
+    // Confirmation retains the result; closing returns to the same register.
+    // The page is on `To buy`, and this order has nothing left to buy, so it
+    // leaves that tab (owner 13 Oct 2026, round 3) …
     await waitFor(() => expect(screen.getByTestId("so-batch-page")).toBeInTheDocument());
-    fireEvent.click(await screen.findByText("No purchase needed"));
-    await waitFor(() =>
-      expect(screen.getByTestId("so-batch-po-link-o1")).toHaveTextContent("PO-2041"),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByTestId("so-batch-row-o1")).not.toBeInTheDocument());
+    expect(screen.getByText("Nothing to buy. Every Sales Order already has its PO.")).toBeInTheDocument();
+    // … and the ordered Sales Order REMAINS on the permanent Register: `All`
+    // shows its one row, now `Ordered`, carrying its document, tick refused.
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "All" }));
+    expect(screen.getByTestId("so-batch-status-o1")).toHaveTextContent("Ordered");
+    expect(screen.getByTestId("so-batch-po-link-o1")).toHaveTextContent("PO-2041");
     expect(screen.getByTestId("so-batch-select-o1")).toBeDisabled();
+    expect(screen.getByTestId("so-batch-footer")).toHaveTextContent("1 sales order");
   });
 
   it("the confirmation declares the version the RENDERED document reported", async () => {
@@ -313,13 +434,15 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
             pos: [
               {
                 id: "PO-2041", supplierId: "s-hooka", supplierName: "Hooka",
-                destinationId: KLANG, destination: "Carres Klang",
+                destinationId: KLANG, destination: "Carres Klang", whatsappGroupUrl: "https://chat.whatsapp.com/test-supplier",
               },
             ],
           })
         : path.includes("print-data")
           ? /* A REVISED purchase order — Version 3 is what the operator sees. */
-            Promise.resolve({ po_number: "PO-2041", po_id: "PO-2041", version: 3, lines: [] })
+            Promise.resolve(officialDocument(3))
+          : path.endsWith("/sends") ? Promise.resolve({ sends: [] })
+          : path.endsWith("email-capability") ? Promise.resolve({ configured: false })
           : Promise.resolve(payload()),
     );
     renderPage();
@@ -328,14 +451,11 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
     fireEvent.click(screen.getByTestId("so-batch-issue"));
     await screen.findByTestId("so-batch-issue-workspace");
     await clickIssue();
-    await screen.findByTestId("so-batch-evidence-PO-2041");
-    expect(screen.getByTestId("so-batch-evidence-PO-2041")).toHaveTextContent("PO V3");
+    await openIssuedDocument();
+    expect(screen.getByLabelText("PO-2041-V3")).toBeChecked();
 
     apiFetch.mockClear();
-    fireEvent.change(screen.getByTestId("so-batch-evidence-recipient"), {
-      target: { value: "Hooka Purchasing Group" },
-    });
-    fireEvent.click(screen.getByTestId("so-batch-evidence-confirm"));
+    await recordSent();
     await waitFor(() =>
       expect(
         apiFetch.mock.calls.some((c) => String(c[0]).includes("confirm-sent")),
@@ -365,6 +485,8 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
     apiFetch.mockResolvedValue(payload());
     renderPage();
     await screen.findByTestId("so-batch-row-o1");
+    /* Search is an icon on the toolbar: press it, then type. */
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
     const search = screen.getByRole("searchbox", { name: "Search" }) as HTMLInputElement;
     fireEvent.change(search, { target: { value: "SO-" } });
     fireEvent.click(screen.getByTestId("so-batch-select-o1"));
@@ -379,7 +501,8 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
     expect(screen.getByTestId("selection-bar")).toBeInTheDocument();
     /* … and clearing it hands back the toolbar with the query still typed. */
     fireEvent.click(screen.getByRole("button", { name: "Clear" }));
-    expect((screen.getByTestId("search-box").querySelector("input") as HTMLInputElement).value).toBe("SO-");
+    expect((screen.getByRole("searchbox", { name: "Search" }) as HTMLInputElement).value).toBe("SO-");
+    expect(screen.getByTestId("so-batch-row-o1")).toBeInTheDocument();
   });
 });
 
@@ -461,7 +584,7 @@ describe("the superseded buying surfaces are gone, not hidden", () => {
 
   it("Manual Purchase is still its own route and never appears inside this page", async () => {
     const app = readFileSync(join(HERE, "OperationApp.tsx"), "utf8");
-    expect(app).toContain('tab === "manual-purchase" && <OperationManualPurchase />');
+    expect(app).toContain('tab === "manual-purchase" && <OperationManualPurchase contextFlow={purchaseRequestContext} />');
     apiFetch.mockResolvedValue(payload());
     renderPage();
     await screen.findByTestId("so-batch-page");

@@ -19,6 +19,9 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 
 const DialogContainer = createContext<HTMLElement | null>(null);
+/** A responsive panel keeps its current surface while a child dialog is open. */
+export const PanelDialogPresence = createContext<(() => (() => void)) | null>(null);
+export function usePanelDialogPresence() { return useContext(PanelDialogPresence); }
 
 /** Read by `Select` · `Popover` · `DatePicker`. Null when not inside a dialog. */
 export function useDialogContainer(): HTMLElement | null {
@@ -37,4 +40,9 @@ export function DialogContainerProvider({
 }) {
   const [container, setContainer] = useState<HTMLElement | null>(null);
   return <DialogContainer.Provider value={container}>{children(setContainer)}</DialogContainer.Provider>;
+}
+
+/** A stable portal host carries the same picker context when its DOM moves. */
+export function DialogContainerScope({ container, children }: { container: HTMLElement | null; children: ReactNode }) {
+  return <DialogContainer.Provider value={container}>{children}</DialogContainer.Provider>;
 }

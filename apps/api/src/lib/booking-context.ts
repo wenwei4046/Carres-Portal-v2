@@ -5,6 +5,7 @@ import {
   storageHold,
   storageObligation,
   stockMatchKey,
+  type BookingGateInput,
   type BookingGateResult,
   type DeliveryGroupKey,
 } from "@carres/shared";
@@ -45,6 +46,73 @@ export type Loaded =
   | { ok: true; ctx: BookingContext }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   | { ok: false; body: any; status: any };
+
+/** The order's own rows the ONE money figure is assembled from. */
+export interface BookingMoneyRows {
+  lines: ReadonlyArray<{ sku: string; qty: number; unit_price: number | null }>;
+  addons: ReadonlyArray<{ qty: number; unit_price: number | null }>;
+  /** `orders.paid` — the money truth (C5). */
+  paid: number | string | null;
+  /** `ops_order_control` — the keyed balance and the storage columns. */
+  control: Record<string, unknown> | null;
+  /** The SO's own `invoices` rows (kind, status, amount, tax_amount, voided_at). */
+  invoices: Parameters<typeof invoiceStorageSumOf>[0];
+  /** `storageSkuCategories` over the lines' SKUs. */
+  storageCategories: Awaited<ReturnType<typeof storageSkuCategories>>;
+  /** Today in MYT — the storage clock's day. */
+  asOf: string;
+}
+
+/**
+ * ⭐ THE ONE ASSEMBLY OF THE MONEY FIGURE THE DO GATE ASKS (Law D).
+ *
+ * Pure: the rows in, the `orderMoney` input out. `loadBookingContext` (one
+ * order, the issue and confirm doors) and `heldDeliveryScopes` (many orders,
+ * the partner portal and the external link's `Hold delivery`) both call it,
+ * so the figure a partner's hold is decided on is byte-for-byte the figure
+ * that refuses the Delivery Order.
+ */
+export function bookingMoneyOf(rows: BookingMoneyRows): BookingGateInput["money"] {
+  const sum = (list: ReadonlyArray<{ qty: number; unit_price: number | null }>) =>
+    list.reduce((s, r) => s + Number(r.unit_price ?? 0) * Number(r.qty ?? 0), 0);
+  const ctrl = rows.control;
+  // C9 — the storage fee is part of the ONE money number, through the one rule
+  // the ladder and the dispatch gate also ask. A manager's release lifts the
+  // HOLD and leaves the fee owed, which is why the gate reads `holding`.
+  const hold = storageHold({
+    storageFrom: (ctrl?.storage_from as string | null) ?? null,
+    override: (ctrl?.storage_fee_override as number | string | null) ?? null,
+    importedMsbf: (ctrl?.storage_fee_msbf as number | string | null) ?? null,
+    importedSof: (ctrl?.storage_fee_sof as number | string | null) ?? null,
+    skus: rows.lines.map((l) => l.sku),
+    categories: rows.storageCategories,
+    asOf: rows.asOf,
+    collectedAt: (ctrl?.storage_collected_at as string | null) ?? null,
+    waiverStatus: (ctrl?.storage_waiver_status as string | null) ?? null,
+  });
+  // GATE CONVERGENCE (2026-09-07): invoice-backed storage beats the legacy
+  // C9 figure when papers exist (never both — never a double count), netted
+  // so `paid` subtracts exactly once; with no paper the C9 answer passes
+  // through byte-identical. One precedence law: `storageObligation`.
+  const lineSum = sum(rows.lines);
+  const addonSum = sum(rows.addons);
+  const paid = rows.paid ?? 0;
+  const storage = storageObligation({
+    invoiceStorageSum: invoiceStorageSumOf(rows.invoices),
+    goodsTotal: lineSum + addonSum,
+    paid,
+    legacyOwing: hold.owing,
+    legacyReleased: hold.released,
+  });
+  return {
+    lineSum,
+    addonSum,
+    paid,
+    controlBalance: (ctrl?.balance as number | string | null) ?? null,
+    storageOwing: storage.owing,
+    storageReleased: storage.released,
+  };
+}
 
 export async function loadBookingContext(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -109,51 +177,19 @@ export async function loadBookingContext(
     qty: number;
     unit_price: number | null;
   }[];
-  const sum = (rows: { qty: number; unit_price: number | null }[]) =>
-    rows.reduce((s, r) => s + Number(r.unit_price ?? 0) * Number(r.qty ?? 0), 0);
-  // C9 — the storage fee is part of the ONE money number, through the one rule
-  // the ladder and the dispatch gate also ask. A manager's release lifts the
-  // HOLD and leaves the fee owed, which is why the gate reads `holding`.
   const ctrl = (controlRes.data ?? null) as Record<string, unknown> | null;
   // CARD-2026-08-28 - the CATALOG owns which rate applies. One bounded read;
   // a SKU the catalog does not hold falls back to the parser, per line.
   const storageCats = await storageSkuCategories(sb, lines.map((l) => l.sku));
-  const hold = storageHold({
-    storageFrom: (ctrl?.storage_from as string | null) ?? null,
-    override: (ctrl?.storage_fee_override as number | string | null) ?? null,
-    importedMsbf: (ctrl?.storage_fee_msbf as number | string | null) ?? null,
-    importedSof: (ctrl?.storage_fee_sof as number | string | null) ?? null,
-    skus: lines.map((l) => l.sku),
-    categories: storageCats,
+  const money = bookingMoneyOf({
+    lines,
+    addons: (addonsRes.data ?? []) as { qty: number; unit_price: number | null }[],
+    paid: (order as { paid?: number | string | null }).paid ?? 0,
+    control: ctrl,
+    invoices: (invoicesRes.data ?? []) as BookingMoneyRows["invoices"],
+    storageCategories: storageCats,
     asOf: todayIsoMYT(),
-    collectedAt: (ctrl?.storage_collected_at as string | null) ?? null,
-    waiverStatus: (ctrl?.storage_waiver_status as string | null) ?? null,
   });
-  // GATE CONVERGENCE (2026-09-07): invoice-backed storage beats the legacy
-  // C9 figure when papers exist (never both — never a double count), netted
-  // so `paid` subtracts exactly once; with no paper the C9 answer passes
-  // through byte-identical. One precedence law: `storageObligation`.
-  const lineSum = sum(lines);
-  const addonSum = sum(
-    (addonsRes.data ?? []) as { qty: number; unit_price: number | null }[],
-  );
-  const paid = (order as { paid?: number | string | null }).paid ?? 0;
-  const invoiceRows = (invoicesRes.data ?? []) as Parameters<typeof invoiceStorageSumOf>[0];
-  const storage = storageObligation({
-    invoiceStorageSum: invoiceStorageSumOf(invoiceRows),
-    goodsTotal: lineSum + addonSum,
-    paid,
-    legacyOwing: hold.owing,
-    legacyReleased: hold.released,
-  });
-  const money = {
-    lineSum,
-    addonSum,
-    paid,
-    controlBalance: (ctrl?.balance as number | string | null) ?? null,
-    storageOwing: storage.owing,
-    storageReleased: storage.released,
-  };
   const reservedQtyByKey: Record<string, number> = {};
   for (const u of (reservedRes.data ?? []) as { sku: string; qty: number | null }[]) {
     const k = stockMatchKey(u.sku);

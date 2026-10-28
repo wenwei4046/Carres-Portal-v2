@@ -159,7 +159,7 @@ function Field({
     <div>
       <label
         htmlFor={id}
-        className="block text-label uppercase tracking-wider text-base-500 font-semibold mb-1"
+        className="block text-label uppercase tracking-[0.06em] text-base-500 mb-1"
       >
         {label}
       </label>

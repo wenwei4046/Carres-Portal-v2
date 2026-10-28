@@ -97,6 +97,7 @@ describe("the supplier's recorded channel", () => {
     expect(poSendChannelOf({ whatsappGroupUrl: "https://chat.whatsapp.com/x" })).toBe("whatsapp");
     expect(poSendChannelOf({ contact: "+60 12-345 6789", contactEmail: "a@b.c" })).toBe("whatsapp");
     expect(poSendChannelOf({ contact: "Mr Tan", contactEmail: "a@b.c" })).toBe("email");
+    expect(poSendChannelOf({ whatsappGroupUrl: "https://chat.whatsapp.com/x", contactEmail: "po@example.com", poSendChannel: "email" })).toBe("email");
     expect(poSendChannelOf({})).toBeNull();
     expect(poSendActOf("PO250925-4827(1)", "Ohana", null)).toBe("Send PO250925-4827(1) to Ohana");
   });

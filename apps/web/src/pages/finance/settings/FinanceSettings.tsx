@@ -2,30 +2,16 @@
  * Finance Settings, at `/finance/settings` (migration 0512), opened from the
  * header gear — the ERP's one Settings entry (Jess, 19 Aug 2026).
  *
- * The one list of money accounts: cash, each real bank, and the holding
- * account of each card or online payment company. Every Paid from and
- * Received into picker reads this list; Finance adds, renames and takes an
- * account out of use here. The database picks the code from the money-accounts
- * heading (0570: NNN-K000 under NNN-0000, HH01..HH99 under HH00, the smallest
- * free one, banks and holding accounts alike) and refuses taking an account out of use while
- * the ledger holds money in it or a payment method still lands money in it
- * (0515, 0523).
- *
- * Words: every label is an existing COPY-STANDARD word (Money account,
- * Account, Name, Kind, Status, Active, Not active, Save, Cancel, and the pay
- * method words Cash · Bank transfer · Online payment for the kinds). A row
- * click opens it; the only new phrases are the page word and the add button.
- *
- * Two more tabs sit beside it: `?tab=chart` holds the chart of accounts
- * (ChartOfAccounts.tsx) and `?tab=card` the card payout banks (0541).
- *
- * An opened account's number changes here too (YH, 24 Sep 2026), through the
- * chart's own door: the same request the Chart of accounts form sends
- * (useSaveAccount, gl_account_update). There is no second renumber.
+ * It opens on Chart of accounts (Chew 2026-10-12), at the plain address,
+ * ChartOfAccounts.tsx. The chart is also the one place that marks a money
+ * account and adds one (0692, Chew 2026-10-13): there is no Money accounts tab,
+ * and an old `?tab=money` link lands on the chart. More tabs: `?tab=posting`
+ * the posting accounts (0657), `?tab=groups` the item groups (0659),
+ * `?tab=card` the card payout banks (0541), `?tab=closed` the last closed day
+ * (0622) and `?tab=requests` who may ask Finance to pay (0645).
  */
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { LEDGER_ACCOUNT_CODE_MESSAGE } from "@carres/shared/finance-ledger";
 import {
   CARD_CHANNELS,
   CARD_CHANNEL_WORD,
@@ -34,11 +20,8 @@ import {
   type CardRouteRow,
   type MoneyAccountRow,
 } from "@carres/shared/money-accounts";
-import { ledgerAccountCodeInput } from "@carres/shared/schemas/finance";
 import Button from "@/components/kit/Button";
-import Checkbox from "@/components/kit/Checkbox";
-import Icon from "@/components/kit/Icon";
-import Input from "@/components/kit/Input";
+import DatePicker from "@/components/kit/DatePicker";
 import Modal from "@/components/kit/Modal";
 import Select from "@/components/kit/Select";
 import Tabs from "@/components/kit/Tabs";
@@ -46,219 +29,46 @@ import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { accountLabel, LoadFailed } from "../other-money-in/parts";
-import { useCardRoutes, useMoneyAccounts, useSaveAccount, useSaveCardRoute, useSaveMoneyAccount } from "./api";
+import { useBooksClosed, useCardRoutes, useMoneyAccounts, useSaveBooksClosed, useSaveCardRoute } from "./api";
+import { useAuth } from "@/lib/auth";
+import { fmtDate } from "@/lib/fmt-date";
 import { FieldError } from "@/components/kit/FieldFrame";
 import ChartOfAccounts from "./ChartOfAccounts";
+import ItemGroups from "./ItemGroups";
+import PostingAccounts from "./PostingAccounts";
+import RequestAccess from "./RequestAccess";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
+// Chew 2026-10-12 (「B 可以」): the chart first, as every other setting is
+// built on it.
 const TABS = [
-  { value: "money", label: "Money accounts" },
   { value: "chart", label: "Chart of accounts" },
+  // 0657 (Chew 2026-10-07): the account each posting the system makes goes to.
+  { value: "posting", label: "Posting accounts" },
+  // 0659 (Chew 2026-10-07): each product's item group and the four accounts it binds.
+  { value: "groups", label: "Item groups" },
   { value: "card", label: "Card payout banks" },
+  { value: "closed", label: "Closed months" },
+  // 0645 (Chew 2026-10-03): which Operation staff may ask Finance to pay.
+  { value: "requests", label: "Payment requests" },
 ] as const;
-
-const KIND_OPTIONS = [
-  { value: "BANK", label: MONEY_ACCOUNT_KIND_WORD.BANK },
-  { value: "HOLDING", label: MONEY_ACCOUNT_KIND_WORD.HOLDING },
-];
-
-const statusWord = (r: MoneyAccountRow) => (r.is_active ? "Active" : "Not active");
 
 export default function FinanceSettings() {
   const [params, setParams] = useSearchParams();
-  /* An unknown `?tab=` lands on Money accounts, the page's first tab. */
+  /* An unknown `?tab=` lands on Chart of accounts, the page's first tab. */
   const asked = params.get("tab") ?? "";
-  const tab = TABS.some((t) => t.value === asked) ? asked : "money";
+  const tab = TABS.some((t) => t.value === asked) ? asked : "chart";
   return (
     <div className="flex h-full min-h-0 flex-col">
       <ModuleHeader destinationHeader testId="finance-settings-destination-header" word="Finance Settings" docTitle="Finance Settings · Carres" />
       <div className="px-6">
-        <Tabs tabs={TABS} value={tab} label="Finance Settings" onValueChange={(v) => setParams(v === "money" ? {} : { tab: v })} />
+        <Tabs tabs={TABS} value={tab} label="Finance Settings" onValueChange={(v) => setParams(v === "chart" ? {} : { tab: v })} />
       </div>
       <div className="min-h-0 flex-1">
-        {tab === "chart" ? <ChartOfAccounts /> : tab === "card" ? <CardRoutes /> : <MoneyAccounts />}
+        {tab === "posting" ? <PostingAccounts /> : tab === "groups" ? <ItemGroups /> : tab === "card" ? <CardRoutes /> : tab === "closed" ? <ClosedMonths />
+          : tab === "requests" ? <RequestAccess /> : <ChartOfAccounts />}
       </div>
     </div>
-  );
-}
-
-function MoneyAccounts() {
-  const query = useMoneyAccounts();
-  /* `undefined` = closed; `null` = a new account; a row = that account. */
-  const [editing, setEditing] = useState<MoneyAccountRow | null | undefined>(undefined);
-  const columns = useMemo<DataGridColumn<MoneyAccountRow>[]>(
-    () => [
-      { key: "code", label: "Account", width: 110, accessor: (r) => r.code, searchValue: (r) => r.code },
-      { key: "name", label: "Name", width: 240, accessor: (r) => r.name, searchValue: (r) => r.name },
-      { key: "kind", label: "Kind", width: 160, accessor: (r) => MONEY_ACCOUNT_KIND_WORD[r.money_kind], filterType: "enum" },
-      { key: "status", label: "Status", width: 120, accessor: statusWord, filterType: "enum" },
-    ],
-    [],
-  );
-
-  if (query.isError) return <LoadFailed what="The accounts" onRetry={() => void query.refetch()} />;
-  return (
-    <ListPageShell register>
-      <DataGrid
-        rows={query.data ?? []}
-        columns={columns}
-        rowKey={(r) => r.code}
-        storageKey="carres.finance.money-accounts.v1"
-        appearance="reference"
-        groupBanner={false}
-        stickyIdentity
-        isLoading={!query.isSuccess}
-        toolbarStart={
-          <Button variant="primary" size="sm" shape="pill" icon="add" onClick={() => setEditing(null)}>
-            Add a money account
-          </Button>
-        }
-        onRowClick={(r) => setEditing(r)}
-      />
-      {editing !== undefined && (
-        <MoneyAccountModal key={editing?.code ?? "new"} account={editing} onClose={() => setEditing(undefined)} />
-      )}
-    </ListPageShell>
-  );
-}
-
-/** The tag a chart refusal carries (0550, forwarded by the API as `code`). */
-const refusalTag = (e: unknown): unknown => {
-  const body = (e as { body?: unknown } | null)?.body;
-  return body && typeof body === "object" ? (body as { code?: unknown }).code : undefined;
-};
-
-/* The chart's refusals that are about the number, shown under the Number
-   field. Every other one (a name, an account gone, a server break) goes to
-   the foot, so the field is never blamed for what it did not cause. */
-const NUMBER_REFUSALS = new Set(["code_shape", "code_exists", "not_finance"]);
-
-function MoneyAccountModal({ account, onClose }: { account: MoneyAccountRow | null; onClose: () => void }) {
-  const save = useSaveMoneyAccount();
-  const renumber = useSaveAccount();
-  const [name, setName] = useState(account?.name ?? "");
-  const [kind, setKind] = useState<"BANK" | "HOLDING">("BANK");
-  const [active, setActive] = useState(account?.is_active ?? true);
-  /* Adding (0577): blank = the next free number under the heading. When every
-     number is used the database asks for one, and this field is where it goes.
-     Editing: the account's own number; a different one renumbers it, and a
-     blank one keeps it. */
-  const [code, setCode] = useState(account?.code ?? "");
-  const [refusal, setRefusal] = useState<string | null>(null);
-  /* A refusal about the number, shown under the Number field. */
-  const [numberRefusal, setNumberRefusal] = useState<string | null>(null);
-  const trimmed = name.trim();
-
-  /* A blank name cannot be sent (Save stays disabled) and the input stops at
-     60 characters, so the only refusals left are the database's own. */
-  const submit = () => {
-    setRefusal(null);
-    setNumberRefusal(null);
-    if (!account) {
-      save.mutate(
-        { code: null, input: code.trim() ? { name: trimmed, kind, code: code.trim().toUpperCase() } : { name: trimmed, kind } },
-        { onSuccess: onClose, onError: (e) => setRefusal(e.message) },
-      );
-      return;
-    }
-    // A blank number keeps the account's own. Otherwise the chart form's
-    // shape check and sentence, so a wrong number is refused under the field
-    // before anything is sent. 310-a000 goes up as 310-A000.
-    const shaped = code.trim() ? ledgerAccountCodeInput.safeParse(code) : { success: true as const, data: account.code };
-    if (!shaped.success) {
-      setNumberRefusal(LEDGER_ACCOUNT_CODE_MESSAGE);
-      return;
-    }
-    const input = { name: trimmed, is_active: active };
-    if (shaped.data === account.code) {
-      save.mutate({ code: account.code, input }, { onSuccess: onClose, onError: (e) => setRefusal(e.message) });
-      return;
-    }
-    void renumberAccount(account, input, shaped.data);
-  };
-
-  /* A new number. The name and the number go through the chart's door in one
-     request: gl_account_update (0570) saves both in one transaction, checks the
-     name against the whole chart (the money account's door checks it only
-     against other money accounts), and every record follows the number
-     (ON UPDATE CASCADE). A name or number it refuses is never saved.
-     Only when Active changed too is the money account's door asked first, with
-     the OLD name, so that a refusal there (money still in the account) comes
-     before the number is touched. If the chart's door then refuses, Active
-     stays saved and the sentence says why the name or number did not change. */
-  const renumberAccount = async (a: MoneyAccountRow, input: { name: string; is_active: boolean }, newCode: string) => {
-    if (input.is_active !== a.is_active) {
-      try {
-        await save.mutateAsync({ code: a.code, input: { name: a.name, is_active: input.is_active } });
-      } catch (e) {
-        setRefusal((e as Error).message);
-        return;
-      }
-    }
-    try {
-      await renumber.mutateAsync({ code: a.code, name: input.name, newCode });
-    } catch (e) {
-      const tag = refusalTag(e);
-      if (typeof tag === "string" && NUMBER_REFUSALS.has(tag)) setNumberRefusal((e as Error).message);
-      else setRefusal((e as Error).message);
-      return;
-    }
-    onClose();
-  };
-
-  return (
-    <Modal
-      open
-      onOpenChange={(o) => {
-        if (!o) onClose();
-      }}
-      title={account ? "Money account" : "Add a money account"}
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            loading={save.isPending || renumber.isPending}
-            disabled={!trimmed}
-            onClick={submit}
-          >
-            Save
-          </Button>
-        </>
-      }
-    >
-      <div className="flex flex-col gap-3" data-testid="money-account-form">
-        <Input id="money-account-name" label="Name" required maxLength={60} value={name} onChange={(e) => setName(e.target.value)} />
-        {account ? (
-          <Checkbox id="money-account-active" label="Active" checked={active} onCheckedChange={setActive} />
-        ) : (
-          <Select
-            id="money-account-kind"
-            label="Kind"
-            value={kind}
-            onValueChange={(v) => setKind(v as "BANK" | "HOLDING")}
-            options={KIND_OPTIONS}
-          />
-        )}
-        {/* PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md): the hint is
-            0577's, adding only; the field on an opened account is 24 Sep's. */}
-        <Input
-          id="money-account-code"
-          label="Number"
-          hint={account ? undefined : "Leave blank to use the next free number."}
-          error={numberRefusal ?? undefined}
-          maxLength={8}
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
-        />
-        {refusal && (
-          <FieldError>
-            {refusal}
-          </FieldError>
-        )}
-      </div>
-    </Modal>
   );
 }
 
@@ -276,6 +86,7 @@ const CHANNEL_OPTIONS = CARD_CHANNELS.map((v) => ({ value: v, label: CARD_CHANNE
  * reader to guess a fallback from the seeded rows.
  */
 function CardRoutes() {
+  const personalLayouts = useFinancePersonalLayouts("finance_card_payout_banks");
   const accountQuery = useMoneyAccounts();
   const routes = useCardRoutes();
   /* `undefined` = closed; `null` = a new route; a row = that route. */
@@ -286,44 +97,53 @@ function CardRoutes() {
     return a ? accountLabel(a) : code;
   };
 
+  /* Chew 2026-10-13 (「这个card payouts banks 要做成表」): the routes are the
+     shared listing, one column per fact, so a long account name is never cut.
+     FINANCE LOOK (Chew 2026-10-13): the look is on and both accounts wrap. Each
+     keeps its code with its name in one cell: a row holds two accounts, and two
+     columns both headed Code would not say which account each belongs to. */
+  const columns: DataGridColumn<CardRouteRow>[] = [
+    { key: "holding", label: MONEY_ACCOUNT_KIND_WORD.HOLDING, width: 320, wrap: true, accessor: (r) => name(r.holding_code), searchValue: (r) => name(r.holding_code) },
+    { key: "channel", label: "Machine at", width: 130, accessor: (r) => CARD_CHANNEL_WORD[r.channel], filterType: "enum" },
+    { key: "bank", label: "Pays out to", width: 320, wrap: true, accessor: (r) => name(r.bank_code), searchValue: (r) => name(r.bank_code) },
+  ];
+
   if (accountQuery.isError) return <LoadFailed what="The accounts" onRetry={() => void accountQuery.refetch()} />;
+  if (routes.isError) return <LoadFailed what="Card payout banks" onRetry={() => void routes.refetch()} />;
   return (
-    <section className="h-full overflow-auto p-6" data-testid="card-routes">
-      <div className="flex items-start justify-between gap-4">
-        <p className="max-w-[560px] text-meta text-kit-slate-11">
-          A card account and machine that is not listed here fills in no bank. Whoever records the
-          card payout chooses it.
-        </p>
-        <Button variant="neutral" size="sm" onClick={() => setEditing(null)}>
-          Add a card payout bank
-        </Button>
-      </div>
-      {routes.isError && <LoadFailed what="Card payout banks" onRetry={() => void routes.refetch()} />}
-      <div className="mt-4 max-w-[560px] border-t border-kit-slate-5">
-        {(routes.data ?? []).map((r) => (
-          /* A clickable row wears the portal's row chrome at rest — a ruled row
-             with a forward chevron (GlobalActivity, HrPeopleTab) — because a
-             hover wash alone never says "open me" until the mouse arrives. */
-          <button
-            key={`${r.holding_code}:${r.channel}`}
-            type="button"
-            className="flex w-full items-center gap-2 border-b border-kit-slate-5 px-2 py-2 text-left text-body hover:bg-kit-slate-3"
-            data-testid={`card-route-${r.holding_code}-${r.channel}`}
-            onClick={() => setEditing(r)}
-          >
-            <span className="min-w-0 flex-1 truncate">
-              {name(r.holding_code)} · {CARD_CHANNEL_WORD[r.channel]} → {name(r.bank_code)}
-            </span>
-            <span className="shrink-0 text-kit-slate-11">
-              <Icon name="forward" size={14} />
-            </span>
-          </button>
-        ))}
+    <ListPageShell register>
+      <div className="flex min-h-0 flex-1 flex-col" data-testid="card-routes">
+        <DataGrid
+          rows={routes.data ?? []}
+          columns={columns}
+          rowKey={(r) => `${r.holding_code}:${r.channel}`}
+          rowTestId={(r) => `card-route-${r.holding_code}-${r.channel}`}
+          storageKey="carres.finance.card-payout-banks.v1"
+          appearance="reference"
+          look="finance" personalLayouts={personalLayouts} fillColumn="bank"
+          groupBanner={false}
+          allowColumnGrouping={false}
+          stickyIdentity
+          isLoading={!routes.isSuccess || !accountQuery.isSuccess}
+          onRowDoubleClick={(r) => setEditing(r)}
+          /* The note says what the table is for, on the toolbar's left beside it. */
+          toolbarStart={
+            <p className="max-w-[560px] text-meta text-kit-slate-11">
+              A card account and machine that is not listed here fills in no bank. Whoever records the
+              card payout chooses it.
+            </p>
+          }
+          toolbarEnd={
+            <Button variant="primary" onClick={() => setEditing(null)} disabled={!accountQuery.isSuccess}>
+              Add a card payout bank
+            </Button>
+          }
+        />
       </div>
       {editing !== undefined && (
         <CardRouteModal route={editing} accounts={accounts} onClose={() => setEditing(undefined)} />
       )}
-    </section>
+    </ListPageShell>
   );
 }
 
@@ -361,14 +181,70 @@ function CardRouteModal({ route, accounts, onClose }: { route: CardRouteRow | nu
       }
     >
       <div className="flex flex-col gap-3" data-testid="card-route-form">
-        <Select id="card-route-holding" label="Card account" required value={holding} onValueChange={setHolding}
-          options={opts("HOLDING")} disabled={route !== null} placeholder="Choose an account" />
-        <Select id="card-route-channel" label="Machine at" required value={channel}
-          onValueChange={(v) => setChannel(v as CardChannel)} options={CHANNEL_OPTIONS} disabled={route !== null} />
+        {route ? (
+          /* An opened route's card account and machine are fixed: read-only
+             facts are text, never a disabled field (01 §3). */
+          <dl className="grid grid-cols-[160px_1fr] gap-y-2 text-body" data-testid="card-route-facts">
+            <dt className="text-kit-slate-11">{MONEY_ACCOUNT_KIND_WORD.HOLDING}</dt>
+            <dd>{opts("HOLDING").find((o) => o.value === route.holding_code)?.label ?? route.holding_code}</dd>
+            <dt className="text-kit-slate-11">Machine at</dt>
+            <dd>{CARD_CHANNEL_WORD[route.channel]}</dd>
+          </dl>
+        ) : (
+          <>
+            <Select id="card-route-holding" label={MONEY_ACCOUNT_KIND_WORD.HOLDING} required value={holding} onValueChange={setHolding}
+              options={opts("HOLDING")} placeholder="Choose an account" />
+            <Select id="card-route-channel" label="Machine at" required value={channel}
+              onValueChange={(v) => setChannel(v as CardChannel)} options={CHANNEL_OPTIONS} />
+          </>
+        )}
         <Select id="card-route-bank" label="Pays out to" required value={bank} onValueChange={setBank}
           options={opts("BANK")} placeholder="Choose an account" />
         {refusal && <FieldError>{refusal}</FieldError>}
       </div>
     </Modal>
+  );
+}
+
+/**
+ * 0622 — Closed months, `?tab=closed`: the last closed day. The ledger refuses
+ * every entry dated on or before it (a trigger on gl_entries), so a month
+ * Finance reported stays as reported. Finance reads it; only the principal
+ * changes it, forward or back, and the database checks that again. Clearing the
+ * day in the calendar and saving reopens every month.
+ */
+function ClosedMonths() {
+  const query = useBooksClosed();
+  const save = useSaveBooksClosed();
+  const mayChange = useAuth((s) => s.role) === "principal";
+  /* `undefined` = not touched, so the field shows the saved day. */
+  const [day, setDay] = useState<string | null | undefined>(undefined);
+  const [refusal, setRefusal] = useState<string | null>(null);
+
+  if (query.isError) return <LoadFailed what="The closed month" onRetry={() => void query.refetch()} />;
+  if (!query.isSuccess) return null;
+  const closed = query.data.closedThrough;
+  const picked = day === undefined ? closed : day;
+  return (
+    <section className="h-full overflow-auto p-6" data-testid="closed-months">
+      <p className="text-strong text-kit-slate-12">{closed ? `Books closed up to ${fmtDate(closed)}` : "No month is closed"}</p>
+      {closed && <p className="mt-1 max-w-[560px] text-meta text-kit-slate-11">The ledger takes nothing dated on or before this day.</p>}
+      {mayChange ? (
+        <div className="mt-4 flex max-w-[560px] items-end gap-3">
+          <DatePicker id="books-closed-through" label="Close up to" value={picked} onChange={(v) => { setDay(v); setRefusal(null); }} />
+          <Button
+            variant="primary"
+            loading={save.isPending}
+            disabled={picked === closed}
+            onClick={() => save.mutate({ closedThrough: picked }, { onSuccess: () => setDay(undefined), onError: (e) => setRefusal(e.message) })}
+          >
+            Save
+          </Button>
+        </div>
+      ) : (
+        <p className="mt-4 text-meta text-kit-slate-11">Only the principal can change this.</p>
+      )}
+      {refusal && <FieldError>{refusal}</FieldError>}
+    </section>
   );
 }

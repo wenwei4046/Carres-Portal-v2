@@ -12,7 +12,7 @@ import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
 /**
- * FINANCE · CREDIT NOTES — the one door that issues a credit note (0627).
+ * FINANCE · CREDIT NOTES — the one door that issues a credit note (0729).
  *
  *   GET  /                 the register (?invoiceId= or ?orderId= narrows it)
  *   POST /                 issue one against a Sales Invoice

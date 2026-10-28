@@ -15,11 +15,11 @@ describe("missingDeliveryDateGuidance", () => {
       so: 1303,
       customer: "Kimmy",
       salesperson: "Shasha",
-      phone: "019-3478913",
+      phone: "019-0000074",
     })).toEqual({
       problem: "No delivery date",
       detail: [
-        "Shasha · Kimmy · 019-3478913",
+        "Shasha · Kimmy · 019-0000074",
         "Ask which delivery date the customer agrees to.",
         "Record the agreed Requested Delivery Date.",
       ].join("\n"),

@@ -1,5 +1,5 @@
 import { cleanup, render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import FinanceApp from "./FinanceApp";
@@ -9,6 +9,10 @@ vi.mock("@/pages/operation/components/GlobalTopBar", () => ({ TopBarIcons: () =>
 vi.mock("@/lib/queries", () => {
   const answered = { data: [], isLoading: false, isError: false, isSuccess: true, refetch: vi.fn(), error: null };
   return {
+    // Finance tables keep personal layouts (0704); none saved here.
+    useRegisterLayouts: () => ({ data: undefined }),
+    useSaveRegisterLayout: () => ({ mutateAsync: vi.fn() }),
+    useSetDefaultRegisterLayout: () => ({ mutateAsync: vi.fn() }),
     usePaymentRegister: () => answered,
     useInvoiceRegister: () => answered,
     // The Monitor's other source reads (2026-09-12).
@@ -17,6 +21,8 @@ vi.mock("@/lib/queries", () => {
     usePaymentSettings: () => ({ ...answered, data: { collection_timing: [], bank_accounts: [] } }),
     useOperationWork: () => ({ data: undefined }),
     useOperationOrders: () => ({ data: undefined, isSuccess: true, isError: false }),
+    // 0707 — the Monitor resolves a scoped SO with no row to its waiting requests.
+    useSalesOrderIdByNumber: () => ({ data: undefined }),
     useCatalog: () => ({ data: undefined }),
     useVoidPayment: () => ({ mutate: vi.fn(), isPending: false }),
     // The Payments object offers `Correct allocation` only to the Payment
@@ -138,6 +144,42 @@ describe("Finance routing", () => {
     expect(screen.getByTestId("payment-monitor-destination-header")).toBeInTheDocument();
     auth.role = "finance";
   });
+  /* 0645 (Chew 2026-10-03, Finance MASTER §3.3): the staff the boss allows ask
+     Finance to pay from here, so Payment Requests is not finance-only. The
+     database shows each person only their own requests. */
+  it("operation staff reach Payment Requests, and only that among Finance's own pages", () => {
+    auth.role = "operation";
+    show("/finance/payment-requests");
+    expect(screen.getByTestId("payment-requests-destination-header")).toBeInTheDocument();
+    cleanup();
+    show("/finance/payment-vouchers");
+    expect(screen.getByTestId("payment-monitor-destination-header")).toBeInTheDocument();
+    auth.role = "finance";
+  });
+  /* 0687 (Chew 2026-10-12, 「hr & BD 也到能申请」): HR and BD staff reach Payment
+     Requests and nothing else under /finance. BD works from the POS, which has
+     no rail, so its page carries one way back. */
+  it("HR and BD staff reach Payment Requests, and every other Finance address lands on it", () => {
+    for (const role of ["hr", "bd"]) {
+      auth.role = role;
+      for (const path of ["/finance/payment-requests", "/finance", "/finance/ar", "/finance/ledger/trial-balance", "/finance/monitor"]) {
+        show(path);
+        expect(screen.getByTestId("payment-requests-destination-header"), `${role} ${path}`).toBeInTheDocument();
+        cleanup();
+      }
+    }
+    auth.role = "finance";
+  });
+  it("BD has Back to POS; HR keeps its own rail and needs none", () => {
+    auth.role = "bd";
+    show("/finance/payment-requests");
+    expect(screen.getByTestId("requests-back-to-pos")).toHaveTextContent("Back to POS");
+    cleanup();
+    auth.role = "hr";
+    show("/finance/payment-requests");
+    expect(screen.queryByTestId("requests-back-to-pos")).not.toBeInTheDocument();
+    auth.role = "finance";
+  });
   it("opens the three Finance Ledger destinations, each on its own route", () => {
     show("/finance/ledger");
     expect(screen.getByTestId("journal-destination-header")).toBeInTheDocument();
@@ -188,5 +230,41 @@ describe("Finance routing", () => {
     expect(screen.getByTestId("payment-monitor-destination-header")).toBeInTheDocument();
     expect(screen.queryByTestId("trial-balance-destination-header")).not.toBeInTheDocument();
     auth.role = "finance";
+  });
+  /* Chew 2026-10-03: the Profit and Loss and the Balance Sheet are two pages,
+     each a row under Reports. */
+  it("opens the Profit and Loss and the Balance Sheet, each on its own route", () => {
+    show("/finance/reports/profit-and-loss");
+    expect(screen.getByTestId("profit-and-loss-destination-header")).toBeInTheDocument();
+    expect(screen.queryByTestId("balance-sheet-destination-header")).not.toBeInTheDocument();
+    cleanup();
+    show("/finance/reports/balance-sheet");
+    expect(screen.getByTestId("balance-sheet-destination-header")).toBeInTheDocument();
+    expect(screen.queryByTestId("profit-and-loss-destination-header")).not.toBeInTheDocument();
+  });
+  it("an old /finance/reports address opens the statement it asked for, with every value it carried", () => {
+    function Address() {
+      const { pathname, search } = useLocation();
+      return <output data-testid="address">{pathname}{search}</output>;
+    }
+    const open = (path: string) => render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter initialEntries={[path]}>
+          <Routes>
+            <Route path="/finance/*" element={<><FinanceApp /><Address /></>} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    open("/finance/reports?from=2026-09-01&to=2026-09-30&dept=SHOWROOM");
+    expect(screen.getByTestId("address")).toHaveTextContent("/finance/reports/profit-and-loss?from=2026-09-01&to=2026-09-30&dept=SHOWROOM");
+    expect(screen.getByTestId("profit-and-loss-destination-header")).toBeInTheDocument();
+    cleanup();
+    open("/finance/reports?asOf=2026-09-30");
+    expect(screen.getByTestId("address")).toHaveTextContent("/finance/reports/balance-sheet?asOf=2026-09-30");
+    expect(screen.getByTestId("balance-sheet-destination-header")).toBeInTheDocument();
+    cleanup();
+    open("/finance/reports");
+    expect(screen.getByTestId("address")).toHaveTextContent(/^\/finance\/reports\/profit-and-loss$/);
   });
 });

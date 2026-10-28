@@ -133,7 +133,7 @@ export default function DOFileUploadField({
       />
       {doNumber.trim().length < 3 && (
         <p
-          className="text-label text-base-500 mt-1 font-body"
+          className="text-meta text-base-500 mt-1 font-body"
           data-testid="do-file-needs-number"
         >
           {imageOnly

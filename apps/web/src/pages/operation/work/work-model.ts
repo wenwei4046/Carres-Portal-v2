@@ -16,7 +16,7 @@ export interface WorkFilters {
 
 export interface WorkSection {
   key: "broken" | "overdue" | "today" | "later" | "no_date";
-  label: "Broken commitments" | "Missed" | "Today" | "Later" | "No date";
+  label: "Broken commitments" | "Late" | "Today" | "Later" | "No date";
   items: WorkRow[];
 }
 
@@ -30,7 +30,7 @@ const SECTION_ORDER: readonly WorkSection["key"][] = [
 
 const SECTION_LABEL: Record<WorkSection["key"], WorkSection["label"]> = {
   broken: "Broken commitments",
-  overdue: "Missed",
+  overdue: "Late",
   today: "Today",
   later: "Later",
   no_date: "No date",
@@ -77,12 +77,18 @@ export function workSections(items: readonly WorkRow[]): WorkSection[] {
 
 /** The day strip: Monday to Friday of the week holding `today`, plus Saturday
  *  when something is due that day. Counted in UTC, so the browser's time zone
- *  cannot move a date. */
-export function workWeek(today: string, dueIsos: readonly (string | null)[]): string[] {
+ *  cannot move a date. `saturday: "always"` is the Tasks door's week (owner
+ *  direction 2026-10-05): Saturday is always drawn, and still holds only the
+ *  acts a module itself dates on Saturday. */
+export function workWeek(
+  today: string,
+  dueIsos: readonly (string | null)[],
+  opts: { saturday?: "when_due" | "always" } = {},
+): string[] {
   const monday = weekStartIso(today);
   const dates = [0, 1, 2, 3, 4].map((offset) => addDaysIso(monday, offset));
   const saturday = addDaysIso(monday, 5);
-  if (dueIsos.includes(saturday)) dates.push(saturday);
+  if (opts.saturday === "always" || dueIsos.includes(saturday)) dates.push(saturday);
   return dates;
 }
 
@@ -245,11 +251,16 @@ export interface WorkRailDates {
  * `today` is the feed's Malaysia date, never the browser's. A missed action
  * counts once, under `Missed`, never again under its past weekday.
  */
-export function workRailDates(items: readonly WorkRow[], today: string, week: string): WorkRailDates {
+export function workRailDates(
+  items: readonly WorkRow[],
+  today: string,
+  week: string,
+  opts: { saturday?: "when_due" | "always" } = {},
+): WorkRailDates {
   const monday = weekStartIso(week);
   /* One work week with arrows — the Payment Monitor rail Jess named as the
      rail every page follows (owner ruling 2026-09-26). */
-  const dates = workWeek(monday, items.map((item) => item.dueIso));
+  const dates = workWeek(monday, items.map((item) => item.dueIso), opts);
   return {
     month: fmtMonth(addDaysIso(monday, 3)),
     previousWeek: addDaysIso(monday, -7),
@@ -290,6 +301,7 @@ export const WORK_MODULES: readonly OperationWorkModule[] = [
   "delivery",
   "payment",
   "issue_tracker",
+  "workspace",
 ];
 
 /** Panels follow the Work area's own width, never the window's. */
@@ -308,6 +320,7 @@ export const WORK_SOURCE_LABEL: Record<OperationWorkModule, string> = {
   delivery: "Delivery",
   payment: "Payment",
   issue_tracker: "Issue Tracker",
+  workspace: "Staff tasks",
 };
 
 /** The focus window: from `generatedOn` through the focus day (`workFocusDay`). */

@@ -1,5 +1,5 @@
 /**
- * The credit note — /api/finance/credit-notes (migration 0627).
+ * The credit note — /api/finance/credit-notes (migration 0729).
  *
  * Issued by Finance against ONE Sales Invoice. It lowers what the order still
  * owes; it is never paid out (payment/MASTER.md §13, Carres does not refund).

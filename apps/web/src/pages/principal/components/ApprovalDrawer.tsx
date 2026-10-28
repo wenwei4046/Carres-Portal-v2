@@ -126,7 +126,7 @@ export default function ApprovalDrawer({ approval, onClose }: Props) {
         <div className="flex justify-between items-start mb-[18px]">
           <div>
             <div className="kicker">{approval.id.slice(0, 8)}</div>
-            <h2 className="font-display text-title leading-tight mt-1 tracking-tight font-semibold">
+            <h2 className="font-display text-strong leading-tight mt-1 tracking-tight">
               {approval.title}
             </h2>
           </div>
@@ -144,35 +144,35 @@ export default function ApprovalDrawer({ approval, onClose }: Props) {
           className="grid gap-x-4 gap-y-2.5 text-body py-4 border-y border-base-100 mb-[18px]"
           style={{ gridTemplateColumns: "auto 1fr" }}
         >
-          <div className="text-base-500 text-label">Type</div>
+          <div className="text-base-500 text-meta">Type</div>
           <div>
             <ApprovalKindBadge kind={approval.kind} />
           </div>
-          <div className="text-base-500 text-label">Status</div>
+          <div className="text-base-500 text-meta">Status</div>
           <div>
             <ApprovalStatusPill status={approval.status} />
           </div>
-          <div className="text-base-500 text-label">By</div>
+          <div className="text-base-500 text-meta">By</div>
           <div>{approval.actor ?? ""}</div>
-          <div className="text-base-500 text-label">When</div>
+          <div className="text-base-500 text-meta">When</div>
           <div>{new Date(approval.created_at).toLocaleString()}</div>
           {approval.refers_to && (
             <>
-              <div className="text-base-500 text-label">Ref</div>
+              <div className="text-base-500 text-meta">Ref</div>
               <div className="font-mono text-meta">{approval.refers_to}</div>
             </>
           )}
           {approval.amount != null && (
             <>
-              <div className="text-base-500 text-label">Amount</div>
-              <div className="font-mono font-semibold">
+              <div className="text-base-500 text-meta">Amount</div>
+              <div className="font-mono font-medium tabular-nums">
                 RM {Number(approval.amount).toLocaleString()}
               </div>
             </>
           )}
           {approval.reason && (
             <>
-              <div className="text-base-500 text-label">Reason</div>
+              <div className="text-base-500 text-meta">Reason</div>
               <div>{approval.reason}</div>
             </>
           )}
@@ -180,11 +180,11 @@ export default function ApprovalDrawer({ approval, onClose }: Props) {
 
         {!isPending && approval.decided_at && (
           <div className="mb-[18px] p-3.5 bg-base-50 rounded-md">
-            <div className="text-label uppercase tracking-wider text-base-500 font-semibold mb-1.5">
+            <div className="text-label uppercase tracking-[0.06em] text-base-500 mb-1.5">
               Decision
             </div>
             <div className="text-body">
-              <strong>{approval.decided_by ?? ""}</strong> ·{" "}
+              <strong className="font-medium">{approval.decided_by ?? ""}</strong> ·{" "}
               {new Date(approval.decided_at).toLocaleString()}
             </div>
             {approval.decision_note && (
@@ -199,7 +199,7 @@ export default function ApprovalDrawer({ approval, onClose }: Props) {
           <div className="pt-[18px] border-t border-base-100">
             {isTopup && (
               <>
-                <div className="text-label uppercase tracking-wider text-base-500 font-semibold mb-1.5">
+                <div className="text-label uppercase tracking-[0.06em] text-base-500 mb-1.5">
                   Method (required to approve)
                 </div>
                 <select
@@ -214,7 +214,7 @@ export default function ApprovalDrawer({ approval, onClose }: Props) {
                     </option>
                   ))}
                 </select>
-                <div className="text-label uppercase tracking-wider text-base-500 font-semibold mb-1.5">
+                <div className="text-label uppercase tracking-[0.06em] text-base-500 mb-1.5">
                   {refWord ? `${refWord} (required to approve)` : "Reference (optional)"}
                 </div>
                 <input
@@ -227,7 +227,7 @@ export default function ApprovalDrawer({ approval, onClose }: Props) {
                 />
               </>
             )}
-            <div className="text-label uppercase tracking-wider text-base-500 font-semibold mb-1.5">
+            <div className="text-label uppercase tracking-[0.06em] text-base-500 mb-1.5">
               {isTopup ? "Reject reason (optional)" : "Note (optional)"}
             </div>
             <textarea

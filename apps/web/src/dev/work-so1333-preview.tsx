@@ -15,7 +15,7 @@ import { createRoot } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
-import OperationWork from "@/pages/operation/OperationWork";
+import WorkspaceTasks from "@/pages/operation/tasks/WorkspaceTasks";
 import PreviewFrame from "./preview-frame";
 import "@/index.css";
 
@@ -63,7 +63,7 @@ createRoot(document.getElementById("root")!).render(
       <MemoryRouter initialEntries={[start]}>
         <PreviewFrame label="Work · SO-1333 replayed reads (test data)">
           <div className="flex h-full flex-col">
-            <OperationWork />
+            <WorkspaceTasks />
           </div>
         </PreviewFrame>
       </MemoryRouter>

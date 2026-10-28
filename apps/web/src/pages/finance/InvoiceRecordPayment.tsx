@@ -4,7 +4,7 @@ import { soRemaining } from "@carres/shared/payment-invoice-register";
 import { likelyDuplicatePayments } from "@carres/shared/payment-duplicate";
 import { SectionCard } from "@/components/SectionPanel";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { qk, useRecordPayment } from "@/lib/queries";
+import { BACKDATE_WAITING_WORDS, qk, useRecordPayment } from "@/lib/queries";
 import { apiFetch } from "@/lib/api";
 import InvoiceSendReceipt from "./InvoiceSendReceipt";
 import type { PaymentTemplateRow } from "@carres/shared/payment-templates";
@@ -49,6 +49,8 @@ export default function InvoiceRecordPayment({ invoice, rows, onClose }: {
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<{ receiptNo: string | null; stillNeeded: number } | null>(null);
   const [sendingReceipt, setSendingReceipt] = useState(false);
+  // 0707 — a paid date more than 14 days back waits for the Payment Approver.
+  const [waiting, setWaiting] = useState(false);
   const templatesQuery = useQuery<{ templates: PaymentTemplateRow[] }>({
     queryKey: ["finance", "payment-templates"],
     queryFn: () => apiFetch("/api/finance/payment-settings/templates"),
@@ -124,6 +126,11 @@ export default function InvoiceRecordPayment({ invoice, rows, onClose }: {
       },
       {
         onSuccess: (out) => {
+          if (out.pendingApproval) {
+            setWaiting(true);
+            setStep("done");
+            return;
+          }
           const receiptNo = (out.payment as { receipt_no?: string | null } | undefined)?.receipt_no ?? null;
           setResult({
             receiptNo,
@@ -136,6 +143,17 @@ export default function InvoiceRecordPayment({ invoice, rows, onClose }: {
         onSettled: () => setSaving(false),
       },
     );
+  }
+
+  if (step === "done" && waiting) {
+    return <div className="flex-1 overflow-auto p-4" data-testid="invoice-record-waiting">
+      <SectionCard><div className="p-4 text-body">
+        <h2 className="text-strong mb-2">Waiting for the Payment Approver</h2>
+        <p>Paid date is more than 14 days ago.</p>
+        <p>{BACKDATE_WAITING_WORDS}</p>
+        <button className="btn-secondary mt-3" onClick={onClose}>Back to invoice</button>
+      </div></SectionCard>
+    </div>;
   }
 
   if (step === "done" && result) {
@@ -165,7 +183,7 @@ export default function InvoiceRecordPayment({ invoice, rows, onClose }: {
         {receiptTemplates.length > 0
           ? <button className="btn-primary mt-3 mr-2"
               onClick={() => setSendingReceipt(true)}>Send receipt</button>
-          : <p className="text-label font-normal mt-1">
+          : <p className="text-meta mt-1">
               No receipt template yet. Ask a manager to add the approved wording in Settings.
             </p>}
         <button className="btn-secondary mt-3" onClick={onClose}>Back to invoice</button>
@@ -196,19 +214,19 @@ export default function InvoiceRecordPayment({ invoice, rows, onClose }: {
         <h2 className="text-strong mb-2">Record payment</h2>
         {step === "edit" ? <div className="space-y-2 text-body">
           <label className="block">
-            <span className="text-label">Amount (RM)</span>
+            <span className="text-meta text-kit-slate-11">Amount (RM)</span>
             <input type="number" min={0} step="0.01" value={amount} autoFocus
               onChange={(e) => setAmount(e.target.value)}
               aria-label="Payment amount" className={inputCls} />
           </label>
           <label className="block">
-            <span className="text-label">Paid date</span>
+            <span className="text-meta text-kit-slate-11">Paid date</span>
             <input type="date" value={paidOn}
               onChange={(e) => setPaidOn(e.target.value)}
               aria-label="Paid date" className={inputCls} />
           </label>
           <label className="block">
-            <span className="text-label">Method</span>
+            <span className="text-meta text-kit-slate-11">Method</span>
             <select value={method}
               onChange={(e) => { setMethod(e.target.value); setFile(null); }}
               aria-label="Payment method" className={inputCls}>
@@ -218,17 +236,17 @@ export default function InvoiceRecordPayment({ invoice, rows, onClose }: {
             </select>
           </label>
           {spec.reference && <label className="block">
-            <span className="text-label">{spec.reference.label}</span>
+            <span className="text-meta text-kit-slate-11">{spec.reference.label}</span>
             <input type="text" value={reference}
               onChange={(e) => setReference(e.target.value)}
               aria-label={spec.reference.label} className={inputCls} />
           </label>}
           <label className="block">
-            <span className="text-label">{spec.evidence}</span>
+            <span className="text-meta text-kit-slate-11">{spec.evidence}</span>
             <input type="file" accept="image/*,application/pdf"
               onChange={(e) => acceptFile(e.target.files?.[0])}
               aria-label={spec.evidence} className="mt-0.5 block w-full text-meta" />
-            <span className="text-label font-normal">
+            <span className="text-meta">
               {file ? file.name : `Add the ${spec.evidence.toLowerCase()} before Review.`}
             </span>
           </label>
@@ -241,18 +259,18 @@ export default function InvoiceRecordPayment({ invoice, rows, onClose }: {
           <p>{rm(amt)} · {spec.label} · {fmtDate(paidOn)}</p>
           {reference.trim() && <p>{spec.reference?.label ?? "Reference"}: {reference.trim()}</p>}
           <p>{file ? `${spec.evidence} attached.` : `No ${spec.evidence.toLowerCase()}.`}</p>
-          <p className="font-semibold">This records customer money.</p>
-          <p className="font-semibold">This does not confirm the bank account.</p>
+          <p className="font-medium">This records customer money.</p>
+          <p className="font-medium">This does not confirm the bank account.</p>
           {needsLook && <div className="rounded-card border border-base-200 p-2"
             data-testid="likely-duplicate-warning">
-            <p className="font-semibold">{earlierUnknown
+            <p className="font-medium">{earlierUnknown
               ? "The earlier payments could not be read."
               : "This customer already has a payment that looks the same."}</p>
-            {duplicates.map((d) => <p key={d.id} className="text-label font-normal">
+            {duplicates.map((d) => <p key={d.id} className="text-meta">
               {d.receipt_no ?? "Receipt number missing"} · {rm(Number(d.amount))} · {fmtDate(d.paid_on)}
               {d.reference ? ` · ${d.reference}` : ""}
             </p>)}
-            <label className="mt-1 flex items-start gap-2 text-label font-normal">
+            <label className="mt-1 flex items-start gap-2 text-meta">
               <input type="checkbox" checked={duplicateChecked}
                 onChange={(e) => setDuplicateChecked(e.target.checked)}
                 aria-label="I checked the earlier payment" />
@@ -260,7 +278,7 @@ export default function InvoiceRecordPayment({ invoice, rows, onClose }: {
                 ? "I opened this order's payments and this one is not there yet."
                 : "I opened the earlier payment and this is a different one."}</span>
             </label>
-            <p className="mt-1 text-label font-normal">
+            <p className="mt-1 text-meta">
               Only a Payment Approver can record it after this.</p>
           </div>}
           <div className="flex gap-2 pt-1">

@@ -132,7 +132,7 @@ describe("Purchase Return Work (PO Duty, Office calendar)", () => {
   it("a passed date with nothing collected reads `Pickup missed · Follow up supplier` (fact · action); any collection closes it", () => {
     const passed = pr({ confirmed_pickup_date: "2026-10-01" });
     const missed = purchaseReturnWorkItems(passed, null, "2026-10-02", NO_HOLIDAYS).find((o) => o.item.ruleKey === PURCHASE_RETURN_WORK_RULE.pickupMissed);
-    expect(`${missed?.problem} · ${missed?.item.action}`).toBe("Pickup missed · Follow up supplier");
+    expect(`${missed?.problem} · ${missed?.item.action}`).toBe("Pickup date passed · Follow up supplier");
     const collected = pr({ confirmed_pickup_date: "2026-10-01", units: [{ ...pr().units[0]!, actual_pickup_date: "2026-10-01T02:00:00Z" }] });
     expect(purchaseReturnWorkItems(collected, null, "2026-10-02", NO_HOLIDAYS)).toEqual([]);
   });
