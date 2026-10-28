@@ -211,7 +211,7 @@ export default function PaymentRecords() {
           emptyMessage={orderScope !== null
             ? `No payment is recorded on SO-${orderScope} yet.`
             : "No payments yet. Recorded customer money will appear here."}
-          expandTitle="Inspect payment" onRowDoubleClick={open}
+          expandTitle="Inspect payment" onRowClick={open} onRowDoubleClick={open}
           expandable={{ renderExpansion: (r) => <Inspect row={r} onOpen={() => open(r)} /> }}
           statusSummary={(visible) => <span data-testid="payment-records-summary">{visible.length} {visible.length === 1 ? "payment" : "payments"} · {rm(visible.filter(isLivePayment).reduce((sum, r) => sum + r.amount, 0))} received</span>}
         />
@@ -342,7 +342,7 @@ function PaymentRecordObject({ payment, onClose, onPrint, printing }: {
     {correcting
       ? <PaymentCorrectAllocation payment={payment} onClose={() => setCorrecting(false)} />
       : voiding
-      ? <ReasonForm testId="payment-void-form" title="Void payment" action="Void payment"
+      ? <ReasonForm testId="payment-void-form" title="Void payment" action="Void payment" pendingLabel="Voiding…" danger
           sentence={`${payment.receipt_no ?? "This payment"} · ${rm(payment.amount)} will stop counting as money. The Receipt stays and is marked VOIDED.`}
           label="Why is this payment being voided" pending={voidPayment.isPending}
           onCancel={() => setVoiding(false)}
@@ -422,8 +422,12 @@ function PaymentRecordObject({ payment, onClose, onPrint, printing }: {
 /** One act that needs a written reason: `Void payment` (no delete, no silent
  *  amount edit — the row stays, stops being money, keeps its Receipt marked
  *  VOIDED), and Finance's `Hold delivery` / `Clear hold` (BR-7). */
-function ReasonForm({ testId, title, sentence, label, action, pending, onCancel, onConfirm }: {
+function ReasonForm({ testId, title, sentence, label, action, pendingLabel, danger, pending, onCancel, onConfirm }: {
   testId: string; title: string; sentence: string; label: string; action: string;
+  /** What the button says while the request is out, e.g. `Voiding…`. */
+  pendingLabel?: string;
+  /** A destructive action: red-edged button, not the main navy one. */
+  danger?: boolean;
   pending: boolean;
   onCancel: () => void;
   onConfirm: (reason: string) => void;
@@ -439,7 +443,7 @@ function ReasonForm({ testId, title, sentence, label, action, pending, onCancel,
           aria-label={label} />
       </label>
       <span className="mt-3 flex flex-wrap gap-2">
-        <button className="btn-primary" disabled={pending || !reason.trim()} onClick={() => onConfirm(reason.trim())}>{action}</button>
+        <button className={danger ? "btn-danger" : "btn-primary"} disabled={pending || !reason.trim()} onClick={() => onConfirm(reason.trim())}>{pending && pendingLabel ? pendingLabel : action}</button>
         <button className="btn-secondary" onClick={onCancel}>Cancel</button>
       </span>
     </Facts>

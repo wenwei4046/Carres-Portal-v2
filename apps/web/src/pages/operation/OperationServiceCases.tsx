@@ -101,8 +101,12 @@ export default function OperationServiceCases() {
   const holidayOpts = useMemo(() => ({ holidays: myHolidaySet() }), []);
   const todayIso = appTodayIso();
 
+  // An empty list under a filter is not an empty module: say which filter emptied it.
+  const filtered = state !== "" || mine || stageShown;
+  const emptyFilteredSentence = `No ${state || ""}${state ? " " : ""}cases${mine ? " of yours" : ""}${stageShown ? " at this stage" : ""}.`;
+
   return (
-    <div className="p-8 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-8 max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-6">
         <p className="text-meta uppercase tracking-wider text-base-500 mb-1">Operation</p>
@@ -163,12 +167,13 @@ export default function OperationServiceCases() {
       )}
 
       {/* Toolbar */}
-      <div className="flex items-center gap-3 mb-4">
+      <div className="flex flex-wrap items-center gap-3 mb-4">
         <div className="flex rounded border border-base-200 overflow-hidden text-body">
           {(["", "ongoing", "closed"] as const).map((s) => (
             <button
               key={s}
               type="button"
+              aria-pressed={state === s}
               onClick={() => setState(s)}
               className={`px-3 py-1.5 font-medium ${
                 state === s
@@ -185,13 +190,7 @@ export default function OperationServiceCases() {
 
         <div className="flex-1" />
 
-        <button
-          type="button"
-          onClick={() => setShowCreate(true)}
-          className="btn-hero text-body py-1.5"
-        >
-          + New Case
-        </button>
+        <Button variant="primary" icon="add" onClick={() => setShowCreate(true)}>New Case</Button>
       </div>
 
       {/* Table */}
@@ -204,14 +203,21 @@ export default function OperationServiceCases() {
           <Button variant="neutral" onClick={() => void listQ.refetch()}>Try again</Button>
         </div>
       ) : rows.length === 0 ? (
-        <div className="rounded border border-base-200 bg-white p-12 text-center">
-          <p className="text-base-700 font-medium">No cases yet.</p>
-          <p className="text-body text-base-500 mt-1">Open a new case when an issue arises.</p>
-        </div>
+        filtered ? (
+          <div className="flex flex-col items-center gap-3 rounded border border-base-200 bg-white p-12 text-center">
+            <p className="text-base-700 font-medium">{emptyFilteredSentence}</p>
+            <Button variant="neutral" onClick={() => { setState(""); setMine(false); setStageId(null); }}>Show all cases</Button>
+          </div>
+        ) : (
+          <div className="rounded border border-base-200 bg-white p-12 text-center">
+            <p className="text-base-700 font-medium">No cases yet.</p>
+            <p className="text-body text-base-600 mt-1">Open a new case when an issue arises.</p>
+          </div>
+        )
       ) : (
         <div className="rounded border border-base-200 bg-white overflow-x-auto">
           <table className="w-full text-body">
-            <thead className="bg-base-50 text-meta uppercase tracking-wider text-base-500">
+            <thead className="bg-base-50 text-meta uppercase tracking-wider text-base-600">
               <tr>
                 <th className="text-left px-3 py-2 font-medium">Case No.</th>
                 {/* J2 — the case→order link gets its own column: it is the
