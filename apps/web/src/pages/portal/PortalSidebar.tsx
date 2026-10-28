@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type Ref } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import MIcon from "@/components/carres/MIcon";
+import ReportProblemModal from "@/pages/operation/components/ReportProblemModal";
 import { useAuth } from "@/lib/auth";
 import { useNavCapabilities } from "./nav-capabilities";
 import NavBadge from "@/components/NavBadge";
@@ -136,6 +137,7 @@ export default function PortalSidebar({ drawer = false, compactForCanvas = false
   }, []);
   const isSalesOrderDetail = /^\/operation\/orders\/so\/(?!new(?:\/|$))[^/]+/.test(location.pathname);
   const [detailExpanded, setDetailExpanded] = useState(false);
+  const [reporting, setReporting] = useState(false);
   useEffect(() => setDetailExpanded(false), [location.pathname, narrowDetail]);
   const autoDetail = isSalesOrderDetail && narrowDetail;
   const autoCanvas = compactForCanvas;
@@ -716,6 +718,18 @@ export default function PortalSidebar({ drawer = false, compactForCanvas = false
             {!collapsed && <span>Settings</span>}
           </Link>
         )}
+        <button
+          type="button"
+          onClick={() => setReporting(true)}
+          data-testid="nav-report-problem"
+          title="Report a problem to IT"
+          aria-label={collapsed ? "Report a problem to IT" : undefined}
+          className={`${ROW} ${collapsed ? "justify-center" : ""} ${ROW_REST}`}
+        >
+          <MIcon name="support_agent" size={MODULE_ICON} className="text-c-tab" />
+          {!collapsed && <span>Report a problem to IT</span>}
+        </button>
+        <ReportProblemModal open={reporting} onClose={() => setReporting(false)} />
         <Link
           to="/me"
           title={`${displayName} · Profile · Sign out`}
