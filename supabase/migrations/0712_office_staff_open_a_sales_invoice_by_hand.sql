@@ -64,6 +64,8 @@ declare
   v_def text := replace(pg_get_functiondef(p_fn), E'\r\n', E'\n');
   v_n   integer;
 begin
+  p_old := replace(p_old, E'\r\n', E'\n');
+  p_new := replace(p_new, E'\r\n', E'\n');
   v_n := (length(v_def) - length(replace(v_def, p_old, ''))) / greatest(length(p_old), 1);
   if v_n <> 1 then
     raise exception '0712: % holds the text to change % times, not once: %', p_fn, v_n, left(p_old, 90);

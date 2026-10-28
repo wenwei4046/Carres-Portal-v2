@@ -186,6 +186,8 @@ declare
   v_def text := replace(pg_get_functiondef(p_fn), E'\r\n', E'\n');
   v_n   integer;
 begin
+  p_old := replace(p_old, E'\r\n', E'\n');
+  p_new := replace(p_new, E'\r\n', E'\n');
   if position(p_new in v_def) > 0 then
     return;
   end if;
