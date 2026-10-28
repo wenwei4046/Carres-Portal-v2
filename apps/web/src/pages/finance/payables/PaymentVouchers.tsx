@@ -5,10 +5,14 @@ import {
   PAYMENT_VOUCHER_METHODS,
   type ApAccountChoice,
   type ApBillOutstandingRow,
+  type ApOpeningBillRow,
   type PaymentVoucherDocument,
   type PaymentVoucherDraftInput,
   type PaymentVoucherRegisterRow,
   type SupplierBillRegisterRow,
+  type SupplierDebitNoteRegisterRow,
+  partyLabel,
+  supplierPayTo,
 } from "@carres/shared/schemas/finance-ap";
 import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
@@ -26,11 +30,15 @@ import {
   useApSuppliers,
   usePaymentVoucher,
   useSupplierBills,
+  useSupplierDebitNotes,
+  useApOpeningBills,
   usePaymentVouchers,
   useSaveVoucher,
+  useSupplierFinance,
   useVoucherAct,
   type VoucherAct,
 } from "@/lib/payables-queries";
+import { answerPaymentRequest, usePaymentRequest } from "@/lib/payment-request-queries";
 import {
   PAY_METHOD_WORD,
   VOUCHER_PURPOSE_WORD,
@@ -43,12 +51,19 @@ import {
   refusal,
   word,
 } from "./payables-words";
-import { FactRow, Facts, FilesCard, HistoryCard, PayablesSwitch, ReadFailed, ReasonModal } from "./PayablesParts";
+import { FactRow, Facts, FilesCard, HistoryCard, ReadFailed, ReasonModal } from "./PayablesParts";
 import { VoucherAdvanceCard } from "./VoucherAdvance";
+import { NotesOwedHint } from "./NoteFollowUpParts";
 import { paymentVoucherPrint } from "./voucher-print";
+import { printVoucher, printVoucherById } from "../preview/row-print";
+import { documentRowMenu } from "@/components/register/row-menu";
+import { VoucherPreview } from "../preview/previews";
+import { useQueryClient } from "@tanstack/react-query";
 import { paysOut } from "@carres/shared/money-accounts";
 import { useMoneyAccounts } from "../settings/api";
 import { useSaveKey } from "../save-key";
+import { amountCell, FINANCE_WIDTH } from "../finance-widths";
+import { useFinancePersonalLayouts } from "../finance-layouts";
 
 /**
  * Finance → Payment Vouchers (migration 0477). The ONE door money leaves
@@ -66,7 +81,33 @@ import { useSaveKey } from "../save-key";
  * Advance (0484–0485): a supplier voucher may also carry money paid before
  * the bill. Approving posts it Dr the payables account like a bill payment;
  * it is applied to a bill later, or sent back, from the voucher's Advance card.
+ *
+ * FINANCE LOOK (Chew 2026-10-13): the account paid from shows its code and its
+ * name in two columns (Code, Paid From), the payee, supplier and bills wrap
+ * rather than being cut, and a zero amount is a blank cell.
  */
+/**
+ * 0636 (Chew 2026-10-03): where a payment to this supplier goes, from
+ * Finance's own supplier details. A read that fails says so; it never
+ * pretends there is no account.
+ */
+function useSupplierPayTo(supplierId: string | null):
+  | { state: "none" } | { state: "loading" } | { state: "failed" } | { state: "ready"; payTo: string | null } {
+  const q = useSupplierFinance();
+  if (!supplierId) return { state: "none" };
+  if (q.isError) return { state: "failed" };
+  if (!q.isSuccess) return { state: "loading" };
+  const row = q.data.find((r) => r.supplier_id === supplierId);
+  return { state: "ready", payTo: row ? supplierPayTo(row) : null };
+}
+
+function payToWords(p: ReturnType<typeof useSupplierPayTo>): string {
+  if (p.state === "failed") return "Bank details could not be loaded";
+  if (p.state === "loading") return "Loading bank details…";
+  if (p.state === "ready" && p.payTo) return p.payTo;
+  return "No bank account on file";
+}
+
 export default function PaymentVouchers() {
   return (
     <Routes>
@@ -80,41 +121,62 @@ export default function PaymentVouchers() {
 
 // ── register ────────────────────────────────────────────────────────────────
 
+/** 0666: the account a voucher pays from; a draft the system raised (a
+ *  dealer's commission) waits for Finance to pick it. */
+// PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), dealer commission step 4).
+function paidFromWord(v: { pay_from_account_code: string | null; pay_from_name: string | null }): string {
+  return v.pay_from_account_code ? `${v.pay_from_account_code} ${v.pay_from_name ?? ""}`.trim() : "Not chosen yet";
+}
+/** The Finance look: the Paid From column holds the name; the code sits in Code. */
+function paidFromName(v: { pay_from_account_code: string | null; pay_from_name: string | null }): string {
+  return v.pay_from_account_code ? v.pay_from_name ?? "" : "Not chosen yet";
+}
+
+/** Duplicate (Chew 2026-10-21): a NEW draft started from this voucher, on the
+ *  new-voucher form that already takes a prefill. Nothing is saved until Save. */
+export const duplicateVoucherPath = (id: string) => `/finance/payment-vouchers/new?copy=${id}`;
+
 function VoucherRegister() {
+  const personalLayouts = useFinancePersonalLayouts("finance_payment_vouchers");
   const navigate = useNavigate();
+  const qc = useQueryClient();
+  // Double-click previews the voucher (Chew 2026-10-21); View opens its page.
+  const [peek, setPeek] = useState<string | null>(null);
   const [dept, setDept] = useDepartmentParam();
   const query = usePaymentVouchers(dept);
   const rows = query.data ?? [];
   const columns = useMemo<DataGridColumn<PaymentVoucherRegisterRow>[]>(() => [
-    { key: "voucher", label: "Voucher No", width: 170,
+    { key: "voucher", label: "Voucher No", width: FINANCE_WIDTH.documentNo,
       accessor: (r) => <Link className="text-kit-blue-11 underline underline-offset-2" to={`/finance/payment-vouchers/${r.id}`}>{r.voucher_no ?? "Draft, no number yet"}</Link>,
       searchValue: (r) => r.voucher_no ?? "", exportValue: (r) => r.voucher_no ?? "Draft, no number yet" },
-    { key: "date", label: "Voucher Date", width: 130, accessor: (r) => fmtDate(r.voucher_date),
+    { key: "date", label: "Voucher Date", width: 120, accessor: (r) => fmtDate(r.voucher_date),
       dateValue: (r) => r.voucher_date, filterType: "date", exportValue: (r) => fmtDate(r.voucher_date) },
-    { key: "payee", label: "Payee", width: 200, accessor: (r) => r.payee_name, searchValue: (r) => r.payee_name },
-    { key: "supplier", label: "Supplier", width: 200, accessor: (r) => r.supplier_name ?? "No supplier",
+    { key: "payee", label: "Payee", width: FINANCE_WIDTH.party, wrap: true, accessor: (r) => r.payee_name, searchValue: (r) => r.payee_name },
+    { key: "supplier", label: "Supplier", width: FINANCE_WIDTH.party, defaultHidden: true, wrap: true, accessor: (r) => r.supplier_name ?? "No supplier",
       searchValue: (r) => r.supplier_name ?? "", filterType: "enum" },
-    { key: "purpose", label: "Purpose", width: 160, accessor: (r) => word(VOUCHER_PURPOSE_WORD, r.purpose),
+    { key: "purpose", label: "Purpose", width: 150, accessor: (r) => word(VOUCHER_PURPOSE_WORD, r.purpose),
       filterValue: (r) => word(VOUCHER_PURPOSE_WORD, r.purpose), filterType: "enum" },
-    { key: "bills", label: "Bills Paid", width: 200, accessor: (r) => r.bill_nos ?? "No bill",
-      searchValue: (r) => r.bill_nos ?? "" },
-    { key: "from", label: "Paid From", width: 180,
-      accessor: (r) => `${r.pay_from_account_code} ${r.pay_from_name ?? ""}`.trim(), filterType: "enum" },
-    { key: "method", label: "Method", width: 130, accessor: (r) => word(PAY_METHOD_WORD, r.pay_method),
+    // 0681: the debit notes it pays are listed beside the bills.
+    { key: "bills", label: "Bills and Debit Notes Paid", headerLines: ["Bills and Debit", "Notes Paid"], width: 200, defaultHidden: true, wrap: true,
+      accessor: (r) => r.bill_nos ?? "No bill", searchValue: (r) => r.bill_nos ?? "" },
+    { key: "code", label: "Code", width: FINANCE_WIDTH.code, accessor: (r) => r.pay_from_account_code ?? "" },
+    { key: "from", label: "Paid From", width: 150, wrap: true,
+      accessor: paidFromName, searchValue: paidFromWord, filterType: "enum" },
+    { key: "method", label: "Method", width: 130, defaultHidden: true, accessor: (r) => word(PAY_METHOD_WORD, r.pay_method),
       filterValue: (r) => word(PAY_METHOD_WORD, r.pay_method), filterType: "enum" },
     { key: "status", label: "Status", width: 120, accessor: (r) => word(VOUCHER_STATUS_WORD, r.status),
       filterValue: (r) => word(VOUCHER_STATUS_WORD, r.status), filterType: "enum" },
-    { key: "advance", label: "Advance", width: 190, accessor: (r) => advanceCell(r),
+    { key: "advance", label: "Advance", width: 190, defaultHidden: true, accessor: (r) => advanceCell(r),
       numberValue: advanceAmount, exportValue: (r) => num(r.advance_amount) ?? "" },
-    { key: "amount", label: "Amount", width: 140, align: "right", accessor: (r) => money(r.amount),
+    { key: "amount", label: "Amount", width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.amount),
       numberValue: (r) => num(r.amount), filterType: "number", exportValue: (r) => num(r.amount) ?? "" },
-    { key: "prepared", label: "Prepared By", width: 150, accessor: (r) => r.prepared_by_name ?? "Not prepared yet",
+    { key: "prepared", label: "Prepared By", width: 150, defaultHidden: true, accessor: (r) => r.prepared_by_name ?? "Not prepared yet",
       filterType: "enum" },
-    { key: "checked", label: "Checked By", width: 150, accessor: (r) => r.checked_by_name ?? "Not checked yet",
+    { key: "checked", label: "Checked By", width: 150, defaultHidden: true, accessor: (r) => r.checked_by_name ?? "Not checked yet",
       filterType: "enum" },
-    { key: "approved", label: "Approved By", width: 150, accessor: (r) => r.approved_by_name ?? "Not approved yet",
+    { key: "approved", label: "Approved By", width: 150, defaultHidden: true, accessor: (r) => r.approved_by_name ?? "Not approved yet",
       filterType: "enum" },
-    { key: "files", label: "Files", width: 90, align: "right", accessor: (r) => String(r.file_count),
+    { key: "files", label: "Files", width: 90, align: "right", defaultHidden: true, accessor: (r) => String(r.file_count),
       numberValue: (r) => r.file_count },
   ], []);
 
@@ -128,8 +190,9 @@ function VoucherRegister() {
             rows={rows}
             columns={columns}
             rowKey={(r) => r.id}
-            storageKey="carres.finance.payment-vouchers.v1"
+            storageKey="carres.finance.payment-vouchers.v3"
             appearance="reference"
+            look="finance" personalLayouts={personalLayouts} fillColumn="payee"
             exportName="Payment Vouchers"
             groupBanner={false}
             stickyIdentity
@@ -142,15 +205,20 @@ function VoucherRegister() {
                   type="button"
                   data-testid="new-voucher"
                   onClick={() => navigate("/finance/payment-vouchers/new")}
-                  className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-kit-blue-9 px-3 text-meta font-semibold text-white hover:opacity-90"
+                  className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-kit-blue-9 px-3 text-body font-semibold text-white hover:opacity-90"
                 >
                   + New Payment Voucher
                 </button>
-                <PayablesSwitch current="vouchers" />
               </span>
             }
             emptyMessage="No payment vouchers yet. Every payment to a supplier or creditor starts here."
-            onRowDoubleClick={(r) => navigate(`/finance/payment-vouchers/${r.id}`)}
+            onRowDoubleClick={(r) => setPeek(r.id)}
+            contextMenu={(r) => documentRowMenu({
+              view: () => navigate(`/finance/payment-vouchers/${r.id}`),
+              // A draft has no number, so no paper (voucher-print.ts).
+              print: r.voucher_no ? () => void printVoucherById(qc, r.id) : undefined,
+              more: [{ label: "Duplicate", onClick: () => navigate(duplicateVoucherPath(r.id)) }],
+            })}
             statusSummary={(visible) => {
               const paid = visible
                 .filter((r) => r.status === "approved")
@@ -166,6 +234,7 @@ function VoucherRegister() {
           />
         </ListPageShell>
       )}
+      <VoucherPreview id={peek} onClose={() => setPeek(null)} onView={(id) => navigate(`/finance/payment-vouchers/${id}`)} />
     </div>
   );
 }
@@ -212,6 +281,7 @@ function VoucherDetail() {
   const [reasonFor, setReasonFor] = useState<"reject" | "cancel" | null>(null);
   const [printing, setPrinting] = useState(false);
   const doc = query.data;
+  const payTo = useSupplierPayTo(doc?.voucher.supplier_id ?? null);
 
   if (query.isError) {
     return (
@@ -241,15 +311,12 @@ function VoucherDetail() {
     if (!printable) return;
     setPrinting(true);
     try {
-      const { renderPaymentVoucherPdf } = await import("@/lib/pdf/render");
-      window.open(URL.createObjectURL(await renderPaymentVoucherPdf(printable)), "_blank", "noopener");
-    } catch (e) {
-      toast.error(`The voucher could not be opened: ${(e as Error).message}`);
+      await printVoucher(doc);
     } finally {
       setPrinting(false);
     }
   };
-  const approveAsk = `Approve paying ${money(v.amount)} to ${v.payee_name} from ${v.pay_from_account_code} ${v.pay_from_name ?? ""}? `
+  const approveAsk = `Approve paying ${money(v.amount)} to ${v.payee_name} from ${paidFromWord(v)}? `
     + `It is entered in the ledger on ${fmtDate(v.voucher_date)}.`;
 
   return (
@@ -291,8 +358,14 @@ function VoucherDetail() {
               {v.supplier_name ? `${v.supplier_name} · ${creditorKindWord(v.supplier_kind)}` : "No supplier"}
             </FactRow>
             <FactRow label="Payee">{v.payee_name}</FactRow>
+            {/* 0636: today's bank details, while somebody still has to send the
+                money. Once approved the money has gone, and today's account may
+                not be the one it went to, so the row leaves. */}
+            {v.supplier_id && (v.status === "draft" || v.status === "prepared" || v.status === "checked") && (
+              <FactRow label="Pay to"><span data-testid="voucher-pay-to">{payToWords(payTo)}</span></FactRow>
+            )}
             <FactRow label="Voucher date">{fmtDate(v.voucher_date)}</FactRow>
-            <FactRow label="Paid from">{v.pay_from_account_code} {v.pay_from_name ?? ""}</FactRow>
+            <FactRow label="Paid from">{paidFromWord(v)}</FactRow>
             <FactRow label="Method">{word(PAY_METHOD_WORD, v.pay_method)}</FactRow>
             <FactRow label="Reference">{v.pay_reference ?? "No reference"}</FactRow>
             <FactRow label="Amount"><span data-testid="voucher-amount">{money(v.amount)}</span></FactRow>
@@ -312,6 +385,8 @@ function VoucherDetail() {
             )}
           </Facts>
           <VoucherBillsCard doc={doc} />
+          {(doc.debit_notes ?? []).length > 0 && <VoucherDebitNotesCard doc={doc} />}
+          {(doc.opening_bills ?? []).length > 0 && <VoucherOpeningBillsCard doc={doc} />}
           <VoucherAdvanceCard doc={doc} />
           <VoucherLinesCard doc={doc} />
           <FilesCard kind="vouchers" id={id} files={doc.files} canAdd={doc.can.add_file} />
@@ -398,6 +473,72 @@ function VoucherBillsCard({ doc }: { doc: PaymentVoucherDocument }) {
   );
 }
 
+/** 0681: the supplier debit notes this voucher pays. */
+function VoucherDebitNotesCard({ doc }: { doc: PaymentVoucherDocument }) {
+  return (
+    <Facts title="Debit notes paid">
+      <div className="overflow-x-auto">
+        <table className="w-full text-body" data-testid="voucher-debit-notes">
+          <thead>
+            <tr className="text-left text-base-500">
+              <th className="py-1 pr-3">Debit Note No</th>
+              <th className="py-1 pr-3">Supplier's debit note</th>
+              <th className="py-1 pr-3">Date</th>
+              <th className="py-1 pr-3">Due date</th>
+              <th className="py-1 pr-3 text-right">Total</th>
+              <th className="py-1 text-right">Paid by this voucher</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(doc.debit_notes ?? []).map((d) => (
+              <tr key={d.debit_note_id} className="border-t border-base-100">
+                <td className="py-1 pr-3"><Link className="text-kit-blue-11 underline underline-offset-2" to={`/finance/debit-notes/${d.debit_note_id}`}>{d.note_no ?? "Draft debit note"}</Link></td>
+                <td className="py-1 pr-3">{d.supplier_note_no}</td>
+                <td className="py-1 pr-3">{fmtDate(d.note_date)}</td>
+                <td className="py-1 pr-3">{d.due_date ? fmtDate(d.due_date) : "No due date"}</td>
+                <td className="py-1 pr-3 text-right">{money(d.note_total)}</td>
+                <td className="py-1 text-right">{money(d.amount_applied)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Facts>
+  );
+}
+
+/** 0705: the opening bills this voucher pays (Opening balances). */
+function VoucherOpeningBillsCard({ doc }: { doc: PaymentVoucherDocument }) {
+  return (
+    <Facts title="Opening bills paid">
+      <div className="overflow-x-auto">
+        <table className="w-full text-body" data-testid="voucher-opening-bills">
+          <thead>
+            <tr className="text-left text-base-500">
+              <th className="py-1 pr-3">Supplier invoice</th>
+              <th className="py-1 pr-3">Bill date</th>
+              <th className="py-1 pr-3">Due date</th>
+              <th className="py-1 pr-3 text-right">Bill total</th>
+              <th className="py-1 text-right">Paid by this voucher</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(doc.opening_bills ?? []).map((o) => (
+              <tr key={o.opening_item_id} className="border-t border-base-100">
+                <td className="py-1 pr-3">{o.doc_no}</td>
+                <td className="py-1 pr-3">{fmtDate(o.doc_date)}</td>
+                <td className="py-1 pr-3">{o.due_date ? fmtDate(o.due_date) : "No due date"}</td>
+                <td className="py-1 pr-3 text-right">{money(o.bill_total)}</td>
+                <td className="py-1 text-right">{money(o.amount_applied)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Facts>
+  );
+}
+
 function VoucherLinesCard({ doc }: { doc: PaymentVoucherDocument }) {
   return (
     <Facts title="Direct lines">
@@ -418,6 +559,11 @@ function VoucherLinesCard({ doc }: { doc: PaymentVoucherDocument }) {
 type Purpose = PaymentVoucherDraftInput["purpose"];
 type Method = PaymentVoucherDraftInput["payMethod"];
 type BillPick = { on: boolean; amount: string };
+/** 0681: a debit note's pick sits beside the bills' under this prefix, so the
+ *  total and the Save checks count it as they count a bill. */
+const DN = "dn:";
+/** 0705: an opening bill's pick (Opening balances), counted the same way. */
+const OB = "ob:";
 type DirectLine = { key: string; accountCode: string; description: string; amount: string; departmentType: DepartmentType | null; departmentId: string | null };
 
 let seq = 0;
@@ -493,11 +639,61 @@ function VoucherForm() {
   const [narration, setNarration] = useState("");
   const [picks, setPicks] = useState<Record<string, BillPick>>(() => {
     const bill = params.get("bill");
-    return bill ? { [bill]: { on: true, amount: "" } } : {};
+    // 0681: a debit note sent from its own page arrives ticked, like a bill.
+    const debitNote = params.get("debitNote");
+    return {
+      ...(bill ? { [bill]: { on: true, amount: "" } } : {}),
+      ...(debitNote ? { [`${DN}${debitNote}`]: { on: true, amount: "" } } : {}),
+    };
   });
   const [lines, setLines] = useState<DirectLine[]>([]);
   const [advance, setAdvance] = useState("");
   const [loaded, setLoaded] = useState(!id);
+  const formPayTo = useSupplierPayTo(supplierId || null);
+  // 0645 (Chew 2026-10-03): a voucher made for a payment request starts from
+  // what was asked, and answers the request once it is saved.
+  const requestId = id ? null : params.get("request");
+  const fromRequest = usePaymentRequest(requestId);
+  const [requestApplied, setRequestApplied] = useState(false);
+  useEffect(() => {
+    const r = fromRequest.data?.request;
+    if (!r || requestApplied) return;
+    setPurpose("DIRECT");
+    setPayee(r.payee_name);
+    const bank = [r.bank_name, r.bank_account_no, r.bank_account_holder].filter(Boolean).join(" ");
+    setNarration(`Payment request ${r.request_no} · ${r.purpose}${bank ? ` · pay to ${bank}` : ""}`.slice(0, 500));
+    setLines([{ ...newLine(), description: r.purpose.slice(0, 200), amount: String(r.amount) }]);
+    setRequestApplied(true);
+  }, [fromRequest.data, requestApplied]);
+
+  // Duplicate (Chew 2026-10-21): a new draft starts from another voucher —
+  // the same purpose, supplier, payee, account paid from, method, note, lines,
+  // advance and amounts — dated today, with no reference (that is the new
+  // payment's own) and no number until it is approved. A bill or debit note it
+  // paid stays ticked only while something is left to pay on it, at most that.
+  const copyId = id ? null : params.get("copy");
+  const copySource = usePaymentVoucher(copyId ?? undefined);
+  const [copyState, setCopyState] = useState<"none" | "waiting" | "picks" | "done">(copyId ? "waiting" : "none");
+  useEffect(() => {
+    const d = copySource.data;
+    if (copyState !== "waiting" || !d) return;
+    setPurpose(d.voucher.purpose);
+    setSupplierId(d.voucher.supplier_id ?? "");
+    setPayee(d.voucher.payee_name);
+    setPayFrom(d.voucher.pay_from_account_code ?? "");
+    setMethod((PAYMENT_VOUCHER_METHODS as readonly string[]).includes(d.voucher.pay_method)
+      ? d.voucher.pay_method as Method : "OTHER");
+    setNarration(d.voucher.narration ?? "");
+    setPicks(Object.fromEntries([
+      ...d.allocations.map((a) => [a.bill_id, { on: true, amount: String(a.amount_applied) }] as const),
+      ...(d.debit_notes ?? []).map((n) => [`${DN}${n.debit_note_id}`, { on: true, amount: String(n.amount_applied) }] as const),
+      ...(d.opening_bills ?? []).map((o) => [`${OB}${o.opening_item_id}`, { on: true, amount: String(o.amount_applied) }] as const),
+    ]));
+    setLines(d.lines.map((l) => ({ ...newLine(), accountCode: l.account_code, description: l.description ?? "", amount: String(l.amount),
+      departmentType: (l.department_type ?? null) as DepartmentType | null, departmentId: l.department_id ?? null })));
+    setAdvance((num(d.voucher.advance_amount) ?? 0) > 0 ? String(d.voucher.advance_amount) : "");
+    setCopyState("picks");
+  }, [copySource.data, copyState]);
 
   // Editing a draft: the form starts from the voucher as saved.
   useEffect(() => {
@@ -507,12 +703,17 @@ function VoucherForm() {
     setSupplierId(d.voucher.supplier_id ?? "");
     setPayee(d.voucher.payee_name);
     setVoucherDate(d.voucher.voucher_date);
-    setPayFrom(d.voucher.pay_from_account_code);
+    // 0666: a draft the system raised waits for Finance to pick the bank.
+    setPayFrom(d.voucher.pay_from_account_code ?? "");
     setMethod((PAYMENT_VOUCHER_METHODS as readonly string[]).includes(d.voucher.pay_method)
       ? d.voucher.pay_method as Method : "OTHER");
     setReference(d.voucher.pay_reference ?? "");
     setNarration(d.voucher.narration ?? "");
-    setPicks(Object.fromEntries(d.allocations.map((a) => [a.bill_id, { on: true, amount: String(a.amount_applied) }])));
+    setPicks(Object.fromEntries([
+      ...d.allocations.map((a) => [a.bill_id, { on: true, amount: String(a.amount_applied) }] as const),
+      ...(d.debit_notes ?? []).map((n) => [`${DN}${n.debit_note_id}`, { on: true, amount: String(n.amount_applied) }] as const),
+      ...(d.opening_bills ?? []).map((o) => [`${OB}${o.opening_item_id}`, { on: true, amount: String(o.amount_applied) }] as const),
+    ]));
     setLines(d.lines.map((l) => ({ ...newLine(), accountCode: l.account_code, description: l.description ?? "", amount: String(l.amount),
       departmentType: (l.department_type ?? null) as DepartmentType | null, departmentId: l.department_id ?? null })));
     setAdvance((num(d.voucher.advance_amount) ?? 0) > 0 ? String(d.voucher.advance_amount) : "");
@@ -551,6 +752,84 @@ function VoucherForm() {
     });
   }, [bills.data, mine]);
 
+  // 0681: the supplier's confirmed debit notes, paid like bills. What a note
+  // can still take is its total less what vouchers hold on it, plus what this
+  // draft already holds.
+  const debitNotes = useSupplierDebitNotes();
+  const mineDn = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const n of existing.data?.debit_notes ?? []) out[n.debit_note_id] = num(n.amount_applied) ?? 0;
+    return out;
+  }, [existing.data]);
+  const dnAvailable = (n: SupplierDebitNoteRegisterRow) =>
+    cents((num(n.total_amount) ?? 0) - (num(n.held_total) ?? 0) + (mineDn[n.id] ?? 0));
+  const debitRows = purpose === "SUPPLIER_BILLS" && supplierId !== ""
+    ? (debitNotes.data ?? [])
+      .filter((n) => n.supplier_id === supplierId && n.status === "confirmed")
+      .map((n) => ({ ...n, available: dnAvailable(n) }))
+      .filter((n) => n.available > 0 || picks[`${DN}${n.id}`]?.on)
+    : [];
+  // A debit note ticked from its own page arrives with no amount: it defaults
+  // to what is left to pay on it.
+  useEffect(() => {
+    if (!debitNotes.data) return;
+    setPicks((before) => {
+      let changed = false;
+      const next = { ...before };
+      for (const [key, p] of Object.entries(before)) {
+        if (!key.startsWith(DN) || !p.on || p.amount !== "") continue;
+        const row = debitNotes.data.find((n) => `${DN}${n.id}` === key);
+        if (row) {
+          next[key] = { on: true, amount: String(dnAvailable(row)) };
+          changed = true;
+        }
+      }
+      return changed ? next : before;
+    });
+    // dnAvailable reads only mineDn, already listed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debitNotes.data, mineDn]);
+
+  // 0705: the supplier's posted opening bills, paid like bills. What one can
+  // still take is its amount less what vouchers hold on it, plus this draft's own.
+  const openingBills = useApOpeningBills(supplierId || null, purpose === "SUPPLIER_BILLS" && supplierId !== "");
+  const mineOb = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const o of existing.data?.opening_bills ?? []) out[o.opening_item_id] = num(o.amount_applied) ?? 0;
+    return out;
+  }, [existing.data]);
+  const obAvailable = (o: ApOpeningBillRow) => cents((num(o.unallocated) ?? 0) + (mineOb[o.item_id] ?? 0));
+  const openingRows = purpose === "SUPPLIER_BILLS" && supplierId !== ""
+    ? (openingBills.data ?? [])
+      .map((o) => ({ ...o, available: obAvailable(o) }))
+      .filter((o) => o.available > 0 || picks[`${OB}${o.item_id}`]?.on)
+    : [];
+
+  // Duplicate, second step: once the supplier's open bills and debit notes are
+  // read, keep only what still has something left to pay, at most that.
+  useEffect(() => {
+    if (copyState !== "picks") return;
+    const forBills = purpose === "SUPPLIER_BILLS" && supplierId !== "";
+    if (forBills && (!bills.data || !debitNotes.data || (!openingBills.data && !openingBills.isError))) return;
+    setPicks((before) => {
+      const next: Record<string, BillPick> = {};
+      if (!forBills) return next;
+      for (const [key, p] of Object.entries(before)) {
+        const dn = key.startsWith(DN) ? debitNotes.data?.find((n) => `${DN}${n.id}` === key) : undefined;
+        const ob = key.startsWith(OB) ? openingBills.data?.find((o) => `${OB}${o.item_id}` === key) : undefined;
+        const bill = key.startsWith(DN) || key.startsWith(OB) ? undefined : bills.data?.find((b) => b.bill_id === key);
+        const left = dn ? (dn.supplier_id === supplierId && dn.status === "confirmed" ? dnAvailable(dn) : 0)
+          : ob ? cents(num(ob.unallocated) ?? 0)
+            : bill ? cents(num(bill.unallocated) ?? 0) : 0;
+        if (left > 0) next[key] = { on: true, amount: String(Math.min(left, num(p.amount) ?? 0) || left) };
+      }
+      return next;
+    });
+    setCopyState("done");
+    // dnAvailable reads only mineDn, empty on a new voucher.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [copyState, purpose, supplierId, bills.data, debitNotes.data, openingBills.data]);
+
   const supplier = (suppliers.data ?? []).find((s) => s.id === supplierId) ?? null;
   // 0512: Paid from reads the one money-account list — cash and banks only.
   const payFromChoices = (moneyAccounts.data ?? []).filter(paysOut);
@@ -579,13 +858,24 @@ function VoucherForm() {
         departmentId: l.departmentId,
       })),
       allocations: purpose === "SUPPLIER_BILLS"
-        ? Object.entries(picks).filter(([, p]) => p.on).map(([billId, p]) => ({ billId, amount: Number(p.amount) }))
+        ? Object.entries(picks).filter(([, p]) => p.on).map(([key, p]) => (key.startsWith(DN)
+          ? { debitNoteId: key.slice(DN.length), amount: Number(p.amount) }
+          : key.startsWith(OB) ? { openingItemId: key.slice(OB.length), amount: Number(p.amount) }
+            : { billId: key, amount: Number(p.amount) }))
         : [],
       advanceAmount: advanceN,
     };
     save.mutate({ id, input }, {
-      onSuccess: (out) => {
+      onSuccess: async (out) => {
         toast.success(id ? "Voucher saved" : "Draft voucher saved");
+        if (requestId && fromRequest.data) {
+          try {
+            await answerPaymentRequest(requestId, { voucherId: out.id });
+            toast.success(`${fromRequest.data.request.request_no} is answered by this voucher`);
+          } catch (e) {
+            toast.error(`The voucher is saved, but it does not answer ${fromRequest.data.request.request_no}: ${refusal(e)}`);
+          }
+        }
         navigate(`/finance/payment-vouchers/${out.id}`);
       },
       onError: (e) => toast.error(refusal(e)),
@@ -598,6 +888,8 @@ function VoucherForm() {
 
   if (id && existing.isError) return <ReadFailed what="This payment voucher" onRetry={() => void existing.refetch()} />;
   if (id && !loaded) return <div className="p-6 text-body">Loading payment voucher…</div>;
+  if (copyId && copySource.isError) return <ReadFailed what="This payment voucher" onRetry={() => void copySource.refetch()} />;
+  if (copyState === "waiting") return <div className="p-6 text-body">Loading payment voucher…</div>;
   if (id && existing.data && !existing.data.can.edit) {
     return (
       <div className="p-6 text-body">
@@ -646,9 +938,18 @@ function VoucherForm() {
                   onChange={(e) => { setSupplierId(e.target.value); setPicks({}); }}>
                   <option value="">{purpose === "SUPPLIER_BILLS" ? "Choose the supplier" : "No supplier"}</option>
                   {(suppliers.data ?? []).map((s) => (
-                    <option key={s.id} value={s.id}>{s.name} · {creditorKindWord(s.kind)}</option>
+                    <option key={s.id} value={s.id}>{partyLabel(s)} · {creditorKindWord(s.kind)}</option>
                   ))}
                 </select>
+                {supplierId !== "" && (
+                  <span className="text-meta text-kit-slate-11" data-testid="voucher-form-pay-to">
+                    {formPayTo.state === "ready" && formPayTo.payTo
+                      ? `Pay to ${formPayTo.payTo}`
+                      : payToWords(formPayTo)}
+                  </span>
+                )}
+                {/* 0676: the notes this supplier still owes (Chew 2026-10-09). */}
+                <NotesOwedHint supplierId={supplierId || null} />
               </label>
               <label className="block">
                 Payee
@@ -700,6 +1001,16 @@ function VoucherForm() {
                     : billRows.length === 0
                       ? <p>This supplier has no confirmed bill left to pay.</p>
                       : <BillPicks rows={billRows} picks={picks} onChange={setPicks} billChecks={billChecks} />}
+            </Facts>
+          )}
+          {debitRows.length > 0 && (
+            <Facts title="Debit notes to pay">
+              <DebitNotePicks rows={debitRows} picks={picks} onChange={setPicks} />
+            </Facts>
+          )}
+          {openingRows.length > 0 && (
+            <Facts title="Opening bills to pay">
+              <OpeningBillPicks rows={openingRows} picks={picks} onChange={setPicks} />
             </Facts>
           )}
           {purpose === "SUPPLIER_BILLS" && supplierId !== "" && (
@@ -780,6 +1091,116 @@ function BillPicks({ rows, picks, onChange, billChecks }: {
                   <input aria-label={`Amount for ${b.bill_no}`} className={`${fieldCls} w-28`} inputMode="decimal"
                     disabled={!p.on} value={p.amount}
                     onChange={(e) => onChange({ ...picks, [b.bill_id]: { on: true, amount: e.target.value } })} />
+                  {over && <span className="block text-meta text-kit-red-11">More than is left to pay</span>}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** 0681: the supplier's confirmed debit notes, ticked and paid like bills. */
+function DebitNotePicks({ rows, picks, onChange }: {
+  rows: Array<SupplierDebitNoteRegisterRow & { available: number }>;
+  picks: Record<string, BillPick>;
+  onChange: (next: Record<string, BillPick>) => void;
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-body" data-testid="voucher-debit-note-picks">
+        <thead>
+          <tr className="text-left text-base-500">
+            <th className="py-1 pr-2" />
+            <th className="py-1 pr-2">Debit Note No</th>
+            <th className="py-1 pr-2">Supplier's debit note</th>
+            <th className="py-1 pr-2">Date</th>
+            <th className="py-1 pr-2">Due date</th>
+            <th className="py-1 pr-2 text-right">Total</th>
+            <th className="py-1 pr-2 text-right">Left to pay</th>
+            <th className="py-1">Pay now</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((n) => {
+            const key = `${DN}${n.id}`;
+            const p = picks[key] ?? { on: false, amount: "" };
+            const over = p.on && (num(p.amount) ?? 0) > n.available;
+            return (
+              <tr key={n.id} className="border-t border-base-100">
+                <td className="py-1 pr-2">
+                  <input type="checkbox" aria-label={`Pay ${n.note_no}`} checked={p.on}
+                    onChange={(e) => onChange({
+                      ...picks,
+                      [key]: { on: e.target.checked, amount: e.target.checked ? String(n.available) : "" },
+                    })} />
+                </td>
+                <td className="py-1 pr-2">{n.note_no}</td>
+                <td className="py-1 pr-2">{n.supplier_note_no}</td>
+                <td className="py-1 pr-2">{fmtDate(n.note_date)}</td>
+                <td className="py-1 pr-2">{n.due_date ? fmtDate(n.due_date) : "No due date"}</td>
+                <td className="py-1 pr-2 text-right">{money(n.total_amount)}</td>
+                <td className="py-1 pr-2 text-right">{money(n.available)}</td>
+                <td className="py-1">
+                  <input aria-label={`Amount for ${n.note_no}`} className={`${fieldCls} w-28`} inputMode="decimal"
+                    disabled={!p.on} value={p.amount}
+                    onChange={(e) => onChange({ ...picks, [key]: { on: true, amount: e.target.value } })} />
+                  {over && <span className="block text-meta text-kit-red-11">More than is left to pay</span>}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** 0705: the supplier's posted opening bills, ticked and paid like bills. */
+function OpeningBillPicks({ rows, picks, onChange }: {
+  rows: Array<ApOpeningBillRow & { available: number }>;
+  picks: Record<string, BillPick>;
+  onChange: (next: Record<string, BillPick>) => void;
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-body" data-testid="voucher-opening-bill-picks">
+        <thead>
+          <tr className="text-left text-base-500">
+            <th className="py-1 pr-2" />
+            <th className="py-1 pr-2">Supplier invoice</th>
+            <th className="py-1 pr-2">Bill date</th>
+            <th className="py-1 pr-2">Due date</th>
+            <th className="py-1 pr-2 text-right">Total</th>
+            <th className="py-1 pr-2 text-right">Left to pay</th>
+            <th className="py-1">Pay now</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((o) => {
+            const key = `${OB}${o.item_id}`;
+            const p = picks[key] ?? { on: false, amount: "" };
+            const over = p.on && (num(p.amount) ?? 0) > o.available;
+            return (
+              <tr key={o.item_id} className="border-t border-base-100">
+                <td className="py-1 pr-2">
+                  <input type="checkbox" aria-label={`Pay opening bill ${o.doc_no}`} checked={p.on}
+                    onChange={(e) => onChange({
+                      ...picks,
+                      [key]: { on: e.target.checked, amount: e.target.checked ? String(o.available) : "" },
+                    })} />
+                </td>
+                <td className="py-1 pr-2">{o.doc_no}</td>
+                <td className="py-1 pr-2">{fmtDate(o.doc_date)}</td>
+                <td className="py-1 pr-2">{o.due_date ? fmtDate(o.due_date) : "No due date"}</td>
+                <td className="py-1 pr-2 text-right">{money(o.total_amount)}</td>
+                <td className="py-1 pr-2 text-right">{money(o.available)}</td>
+                <td className="py-1">
+                  <input aria-label={`Amount for opening bill ${o.doc_no}`} className={`${fieldCls} w-28`} inputMode="decimal"
+                    disabled={!p.on} value={p.amount}
+                    onChange={(e) => onChange({ ...picks, [key]: { on: true, amount: e.target.value } })} />
                   {over && <span className="block text-meta text-kit-red-11">More than is left to pay</span>}
                 </td>
               </tr>

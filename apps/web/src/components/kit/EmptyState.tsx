@@ -9,7 +9,8 @@
  *
  * So `title` is required and `action` is optional. There is deliberately no
  * illustration slot: art is decoration, and §3.4 bans colour used as
- * decoration; the icon is a `slate-9` glyph at §5.1's 18px empty-state size.
+ * decoration; the icon is a muted glyph at the 18px empty-state size. v4 text
+ * colours (01 §1): ink title, secondary detail, muted glyph.
  */
 import type { ReactNode } from "react";
 import Icon, { type IconName } from "./Icon";
@@ -34,12 +35,12 @@ export default function EmptyState({
       className="flex flex-col items-center justify-center gap-2 px-4 py-8 text-center"
     >
       {icon && (
-        <span className="text-kit-slate-9">
+        <span className="text-c-muted">
           <Icon name={icon} size={18} />
         </span>
       )}
-      <p className="text-strong text-kit-slate-12">{title}</p>
-      {detail && <p className="text-meta text-kit-slate-11">{detail}</p>}
+      <p className="text-strong text-c-ink">{title}</p>
+      {detail && <p className="text-meta text-c-secondary">{detail}</p>}
       {action}
     </div>
   );

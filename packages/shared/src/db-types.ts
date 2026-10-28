@@ -323,6 +323,17 @@ export interface CatalogFabricRow {
   /** 0226 — operation's recorded buying add-on (RM). Postgres numeric may
    *  arrive as a string; nullable = not recorded. */
   cost: number | string | null;
+  /** 0721 — Houzs fabric_trackings stock columns (stored, typed or imported). */
+  price_sen?: number | null;
+  soh_sen?: number | null;
+  po_outstanding_sen?: number | null;
+  last_month_usage_sen?: number | null;
+  one_week_usage_sen?: number | null;
+  two_weeks_usage_sen?: number | null;
+  one_month_usage_sen?: number | null;
+  shortage_sen?: number | null;
+  reorder_point_sen?: number | null;
+  lead_time_days?: number | null;
   created_at: string;
   updated_at: string;
   updated_by: string | null;

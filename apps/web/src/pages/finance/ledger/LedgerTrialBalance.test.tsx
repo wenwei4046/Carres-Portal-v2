@@ -5,8 +5,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { itSaysNoBannedWord } from "@/test/banned-words";
+import styles from "@/components/register/DataGrid.module.css";
 import LedgerTrialBalance, { trialBalanceLines } from "./LedgerTrialBalance";
 import { trialBalanceSheet } from "../month-end-pack";
+import { rm } from "@/lib/format-currency";
 
 const api = vi.hoisted(() => ({ fetch: vi.fn(), sheet: vi.fn(() => ({})) }));
 vi.mock("@/lib/api", () => ({ apiFetch: api.fetch }));
@@ -48,13 +50,16 @@ describe("Trial Balance", () => {
   it("groups the accounts by kind, debits beside credits, and totals both", async () => {
     show();
     expect(screen.getByTestId("trial-balance-destination-header")).toBeInTheDocument();
-    expect(await screen.findByText("1210 Trade receivables")).toBeInTheDocument();
+    // The code and the name are two columns, each in its own cell.
+    const receivables = (await screen.findByText("Trade receivables")).closest("tr")!;
+    expect(within(receivables).getByRole("cell", { name: "1210" })).toBeInTheDocument();
     expect(api.fetch).toHaveBeenCalledWith("/api/finance/ledger/trial-balance?asOf=2026-09-11");
     expect(screen.getByText(/Kind: Asset/)).toBeInTheDocument();
     expect(screen.getByText(/Kind: Liability/)).toBeInTheDocument();
     expect(screen.getByText(/Kind: Income/)).toBeInTheDocument();
     // An account nothing was posted to has nothing to try.
-    expect(screen.queryByText("1300 Stock")).not.toBeInTheDocument();
+    expect(screen.queryByText("Stock")).not.toBeInTheDocument();
+    expect(screen.queryByText("1300")).not.toBeInTheDocument();
     // 1210: 150 debit less 40 credit sits on the debit side; 2110 on the credit side.
     expect(screen.getByText("RM 110.00")).toBeInTheDocument();
     expect(screen.getAllByText("RM 30.00").length).toBe(2);
@@ -70,10 +75,12 @@ describe("Trial Balance", () => {
     expect(screen.getByLabelText("As of")).toBeInTheDocument();
   });
 
-  it("opens an account's own entries in the Journal, over the same period", async () => {
+  it("opens an account's own entries in the Journal, over the same period, from its code", async () => {
     show();
-    const link = await screen.findByRole("link", { name: "1210 Trade receivables" });
+    const link = await screen.findByRole("link", { name: "1210" });
     expect(link).toHaveAttribute("href", "/finance/ledger?account=1210&from=2026-09-10&to=2026-09-11");
+    // The name is plain text; only the code is the link.
+    expect(screen.queryByRole("link", { name: /Trade receivables/ })).not.toBeInTheDocument();
   });
 
   it("raises the band only while debits and credits differ", async () => {
@@ -169,12 +176,19 @@ describe("Trial Balance headings", () => {
     api.fetch.mockResolvedValue(NESTED);
     show();
     const bank = await screen.findByText("Bank");
-    expect(bank).toHaveClass("font-semibold", "pl-8");
+    expect(bank).toHaveClass("pl-8");
+    // A heading line reads as a subtotal row, with no code and no link.
+    const bankRow = bank.closest("tr")!;
+    expect(bankRow).toHaveClass(styles.trSubtotal);
+    expect(within(bankRow).queryByRole("link")).not.toBeInTheDocument();
     expect(screen.getByText("Current assets")).toHaveClass("pl-4");
-    expect(screen.getByRole("link", { name: "CA-B1 Maybank" }).parentElement).toHaveClass("pl-12");
+    const maybank = screen.getByText("Maybank");
+    expect(maybank).toHaveClass("pl-12");
+    expect(maybank.closest("tr")).not.toHaveClass(styles.trSubtotal);
+    expect(within(maybank.closest("tr")!).getByRole("link", { name: "CA-B1" })).toBeInTheDocument();
     expect(screen.queryByText("Stock")).not.toBeInTheDocument();
     expect(screen.queryByText("Deposits paid")).not.toBeInTheDocument();
-    expect(screen.queryByText("ST-F Finished goods")).not.toBeInTheDocument();
+    expect(screen.queryByText("Finished goods")).not.toBeInTheDocument();
     // Assets and Current assets both carry RM 520.00. The footer is the
     // accounts alone, RM 570.00 on each side (500 + 20 + 50 = 30 + 100 + 440),
     // with no subtotal added in a second time.
@@ -195,32 +209,33 @@ describe("Trial Balance headings", () => {
     api.fetch.mockResolvedValue(NESTED);
     show();
     await screen.findByText("Bank");
-    sortBy("Account");
-    sortBy("Account");
-    // Descending by account, grouped by kind in the order the kinds first appear.
-    expect(printedAccounts()).toEqual(["LI-T Trade payables", "IN-S Sales", "EX-P Purchases", "CA-C Cash in hand", "CA-B2 Public Bank", "CA-B1 Maybank"]);
+    sortBy("Code");
+    sortBy("Code");
+    // Descending by code, grouped by kind in the order the kinds first appear.
+    expect(printedAccounts()).toEqual(["LI-T", "IN-S", "EX-P", "CA-C", "CA-B2", "CA-B1"]);
     expect(screen.queryByText("Current assets")).not.toBeInTheDocument();
     expect(screen.queryByText("Bank")).not.toBeInTheDocument();
-    expect(screen.getByText("CA-B1 Maybank")).not.toHaveClass("pl-12");
+    expect(screen.getByText("Maybank")).not.toHaveClass("pl-12");
     expect(screen.getAllByText("RM 570.00").length).toBe(2);
     expect(screen.getByTestId("trial-balance-summary")).toHaveTextContent("6 accounts");
-    sortBy("Account");
+    sortBy("Code");
     expect(screen.getByText("Current assets")).toBeInTheDocument();
-    expect(printedAccounts()).toEqual(["CA-B1 Maybank", "CA-B2 Public Bank", "CA-C Cash in hand", "LI-T Trade payables", "IN-S Sales", "EX-P Purchases"]);
+    expect(printedAccounts()).toEqual(["CA-B1", "CA-B2", "CA-C", "LI-T", "IN-S", "EX-P"]);
   });
 
   it("Export Excel leaves the heading lines' Debit and Credit empty, so a column sum counts each account once", async () => {
     api.fetch.mockResolvedValue(NESTED);
     show();
     await screen.findByText("Bank");
-    fireEvent.click(screen.getByRole("button", { name: "Export" }));
+    (fireEvent.click(screen.getByRole("button", { name: "Page tools" })), fireEvent.click(screen.getByRole("menuitem", { name: "Export" })));
     fireEvent.click(screen.getByRole("menuitem", { name: "Excel" }));
     await waitFor(() => expect(api.sheet).toHaveBeenCalled());
     const sheet = (api.sheet.mock.calls[0] as unknown[])[0] as Record<string, string>[];
-    expect(sheet.map((r) => `${r.Account}|${r.Debit}|${r.Credit}`)).toEqual([
-      "Assets||", "  Current assets||", "    Bank||",
-      "      CA-B1 Maybank|500|0", "      CA-B2 Public Bank|0|30", "    CA-C Cash in hand|20|0",
-      "LI-T Trade payables|0|100", "IN-S Sales|0|440", "EX-P Purchases|50|0",
+    // The code in its own column (empty on a heading line); the name indented by depth.
+    expect(sheet.map((r) => `${r.Code}|${r.Account}|${r.Debit}|${r.Credit}`)).toEqual([
+      "|Assets||", "|  Current assets||", "|    Bank||",
+      "CA-B1|      Maybank|500|0", "CA-B2|      Public Bank|0|30", "CA-C|    Cash in hand|20|0",
+      "LI-T|Trade payables|0|100", "IN-S|Sales|0|440", "EX-P|Purchases|50|0",
     ]);
     const total = (side: string) => sheet.reduce((s, r) => s + Number(r[side] || 0), 0);
     expect([total("Debit"), total("Credit")]).toEqual([570, 570]);
@@ -235,9 +250,9 @@ describe("Trial Balance headings", () => {
     // A heading's name finds nothing: no bold heading line with a subtotal beside an RM 0.00 footer.
     await waitFor(() => expect(screen.queryByText("Current assets")).not.toBeInTheDocument());
     fireEvent.change(screen.getByRole("searchbox", { name: "Search" }), { target: { value: "Maybank" } });
-    const link = await screen.findByRole("link", { name: "CA-B1 Maybank" });
+    expect(await screen.findByRole("link", { name: "CA-B1" })).toBeInTheDocument();
     // Flat, as while a column is sorted: not indented under a heading that is not there.
-    await waitFor(() => expect(link.parentElement).not.toHaveClass("pl-12"));
+    await waitFor(() => expect(screen.getByText("Maybank")).not.toHaveClass("pl-12"));
     expect(screen.queryByText("Bank")).not.toBeInTheDocument();
     expect(screen.getAllByText("RM 500.00").length).toBe(2);
     expect(screen.getByTestId("trial-balance-summary")).toHaveTextContent("1 account ·");
@@ -278,7 +293,67 @@ describe("Trial Balance headings", () => {
   });
 });
 
+// ── Report drill-down (Chew 2026-10-21) ─────────────────────────────────────
+
+describe("Trial Balance drill-down", () => {
+  const drillLine = (entryNo: string, debit: number, credit: number) => ({
+    entryDate: "2026-09-10", entryNo, sourceType: "SUPPLIER_BILL", docNo: `BILL-${entryNo}`, description: null,
+    debit, credit, balance: 0, partyType: "SUPPLIER", partyName: null,
+  });
+  function serve(report: unknown, lines: ReturnType<typeof drillLine>[]) {
+    api.fetch.mockImplementation(async (url: string) => {
+      const u = new URL(url, "http://portal.test");
+      if (u.pathname === "/api/finance/ledger/report-drill") {
+        return { status: "OK", go_live_on: "2026-09-10", from: "2026-09-10", to: "2026-09-11", account: u.searchParams.get("account"),
+          block: { code: "2110", name: "Trade payables", kind: "LIABILITY", opening: 0, lines, totalDebit: 0, totalCredit: 0, closing: 0 } };
+      }
+      return report;
+    });
+  }
+  const drillReads = () => api.fetch.mock.calls.map(([u]) => new URL(u as string, "http://portal.test"))
+    .filter((u) => u.pathname === "/api/finance/ledger/report-drill");
+
+  it("an account line opens its entries from the ledger's first day to the as-of day, on the side the line shows", async () => {
+    serve(REPORT, [drillLine("JE-1", 0, 100), drillLine("JE-2", 70, 0)]);
+    show("/finance/ledger/trial-balance?asOf=2026-09-11&dept=SHOWROOM");
+    const toggle = await screen.findByTestId("trial-balance-expand-2110");
+    expect(toggle).toHaveAccessibleName("Show entries");
+    fireEvent.click(toggle);
+    const drill = await screen.findByTestId("trial-balance-drill-2110");
+    expect(Object.fromEntries(drillReads()[0]!.searchParams))
+      .toEqual({ account: "2110", from: "2026-09-10", to: "2026-09-11", departmentType: "SHOWROOM" });
+    const rows = within(drill).getAllByTestId("trial-balance-drill-2110-row")
+      .map((r) => Array.from(r.children).map((td) => (td.textContent ?? "").trim()));
+    // On the credit side, where the line shows RM 30.00: 100 - 70.
+    expect(rows.map((r) => [r[1], r[2], r[4], r[5]])).toEqual([
+      ["JE-1", "No memo", "Name not available", "RM 100.00"],
+      ["JE-2", "No memo", "Name not available", rm(-70)],
+    ]);
+    expect(screen.queryByTestId("trial-balance-drill-2110-differs")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("trial-balance-expand-2110"));
+    expect(screen.queryByTestId("trial-balance-drill-2110")).not.toBeInTheDocument();
+  });
+
+  it("entries that do not add up to the line say the difference", async () => {
+    serve(REPORT, [drillLine("JE-1", 0, 100)]);
+    show();
+    fireEvent.click(await screen.findByTestId("trial-balance-expand-2110"));
+    expect(await screen.findByTestId("trial-balance-drill-2110-differs"))
+      .toHaveTextContent("Entries add up to RM 100.00; the line shows RM 30.00.");
+  });
+
+  it("a heading line has no chevron", async () => {
+    serve(NESTED, []);
+    show();
+    await screen.findByTestId("trial-balance-expand-CA-B1");
+    expect(screen.queryByTestId("trial-balance-expand-CA")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("trial-balance-expand-CA-B")).not.toBeInTheDocument();
+    const bank = screen.getAllByText("Bank").map((e) => e.closest("tr")!).find((tr) => tr.className.includes(styles.trSubtotal))!;
+    expect(within(bank).queryByRole("button", { name: "Show entries" })).not.toBeInTheDocument();
+  });
+});
+
 describe("Trial Balance words", () => {
   itSaysNoBannedWord(join(dirname(fileURLToPath(import.meta.url)), "LedgerTrialBalance.tsx"),
-    { minStrings: 8, expectString: "No opening balances" });
+    { minStrings: 8, expectString: "Show entries" });
 });

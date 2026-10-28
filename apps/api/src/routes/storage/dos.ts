@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
+import { purchasingActorMayIssue } from "../../lib/purchasing-po-authority";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -62,9 +63,13 @@ const signUploadSchema = z
     do_number: z.string().min(3).max(50),
     mime_type: z.enum([...ALLOWED_MIMES, ...ARRIVAL_MIMES] as [string, ...string[]]),
     size_bytes: z.number().int().positive().max(MAX_SIZE),
-    kind: z.enum(["do", "claim", "arrival", "answer"]).default("do"),
+    po_version: z.number().int().positive().optional(),
+    kind: z.enum(["do", "claim", "arrival", "answer", "send"]).default("do"),
   })
   .superRefine((v, ctx) => {
+    if (v.kind === "send" && (!v.po_version || !["image/jpeg", "image/png"].includes(v.mime_type))) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["po_version"], message: "A PO version and screenshot are required" });
+    }
     const pool: readonly string[] =
       v.kind === "arrival" ? ARRIVAL_MIMES : v.kind === "answer" ? ANSWER_MIMES : ALLOWED_MIMES;
     if (!pool.includes(v.mime_type)) {
@@ -171,7 +176,18 @@ dosRouter.post("/sign-upload", async (c) => {
         : kind === "answer"
           ? `answer-${safeDo}`
           : safeDo;
-  const path = `${po_id}/${crypto.randomUUID()}-${slug}.${ext}`;
+  let path = `${po_id}/${crypto.randomUUID()}-${slug}.${ext}`;
+  if (kind === "send") {
+    if (!["operation", "principal"].includes(auth.role) || po_id.includes("/") || po_id.includes("..")) throw new HTTPException(403);
+    const sb = userClient(c.env, auth.jwt);
+    const admitted = await purchasingActorMayIssue(sb, auth.id);
+    if (admitted.error) throw new HTTPException(503);
+    if (!admitted.mayIssue) throw new HTTPException(403);
+    const po = await sb.from("purchase_orders").select("version").eq("id", po_id).maybeSingle();
+    if (po.error) throw new HTTPException(503);
+    if (!po.data || po.data.version !== parsed.data.po_version) return c.json({ code: "stale_po_version" }, 409);
+    path = `po-send/${po_id}/V${parsed.data.po_version}/${auth.id}/${crypto.randomUUID()}.${ext}`;
+  }
 
   // F11 — USER JWT, never service_role. Storage RLS (migration 0042) gates
   // writes; we just defer to it.

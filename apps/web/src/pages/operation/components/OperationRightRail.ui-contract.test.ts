@@ -11,28 +11,35 @@ describe("ERP Shell V1 quick rail contract", () => {
     const src = read("OperationRightRail.tsx");
     expect(src).not.toContain('label: "Team"');
     expect(src).toContain('label: "Calendar"');
-    expect(src).toContain('label: "My Work"');
+    expect(src).toContain('label: "Tasks"');
     expect(src).toContain('label: "Activity"');
     expect(src).not.toContain('label: "Follow-ups"');
-    expect(src).toContain("w-[340px]");
+    expect(src).not.toContain('label: "My Work"');
+    /* The ONE right area is at most the governed drawer width (owner direction 2026-10-05). */
+    expect(src).toContain("max-w-drawer");
   });
 
   /**
-   * The rail's My Work is the `Work` destination's PEEK (ui/MASTER.md §5), so
+   * The rail's Tasks door is the `Work` destination's PEEK (ui/MASTER.md §5), so
    * it wears that destination's face — owner ruling 2026-08-15. It used to
    * wear the Flag borrowed from the Orders follow-up column, a different
    * system entirely. One TABS entry drives both the collapsed icon strip and
    * the expanded panel header, so the two states cannot drift apart.
    */
-  it("gives My Work the same icon as the left-navigation Work destination", () => {
-    const rail = read("OperationRightRail.tsx");
+  /* RETIRED (owner ruling 2026-10-08): the Quick Rail is no longer mounted —
+   * the shell's right side is the `ShellTasks` card only, and Calendar and
+   * Activity left the shell — so its Tasks door no longer has to wear the
+   * left-menu Work row's face. The Work row itself is now `Workspace`, drawn
+   * with the Material `home` symbol. What stays binding is that the shell does
+   * not bring the rail back. */
+  it("the shell no longer mounts the Quick Rail; the Work row wears the Material `home` face", () => {
+    const shell = read("../OperationApp.tsx");
+    expect(shell).not.toMatch(/import\s+OperationRightRail\b/);
+    expect(shell).not.toContain("<OperationRightRail");
+    expect(shell).toContain("<ShellTasks");
     const nav = read("../../portal/portal-nav.ts");
-    const navIcon = /\{\s*key:\s*"work",[^}]*icon:\s*(\w+)/.exec(nav)?.[1];
-    expect(navIcon).toBe("ListTodo");
-    expect(rail).toMatch(
-      new RegExp(`key:\\s*"tasks",\\s*label:\\s*"My Work",\\s*icon:\\s*${navIcon}\\b`),
-    );
-    expect(rail).not.toContain("icon: Flag");
+    expect(nav).toMatch(/\{\s*key:\s*"work",\s*label:\s*"Workspace",[^}]*mIcon:\s*"home"/);
+    expect(read("OperationRightRail.tsx")).not.toContain("icon: Flag");
   });
 
   it("does not put duty editing or a second Team queue in Quick Rail", () => {
@@ -50,7 +57,8 @@ describe("ERP Shell V1 quick rail contract", () => {
 
   it("makes My Work derived and removes generic manual workflow controls", () => {
     const src = read("rail/TasksPanel.tsx");
-    expect(src).toContain('label: "Missed"');
+    expect(src).toContain('label: "Late"');
+    expect(src).not.toContain('label: "Missed"');
     expect(src).toContain('label: "Today"');
     expect(src).not.toContain('label: "Later"');
     expect(src).toContain('day=missed');

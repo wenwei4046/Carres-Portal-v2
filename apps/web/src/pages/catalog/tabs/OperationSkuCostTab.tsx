@@ -1,11 +1,12 @@
-import { memo, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { CatalogResponse } from "@carres/shared";
 import { PRODUCT_CATEGORIES, activeSofaSizes } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import { appTodayIso } from "@/lib/fmt-date";
 import { useAuth } from "@/lib/auth";
-import { useOperationSuppliers, usePatchCatalogSku } from "@/lib/queries";
+import { useDeleteCatalogSku, useOperationSuppliers, usePatchCatalogSku } from "@/lib/queries";
+import { bulkDeleteSkus } from "./bulk-delete-skus";
 import { INPUT_CLS } from "@/pages/operation/components/Modal";
 import { CategoryChip, CATEGORY_LABEL, CodeChip } from "../components/atoms";
 import { fmtRm } from "../format";
@@ -46,17 +47,19 @@ import { useSkuFilter, type FlatRow } from "./use-sku-filter";
  * pollution"*. A read-only number answers the question that used to be asked
  * across the room; it cannot be fat-fingered into the customer's price.
  *
- * 🟡 STILL NOT HERE, deliberately: bulk delete. Every other gap Jess named is
- * closed above, but permanently deleting catalog rows is destructive and was
- * never asked for by name — it needs its own yes, not an inference from
- * "align".
+ * BULK DELETE — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): purchasing
+ * deletes products here, Houzs way; Jess was not part of this decision. Tick
+ * rows, `Delete N`. The database refuses, by name, any SKU that orders,
+ * purchase orders, stock or bills name (0721); those are turned off instead.
+ * Selling price stays principal-only (Houzs gives purchasing no clear price
+ * edit, so the 0175 lock is kept).
  *
  * Same render cap as the selling SKU Master: at most VISIBLE_CAP rows, with a
  * refine-your-filter hint past that (Loo's HV-Portal lag rule).
  */
 
 const VISIBLE_CAP = 300;
-// 10 tracks: code · desc · product · category · size · supplier · cost · price
+// 11 tracks: tick · code · desc · product · category · size · supplier · cost · price
 // · pwp · margin.
 // 2026-08-24 - SUPPLIER added beside cost: the buyer recording a cost is
 // looking at a quotation, and the quotation has a name on it. The name is
@@ -65,7 +68,7 @@ const VISIBLE_CAP = 300;
 // grid scrolls sideways in its own container rather than shrinking the columns
 // that were already here.
 const GRID_COLS =
-  "170px minmax(180px,1.4fr) minmax(120px,1fr) 100px 100px minmax(150px,1.2fr) 110px 110px 110px 90px";
+  "32px 170px minmax(180px,1.4fr) minmax(120px,1fr) 100px 100px minmax(150px,1.2fr) 110px 110px 110px 90px";
 
 export default function OperationSkuCostTab({ catalog }: { catalog: CatalogResponse }) {
   /* The SAME gate the server applies (0175) — price, PWP and the per-size grid
@@ -103,6 +106,39 @@ export default function OperationSkuCostTab({ catalog }: { catalog: CatalogRespo
 
   const visible = filtered.slice(0, VISIBLE_CAP);
   const overflow = filtered.length - visible.length;
+
+  const del = useDeleteCatalogSku();
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  // A tick that left the screen (filter change) is dropped, so `Delete N`
+  // never counts a row nobody can see.
+  useEffect(() => {
+    setSelected((prev) => {
+      if (prev.size === 0) return prev;
+      const live = new Set(visible.map((r) => r.sku.id));
+      const next = new Set([...prev].filter((id) => live.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [visible]);
+  const visibleIds = visible.map((r) => r.sku.id);
+  const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selected.has(id));
+  const toggleRow = useCallback((id: string) => {
+    setSelected((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  }, []);
+  function toggleAll() {
+    setSelected(allSelected ? new Set() : new Set(visibleIds));
+  }
+  async function bulkDelete() {
+    if (selected.size === 0) return;
+    if (!confirm(`Delete ${selected.size} SKU${selected.size === 1 ? "" : "s"}? A SKU on orders, purchase orders, stock or bills is kept.`)) return;
+    const codeById = new Map(visible.map((r) => [r.sku.id, r.sku.sku]));
+    await bulkDeleteSkus([...selected], (id) => codeById.get(id) ?? id, (id) => del.mutateAsync(id));
+    setSelected(new Set());
+  }
 
   /* Export the CURRENTLY FILTERED set, in the round-trippable import format —
      the same builder the selling grid uses, so a file exported from one door
@@ -167,6 +203,17 @@ export default function OperationSkuCostTab({ catalog }: { catalog: CatalogRespo
             >
               Prices: Master Admin only
             </span>
+          )}
+          {selected.size > 0 && (
+            <button
+              type="button"
+              onClick={() => void bulkDelete()}
+              disabled={del.isPending}
+              className="btn-danger text-meta"
+              data-testid="opcost-bulk-delete"
+            >
+              {del.isPending ? "Working…" : `Delete ${selected.size}`}
+            </button>
           )}
           <button
             type="button"
@@ -251,6 +298,12 @@ export default function OperationSkuCostTab({ catalog }: { catalog: CatalogRespo
           className="grid items-center gap-3 px-3 py-2 bg-base-50 border-b border-base-200"
           style={{ gridTemplateColumns: GRID_COLS }}
         >
+          <input
+            type="checkbox"
+            aria-label="Select all visible SKUs"
+            checked={allSelected}
+            onChange={toggleAll}
+          />
           <div className="label">Code</div>
           <div className="label">Description</div>
           <div className="label">Product</div>
@@ -278,6 +331,8 @@ export default function OperationSkuCostTab({ catalog }: { catalog: CatalogRespo
             supplierName={r.sku.supplierId ? supplierNameById.get(r.sku.supplierId) ?? null : null}
             suppliers={suppliersQ.data?.suppliers ?? []}
             onOpenSuppliers={() => setOffersFor(r)}
+            selected={selected.has(r.sku.id)}
+            onToggle={toggleRow}
           />
         ))}
       </div>
@@ -321,8 +376,12 @@ const CostRowView = memo(function CostRowView({
   supplierName,
   suppliers,
   onOpenSuppliers,
+  selected,
+  onToggle,
 }: {
   row: FlatRow;
+  selected: boolean;
+  onToggle: (id: string) => void;
   editMode: boolean;
   /** 0175 — the principal alone may move a selling price. Everyone internal
    *  READS it (Jess 2026-08-26), which is why the cell renders either way. */
@@ -443,6 +502,12 @@ const CostRowView = memo(function CostRowView({
           a modal names every supplier that has quoted this SKU and at what
           cost. `SkuMasterTab` has worked this way since the offers shipped;
           this grid is now the same interaction, opening the same component. */}
+      <input
+        type="checkbox"
+        aria-label={`Select ${sku.sku}`}
+        checked={selected}
+        onChange={() => onToggle(sku.id)}
+      />
       <div>
         <button
           type="button"

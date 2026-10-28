@@ -1,6 +1,7 @@
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ZodTypeAny, infer as ZodInfer } from "zod";
+import { plannedProductionStartRefusal } from "@carres/shared";
 
 /**
  * Postgres SQLSTATE → HTTP status + error body. Spec §17.5 CQ2 contract:
@@ -24,6 +25,18 @@ import type { ZodTypeAny, infer as ZodInfer } from "zod";
  * `error: "rule_violation"` wording.
  */
 export type PgErrorish = { code?: string; message?: string; details?: string };
+
+/**
+ * The sentence a refusal shows. The database still raises its pre-2026-10-06
+ * wording for the planned production start (`The proceed date is already
+ * recorded…`, `Proceed date is required`, `The proceed date has passed`); a
+ * committed migration is never rewritten, so the refusal is recognised by its
+ * DETAIL tag and answered in the governed words (owner ruling 2026-10-06, two
+ * dates, two names; COPY-STANDARD). Every other refusal keeps its own sentence.
+ */
+export function refusalMessage(error: { message?: string; details?: string | null }): string | undefined {
+  return plannedProductionStartRefusal(error.details) ?? error.message;
+}
 
 export function mapPgError(error: PgErrorish) {
   switch (error.code) {
@@ -79,7 +92,7 @@ export function mapPgError(error: PgErrorish) {
      * no tag still reads `invalid_param`, so nothing that keyed off that word
      * for an untagged refusal changes. */
     case "22023":
-      return { status: 422 as const, body: { error: "invalid_param", code: error.details ?? "invalid_param", message: error.message ?? "invalid param" } };
+      return { status: 422 as const, body: { error: "invalid_param", code: error.details ?? "invalid_param", message: refusalMessage(error) ?? "invalid param" } };
     case "P0001":
       return { status: 422 as const, body: { error: "rule_violation", code: error.details ?? "invalid_param", message: error.message ?? "rule violation" } };
     case "40001":

@@ -121,7 +121,7 @@ export default function WarehouseUnitProblemReport({
         ) : null}
 
         <section>
-          <h3 className="mb-2 text-label text-kit-slate-11">What did you see?</h3>
+          <h3 className="mb-2 text-meta text-kit-slate-11">What did you see?</h3>
           <div className="grid grid-cols-2 gap-2" role="group" aria-label="What did you see?">
             {unitProblemChoices.map((choice) => (
               <Button
@@ -137,7 +137,7 @@ export default function WarehouseUnitProblemReport({
         </section>
 
         <section>
-          <h3 className="mb-2 text-label text-kit-slate-11">Photo</h3>
+          <h3 className="mb-2 text-meta text-kit-slate-11">Photo</h3>
           <EvidenceUploadField<Evidence>
             entries={evidence}
             onChange={setEvidence}
@@ -155,7 +155,7 @@ export default function WarehouseUnitProblemReport({
         </section>
 
         <section className="grid gap-1">
-          <label htmlFor="unit-problem-note" className="text-label text-kit-slate-11">
+          <label htmlFor="unit-problem-note" className="text-meta text-kit-slate-11">
             What happened, in one sentence
           </label>
           <textarea

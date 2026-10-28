@@ -27,14 +27,14 @@ export interface MoneyAccountRow {
   is_card_account: boolean;
 }
 
-/** The kind as the page says it, in COPY-STANDARD's pay-method words:
- *  the money arrives as cash, by bank transfer, or as an online payment. No
- *  kind has a word of its own in the standard yet. The database's check
- *  constraint keeps the kind to these three. */
+/** The kind as the page says it: each kind has its own word in COPY-STANDARD
+ *  (Finance Settings block), not a pay-method word. HOLDING is where card and
+ *  online money waits for the card payout. The database's check constraint
+ *  keeps the kind to these three. */
 export const MONEY_ACCOUNT_KIND_WORD: Record<MoneyAccountKind, string> = {
   CASH: "Cash",
-  BANK: "Bank transfer",
-  HOLDING: "Online payment",
+  BANK: "Bank account",
+  HOLDING: "Card and online holding",
 };
 
 /** May money leave from this account (a voucher's Paid from)? */

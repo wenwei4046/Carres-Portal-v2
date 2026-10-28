@@ -58,8 +58,10 @@ export function poSendChannelOf(doors: {
   whatsappGroupUrl?: string | null;
   contact?: string | null;
   contactEmail?: string | null;
+  poSendChannel?: string | null;
 } | null | undefined): PoSendChannel {
   if (!doors) return null;
+  if (doors.poSendChannel === "email" && doors.contactEmail?.trim()) return "email";
   if (doors.whatsappGroupUrl?.trim() || (doors.contact ?? "").replace(/\D/g, "")) return "whatsapp";
   if (doors.contactEmail?.trim()) return "email";
   return null;
@@ -264,13 +266,15 @@ export interface PoWindowSupplierDoors {
   whatsapp_group_url?: string | null;
   contact?: string | null;
   contact_email?: string | null;
+  po_send_channel?: string | null;
 }
 
 /**
  * The window model over the SO Batch read — the Work feed, its completion
  * probe and the Work right panel all run THIS, so "which demand and which POs
  * a window holds" has one answer (Law D). Only rows SO Batch may actually
- * buy (`isSelectableForBuying`) are demand; a received PO needs no sending.
+ * buy (`isSelectableForBuying`) are demand. Goods receipt never supplies current-version
+ * confirmed-sent evidence; the sending obligation remains independently open.
  */
 export function poWindowWorkFromSoBatch(
   read: {
@@ -298,7 +302,7 @@ export function poWindowWorkFromSoBatch(
       version: po.version ?? 1,
       supplierId: po.supplierId,
       supplierName: po.supplierName,
-      sentCurrentVersion: po.sentCurrentVersion || po.status === "received",
+      sentCurrentVersion: po.sentCurrentVersion,
       poWindow: po.poWindow ?? null,
       orderId: reg.orderId,
     }))),
@@ -308,6 +312,7 @@ export function poWindowWorkFromSoBatch(
         whatsappGroupUrl: door.whatsapp_group_url ?? null,
         contact: door.contact ?? null,
         contactEmail: door.contact_email ?? null,
+        poSendChannel: door.po_send_channel ?? null,
       } : null);
     },
     ...(opts.keepClosed ? { keepClosed: true } : {}),

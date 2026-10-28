@@ -357,7 +357,7 @@ export default function OperationStockOnHand() {
         <p className="text-body text-base-500">Loading…</p>
       ) : invQ.isError ? (
         <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-body">
-          <div className="text-destructive font-semibold mb-2">
+          <div className="text-destructive font-medium mb-2">
             Couldn&rsquo;t load stock
           </div>
           <div className="text-meta text-base-700 mb-3">
@@ -366,7 +366,7 @@ export default function OperationStockOnHand() {
           <button
             type="button"
             onClick={() => void invQ.refetch()}
-            className="btn-secondary text-label py-1.5 px-3"
+            className="btn-secondary text-body font-medium py-1.5 px-3"
           >
             Retry
           </button>
@@ -520,7 +520,7 @@ export default function OperationStockOnHand() {
               <button
                 type="button"
                 onClick={clearAll}
-                className="text-label text-base-500 hover:text-primary underline pl-1"
+                className="text-body font-medium text-base-500 hover:text-primary underline pl-1"
               >
                 Clear filters
               </button>
@@ -532,7 +532,7 @@ export default function OperationStockOnHand() {
             <div className="flex items-center justify-between mb-2">
               <div className="text-meta text-base-500">
                 Showing{" "}
-                <span className="font-semibold text-base-800">
+                <span className="font-medium text-base-800">
                   {filtered.length}
                 </span>{" "}
                 of {counts.all} units
@@ -579,7 +579,7 @@ function MetricRow({
   return (
     <div className="flex items-baseline justify-between">
       <span className="text-meta text-base-600">{label}</span>
-      <span className={`text-strong font-semibold ${tone ?? "text-base-900"}`}>
+      <span className={`text-strong ${tone ?? "text-base-900"}`}>
         {n}
       </span>
     </div>
@@ -588,7 +588,7 @@ function MetricRow({
 
 function RailLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-label font-semibold uppercase tracking-[0.03em] text-base-400">
+    <div className="text-label uppercase tracking-[0.06em] text-base-400">
       {children}
     </div>
   );
@@ -633,7 +633,7 @@ function FilterPill({
       <span className="truncate">{label}</span>
       {n !== undefined ? (
         <span
-          className={`text-label font-mono ${
+          className={`text-meta font-mono ${
             active ? "text-white/80" : "text-base-400"
           }`}
         >
@@ -670,7 +670,7 @@ function AttnChip({
       }`}
     >
       <span>{label}</span>
-      <span className="text-label font-mono font-semibold">{n}</span>
+      <span className="text-label font-mono font-bold">{n}</span>
     </button>
   );
 }

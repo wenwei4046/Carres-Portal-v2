@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import {
-  ASSIGN_IN_SALES_ORDERS,
-  ASSIGN_IN_SALES_ORDERS_HREF,
+  MANAGER_ASSIGNS_IN_STAFF_DUTIES,
+  MANAGER_ASSIGNS_IN_STAFF_DUTIES_HREF,
   NOBODY_ASSIGNED_TO_ORDER,
   type CollectionOwnerContextRow,
 } from "@carres/shared/payment-collection-owner";
@@ -21,7 +21,9 @@ import { toast } from "sonner";
  * principal or manager) the one formal `Hand over collection` door. Cover is
  * never written here: leave and buddy cover live in Staff & Duties. The owner
  * itself is the individual the Sales Order was dealt to (0504), so the
- * unresolved case points at the assignment, not at a duty holder.
+ * unresolved case is a system error a manager fixes: `Nobody assigned to this
+ * order` over `Manager assigns in Settings → Staff & Duties` (owner ruling
+ * 2026-09-26), never a duty holder to fill.
  */
 export default function InvoiceCollectionOwner({ orderId, canRead }: {
   orderId: string;
@@ -42,8 +44,9 @@ export default function InvoiceCollectionOwner({ orderId, canRead }: {
       : ownerQ.isError ? <p>Owner facts could not be loaded.</p>
       : !owner ? <>
           <p className="text-kit-red-11" data-testid="collection-owner-none">{NOBODY_ASSIGNED_TO_ORDER}</p>
-          <p className="text-label font-normal">
-            <Link to={ASSIGN_IN_SALES_ORDERS_HREF} className="underline underline-offset-2">{ASSIGN_IN_SALES_ORDERS}</Link>
+          <p className="text-meta">
+            <Link to={MANAGER_ASSIGNS_IN_STAFF_DUTIES_HREF} className="underline underline-offset-2"
+              data-testid="collection-owner-none-door">{MANAGER_ASSIGNS_IN_STAFF_DUTIES}</Link>
           </p>
         </>
       : <OwnerFacts owner={owner} />}
@@ -69,8 +72,8 @@ function History({ owner }: { owner: CollectionOwnerContextRow }) {
   const rows = [...owner.history].reverse();
   if (rows.length === 0) return null;
   return <details className="mt-2" data-testid="collection-owner-history">
-    <summary className="cursor-pointer text-label">History · {rows.length} {rows.length === 1 ? "change" : "changes"}</summary>
-    <div className="mt-1 space-y-1 text-label font-normal">
+    <summary className="cursor-pointer text-meta">History · {rows.length} {rows.length === 1 ? "change" : "changes"}</summary>
+    <div className="mt-1 space-y-1 text-meta">
       {rows.map((h) => <p key={h.id}>
         {h.source === "handover"
           ? `Handed over · ${h.previous_owner_user_name ?? "Nobody"} → ${h.owner_user_name ?? "Name not recorded"} · ${h.reason} · by ${h.changed_by_name ?? "Staff identity not recorded"} · ${fmtDate(h.changed_at, { time: true })} · effective from ${fmtDate(h.effective_from)}`
@@ -110,17 +113,17 @@ function HandoverForm({ orderId, current, onClose }: {
   });
   const ready = newOwner !== "" && reason.trim().length >= 3 && effectiveFrom >= appTodayIso();
   return <div className="mt-2 space-y-2" data-testid="collection-owner-handover">
-    {current && <p className="text-label font-normal">Previous owner: {current.normal_user_name ?? "Name not recorded"}</p>}
-    <label className="block text-label">New owner
+    {current && <p className="text-meta">Previous owner: {current.normal_user_name ?? "Name not recorded"}</p>}
+    <label className="block text-meta">New owner
       <select className="input mt-1 w-full" value={newOwner} onChange={(e) => setNewOwner(e.target.value)} data-testid="collection-owner-new">
         <option value="">Choose staff…</option>
         {staff.map((s) => <option key={s.userId} value={s.userId}>{s.name ?? s.email}</option>)}
       </select>
     </label>
-    <label className="block text-label">Reason
+    <label className="block text-meta">Reason
       <input className="input mt-1 w-full" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why the collection changes hands" data-testid="collection-owner-reason" />
     </label>
-    <label className="block text-label">Effective from
+    <label className="block text-meta">Effective from
       <input type="date" className="input mt-1" value={effectiveFrom} min={appTodayIso()} onChange={(e) => setEffectiveFrom(e.target.value)} data-testid="collection-owner-from" />
     </label>
     <span className="flex gap-2">

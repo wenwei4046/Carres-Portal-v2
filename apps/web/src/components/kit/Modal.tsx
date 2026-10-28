@@ -16,7 +16,7 @@
  * No `className`, no `style`, and no free size — `width` is a closed union of
  * one literal whose absence is the default. See `DialogFrame` for why.
  */
-import type { ReactNode } from "react";
+import type { RefObject, ReactNode } from "react";
 import DialogFrame from "./DialogFrame";
 
 export default function Modal({
@@ -27,6 +27,8 @@ export default function Modal({
   footer,
   width,
   children,
+  returnFocusRef,
+  variant,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -48,6 +50,10 @@ export default function Modal({
    */
   width?: "wide" | "viewer";
   children: ReactNode;
+  /** Persistent trigger for a dialog opened by a menu item that unmounts. */
+  returnFocusRef?: RefObject<HTMLElement>;
+  /** Existing task-wide review: full surface; its owning form alone closes it. */
+  variant?: "task-review";
 }) {
   return (
     <DialogFrame
@@ -59,6 +65,8 @@ export default function Modal({
       description={description}
       footer={footer}
       width={width}
+      returnFocusRef={returnFocusRef}
+      variant={variant}
     >
       {children}
     </DialogFrame>

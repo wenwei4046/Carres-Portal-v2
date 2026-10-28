@@ -116,6 +116,21 @@ describe("Monthly demand", () => {
     for (const cells of rowTexts()) expect(cells[cells.length - 1]).toBe("Unavailable");
   });
 
+  it("prints `Not applicable` in every To buy cell when Product category is Accessory, never 0", () => {
+    const orders = [
+      order("p1", { deliveryDate: "2026-11-10", lines: [{ id: "p1-L1", sku: "PILLOW-1", qty: 4, category: "accessory" }] }),
+      order("p2", { deliveryDate: "2026-12-10", lines: [{ id: "p2-L1", sku: "MP-1", qty: 2, category: "accessory" }] }),
+    ];
+    for (const toBuyByLine of [new Map([["p1-L1", 0]]), null]) {
+      const { unmount } = mount({ view: viewOf({ orders, toBuyByLine, filters: { category: "Accessory" } }) });
+      const rows = rowTexts();
+      for (const cells of rows) expect(cells[cells.length - 1]).toBe("Not applicable");
+      /* Nov 2026 still counts the pillows: only To buy has nothing to say. */
+      expect(rows[1]).toEqual(["Nov 2026", "0", "0", "0", "4", "4", "0", "4", "Not applicable"]);
+      unmount();
+    }
+  });
+
   it("a month is a door that hands its row back", () => {
     const { onOpenMonth } = mount();
     fireEvent.click(screen.getByRole("button", { name: "Open Sales Orders for Dec 2026" }));
@@ -214,6 +229,14 @@ describe("Export writes the matrix on screen (owner ruling 2026-09-26)", () => {
     expect(sheet.headers).toEqual(headers);
     expect(sheet.rows.map((r) => r[0])).toEqual(names);
     expect(sheet.rows.every((r) => r[r.length - 1] === "Unavailable")).toBe(true);
+  });
+
+  it("the sheet writes `Not applicable` under To buy for Accessory, month rows and Total", () => {
+    const orders = [order("p1", { deliveryDate: "2026-11-10", lines: [{ id: "p1-L1", sku: "PILLOW-1", qty: 4, category: "accessory" }] })];
+    const sheet = monthlyDemandSheet(viewOf({ orders, filters: { category: "Accessory" } }));
+    expect(sheet.headers.at(-1)).toBe("To buy");
+    expect(sheet.rows.map((r) => r[r.length - 1])).toEqual(Array(sheet.rows.length).fill("Not applicable"));
+    expect(sheet.rows.at(-1)![0]).toBe("Total");
   });
 
   it("an empty window cannot be exported", () => {

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { MANAGER_ASSIGNS_IN_STAFF_DUTIES_HREF } from "@carres/shared/payment-collection-owner";
 import SettingsWorkspace from "./SettingsWorkspace";
 
 vi.mock("./StaffDuties", () => ({ default: ({ settingsNavigation }: { settingsNavigation?: ReactNode }) => <div data-testid="duties-stub">{settingsNavigation}Duties</div> }));
@@ -67,21 +68,35 @@ describe("SettingsWorkspace rail — the governed shell", () => {
     expect(rail.className).not.toContain("w-[280px]");
   });
 
-  it("marks the active page with the pale-blue wash and a 2px blue left line", () => {
+  /* The pale-blue wash + 2px blue left line is RETIRED (Layout Standard §2,
+     owner 2026-10-08): the selected row wears the theme select colours at 600,
+     with no blue and no left line — the same selected row as the side menu. */
+  it("marks the active page with the theme select colours, no blue and no left line", () => {
     renderAt();
     const active = screen.getByTestId("settings-section-purchasing");
     expect(active).toHaveAttribute("aria-current", "page");
-    expect(active.className).toContain("bg-kit-blue-3");
+    expect(active.className).toContain("bg-c-select-bg");
+    expect(active.className).toContain("text-c-select-fg");
+    expect(active.className).toContain("font-semibold");
+    expect(active.className).not.toMatch(/kit-blue/);
     // The near-black pill is retired.
     expect(active.className).not.toContain("bg-base-900");
-    const line = active.querySelector("span[aria-hidden]");
-    expect(line?.className).toContain("w-0.5");
-    expect(line?.className).toContain("bg-kit-blue-9");
+    expect(active.querySelector("span[aria-hidden]")).toBeNull();
 
-    // An inactive row carries neither the wash nor a line.
+    // An inactive row carries neither the selected colours nor a line.
     const inactive = screen.getByTestId("settings-section-payment");
-    expect(inactive.className).not.toContain("bg-kit-blue-3");
+    expect(inactive.className).not.toContain("bg-c-select-bg");
     expect(inactive.querySelector("span[aria-hidden]")).toBeNull();
+  });
+
+  /* Settings → Appearance (handoff v4, owner 2026-10-08): each person's own
+     theme and focus outline, the FIRST row of the rail. */
+  it("lists Appearance first, on its own address", () => {
+    renderAt();
+    const rows = Array.from(document.querySelectorAll("[data-testid^='settings-section-']"));
+    expect(rows[0]).toHaveAttribute("data-testid", "settings-section-appearance");
+    expect(rows[0]).toHaveAttribute("href", "/operation/settings/appearance");
+    expect(rows[0]).toHaveTextContent("Appearance");
   });
 
   it("hides completely and leaves NO second 60px icon strip; the content offers Show settings", () => {
@@ -199,7 +214,7 @@ describe("SettingsWorkspace — the Delivery group", () => {
     renderAt("/operation/settings/delivery/partners");
     expect(screen.getByText("Delivery", { selector: "[data-settings-group]" })).toBeInTheDocument();
     for (const [label, slug] of [
-      ["Logistics Partners", "partners"],
+      ["Logistics", "partners"],
       ["Delivery Rules", "rules"],
       ["Message Templates", "templates"],
       ["Access", "access"],
@@ -212,7 +227,7 @@ describe("SettingsWorkspace — the Delivery group", () => {
     expect(screen.getByText("Delivery settings")).toBeInTheDocument();
   });
 
-  it("lands `/delivery` on Logistics Partners, and a partner object route mounts the page", () => {
+  it("lands `/delivery` on Logistics, and a partner object route mounts the page", () => {
     renderAt("/operation/settings/delivery");
     expect(screen.getByText("Delivery settings")).toBeInTheDocument();
     renderAt("/operation/settings/delivery/partners/p-nets/schedule");
@@ -222,6 +237,14 @@ describe("SettingsWorkspace — the Delivery group", () => {
 
 
 describe("Staff & Duties Settings entry", () => {
+  it("the Payment unassigned-order door (owner ruling 2026-09-26) lands on this page", () => {
+    expect(MANAGER_ASSIGNS_IN_STAFF_DUTIES_HREF).toBe("/operation/settings/staff-duties");
+    render(<MemoryRouter initialEntries={[MANAGER_ASSIGNS_IN_STAFF_DUTIES_HREF]}><Routes>
+      <Route path="/operation/settings/*" element={<SettingsWorkspace />} />
+    </Routes></MemoryRouter>);
+    expect(screen.getByTestId("duties-stub")).toBeVisible();
+  });
+
   it("opens with navigation hidden and returns to the same duty after choosing the section", () => {
     render(<MemoryRouter initialEntries={["/operation/settings/staff-duties"]}><Routes>
       <Route path="/operation/settings/*" element={<SettingsWorkspace />} />

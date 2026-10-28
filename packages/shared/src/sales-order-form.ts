@@ -48,6 +48,53 @@ export const DELIVERY_FACT_REFUSALS = {
   date: "Delivery date is required. Ask the customer for the date before you save the order.",
 } as const;
 
+/**
+ * ⭐ TWO DATES, TWO NAMES — owner ruling 2026-10-06 (Jess; Orders MASTER
+ * § Two dates, two names; COPY-STANDARD). `orders.proceed_date` is the day
+ * Sales PLANS production to start: it is `Planned production start` on every
+ * surface. `Proceed Date` names only the actual hand-off to Operation
+ * (`orders.proceeded_at`). Names only: no date, no arithmetic and no rule moved.
+ */
+export const PLANNED_PRODUCTION_START = "Planned production start";
+
+/** The planned production start's refusals, one wording on every door. */
+export const PLANNED_PRODUCTION_START_REFUSALS = {
+  required: "Planned production start: pick the day production should start",
+  afterDelivery: "Planned production start: must be on or before the delivery date",
+  recorded: "The planned production start is already recorded and cannot be changed here",
+  passed: "The planned production start has passed",
+} as const;
+
+/** `Planned production start: can't be in the past (earliest {date})`. */
+export function plannedProductionStartInPast(earliestIso: string): string {
+  return `${PLANNED_PRODUCTION_START}: can't be in the past (earliest ${earliestIso})`;
+}
+
+/**
+ * The database still raises its pre-2026-10-06 sentences (`Proceed date is
+ * required`, `The proceed date is already recorded…`, `The proceed date has
+ * passed`). A committed migration is never rewritten, and the sentence is not
+ * worth a function replacement, so every API door maps the refusal by its
+ * DETAIL code — the tag the database raises beside the sentence — to the
+ * governed words. `null` means the code is not a planned-production-start
+ * refusal and the caller keeps the database's own message.
+ */
+export function plannedProductionStartRefusal(detail: string | null | undefined): string | null {
+  switch (detail) {
+    case "proceed_date_required":
+    case "invalid_proceed_date":
+      return PLANNED_PRODUCTION_START_REFUSALS.required;
+    case "proceed_after_delivery":
+      return PLANNED_PRODUCTION_START_REFUSALS.afterDelivery;
+    case "proceed_date_recorded":
+      return PLANNED_PRODUCTION_START_REFUSALS.recorded;
+    case "proceed_date_passed":
+      return PLANNED_PRODUCTION_START_REFUSALS.passed;
+    default:
+      return null;
+  }
+}
+
 /** Building type of the delivery address (rides `entry_data.fields.building_type`). */
 export const BUILDING_TYPE_OPTIONS = [
   "Landed",

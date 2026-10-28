@@ -1,3 +1,5 @@
+import { poLineReportable } from "./po-receiving";
+import { matchesRegisterColumnFilters, type RegisterColumnQuery, type RegisterColumnFact } from "./register-column-query";
 /**
  * The Receiving page's ONE register arithmetic (owner correction 2026-09-06,
  * rail overwritten by the owner ruling 2026-09-17 and PURCHASING CARD 12).
@@ -73,9 +75,12 @@ export interface GrnRegisterFactRow {
   extra: boolean;
   /** A cancelled (voided) GRN. It keeps its row and its number forever. */
   cancelled: boolean;
+  /** Receipt of a Consignment Order (`purchase_orders.is_consignment`). */
+  consignment?: boolean;
   /** What the Search box may match — the placeholder's own list: GRN, PO,
    *  supplier or DO number. Lower-cased by the builder, not the caller. */
   searchText: string;
+  columnFacts?: Record<string, RegisterColumnFact>;
 }
 
 export interface GrnRegisterSelection {
@@ -90,7 +95,10 @@ export interface GrnRegisterSelection {
   to?: string | null;
   /** `Cancelled GRNs` — true narrows to them. Absent lists both. */
   cancelled?: boolean | null;
+  /** `Consignment goods` — true narrows to receipts of Consignment Orders. */
+  consignment?: boolean | null;
   q?: string | null;
+  columns?: RegisterColumnQuery | null;
 }
 
 export interface GrnRegisterView {
@@ -114,6 +122,7 @@ export interface GrnRegisterView {
     /** Overlapping by construction — never summed into a total. */
     receivedWith: Record<GrnReceivedWith, number>;
     cancelled: number;
+    consignment: number;
   };
 }
 
@@ -124,6 +133,7 @@ type FacetKey =
   | "receivedWith"
   | "grnDate"
   | "cancelled"
+  | "consignment"
   | "";
 
 function hasReceivedWith(r: GrnRegisterFactRow, kind: GrnReceivedWith): boolean {
@@ -157,6 +167,8 @@ function matchesExcept(
     return false;
   if (except !== "cancelled" && sel.cancelled === true && !r.cancelled)
     return false;
+  if (except !== "consignment" && sel.consignment === true && !r.consignment)
+    return false;
   if (except !== "grnDate") {
     // A record with no creation date on file is not given one: it simply is
     // not in any dated answer.
@@ -167,6 +179,7 @@ function matchesExcept(
   // so no facet is counted "without" it.
   const q = (sel.q ?? "").trim().toLowerCase();
   if (q && !r.searchText.toLowerCase().includes(q)) return false;
+  if (sel.columns && !matchesRegisterColumnFilters(sel.columns, key => r.columnFacts?.[key])) return false;
   return true;
 }
 
@@ -186,6 +199,7 @@ export function buildGrnRegisterView(
     extra: 0,
   };
   let cancelled = 0;
+  let consignment = 0;
   const filtered: GrnRegisterFactRow[] = [];
   for (const r of rows) {
     if (matchesExcept(r, sel, "category"))
@@ -204,13 +218,23 @@ export function buildGrnRegisterView(
       if (r.extra) receivedWith.extra += 1;
     }
     if (matchesExcept(r, sel, "cancelled") && r.cancelled) cancelled += 1;
+    if (matchesExcept(r, sel, "consignment") && r.consignment) consignment += 1;
     if (matchesExcept(r, sel, "")) filtered.push(r);
   }
+  const sort = sel.columns?.sort;
+  if (sort) filtered.sort((a, b) => {
+    const left = a.columnFacts?.[sort.key], right = b.columnFacts?.[sort.key];
+    const value = (fact: RegisterColumnFact | undefined) => fact?.number !== undefined ? fact.number ?? "" : fact?.date !== undefined ? fact.date ?? "" : fact?.text ?? "";
+    const x = value(left), y = value(right);
+    if (x === "" || y === "") return x === y ? 0 : x === "" ? 1 : -1;
+    const result = typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y), "en", { numeric: true });
+    return result * (sort.dir === "asc" ? 1 : -1) || a.id.localeCompare(b.id);
+  });
   const from = Math.max(0, Math.floor(offset));
   return {
     total: filtered.length,
     pageIds: filtered.slice(from, from + Math.max(1, limit)).map((r) => r.id),
-    facets: { category, supplier, site, grnDate, receivedWith, cancelled },
+    facets: { category, supplier, site, grnDate, receivedWith, cancelled, consignment },
   };
 }
 
@@ -228,7 +252,7 @@ export function expectedArrivalCounts(
     version?: number | null;
     promises?: readonly PoDatePromise[] | null;
     purchase_order_lines?:
-      | readonly { qty: number | null; received_qty: number | null }[]
+      | readonly { qty: number | null; received_qty: number | null; cancelled_qty?: number | null }[]
       | null;
   }[],
 ): Record<string, number> {
@@ -236,7 +260,7 @@ export function expectedArrivalCounts(
   for (const po of pos) {
     if (po.status !== "open") continue;
     const lines = po.purchase_order_lines ?? [];
-    const owes = lines.some((l) => (l.received_qty ?? 0) < (l.qty ?? 0));
+    const owes = lines.some((l) => poLineReportable(l)>0);
     if (!owes) continue;
     const date = poSupplierDeliveryDateOf(po.promises, po.version ?? 1);
     if (!date) continue;

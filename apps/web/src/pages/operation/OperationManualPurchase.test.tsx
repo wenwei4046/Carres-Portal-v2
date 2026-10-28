@@ -183,7 +183,6 @@ const REGISTER = {
       delivery_date: "2026-09-12",
       order_by: "2026-09-01",
       production_days_missing: false,
-      transit_days_missing: false,
     },
     {
       id: "l2",
@@ -206,12 +205,11 @@ const REGISTER = {
       item_label: "MATTRESS-LOOK-9",
       po_ids: [],
       destination_id: KLANG,
-      // Card 06 — no Delivery Date and no transit number: no Order By, and
-      // the exact Settings fact is named for the setup lens.
+      // Card 06 — no Delivery Date: no Order By. (No setup gap: the supplier
+      // transit fact was removed by owner ruling 2026-09-29.)
       delivery_date: null,
       order_by: null,
       production_days_missing: false,
-      transit_days_missing: true,
       /* The date the issue door WOULD stamp — `PO Date + n Settings working
          days`, projected by the server (owner instruction 2026-09-23). */
       po_delivery_date: "2026-10-02",
@@ -240,7 +238,6 @@ const REGISTER = {
       delivery_date: null,
       order_by: null,
       production_days_missing: false,
-      transit_days_missing: false,
     },
   ],
   // Card 04 — id → the ACTUAL po_no; the column prints numbers, never UUIDs.
@@ -334,11 +331,11 @@ const PICK = {
 const PLAN_LINES: Record<string, Record<string, unknown>> = {
   "5539-2NA": {
     sku: "5539-2NA", supplierId: "s1", supplierName: "Ohana", category: "sofa",
-    productionDays: 14, transitDays: 1, arrival: "2026-09-12",
+    productionDays: 14, arrival: "2026-09-12",
   },
   "5539-CNR": {
     sku: "5539-CNR", supplierId: "s1", supplierName: "Ohana", category: "sofa",
-    productionDays: 14, transitDays: 1, arrival: "2026-09-14",
+    productionDays: 14, arrival: "2026-09-14",
   },
 };
 
@@ -350,7 +347,7 @@ function planFor(init?: RequestInit): unknown {
     (sku) =>
       PLAN_LINES[sku] ?? {
         sku, supplierId: null, supplierName: null, category: null,
-        productionDays: null, transitDays: null, arrival: null,
+        productionDays: null, arrival: null,
       },
   );
   const complete = lines.length > 0 && lines.every((l) => l.arrival != null);
@@ -499,6 +496,21 @@ function pickDeliveryDate(dayOfMonth = 15) {
 }
 
 describe("the register — one request per row (card §7)", () => {
+  /* ONE ROW MENU — owner ruling 2026-10-05. A Manual Purchase Request has no
+     paper of its own, so its menu is `View` alone (plus `Open {PO}` after the
+     divider when it has exactly one PO); nothing fills the Print slot. */
+  it("the row menu reads View (no Print) and View opens the saved request", async () => {
+    seedDetail(false);
+    await loaded();
+    fireEvent.contextMenu(screen.getByTestId(`mp-row-${REQ1}`));
+    const menu = screen.getByRole("menu", { name: "Row actions" });
+    const words = within(menu).getAllByRole("menuitem").map((i) => i.textContent);
+    expect(words[0]).toBe("View");
+    expect(words).not.toContain("Print");
+    expect(words.slice(1).every((w) => /^Open /.test(w ?? ""))).toBe(true);
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "View" }));
+    await screen.findByTestId("mp-detail");
+  });
   it("⭐ `MPR No` is the identity again — and a retired REQ number still never prints", async () => {
     await loaded();
     /* Owner ruling 2026-09-18, which OVERWRITES Card 08's 2026-09-04
@@ -558,8 +570,10 @@ describe("the register — one request per row (card §7)", () => {
   it("`+ Manual Purchase Request` is the page's create door — COPY-STANDARD's own word", async () => {
     await loaded();
     const btn = screen.getByTestId("manual-purchase-new-request");
-    expect(btn).toHaveTextContent("+ Manual Purchase Request");
-    expect(btn).toHaveTextContent(MW.newRequest);
+    /* The + is the drawn icon; the COPY word is the button's name. */
+    expect(btn).toHaveAccessibleName("+ Manual Purchase Request");
+    expect(btn).toHaveAccessibleName(MW.newRequest);
+    expect(btn).toHaveTextContent("Manual Purchase Request");
   });
 
   it("Purpose is NOT a parent column (Card 04); a retired word survives on the object", async () => {
@@ -629,9 +643,6 @@ describe("Card 03 · the left filter rail", () => {
       "Hooka",
       "Office Co",
       "Ohana",
-      // Only the setup row with an affected request (REQ-0002's transit gap).
-      "Setup to fix",
-      "Transit days not set",
     ];
     let cursor = -1;
     for (const word of expected) {
@@ -640,7 +651,9 @@ describe("Card 03 · the left filter rail", () => {
       cursor = at;
     }
     // R2 — retired from this page.
-    for (const retired of ["WORK TO DO", "TO ORDER", "All not ordered", "Approve purchase", "Production days not set"]) {
+    // `Setup to fix` draws only while an affected request exists — none here —
+    // and the supplier transit row was removed by owner ruling 2026-09-29.
+    for (const retired of ["WORK TO DO", "TO ORDER", "All not ordered", "Approve purchase", "Production days not set", "Setup to fix", "Transit days not set"]) {
       expect(text.toLowerCase(), retired).not.toContain(retired.toLowerCase());
     }
   });
@@ -691,7 +704,7 @@ describe("Card 03 · the left filter rail", () => {
     expect(optionText("mp-product-select", "mattress")).toContain("0");
     expect(optionText("mp-product-select", "sofa")).toContain("1");
     expect(optionText("mp-product-select", "bedframe")).toContain("1");
-    expect(screen.getByTestId("mp-setup-transit_days_not_set").textContent).toContain("1");
+    expect(screen.queryByTestId("mp-setup-transit_days_not_set")).toBeNull();
     expect(screen.queryByTestId("mp-setup-production_days_not_set")).toBeNull();
   });
 
@@ -820,14 +833,11 @@ describe("Card 03 · the left filter rail", () => {
   it("a narrowed dropdown wears the rail's own active treatment", async () => {
     await loaded();
     const supplier = screen.getByTestId("mp-supplier-select");
-    expect(supplier.className).not.toContain("bg-kit-blue-3");
+    expect(supplier.className).not.toContain("bg-c-select-bg");
     pick("mp-supplier-select", "Hooka");
-    // Same blue field the selected ROW carried, plus the left-edge marker —
-    // a narrowed section must not be quieter than a selected row was.
-    expect(screen.getByTestId("mp-supplier-select").className).toContain("bg-kit-blue-3");
-    expect(
-      screen.getByTestId("mp-supplier-select").parentElement!.querySelector(".bg-kit-blue-9"),
-    ).not.toBeNull();
+    // The same select wash a selected row carries (v4 kit: the wash alone marks
+    // a choice, no edge marker) — a narrowed section must not read as unset.
+    expect(screen.getByTestId("mp-supplier-select").className).toContain("bg-c-select-bg");
   });
 
   it("the rail is navigation, not batch selection — a dropdown grows no checkbox", async () => {
@@ -1090,10 +1100,10 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
     for (const id of ["mp-raised-by", "mp-proceed-date"]) {
       const box = screen.getByTestId(id);
       expect(box.getAttribute("data-kit")).toBe("automatic-field");
-      expect(box.className).toContain("bg-kit-slate-3");
-      expect(box.className).not.toContain("bg-white");
+      expect(box.className).toContain("bg-c-search-bg"); // v4 grey
+      expect(box.className).not.toContain("bg-c-card");
     }
-    expect(document.getElementById("mp-purpose")!.className).toContain("bg-white");
+    expect(document.getElementById("mp-purpose")!.className).toContain("bg-c-card"); // v4 white
   });
 
   it("Card 06 · Proceed Date is a read-only server preview; the browser holds no clock", async () => {
@@ -1860,7 +1870,7 @@ describe("closure §2 · Catalog remains the selected issue price authority", ()
           Object.assign(new Error("refused"), {
             body: {
               code: "not_po_duty",
-              message: "You do not hold PO duty today.",
+              message: "Only Operation staff may issue a purchase order.",
               action: "Ask Shasha to issue this purchase order.",
             },
           }),
@@ -1873,7 +1883,7 @@ describe("closure §2 · Catalog remains the selected issue price authority", ()
     });
     await tickReady();
     const err = await issueFromReview();
-    expect(err).toHaveTextContent("You do not hold PO duty today.");
+    expect(err).toHaveTextContent("Only Operation staff may issue a purchase order.");
     expect(err).toHaveTextContent("Ask Shasha to issue this purchase order.");
   });
 
@@ -2608,7 +2618,7 @@ describe("the row expansion — goods, their Status, and their own Ready Stock",
     fireEvent.click(screen.getByTestId(`mp-expand-${REQ2}`));
     const box = await screen.findByTestId(`mp-expansion-${REQ2}`);
     // The absence names itself; `—` would not say WHY the cell is empty.
-    expect(box.textContent).toContain("Not ordered yet");
+    expect(box.textContent).toContain("No PO yet");
     expect(box.textContent).toContain("Need PO");
   });
 
@@ -3361,7 +3371,7 @@ describe("Card 05 · the object detail", () => {
   it("the Object Header: one back destination, the identity, one state pill", async () => {
     const detail = await openObject();
     // The shared object header (Law C) with the Register as back destination.
-    expect(within(detail).getByLabelText("Manual Purchase Request")).toBeInTheDocument();
+    expect(within(detail).getByLabelText("Back to Manual Purchase Request")).toBeInTheDocument();
     /* Card 08 §3.3 — the identity is `{Need for} · {For}` (REQ1's retired
        purpose prints its own truthful word; its For was never stored), and
        no number or UUID appears anywhere in the header. */
@@ -3393,7 +3403,7 @@ describe("Card 05 · the object detail", () => {
     const detail = await openObject();
     // The Register surface is preserved (hidden), not unmounted.
     expect(screen.getByTestId("mp-register-surface")).toHaveAttribute("aria-hidden", "true");
-    fireEvent.click(within(detail).getByLabelText("Manual Purchase Request"));
+    fireEvent.click(within(detail).getByLabelText("Back to Manual Purchase Request"));
     await screen.findByTestId("purchasing-tabs");
     expect(screen.queryByTestId("mp-detail")).toBeNull();
     expect(screen.getByTestId("mp-register-surface")).not.toHaveAttribute("aria-hidden");
@@ -3559,10 +3569,10 @@ describe("Card 05 · the object detail", () => {
     expect(within(table).getByTestId("mp-object-po-1")).toHaveTextContent("Same as PO");
   });
 
-  it("no PO lineage reads `Not ordered yet` — never an inference", async () => {
+  it("no PO lineage reads `No PO yet` — never an inference", async () => {
     await openObject();
     expect(screen.getByTestId("mp-object-not-ordered")).toHaveTextContent(
-      "Not ordered yet",
+      "No PO yet",
     );
   });
 
@@ -3724,7 +3734,7 @@ describe("Card 06 §7 / Card 08 · the Work deep link opens the exact request by
     expect(screen.getByTestId("object-identity")).toHaveTextContent("Display");
     expect(screen.getByTestId("mp-detail").textContent).not.toContain("REQ-0001");
     // `‹ Manual Purchase` returns to the Register — not a reopen loop.
-    fireEvent.click(screen.getByText("Manual Purchase Request", { selector: "a *, a" }));
+    fireEvent.click(screen.getByRole("link", { name: "Back to Manual Purchase Request" }));
     await waitFor(() => expect(screen.queryByTestId("mp-detail")).toBeNull());
   });
 

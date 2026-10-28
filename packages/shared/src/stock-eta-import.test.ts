@@ -128,15 +128,15 @@ describe("masterRecordToOrderRow", () => {
       Qty: 1,
       "Item Detail": "1013Jager/Fab3-King/PC151-02",
       PO: "PO/2603-065",
-      Customer: "Yip Chung Sien",
-      Phone: "010-9738523",
-      "Add 1": "B-20-05",
+      Customer: "TEST customer A",
+      Phone: "012-0000001",
+      "Add 1": "1, Jalan TEST 1",
     });
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.row.ref).toBe("CR1052");
       expect(r.row.poDocNo).toBe("PO/2603-065");
-      expect(r.row.debtorName).toBe("Yip Chung Sien");
+      expect(r.row.debtorName).toBe("TEST customer A");
       expect(r.row.qty).toBe(1);
       expect(r.row.deliveryDate).toBe("2026-03-26");
     }

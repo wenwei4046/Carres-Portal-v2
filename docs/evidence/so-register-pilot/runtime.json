@@ -1,0 +1,212 @@
+{
+  "sourceSha": "dbeafe3ea41306ba0829154a0158277ac7b35568",
+  "capturedAt": "2026-10-01T10:10:06.553Z",
+  "environment": "Local synthetic read-only fixture; not production verification",
+  "evidence": [
+    [
+      "menuFocus",
+      true
+    ],
+    [
+      "goods",
+      10,
+      {
+        "x": 880,
+        "y": 0,
+        "width": 560,
+        "height": 1000
+      }
+    ],
+    [
+      "goodsFocus",
+      true
+    ],
+    [
+      "sameRows",
+      true,
+      7
+    ],
+    [
+      "detailURL",
+      "/operation/orders?view=cards"
+    ],
+    [
+      "return",
+      600,
+      600,
+      "00000000-0000-4000-8000-000000000046"
+    ],
+    [
+      "platformFont",
+      1440,
+      {
+        "fonts": [
+          {
+            "familyName": "Inter",
+            "postScriptName": "Inter-Regular",
+            "isCustomFont": true,
+            "glyphCount": 10
+          }
+        ]
+      }
+    ],
+    [
+      "layout",
+      1440,
+      {
+        "overflow": false,
+        "toolbar": {
+          "x": 480,
+          "y": 59,
+          "w": 888,
+          "h": 48
+        },
+        "search": {
+          "x": 492,
+          "y": 66.5,
+          "w": 280,
+          "h": 32
+        },
+        "tools": {
+          "x": 1324,
+          "y": 66.5,
+          "w": 32,
+          "h": 32
+        }
+      }
+    ],
+    [
+      "platformFont",
+      1060,
+      {
+        "fonts": [
+          {
+            "familyName": "Inter",
+            "postScriptName": "Inter-Regular",
+            "isCustomFont": true,
+            "glyphCount": 10
+          }
+        ]
+      }
+    ],
+    [
+      "layout",
+      1060,
+      {
+        "overflow": false,
+        "toolbar": {
+          "x": 308,
+          "y": 59,
+          "w": 680,
+          "h": 48
+        },
+        "search": {
+          "x": 320,
+          "y": 66.5,
+          "w": 280,
+          "h": 32
+        },
+        "tools": {
+          "x": 944,
+          "y": 66.5,
+          "w": 32,
+          "h": 32
+        }
+      }
+    ],
+    [
+      "platformFont",
+      825,
+      {
+        "fonts": [
+          {
+            "familyName": "Inter",
+            "postScriptName": "Inter-Regular",
+            "isCustomFont": true,
+            "glyphCount": 10
+          }
+        ]
+      }
+    ],
+    [
+      "layout",
+      825,
+      {
+        "overflow": false,
+        "toolbar": {
+          "x": 112,
+          "y": 59,
+          "w": 641,
+          "h": 48
+        },
+        "search": {
+          "x": 124,
+          "y": 66.5,
+          "w": 280,
+          "h": 32
+        },
+        "tools": {
+          "x": 709,
+          "y": 66.5,
+          "w": 32,
+          "h": 32
+        }
+      }
+    ],
+    [
+      "platformFont",
+      390,
+      {
+        "fonts": [
+          {
+            "familyName": "Inter",
+            "postScriptName": "Inter-Regular",
+            "isCustomFont": true,
+            "glyphCount": 10
+          }
+        ]
+      }
+    ],
+    [
+      "layout",
+      390,
+      {
+        "overflow": false,
+        "toolbar": {
+          "x": 52,
+          "y": 103,
+          "w": 330,
+          "h": 53
+        },
+        "search": {
+          "x": 64,
+          "y": 109,
+          "w": 124.703125,
+          "h": 40
+        },
+        "tools": {
+          "x": 330,
+          "y": 109,
+          "w": 40,
+          "h": 40
+        }
+      }
+    ],
+    [
+      "railFocus",
+      true
+    ],
+    [
+      "table",
+      {
+        "weight": "600",
+        "height": 36
+      },
+      40
+    ],
+    [
+      "errors",
+      []
+    ]
+  ]
+}

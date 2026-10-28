@@ -17,6 +17,9 @@ import {
   type AgeScope,
   type CustomerOwingRow,
 } from "./money-owed";
+import { FINANCE_WIDTH } from "./finance-widths";
+import { useFinancePersonalLayouts } from "./finance-layouts";
+import { documentRowMenu } from "@/components/register/row-menu";
 
 const soWord = (r: CustomerOwingRow) => (r.so !== null ? `SO-${r.so}` : "SO not available");
 const ageWord = (days: number | null) =>
@@ -41,8 +44,13 @@ export function ageScopeWord(scope: AgeScope): string {
  * age scope — the door from the Dashboard's A/R Aging rows and Overdue tile,
  * so the footer then prints the same figure the Dashboard printed. The scope
  * shows as a removable condition beside the column filters.
+ *
+ * FINANCE LOOK (Chew 2026-10-13): the customer wraps rather than being cut.
+ * Outstanding keeps its wider cell for the storage line under the amount, and
+ * is never zero here (only orders owing money are listed).
  */
 export default function FinanceAR() {
+  const personalLayouts = useFinancePersonalLayouts("finance_ar");
   const [dept, setDept] = useDepartmentParam();
   const query = useInvoiceRegister(dept);
   const invoiceRows = query.data;
@@ -75,7 +83,9 @@ export default function FinanceAR() {
     return next;
   });
   const [openId, setOpenId] = useState<string | null>(null);
-  // The row's Record receipt button opens the form; a double-click only opens the order.
+  /* A list row carries no button (Chew 2026-10-21): the row menu's Record
+     receipt opens the drawer with the form showing; a double-click or View
+     only opens the order, whose drawer has the same Record receipt door. */
   const [recording, setRecording] = useState(false);
   const open = openId ? rows.find((r) => r.orderId === openId) ?? null : null;
   const payments: readonly OrderPaymentRow[] = useMemo(() => {
@@ -85,7 +95,7 @@ export default function FinanceAR() {
 
   const columns = useMemo<DataGridColumn<CustomerOwingRow>[]>(() => [
     { key: "so", label: "SO No", width: 120, accessor: soWord, searchValue: soWord },
-    { key: "customer", label: "Customer", width: 240, accessor: (r) => r.customer,
+    { key: "customer", label: "Customer", width: FINANCE_WIDTH.party, wrap: true, accessor: (r) => r.customer,
       searchValue: (r) => r.customer },
     // Days since the invoice was issued, Malaysia time — the age the Dashboard's A/R Aging buckets by.
     { key: "age", label: "Age", width: 110, align: "right",
@@ -98,19 +108,10 @@ export default function FinanceAR() {
       accessor: (r) => (
         <span className="flex flex-col items-end">
           <span className="tabular-nums">{rm(r.outstanding)}</span>
-          {r.storageOwing > 0 && <span className="text-label font-normal">includes storage {rm(r.storageOwing)}</span>}
+          {r.storageOwing > 0 && <span className="text-meta whitespace-normal text-right">includes storage {rm(r.storageOwing)}</span>}
         </span>
       ),
       numberValue: (r) => r.outstanding, filterType: "number", exportValue: (r) => r.outstanding },
-    { key: "act", label: "Record receipt", width: 150, filterable: false,
-      accessor: (r) => (
-        <button type="button" className="btn-secondary" data-testid={`ar-record-${r.orderId}`}
-          onClick={(e) => { e.stopPropagation(); setRecording(true); setOpenId(r.orderId); }}>
-          Record receipt
-        </button>
-      ),
-      /* A door is not a fact: it never joins the search or the export. */
-      searchValue: () => "", exportValue: () => "" },
   ], [today]);
 
   return (
@@ -128,8 +129,9 @@ export default function FinanceAR() {
             rows={rows}
             columns={columns}
             rowKey={(r) => r.orderId}
-            storageKey="carres.finance.ar.v2"
+            storageKey="carres.finance.ar.v3"
             appearance="reference"
+            look="finance" personalLayouts={personalLayouts} fillColumn="customer"
             exportName="AR · Receivables"
             groupBanner={false}
             stickyIdentity
@@ -143,6 +145,16 @@ export default function FinanceAR() {
               : undefined}
             onClearConditions={ageScope ? clearAge : undefined}
             onRowDoubleClick={(r) => { setRecording(false); setOpenId(r.orderId); }}
+            /* An order owing money is not a Finance document: a double-click
+               still opens its drawer. The row menu (Chew 2026-10-21) is that
+               same View, then Record receipt on the drawer's own condition:
+               only while something is owed. */
+            contextMenu={(r) => documentRowMenu({
+              view: () => { setRecording(false); setOpenId(r.orderId); },
+              more: r.outstanding > 0
+                ? [{ label: "Record receipt", onClick: () => { setRecording(true); setOpenId(r.orderId); } }]
+                : [],
+            })}
             statusSummary={(visible) => {
               const t = outstandingTotal(visible);
               return (

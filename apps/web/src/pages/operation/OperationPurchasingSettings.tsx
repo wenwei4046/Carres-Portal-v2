@@ -9,7 +9,6 @@ import { toast } from "sonner";
 import {
   PURCHASING_NUMBER_RANGE,
   PRODUCTION_WORKING_DAYS_RANGE,
-  TRANSIT_DAYS_RANGE,
   SUNDAY,
   WEEKDAYS,
   clockWordOf,
@@ -25,17 +24,20 @@ import {
   usePurchasingSettings,
   useCreatePurchasingDestination,
   useSetProductionDays,
-  useSetSupplierTransitDays,
   useSetSupplierTermsDays,
   useSetSupplierAddress,
+  useSetSupplierChannel,
   useSetPurchasingNumber,
+  useSetPurchaseRequestSettings,
   useSetPurchasingPoDays,
+  useSetReadyStockPriority,
   useSetPurchasingPoWindows,
   useSetSupplierPoCutoff,
   useSetSupplierWorkWeek,
   useSetPurchasingSupplierCollection,
   useUpdatePurchasingDestination,
 } from "@/lib/queries";
+import Select from "@/components/kit/Select";
 import Input from "@/components/kit/Input";
 import Textarea from "@/components/kit/Textarea";
 import Button from "@/components/kit/Button";
@@ -285,9 +287,10 @@ export default function OperationPurchasingSettings({
   const setNumber = useSetPurchasingNumber();
   const setPoDays = useSetPurchasingPoDays();
   const setProduction = useSetProductionDays();
-  const setTransit = useSetSupplierTransitDays();
   const setTerms = useSetSupplierTermsDays();
   const setAddress = useSetSupplierAddress();
+  const setChannel = useSetSupplierChannel();
+  const [channelDraft, setChannelDraft] = useState<Record<string, string>>({});
   const setWorkWeek = useSetSupplierWorkWeek();
   const createDestination = useCreatePurchasingDestination();
   const updateDestination = useUpdatePurchasingDestination();
@@ -296,7 +299,6 @@ export default function OperationPurchasingSettings({
   const [poDraft, setPoDraft] = useState<number[] | null>(null);
   const [weekDraft, setWeekDraft] = useState<Record<string, number[]>>({});
   const [prodDraft, setProdDraft] = useState<Record<string, string>>({});
-  const [transitDraft, setTransitDraft] = useState<Record<string, string>>({});
   const [termsDraft, setTermsDraft] = useState<Record<string, string>>({});
   /* 0611 · keyed `${supplierId}:${kind}` so the two addresses never share a draft. */
   const [addressDraft, setAddressDraft] = useState<Record<string, string>>({});
@@ -397,6 +399,12 @@ export default function OperationPurchasingSettings({
           />
         </div>
 
+        <div className="mb-8 max-w-[860px]" data-testid="ready-stock-priority-settings">
+          <ReadyStockPrioritySection key={data.readyStockPriority ?? "unavailable"} settings={data} canEdit={canEdit} />
+        </div>
+        <div className="mb-8 max-w-[860px]" data-testid="purchase-request-settings">
+          <PurchaseRequestSettingsSection settings={data} canEdit={canEdit} />
+        </div>
         <div className="mb-8 max-w-[860px]" data-testid="deliver-to-settings">
           <Block
             title="Deliver To"
@@ -762,105 +770,6 @@ export default function OperationPurchasingSettings({
           </Block>
         </div>
 
-        {/* ── Transit days, per supplier ───────────────────────────────────
-            THE SECOND LEG OF THE LEAD TIME (owner correction, 2026-09-09).
-            `purchasing_supplier_settings.transit_days` and its audited write
-            door have existed since migration 0318, and NOTHING in the portal
-            has ever shown or set them — while Manual Purchase told the operator
-            "Add transit days for {supplier} in Settings". This is that field.
-            The stored values are read as they are; nothing is defaulted, and a
-            supplier nobody has set reads `Set a number`. */}
-        <div className="mb-8 max-w-[860px]" data-testid="transit-days-settings">
-          <Block title="Transit days" subtitle={"Working days between the factory finishing and the goods reaching Carres. Counted on the Carres work week, not the factory’s."}>
-          <div className="bg-white">
-            {data.suppliers.length === 0 && (
-              <div className="py-4 text-body text-base-600">
-                No factory has SKUs yet. Add SKUs in Operation Catalog and the
-                factory appears here.
-              </div>
-            )}
-            {data.suppliers.map((s) => {
-              const draft =
-                transitDraft[s.id] ?? (s.transitDays == null ? "" : String(s.transitDays));
-              const n = Number(draft);
-              const valid =
-                draft !== "" &&
-                Number.isInteger(n) &&
-                n >= TRANSIT_DAYS_RANGE.min &&
-                n <= TRANSIT_DAYS_RANGE.max;
-              const dirty = valid && n !== s.transitDays;
-              return (
-                <div
-                  key={s.id}
-                  className="py-3 border-b border-base-100 last:border-b-0 flex items-start justify-between gap-4 flex-wrap"
-                  data-testid={`transit-row-${s.id}`}
-                >
-                  <div className="min-w-[240px]">
-                    <div className="text-body text-base-900">{s.name}</div>
-                    {s.transitDays == null && (
-                      <div
-                        className="text-meta text-warning mt-0.5"
-                        data-testid={`transit-set-a-number-${s.id}`}
-                      >
-                        Set a number
-                      </div>
-                    )}
-                    <ChangeLine
-                      settings={data}
-                      settingKey="supplier_transit_days"
-                      supplierId={s.id}
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min={TRANSIT_DAYS_RANGE.min}
-                      max={TRANSIT_DAYS_RANGE.max}
-                      step={1}
-                      value={draft}
-                      disabled={!canEdit}
-                      onChange={(e) =>
-                        setTransitDraft((d) => ({ ...d, [s.id]: e.target.value }))
-                      }
-                      className={`${INPUT_CLS} w-24 disabled:opacity-60`}
-                      data-testid={`transit-days-${s.id}`}
-                    />
-                    <span className="text-meta text-base-500 w-[86px]">working days</span>
-                    {canEdit && (
-                      <button
-                        type="button"
-                        disabled={!dirty || setTransit.isPending}
-                        onClick={() =>
-                          setTransit
-                            .mutateAsync({ supplierId: s.id, days: n })
-                            .then(() => {
-                              setTransitDraft((d) => {
-                                const next = { ...d };
-                                delete next[s.id];
-                                return next;
-                              });
-                              toast.success("Saved");
-                            })
-                            .catch(fail)
-                        }
-                        className="btn-primary text-meta disabled:opacity-40"
-                        data-testid={`transit-save-${s.id}`}
-                      >
-                        Save
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <p className="text-label text-base-500 mt-2">
-            Order By allows for this time as well as production time, so the
-            Safety days stay whole.
-          </p>
-          </Block>
-        </div>
-
         {/* ── Payment terms, per supplier (0530) ───────────────────────────
             Days after the bill date. A PO's own terms win over these; the
             bill form fills in the due date from whichever is set. Empty = not
@@ -928,12 +837,13 @@ export default function OperationPurchasingSettings({
         </div>
 
         {/* ── Supplier addresses (0611) ─────────────────────────────────────
-            `Address` prints on the PO and Repair Order PDFs; `Return address`
-            is a Purchase Return's `Return To` (Purchasing §9.6). Two separate
-            facts, saved one at a time: one is never copied into the other,
-            and a blank saves nothing recorded. */}
+            ONE address per supplier (owner ruling 2026-09-29, Jess: "of course
+            return to the supplier"). `Address` prints on the PO and Repair
+            Order PDFs and is also where Purchase Returns go. `Return address`
+            is filled ONLY when the supplier wants returns somewhere else; blank
+            reads `Same as Address`. Each is saved on its own. */}
         <div className="mb-8 max-w-[860px]" data-testid="supplier-address-settings">
-          <Block title="Supplier addresses" subtitle="The Address prints on the PO. Purchase Returns go to the Return address.">
+          <Block title="Supplier addresses" subtitle="The Address prints on the PO. Purchase Returns go there too. Fill Return address only if returns go somewhere else.">
           <div className="bg-white">
             {data.suppliers.map((s) => (
               <div
@@ -958,7 +868,7 @@ export default function OperationPurchasingSettings({
                           maxLength={SUPPLIER_ADDRESS_MAX}
                           value={draft}
                           disabled={!canEdit}
-                          placeholder={canEdit ? undefined : GOODS_ABSENCE_WORDS.notRecorded}
+                          placeholder={kind === "returnAddress" ? "Same as Address" : canEdit ? undefined : GOODS_ABSENCE_WORDS.notRecorded}
                           onChange={(e) => setAddressDraft((d) => ({ ...d, [key]: e.target.value }))}
                         />
                         {canEdit && (
@@ -993,6 +903,53 @@ export default function OperationPurchasingSettings({
               </div>
             ))}
           </div>
+          </Block>
+        </div>
+
+        <div className="mb-8 max-w-[860px]" data-testid="supplier-channel-settings">
+          <Block title="Communication">
+            {data.suppliers.map((supplier) => (
+              <div key={supplier.id} className="py-3 border-b border-base-100 last:border-b-0">
+                <div className="mb-2 text-body font-semibold text-base-900">{supplier.name}</div>
+                <div className="grid grid-cols-1 gap-3 min-[820px]:grid-cols-2">
+                  {(["whatsappGroupUrl", "contactEmail", "poSendChannel"] as const).map((kind) => {
+                    const key = `${supplier.id}:${kind}`;
+                    const saved = supplier[kind] ?? "";
+                    const draft = channelDraft[key] ?? saved;
+                    return (
+                      <form key={kind} className="flex flex-col gap-2" onSubmit={(event) => {
+                        event.preventDefault();
+                        if (!canEdit || setChannel.isPending) return;
+                        void setChannel.mutateAsync({ supplierId: supplier.id, kind, text: draft })
+                          .then(() => {
+                            setChannelDraft((current) => {
+                              const next = { ...current };
+                              delete next[key];
+                              return next;
+                            });
+                            toast.success("Saved");
+                          }).catch(fail);
+                      }}>
+                        {kind === "poSendChannel" ? <Select id={`supplier-${kind}-${supplier.id}`}
+                          label="Channel" value={draft || undefined} placeholder="Not recorded"
+                          disabled={!canEdit || setChannel.isPending}
+                          options={[{ value: "email", label: "Email" }, { value: "whatsapp", label: "WhatsApp" }]}
+                          onValueChange={(value) => setChannelDraft((current) => ({ ...current, [key]: value }))} /> :
+                        <Input id={`supplier-${kind}-${supplier.id}`}
+                          label={kind === "contactEmail" ? "Email" : "WhatsApp group"}
+                          type={kind === "contactEmail" ? "email" : "url"}
+                          maxLength={500} value={draft} disabled={!canEdit || setChannel.isPending}
+                          onChange={(event) => setChannelDraft((current) => ({ ...current, [key]: event.target.value }))} />}
+
+                        <ChangeLine settings={data} settingKey={kind === "contactEmail" ? "supplier_contact_email" : kind === "poSendChannel" ? "supplier_po_send_channel" : "supplier_whatsapp_group_url"} supplierId={supplier.id} />
+                        {canEdit && <div><Button type="submit" variant="primary" loading={setChannel.isPending}
+                          disabled={draft.trim() === saved.trim()}>Save</Button></div>}
+                      </form>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </Block>
         </div>
 
@@ -1168,7 +1125,7 @@ export default function OperationPurchasingSettings({
         {/* ⭐ SUPPLIER CLAIMS (Purchasing MASTER §9.5, owner-approved / LOCKED
             2026-09-06; storage 0606): the two reply-timing numbers, Office
             working days. The Supplier Claims lane reads them for `Reply
-            expected`, `Reply overdue` and the escalation Work; a change never
+            expected`, its `passed` state and the escalation Work; a change never
             moves an existing claim's dated obligation. */}
         {data.claimReplyWaitingDays != null && data.claimEscalationExtraDays != null && (
           <div className="mt-8 max-w-[860px]" data-testid="supplier-claims-settings">
@@ -1190,7 +1147,7 @@ export default function OperationPurchasingSettings({
                 </NumberRow>
                 <NumberRow
                   label="Extra days before escalation"
-                  hint="After a missed reply, before the Purchasing Approver is asked to decide."
+                  hint="After the reply date has passed, before the Purchasing Approver is asked to decide."
                   unit="Office working days"
                   value={data.claimEscalationExtraDays}
                   min={PURCHASING_NUMBER_RANGE.claim_escalation_extra_days.min}
@@ -1244,6 +1201,58 @@ export default function OperationPurchasingSettings({
  * rewrites an issued PO; the SQL door records the old and new value, and the
  * history line reads it in clock words.
  */
+function PurchaseRequestSettingsSection({ settings, canEdit }: { settings: PurchasingSettingsResponse; canEdit: boolean }) {
+  const saved = settings.requestSettings;
+  const save = useSetPurchaseRequestSettings();
+  const [normal, setNormal] = useState(saved ? String(saved.normalDays) : "");
+  const [service, setService] = useState(saved ? String(saved.serviceDays) : "");
+  const [screenshot, setScreenshot] = useState(saved ? (saved.manualWhatsappScreenshotRequired ? "active" : "inactive") : "");
+  const [problem, setProblem] = useState<string | null>(null);
+  const validDays = (text: string) => text.trim() !== "" && Number.isInteger(Number(text)) && Number(text) >= 0 && Number(text) <= 2147483647;
+  const dirty = saved && (normal !== String(saved.normalDays) || service !== String(saved.serviceDays) || screenshot !== (saved.manualWhatsappScreenshotRequired ? "active" : "inactive"));
+  return <Block title="Purchase requests" subtitle="Customer Original Delivery Date is planned from the selected Proceed Date, in calendar days.">
+    {saved ? <>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Input id="request-normal-days" label="Normal / Ready Stock" hint="Calendar days after Proceed Date" type="number" min={0} step={1} value={normal} disabled={!canEdit || save.isPending} onChange={(event) => setNormal(event.target.value)} />
+        <Input id="request-service-days" label="Service Case" hint="Calendar days after Proceed Date" type="number" min={0} step={1} value={service} disabled={!canEdit || save.isPending} onChange={(event) => setService(event.target.value)} />
+        <Select id="request-whatsapp-screenshot" label="Manual WhatsApp screenshot" value={screenshot} disabled={!canEdit || save.isPending} onValueChange={setScreenshot} options={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]} />
+      </div>
+      {canEdit && <div className="flex justify-end py-3"><Button loading={save.isPending} disabled={!dirty || !validDays(normal) || !validDays(service) || !screenshot} onClick={async () => {
+        setProblem(null);
+        try { await save.mutateAsync({ normalDays: Number(normal), serviceDays: Number(service), manualWhatsappScreenshotRequired: screenshot === "active" }); }
+        catch { setProblem("Not confirmed · Try again"); }
+      }}>Save</Button></div>}
+      <ChangeLine settings={settings} settingKey="purchase_request_normal_days" />
+      <ChangeLine settings={settings} settingKey="purchase_request_service_days" />
+      <ChangeLine settings={settings} settingKey="po_manual_whatsapp_screenshot_required" />
+    </> : <p className="text-meta text-kit-slate-11">Not available</p>}
+    {problem && <p role="alert" className="text-meta text-kit-red-11">{problem}</p>}
+  </Block>;
+}
+
+function ReadyStockPrioritySection({ settings, canEdit }: { settings: PurchasingSettingsResponse; canEdit: boolean }) {
+  const save = useSetReadyStockPriority();
+  const [draft, setDraft] = useState(settings.readyStockPriority ?? "");
+  const [problem, setProblem] = useState<string | null>(null);
+  return <Block title="Ready Stock" subtitle="Priority">
+    <div className="flex flex-wrap items-end gap-3 py-3">
+      <Select id="ready-stock-priority" label="Priority" value={draft}
+        disabled={!canEdit || settings.readyStockPriority == null || save.isPending}
+        onValueChange={value => setDraft(value as "customer_delivery" | "proceed_date")}
+        options={[{ value: "customer_delivery", label: "Customer Requested Delivery Date" }, { value: "proceed_date", label: "Proceed Date" }]} />
+      {canEdit && <Button loading={save.isPending} disabled={!draft || draft === settings.readyStockPriority || settings.readyStockPriority == null}
+        onClick={async () => {
+          setProblem(null);
+          try { await save.mutateAsync({ priority: draft as "customer_delivery" | "proceed_date" }); }
+          catch { setProblem("Not confirmed · Try again"); }
+        }}>Save</Button>}
+    </div>
+    {settings.readyStockPriority == null && <p className="text-meta text-kit-slate-11">Not available</p>}
+    {problem && <p role="alert" className="text-meta text-kit-red-11">{problem}</p>}
+    <ChangeLine settings={settings} settingKey="ready_stock_priority" />
+  </Block>;
+}
+
 function PoWindowsSection({
   settings,
   canEdit,

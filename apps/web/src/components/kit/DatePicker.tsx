@@ -25,7 +25,7 @@ import { useState } from "react";
 import { DayPicker } from "react-day-picker";
 import FieldFrame from "./FieldFrame";
 import Icon from "./Icon";
-import Popover from "./Popover";
+import CPopover from "@/components/carres/CPopover";
 import { controlClass } from "./field-recipe";
 import { fmtDate } from "@/lib/fmt-date";
 
@@ -50,28 +50,39 @@ export function toIso(date: Date): string {
  *  inline month calendar renders the SAME `react-day-picker` primitive and must
  *  wear the same skin — a second spelling of these classes is the §6.1 defect. */
 export const CALENDAR_CLASSNAMES = {
-  root: "text-body text-kit-slate-12",
+  root: "text-body text-c-ink",
   months: "flex flex-col gap-4",
   month: "flex flex-col gap-2",
   month_caption: "flex items-center justify-center",
-  caption_label: "text-strong text-kit-slate-12",
+  caption_label: "text-strong text-c-ink",
   nav: "flex items-center justify-between",
-  button_previous: "rounded-control p-1 text-kit-slate-11 hover:bg-kit-slate-3",
-  button_next: "rounded-control p-1 text-kit-slate-11 hover:bg-kit-slate-3",
+  button_previous: "rounded-lg p-1 text-c-secondary hover:bg-c-hover",
+  button_next: "rounded-lg p-1 text-c-secondary hover:bg-c-hover",
   chevron: "fill-current",
   month_grid: "w-full border-collapse",
-  weekdays: "text-label text-kit-slate-11",
+  weekdays: "text-meta text-c-muted",
   weekday: "p-1 font-normal",
   week: "",
   day: "p-0 text-center",
   day_button:
-    "h-8 w-8 rounded-control text-body text-kit-slate-12 hover:bg-kit-slate-3 " +
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9",
-  today: "font-medium text-kit-blue-11",
-  selected: "[&>button]:bg-kit-blue-9 [&>button]:text-white [&>button]:hover:brightness-95",
-  outside: "text-kit-slate-9",
-  disabled: "opacity-40",
+    "h-8 w-8 rounded-lg text-body text-c-ink enabled:hover:bg-c-hover " +
+    "focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:2px]",
+  today: "font-semibold text-c-select-fg",
+  selected:
+    "[&>button]:bg-c-select-bg [&>button]:font-semibold [&>button]:text-c-select-fg [&>button]:hover:bg-c-select-bg",
+  outside: "text-c-muted",
+  disabled: "opacity-[0.45]",
   hidden: "invisible",
+};
+
+/* The field pop-up has room for seven44px targets on a390px screen. The
+   inline Monitor rail consumes the exported skin with its own governed
+   geometry; do not silently widen that216px adapter by changing its nav. */
+const FIELD_CALENDAR_CLASSNAMES = {
+  ...CALENDAR_CLASSNAMES,
+  button_previous: `${CALENDAR_CLASSNAMES.button_previous} max-[767px]:h-11 max-[767px]:w-11`,
+  button_next: `${CALENDAR_CLASSNAMES.button_next} max-[767px]:h-11 max-[767px]:w-11`,
+  day_button: `${CALENDAR_CLASSNAMES.day_button} max-[767px]:h-11 max-[767px]:w-11`,
 };
 
 export default function DatePicker({
@@ -103,7 +114,7 @@ export default function DatePicker({
 
   return (
     <FieldFrame id={id} label={label} hint={hint} error={error} required={required}>
-      <Popover
+      <CPopover
         label={label ?? placeholder}
         open={open}
         onOpenChange={setOpen}
@@ -118,16 +129,17 @@ export default function DatePicker({
             data-kit="date-picker"
             className={`${controlClass(Boolean(error), "single")} inline-flex items-center justify-between gap-2 text-left`}
           >
-            <span className={value ? "" : "text-kit-slate-9"}>
+            <span className={value ? "" : "text-c-muted"}>
               {value ? fmtDate(value) : placeholder}
             </span>
-            <span className="text-kit-slate-9">
+            <span className="text-c-secondary">
               <Icon name="date" size={16} />
             </span>
           </button>
         }
       >
         <DayPicker
+          autoFocus
           mode="single"
           selected={selected}
           defaultMonth={selected}
@@ -138,9 +150,9 @@ export default function DatePicker({
           }}
           showOutsideDays
           weekStartsOn={1}
-          classNames={CALENDAR_CLASSNAMES}
+          classNames={FIELD_CALENDAR_CLASSNAMES}
         />
-      </Popover>
+      </CPopover>
     </FieldFrame>
   );
 }

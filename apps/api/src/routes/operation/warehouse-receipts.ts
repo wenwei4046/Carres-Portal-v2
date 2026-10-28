@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import { z } from "zod";
 import {
   arrivalReceivingInput,
+  documentDisplayNumber,
+  type RegisterColumnQuery,
   buildGrnRegisterView,
   catalogCategoryWordOf,
   poSupplierDeliveryDateOf,
@@ -21,7 +23,7 @@ import {
   type WarehouseReceiptLine,
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
-import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { mapPgError, parseJsonBody, readAllPages } from "../../lib/route-helpers";
 import { isMissingRelationError } from "../../lib/optional-relation";
 import { skuCategories } from "../../lib/sku-categories";
 import { adminClient, userClient } from "../../lib/supabase";
@@ -191,6 +193,16 @@ const GRN_PAGE_DEFAULT = 50;
 const GRN_PAGE_MAX = 200;
 /** The scan's own page size — a Worker-side read, never sent to the browser. */
 const GRN_SCAN_PAGE = 1000;
+const GRN_COLUMN_KEYS = new Set(["grnDate", "grn", "source", "po", "supplier", "deliverTo", "actualSite", "supplierConfirmedDeliveryDate", "receivedAt", "doNo", "items", "receivedQty", "damagedQty", "wrongQty", "extraQty"]);
+const grnColumnKey = z.string().refine(key => GRN_COLUMN_KEYS.has(key));
+const grnColumnQuery = z.object({
+  filters: z.record(grnColumnKey, z.array(z.string().max(2000)).max(5000)),
+  dateFilters: z.record(grnColumnKey, z.enum(["today", "tomorrow", "thisWeek", "thisMonth", "lastMonth", "overdue"])),
+  numberFilters: z.record(grnColumnKey, z.object({ min: z.number().finite().optional(), max: z.number().finite().optional() }).strict()),
+  dateRangeFilters: z.record(grnColumnKey, z.object({ from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }).strict()),
+  sort: z.object({ key: grnColumnKey, dir: z.enum(["asc", "desc"]) }).strict().nullable(),
+}).strict();
+
 
 warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -203,6 +215,8 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
      (`buildGrnRegisterView`) for facets and the slice, then reads the full
      record for just that page. Everything else keeps the legacy shape. ── */
   if (c.req.query("scope") === "grn") {
+    const differences = c.req.query("view") === "differences";
+    const exportAll = c.req.query("export") === "1";
     const limit = Math.min(
       Math.max(1, Math.floor(Number(c.req.query("limit")) || GRN_PAGE_DEFAULT)),
       GRN_PAGE_MAX,
@@ -220,7 +234,16 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
         : null;
     const isoDay = (v: string | undefined) =>
       v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
+    let columns: RegisterColumnQuery | null = null;
+    if (c.req.query("columns")) {
+      try {
+        const parsed = grnColumnQuery.safeParse(JSON.parse(c.req.query("columns")!));
+        if (!parsed.success) return c.json({ message: "Invalid register filters" }, 422);
+        columns = parsed.data;
+      } catch { return c.json({ message: "Invalid register filters" }, 422); }
+    }
     const sel = {
+      columns,
       category: c.req.query("category") ?? null,
       supplier: c.req.query("supplier") ?? null,
       site: c.req.query("site") ?? null,
@@ -228,6 +251,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
       from: isoDay(c.req.query("from")),
       to: isoDay(c.req.query("to")),
       cancelled: c.req.query("cancelled") === "1" ? true : null,
+      consignment: c.req.query("consignment") === "1" ? true : null,
       q: c.req.query("q") ?? null,
     };
 
@@ -236,6 +260,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
     // submitted stamp breaking ties).
     type ScanRow = {
       id: string;
+      arrival_source_id?: string | null;
       po_id: string;
       warehouse_id: string | null;
       actual_site_id: string | null;
@@ -255,9 +280,9 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
       const { data, error } = await sb
         .from("warehouse_receipts")
         .select(
-          "id, po_id, warehouse_id, actual_site_id, goods_received_at, submitted_at, posted_at, status, grn_no, do_number, lines, extra_lines",
+          "id, po_id, arrival_source_id, warehouse_id, actual_site_id, goods_received_at, submitted_at, posted_at, status, grn_no, do_number, lines, extra_lines",
         )
-        .in("status", ["posted", "voided"])
+        .in("status", differences ? ["draft", "submitted", "returned", "posted"] : ["posted", "voided"])
         .order("goods_received_at", { ascending: false })
         .order("submitted_at", { ascending: false })
         .range(from, from + GRN_SCAN_PAGE - 1);
@@ -267,6 +292,26 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
       }
       scan.push(...((data ?? []) as ScanRow[]));
       if ((data ?? []).length < GRN_SCAN_PAGE) break;
+    }
+
+    if (differences) {
+      const notReceived = new Set<string>();
+      for (let start = 0; start < scan.length; start += 100) {
+        const ids = scan.slice(start, start + 100).map(row => row.id);
+        const results = await readAllPages<{ id: string; receipt_id: string }>((from, to) => sb
+          .from("receiving_unit_results").select("id, receipt_id")
+          .in("receipt_id", ids).eq("outcome", "not_received").order("id").range(from, to));
+        if (!("rows" in results)) return c.json({ message: "Receiving could not be opened" }, 500);
+        for (const result of results.rows) notReceived.add(result.receipt_id);
+      }
+      const included = scan.filter(row => {
+        if (["draft", "submitted", "returned"].includes(row.status ?? "")) return true;
+        if (row.status !== "posted") return false;
+        const totals = warehouseReceiptTotals(row.lines ?? []);
+        return totals.damaged > 0 || totals.wrongItem > 0 || notReceived.has(row.id)
+          || receivingExtraQty((Array.isArray(row.extra_lines) ? row.extra_lines : []) as ReceivingExtraLine[]) > 0;
+      });
+      scan.splice(0, scan.length, ...included);
     }
 
     const scanPoIds = [...new Set(scan.map((r) => r.po_id).filter(Boolean))];
@@ -286,7 +331,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
         readByIds<Record<string, unknown>>(scanPoIds, (ids) =>
           sb
             .from("purchase_orders")
-            .select("id, version, supplier_id, suppliers(name)")
+            .select("id, version, supplier_id, receipt_only, is_consignment, suppliers(name)")
             .in("id", ids),
         ),
         // Only the fields the ONE reply arithmetic reads
@@ -312,11 +357,19 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
 
     const supplierByPo = new Map<string, string | null>();
     const versionByPo = new Map<string, number>();
+    const hiddenPo = new Set<string>();
     for (const p of poRows) {
       const sup = p.suppliers as { name?: string } | null;
       supplierByPo.set(p.id as string, sup?.name ?? null);
       versionByPo.set(p.id as string, (p.version as number | null) ?? 1);
+      // 0728: a PO issued only to carry a no-PO Goods Receipt is not shown
+      // (Houzs grns.ts:1408 has no PO there).
+      if (p.receipt_only === true) hiddenPo.add(p.id as string);
     }
+    /* `Consignment goods` — the Consignment Receive entry, Houzs way (Weisiang's
+       decision, Mr Lim, WhatsApp 2026-10-22; Jess was not part of it). Not a
+       second receipt page: the same GRN records, narrowed to Consignment Orders. */
+    const consignmentPo = new Set(poRows.filter((p) => p.is_consignment === true).map((p) => p.id as string));
     const promisesByPo = new Map<string, PoDatePromise[]>();
     for (const row of promiseRows) {
       const pid = row.po_id as string;
@@ -338,10 +391,171 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
       scan.flatMap((r) => (r.lines ?? []).map((l) => l.sku)),
     );
 
+    // The Product cell speaks the GRN PAPER's word — `product_skus.variant`,
+    // else the SKU — resolved for the complete authorised filter population.
+    const scanSkus = [
+      ...new Set(
+        scan.flatMap((r) => [
+          ...((Array.isArray(r.lines) ? r.lines : []) as WarehouseReceiptLine[]).map(
+            (l) => l.sku,
+          ),
+          // Extra goods are their own rows in the expansion and need the same
+          // item word and category as an ordered line.
+          ...((Array.isArray(r.extra_lines) ? r.extra_lines : []) as Array<{
+            sku?: string;
+          }>)
+            .map((x) => x.sku)
+            .filter((v): v is string => typeof v === "string" && v.length > 0),
+        ]),
+      ),
+    ];
+    const productWordBySku = new Map<string, string>();
+    if (scanSkus.length > 0) {
+      const skuRows = await readByIds<{ sku: string; variant: string | null }>(scanSkus, ids =>
+        sb.from("product_skus").select("sku, variant").in("sku", ids));
+      for (const s of (skuRows ?? []) as Array<{ sku: string; variant: string | null }>)
+        if (s.variant) productWordBySku.set(s.sku, s.variant);
+    }
+
+    // Source references are filterable facts, so resolve them across the full
+    // authorised scan. Unit results and signed evidence remain page-only.
+    const scanLineIds = [
+      ...new Set(
+        scan.flatMap((r) =>
+          ((Array.isArray(r.lines) ? r.lines : []) as WarehouseReceiptLine[]).map(
+            (l) => l.id,
+          ),
+        ),
+      ),
+    ].filter((id) => typeof id === "string" && id.length > 0);
+
+    /** `po_line_id` → the governed reference numbers of that line's sources. */
+    const refsByLine = new Map<string, string[]>();
+    if (scanLineIds.length > 0) {
+      const poLines = await readByIds<{
+        id: string;
+        demand_id: string | null;
+      }>(scanLineIds, (ids) =>
+        sb
+          .from("purchase_order_lines")
+          .select("id, demand_id")
+          .in("id", ids),
+      );
+      const sources = await readByIds<{ po_line_id: string; so: number | null; purchase_demand_id?: string | null }>(
+        scanLineIds,
+        (ids) =>
+          sb
+            .from("po_line_sources")
+            .select("po_line_id, so, purchase_demand_id")
+            .in("po_line_id", ids),
+      );
+      for (const src of sources) {
+        if (src.so == null) continue;
+        const list = refsByLine.get(src.po_line_id) ?? [];
+        const reference = `SO-${Number(src.so)}`;
+        if (!list.includes(reference)) list.push(reference);
+        refsByLine.set(src.po_line_id, list);
+      }
+      // The Manual Purchase Request number (owner ruling 2026-09-18) — the
+      // request's own `MPR-YYYYMMDD-RRRR`, reached through the line's demand.
+      const demandIds = [
+        ...new Set(
+          [...sources.map(s => s.purchase_demand_id).filter((v): v is string => typeof v === "string"), ...poLines
+            .map((l) => l.demand_id)
+            .filter((v): v is string => typeof v === "string" && v.length > 0)],
+        ),
+      ];
+      const requestByDemand = new Map<string, string>();
+      if (demandIds.length > 0) {
+        const demands = await readByIds<{ id: string; request_id: string | null }>(
+          demandIds,
+          (ids) =>
+            sb.from("purchase_demands").select("id, request_id").in("id", ids),
+        );
+        const requestIds = [
+          ...new Set(
+            demands
+              .map((d) => d.request_id)
+              .filter((v): v is string => typeof v === "string" && v.length > 0),
+          ),
+        ];
+        const reqNoById = new Map<string, string>();
+        if (requestIds.length > 0) {
+          const requests = await readByIds<{ id: string; req_no: string | null }>(
+            requestIds,
+            (ids) =>
+              sb.from("purchase_requests").select("id, req_no").in("id", ids),
+          );
+          for (const r of requests)
+            if (r.req_no) reqNoById.set(r.id, r.req_no);
+        }
+        for (const d of demands)
+          if (d.request_id && reqNoById.has(d.request_id))
+            requestByDemand.set(d.id, reqNoById.get(d.request_id)!);
+      }
+      for (const line of poLines) {
+        const attributed = sources.filter(s => s.po_line_id === line.id && s.purchase_demand_id);
+        const ids = attributed.length ? attributed.map(s => s.purchase_demand_id!) : line.demand_id ? [line.demand_id] : [];
+        for (const id of ids) {
+          const mpr = requestByDemand.get(id);
+          if (!mpr) continue;
+          const list = refsByLine.get(line.id) ?? [];
+          if (!list.includes(mpr)) list.push(mpr);
+          refsByLine.set(line.id, list);
+        }
+      }
+    }
+
+    /* A receipt that came through an arrival source (0490) has NO purchase
+       order at all — the check constraint allows exactly one of the two — so
+       its own document number IS the reference: `RO-…` for a repair return,
+       the claim, case or delivery paper for the others. */
+    const arrivalIds = [
+      ...new Set(
+        scan
+          .map((r) => r.arrival_source_id as string | null | undefined)
+          .filter((v): v is string => typeof v === "string" && v.length > 0),
+      ),
+    ];
+    const arrivalNoById = new Map<string, string>();
+    if (arrivalIds.length > 0) {
+      try {
+        const arrivals = await readByIds<{ id: string; source_no: string | null }>(
+          arrivalIds,
+          (ids) =>
+            sb.from("arrival_sources").select("id, source_no").in("id", ids),
+        );
+        for (const a of arrivals)
+          if (a.source_no) arrivalNoById.set(a.id, a.source_no);
+      } catch (error) {
+        // A failed source read cannot become a false empty source-filter answer.
+        const mapped = mapPgError(error as never);
+        return c.json(mapped.body, mapped.status);
+      }
+    }
+
     const factRows: GrnRegisterFactRow[] = scan.map((r) => {
       const supplierName = supplierByPo.get(r.po_id) ?? null;
       const totals = warehouseReceiptTotals(r.lines ?? []);
+      const number = receivingDisplayNo({ id: r.id, status: r.status, grn_no: r.grn_no, goods_received_at: r.goods_received_at ?? undefined, submitted_at: r.submitted_at ?? undefined });
+      const source = [...new Set([
+        ...(r.arrival_source_id && arrivalNoById.has(r.arrival_source_id) ? [arrivalNoById.get(r.arrival_source_id)!] : []),
+        ...(r.lines ?? []).flatMap(line => refsByLine.get(line.id) ?? []),
+      ])].map(ref => documentDisplayNumber(ref)).join(" · ");
+      const labels = [...new Set((r.lines ?? []).map(line => productWordBySku.get(line.sku) ?? line.sku))];
+      const actualSite = (r.actual_site_id ? whNames.get(r.actual_site_id) : null) ?? (r.warehouse_id ? whNames.get(r.warehouse_id) : null) ?? "";
+      const extra = receivingExtraQty((Array.isArray(r.extra_lines) ? r.extra_lines : []) as ReceivingExtraLine[]);
       return {
+        columnFacts: {
+          grnDate: { text: businessDay(r.posted_at) ?? "", date: businessDay(r.posted_at) },
+          grn: { text: number }, source: { text: source }, po: { text: hiddenPo.has(r.po_id) ? "" : documentDisplayNumber(r.po_id ?? "") },
+          supplier: { text: supplierName ?? "" }, deliverTo: { text: r.warehouse_id ? whNames.get(r.warehouse_id) ?? "" : "" },
+          actualSite: { text: actualSite }, supplierConfirmedDeliveryDate: { text: supplierDateByPo.get(r.po_id) ?? "Not confirmed", date: supplierDateByPo.get(r.po_id) ?? null },
+          receivedAt: { text: r.goods_received_at ?? "", date: r.goods_received_at }, doNo: { text: r.do_number ?? "" },
+          items: { text: labels.join(" · ") }, receivedQty: { text: String(totals.received), number: totals.received },
+          damagedQty: { text: String(totals.damaged), number: totals.damaged }, wrongQty: { text: String(totals.wrongItem), number: totals.wrongItem },
+          extraQty: { text: String(extra), number: extra },
+        },
         id: r.id,
         categories: receiptCategoryWords(r.lines, scanCatalog),
         supplierName,
@@ -361,22 +575,32 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
               : []) as ReceivingExtraLine[],
           ) > 0,
         cancelled: r.status === "voided",
+        consignment: consignmentPo.has(r.po_id),
         // The Search box's own promise: GRN, PO, supplier or DO number.
         searchText: [
+          r.grn_no ?? "",
           receivingDisplayNo({
             id: r.id,
+            status: r.status,
             grn_no: r.grn_no,
             goods_received_at: r.goods_received_at ?? undefined,
             submitted_at: r.submitted_at ?? undefined,
           }),
-          r.po_id,
+          hiddenPo.has(r.po_id) ? "" : r.po_id,
+          hiddenPo.has(r.po_id) ? "" : documentDisplayNumber(r.po_id ?? ""),
           r.do_number ?? "",
           supplierName ?? "",
         ].join(" "),
       };
     });
 
-    const view = buildGrnRegisterView(factRows, sel, offset, limit);
+    const view = buildGrnRegisterView(factRows, sel, exportAll ? 0 : offset, exportAll ? Math.max(1, factRows.length) : limit);
+    // Dropdown choices cover the complete authorised population narrowed by the
+    // existing rail/search. Current column choices remain available to clear.
+    const choiceIds = new Set(buildGrnRegisterView(factRows, { ...sel, columns: null }, 0, Math.max(1, factRows.length)).pageIds);
+    const columnValues = Object.fromEntries([...GRN_COLUMN_KEYS].map(key => [key,
+      [...new Set(factRows.filter(row => choiceIds.has(row.id)).map(row => row.columnFacts?.[key]?.text ?? ""))].sort((a, b) => a.localeCompare(b, "en", { numeric: true })),
+    ]));
 
     // The page itself — full records for exactly these ids, in the scan's
     // order (a `.in(…)` read has no order of its own).
@@ -412,7 +636,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
       ),
     ];
     const userNames = new Map<string, string>();
-    if (pageUserIds.length > 0) {
+    if (!exportAll && pageUserIds.length > 0) {
       const { data: users } = await sb
         .from("app_users")
         .select("id, name")
@@ -421,166 +645,13 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
         userNames.set(u.id as string, u.name as string);
     }
 
-    // The Product cell speaks the GRN PAPER's word — `product_skus.variant`,
-    // else the SKU — resolved for the page only.
-    const pageSkus = [
-      ...new Set(
-        ordered.flatMap((r) => [
-          ...((Array.isArray(r.lines) ? r.lines : []) as WarehouseReceiptLine[]).map(
-            (l) => l.sku,
-          ),
-          // Extra goods are their own rows in the expansion and need the same
-          // item word and category as an ordered line.
-          ...((Array.isArray(r.extra_lines) ? r.extra_lines : []) as Array<{
-            sku?: string;
-          }>)
-            .map((x) => x.sku)
-            .filter((v): v is string => typeof v === "string" && v.length > 0),
-        ]),
-      ),
-    ];
-    const productWordBySku = new Map<string, string>();
-    if (pageSkus.length > 0) {
-      const { data: skuRows } = await sb
-        .from("product_skus")
-        .select("sku, variant")
-        .in("sku", pageSkus);
-      for (const s of (skuRows ?? []) as Array<{ sku: string; variant: string | null }>)
-        if (s.variant) productWordBySku.set(s.sku, s.variant);
-    }
-
-    /* ── THE PAGE'S OWN RECEIPT FACTS — the same ones the official GRN
-       object reads (§9.4), resolved for the fifty rows on screen and never
-       for the whole history. They answer two approved columns:
-
-         `SO No / MPR No / CO No / RO No`   the receipt's ACTUAL linked
-                                            documents, per line, blank when
-                                            there are none — never invented,
-                                            and never a PO standing in for a
-                                            CO or RO receipt
-         the read-only goods expansion      one row per received line, with
-                                            the source number above its own
-                                            line-bound Unit IDs
-       ──────────────────────────────────────────────────────────────────── */
-    const pageLineIds = [
-      ...new Set(
-        ordered.flatMap((r) =>
-          ((Array.isArray(r.lines) ? r.lines : []) as WarehouseReceiptLine[]).map(
-            (l) => l.id,
-          ),
-        ),
-      ),
-    ].filter((id) => typeof id === "string" && id.length > 0);
-
-    /** `po_line_id` → the governed reference numbers of that line's sources. */
-    const refsByLine = new Map<string, string[]>();
-    if (pageLineIds.length > 0) {
-      const poLines = await readByIds<{
-        id: string;
-        demand_id: string | null;
-      }>(pageLineIds, (ids) =>
-        sb
-          .from("purchase_order_lines")
-          .select("id, demand_id")
-          .in("id", ids),
-      );
-      const sources = await readByIds<{ po_line_id: string; so: number | null }>(
-        pageLineIds,
-        (ids) =>
-          sb
-            .from("po_line_sources")
-            .select("po_line_id, so")
-            .in("po_line_id", ids),
-      );
-      for (const src of sources) {
-        if (src.so == null) continue;
-        const list = refsByLine.get(src.po_line_id) ?? [];
-        const reference = `SO-${Number(src.so)}`;
-        if (!list.includes(reference)) list.push(reference);
-        refsByLine.set(src.po_line_id, list);
-      }
-      // The Manual Purchase Request number (owner ruling 2026-09-18) — the
-      // request's own `MPR-YYYYMMDD-RRRR`, reached through the line's demand.
-      const demandIds = [
-        ...new Set(
-          poLines
-            .map((l) => l.demand_id)
-            .filter((v): v is string => typeof v === "string" && v.length > 0),
-        ),
-      ];
-      const requestByDemand = new Map<string, string>();
-      if (demandIds.length > 0) {
-        const demands = await readByIds<{ id: string; request_id: string | null }>(
-          demandIds,
-          (ids) =>
-            sb.from("purchase_demands").select("id, request_id").in("id", ids),
-        );
-        const requestIds = [
-          ...new Set(
-            demands
-              .map((d) => d.request_id)
-              .filter((v): v is string => typeof v === "string" && v.length > 0),
-          ),
-        ];
-        const reqNoById = new Map<string, string>();
-        if (requestIds.length > 0) {
-          const requests = await readByIds<{ id: string; req_no: string | null }>(
-            requestIds,
-            (ids) =>
-              sb.from("purchase_requests").select("id, req_no").in("id", ids),
-          );
-          for (const r of requests)
-            if (r.req_no) reqNoById.set(r.id, r.req_no);
-        }
-        for (const d of demands)
-          if (d.request_id && reqNoById.has(d.request_id))
-            requestByDemand.set(d.id, reqNoById.get(d.request_id)!);
-      }
-      for (const line of poLines) {
-        const mpr = line.demand_id ? requestByDemand.get(line.demand_id) : null;
-        if (!mpr) continue;
-        const list = refsByLine.get(line.id) ?? [];
-        if (!list.includes(mpr)) list.push(mpr);
-        refsByLine.set(line.id, list);
-      }
-    }
-
-    /* A receipt that came through an arrival source (0490) has NO purchase
-       order at all — the check constraint allows exactly one of the two — so
-       its own document number IS the reference: `RO-…` for a repair return,
-       the claim, case or delivery paper for the others. */
-    const arrivalIds = [
-      ...new Set(
-        ordered
-          .map((r) => r.arrival_source_id as string | null | undefined)
-          .filter((v): v is string => typeof v === "string" && v.length > 0),
-      ),
-    ];
-    const arrivalNoById = new Map<string, string>();
-    if (arrivalIds.length > 0) {
-      try {
-        const arrivals = await readByIds<{ id: string; source_no: string | null }>(
-          arrivalIds,
-          (ids) =>
-            sb.from("arrival_sources").select("id, source_no").in("id", ids),
-        );
-        for (const a of arrivals)
-          if (a.source_no) arrivalNoById.set(a.id, a.source_no);
-      } catch (e) {
-        // The arrival-source tables are still unnumbered in some deployments;
-        // a register that cannot read them prints no reference rather than
-        // refusing to open (the same discipline `readReceipts` already uses).
-        console.error("reading arrival sources failed (non-fatal):", e);
-      }
-    }
-
     /** `receipt id` → `po_line_id` → the Unit IDs THIS receiving answered. */
     const unitsByReceiptLine = new Map<string, Map<string, string[]>>();
     /* A FAILED read is not an empty answer. When the Units could not be read
        the register says so on the cell instead of printing `Counted stock`
        over goods that are individually tracked (COPY-STANDARD). */
     let unitReadFailed = false;
-    if (view.pageIds.length > 0) {
+    if (!exportAll && view.pageIds.length > 0) {
       try {
         const results = await readByIds<{
           receipt_id: string;
@@ -635,6 +706,10 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
        item word — so the register and the document can never disagree. */
     const lineInfo: Record<string, { description: string | null; category: string }> =
       {};
+    const pageSkus = new Set(ordered.flatMap(r => [
+      ...(Array.isArray(r.lines) ? r.lines as WarehouseReceiptLine[] : []).map(line => line.sku),
+      ...(Array.isArray(r.extra_lines) ? r.extra_lines as ReceivingExtraLine[] : []).map(line => line.sku),
+    ]));
     for (const sku of pageSkus) {
       lineInfo[sku] = {
         description: productWordBySku.get(sku) ?? null,
@@ -648,7 +723,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
       .map((r) => r.do_file_path as string | null)
       .filter((p): p is string => typeof p === "string" && p.length > 0);
     const doUrls = new Map<string, string>();
-    if (doPaths.length > 0) {
+    if (!exportAll && doPaths.length > 0) {
       try {
         const admin = adminClient(c.env);
         const { data: signed } = await admin.storage
@@ -695,7 +770,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
               ...lines.flatMap((l) => refsByLine.get(l.id) ?? []),
             ]),
           ],
-          unit_ids_by_line: unitReadFailed
+          unit_ids_by_line: exportAll || unitReadFailed
             ? null
             : Object.fromEntries(
                 unitsByReceiptLine.get(r.id as string) ??
@@ -729,8 +804,9 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
           opens_claims: warehouseReceiptOpensClaims(lines),
         };
       }),
-      page: { offset, limit, total: view.total },
+      page: { offset: exportAll ? 0 : offset, limit: exportAll ? view.total : limit, total: view.total },
       facets: view.facets,
+      column_values: columnValues,
       /* The expansion's item words and governed categories, resolved once for
          the page — the same two facts the official GRN document prints. */
       line_info: lineInfo,
@@ -1118,6 +1194,31 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
   if (!row) return c.json({ error: "receipt not found" }, 404);
   const r = row as ReceiptRow;
 
+  // Related documents are read through this actor's RLS scope and exact source IDs.
+  // A failed relationship read is unavailable, never a false empty result.
+  const relatedRead = (async () => {
+    const all = async <T>(page: Parameters<typeof readAllPages>[0]): Promise<T[]> => {
+      const result = await readAllPages<T>(page);
+      if ("rows" in result) return result.rows;
+      throw new Error("Related records could not be read completely");
+    };
+    try {
+      const claims = await all<{ id: string; claim_no: string | null }>((from, to) => sb
+        .from("supplier_claims").select("id, claim_no")
+        .eq("warehouse_receipt_id", id).order("id").range(from, to));
+      const returns = await all<{ id: string; pr_no: string }>((from, to) => sb
+        .from("purchase_returns").select("id, pr_no")
+        .eq("warehouse_receipt_id", id).order("id").range(from, to));
+      for (let offset = 0; offset < claims.length; offset += 100) {
+        returns.push(...await all<{ id: string; pr_no: string }>((from, to) => sb
+          .from("purchase_returns").select("id, pr_no")
+          .in("supplier_claim_id", claims.slice(offset, offset + 100).map(claim => claim.id))
+          .order("id").range(from, to)));
+      }
+      return { claims, returns: [...new Map(returns.map(record => [record.id, record])).values()] };
+    } catch { return null; }
+  })();
+
   const [unitsRead, eventsRead, poRead] = await Promise.all([
     sb
       .from("receiving_unit_results")
@@ -1312,6 +1413,7 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
       arrival_evidence_files: arrivalEvidence,
       unit_results: unitResults,
     },
+    related_records: await relatedRead,
     line_info: lineInfo,
     po: po ?? null,
     events: ((evs ?? []) as Array<Record<string, unknown>>).map((e) => ({

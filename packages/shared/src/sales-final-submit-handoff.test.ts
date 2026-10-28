@@ -141,10 +141,12 @@ describe("Sales final submit is the Sales → Purchasing handoff", () => {
   it("shows the actual handoff in SO Batch Purchase, not planned production start", () => {
     const contract = read("packages/shared/src/so-batch-purchase.ts");
     const demandRead = read("apps/api/src/lib/purchase-demand-read.ts");
-    const register = read("apps/web/src/pages/operation/so-batch/SoBatchRegister.tsx");
+    /* The By sales order list draws the column (kit list since 13 Oct 2026). */
+    const register = read("apps/web/src/pages/operation/so-batch/SoBatchBySalesOrder.tsx");
     expect(contract).toContain("proceededAt");
     expect(demandRead).toContain("proceeded_at");
-    expect(register).toContain("o.proceededAt");
+    expect(register).toContain("order.proceededAt");
+    expect(register).not.toMatch(/proceedDate|proceed_date/);
     expect(contract).not.toMatch(/orders\.proceed_date[^\n]*Operations received/i);
   });
 });

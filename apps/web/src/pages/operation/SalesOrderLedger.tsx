@@ -4,6 +4,7 @@ import type { SalesOrderRevisionRow } from "@/lib/queries";
 import { fmtDate } from "@/lib/fmt-date";
 import { isToday, isYesterday } from "./components/activity-display";
 import { describeRevisionChanges } from "./sales-order-revisions";
+import { OverflowText } from "@/components/register/DataGrid";
 
 /**
  * ⭐ THE THREE-RANK RECORD GRAMMAR (CARD 2026-08-27, owner-approved).
@@ -102,7 +103,7 @@ const HISTORY_FIELD_WORDS: Record<string, string> = {
   customer_emergency: "Emergency contact",
   delivery_date: "Requested Delivery Date",
   delivery_date_tbd: "Delivery date to be confirmed",
-  proceed_date: "Proceed date",
+  proceed_date: "Planned production start",
   salesperson_id: "Salesperson",
   outlet_id: "Showroom",
   dealer_id: "Dealer",
@@ -297,33 +298,34 @@ export function groupHistoryChronology<T extends { occurred_at: string }>(
  *  Before → After list); an empty rank renders nothing at all. Exported so
  *  every object History (Manual Purchase, Card 05) draws the SAME record —
  *  one implementation, never a lookalike (Law C). */
-export function RecordRanks({ words, index }: { words: LedgerRecordWords; index?: number }) {
+function recordDetails(words: LedgerRecordWords, index?: number, overflow = false) {
+  return words.detail.length > 0 ? (
+    <span className="flex min-w-0 w-full flex-col gap-0.5" {...(index != null ? { "data-testid": `history-detail-${index}` } : {})}>
+      {words.detail.map((line, d) => (
+        <span key={d} className="min-w-0 text-label font-normal text-c-secondary break-words">
+          {overflow ? <OverflowText text={line} label={words.title} /> : line}
+        </span>
+      ))}
+    </span>
+  ) : null;
+}
+
+export function RecordRanks({ words, index, overflow = false }: { words: LedgerRecordWords; index?: number; overflow?: boolean }) {
   return (
     <>
       <span
-        className="text-body font-semibold text-base-900 break-words"
+        className="text-body font-semibold text-c-ink break-words"
         {...(index != null ? { "data-testid": `history-title-${index}` } : {})}
       >
         {words.title}
       </span>
       <span
-        className="text-meta font-normal text-base-600 break-words"
+        className="text-meta font-normal text-c-secondary break-words"
         {...(index != null ? { "data-testid": `history-identity-${index}` } : {})}
       >
         {words.identity}
       </span>
-      {words.detail.length > 0 && (
-        <span
-          className="flex flex-col gap-0.5"
-          {...(index != null ? { "data-testid": `history-detail-${index}` } : {})}
-        >
-          {words.detail.map((line, d) => (
-            <span key={d} className="text-label font-normal text-base-600 break-words">
-              {line}
-            </span>
-          ))}
-        </span>
-      )}
+      {recordDetails(words, index, overflow)}
     </>
   );
 }
@@ -367,7 +369,7 @@ export default function SalesOrderLedger({
             role="tab"
             aria-selected={view === key}
             onClick={() => changeView(key)}
-            className={`rounded-full px-3 py-1 text-meta font-medium ${view === key ? "bg-kit-blue-9 text-white" : "border border-base-200 bg-white text-base-700"}`}
+            className={`rounded-full px-3 py-1 text-meta font-medium ${view === key ? "bg-c-select-bg text-c-select-fg" : "border border-c-input-border bg-c-card text-c-body"}`}
           >
             {key === "revisions" ? "Revisions" : "History"}
           </button>
@@ -375,32 +377,36 @@ export default function SalesOrderLedger({
       </div>}
       {view === "revisions" ? (
         revisions.length === 0 ? (
-          <p className="text-body text-base-500">No revisions recorded</p>
+          <p className="text-body text-c-muted">No revisions recorded</p>
         ) : (
           /* One revision record is ONE clickable door — the duplicate chip
              row above a second list is retired (CARD 2026-08-27). Selecting a
              record opens the complete read-only Sales Order version; quiet
              dividers separate records, never nested cards. */
-          <ul className="flex flex-col divide-y divide-base-200" data-testid="revision-list">
+          <ul className="flex flex-col divide-y divide-c-row-line" data-testid="revision-list">
             {[...revisions].reverse().map((r) => {
               const current = r.revision === currentRevision;
               const selected = viewedRevision == null ? current : viewedRevision === r.revision;
               const words = revisionRecordWords(r, currentRevision, orderReference);
               return (
                 <li key={r.revision} className="py-1 first:pt-0 last:pb-0">
-                  <button
-                    type="button"
-                    onClick={() => onViewRevision(current ? null : r.revision)}
-                    aria-current={selected ? "true" : undefined}
-                    data-testid={`revision-record-${r.revision}`}
-                    className={`flex w-full min-w-0 flex-col items-start gap-0.5 rounded-control px-2 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 focus-visible:ring-offset-1 ${selected ? "bg-kit-blue-3" : "hover:bg-hovertint"}`}
-                  >
-                    <RecordRanks words={words} />
-                  </button>
+                  <div className={`flex w-full min-w-0 flex-col items-start gap-0.5 rounded-lg px-2 py-2 ${selected ? "bg-c-select-bg" : "hover:bg-c-hover"}`}>
+                    <button
+                      type="button"
+                      onClick={() => onViewRevision(current ? null : r.revision)}
+                      aria-current={selected ? "true" : undefined}
+                      data-testid={`revision-record-${r.revision}`}
+                      aria-label={[words.title, words.identity, ...words.detail].join(" · ")}
+                      className="flex w-full min-w-0 flex-col items-start gap-0.5 rounded-lg text-left focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px]"
+                    >
+                      <RecordRanks words={{ ...words, detail: words.detail.slice(0, 1) }} />
+                    </button>
+                    {recordDetails({ ...words, detail: words.detail.slice(1) }, undefined, true)}
+                  </div>
                   {!current && onProposeRevision && (
                     <button
                       type="button"
-                      className="ml-2 mt-0.5 text-meta font-medium text-kit-blue-9 underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 focus-visible:ring-offset-1"
+                      className="ml-2 mt-0.5 text-meta font-medium text-c-ink underline underline-offset-2 focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px]"
                       onClick={() => onProposeRevision(r)}
                     >
                       Propose this version again
@@ -412,7 +418,7 @@ export default function SalesOrderLedger({
           </ul>
         )
       ) : history.length === 0 ? (
-        <p className="text-body text-base-500">No history recorded</p>
+        <p className="text-body text-c-muted">No history recorded</p>
       ) : (
         <div className="flex flex-col gap-4" data-testid="doc-history">
           {groupHistoryChronology(history).map((group) => (
@@ -420,18 +426,18 @@ export default function SalesOrderLedger({
               {/* The governed chronology heading. It hides no date — every
                   record's second rank carries its weekday + date + time. */}
               <h3
-                className="mb-1.5 text-label font-semibold text-base-500"
+                className="mb-1.5 text-label font-semibold text-c-muted"
                 data-testid={`history-group-${group.heading}`}
               >
                 {group.heading}
               </h3>
-              <ul className="flex flex-col divide-y divide-base-200">
+              <ul className="flex flex-col divide-y divide-c-row-line">
                 {group.events.map((event) => {
                   const index = history.indexOf(event);
                   const words = historyRecordWords(event, revisions);
                   return (
                     <li key={index} className="flex min-w-0 flex-col gap-0.5 py-2 first:pt-0 last:pb-0">
-                      <RecordRanks words={words} index={index} />
+                      <RecordRanks words={words} index={index} overflow />
                     </li>
                   );
                 })}

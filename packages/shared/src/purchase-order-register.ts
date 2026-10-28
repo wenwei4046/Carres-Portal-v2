@@ -81,7 +81,9 @@ export interface PurchaseOrderRegisterInput {
   expectedReadyDate?: string | null;
   /** `null` = the line quantities could not be read. An unknown read is never
    *  zero and never Completed (Purchasing MASTER §5.8 / §9.3). */
-  lines: readonly { qty: number | null; receivedQty: number | null }[] | null;
+  lines: readonly { qty: number | null; receivedQty: number | null; cancelledQty?:number }[] | null;
+  /** Only the exact current effective cancellation may retain its send action. */
+  cancellationVersion?:number|null;
   sends: readonly PurchaseOrderRegisterSend[];
 }
 
@@ -141,12 +143,13 @@ export function purchaseOrderRegisterFacts(
     (sum, line) => sum + Math.max(0, Math.min(Number(line.qty) || 0, Number(line.receivedQty) || 0)),
     0,
   );
-  const open = Math.max(0, ordered - received);
+  const cancelledQty=lines.reduce((total,line)=>total+Math.max(0,Number(line.cancelledQty??0)),0);
+  const open = Math.max(0, ordered - received - cancelledQty);
   /* Goods are known to be pending only when the read succeeded. */
   const pending = quantitiesKnown && open > 0;
   const confirmed = input.sends
     .filter((send) => send.kind === "confirmed_sent" && confirmedVersion(send) > 0)
-    .sort((a, b) => b.sentAt.localeCompare(a.sentAt));
+    .sort((a, b) => b.sentAt.localeCompare(a.sentAt) || confirmedVersion(b)-confirmedVersion(a));
   const currentSend = confirmed.find((send) => confirmedVersion(send) === version) ?? null;
   const latestConfirmedSend = confirmed[0] ?? null;
   const supplierVersion = latestConfirmedSend ? confirmedVersion(latestConfirmedSend) : null;
@@ -157,8 +160,9 @@ export function purchaseOrderRegisterFacts(
     !cancelled && (input.status === "received" || (quantitiesKnown && ordered > 0 && open === 0));
   const filters: PurchaseOrderRegisterFilter[] = [];
 
-  if (!cancelled && !completed && !currentSend) filters.push("pdf_not_sent");
-  if (!cancelled && !completed && version > 1 && supplierVersion !== version) {
+  const cancellationSend=input.cancellationVersion===version;
+  if ((!cancelled || cancellationSend) && !currentSend) filters.push("pdf_not_sent");
+  if ((!cancelled || cancellationSend) && version > 1 && supplierVersion !== version) {
     filters.push("supplier_update_required");
   }
   /* SUPPLIER REPLY facets: only a current version marked as sent with goods
@@ -248,7 +252,7 @@ export function purchaseOrderWork(
   input: PurchaseOrderRegisterInput,
   facts: PurchaseOrderRegisterFacts,
 ): PurchaseOrderWorkCopy | null {
-  if (facts.operationStatus === "Completed" || facts.operationStatus === "Cancelled") return null;
+  if (facts.operationStatus === "Cancelled" && input.cancellationVersion!==facts.version) return null;
   /* ⭐ ISSUED IS NOT SENT, AND THE LINE SAYS SEND (owner 2026-09-25, the PO
      window send line; Purchasing §5.6.1 · COPY). The PO already exists, so
      `Issue …` told the operator to do what was done. The Work card, the PO
@@ -256,13 +260,13 @@ export function purchaseOrderWork(
   const docNo = poDocumentNumberOf(input.id, facts.version);
   if (facts.filters.includes("supplier_update_required")) {
     return {
-      problem: `${docNo} has not been sent`,
+      problem: "Sending not confirmed",
       action: `Send ${docNo} to ${input.supplierName}`,
     };
   }
   if (facts.filters.includes("pdf_not_sent")) {
     return {
-      problem: "The PO PDF has not been sent",
+      problem: "Sending not confirmed",
       action: `Send ${docNo} to ${input.supplierName}`,
     };
   }
@@ -286,6 +290,8 @@ export function purchaseOrderReplyWorkItems(
   owner: WorkspaceDutyResolution | null,
   today: string,
   holidays: ReadonlySet<string> = myHolidaySet(),
+  /** The stored Office calendar's off days; default Saturday and Sunday. */
+  offDays: readonly number[] = PURCHASING_OFFICE_OFF_DAYS,
 ): WorkItem[] {
   const facts = purchaseOrderRegisterFacts(input, today);
   /* Only a PASSED supplier date is supplier-contact Work here; a sent PO
@@ -294,9 +300,11 @@ export function purchaseOrderReplyWorkItems(
   const copy = purchaseOrderWork(input, facts)!;
   // A passed promise starts on that date. Move only the computed work day
   // to the next Office working day.
-  let due = input.supplierDate ?? null;
-  const options = { offDays: PURCHASING_OFFICE_OFF_DAYS, holidays };
-  if (due && (PURCHASING_OFFICE_OFF_DAYS.includes(new Date(`${due}T00:00:00Z`).getUTCDay()) || holidays.has(due))) {
+  let due = input.expectedArrivals != null
+    ? [...input.expectedArrivals].filter((date) => date < today).sort()[0] ?? null
+    : input.supplierDate ?? null;
+  const options = { offDays, holidays };
+  if (due && (offDays.includes(new Date(`${due}T00:00:00Z`).getUTCDay()) || holidays.has(due))) {
     due = addWorkingDays(due, 1, options);
   }
   return [{
@@ -343,7 +351,7 @@ export function purchaseOrderArrivalCheckWorkItems(
     supplierId: string;
     supplierName: string;
     status: "open" | "received" | "cancelled";
-    /** OUR predicted arrival — `expectedArrivalOf`'s production + transit
+    /** OUR predicted arrival — `expectedArrivalOf`'s production-days
      *  result, as persisted on `purchase_orders.eta_date`. No anchor, no
      *  call: nothing is invented to stand in for it. */
     etaDateIso: string | null;
@@ -360,6 +368,8 @@ export function purchaseOrderArrivalCheckWorkItems(
   owner: WorkspaceDutyResolution | null,
   today: string,
   holidays: ReadonlySet<string> = myHolidaySet(),
+  /** The stored Office calendar's off days; default Saturday and Sunday. */
+  offDays: readonly number[] = PURCHASING_OFFICE_OFF_DAYS,
 ): WorkItem[] {
   /* The call engine reads only status, the anchor, the answer's about-date
    * and each line's outstanding quantity. The remaining `SupplierCallLine`
@@ -381,9 +391,9 @@ export function purchaseOrderArrivalCheckWorkItems(
       balanceAnswerAboutQty: null,
     })),
   };
-  const call = tomorrowDeliveryCallOf(po, { todayIso: today, holidays });
+  const call = tomorrowDeliveryCallOf(po, { todayIso: today, holidays, offDays });
   if (!call) return [];
-  const options = { offDays: PURCHASING_OFFICE_OFF_DAYS, holidays };
+  const options = { offDays, holidays };
   return [{
     ruleKey: "purchasing.confirm_tomorrows_delivery",
     module: "purchasing",

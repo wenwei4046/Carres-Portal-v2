@@ -24,9 +24,11 @@
  * Supplier; at 390 one Unit tick per row and 40px bottom actions. Every write
  * is the claim's own door; the page never prints a refusal it did not receive.
  */
+import { useOfficeDays } from "@/lib/deadline-queries";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
+  documentDisplayNumber,
   SUPPLIER_CLAIM_DECISIONS,
   supplierClaimDecision,
   ISSUE_PURCHASE_RETURN,
@@ -124,6 +126,9 @@ export default function SupplierClaimPanel({ claim }: { claim: SupplierClaimList
   const navigate = useNavigate();
   const wide = useWide();
   const today = appTodayIso();
+  /* The claim's dates are Purchasing's OFFICE work: the stored Office
+     calendar's weekdays and holidays (Settings → Office). */
+  const office = useOfficeDays().office;
   const facts = {
     id: claim.id, claim_no: claim.claim_no, status: claim.status, supplier_name: claim.supplier_name,
     requested_action: claim.requested_action, requested_at: claim.requested_at, supplier_response: claim.supplier_response,
@@ -137,7 +142,7 @@ export default function SupplierClaimPanel({ claim }: { claim: SupplierClaimList
   // §9.6: `Return to supplier` recorded and no Purchase Return yet — the same
   // fact Work projects as `Issue the purchase return to {Supplier}`.
   const pendingReturn = open && execution === "return_to_supplier" && record.data != null && (record.data.purchase_returns ?? []).length === 0;
-  const action = supplierClaimCurrentAction(facts) ?? (pendingReturn
+  const action = supplierClaimCurrentAction(facts, office) ?? (pendingReturn
     ? { rule: null, fact: "Not issued", instruction: `Issue the purchase return to ${claim.supplier_name ?? "the supplier"}`, date: null, button: ISSUE_PURCHASE_RETURN }
     : null);
   const openDoor = (button: string | null) => {
@@ -202,11 +207,11 @@ function ItemSection({ claim, record }: { claim: SupplierClaimListRow; record: S
       <Fact idPrefix="claim-fact" own={false} framed label="Qty" value={claim.qty} />
       <Fact idPrefix="claim-fact" own={false} framed label="Units" value={units == null ? "Units could not be loaded" : tracked.length ? tracked.map((u) => u.unit_code).join(" · ") : supplierClaimUnitLine(units)} />
       <Fact idPrefix="claim-fact" own={false} framed label="PO No" value={claim.po_id
-        ? <><Link className="text-kit-blue-11 hover:underline" to={`/operation/procurement/${encodeURIComponent(claim.po_id)}`}>{claim.po_id}</Link><span className="block text-meta text-kit-slate-11">{supplierClaimUnitLine(units)}</span></>
+        ? <><Link className="text-kit-blue-11 hover:underline" to={`/operation/procurement/${encodeURIComponent(claim.po_id)}`}>{documentDisplayNumber(claim.po_id)}</Link><span className="block text-meta text-kit-slate-11">{supplierClaimUnitLine(units)}</span></>
         : absent} />
       <Fact idPrefix="claim-fact" own={false} framed label="GRN No" value={claim.grn_no && claim.warehouse_receipt_id
-        ? <Link className="text-kit-blue-11 hover:underline" to={`/operation?tab=receiving&session=${encodeURIComponent(claim.warehouse_receipt_id)}`}>{claim.grn_no}</Link>
-        : claim.grn_no || absent} />
+        ? <Link className="text-kit-blue-11 hover:underline" to={`/operation?tab=receiving&session=${encodeURIComponent(claim.warehouse_receipt_id)}`}>{documentDisplayNumber(claim.grn_no ?? "")}</Link>
+        : documentDisplayNumber(claim.grn_no ?? "") || absent} />
     </Facts>
   </Block>;
 }
@@ -258,10 +263,10 @@ function SupplierSection({ claim, record, today, onAsk, onReply, open, inlineFor
   const data = record.data;
   const codes = new Map((data?.units ?? []).map((u) => [u.id, u.unit_code ?? u.id]));
   // Dates come from the timing the ask snapshotted (0607), never the live setting.
-  const state = supplierClaimReplyState(claim, today);
+  const state = supplierClaimReplyState(claim, today, useOfficeDays().office);
   const stateLine = state.kind === "not_recorded" ? `Supplier Response: ${absent}`
     : state.kind === "expected" ? `Reply expected ${fmtDate(state.date)}`
-    : state.kind === "overdue" ? `Reply overdue · ${fmtDate(state.date)}`
+    : state.kind === "overdue" ? `Reply expected ${fmtDate(state.date)} · passed`
     : state.kind === "escalated" ? `Escalated to ${data?.approver_name ?? "Purchasing Approver"}`
     : null;
   const current = data?.replies.find((r) => r.current) ?? null;
@@ -345,7 +350,7 @@ function ResultSection({ claim, record, open, onNext, onIssue }: {
             const send = pr ? purchaseReturnSendLine({ sends: pr.sends ?? [] }) : null;
             const received = pr ? purchaseReturnSupplierReceivedDate(pr) : null;
             return <div key={ref.id} className="rounded-control border border-kit-slate-5 px-3 py-2 text-body text-kit-slate-12">
-              <Link className="font-semibold text-kit-blue-11 hover:underline" to={`/operation?tab=purchase-returns&pr=${encodeURIComponent(ref.id)}`}>{purchaseReturnNo(ref.pr_no)}</Link>
+              <Link className="font-semibold text-kit-blue-11 hover:underline" to={`/operation?tab=${ref.is_consignment ? "consignment-returns" : "purchase-returns"}&pr=${encodeURIComponent(ref.id)}`}>{purchaseReturnNo(ref.pr_no)}</Link>
               {pr ? <>
                 <p>{send?.sent ? `${send.text} · ${fmtDate(send.date)}` : "Sending not confirmed"}</p>
                 <p>{pr.confirmed_pickup_date ? `Confirmed Pickup Date ${fmtDate(pr.confirmed_pickup_date)}` : "Pickup date not confirmed"}{` · ${purchaseReturnPickupState(pr)}`}</p>

@@ -120,6 +120,10 @@ export default function OrderEntryPage({ embedded = false }: { embedded?: boolea
   });
 
   const entryConfig = cfgQ.data?.entryConfig;
+  /* TEAM-02 (owner 9 Oct 2026): only the owner or a person named for Sales
+     Orders changes the shared config; everyone else reads it. An older API
+     without the flag keeps today's behaviour. */
+  const canEdit = cfgQ.data?.canEdit !== false;
   useEffect(() => {
     if (entryConfig && !draft) setDraft(initDraft(entryConfig));
   }, [entryConfig, draft]);
@@ -459,8 +463,14 @@ export default function OrderEntryPage({ embedded = false }: { embedded?: boolea
         <div className="text-body text-danger">Failed to load the order entry config.</div>
       )}
 
+      {draft && !canEdit && (
+        <p className="mb-4 text-meta text-kit-slate-11" data-testid="order-entry-read-only">
+          You can read these settings. Only the owner and the people named in Settings editors can change them.
+        </p>
+      )}
+
       {draft && (
-        <>
+        <fieldset disabled={!canEdit} className="m-0 min-w-0 border-0 p-0">
           {/* ------------------------------------------------ payment methods */}
           <section className="mb-6 rounded-card border border-base-200 bg-white p-5 shadow-sm" data-testid="payment-methods-panel" data-settings-pattern="2990-maintenance-panel">
             <header className="mb-4 flex items-start justify-between gap-4">
@@ -668,7 +678,7 @@ export default function OrderEntryPage({ embedded = false }: { embedded?: boolea
             </button>
           </div>
           </>}
-        </>
+        </fieldset>
       )}
     </div>
   );

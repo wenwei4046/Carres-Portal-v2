@@ -66,28 +66,28 @@ export default function InvoiceCollectionResult({ invoice, onClose }: {
               outcome === key
                 ? "border-kit-blue-9 bg-kit-blue-3"
                 : "border-base-200 bg-white hover:bg-hovertint"}`}>
-            <span className="block text-body font-semibold">{COLLECTION_OUTCOME_WORD[key]}</span>
-            <span className="block text-label font-normal">{COLLECTION_OUTCOME_NEXT[key]}</span>
+            <span className="block text-body font-medium">{COLLECTION_OUTCOME_WORD[key]}</span>
+            <span className="block text-meta">{COLLECTION_OUTCOME_NEXT[key]}</span>
           </button>)}
         </div>
 
         {needsDate && <label className="block">
-          <span className="text-label">The day the customer promised</span>
+          <span className="text-meta text-kit-slate-11">The day the customer promised</span>
           <input type="date" value={promisedDate} min={appTodayIso()}
             onChange={(e) => setPromisedDate(e.target.value)}
             aria-label="The day the customer promised"
             className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body" />
-          <span className="text-label font-normal">A promise cannot be for a day that has passed.</span>
+          <span className="text-meta">A promise cannot be for a day that has passed.</span>
         </label>}
 
         <label className="block">
-          <span className="text-label">Anything to add (optional)</span>
+          <span className="text-meta text-kit-slate-11">Anything to add (optional)</span>
           <input value={note} onChange={(e) => setNote(e.target.value)}
             aria-label="Anything to add"
             className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body" />
         </label>
 
-        {outcome === "customer_paid" && <p className="text-label font-normal"
+        {outcome === "customer_paid" && <p className="text-meta"
           data-testid="said-paid-is-not-money">
           This only records what the customer said. The amount still needed does not change
           until the payment is recorded with its evidence.</p>}

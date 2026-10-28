@@ -4,6 +4,7 @@ import {
   linkSaveScheduledInput,
   logisticsCardModel,
   moneyAffectsDelivery,
+  paymentDeadlineOf,
   stockRouteOfDestination,
   type LogisticsCardInput,
 } from "./logistics-card";
@@ -174,5 +175,57 @@ describe("the link inputs", () => {
   it("`other` needs its words", () => {
     expect(linkCannotDeliverInput.safeParse({ reason: "other" }).success).toBe(false);
     expect(linkCannotDeliverInput.safeParse({ reason: "no_capacity" }).success).toBe(true);
+  });
+});
+
+describe("the payment deadline is Payment's own clock (one arithmetic, 9 Oct 2026)", () => {
+  // Tue 27 Oct 2026 delivery: T−2 Sat 24 · T−3 Fri 23 · T−4 Thu 22.
+  it("the stored ordinary pair moves the Klang Valley deadline", () => {
+    const timing = { askDaysBefore: 5, deadlineDaysBefore: 4, outstationAskDaysBefore: 4, outstationDeadlineDaysBefore: 3 };
+    expect(paymentDeadlineOf({ anchorIso: "2026-10-27", outstation: false })).toBe("2026-10-24");
+    expect(paymentDeadlineOf({ anchorIso: "2026-10-27", outstation: false, timing })).toBe("2026-10-22");
+  });
+
+  it("the stored outstation pair moves the outstation deadline", () => {
+    const timing = { askDaysBefore: 3, deadlineDaysBefore: 2, outstationAskDaysBefore: 5, outstationDeadlineDaysBefore: 4 };
+    expect(paymentDeadlineOf({ anchorIso: "2026-10-27", outstation: true })).toBe("2026-10-23");
+    expect(paymentDeadlineOf({ anchorIso: "2026-10-27", outstation: true, timing })).toBe("2026-10-22");
+    expect(moneyAffectsDelivery({ owed: 10, anchorIso: "2026-10-27", todayIso: "2026-10-22", outstation: true, timing })).toBe(true);
+    expect(moneyAffectsDelivery({ owed: 10, anchorIso: "2026-10-27", todayIso: "2026-10-22", outstation: true })).toBe(false);
+  });
+});
+
+describe("the stored Delivery leads reach the card (DEL-04 · DEL-05, 9 Oct 2026)", () => {
+  // Requested Tue 27 Oct; the Mon–Sat delivery week.
+  it("the contact check follows the stored Contact lead; the 2 and 1 day checks stay fixed", () => {
+    const m = logisticsCardModel(input({ contactLeadWorkingDays: 5 }));
+    // T−5 = Wed 21; T−2 Sat 24; T−1 Mon 26.
+    expect(m.rows.map((r) => r.dueIso)).toEqual(["2026-10-21", "2026-10-24", "2026-10-26"]);
+    expect(m.rows.map((r) => r.label)).toEqual([
+      "5 working days before",
+      "2 working days before",
+      "1 working day before",
+    ]);
+    // The seed reads the ruled words.
+    expect(logisticsCardModel(input()).rows[0].label).toBe("3 working days before");
+  });
+
+  it("Contact logistics is due on the stored contact day", () => {
+    const m = logisticsCardModel(input({ contactLeadWorkingDays: 5, todayIso: "2026-10-21" }));
+    expect(m.currentAction?.door).toBe("contact");
+    expect(m.currentAction?.dueIso).toBe("2026-10-21");
+    expect(m.currentAction?.act).toBe("Contact logistics today");
+  });
+
+  it("Assign logistics is due the stored assignment lead before the Scheduled date, else the Requested one", () => {
+    const none = { partnerName: null };
+    expect(logisticsCardModel(input(none)).currentAction?.dueIso).toBe("2026-10-23"); // Requested − 3
+    expect(logisticsCardModel(input({ ...none, assignLeadWorkingDays: 5 })).currentAction?.dueIso).toBe("2026-10-21");
+    // Scheduled outranks Requested (it was Requested ?? Scheduled before).
+    expect(logisticsCardModel(input({ ...none, scheduledIso: "2026-10-30" })).currentAction?.dueIso).toBe("2026-10-27");
+    // An order that started inside the cut-off is due the day it started — never red before it.
+    const late = logisticsCardModel(input({ ...none, startedIso: "2026-10-26", todayIso: "2026-10-26" }));
+    expect(late.currentAction?.dueIso).toBe("2026-10-26");
+    expect(late.currentAction?.timing).toBe("today");
   });
 });

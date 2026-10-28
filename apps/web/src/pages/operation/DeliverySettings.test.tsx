@@ -98,7 +98,7 @@ describe("the partner object — seven sections, ONE Save changes naming its gap
   it("opens on Partner details, lists the seven section links, and saves through the details door", async () => {
     renderAt(`/operation/settings/delivery/partners/${NETS}`);
     const nav = screen.getByTestId("delivery-settings-partner-nav");
-    for (const label of ["Partner details", "Coverage", "Schedule", "Warehouses & handover points", "Drivers and Vehicles", "Services & charges", "Portal access"]) {
+    for (const label of ["Company details", "Coverage", "Schedule", "Transit points", "Drivers and Vehicles", "Services & charges", "Portal access"]) {
       expect(within(nav).getByRole("link", { name: label })).toBeInTheDocument();
     }
     const save = screen.getByTestId("delivery-settings-save");
@@ -141,12 +141,62 @@ describe("the partner object — seven sections, ONE Save changes naming its gap
 });
 
 describe("Delivery Rules — per partner, with the shared facts read-only", () => {
+  it("keeps the fixed policy when old company settings contradict it", () => {
+    state.data!.partners[0]!.proof_rules = { deliveredPhoto: false, deliveredSignedDo: false, partialSignedDo: false, failedPhoto: false };
+    renderAt("/operation/settings/delivery/rules");
+    const nets = within(screen.getByTestId(`delivery-settings-rules-${NETS}`));
+    expect(nets.getByText("Logistics contacts the customer")).toBeInTheDocument();
+    for (const name of ["Delivered · delivery photo", "Delivered · signed Delivery Order", "Partially Delivered · signed Delivery Order"]) {
+      expect(nets.getByText(name)).toBeInTheDocument();
+      expect(nets.queryByRole("checkbox", { name })).not.toBeInTheDocument();
+    }
+    expect(nets.getByRole("checkbox", { name: "Failed Delivery · photo" })).toBeEnabled();
+    expect(screen.queryByRole("combobox", { name: "Who contacts the customer" })).not.toBeInTheDocument();
+  });
+
   it("prints who contacts the customer per partner, the shared contact lead, and the two mirrors", () => {
     renderAt("/operation/settings/delivery/rules");
     expect(screen.getByTestId("delivery-settings-rule-mirrors")).toHaveTextContent("3 working days before the requested delivery date");
     expect(screen.getByTestId("delivery-settings-rule-mirrors")).toHaveTextContent("Amount needed = RM 0");
     expect(screen.getByTestId(`delivery-settings-rules-${NETS}`)).toBeInTheDocument();
     expect(screen.getByTestId(`delivery-settings-rules-${AL}`)).toBeInTheDocument();
+  });
+});
+
+describe("Delivery Rules → Assign logistics by (DEL-04, 0673)", () => {
+  it("an editor changes the lead and saves it through its own door with the revision and reason", async () => {
+    state.data = response({ rules: { assignmentLeadWorkingDays: 3, revision: 4, stored: true, canEdit: true } });
+    renderAt("/operation/settings/delivery/rules");
+    const card = screen.getByTestId("delivery-settings-assign-by");
+    expect(card).toHaveTextContent("Uses Requested delivery until the delivery is scheduled");
+    const save = screen.getByTestId("delivery-settings-save");
+    expect(save).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Assign logistics by"), { target: { value: "31" } });
+    expect(save).toHaveTextContent("Choose between 1 and 30 working days.");
+    expect(save).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Assign logistics by"), { target: { value: "5" } });
+    fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "Partners book earlier" } });
+    expect(save).not.toBeDisabled();
+    fireEvent.click(save);
+    await screen.findByText("Save changes");
+    expect(apiFetch).toHaveBeenCalledWith(
+      "/api/operation/delivery-settings/rules/assignment-lead",
+      expect.objectContaining({ method: "PUT", body: JSON.stringify({ workingDays: 5, revision: 4, reason: "Partners book earlier" }) }),
+    );
+    /* The partner rules were unchanged — no partner write. */
+    expect(apiFetch.mock.calls.some((c) => c[0] === "/api/operation/delivery-settings/partner/rules")).toBe(false);
+  });
+
+  it("a reader sees the stored value in words; an uninstalled table is never editable", () => {
+    state.data = response({ canEdit: false, rules: { assignmentLeadWorkingDays: 4, revision: 1, stored: true, canEdit: false } });
+    const { unmount } = renderAt("/operation/settings/delivery/rules");
+    expect(screen.getByTestId("delivery-settings-assign-by")).toHaveTextContent("4 working days before Scheduled delivery");
+    expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
+    unmount();
+    state.data = response({ rules: { assignmentLeadWorkingDays: 3, revision: null, stored: false, canEdit: true } });
+    renderAt("/operation/settings/delivery/rules");
+    expect(screen.getByTestId("delivery-settings-assign-by")).toHaveTextContent("3 working days before Scheduled delivery");
+    expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
   });
 });
 
@@ -161,5 +211,33 @@ describe("Message Templates and Access", () => {
     expect(screen.getByTestId("delivery-settings-duty-delivery_duty")).toHaveAttribute("href", "/operation/settings/staff-duties?duty=delivery_duty");
     expect(screen.getByTestId("delivery-settings-duty-delivery_charge_approver")).toBeInTheDocument();
     expect(screen.queryByText(/Shasha|Yu Jun/)).toBeNull();
+  });
+});
+
+describe("Delivery Rules → Courier dispatch within (DEL-10, 0678)", () => {
+  it("an editor saves it through its own door; a lead saved first hands its new revision on", async () => {
+    apiFetch.mockImplementation(async (url: string) =>
+      url.endsWith("/rules/assignment-lead") ? { revision: 5 } : {});
+    state.data = response({ rules: { assignmentLeadWorkingDays: 3, courierDispatchWorkingDays: 3, courierDispatchStored: true, revision: 4, stored: true, canEdit: true } });
+    renderAt("/operation/settings/delivery/rules");
+    const card = screen.getByTestId("delivery-settings-courier-dispatch");
+    expect(card).toHaveTextContent("Counts the dispatching Warehouse's working days");
+    expect(card).toHaveTextContent("not a customer delivery date");
+    fireEvent.change(screen.getByLabelText("Assign logistics by"), { target: { value: "5" } });
+    fireEvent.change(screen.getByLabelText("Courier dispatch within"), { target: { value: "4" } });
+    fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "One packer" } });
+    fireEvent.click(screen.getByTestId("delivery-settings-save"));
+    await screen.findByText("Save changes");
+    expect(apiFetch).toHaveBeenCalledWith(
+      "/api/operation/delivery-settings/rules/courier-dispatch",
+      expect.objectContaining({ method: "PUT", body: JSON.stringify({ workingDays: 4, revision: 5, reason: "One packer" }) }),
+    );
+  });
+
+  it("before 0678 the default reads in words and is not editable", () => {
+    state.data = response({ rules: { assignmentLeadWorkingDays: 3, courierDispatchWorkingDays: 3, courierDispatchStored: false, revision: 4, stored: true, canEdit: true } });
+    renderAt("/operation/settings/delivery/rules");
+    expect(screen.getByTestId("delivery-settings-courier-dispatch")).toHaveTextContent("3 working days after Warehouse confirms the goods can be packed");
+    expect(screen.queryByLabelText("Courier dispatch within")).not.toBeInTheDocument();
   });
 });

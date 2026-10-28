@@ -84,11 +84,15 @@ export function unitProblemAction(
   unit: UnitProblemUnit,
   problem: UnitProblem,
   today: string,
-  opts: WorkingDayOptions = {},
+  /** The check is GRN Duty's work AT the Site, so it is due the next day the
+   *  Site works: pass the Site's own calendar as a step function
+   *  (`(from, n) => warehouseAddOperatingDays(from, n, "receiving", …)`), or
+   *  working-day options. Absent ⇒ the engine default week. */
+  calendar: WorkingDayOptions | ((from: string, n: number) => string) = {},
 ): { trigger: string; ownerRule: "grn_duty"; action: string; recipient: string; requiredResult: string; dueOn: string } {
   const site = unit.siteName ?? "the Site";
   const id = unit.unitCode;
-  const dueOn = addWorkingDays(today, 1, opts);
+  const dueOn = typeof calendar === "function" ? calendar(today, 1) : addWorkingDays(today, 1, calendar);
   const byProblem: Record<UnitProblem, { trigger: string; action: string; requiredResult: string }> = {
     damaged: {
       trigger: `${id} was reported damaged`,
@@ -165,8 +169,12 @@ export function unitProblemIntake(
 /** Count again — a repeat look for a Unit an open `Not found` report names
  *  (Stock MASTER §6: "a repeat creates new evidence and says Count these
  *  Units again"). */
-export function unitCountAgainAction(unit: UnitProblemUnit, today: string, opts: WorkingDayOptions = {}) {
-  return unitProblemAction(unit, "not_found", today, opts);
+export function unitCountAgainAction(
+  unit: UnitProblemUnit,
+  today: string,
+  calendar: WorkingDayOptions | ((from: string, n: number) => string) = {},
+) {
+  return unitProblemAction(unit, "not_found", today, calendar);
 }
 
 /** The Make available for sale checks, in the order the confirm dialog prints

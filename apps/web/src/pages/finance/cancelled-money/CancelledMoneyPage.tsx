@@ -1,6 +1,6 @@
 /**
  * Finance → Cancelled orders holding money, at `/finance/cancelled-money`
- * (migration 0690). READ ONLY: cancelling an order creates no refund and moves
+ * (migration 0729). READ ONLY: cancelling an order creates no refund and moves
  * no payment, so this lists the cancelled orders whose customer money is still
  * held. No refund and no move is offered here; Finance has not ruled which.
  */

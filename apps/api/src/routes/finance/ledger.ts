@@ -1,17 +1,26 @@
-import { Hono, type Context } from "hono";
+import { Hono, type Context, type MiddlewareHandler } from "hono";
 import type { ZodError } from "zod";
 import {
   departmentRpcArgs,
+  ledgerAccountActiveInput,
   ledgerAccountAddInput,
+  ledgerAccountAddInSectionInput,
   ledgerAccountCodeShape,
+  ledgerAccountEditInput,
   ledgerAccountLedgerQuery,
   ledgerAccountMoveInput,
   ledgerAccountReorderInput,
   ledgerAccountUpdateInput,
   ledgerAsOfQuery,
+  ledgerBooksClosedInput,
+  ledgerChartImportInput,
+  ledgerPostingAccountSetInput,
+  ledgerItemGroupPlaceInput,
+  ledgerItemGroupSaveInput,
   ledgerEntriesQuery,
   ledgerEntryRef,
   ledgerPeriodQuery,
+  type LedgerBooksClosed,
 } from "@carres/shared";
 import {
   baseSourceType,
@@ -40,7 +49,15 @@ import {
   trialBalanceSides,
 } from "@carres/shared/finance-ledger";
 import { CUSTOMERS, SUPPLIERS } from "@carres/shared/tables";
-import { requireFinance } from "../../lib/auth-guards";
+import { dailyBankQuery, dailyBankRow, sen, type DailyBankDay } from "@carres/shared/daily-bank";
+import { arAgingQuery, arAgingReport, type ArAgingAnswer } from "@carres/shared/ar-aging";
+import { cashFlowQuery, cashFlowReport, type CashFlowAnswer } from "@carres/shared/cash-flow";
+import { generalLedgerBlocks, generalLedgerQuery, type GeneralLedgerAnswer, type ReportDrillAnswer } from "@carres/shared/general-ledger";
+import { stockValueQuery, stockValueReport, type StockValueAnswer } from "@carres/shared/stock-value";
+import { stockDropsTotal, stockDropUnitCost, stockDropValue, type StockDropPoLine, type StockDropRow } from "@carres/shared/stock-drops";
+import { collectionQuery, collectionReport, type CollectionAnswer } from "@carres/shared/collection";
+import { forecastQuery, forecastReport, forecastSaveInput, type ForecastAnswer, type ForecastSaved } from "@carres/shared/forecast";
+import { requireFinance, requireFinanceOrPurchasing } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody, readAllPages } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -54,7 +71,7 @@ import financeMoneyAccountsRouter from "./money-accounts";
  * and principal — the HTTP mirror of `gl_may_read()`) and reads through
  * `userClient`, so the ledger's own gates see the signed-in user: RLS on the
  * four `gl_*` tables and `gl_report_guard()` inside every report function.
- * Nothing here writes but the one account door. The ledger is written only by `gl_post` / `gl_reverse`.
+ * Nothing here writes but the account doors and the closed-month door. The ledger is written only by `gl_post` / `gl_reverse`.
  *
  *   GET /entries            the Journal, one page, newest first
  *   GET /entries/:ref       one entry (id or entry number) with its lines
@@ -71,13 +88,40 @@ import financeMoneyAccountsRouter from "./money-accounts";
  *   POST  /accounts         add an account under a heading, or a heading on its own or with
  *                           its first account (gl_account_add, 0577, 0608). The kind follows the heading;
  *                           a heading at the top of the chart (parentCode null) carries its own kind.
+ *   POST  /accounts/import  AutoCount's printed chart, read on the screen (gl_chart_import, 0655):
+ *                           apply false answers what it would do, row by row; true makes the new
+ *                           accounts. It never renames, moves or retires an account already there.
+ *                           Since 0656 it keeps each account's section and special type, and fills
+ *                           them on an account already there when they are empty.
+ *   POST  /accounts/in-section  add an account or heading in an AutoCount section (0656)
+ *   PUT   /accounts/:code   edit one account: the heading it sits under, its section, its name and
+ *                           number, in one act (gl_account_edit, 0656)
+ *   POST  /accounts/:code/active  retire an account the ledger never posted to, or bring one back
+ *                           (gl_account_set_active, 0656)
+ *   GET /posting-accounts   the account each posting goes to: the income map with every add-on,
+ *                           the posting roles, and the latest changes (gl_posting_accounts, 0657;
+ *                           since 0658 a way of being paid's money account changes too)
+ *   PUT /posting-accounts   change one of them (gl_posting_account_set, 0657; a way of being paid
+ *                           through payment_method_account_set, 0658); refused with 409 when
+ *                           someone changed it after the screen read it
+ *   GET /item-groups        the item groups and their four accounts, every product and its group,
+ *                           the sales that went to the goods account, the changes (0659)
+ *   POST /item-groups       add an item group; PUT /item-groups/:id changes one (gl_item_group_save)
+ *   POST /item-groups/place move a product into another item group (gl_item_group_place); 409
+ *                           when someone changed the group or moved the product meanwhile
  *   GET /trial-balance      every account as it stood at the end of a day, and every
  *                           heading's own subtotal at every depth, in the chart's order
  *   GET /account-ledger     one account, line by line
+ *   GET /report-drill       the entries behind one account line of a statement: the General
+ *                           Ledger read for that account, with each party named (Chew 2026-10-21)
  *   GET /health             gl_ledger_health, always eleven rows
  *   GET /self-check         books · control accounts · receivables · payables · rental months · health
  *   GET /profit-and-loss    gl_profit_and_loss, passed through
  *   GET /balance-sheet      gl_balance_sheet, passed through
+ *   GET /ar-aging           what each customer and other debtor owed on a day, with its invoices
+ *                           still open then (fin_ar_aging, 0686), passed through
+ *   GET /books-closed       the last closed day, or null (gl_config, 0622)
+ *   PUT /books-closed       set or clear it: principal only (gl_set_books_closed_through, 0622)
  *
  *   /money-accounts         the one list of cash, bank and holding accounts
  *                           (0512) — the only writer mounted here; see money-accounts.ts
@@ -359,13 +403,17 @@ async function readChart(sb: Sb): Promise<{ chart: LedgerChart } | { error: PgEr
         is_active: r.is_active === true,
         is_header: typeof r.is_heading === "boolean" ? r.is_heading : parents.has(String(r.code)),
         sort_order: Number(r.sort_order ?? 0),
+        // 0656: AutoCount's section and special type. Null before 0656 is applied.
+        section: typeof r.section === "string" ? r.section : null,
+        special: typeof r.special === "string" ? r.special : null,
       })),
     },
   };
 }
 
 // 0540: the finance departments, for every Department filter and line picker.
-financeLedgerRouter.get("/departments", requireFinance, async (c) => {
+// 2026-10-26: Purchasing picks a no-GRN bill line's department too (fin_departments is is_internal()).
+financeLedgerRouter.get("/departments", requireFinanceOrPurchasing, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("fin_departments");
   if (error) return ledgerError(c, error, "The department list");
@@ -374,11 +422,21 @@ financeLedgerRouter.get("/departments", requireFinance, async (c) => {
 
 financeLedgerRouter.get("/accounts", requireFinance, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const [read, rules, roles, money] = await Promise.all([
+  const [read, rules, roles, money, sections, incomeMap, paymentMap, itemGroups] = await Promise.all([
     readChart(sb),
     sb.rpc("gl_rule_headings"),
     sb.rpc("gl_account_roles_read"),
     sb.from("gl_money_accounts").select("account_code"),
+    // 0656: AutoCount's sections, in order. Before 0656 the table is not
+    // there; the read fails and the chart loads with no sections.
+    sb.from("gl_sections").select("section,kind,sort_order").order("sort_order"),
+    // 0656: the accounts an invoice or a customer payment posts to, which the
+    // retire door refuses. A failed read only shows a retire icon too many.
+    sb.from("gl_income_account_map").select("account_code"),
+    sb.from("gl_payment_account_map").select("account_code"),
+    // 0659: an item group's four accounts, which the retire door refuses too.
+    // Before 0659 the table is not there and the read fails like the others.
+    sb.from("gl_item_groups").select("purchase_account,sales_account,sales_return_account,purchase_return_account"),
   ]);
   if ("error" in read) return ledgerError(c, read.error, "The chart of accounts");
   // 0570: the headings no account moves into or out of, so the chart screen
@@ -395,7 +453,25 @@ financeLedgerRouter.get("/accounts", requireFinance, async (c) => {
   const moneyAccounts = !money.error && Array.isArray(money.data)
     ? (money.data as Json[]).map((r) => String(r.account_code))
     : [];
-  return c.json({ ...read.chart, rule_headings: ruleHeadings, roles: roleMap, money_accounts: moneyAccounts });
+  const sectionRows = !sections.error && Array.isArray(sections.data)
+    ? (sections.data as Json[]).map((r) => ({ section: String(r.section), kind: String(r.kind), sort_order: Number(r.sort_order) }))
+    : [];
+  const mapped = (res: { error: unknown; data: unknown }) =>
+    !res.error && Array.isArray(res.data) ? (res.data as Json[]).map((r) => String(r.account_code)) : [];
+  const groupAccounts = !itemGroups.error && Array.isArray(itemGroups.data)
+    ? (itemGroups.data as Json[]).flatMap((r) =>
+        [r.purchase_account, r.sales_account, r.sales_return_account, r.purchase_return_account]
+          .filter((v): v is string => typeof v === "string" && v !== ""))
+    : [];
+  const systemAccounts = [...new Set([...mapped(incomeMap), ...mapped(paymentMap), ...groupAccounts])];
+  return c.json({
+    ...read.chart,
+    rule_headings: ruleHeadings,
+    roles: roleMap,
+    money_accounts: moneyAccounts,
+    sections: sectionRows,
+    system_accounts: systemAccounts,
+  });
 });
 
 /**
@@ -514,6 +590,204 @@ financeLedgerRouter.post("/accounts", requireFinance, async (c) => {
   });
   if (error) return accountError(c, error);
   return c.json({ code: String(data) }, 201);
+});
+
+// ── 0656: the chart in AutoCount's sections ──────────────────────────────────
+/** Add an account or a heading in a section, under one of its headings or at
+ *  its top (gl_account_add_in_section, which writes through gl_account_add). */
+financeLedgerRouter.post("/accounts/in-section", requireFinance, async (c) => {
+  const body = await parseJsonBody(c, ledgerAccountAddInSectionInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("gl_account_add_in_section", {
+    p_section: body.data.section,
+    p_parent_code: body.data.parentCode,
+    p_code: body.data.code,
+    p_name: body.data.name,
+    p_is_heading: body.data.isHeading,
+  });
+  if (error) return accountError(c, error);
+  return c.json({ code: String(data) }, 201);
+});
+
+/** Edit one account in one act: the heading it sits under, its section, then
+ *  its name and number (gl_account_edit). The number answered is the one the
+ *  account has now. */
+financeLedgerRouter.put("/accounts/:code", requireFinance, async (c) => {
+  const code = c.req.param("code");
+  if (!ledgerAccountCodeShape.test(code)) {
+    return c.json({ error: "not_found", code: "not_found", message: "That account is not in the chart." }, 404);
+  }
+  const body = await parseJsonBody(c, ledgerAccountEditInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("gl_account_edit", {
+    p_code: code,
+    p_name: body.data.name,
+    p_new_code: body.data.code,
+    p_section: body.data.section,
+    p_under: body.data.under,
+  });
+  if (error) return accountError(c, error);
+  return c.json({ code: String(data) });
+});
+
+/** Retire an account the ledger never posted to, or bring one back
+ *  (gl_account_set_active). Every refusal is the database's sentence. */
+financeLedgerRouter.post("/accounts/:code/active", requireFinance, async (c) => {
+  const code = c.req.param("code");
+  if (!ledgerAccountCodeShape.test(code)) {
+    return c.json({ error: "not_found", code: "not_found", message: "That account is not in the chart." }, 404);
+  }
+  const body = await parseJsonBody(c, ledgerAccountActiveInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("gl_account_set_active", { p_code: code, p_active: body.data.active });
+  if (error) return accountError(c, error);
+  return c.json({ code: String(data), active: body.data.active });
+});
+
+/** 0655: the answer is the database's, row by row. A refused row is a row with
+ *  its reason, not an error; only a refused CALL (no Finance role, nothing to
+ *  import, too many rows) comes back as an error with the door's sentence. */
+financeLedgerRouter.post("/accounts/import", requireFinance, async (c) => {
+  const body = await parseJsonBody(c, ledgerChartImportInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("gl_chart_import", {
+    p_rows: body.data.rows,
+    p_apply: body.data.apply,
+  });
+  if (error) return accountError(c, error);
+  return c.json(data, body.data.apply ? 201 : 200);
+});
+
+// ── the posting accounts (0657) ──────────────────────────────────────────────
+financeLedgerRouter.get("/posting-accounts", requireFinance, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("gl_posting_accounts");
+  if (error) return ledgerError(c, error, "The posting accounts");
+  return c.json(data);
+});
+
+/** 0657: which account fits, and whether the screen's `was` is still the
+ *  account, are the database's to judge; its sentence comes back as it is. */
+financeLedgerRouter.put("/posting-accounts", requireFinance, async (c) => {
+  const body = await parseJsonBody(c, ledgerPostingAccountSetInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  // 0658: a way of being paid goes through Payment settings' record, keyed
+  // `{method}/{source channel}`; every other posting through the ledger's door.
+  if (body.data.what === "PAYMENT") {
+    const at = body.data.key.indexOf("/");
+    const { data, error } = await sb.rpc("payment_method_account_set", {
+      p_method: at < 0 ? body.data.key : body.data.key.slice(0, at),
+      p_source_channel: at < 0 ? "*" : body.data.key.slice(at + 1),
+      p_account_code: body.data.accountCode,
+      p_was: body.data.was,
+    });
+    if (error) return accountError(c, error);
+    return c.json(data);
+  }
+  const { data, error } = await sb.rpc("gl_posting_account_set", {
+    p_what: body.data.what,
+    p_key: body.data.key,
+    p_account_code: body.data.accountCode,
+    p_was: body.data.was,
+  });
+  if (error) return accountError(c, error);
+  return c.json(data);
+});
+
+// ── the item groups (0659) ───────────────────────────────────────────────────
+financeLedgerRouter.get("/item-groups", requireFinance, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("gl_item_groups_read");
+  if (error) return ledgerError(c, error, "The item groups");
+  return c.json(data);
+});
+
+/** 0659: which account fits, and whether the screen's `was` is still the
+ *  group, are the database's to judge; its sentence comes back as it is. */
+const itemGroupArgs = (id: string | null, d: { name: string; purchaseAccount: string | null; salesAccount: string | null;
+  salesReturnAccount: string | null; purchaseReturnAccount: string | null; active: boolean; was: unknown }) => ({
+  p_id: id,
+  p_name: d.name,
+  p_purchase_account: d.purchaseAccount,
+  p_sales_account: d.salesAccount,
+  p_sales_return_account: d.salesReturnAccount,
+  p_purchase_return_account: d.purchaseReturnAccount,
+  p_active: d.active,
+  p_was: d.was,
+});
+
+financeLedgerRouter.post("/item-groups", requireFinance, async (c) => {
+  const body = await parseJsonBody(c, ledgerItemGroupSaveInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("gl_item_group_save", itemGroupArgs(null, body.data));
+  if (error) return accountError(c, error);
+  return c.json(data, 201);
+});
+
+financeLedgerRouter.put("/item-groups/:id", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) {
+    return c.json({ error: "not_found", code: "not_found", message: "That item group is not in the list." }, 404);
+  }
+  const body = await parseJsonBody(c, ledgerItemGroupSaveInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("gl_item_group_save", itemGroupArgs(id, body.data));
+  if (error) return accountError(c, error);
+  return c.json(data);
+});
+
+financeLedgerRouter.post("/item-groups/place", requireFinance, async (c) => {
+  const body = await parseJsonBody(c, ledgerItemGroupPlaceInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("gl_item_group_place", {
+    p_model_id: body.data.modelId,
+    p_group_id: body.data.groupId,
+    p_was: body.data.was,
+  });
+  if (error) return accountError(c, error);
+  return c.json(data);
+});
+
+// ── the closed months (0622) ─────────────────────────────────────────────────
+
+/** Principal only: the HTTP mirror of `is_principal()` inside
+ *  `gl_set_books_closed_through`. Refused before any database call. */
+const requirePrincipal: MiddlewareHandler<AppEnv> = async (c, next) => {
+  if (c.var.auth?.role !== "principal") {
+    return c.json({ error: "forbidden", code: "forbidden", message: "Only the principal may close or reopen a month." }, 403);
+  }
+  await next();
+};
+
+/** The last closed day, or null when no month is closed. Finance and principal read it. */
+financeLedgerRouter.get("/books-closed", requireFinance, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.from("gl_config").select("books_closed_through").limit(1).maybeSingle();
+  if (error) return ledgerError(c, error, "The closed month");
+  const out: LedgerBooksClosed = { closedThrough: (data as { books_closed_through?: string | null } | null)?.books_closed_through ?? null };
+  return c.json(out);
+});
+
+/** Set or clear it. A refusal (a day that has not ended) keeps the database's sentence. */
+financeLedgerRouter.put("/books-closed", requirePrincipal, async (c) => {
+  const body = await parseJsonBody(c, ledgerBooksClosedInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.rpc("gl_set_books_closed_through", { p_date: body.data.closedThrough });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.status === 500 ? { ...m.body, message: "The closed month could not be saved. Try again." } : m.body, m.status);
+  }
+  const out: LedgerBooksClosed = { closedThrough: body.data.closedThrough };
+  return c.json(out);
 });
 
 // ── the trial balance ────────────────────────────────────────────────────────
@@ -956,6 +1230,313 @@ financeLedgerRouter.get("/balance-sheet", requireFinance, async (c) => {
   if (error) return ledgerError(c, error, "The balance sheet");
   if (!Array.isArray(data) || data.length === 0) return failed(c, "The balance sheet");
   return c.json({ rows: data });
+});
+
+// ── Daily Bank (0637, Chew 2026-10-03) ──────────────────────────────────────
+
+/** One day, every money account, passed through. Closing, available and the
+ *  totals are the shared daily-bank arithmetic's, worked out on the page and
+ *  nowhere here. The figures are read once so a broken answer refuses with a
+ *  plain sentence instead of printing as a whole one. */
+financeLedgerRouter.get("/daily-bank", requireFinance, async (c) => {
+  const parsed = dailyBankQuery.safeParse(queryOf(c));
+  if (!parsed.success) return invalid(c, parsed.error);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("fin_daily_bank", { p_day: parsed.data.day ?? todayIsoMYT() });
+  if (error) return ledgerError(c, error, "Daily Bank");
+  const day = data as DailyBankDay | null;
+  if (!day || typeof day.day !== "string" || !Array.isArray(day.accounts)) return failed(c, "Daily Bank");
+  try {
+    for (const a of day.accounts) {
+      dailyBankRow(a);
+      for (const l of a.lines) { sen(l.received); sen(l.paid); }
+      for (const v of a.pending_vouchers) sen(v.amount);
+    }
+  } catch {
+    return failed(c, "Daily Bank");
+  }
+  return c.json(day);
+});
+
+// ── Cash Flow (0638, Chew 2026-10-03) ───────────────────────────────────────
+
+/** A period of cash and bank money, passed through. It is read once through
+ *  the shared arithmetic, which refuses figures it cannot read and rows that
+ *  do not add up to the accounts' money in and out. */
+financeLedgerRouter.get("/cash-flow", requireFinance, async (c) => {
+  const parsed = cashFlowQuery.safeParse(queryOf(c));
+  if (!parsed.success) return invalid(c, parsed.error);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  // 0684 (Chew ruling 1): one channel's money only, when a department is asked for.
+  const { data, error } = await sb.rpc("fin_cash_flow", { p_from: parsed.data.from, p_to: parsed.data.to, ...departmentRpcArgs(parsed.data) });
+  if (error) return ledgerError(c, error, "Cash Flow");
+  const answer = data as CashFlowAnswer | null;
+  if (!answer || !Array.isArray(answer.accounts) || !Array.isArray(answer.rows) || !answer.card) return failed(c, "Cash Flow");
+  try {
+    cashFlowReport(answer);
+  } catch {
+    return failed(c, "Cash Flow");
+  }
+  return c.json(answer);
+});
+
+// ── AR Aging (0686, Chew 2026-10-03 and 2026-10-12) ─────────────────────────
+
+/** What each customer and other debtor owed on a day, with its invoices still
+ *  open then. Read once through the shared arithmetic, which refuses a figure
+ *  it cannot read; passed through as it came. */
+financeLedgerRouter.get("/ar-aging", requireFinance, async (c) => {
+  const parsed = arAgingQuery.safeParse(queryOf(c));
+  if (!parsed.success) return invalid(c, parsed.error);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("fin_ar_aging", { p_as_at: parsed.data.asAt ?? todayIsoMYT() });
+  if (error) return ledgerError(c, error, "AR aging");
+  const answer = data as ArAgingAnswer | null;
+  if (!answer || typeof answer.as_at !== "string" || !Array.isArray(answer.debtors) || !Array.isArray(answer.controls)
+      || !answer.before_go_live) {
+    return failed(c, "AR aging");
+  }
+  try {
+    arAgingReport(answer, "invoice", "month");
+  } catch {
+    return failed(c, "AR aging");
+  }
+  return c.json(answer);
+});
+
+// ── General Ledger (0639, Chew 2026-10-03) ──────────────────────────────────
+
+/** Every account's period, gathered by the database from gl_account_ledger's
+ *  own rows. Read once through the shared reader, which refuses a block that
+ *  does not hold together; the answer passes through as it came. */
+financeLedgerRouter.get("/general-ledger", requireFinance, async (c) => {
+  const parsed = generalLedgerQuery.safeParse(queryOf(c));
+  if (!parsed.success) return invalid(c, parsed.error);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("fin_general_ledger", {
+    p_from: parsed.data.from,
+    p_to: parsed.data.to,
+    p_accounts: parsed.data.accounts ? parsed.data.accounts.split(",") : null,
+    ...departmentRpcArgs(parsed.data),
+  });
+  if (error) return ledgerError(c, error, "The General Ledger");
+  const answer = data as GeneralLedgerAnswer | null;
+  if (!answer || (answer.status !== "OK" && answer.status !== "BEFORE_GO_LIVE") || !Array.isArray(answer.accounts)) {
+    return failed(c, "The General Ledger");
+  }
+  try {
+    generalLedgerBlocks(answer);
+  } catch {
+    return failed(c, "The General Ledger");
+  }
+  return c.json(answer);
+});
+
+// ── Report drill-down (Chew 2026-10-21) ─────────────────────────────────────
+
+/** The entries behind one account line of the Profit and Loss, the Balance
+ *  Sheet or the Trial Balance: the General Ledger's own read
+ *  (fin_general_ledger) for that one account, period and department, checked
+ *  by the same reader, with each line's party named. The page works out
+ *  nothing but which side of each line it prints. */
+financeLedgerRouter.get("/report-drill", requireFinance, async (c) => {
+  const parsed = ledgerAccountLedgerQuery.safeParse(queryOf(c));
+  if (!parsed.success) return invalid(c, parsed.error);
+  const { account, from, to } = parsed.data;
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("fin_general_ledger", {
+    p_from: from, p_to: to, p_accounts: [account], ...departmentRpcArgs(parsed.data),
+  });
+  if (error) return ledgerError(c, error, "The General Ledger");
+  const answer = data as GeneralLedgerAnswer | null;
+  if (!answer || (answer.status !== "OK" && answer.status !== "BEFORE_GO_LIVE") || !Array.isArray(answer.accounts)
+    || answer.accounts.some((a) => a.account_code !== account)) {
+    return failed(c, "The General Ledger");
+  }
+  let blocks: ReturnType<typeof generalLedgerBlocks>;
+  try {
+    blocks = generalLedgerBlocks(answer);
+  } catch {
+    return failed(c, "The General Ledger");
+  }
+  const block = blocks[0] ?? null;
+  // The block's lines are the account's LINE rows, in the same order.
+  const lineRows = (answer.accounts[0]?.rows ?? []).filter((r) => r.row_kind === "LINE");
+  if (block && lineRows.length !== block.lines.length) return failed(c, "The General Ledger");
+
+  const idsOf = (kind: string) => [...new Set(lineRows
+    .filter((r) => r.party_type === kind && typeof r.party_id === "string")
+    .map((r) => r.party_id as string))];
+  const nameRead = (table: string, ids: string[]) => (ids.length
+    ? sb.from(table).select("id,name").in("id", ids)
+    : Promise.resolve({ data: [], error: null }));
+  const reads = await Promise.all([
+    nameRead(CUSTOMERS, idsOf("CUSTOMER")),
+    nameRead(SUPPLIERS, idsOf("SUPPLIER")),
+    nameRead("finance_parties", idsOf("OTHER")),
+  ]);
+  // A name that cannot be read stays null and the page says so; it is never guessed.
+  const names = new Map<string, string>();
+  for (const r of reads.flatMap((x) => (x.error ? [] : ((x.data ?? []) as Json[])))) {
+    if (typeof r.id === "string" && typeof r.name === "string") names.set(r.id, r.name);
+  }
+
+  const drill: ReportDrillAnswer = {
+    status: answer.status, go_live_on: answer.go_live_on, from: answer.from, to: answer.to, account,
+    block: block ? {
+      ...block,
+      lines: block.lines.map((l, i) => {
+        const r = lineRows[i]!;
+        const partyType = typeof r.party_type === "string" ? r.party_type : null;
+        return { ...l, partyType, partyName: partyType && typeof r.party_id === "string" ? (names.get(r.party_id) ?? null) : null };
+      }),
+    } : null,
+  };
+  return c.json(drill);
+});
+
+// ── Stock value, provisional (0643, Chew 2026-10-03) ────────────────────────
+
+/** Every Carres-owned Unit held at the end of a day, grouped and costed by the
+ *  database from Stock's own Units. Read once through the shared arithmetic,
+ *  which refuses a value that is not quantity × cost; passed through as it came. */
+financeLedgerRouter.get("/stock-value", requireFinance, async (c) => {
+  const parsed = stockValueQuery.safeParse(queryOf(c));
+  if (!parsed.success) return invalid(c, parsed.error);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("fin_stock_value", { p_month_end: parsed.data.monthEnd });
+  if (error) return ledgerError(c, error, "The stock value");
+  const answer = data as StockValueAnswer | null;
+  if (!answer || !Array.isArray(answer.units) || !answer.left_out) return failed(c, "The stock value");
+  try {
+    stockValueReport(answer);
+  } catch {
+    return failed(c, "The stock value");
+  }
+  return c.json(answer);
+});
+
+// ── Stock drops (0714; YH 2026-10-26: no journal, a read-only list) ──────────
+
+type StockDropRead = {
+  adjustment_id: string;
+  unit_id: string;
+  stock_adjustments: { adjustment_no: string; created_at: string; reason: string; warehouses: { name: string } | null } | null;
+  ops_stock_items: { unit_code: string; sku: string; qty: number; purchase_order_lines: StockDropPoLine | null } | null;
+};
+
+/** Every Unit Stock wrote off on a Stock Adjustment, newest first, each valued
+ *  at its PO line cost as the stock value is (0643). Reads only; posts nothing. */
+financeLedgerRouter.get("/stock-drops", requireFinance, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const read = await readAllPages<StockDropRead>((a, b) => sb
+    .from("stock_adjustment_units")
+    .select("adjustment_id, unit_id, stock_adjustments!inner(adjustment_no, created_at, reason, warehouses(name)), ops_stock_items!inner(unit_code, sku, qty, purchase_order_lines(cost, commercial_treatment))")
+    .eq("direction", "minus")
+    .order("adjustment_id")
+    .order("unit_id")
+    .range(a, b));
+  if ("tooMany" in read) return failed(c, "The stock drops");
+  if ("error" in read) return ledgerError(c, read.error, "The stock drops");
+  try {
+    const rows: StockDropRow[] = read.rows.map((r) => {
+      const adj = one(r.stock_adjustments);
+      const unit = one(r.ops_stock_items);
+      if (!adj || !unit) throw new Error("unreadable");
+      const unitCost = stockDropUnitCost(one(unit.purchase_order_lines));
+      return {
+        key: `${r.adjustment_id}:${r.unit_id}`,
+        adjustment_no: adj.adjustment_no,
+        dropped_at: adj.created_at,
+        site_name: one(adj.warehouses)?.name ?? null,
+        reason: adj.reason,
+        unit_code: unit.unit_code,
+        sku: unit.sku,
+        qty: unit.qty,
+        unit_cost: unitCost,
+        value: stockDropValue(unit.qty, unitCost),
+      };
+    });
+    rows.sort((x, y) => y.dropped_at.localeCompare(x.dropped_at) || x.unit_code.localeCompare(y.unit_code));
+    return c.json({ rows, total: stockDropsTotal(rows) });
+  } catch {
+    return failed(c, "The stock drops");
+  }
+});
+
+// ── Collection report (0644, Chew 2026-10-03) ───────────────────────────────
+
+/** The orders placed in a period with their deposit, balance paid and sales
+ *  invoice, read from Orders' and Payment's own records. Read once through the
+ *  shared arithmetic, which refuses a figure it cannot read; passed through. */
+financeLedgerRouter.get("/collection", requireFinance, async (c) => {
+  const parsed = collectionQuery.safeParse(queryOf(c));
+  if (!parsed.success) return invalid(c, parsed.error);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("fin_collection", { p_from: parsed.data.from, p_to: parsed.data.to });
+  if (error) return ledgerError(c, error, "The Collection report");
+  const answer = data as CollectionAnswer | null;
+  if (!answer || !Array.isArray(answer.orders)) return failed(c, "The Collection report");
+  try {
+    collectionReport(answer, 50);
+  } catch {
+    return failed(c, "The Collection report");
+  }
+  return c.json(answer);
+});
+
+// ── Forecast (0646, Chew 2026-10-03) ────────────────────────────────────────
+
+/** A month's plan and the accounts it can hold. Read once through the shared
+ *  arithmetic, which refuses a cell it cannot read; passed through as it came.
+ *  The page sets it beside the month's Profit and Loss, read on its own. */
+financeLedgerRouter.get("/forecast", requireFinance, async (c) => {
+  const parsed = forecastQuery.safeParse(queryOf(c));
+  if (!parsed.success) return invalid(c, parsed.error);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("fin_forecast_read", { p_month: parsed.data.month });
+  if (error) return ledgerError(c, error, "The forecast");
+  const answer = data as ForecastAnswer | null;
+  if (!answer || answer.month !== parsed.data.month || !Array.isArray(answer.accounts) || !Array.isArray(answer.planned_months)
+      || answer.lines === null || typeof answer.lines !== "object") {
+    return failed(c, "The forecast");
+  }
+  try {
+    forecastReport(answer.accounts, answer.lines, null);
+    if (answer.previous) forecastReport(answer.accounts, answer.previous.lines, null);
+  } catch {
+    return failed(c, "The forecast");
+  }
+  return c.json(answer);
+});
+
+/**
+ * The whole month at once. The database checks every cell and names the
+ * first wrong one; its sentence and tag pass through (mapPgError):
+ *   not_finance 42501 → 403 · month_invalid, lines_invalid 22023 → 422 ·
+ *   account_not_plannable, cell_invalid, income_needs_amount P0001 → 422 ·
+ *   forecast_changed 40001 → 409 (someone else saved the month since).
+ */
+financeLedgerRouter.put("/forecast/:month", requireFinance, async (c) => {
+  const month = forecastQuery.safeParse({ month: c.req.param("month") });
+  if (!month.success) return invalid(c, month.error);
+  const body = await parseJsonBody(c, forecastSaveInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("fin_forecast_save", {
+    p_month: month.data.month,
+    p_lines: body.data.lines,
+    p_was: body.data.was,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.status === 500 ? { ...m.body, message: "The forecast could not be saved. Try again." } : m.body, m.status);
+  }
+  if (typeof data !== "string") {
+    return c.json({ error: "rpc_failed", code: "rpc_failed", message: "The forecast could not be saved. Try again." }, 500);
+  }
+  const out: ForecastSaved = { month: month.data.month, saved_at: data };
+  return c.json(out);
 });
 
 export default financeLedgerRouter;

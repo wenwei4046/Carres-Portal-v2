@@ -1,17 +1,25 @@
+import PoCancellationFields from "./PoCancellationFields";
+import { PoSendEvidenceButton } from "../components/PoSendEvidence";
+import Loading from "@/components/kit/Loading";
+import KitModal from "@/components/kit/Modal";
+import KitButton from "@/components/kit/Button";
 // design-standard: not-a-list-page — this page uses the approved full-bleed
 // Register engine (components/register/DataGrid), which already owns search,
 // filters, columns, export and footer. ListPageShell would add a second set of
 // list chrome around the same register, contrary to the Sales Orders template.
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import "./purchase-order-detail.css";
 import registerStyles from "./PurchaseOrdersRegister.module.css";
 import type { IconName } from "@/components/kit/Icon";
-import { FilterRail, FilterRailGroup, FilterRailRow, FilterRailSelect, ShowFiltersButton, useFilterRailOpen } from "../components/workspace-rail";
+import { FILTER_RAIL_KIT_LIST_BELOW_PX, FilterRail, FilterRailGroup, FilterRailRow, FilterRailSelect, ShowFiltersButton, useFilterRailOpen } from "../components/workspace-rail";
+import EmbeddedSalesOrders, { linkedSalesOrderIds } from "../components/EmbeddedSalesOrders";
 import { ArrowLeft, ChevronDown, Download, FileCheck2, X } from "lucide-react";
 import {
+  monthlyDemandOf,
+  type MonthlyDemandRow,
   demandPurposeLabelOf,
   manualPurchaseSourceLine,
-  myHolidaySet,
+  type WorkingDayOptions,
   poExpectedArrivalsOf,
   poLineSupplierAnswersOf,
   poSupplierAnswerSummaryOf,
@@ -26,32 +34,45 @@ import {
   type PurchaseOrderRegisterFilter,
   type PurchaseOrderRegisterInput,
   GOODS_ABSENCE_WORDS,
+  GOODS_CATEGORY_WORDS,
+  documentDisplayNumber,
   poDocumentNumberOf,
+  readPoSendEvidence,
 } from "@carres/shared";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import {
   DataGrid,
   type DataGridColumn,
   type DataGridContextMenuItem,
   type DataGridPersonalLayouts,
 } from "@/components/register/DataGrid";
+import { documentRowMenu } from "@/components/register/row-menu";
+import { printPurchaseOrder } from "../record-print";
 import SupplierReplySection, { batchWord } from "./SupplierReplySection";
 import { Modal } from "../components/Modal";
 import { apiFetch } from "@/lib/api";
-import { fmtDate } from "@/lib/fmt-date";
+import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import TwoLineCell from "@/components/register/TwoLineCell";
+import { prepareSelectedPoDocuments, zipPoBundle } from "@/lib/purchasing/po-bundle";
 import { renderPoPdf } from "@/lib/pdf/render";
 import { usePdfCanvases } from "@/lib/pdf/use-pdf-canvases";
 /* The Sales Order's card: same heading face, same border, same padding. The
    PO document is read against the SO every day; two card grammars on two
    sister pages read as two apps (YH, 2026-09-04). */
 import Block from "@/components/kit/Block";
-import DropdownMenu from "@/components/kit/DropdownMenu";
-import Popover from "@/components/kit/Popover";
+import Tabs, { SEGMENT, SEGMENT_OFF, SEGMENT_ON, SEGMENTED_TRACK } from "@/components/kit/Tabs";
+import StatusPill from "@/components/kit/StatusPill";
+import Checkbox from "@/components/kit/Checkbox";
+import Button from "@/components/kit/Button";
+import SalesOrderMonthlyDemand from "../SalesOrderMonthlyDemand";
+import CPopover, { CMenu } from "@/components/carres/CPopover";
 import { Fact } from "../SalesOrderWorkspace";
 import { SO_HEAD_ROW, SO_ROW, SO_TABLE, SO_TD, SO_TH } from "../components/so-document-table";
 import TableScroller from "@/components/TableScroller";
 import type { PoTemplateData } from "@/lib/pdf/types";
 import {
+  useCatalog,
+  useMonthlyDemandFacts,
   useOperationPoAudit,
   useOperationPos,
   useOperationPoUnits,
@@ -59,7 +80,6 @@ import {
   useOperationSuppliers,
   useOperationWarehouse,
   usePoReceiving,
-  useRecordSend,
   useRegisterLayouts,
   useRevisePo,
   useSaveRegisterLayout,
@@ -69,9 +89,13 @@ import {
   type SupplierRow,
 } from "@/lib/queries";
 import { workspaceDutyActor } from "../workspace-duty-owner";
+import { useOfficeDays } from "@/lib/deadline-queries";
 import PurchasingTabs from "../PurchasingTabs";
-import PoIssueEvidence, { CHANNEL_WORD, doorsForIssuedPo } from "../components/PoIssueEvidence";
+import { PoWaitingFlags, useWaitingPoChangeRequests } from "../OperationPoChangeRequests";
+import { CHANNEL_WORD, refreshPurchasingReads } from "../components/PoIssueEvidence";
+import { PoSupplierResultContent } from "../so-batch/PoSupplierResultPanel";
 import ChangeDeliverToForm from "./ChangeDeliverToForm";
+import NewPurchaseOrderModal from "./NewPurchaseOrderModal";
 import GoodsMiniTable, { goodsCategoryOf, type GoodsMiniLine } from "../components/GoodsMiniTable";
 import { lineConfigBits } from "../../dealer/new-order/special-addons-picker";
 import { personInitials } from "@/lib/staff-avatar";
@@ -99,6 +123,7 @@ import { personInitials } from "@/lib/staff-avatar";
 type RailRow = { key: PurchaseOrderRegisterFilter; label: string };
 
 const RAIL_GROUPS: Array<{ heading: string; icon: IconName; rows: RailRow[] }> = [
+  { heading: "Sending", icon: "goods", rows: [{ key: "pdf_not_sent", label: "Confirm PO sent to supplier" }] },
   {
     heading: "Supplier reply",
     icon: "message",
@@ -122,6 +147,39 @@ const RAIL_ROWS: RailRow[] = RAIL_GROUPS.flatMap((group) => group.rows);
 
 /* The four governed groups, in display order: the two open headings first,
    then the collapsed history. Membership is the shared classifier's. */
+type PoDisplay = "overview" | "table" | "cards";
+type PoStateTab = "open" | "received" | "all";
+
+/**
+ * The Overview display's words (owner's 12 Oct 2026 package, COPY-STANDARD
+ * "Purchase Orders Overview"). The tabs are the four governed groups read
+ * three ways: `Open` is `Confirm PO sent to supplier` and `Waiting for goods
+ * from supplier`, `Received` is `Completed`, `All` adds `Cancelled`. The
+ * column names are the register's own.
+ */
+const PO_OVERVIEW = {
+  view: "Overview",
+  open: "Open",
+  received: "Received",
+  all: "All",
+  qty: (n: number, sets: boolean) => sets ? `${n} ${n === 1 ? "set" : "sets"}` : `${n} ${n === 1 ? "pc" : "pcs"}`,
+} as const;
+const PO_STATE_GROUPS: Record<PoStateTab, ReadonlySet<string>> = {
+  open: new Set(["not_marked_as_sent", "issued"]),
+  received: new Set(["completed"]),
+  all: new Set(["not_marked_as_sent", "issued", "completed", "cancelled"]),
+};
+const weekdayOf = (iso: string) => fmtDate(iso).split(",")[0] ?? "";
+/* The Overview's five fixed columns; `PO No` takes the room they leave and is
+   never under 146, so `Status` stays in view with no side scroll at 1025,
+   1164 and 1440 (01 §5). Measured, not guessed: the status pill `Sending not
+   confirmed` is 151 wide, the `PO Delivery Date` header needs 112, and the
+   tick, the arrow and the content edge take 92. */
+const PO_OVERVIEW_FIXED = { items: 76, source: 102, poDate: 88, delivery: 112, status: 162 } as const;
+const PO_OVERVIEW_FIXED_TOTAL = Object.values(PO_OVERVIEW_FIXED).reduce((sum, width) => sum + width, 0);
+const PO_OVERVIEW_LEAD = 92;
+const PO_OVERVIEW_PO_MIN = 180;
+
 const PO_GROUPS = [
   { key: "not_marked_as_sent", label: "Confirm PO sent to supplier", alwaysOpen: true },
   { key: "issued", label: "Waiting for goods from supplier", alwaysOpen: true },
@@ -135,6 +193,21 @@ type RailFilter = {
   deliverTo: string | null;
 };
 const RAIL_CLEAR: RailFilter = { facet: null, supplier: null, deliverTo: null };
+
+type PoListingReturn = { params: string; selectedKeys: string[]; filter: RailFilter };
+/** Router entry state survives a related-module visit; the grid already keeps
+ * its own search, column filters and per-presentation scroll in sessionKey. */
+function poListingReturnOf(state: unknown): PoListingReturn | null {
+  if (!state || typeof state !== "object") return null;
+  const value = (state as { poListingReturn?: unknown }).poListingReturn;
+  if (!value || typeof value !== "object") return null;
+  const saved = value as Partial<PoListingReturn>;
+  if (typeof saved.params !== "string" || !Array.isArray(saved.selectedKeys) || !saved.selectedKeys.every(key => typeof key === "string") || !saved.filter) return null;
+  const { facet, supplier, deliverTo } = saved.filter;
+  if ((facet !== null && !RAIL_ROWS.some(row => row.key === facet)) ||
+      (supplier !== null && typeof supplier !== "string") || (deliverTo !== null && typeof deliverTo !== "string")) return null;
+  return { params: saved.params, selectedKeys: saved.selectedKeys, filter: { facet, supplier, deliverTo } };
+}
 
 /**
  * One governed reference behind the PO, as the `SO No / MPR No` column reads
@@ -295,17 +368,18 @@ function supplierDateOf(po: operationPoListRow): string | null {
 /** 0587 — the PO's expected arrivals, one per line / batch, and whether any
  *  of them has an open, unconfirmed day-before check (the ONE call engine,
  *  `tomorrowDeliveryCallOf`, per arrival — Law D). */
-function arrivalFactsOf(po: operationPoListRow, today: string) {
+function arrivalFactsOf(po: operationPoListRow, today: string, office: WorkingDayOptions) {
   const version = po.version ?? 1;
   const lines = (po.purchase_order_lines ?? []).map((line, i) => ({
-    id: line.id ?? `${po.id}#${i}`, qty: Number(line.qty ?? 0), receivedQty: Number(line.received_qty ?? 0),
+    id: line.id ?? `${po.id}#${i}`, qty: Number(line.qty ?? 0), receivedQty: Number(line.received_qty ?? 0),cancelledQty:line.cancelled_qty,
   }));
   const arrivals = poExpectedArrivalsOf({
     version, officialDeliveryDate: po.official_delivery_date ?? null, etaDate: po.eta_date ?? null,
     promises: (po.promises ?? []) as never, lines,
   });
   const dates = [...new Set(arrivals.map((a) => a.arrival))];
-  const holidays = myHolidaySet();
+  /* The day-before check is PO Duty's OFFICE work: the stored Office
+     calendar's weekdays and holidays (Settings → Office). */
   const arrivalCheckOpen = dates.some((date) => {
     const confirmed = (po.arrival_confirmations ?? []).some((c) =>
       c.po_version === version && c.for_date === date && !!po.destination_id && c.destination_id === po.destination_id);
@@ -315,21 +389,22 @@ function arrivalFactsOf(po: operationPoListRow, today: string) {
       lines: arrivals.filter((a) => a.arrival === date).map((a, i) => ({
         id: `${po.id}#${i}`, sku: "", qty: a.qty, receivedQty: 0, shortSinceIso: null, balanceAnswerAboutQty: null,
       })),
-    }, { todayIso: today, holidays });
+    }, { todayIso: today, holidays: office.holidays as ReadonlySet<string>, offDays: office.offDays });
     return !!call;
   });
   return { dates, arrivalCheckOpen };
 }
 
-function toRegisterInput(po: operationPoListRow, supplierName: string, today: string): PurchaseOrderRegisterInput {
+function toRegisterInput(po: operationPoListRow, supplierName: string, today: string, office: WorkingDayOptions): PurchaseOrderRegisterInput {
   const lineIds = (po.purchase_order_lines ?? []).map((line, i) => line.id ?? `${po.id}#${i}`);
   const summary = poSupplierAnswerSummaryOf(po.promises, po.version ?? 1, lineIds, po.official_delivery_date ?? null);
-  const arrival = arrivalFactsOf(po, today);
+  const arrival = arrivalFactsOf(po, today, office);
   return {
     id: po.id,
     supplierName,
     status: po.status,
     version: po.version ?? 1,
+    cancellationVersion:po.cancellation_version,
     supplierDate: supplierDateOf(po),
     expectedArrivals: summary.answeredLines > 0 || arrival.dates.length > 0 ? arrival.dates : null,
     changedLines: summary.changed,
@@ -341,6 +416,7 @@ function toRegisterInput(po: operationPoListRow, supplierName: string, today: st
       ? po.purchase_order_lines.map((line) => ({
           qty: line.qty ?? null,
           receivedQty: line.received_qty ?? null,
+          cancelledQty:line.cancelled_qty,
         }))
       : null,
     sends: (po.sends ?? []).map((send) => ({
@@ -367,15 +443,16 @@ function OwnerBadge({
   const initials = name?.trim() ? personInitials(name, "") : "PO";
   return (
     <span
+      role="img"
+      aria-label={`${label} · PO Duty`}
       className="inline-flex shrink-0 items-center gap-1.5"
       data-owner-id={userId ?? "not-assigned"}
       data-owner-duty="PO Duty"
       title={`${label} · PO Duty`}
     >
-      <span className="inline-flex size-6 items-center justify-center rounded-full bg-kit-blue-3 text-[10px] font-semibold text-kit-blue-11">
+      <span aria-hidden="true" className="inline-flex size-6 items-center justify-center rounded-full bg-kit-blue-3 text-[11px] font-bold leading-none text-kit-blue-11">
         {initials}
       </span>
-      <span className="sr-only">{label} · PO Duty</span>
     </span>
   );
 }
@@ -390,9 +467,27 @@ export default function PurchaseOrdersPage() {
   const warehouseQ = useOperationWarehouse();
   const dutyQ = useWorkspaceDuties();
   const poDutyActor = workspaceDutyActor(dutyQ.data, "po_duty");
+  /* 0717 · YH 2026-10-26: a PO with a request waiting for approval says so. */
+  const waitingByPo = useWaitingPoChangeRequests();
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
-  const [filter, setFilter] = useState<RailFilter>(RAIL_CLEAR);
+  const location = useLocation();
+  /* New Purchase Order — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22):
+     office staff open a PO with no source, the Houzs way. Catalog is read only
+     once the form opens. */
+  const [newPoOpen, setNewPoOpen] = useState(false);
+  /* New Consignment Order — the same form and door, marked consignment
+     (Weisiang's decision, Mr Lim, WhatsApp 2026-10-22; Jess was not part of it). */
+  const [newPoConsignment, setNewPoConsignment] = useState(false);
+  const catalogQ = useCatalog({ enabled: newPoOpen });
+  const newPoSkus = useMemo(() => {
+    const models = new Map((catalogQ.data?.models ?? []).map((m) => [m.id, m.name]));
+    return (catalogQ.data?.skus ?? [])
+      .filter((s) => !s.discontinuedAt)
+      .map((s) => ({ sku: s.sku, supplierId: s.supplierId, label: `${s.sku} · ${models.get(s.modelId) ?? ""} ${s.variant}`.trim() }));
+  }, [catalogQ.data]);
+  const restoredListing = poListingReturnOf(location.state);
+  const [filter, setFilter] = useState<RailFilter>(() => restoredListing?.filter ?? RAIL_CLEAR);
   /* The personal saved-layout pilot (ui MASTER §6.7 rule 4). A failed read
      leaves the Columns menu without saved layouts; the register still works. */
   const layoutsQ = useRegisterLayouts("purchase_orders");
@@ -423,13 +518,78 @@ export default function PurchaseOrdersPage() {
      the rail starts hidden on a canvas narrower than 896px, where it would
      float over the very rows the operator came to read. */
   const canvasRef = useRef<HTMLDivElement>(null);
-  const [railOpen, setRailVisible] = useFilterRailOpen("carres.purchaseOrders.filterRail", canvasRef);
+  const [railOpen, setRailVisible] = useFilterRailOpen("carres.purchaseOrders.filterRail", canvasRef,
+    params.get("view") == null ? FILTER_RAIL_KIT_LIST_BELOW_PX : undefined);
+  const [bundleBusy, setBundleBusy] = useState(false);
+  const [facetCandidates, setFacetCandidates] = useState<RegisterRow[]>([]);
+  // DataGrid may recompute facet rows when presentation props change. Download
+  // needs membership only; unchanged membership must not trigger another render.
+  const updateFacetCandidates = useCallback((rows: RegisterRow[]) => {
+    setFacetCandidates(previous => previous.length === rows.length &&
+      previous.every((row, index) => row.id === rows[index]?.id) ? previous : rows);
+  }, []);
   const [pdfProblem, setPdfProblem] = useState<string | null>(null);
   /* The PO whose receipts are open. `{n} receipt dates` and `{n} GRNs` are
      two doors into the SAME list, because they are two facts about one set of
      receipts — not two different collections. */
   const [receiptsFor, setReceiptsFor] = useState<RegisterRow | null>(null);
   const today = todayMYT();
+  /* The stored Office calendar (Settings → Office) — Purchasing's week. */
+  const officeDays = useOfficeDays();
+  const monthly = params.get("view") === "monthly";
+  /* ⭐ THREE DISPLAYS OF THE SAME ROWS (owner's 12 Oct 2026 package; MASTER
+     §9.3). `Overview` is the first: the package's six columns, one flat list
+     with the `Open` · `Received` · `All` tabs. `Table` is the eleven-column
+     grouped register, unchanged, and `Cards` is unchanged. */
+  const display: PoDisplay = params.get("view") === "cards" ? "cards" : params.get("view") === "table" ? "table" : "overview";
+  const cards = display === "cards";
+  const overview = display === "overview";
+  const stateTab: PoStateTab = params.get("state") === "received" ? "received" : params.get("state") === "all" ? "all" : "open";
+  const overviewBox = useRef<HTMLDivElement>(null);
+  const [overviewRoom, setOverviewRoom] = useState(0);
+  useEffect(() => {
+    const el = overviewBox.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => setOverviewRoom(el.clientWidth));
+    observer.observe(el);
+    setOverviewRoom(el.clientWidth);
+    return () => observer.disconnect();
+  });
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set(restoredListing?.selectedKeys ?? []));
+  const listingReturnParams = useRef<string | null>(restoredListing?.params ?? null);
+  const toggleRow = (id: string) => setSelectedKeys((previous) => {
+    const next = new Set(previous);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const changePresentation = (value: string) => setParams((previous) => {
+    const next = new URLSearchParams(previous);
+    if (value === "cards" || value === "table") next.set("view", value); else next.delete("view");
+    return next;
+  });
+  const presentationTabs = <Tabs variant="segmented" label="Purchase Orders display" value={display}
+    onValueChange={changePresentation}
+    tabs={[{ value: "overview", label: PO_OVERVIEW.view, icon: "order" }, { value: "table", label: "Table", icon: "table" }, { value: "cards", label: "Cards", icon: "cards" }]} />;
+  const stateTabs = <Tabs variant="segmented" label="Purchase Orders shown" value={stateTab}
+    onValueChange={(value) => setParams((previous) => {
+      const next = new URLSearchParams(previous);
+      if (value === "received" || value === "all") next.set("state", value); else next.delete("state");
+      return next;
+    })}
+    tabs={[{ value: "open", label: PO_OVERVIEW.open }, { value: "received", label: PO_OVERVIEW.received }, { value: "all", label: PO_OVERVIEW.all }]} />;
+  const demandQ = useMonthlyDemandFacts(monthly);
+  const focusMonth = today.slice(0, 7);
+  const demandView = useMemo(() => demandQ.data ? monthlyDemandOf({
+    orders: demandQ.data.orders, startMonth: focusMonth, months: 6,
+    toBuyByLine: demandQ.data.toBuyByLine, focusMonth,
+  }) : null, [demandQ.data, focusMonth]);
+  const openDemandMonth = (row: MonthlyDemandRow) => {
+    if (!row.month) return;
+    const requested = row.kind === "month" ? row.month : `${row.kind}:${row.month}`;
+    /* Every order of that month, open or delivered, as Monthly demand counts it. */
+    navigate(`/operation/orders?tab=all&requested=${encodeURIComponent(requested)}`);
+  };
+
 
   const suppliers = useMemo(
     () => new Map((suppliersQ.data?.suppliers ?? []).map((supplier) => [supplier.id, supplier])),
@@ -457,7 +617,7 @@ export default function PurchaseOrdersPage() {
     return (posQ.data?.pos ?? []).map((po) => {
       const supplier = suppliers.get(po.supplier_id) ?? null;
       const supplierName = supplier?.name ?? "Supplier not recorded";
-      const input = toRegisterInput(po, supplierName, today);
+      const input = toRegisterInput(po, supplierName, today, officeDays.office);
       const facts = purchaseOrderRegisterFacts(input, today);
       const sources = sourceRefsOf(po);
       const lineIds = (po.purchase_order_lines ?? []).map((line, i) => line.id ?? `${po.id}#${i}`);
@@ -479,7 +639,7 @@ export default function PurchaseOrdersPage() {
         work: purchaseOrderWork(input, facts),
       };
     }).sort(compareDefault);
-  }, [destinations, posQ.data, suppliers, today, warehouses]);
+  }, [destinations, posQ.data, suppliers, today, warehouses, officeDays.office]);
 
   /* ⛔ A DECORATIVE BADGE MAY NOT BLANK THE REGISTER (YH, 2026-09-01, defect 14).
      `dutyQ` was in both mandatory-read gates, and it is the ONE query on this
@@ -556,19 +716,31 @@ export default function PurchaseOrdersPage() {
     return (
       <PurchaseOrderObject
         row={selected}
-        messageTemplate={posQ.data?.messageTemplate ?? null}
         owner={poDutyActor}
         destinations={destinations}
         activeDestinations={activeDestinations}
         onBack={() => {
+          const batchReturn = location.state?.soBatchReturn;
+          if (batchReturn && typeof batchReturn.path === "string" && Array.isArray(batchReturn.pos)) {
+            const returnUrl = new URL(batchReturn.path, "https://carres.invalid");
+            if (returnUrl.origin === "https://carres.invalid" &&
+                (returnUrl.pathname === "/operation/to-order" || (returnUrl.pathname === "/operation" && returnUrl.searchParams.get("tab") === "purchase"))) {
+              navigate(`${returnUrl.pathname}${returnUrl.search}`, { state: { soBatchIssuedPos: batchReturn.pos,
+                ...(batchReturn.preparation ? { soBatchPreparation: batchReturn.preparation } : {}) } });
+              return;
+            }
+          }
+          const returnParams = listingReturnParams.current;
+          listingReturnParams.current = null;
           setParams((current) => {
+            if (returnParams !== null) return new URLSearchParams(returnParams);
             const next = new URLSearchParams(current);
             next.delete("po");
             next.delete("view");
             return next;
           });
         }}
-        onChanged={() => void posQ.refetch()}
+        onChanged={() => { refreshPurchasingReads(); void posQ.refetch(); }}
       />
     );
   }
@@ -599,19 +771,22 @@ export default function PurchaseOrdersPage() {
     ...(filter.deliverTo ? [{ key: "deliverTo", label: `Supplier Deliver To: ${filter.deliverTo}`, onClear: () => setFilter((f) => ({ ...f, deliverTo: null })) }] : []),
   ];
   const openObject = (row: RegisterRow, view?: ObjectView) => {
+    listingReturnParams.current = params.toString();
     setParams((current) => {
       const next = new URLSearchParams(current);
       next.set("po", row.id);
       if (view) next.set("view", view);
       else next.delete("view");
       return next;
-    });
+    }, { state: { ...location.state, poListingReturn: {
+      params: params.toString(), selectedKeys: [...selectedKeys], filter,
+    } satisfies PoListingReturn } });
   };
   /** The actual receipt, in Receiving, which owns it. */
   const openReceipt = (receiptId: string) =>
     navigate(`/operation?tab=receiving&session=${encodeURIComponent(receiptId)}`);
-  const link = "font-medium text-kit-blue-11 underline-offset-2 hover:underline";
-  const supporting = "text-[11px] leading-4 text-kit-slate-11";
+  const link = "text-left font-medium text-kit-blue-11 underline-offset-2 hover:underline";
+  const supporting = "text-meta text-kit-slate-11";
 
   /**
    * ⭐ THE ELEVEN COLUMNS, EXACTLY (Purchasing MASTER §9.3, Jess 2026-09-18):
@@ -658,7 +833,8 @@ export default function PurchaseOrdersPage() {
       key: "po",
       chooserGroup: "Document",
       label: "PO No",
-      width: 170,
+      width: 180,
+      minWidth: 180,
       sortable: true,
       filterType: "numbering",
       /* ⭐ THE NUMBER OPENS THE PO, AND NOTHING ELSE SHARES IT (§6.8). The
@@ -671,13 +847,14 @@ export default function PurchaseOrdersPage() {
           className="font-mono font-semibold text-kit-blue-11 hover:underline"
           onClick={(event) => { event.stopPropagation(); openObject(row); }}
         >
-          {row.id}
+          {displayedIdentity(row)}
         </button>
       ),
-      /* The document states stay findable by typing them (defect 27). */
-      searchValue: (row) => `${row.id} ${row.facts.documentState}`,
-      filterValue: (row) => row.id,
-      exportValue: (row) => row.id,
+      /* The stored number and the document states stay findable by typing
+         them (defect 27; owner ruling 2026-10-01: both spellings resolve). */
+      searchValue: (row) => `${row.id} ${displayedIdentity(row)} ${row.facts.documentState}`,
+      filterValue: (row) => displayedIdentity(row),
+      exportValue: (row) => displayedIdentity(row),
     },
     {
       key: "source",
@@ -713,7 +890,7 @@ export default function PurchaseOrdersPage() {
            portal, so the list stops them before they reach the row. */
         return (
           <span onClick={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()}>
-            <Popover
+            <CPopover
               label={`Sources of ${row.id}`}
               trigger={
                 <button type="button" className={link} data-testid={`po-source-${row.id}`}>
@@ -742,7 +919,7 @@ export default function PurchaseOrdersPage() {
                   );
                 })}
               </ul>
-            </Popover>
+            </CPopover>
           </span>
         );
       },
@@ -947,42 +1124,182 @@ export default function PurchaseOrdersPage() {
       /* The CURRENT version only; earlier marks stay in Revisions. A mark is
          a person's statement of sending, never supplier receipt — and its
          ABSENCE is not proof that no send happened. */
+      /* The version itself is part of the PO No identity (`PO-260828-4827-V2`,
+         owner ruling 2026-10-01); this column keeps only the send-state words. */
       accessor: (row) => (
-        <span className="flex flex-col leading-4" data-testid={`po-version-${row.id}`}>
-          <span>PO V{row.facts.version}</span>
-          <span className={supporting}>{versionLine(row)}</span>
-        </span>
+        <span className="block leading-4" data-testid={`po-version-${row.id}`}>{versionLine(row)}</span>
       ),
-      searchValue: (row) => `PO V${row.facts.version} ${versionLine(row)}`,
-      filterValue: (row) => `PO V${row.facts.version}`,
-      exportValue: (row) => `PO V${row.facts.version} · ${versionLine(row)}`,
+      searchValue: (row) => versionLine(row),
+      filterValue: (row) => versionLine(row),
+      exportValue: (row) => versionLine(row),
     },
   ];
 
-  const contextMenu = (row: RegisterRow): DataGridContextMenuItem[] => [
-    { label: "View", onClick: () => openObject(row) },
+  /* ── The Overview display: six columns (01 §5 cell formats) ─────────────
+     Every cell reads the same row facts as the eleven-column register, so the
+     two displays can never disagree. Nothing is dropped: the facts this
+     display does not print stay in `Table`, in the goods row and on the PO. */
+  const sourceColumn = columns.find((column) => column.key === "source")!;
+  const dateCell = (iso: string | null | undefined) => iso
+    ? <TwoLineCell top={<span className="tabular-nums">{fmtDateShort(iso)}</span>} sub={weekdayOf(iso)} />
+    : <Absence />;
+  const categoriesOf = (row: RegisterRow) => [...new Set((row.po.purchase_order_lines ?? []).map((line) => {
+    const classified = goodsCategoryOf(line);
+    return (GOODS_CATEGORY_WORDS as readonly string[]).includes(classified) ? classified : "Other goods";
+  }))];
+  const railWord = (key: string) => RAIL_ROWS.find((item) => item.key === key)?.label ?? null;
+  const statusNote = (row: RegisterRow): { text: string; warn: boolean } | null => {
+    if (row.facts.group === "completed") { const arrived = firstArrival(row); return arrived ? { text: fmtDate(arrived), warn: false } : null; }
+    if (row.facts.group === "cancelled") return null;
+    if (row.facts.filters.includes("supplier_date_passed")) return { text: railWord("supplier_date_passed") ?? "", warn: true };
+    if (row.facts.filters.includes("partly_received")) return { text: railWord("partly_received") ?? "", warn: false };
+    return null;
+  };
+  /* Spare room goes to `Items` first (up to 34 more, so two categories fit on
+     one line), then to `PO No`. */
+  const spare = overviewRoom > 0 ? Math.max(0, Math.floor(overviewRoom - PO_OVERVIEW_LEAD - PO_OVERVIEW_FIXED_TOTAL - PO_OVERVIEW_PO_MIN)) : 108;
+  const itemsWidth = PO_OVERVIEW_FIXED.items + Math.min(34, spare);
+  const poWidth = PO_OVERVIEW_PO_MIN + spare - Math.min(34, spare);
+  const overviewColumns: Array<DataGridColumn<RegisterRow>> = [
     {
-      label: "Download official PDF",
-      onClick: () => {
-        setPdfProblem(null);
-        void downloadOfficialPdf(row.id).catch(() => {
-          setPdfProblem("The official PDF could not be downloaded");
-        });
+      key: "po", label: "PO No", width: poWidth, minWidth: PO_OVERVIEW_PO_MIN, sortable: true, filterType: "numbering", wrap: true,
+      accessor: (row) => (
+        <TwoLineCell strong testId={`po-overview-po-${row.id}`}
+          top={<button type="button" className="text-left font-semibold text-c-ink hover:underline"
+            onClick={(event) => { event.stopPropagation(); openObject(row); }}>{displayedIdentity(row)}</button>}
+          sub={row.supplierName} />
+      ),
+      searchValue: (row) => `${row.id} ${displayedIdentity(row)} ${row.facts.documentState} ${row.supplierName} ${row.deliverTo}`,
+      filterValue: (row) => displayedIdentity(row),
+      exportValue: (row) => displayedIdentity(row),
+    },
+    {
+      key: "items", label: "Items", width: itemsWidth, minWidth: PO_OVERVIEW_FIXED.items, sortable: true, wrap: true,
+      accessor: (row) => {
+        const categories = categoriesOf(row);
+        return row.facts.quantitiesKnown
+          ? <TwoLineCell top={PO_OVERVIEW.qty(row.facts.quantities.ordered, categories.length === 1 && categories[0] === "Sofa")} sub={categories.join(", ")} />
+          : <TwoLineCell top={<Absence />} sub={categories.join(", ")} />;
       },
+      searchValue: (row) => [...row.items, ...(row.po.purchase_order_lines ?? []).map((line) => line.sku)].join(" "),
+      filterValue: (row) => categoriesOf(row).join(", "),
+      exportValue: (row) => itemsSummary(row.items),
+      sortFn: (a, b) => a.facts.quantities.ordered - b.facts.quantities.ordered,
+    },
+    { ...sourceColumn, width: PO_OVERVIEW_FIXED.source, minWidth: PO_OVERVIEW_FIXED.source, wrap: true },
+    {
+      key: "po_date", label: "PO Doc Date", headerLines: ["PO", "Doc Date"], width: PO_OVERVIEW_FIXED.poDate, minWidth: PO_OVERVIEW_FIXED.poDate, sortable: true, filterType: "date",
+      accessor: (row) => dateCell(row.poDate),
+      searchValue: (row) => (row.poDate ? fmtDate(row.poDate) : "Not recorded"),
+      exportValue: (row) => row.poDate ?? "Not recorded",
+      dateValue: (row) => row.poDate,
+      sortFn: (a, b) => (a.poDate ?? "").localeCompare(b.poDate ?? ""),
+    },
+    {
+      key: "default_delivery", label: "PO Delivery Date", headerLines: ["PO", "Delivery Date"], width: PO_OVERVIEW_FIXED.delivery, minWidth: PO_OVERVIEW_FIXED.delivery, sortable: true, filterType: "date",
+      accessor: (row) => dateCell(row.po.official_delivery_date),
+      searchValue: (row) => (row.po.official_delivery_date ? fmtDate(row.po.official_delivery_date) : "Not recorded"),
+      exportValue: (row) => row.po.official_delivery_date ?? "Not recorded",
+      dateValue: (row) => row.po.official_delivery_date ?? null,
+      sortFn: (a, b) => (a.po.official_delivery_date ?? "9999").localeCompare(b.po.official_delivery_date ?? "9999"),
+    },
+    {
+      key: "status", label: "Status", width: PO_OVERVIEW_FIXED.status, minWidth: PO_OVERVIEW_FIXED.status, sortable: true, wrap: true,
+      accessor: (row) => {
+        const state = row.facts.documentState;
+        const note = statusNote(row);
+        return (
+          <span className="flex min-w-0 flex-col items-start gap-0.5" data-testid={`po-overview-status-${row.id}`}>
+            {state === "Sending not confirmed" ? <StatusPill tone="warning">{state}</StatusPill>
+              : state === "Completed" ? <StatusPill tone="success">{state}</StatusPill>
+              : <span className="text-body text-c-tab">{state}</span>}
+            {note ? <span className={`break-words text-meta ${note.warn ? "text-c-warn-fg" : "text-c-secondary"}`}>{note.text}</span> : null}
+            <PoWaitingFlags waiting={waitingByPo.get(row.id)} />
+          </span>
+        );
+      },
+      searchValue: (row) => `${row.facts.documentState} ${statusNote(row)?.text ?? ""}`,
+      filterValue: (row) => row.facts.documentState,
+      exportValue: (row) => row.facts.documentState,
+      sortFn: (a, b) => PO_GROUPS.findIndex((g) => g.key === a.facts.group) - PO_GROUPS.findIndex((g) => g.key === b.facts.group),
     },
   ];
+  const overviewRows = visibleRows.filter((row) => PO_STATE_GROUPS[stateTab].has(row.facts.group));
+
+  async function downloadSelectedPdfs() {
+    if (bundleBusy) return;
+    const candidates = new Set(facetCandidates.map(row => row.id));
+    const selection = visibleRows.filter(row => candidates.has(row.id) && selectedKeys.has(row.id));
+    if (!selection.length) return;
+    setBundleBusy(true); setPdfProblem(null);
+    let url: string | undefined;
+    try {
+      const documents = await prepareSelectedPoDocuments(selection.map(row => ({ id: row.id,
+        supplierId: row.po.supplier_id, version: row.facts.version })),
+        id => apiFetch<PoTemplateData>(`/api/operation/pos/${encodeURIComponent(id)}/print-data`), renderPoPdf);
+      url = URL.createObjectURL(await zipPoBundle(documents));
+      const link = document.createElement("a");
+      link.href = url; link.download = "Purchase-orders.zip";
+      document.body.appendChild(link); link.click(); link.remove();
+    } catch {
+      setPdfProblem("The official PDF could not be downloaded");
+    } finally {
+      if (url) URL.revokeObjectURL(url);
+      setBundleBusy(false);
+    }
+  }
+
+  /* ONE ROW MENU (owner ruling 2026-10-05): `View · Print`. View opens the
+     PO's read-first document page (Edit stays a button there); Print opens the
+     same official bytes `Download PDF` saves, and records no send. A cancelled
+     PO has no paper by design (`po_not_printable`, 0402), so it has no Print. */
+  const contextMenu = (row: RegisterRow): DataGridContextMenuItem[] =>
+    documentRowMenu({
+      view: () => openObject(row),
+      print: row.po.status === "cancelled" && row.po.cancellation_version!==row.facts.version
+        ? undefined
+        : () => {
+            setPdfProblem(null);
+            void printPurchaseOrder(row.id).catch(() => {
+              setPdfProblem("The official PDF could not be opened");
+            });
+          },
+    });
 
   return (
     <div ref={canvasRef} className={`${registerStyles.page} flex h-full min-h-0 flex-col`} data-testid="purchase-orders-register">
       <PurchasingTabs />
+      <NewPurchaseOrderModal
+        open={newPoOpen}
+        onOpenChange={setNewPoOpen}
+        suppliers={(suppliersQ.data?.suppliers ?? []).map((s) => ({ id: s.id, name: s.name }))}
+        destinations={activeDestinations}
+        skus={newPoSkus}
+        consignment={newPoConsignment}
+        onIssued={(poId) => {
+          setNewPoOpen(false);
+          refreshPurchasingReads();
+          void posQ.refetch();
+          if (poId) setParams((current) => { const next = new URLSearchParams(current); next.set("po", poId); next.delete("view"); return next; });
+        }}
+      />
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
         {railOpen && (
         <FilterRail
-          className="max-md:absolute max-md:inset-y-0 max-md:left-0 max-md:z-30"
+          className="so-template-rail max-md:absolute max-md:inset-y-0 max-md:left-0 max-md:z-30"
           onHide={() => setRailVisible(false)}
           ariaLabel="Purchase order filters"
           testId="po-filter-rail"
+          header={<div className="so-rail-navigation"><Tabs fill orientation="vertical" label="Purchase Orders view"
+            value={monthly ? "monthly" : "list"}
+            onValueChange={(value) => setParams((previous) => {
+              const next = new URLSearchParams(previous);
+              if (value === "monthly") next.set("view", "monthly"); else next.delete("view");
+              return next;
+            })}
+            tabs={[{ value: "list", label: "Listing", icon: "order" }, { value: "monthly", label: "Monthly demand", icon: "date" }]} /></div>}
         >
+          {!monthly && <>
           {RAIL_GROUPS.map((group) => (
             <FilterRailGroup key={group.heading} title={group.heading} icon={group.icon}>
               {group.rows.map((item) => (
@@ -1017,23 +1334,64 @@ export default function PurchaseOrdersPage() {
               onChange={(deliverTo) => setFilter((f) => ({ ...f, deliverTo }))}
             />
           </FilterRailGroup>
+          </>}
         </FilterRail>
         )}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col p-2" data-testid="po-register-content">
+        {monthly ? <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {!railOpen && <div className="shrink-0 p-2"><ShowFiltersButton onShow={() => setRailVisible(true)} testId="purchase-orders-show-filters" /></div>}
+          <SalesOrderMonthlyDemand view={demandView} focusMonth={focusMonth}
+          onOpenMonth={openDemandMonth} loading={demandQ.isLoading}
+          error={demandQ.isError ? demandQ.error : undefined} onRetry={() => void demandQ.refetch()} /></div> :
+        <div ref={overviewBox} className="flex min-h-0 min-w-0 flex-1 flex-col p-2" data-testid="po-register-content">
           {pdfProblem ? (
             <ReadProblem
               problem={pdfProblem}
-              action="Use Download official PDF again. If it still fails, ask the system owner to check the PO document."
+              /* The row menu's door is `Print` since the one row menu
+                 (2026-10-05); the advice names no retired door — the same
+                 sentence the PO preview prints. */
+              action="Try again. If it still fails, ask the system owner to check the PO document."
             />
           ) : null}
             <DataGrid<RegisterRow>
               appearance="reference"
+              presentationTools
+              sessionKey={overview ? "carres.purchaseOrders.overview.v1" : "carres.purchaseOrders.register.v2"}
+              labelledToolbar
+              rowHeight={overview ? 54 : 32}
+              presentationKey={display}
+              toolbarEnd={presentationTabs}
+              selectionPrimary={<>{presentationTabs}<Button size="sm" loading={bundleBusy} disabled={bundleBusy} onClick={() => void downloadSelectedPdfs()}>Download PDFs</Button></>}
+              selectable={{ selectedKeys, onToggle: toggleRow,
+                onToggleAll: (keys, allSelected) => setSelectedKeys((previous) => {
+                  const next = new Set(previous);
+                  const remove = allSelected;
+                  for (const key of keys) { if (remove) next.delete(key); else next.add(key); }
+                  return next;
+                }) }}
+              renderResults={cards ? (visible) => <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-2 2xl:grid-cols-3" data-testid="purchase-orders-cards">
+                {visible.map((row) => <div key={row.id} data-row-key={row.id} tabIndex={-1}>
+                  <Block title={displayedIdentity(row)} headerSlot={<div className="flex items-center gap-3">
+                    <Checkbox id={`card-select-${row.id}`} ariaLabel={`Select ${row.id}`} checked={selectedKeys.has(row.id)} onCheckedChange={() => toggleRow(row.id)} />
+                    <Button size="touch" variant="ghost" onClick={() => openObject(row)}>View</Button>
+                  </div>}>
+                    <dl className="grid min-w-0 grid-cols-2 gap-3 text-body">
+                      <div><dt className="text-meta text-kit-slate-11">Supplier</dt><dd>{row.supplierName}</dd></div>
+                      <div><dt className="text-meta text-kit-slate-11">PO Doc Date</dt><dd>{row.poDate ? fmtDate(row.poDate) : "Not recorded"}</dd></div>
+                      <div><dt className="text-meta text-kit-slate-11">Supplier Deliver To</dt><dd>{row.deliverTo}</dd></div>
+                      <div><dt className="text-meta text-kit-slate-11">PO Version</dt><dd>{versionLine(row)}</dd></div>
+                      <div className="col-span-2"><dt className="text-meta text-kit-slate-11">Items</dt><dd className="break-words">{itemsSummary(row.items)}</dd></div>
+                    </dl>
+                  </Block>
+                </div>)}
+              </div> : undefined}
               palette="slate"
               searchPresentation="responsive"
-              rows={visibleRows}
-              columns={columns}
+              rows={overview ? overviewRows : visibleRows}
+              facetRows={allRows}
+              onFacetRowsChange={updateFacetCandidates}
+              columns={overview ? overviewColumns : columns}
               /* v2 — the nine-column date-first register replaces v1's twelve. */
-              storageKey="carres.purchaseOrders.register.v2"
+              storageKey={overview ? "carres.purchaseOrders.overview.v1" : "carres.purchaseOrders.register.v2"}
               rowKey={(row) => row.id}
               rowTestId={(row) => `grid-row-${row.id}`}
               exportName="Purchase Orders"
@@ -1042,11 +1400,12 @@ export default function PurchaseOrdersPage() {
               emptyMessage={allRows.length === 0 ? "No purchase orders yet" : "No purchase orders match these filters"}
               noMatchMessage="No purchase orders match these filters"
               activeConditions={activeConditions}
+              reserveConditionRow
               onClearConditions={() => setFilter(RAIL_CLEAR)}
-              leadingColumns={{ date: "po_date", identity: "po" }}
-              personalLayouts={personalLayouts}
+              leadingColumns={overview ? undefined : { date: "po_date", identity: "po" }}
+              personalLayouts={overview ? undefined : personalLayouts}
               groupBanner={false}
-              fixedGroups={{
+              fixedGroups={overview ? undefined : {
                 groups: PO_GROUPS,
                 groupOf: (row) => row.facts.group,
                 revealMatches: activeConditions.length > 0,
@@ -1057,26 +1416,46 @@ export default function PurchaseOrdersPage() {
               expandTitle="Show goods"
               expandable={{
                 flush: true,
-                alignToColumn: "po_date",
+                alignToColumn: overview ? "po" : "po_date",
+                /* The goods rows are wider than the Overview: they scroll
+                   sideways inside themselves and never widen the list
+                   (01 §6), so `Status` stays in view with a row open. */
+                fitExpansionToViewport: overview,
                 testId: (row) => `po-expand-${row.id}`,
                 renderExpansion: (row) => <OrderedGoods row={row} destinations={destinations} />,
               }}
-              toolbarStart={!railOpen && (
-                <ShowFiltersButton
-                  onShow={() => setRailVisible(true)}
-                  testId="purchase-orders-show-filters"
-                />
-              )}
-              /* One total, including collapsed groups; no quantity totals. */
-              statusSummary={(filtered) => (
-                <span data-testid="po-footer">
-                  {filtered.length === allRows.length
+              toolbarStart={<>
+                {!railOpen && (
+                  <ShowFiltersButton
+                    onShow={() => setRailVisible(true)}
+                    testId="purchase-orders-show-filters"
+                  />
+                )}
+                <Button size="sm" icon="add" onClick={() => { setNewPoConsignment(false); setNewPoOpen(true); }} data-testid="po-new">New Purchase Order</Button>
+                <Button size="sm" icon="add" onClick={() => { setNewPoConsignment(true); setNewPoOpen(true); }} data-testid="po-new-consignment">New Consignment Order</Button>
+                {overview && stateTabs}
+              </>}
+              statusSummary={(filtered, selectedRows) => {
+                const scope = selectedRows.length ? selectedRows : filtered;
+                const quantities = new Map<string, number>();
+                for (const row of scope) for (const line of row.po.purchase_order_lines ?? []) {
+                  const classified = goodsCategoryOf(line);
+                  const category = (GOODS_CATEGORY_WORDS as readonly string[]).includes(classified) ? classified : "Other goods";
+                  quantities.set(category, (quantities.get(category) ?? 0) + Number(line.qty ?? 0));
+                }
+                const parts = GOODS_CATEGORY_WORDS.filter((word) => word !== "Service" && word !== "Other goods" && (quantities.get(word) ?? 0) > 0)
+                  .map((word) => `${word} ${quantities.get(word)}`);
+                const unknown = quantities.get("Other goods") ?? 0;
+                return <span data-testid="po-footer">
+                  {selectedRows.length ? `${selectedRows.length} selected purchase orders` : filtered.length === allRows.length
                     ? allRows.length === 1 ? "1 purchase order" : `${allRows.length} purchase orders`
                     : `${filtered.length} of ${allRows.length} purchase orders`}
-                </span>
-              )}
+                  {parts.length > 0 && ` · Qty: ${parts.join(" · ")}`}
+                  {unknown > 0 && ` · Not in catalog ${unknown}`}
+                </span>;
+              }}
             />
-        </div>
+        </div>}
       </div>
       {receiptsFor ? (
         <ReceiptsDialog
@@ -1114,9 +1493,9 @@ function ReceiptsDialog({
         <table className="w-full text-left text-body" aria-label={`Receipts on ${row.id}`}>
           <thead className="border-b border-kit-slate-5 bg-kit-slate-3">
             <tr>
-              <th scope="col" className="px-2 py-1.5 text-label font-semibold text-kit-slate-11">Goods Received Date</th>
-              <th scope="col" className="px-2 py-1.5 text-label font-semibold text-kit-slate-11">GRN No</th>
-              <th scope="col" className="px-2 py-1.5 text-label font-semibold text-kit-slate-11">Received Qty</th>
+              <th scope="col" className="px-2 py-1.5 text-meta font-medium text-kit-slate-11">Goods Received Date</th>
+              <th scope="col" className="px-2 py-1.5 text-meta font-medium text-kit-slate-11">GRN No</th>
+              <th scope="col" className="px-2 py-1.5 text-meta font-medium text-kit-slate-11">Received Qty</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-kit-slate-5">
@@ -1127,7 +1506,7 @@ function ReceiptsDialog({
                     <span className="tabular-nums">
                       {receipt.receivedOn ? fmtDate(receipt.receivedOn) : <Absence />}
                     </span>
-                    <span className="text-[11px] leading-4 text-kit-slate-11">Time not recorded</span>
+                    <span className="text-meta text-kit-slate-11">Time not recorded</span>
                   </span>
                 </td>
                 <td className="px-2 py-1.5 align-top">
@@ -1157,7 +1536,7 @@ function ReceiptsDialog({
  *  stored identity opens nothing — it prints its governed label as a fact. */
 function sourceHref(source: SourceRef): string | null {
   if (source.kind === "sales_order") return source.orderId ? `/operation/orders/so/${source.orderId}` : null;
-  return source.requestId ? `/operation?tab=manual-purchase&request=${encodeURIComponent(source.requestId)}` : null;
+  return source.requestId ? `/operation?tab=manual-purchase&mp=${encodeURIComponent(source.requestId)}` : null;
 }
 
 /** The first arrival this PO recorded — the sort key for Goods Received Date.
@@ -1168,7 +1547,14 @@ function firstArrival(row: RegisterRow): string | null {
   return dates.length === 0 ? null : dates.reduce((a, b) => (a <= b ? a : b));
 }
 
-/** Line 2 of PO Version — the CURRENT version's sent mark, or its absence. */
+/** The register's displayed identity — `PO-260828-4827-V2` (owner ruling
+ *  2026-10-01): the stored number shortened for the eye, carrying the CURRENT
+ *  version. A legacy non-date number keeps its spelling and gains no date. */
+function displayedIdentity(row: RegisterRow): string {
+  return documentDisplayNumber(`${row.id}-V${row.facts.version}`);
+}
+
+/** The PO Version column — the CURRENT version's sent mark, or its absence. */
 function versionLine(row: RegisterRow): string {
   const mark = row.facts.currentSend;
   return mark
@@ -1271,12 +1657,21 @@ function OrderedGoods({ row, destinations }: { row: RegisterRow; destinations: A
   );
 }
 
+/** A live response must still be the version named by the open PO. Never
+ * paint a newer document beneath an older version's header or send form. */
+function checkDocumentVersion(data: PoTemplateData, poId: string, version: number): void {
+  if (data.po_id !== poId || data.version !== version || data.draft) {
+    throw Object.assign(new Error("stale_po_version"), { body: { code: "stale_po_version" } });
+  }
+}
+
 /** 0430 — reprint the KEPT document of an already-sent version, exactly as it
  *  was recorded at that version's first confirmed send. */
 async function downloadKeptPdf(poId: string, version: number): Promise<void> {
   const data = await apiFetch<PoTemplateData>(
     `/api/operation/pos/${encodeURIComponent(poId)}/print-data?version=${version}`,
   );
+  checkDocumentVersion(data, poId, version);
   const blob = await renderPoPdf(data);
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -1288,13 +1683,14 @@ async function downloadKeptPdf(poId: string, version: number): Promise<void> {
   URL.revokeObjectURL(url);
 }
 
-async function downloadOfficialPdf(poId: string): Promise<void> {
+async function downloadOfficialPdf(poId: string, version: number): Promise<void> {
   const data = await apiFetch<PoTemplateData>(`/api/operation/pos/${encodeURIComponent(poId)}/print-data`);
+  checkDocumentVersion(data, poId, version);
   const blob = await renderPoPdf(data);
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `${poId}.pdf`;
+  anchor.download = `${documentDisplayNumber(`${poId}-V${version}`)}.pdf`;
   anchor.rel = "noopener";
   document.body.appendChild(anchor);
   anchor.click();
@@ -1302,13 +1698,12 @@ async function downloadOfficialPdf(poId: string): Promise<void> {
   setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
-const OBJECT_VIEWS = ["Document", "Revisions", "History", "Order Route"] as const;
+const OBJECT_VIEWS = ["Document", "Revisions", "History", "Order Route", "Sales Order"] as const;
 type ObjectView = (typeof OBJECT_VIEWS)[number];
-type DocumentMode = "read" | "issue" | "revise" | "deliverTo";
+type DocumentMode = "read" | "issue" | "revise" | "deliverTo" | "cancel";
 
 function PurchaseOrderObject({
   row,
-  messageTemplate,
   owner,
   destinations,
   activeDestinations,
@@ -1316,7 +1711,6 @@ function PurchaseOrderObject({
   onChanged,
 }: {
   row: RegisterRow;
-  messageTemplate: string | null;
   owner: { userId: string; name: string | null } | null;
   destinations: Array<{ id: string; name: string }>;
   activeDestinations: Array<{ id: string; name: string }>;
@@ -1333,7 +1727,11 @@ function PurchaseOrderObject({
      to Document, so a hand-typed `?view=nonsense` cannot render a blank tab. */
   const [objectParams, setObjectParams] = useSearchParams();
   const viewParam = objectParams.get("view");
-  const view: ObjectView = (OBJECT_VIEWS as readonly string[]).includes(viewParam ?? "")
+  /* `Sales Order` earns its tab only when this PO links one (UI MASTER "A tab
+     earns its place"; owner 2026-10-05): a stock or MPR PO opens no empty room. */
+  const salesOrderIds = linkedSalesOrderIds(row.sources);
+  const views = salesOrderIds.length ? OBJECT_VIEWS : OBJECT_VIEWS.filter((item) => item !== "Sales Order");
+  const view: ObjectView = (views as readonly string[]).includes(viewParam ?? "")
     ? (viewParam as ObjectView)
     : "Document";
   const setView = (next: ObjectView) => {
@@ -1345,24 +1743,33 @@ function PurchaseOrderObject({
     }, { replace: true });
   };
   const [mode, setMode] = useState<DocumentMode>("read");
+  const [revisionDirty, setRevisionDirty] = useState(false);
+  const [cancellationDirty, setCancellationDirty] = useState(false);
+  const [discardDocument, setDiscardDocument] = useState(false);
+  const afterDiscard = useRef<(() => void) | null>(null);
+  const leaveDocument = (action: () => void) => {
+    if ((mode === "cancel" && cancellationDirty) || (mode === "revise" && revisionDirty)) {
+      afterDiscard.current = action;
+      setDiscardDocument(true);
+    } else action();
+  };
   const [pdfProblem, setPdfProblem] = useState<string | null>(null);
   const [pdfAction, setPdfAction] = useState<string | null>(null);
   /* Cancelled is the one document state with no official PDF to show. */
-  const cancelled = row.po.status === "cancelled";
+  const cancelled = row.po.status === "cancelled" && row.po.cancellation_version!==row.facts.version;
   const unitsQ = useOperationPoUnits(row.id);
   const receivingQ = usePoReceiving(row.id);
   const claimsQ = useOperationSupplierClaims("all", row.id);
   const auditQ = useOperationPoAudit(row.id);
-  const recordOpen = useRecordSend(row.id);
   const po = row.po;
-  const issueNeeded = row.facts.currentSend == null && po.status === "open";
+  const issueNeeded = row.facts.currentSend == null && (po.status !== "cancelled" || po.cancellation_version===row.facts.version);
 
   return (
     <div className="po-detail-style flex h-full min-h-0 flex-col bg-kit-canvas" data-testid="purchase-order-object">
       <PurchasingTabs />
       <header className="shrink-0 border-b border-kit-slate-5 bg-white px-4 pt-3">
         <div className="flex flex-wrap items-start gap-3">
-          <button type="button" aria-label="Back to Purchase Orders" className="mt-1 text-kit-slate-11 hover:text-kit-slate-12" onClick={onBack}>
+          <button type="button" aria-label="Back to Purchase Orders" className="mt-1 text-kit-slate-11 hover:text-kit-slate-12" onClick={() => leaveDocument(onBack)}>
             <ArrowLeft size={18} />
           </button>
           <div className="min-w-0 flex-1">
@@ -1371,7 +1778,7 @@ function PurchaseOrderObject({
                 lives HERE, once, beside `number · party`. The `Status` and
                 `PO Version` facts are retired from the grid. */}
             <h1 className="text-page font-semibold text-kit-slate-12">
-              <span className="font-mono">{poDocumentNumberOf(po.id, row.facts.version)}</span> · {row.supplierName}
+              <span className="font-mono">{documentDisplayNumber(`${po.id}-V${row.facts.version}`)}</span> · {row.supplierName}
               <span className="ml-3 inline-block whitespace-nowrap align-middle text-body font-normal text-kit-slate-11" data-testid="po-object-state">
                 {row.facts.operationStatus ?? row.facts.documentState}
               </span>
@@ -1387,10 +1794,10 @@ function PurchaseOrderObject({
                 telling them to escalate a HEALTHY refusal, which teaches a team
                 to distrust the page's error strip. */}
             {cancelled ? null : (
-              <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-control border border-kit-slate-5 px-3 text-meta" onClick={() => {
+              <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-control border border-kit-slate-5 px-3 text-body font-medium" onClick={() => {
                 setPdfProblem(null);
                 setPdfAction(null);
-                void downloadOfficialPdf(po.id).catch((e: unknown) => {
+                void downloadOfficialPdf(po.id, row.facts.version).catch((e: unknown) => {
                   /* The server's OWN two lines, the way PoIssueEvidence already
                      does it; a refusal carrying only a code becomes governed
                      words rather than a code on screen. */
@@ -1416,16 +1823,17 @@ function PurchaseOrderObject({
                 sending moved to CURRENT ACTION: the one primary button is the
                 Work sentence, never a header button. */}
             {po.status === "open" && mode === "read" ? (
-              <DropdownMenu
+              <CMenu
                 label="Edit purchase order"
                 trigger={
-                  <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-control border border-kit-slate-5 px-3 text-meta font-medium" data-testid="po-object-edit">
+                  <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-control border border-kit-slate-5 px-3 text-body font-medium" data-testid="po-object-edit">
                     Edit <ChevronDown size={14} />
                   </button>
                 }
                 items={[
                   { key: "revise", label: "Revise quantity or Deliver To", onSelect: () => setMode("revise") },
                   { key: "deliverTo", label: "Change Deliver To", onSelect: () => setMode("deliverTo") },
+                  ...(po.contextual_cancellation_available?[{key:"cancel",label:"Cancel goods not received",onSelect:()=>setMode("cancel")}]:[]),
                 ]}
               />
             ) : null}
@@ -1439,13 +1847,15 @@ function PurchaseOrderObject({
             />
           </div>
         ) : null}
-        <nav className="mt-3 flex gap-1 overflow-x-auto whitespace-nowrap" aria-label="Purchase order views">
-          {OBJECT_VIEWS.map((item) => (
+        {/* The kit segmented control (01 §3); the track wraps on a narrow page
+            instead of scrolling a view out of sight. */}
+        <nav className={`${SEGMENTED_TRACK} mt-3 max-w-full flex-wrap`} aria-label="Purchase order views">
+          {views.map((item) => (
             <button
               key={item}
               type="button"
-              className={`h-8 border-b-2 px-3 text-meta font-medium ${view === item ? "border-kit-blue-9 text-kit-blue-11" : "border-transparent text-kit-slate-11 hover:text-kit-slate-12"}`}
-              onClick={() => { setView(item); setMode("read"); }}
+              className={`${SEGMENT} ${view === item ? SEGMENT_ON : SEGMENT_OFF}`}
+              onClick={() => leaveDocument(() => { setView(item); setMode("read"); })}
             >
               {item}
             </button>
@@ -1459,7 +1869,7 @@ function PurchaseOrderObject({
       <main
         className={
           view === "Document" && mode === "read"
-            ? "min-h-0 flex-1 overflow-y-auto"
+            ? "min-h-0 flex-1 overflow-y-auto min-[1130px]:overflow-hidden"
             : "min-h-0 flex-1 overflow-y-auto p-3 sm:p-4"
         }
       >
@@ -1472,38 +1882,32 @@ function PurchaseOrderObject({
             <section className="min-w-0 border border-kit-slate-5 bg-white p-4">
               <div className="mb-3 flex items-center justify-between border-b border-kit-slate-5 pb-3">
                 <div>
-                  <h2 className="text-body font-semibold">{mode === "issue" ? "Issue purchase order" : mode === "deliverTo" ? "Change Deliver To" : "Revise purchase order"}</h2>
+                  <h2 className="text-strong">{mode === "issue" ? "Confirm PO sent to supplier" : mode === "deliverTo" ? "Change Deliver To" : mode === "cancel" ? "Cancel goods not received" : "Revise purchase order"}</h2>
                   <p className="text-meta text-kit-slate-11">Check the official document beside these fields before you finish.</p>
                 </div>
-                <button type="button" aria-label="Close document work" onClick={() => setMode("read")}><X size={16} /></button>
+                <button type="button" aria-label="Close document work" onClick={() => leaveDocument(() => setMode("read"))}><X size={16} /></button>
               </div>
               {mode === "issue" ? (
-                <PoIssueEvidence
-                  po={{
+                <PoSupplierResultContent
+                  showOpenObject={false}
+                  open
+                  onClose={() => setMode("read")}
+                  pos={[{
                     id: po.id,
+                    version: row.facts.version,
                     supplierId: po.supplier_id,
                     supplierName: row.supplierName,
                     destinationId: po.destination_id ?? "not-recorded",
                     destination: row.deliverTo,
                     whatsappGroupUrl: row.supplier?.whatsapp_group_url ?? null,
                     contactEmail: row.supplier?.contact_email ?? null,
+                    poSendChannel: row.supplier?.po_send_channel ?? null,
                     contact: row.supplier?.contact ?? null,
-                  }}
-                  version={po.version ?? 1}
-                  evidence={po.sends ?? []}
-                  doors={doorsForIssuedPo({
-                    id: po.id,
-                    supplierId: po.supplier_id,
-                    supplierName: row.supplierName,
-                    destinationId: po.destination_id ?? "not-recorded",
-                    destination: row.deliverTo,
-                    whatsappGroupUrl: row.supplier?.whatsapp_group_url ?? null,
-                    contactEmail: row.supplier?.contact_email ?? null,
-                    contact: row.supplier?.contact ?? null,
-                  }, messageTemplate)}
-                  onOpened={(channel) => recordOpen.mutate({ channel })}
-                  onConfirmed={() => { onChanged(); setMode("read"); }}
+                  }]}
+                  onChanged={onChanged}
                 />
+              ) : mode === "cancel" ? (
+                <PoCancellationFields poId={po.id} onDirtyChange={setCancellationDirty} onSaved={()=>{setCancellationDirty(false);onChanged();setMode("read");}} onCancel={()=>leaveDocument(()=>setMode("read"))} renderProblem={(problem,action,onRetry)=><ReadProblem problem={problem} action={action} onRetry={onRetry}/>}/>
               ) : mode === "deliverTo" ? (
                 <ChangeDeliverToForm
                   po={po}
@@ -1519,12 +1923,13 @@ function PurchaseOrderObject({
                   po={po}
                   destinations={destinations}
                   activeDestinations={activeDestinations}
-                  onSaved={() => { onChanged(); setMode("read"); }}
-                  onCancel={() => setMode("read")}
+                  onDirtyChange={setRevisionDirty}
+                  onSaved={() => { setRevisionDirty(false); onChanged(); setMode("read"); }}
+                  onCancel={() => leaveDocument(() => setMode("read"))}
                 />
               )}
             </section>
-            <OfficialPreview poId={po.id} />
+            <OfficialPreview poId={po.id} version={po.version??1} />
           </div>
         ) : view === "Document" ? (
           <DocumentView
@@ -1546,6 +1951,8 @@ function PurchaseOrderObject({
             onRetryReceiving={() => void receivingQ.refetch()}
             onRetryClaims={() => void claimsQ.refetch()}
           />
+        ) : view === "Sales Order" ? (
+          <EmbeddedSalesOrders orderIds={salesOrderIds} />
         ) : view === "Revisions" ? (
           <RecordList
             title="Revisions"
@@ -1556,7 +1963,7 @@ function PurchaseOrderObject({
             rows={[
               {
                 id: "current-document",
-                title: `Current document · PO V${po.version ?? 1}`,
+                title: `Current document · ${documentDisplayNumber(`${po.id}-V${po.version ?? 1}`)}`,
                 meta: "Live purchase order",
                 detail: "This is the version used by the official PDF.",
               },
@@ -1570,12 +1977,12 @@ function PurchaseOrderObject({
                   .map((send) => send.po_version as number),
               )].sort((a, b) => b - a).map((sentVersion) => ({
                 id: `sent-v${sentVersion}`,
-                title: `Sent document · PO V${sentVersion}`,
+                title: `Sent document · ${documentDisplayNumber(`${po.id}-V${sentVersion}`)}`,
                 meta: "Recorded at the confirmed send",
                 action: (
                   <button
                     type="button"
-                    className="inline-flex h-7 items-center gap-1.5 rounded-control border border-kit-slate-5 px-2 text-meta"
+                    className="inline-flex h-7 items-center gap-1.5 rounded-control border border-kit-slate-5 px-2 text-body font-medium"
                     data-testid={`po-sent-version-pdf-${sentVersion}`}
                     onClick={() => void downloadKeptPdf(po.id, sentVersion).catch((e: unknown) => {
                       const body = (e as { body?: { message?: string } }).body;
@@ -1601,11 +2008,21 @@ function PurchaseOrderObject({
             problem={auditQ.isError ? "The PO history could not be loaded" : null}
             action="Try again. If it still fails, ask the system owner to check the PO history."
             onRetry={() => void auditQ.refetch()}
-            rows={(auditQ.data?.history ?? []).map((event) => ({
+            rows={[...(po.sends ?? []).flatMap((send) => {
+              const proof = readPoSendEvidence(send.note);
+              if (!proof || send.kind !== "confirmed_sent" || send.channel !== "whatsapp") return [];
+              const context = `${documentDisplayNumber(`${po.id}-V${send.po_version}`)} · ${send.recipient ?? "Not recorded"}`;
+              return [{
+                id: `send-proof-${proof.path}`,
+                title: context,
+                meta: `${send.sent_by_name ?? "Staff identity not recorded"} · ${fmtDate(send.sent_at, { time: true })}`,
+                action: <PoSendEvidenceButton poId={po.id} note={send.note} context={context} />,
+              }];
+            }), ...(auditQ.data?.history ?? []).map((event) => ({
               id: event.id,
               title: event.text,
               meta: `${event.actor_name ?? "Staff identity not recorded"} · ${event.by_role ?? "Role not recorded"} · ${fmtDate(event.occurred_at, { time: true })}`,
-            }))}
+            }))]}
           />
         ) : (
           <OrderRoute
@@ -1621,6 +2038,13 @@ function PurchaseOrderObject({
           />
         )}
       </main>
+      <KitModal open={discardDocument} onOpenChange={setDiscardDocument} title="Discard" footer={<>
+        <KitButton onClick={() => setDiscardDocument(false)}>Cancel</KitButton>
+        <KitButton variant="primary" onClick={() => {
+          setDiscardDocument(false); setCancellationDirty(false); setRevisionDirty(false);
+          const action = afterDiscard.current; afterDiscard.current = null; action?.();
+        }}>Discard</KitButton>
+      </>}>Not saved</KitModal>
     </div>
   );
 }
@@ -1631,25 +2055,28 @@ function PurchaseOrderObject({
  * button for the PO's state. `Sending not confirmed` opens the one send area
  * (`PoIssueEvidence`); the supplier-answer door lives in `Supplier reply` below
  * and is not drawn twice. Waiting with nothing due says `Nothing to do until
- * {date}`; a completed or cancelled PO has no block.
+ * {date}`; goods completion hides the block only when current sending is confirmed.
+ * Cancelled documents retain the separate governed send/PDF restriction.
  */
 function CurrentAction({ row, owner, onIssue }: { row: RegisterRow; owner: { userId: string; name: string | null } | null; onIssue: (() => void) | null }) {
   const state = row.facts.operationStatus;
-  if (state === "Completed" || state === "Cancelled") return null;
-  const fact = row.work?.problem ?? (onIssue ? "The PO PDF has not been sent" : null);
-  const action = row.work?.action ?? (onIssue ? `Send ${poDocumentNumberOf(row.id, row.facts.version)} to ${row.supplierName}` : null);
+  if ((state === "Cancelled" || state === "Completed") && !onIssue) return null;
+  const fact = row.work?.problem ?? (onIssue ? "Sending not confirmed" : null);
+  const displayedNumber = displayedIdentity(row);
+  const action = row.work?.action?.replace(poDocumentNumberOf(row.id, row.facts.version), displayedNumber)
+    ?? (onIssue ? `Send ${displayedNumber} to ${row.supplierName}` : null);
   const nextArrival = row.answerSummary.date ?? row.po.official_delivery_date ?? null;
   return (
     <Block title="Current action">
       {fact && action ? (
         <div className="flex flex-wrap items-center gap-3" data-testid="po-object-work">
           <OwnerBadge userId={owner?.userId ?? null} name={owner?.name ?? null} />
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 basis-48 grow">
             <div className="text-strong text-kit-slate-12">{fact}</div>
             <div className="text-meta text-kit-slate-11">{action}</div>
           </div>
           {onIssue ? (
-            <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-control bg-kit-blue-9 px-3 text-meta font-semibold text-white" onClick={onIssue} data-testid="po-object-primary">
+            <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-control bg-kit-blue-9 px-3 text-body font-semibold text-white" onClick={onIssue} data-testid="po-object-primary">
               <FileCheck2 size={14} /> Issue current PDF
             </button>
           ) : null}
@@ -1661,6 +2088,15 @@ function CurrentAction({ row, owner, onIssue }: { row: RegisterRow; owner: { use
       )}
     </Block>
   );
+}
+
+/** 0717 · YH 2026-10-26: the request this PO waits on, linked to its queue.
+ *  Follows Houzs frontend/src/pages/scm-v2/PurchaseOrderDetailV2.tsx:1402-1430
+ *  per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
+function WaitingForApproval({ poId }: { poId: string }) {
+  const waiting = useWaitingPoChangeRequests().get(poId);
+  if (!waiting?.length) return null;
+  return <div className="flex flex-wrap gap-3 rounded-control border border-kit-slate-5 px-3 py-2" data-testid="po-object-waiting"><PoWaitingFlags waiting={waiting} /></div>;
 }
 
 function DocumentView({ row, owner, onIssue, units, receiving, claims, destinations, unitLoading, receivingLoading, claimsLoading, unitError, receivingError, claimsError, onRetryUnits, onRetryReceiving, onRetryClaims, onSupplierDateSaved }: {
@@ -1706,27 +2142,13 @@ function DocumentView({ row, owner, onIssue, units, receiving, claims, destinati
       .map((source) => source.request_id ?? source.reference),
   ).size;
   return (
-    /* ⭐ THE FACTS AND THE DOCUMENT, SIDE BY SIDE — AS TWO PANES (YH, 2026-09-03).
-       The first cut put them in one grid inside a scrolling page and pinned the
-       document with `sticky`: a bordered box holding an iframe holding the
-       browser's PDF viewer, with its own grey chrome and its own scrollbar,
-       jumping as the page scrolled under it. The Sales Order does not do that.
-       Its facts and its document are two panes that each scroll on their own
-       and the page does not; the document is sheets of paper on the canvas, no
-       box, no caption strip. This is that shape, 50/50 at `lg`; below it the
-       two stack, facts first, and the page scrolls normally.
-
-       `min-w-0` on the facts pane is load-bearing. A flex item defaults to
-       `min-width: auto`, so the Goods lines table's `min-w-[900px]` would size
-       the PANE rather than scroll inside it, and the document would be
-       squeezed to nothing. */
-    /* ⭐ VIEWING NEVER SPLITS (Purchasing MASTER §9.3 composition, owner
-       2026-09-25; UI MASTER §4.1). One scroll: Current action → Purchase order
-       → Goods lines → Receiving → Claims and returns → Document, the current
-       version's PDF full width and last. Only `Edit` and issuing open the
-       50/50 split beside the paper. */
-    <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-3 p-3 sm:p-4" data-testid="po-document-panes">
+    /* Purchasing's 2026-10-04 object ruling: read-only original facts and
+       the actual current PDF share equal panes; Edit remains an explicit door.
+       Each desktop pane scrolls independently; narrow screens stack. */
+    <div className="grid min-h-0 grid-cols-1 gap-3 p-3 sm:p-4 min-[1130px]:h-full min-[1130px]:grid-cols-2" data-testid="po-document-panes" data-layout="50-50">
+      <div className="flex min-w-0 flex-col gap-3 min-[1130px]:min-h-0 min-[1130px]:overflow-y-auto" data-testid="po-document-facts-pane">
       <CurrentAction row={row} owner={owner} onIssue={onIssue} />
+      <WaitingForApproval poId={po.id} />
       <Block title="Purchase order">
         {/* The Sales Order fact grammar (owner, 2026-09-26): label over a
             boxed value, three to a row, 12px gaps — "got box … I want follow":
@@ -1753,7 +2175,7 @@ function DocumentView({ row, owner, onIssue, units, receiving, claims, destinati
             sku: line.sku,
             item: [line.model_name, line.size].filter(Boolean).join(" · ") || line.sku,
             itemDetail: lineConfigBits(line.attrs as Record<string, unknown> | null | undefined).join(" · ") || undefined,
-            qty: Number(line.qty ?? 0),
+            qty: Number(line.qty ?? 0)-Number(line.cancelled_qty??0),
             receivedQty: Number(line.received_qty ?? 0),
             unitIds: unitsOf(line).map((u) => u.unit_code).sort((a, b) => a.localeCompare(b)),
           }))}
@@ -1818,9 +2240,9 @@ function DocumentView({ row, owner, onIssue, units, receiving, claims, destinati
                       ? destinations.find((destination) => destination.id === line.destination_id)?.name ?? <Absence />
                       : row.deliverTo === "Not recorded" ? <Absence /> : row.deliverTo
                   }</td>
-                  <td className={`${SO_TD} tabular-nums`}>{line.qty}</td>
+                  <td className={`${SO_TD} tabular-nums`}>{line.qty}{Number(line.cancelled_qty??0)>0 ? <div className="text-meta text-kit-slate-11">Cancelled Qty {line.cancelled_qty}</div>:null}</td>
                   <td className={`${SO_TD} tabular-nums`}>{line.received_qty}</td>
-                  <td className={`${SO_TD} tabular-nums`}>{Math.max(0, line.qty - line.received_qty)}</td>
+                  <td className={`${SO_TD} tabular-nums`}>{line.pending_qty ?? Math.max(0, line.qty-line.received_qty-(line.cancelled_qty??0))}</td>
                 </tr>
               ))}
             </tbody>
@@ -1832,29 +2254,32 @@ function DocumentView({ row, owner, onIssue, units, receiving, claims, destinati
           IDs card is gone: units live on their Goods line above. */}
       <div className="flex flex-col gap-3">
         <ConnectionBlock title="Receiving" empty="No receiving session is connected to this PO." hasContent={receiving.length > 0} loading={receivingLoading} problem={receivingError ? "The Receiving connection could not be loaded" : null} action="Try again. If it still fails, ask the system owner to check the receiving connection." onRetry={onRetryReceiving}>
-          {receiving.map((receipt) => <ConnectionRow key={receipt.id} primary={receipt.do_number ?? "Supplier DO not recorded"} secondary={`${receipt.status} · ${fmtDate(receipt.goods_received_at)}`} />)}
+          {receiving.map((receipt) => <ConnectionRow key={receipt.id} primary={receipt.do_number ?? "Supplier DO not recorded"} href={`/operation?tab=receiving&session=${encodeURIComponent(receipt.id)}`} secondary={`${receipt.status} · ${fmtDate(receipt.goods_received_at)}`} />)}
           {receiving.length > 0 ? <Link className="mt-2 text-meta font-medium text-kit-blue-11 hover:underline" to={`/operation?tab=receiving&po=${encodeURIComponent(po.id)}`}>Open Receiving</Link> : null}
         </ConnectionBlock>
         <ConnectionBlock title="Claims and returns" empty="No claim or return is connected to this PO." hasContent={claims.length + returnRows.length > 0} loading={claimsLoading || receivingLoading} problem={claimsError || receivingError ? "The claims and returns connection could not be loaded" : null} action="Try again. If it still fails, ask the system owner to check the claim and receiving return connections." onRetry={() => { onRetryClaims(); onRetryReceiving(); }}>
-          {claims.map((claim) => <ConnectionRow key={claim.id} primary={claim.claim_no} secondary={`${claim.status}${claim.requested_action === "return_for_inspection" ? ` · ${supplierClaimRequestLabel("return_for_inspection")}` : ""}`} />)}
-          {returnRows.map((receipt) => <ConnectionRow key={`return-${receipt.id}`} primary="Receiving return" secondary={receipt.return_reason!} />)}
+          {claims.map((claim) => <ConnectionRow key={claim.id} primary={documentDisplayNumber(claim.claim_no)} href={`/operation?tab=claims&claim=${encodeURIComponent(claim.id)}`} secondary={`${claim.status}${claim.requested_action === "return_for_inspection" ? ` · ${supplierClaimRequestLabel("return_for_inspection")}` : ""}`} />)}
+          {returnRows.map((receipt) => <ConnectionRow key={`return-${receipt.id}`} primary="Receiving return" href={`/operation?tab=receiving&session=${encodeURIComponent(receipt.id)}`} secondary={receipt.return_reason!} />)}
           {claims.length > 0 ? <Link className="mt-2 text-meta font-medium text-kit-blue-11 hover:underline" to={`/operation?tab=claims&po=${encodeURIComponent(po.id)}`}>Open Claims and Returns</Link> : null}
         </ConnectionBlock>
       </div>
+      </div>
+      <div className="min-w-0 min-[1130px]:min-h-0 min-[1130px]:overflow-y-auto">
       <Block title="Document">
         <div data-testid="po-document-column">
         {/* A cancelled purchase order has no official document to preview —
             0402 refuses to print one by design. Saying so beats mounting a frame
             that can only fill with an error strip. */}
-        {row.po.status === "cancelled" ? (
+        {row.po.status === "cancelled" && row.po.cancellation_version!==row.facts.version ? (
           <p className="text-body text-kit-slate-11" data-testid="po-cancelled-no-document">
             A cancelled purchase order has no official document.
           </p>
         ) : (
-          <OfficialPreview poId={po.id} />
+          <OfficialPreview poId={po.id} version={po.version??1} />
         )}
         </div>
       </Block>
+      </div>
     </div>
   );
 }
@@ -1885,16 +2310,16 @@ function ConnectionBlock({ title, empty, children, hasContent, loading, problem,
   return <Block title={title}><div className="flex flex-col gap-2">{problem ? <ReadProblem problem={problem} action={action ?? "Try again."} onRetry={onRetry} /> : loading ? <Absence>Loading…</Absence> : hasContent ? children : <p className="text-meta text-kit-slate-11">{empty}</p>}</div></Block>;
 }
 
-function ConnectionRow({ primary, secondary }: { primary: string; secondary: string }) {
-  return <div><div className="text-body font-medium text-kit-slate-12">{primary}</div><div className="text-meta text-kit-slate-11">{secondary}</div></div>;
+function ConnectionRow({ primary, secondary, href }: { primary: string; secondary: string; href?: string }) {
+  return <div><div className="text-body font-medium text-kit-slate-12">{href ? <Link to={href} className="text-kit-blue-11 hover:underline">{primary}</Link> : primary}</div><div className="text-meta text-kit-slate-11">{secondary}</div></div>;
 }
 
 function RecordList({ title, empty, rows, problem, action, onRetry }: { title: string; empty: string; rows: Array<{ id: string; title: string; meta: string; detail?: string; action?: React.ReactNode }>; problem?: string | null; action?: string; onRetry?: () => void }) {
-  return <div className="mx-auto w-full max-w-[980px]"><Block title={title}><div className="divide-y divide-kit-slate-4">{problem ? <ReadProblem problem={problem} action={action ?? "Try again."} onRetry={onRetry} /> : rows.length ? rows.map((row) => <article key={row.id} className="py-3"><div className="text-body font-semibold text-kit-slate-12">{row.title}</div><div className="mt-0.5 text-meta text-kit-slate-11">{row.meta}</div>{row.detail ? <div className="mt-1 text-body text-kit-slate-11">{row.detail}</div> : null}{row.action ? <div className="mt-1">{row.action}</div> : null}</article>) : <Absence>{empty}</Absence>}</div></Block></div>;
+  return <div className="mx-auto w-full max-w-[980px]"><Block title={title}><div className="divide-y divide-kit-slate-4">{problem ? <ReadProblem problem={problem} action={action ?? "Try again."} onRetry={onRetry} /> : rows.length ? rows.map((row) => <article key={row.id} className="py-3"><div className="text-body font-medium text-kit-slate-12">{row.title}</div><div className="mt-0.5 text-meta text-kit-slate-11">{row.meta}</div>{row.detail ? <div className="mt-1 text-body text-kit-slate-11">{row.detail}</div> : null}{row.action ? <div className="mt-1">{row.action}</div> : null}</article>) : <Absence>{empty}</Absence>}</div></Block></div>;
 }
 
 function ReadProblem({ problem, action, onRetry }: { problem: string; action: string; onRetry?: () => void }) {
-  return <div className="bg-kit-red-3 px-3 py-2"><div className="text-meta font-semibold text-kit-red-11">{problem}</div><div className="text-meta text-kit-slate-11">{action}</div>{onRetry ? <button type="button" className="mt-2 h-7 rounded-control border border-kit-red-9 bg-white px-2 text-meta font-medium text-kit-red-11" onClick={onRetry}>Try again</button> : null}</div>;
+  return <div className="bg-kit-red-3 px-3 py-2"><div className="text-body font-medium text-kit-red-11">{problem}</div><div className="text-meta text-kit-slate-11">{action}</div>{onRetry ? <button type="button" className="mt-2 h-7 rounded-control border border-kit-red-9 bg-white px-2 text-body font-medium text-kit-red-11" onClick={onRetry}>Try again</button> : null}</div>;
 }
 
 function OrderRoute({ row, receiving, claims, receivingLoading, claimsLoading, receivingError, claimsError, onRetryReceiving, onRetryClaims }: {
@@ -1912,21 +2337,21 @@ function OrderRoute({ row, receiving, claims, receivingLoading, claimsLoading, r
   const problemCount = claims.length + returnRows.length;
   const problemLoading = claimsLoading || receivingLoading;
   const problemError = claimsError || receivingError;
-  return <div className="mx-auto w-full max-w-[1100px]"><Block title="Order Route"><div className="grid grid-cols-1 gap-3 md:grid-cols-4"><RouteNode title="Source" main={sourceSummary(row.sources)} detail={row.sources.length === 0 ? "No governed source is recorded" : ""}>{row.sources.map((source) => { const href = sourceHref(source); return href ? <Link key={source.reference} to={href} className="block font-mono text-meta text-kit-blue-11 underline-offset-2 hover:underline">{source.reference}</Link> : <span key={source.reference} className="block font-mono text-meta text-kit-slate-11">{source.reference}</span>; })}</RouteNode><RouteNode title="Purchase Order" main={row.id} detail={`PO V${row.facts.version} · ${row.facts.documentState}`} />{receivingError ? <RouteProblem title="Receiving" problem="The Receiving connection could not be loaded" action="Try again. If it still fails, ask the system owner to check the receiving connection." onRetry={onRetryReceiving} /> : <RouteNode title="Receiving" main={receivingLoading ? "Loading…" : receiving.length ? `${receiving.length} connected` : "None recorded"} detail={receivingLoading ? "Checking the receiving record" : receiving.map((receipt) => receipt.do_number ?? receipt.status).join(" · ") || "Receiving owns this fact"} />}{problemError ? <RouteProblem title="Claims and returns" problem="The claims and returns connection could not be loaded" action="Try again. If it still fails, ask the system owner to check the claim and receiving return connections." onRetry={() => { onRetryClaims(); onRetryReceiving(); }} /> : <RouteNode title="Claims and returns" main={problemLoading ? "Loading…" : problemCount ? `${problemCount} connected` : "None recorded"} detail={problemLoading ? "Checking the claim and receiving return records" : [...claims.map((claim) => claim.claim_no), ...returnRows.map(() => "Receiving return")].join(" · ") || "No connected problem record"} />}</div></Block></div>;
+  return <div className="mx-auto w-full max-w-[1100px]"><Block title="Order Route"><div className="grid grid-cols-1 gap-3 md:grid-cols-4"><RouteNode title="Source" main={sourceSummary(row.sources)} detail={row.sources.length === 0 ? "No governed source is recorded" : ""}>{row.sources.map((source) => { const href = sourceHref(source); return href ? <Link key={source.reference} to={href} className="block font-mono text-meta text-kit-blue-11 underline-offset-2 hover:underline">{source.reference}</Link> : <span key={source.reference} className="block font-mono text-meta text-kit-slate-11">{source.reference}</span>; })}</RouteNode><RouteNode title="Purchase Order" main={displayedIdentity(row)} detail={row.facts.documentState} />{receivingError ? <RouteProblem title="Receiving" problem="The Receiving connection could not be loaded" action="Try again. If it still fails, ask the system owner to check the receiving connection." onRetry={onRetryReceiving} /> : <RouteNode title="Receiving" main={receivingLoading ? "Loading…" : receiving.length ? `${receiving.length} connected` : "None recorded"} detail={receivingLoading ? "Checking the receiving record" : receiving.map((receipt) => receipt.do_number ?? receipt.status).join(" · ") || "Receiving owns this fact"} />}{problemError ? <RouteProblem title="Claims and returns" problem="The claims and returns connection could not be loaded" action="Try again. If it still fails, ask the system owner to check the claim and receiving return connections." onRetry={() => { onRetryClaims(); onRetryReceiving(); }} /> : <RouteNode title="Claims and returns" main={problemLoading ? "Loading…" : problemCount ? `${problemCount} connected` : "None recorded"} detail={problemLoading ? "Checking the claim and receiving return records" : [...claims.map((claim) => claim.claim_no), ...returnRows.map(() => "Receiving return")].join(" · ") || "No connected problem record"} />}</div></Block></div>;
 }
 
 /** `children` — where a node's facts are individually REACHABLE rather than
  *  summarised: the Source node names every SO and MPR behind this PO, each
  *  one a door (MASTER §9.3, "individually reachable"). */
 function RouteNode({ title, main, detail, children }: { title: string; main: string; detail: string; children?: ReactNode }) {
-  return <div className="border-l-2 border-kit-blue-9 bg-kit-slate-3 p-3"><div className="text-label text-kit-slate-11">{title}</div><div className="mt-1 text-body font-semibold text-kit-slate-12">{main}</div>{detail ? <div className="mt-1 text-meta text-kit-slate-11">{detail}</div> : null}{children ? <div className="mt-1 space-y-0.5">{children}</div> : null}</div>;
+  return <div className="border-l-2 border-kit-blue-9 bg-kit-slate-3 p-3"><div className="text-meta text-kit-slate-11">{title}</div><div className="mt-1 text-body font-medium text-kit-slate-12">{main}</div>{detail ? <div className="mt-1 text-meta text-kit-slate-11">{detail}</div> : null}{children ? <div className="mt-1 space-y-0.5">{children}</div> : null}</div>;
 }
 
 function RouteProblem({ title, problem, action, onRetry }: { title: string; problem: string; action: string; onRetry: () => void }) {
-  return <div className="border-l-2 border-kit-red-9 bg-kit-red-3 p-3"><div className="text-label text-kit-slate-11">{title}</div><ReadProblem problem={problem} action={action} onRetry={onRetry} /></div>;
+  return <div className="border-l-2 border-kit-red-9 bg-kit-red-3 p-3"><div className="text-meta text-kit-slate-11">{title}</div><ReadProblem problem={problem} action={action} onRetry={onRetry} /></div>;
 }
 
-function OfficialPreview({ poId }: { poId: string }) {
+function OfficialPreview({ poId, version }: { poId: string; version: number }) {
   /* The same blob `Download PDF` saves, painted as pages. The header already
      names the PO, so the paper carries no caption strip of its own. */
   const [refusal, setRefusal] = useState<{ wrong: string; todo: string } | null>(null);
@@ -1934,6 +2359,7 @@ function OfficialPreview({ poId }: { poId: string }) {
     setRefusal(null);
     try {
       const data = await apiFetch<PoTemplateData>(`/api/operation/pos/${encodeURIComponent(poId)}/print-data`);
+      checkDocumentVersion(data, poId, version);
       return await renderPoPdf(data);
     } catch (error) {
       const body = (error as { body?: { message?: string; action?: string; code?: string } } | null)?.body;
@@ -1943,8 +2369,8 @@ function OfficialPreview({ poId }: { poId: string }) {
       }
       throw error;
     }
-  }, [poId]);
-  const { pdfError, setPane, retry } = usePdfCanvases(poId, render);
+  }, [poId, version]);
+  const { pdfLoading, pdfError, setPane, retry } = usePdfCanvases(`${poId}:${version}`, render);
   return (
     <div className="mx-auto w-full max-w-[700px]">
       {pdfError ? (
@@ -1952,7 +2378,8 @@ function OfficialPreview({ poId }: { poId: string }) {
           <ReadProblem problem={refusal?.wrong ?? "The official PDF could not be opened"} action={refusal?.todo ?? "Try again. If it still fails, ask the system owner to check the PO document."} onRetry={retry} />
         </div>
       ) : null}
-      <div ref={setPane} data-testid="pdf-pane" aria-label="Official purchase order preview" />
+      {pdfLoading ? <Loading variant="skeleton" label="Loading" /> : null}
+      <div ref={setPane} data-testid="pdf-pane" aria-busy={pdfLoading} aria-label="Official purchase order preview" />
     </div>
   );
 }
@@ -1961,12 +2388,14 @@ function RevisionForm({
   po,
   destinations,
   activeDestinations,
+  onDirtyChange,
   onSaved,
   onCancel,
 }: {
   po: operationPoListRow;
   destinations: Array<{ id: string; name: string }>;
   activeDestinations: Array<{ id: string; name: string }>;
+  onDirtyChange: (dirty: boolean) => void;
   onSaved: () => void;
   onCancel: () => void;
 }) {
@@ -1990,6 +2419,9 @@ function RevisionForm({
       destinationId: nextDestinationId === (po.destination_id ?? "") ? null : nextDestinationId || null,
     }];
   });
+  const dirty = changes.length > 0 || reason.trim().length > 0;
+  useEffect(() => { onDirtyChange(dirty); }, [dirty, onDirtyChange]);
+  useEffect(() => () => onDirtyChange(false), [onDirtyChange]);
   const invalidNumber = po.purchase_order_lines.some((line) => !Number.isInteger(Number(draft[line.id])));
   const belowMinimum = po.purchase_order_lines.some((line) => Number(draft[line.id]) < 1);
   const belowReceived = po.purchase_order_lines.some((line) => Number(draft[line.id]) < line.received_qty);
@@ -2002,6 +2434,6 @@ function RevisionForm({
     const pickerDestinations = activeDestinations.some((destination) => destination.id === currentDestinationId) || !currentDestination
       ? activeDestinations
       : [currentDestination, ...activeDestinations];
-    return <div key={line.id} className="grid grid-cols-1 gap-2 border-b border-kit-slate-4 pb-3 sm:grid-cols-[minmax(0,1fr)_88px_minmax(150px,0.8fr)]"><div><div className="text-body font-semibold">{line.model_name ?? line.sku}</div><div className="text-meta text-kit-slate-11">{line.sku} · {line.received_qty} received</div></div><label className="text-meta text-kit-slate-11">Qty<input aria-label={`Qty for ${line.sku}`} type="number" min={Math.max(1, line.received_qty)} value={value} className="mt-1 h-8 w-full rounded-control border border-kit-slate-5 px-2 text-right" onChange={(event) => setDraft((current) => ({ ...current, [line.id]: event.target.value }))} /></label><label className="text-meta text-kit-slate-11">Deliver To<select aria-label={`Deliver To for ${line.sku}`} value={destinationDraft[line.id] ?? currentDestinationId} className="mt-1 h-8 w-full rounded-control border border-kit-slate-5 bg-white px-2" onChange={(event) => setDestinationDraft((current) => ({ ...current, [line.id]: event.target.value }))}>{currentDestinationId ? null : <option value="" disabled>Not recorded</option>}{pickerDestinations.map((destination) => { const closed = !activeDestinations.some((active) => active.id === destination.id); return <option key={destination.id} value={destination.id} disabled={closed}>{destination.name}{closed ? " (closed)" : ""}</option>; })}</select></label></div>;
-  })}</div><label className="mt-4 block text-meta text-kit-slate-11">Why<input className="mt-1 h-8 w-full rounded-control border border-kit-slate-5 px-2" value={reason} onChange={(event) => setReason(event.target.value)} /></label>{gap ? <div className="mt-3"><div className="text-meta text-kit-red-11">{gap}</div><div className="text-meta text-kit-slate-11">{action}</div></div> : null}{error ? <div className="mt-3"><div className="text-meta text-kit-red-11">The revision could not be saved</div><div className="text-meta text-kit-slate-11">{error}</div></div> : null}<div className="mt-4 flex justify-end gap-2"><button type="button" className="h-8 rounded-control border border-kit-slate-5 px-3 text-meta" onClick={onCancel}>Cancel</button><button type="button" disabled={!!gap || save.isPending} className="h-8 rounded-control bg-kit-blue-9 px-3 text-meta font-semibold text-white disabled:bg-kit-slate-6" onClick={() => { if (gap) return; setError(null); save.mutate({ reason: reason.trim(), lines: changes }, { onSuccess: onSaved, onError: (cause) => setError(cause instanceof Error ? cause.message : String(cause)) }); }}>{save.isPending ? "Saving…" : `Save PO V${(po.version ?? 1) + 1}`}</button></div></div>;
+    return <div key={line.id} className="grid grid-cols-1 gap-2 border-b border-kit-slate-4 pb-3 sm:grid-cols-[minmax(0,1fr)_88px_minmax(150px,0.8fr)]"><div><div className="text-body">{line.model_name ?? line.sku}</div><div className="text-meta text-kit-slate-11">{line.sku} · {line.received_qty} received</div></div><label className="text-meta text-kit-slate-11">Qty<input aria-label={`Qty for ${line.sku}`} type="number" min={Math.max(1, line.received_qty)} value={value} className="mt-1 h-8 w-full rounded-control border border-kit-slate-5 px-2 text-right" onChange={(event) => setDraft((current) => ({ ...current, [line.id]: event.target.value }))} /></label><label className="text-meta text-kit-slate-11">Deliver To<select aria-label={`Deliver To for ${line.sku}`} value={destinationDraft[line.id] ?? currentDestinationId} className="mt-1 h-8 w-full rounded-control border border-kit-slate-5 bg-white px-2" onChange={(event) => setDestinationDraft((current) => ({ ...current, [line.id]: event.target.value }))}>{currentDestinationId ? null : <option value="" disabled>Not recorded</option>}{pickerDestinations.map((destination) => { const closed = !activeDestinations.some((active) => active.id === destination.id); return <option key={destination.id} value={destination.id} disabled={closed}>{destination.name}{closed ? " (closed)" : ""}</option>; })}</select></label></div>;
+  })}</div><label className="mt-4 block text-meta text-kit-slate-11">Why<input className="mt-1 h-8 w-full rounded-control border border-kit-slate-5 px-2" value={reason} onChange={(event) => setReason(event.target.value)} /></label>{gap ? <div className="mt-3"><div className="text-meta text-kit-red-11">{gap}</div><div className="text-meta text-kit-slate-11">{action}</div></div> : null}{error ? <div className="mt-3"><div className="text-meta text-kit-red-11">The revision could not be saved</div><div className="text-meta text-kit-slate-11">{error}</div></div> : null}<div className="mt-4 flex justify-end gap-2"><button type="button" className="h-8 rounded-control border border-kit-slate-5 px-3 text-body font-medium" onClick={onCancel}>Cancel</button><button type="button" disabled={!!gap || save.isPending} className="h-8 rounded-control bg-kit-blue-9 px-3 text-body font-semibold text-white disabled:bg-kit-slate-6" onClick={() => { if (gap) return; setError(null); save.mutate({ reason: reason.trim(), lines: changes }, { onSuccess: onSaved, onError: (cause) => setError(cause instanceof Error ? cause.message : String(cause)) }); }}>{save.isPending ? "Saving…" : "Send for approval"}</button></div></div>;
 }

@@ -4,6 +4,13 @@ import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
 vi.mock("../../lib/supabase", () => ({ userClient: vi.fn(), adminClient: vi.fn() }));
+/* The Settings editor gate (TEAM-02, 0668/0674) has its own tests in
+ * settings-core.test.ts; here it answers like the database does while nobody
+ * is named: the owner may edit, the route is otherwise unchanged. */
+vi.mock("../../lib/settings-editor", () => ({
+  canEditSettings: vi.fn(async (_env: unknown, _jwt: unknown, _section: unknown, role?: string | null) => role === "principal"),
+  requireSettingsEditor: () => async (_c: unknown, next: () => Promise<void>) => { await next(); },
+}));
 import { userClient } from "../../lib/supabase";
 
 /**
@@ -560,5 +567,78 @@ describe("S2-A · the scheduled cover is the one the resolver will use", () => {
     const grn = body.duties.find((d) => d.key === "grn_duty")!;
     expect(grn.scheduled_cover_id).toBe("soon");
     expect(body.duties.find((d) => d.key === "po_duty")!.scheduled_cover_id).toBeNull();
+  });
+});
+
+
+describe("scoped assignment history", () => {
+  it("forwards an older-page cursor through the authenticated source", async () => {
+    const sb = makeSb({}, { workspace_assignment_history: { data: [{ id: 5, to_name: "Shasha" }] } });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await req("/api/operation/workspace-duties/grn_duty/history?before=9", "GET", await makeJwt("operation"));
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("workspace_assignment_history", { p_duty_key: "grn_duty", p_before: 9, p_limit: 50 });
+    expect(await res.json()).toEqual({ records: [{ id: 5, to_name: "Shasha" }] });
+  });
+  it.each(["0", "-1", "NaN", "9007199254740992"])("refuses malformed cursor %s", async (cursor) => {
+    const res = await req(`/api/operation/workspace-duties/grn_duty/history?before=${cursor}`, "GET", await makeJwt("operation"));
+    expect(res.status).toBe(400); expect(userClient).not.toHaveBeenCalled();
+  });
+  it("refuses a dealer and an unauthenticated caller", async () => {
+    expect((await req("/api/operation/workspace-duties/grn_duty/history", "GET", await makeJwt("dealer"))).status).toBe(403);
+    expect((await req("/api/operation/workspace-duties/grn_duty/history", "GET", null)).status).toBe(401);
+    expect(userClient).not.toHaveBeenCalled();
+  });
+});
+
+describe("0671 · the monthly-rotation origin travels, and the page survives before 0671 is applied", () => {
+  function sbWithOrigin(missingColumn: boolean) {
+    const base = makeSb(dutyTables(), {
+      workspace_can_assign_duties: { data: true },
+      workspace_resolve_duty: { data: RESOLVED },
+    });
+    const selects: string[] = [];
+    const from = base.from.bind(base);
+    return {
+      selects,
+      sb: {
+        ...base,
+        from(table: string) {
+          const b = from(table) as Record<string, unknown>;
+          if (table !== "workspace_duty_assignments") return b;
+          let cols = "";
+          b.select = vi.fn((c: string) => { cols = c; selects.push(c); return b; });
+          b.then = (resolve: (r: Result) => unknown) =>
+            Promise.resolve(
+              missingColumn && cols.includes("origin")
+                ? { data: null, error: { code: "42703", message: "column workspace_duty_assignments.origin does not exist" } }
+                : { data: [{ ...(dutyTables().workspace_duty_assignments.list.data[0]!), ...(cols.includes("origin") ? { origin: "monthly_rotation" } : {}) }], error: null },
+            ).then(resolve);
+          return b;
+        },
+      },
+    };
+  }
+
+  it("reads origin with the assignments", async () => {
+    const { sb, selects } = sbWithOrigin(false);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req("/api/operation/workspace-duties", "GET", await makeJwt("operation"));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { duties: Array<{ key: string; assignments: Array<{ origin: string }> }> };
+    expect(body.duties.find((d) => d.key === "grn_duty")!.assignments[0]!.origin).toBe("monthly_rotation");
+    expect(selects).toHaveLength(1);
+  });
+
+  it("falls back to the columns before 0671 instead of failing the page", async () => {
+    const { sb, selects } = sbWithOrigin(true);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req("/api/operation/workspace-duties", "GET", await makeJwt("operation"));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { duties: Array<{ key: string; assignments: Array<{ origin: string }> }> };
+    expect(body.duties.find((d) => d.key === "grn_duty")!.assignments[0]!.origin).toBe("manual");
+    expect(selects.map((c) => c.includes("origin"))).toEqual([true, false]);
   });
 });

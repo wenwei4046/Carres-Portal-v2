@@ -136,7 +136,7 @@ describe("ServiceCaseWizard — a new hire files a case without writing a senten
           so: "SO-1303",
           refNos: ["CR1303"],
           customerName: "Kimmy",
-          customerPhone: "019-3478913",
+          customerPhone: "019-0000074",
           customerAddress: "12 Jalan Klang",
           deliveryDate: "2026-08-30",
           lines: [{ id: "00000000-0000-0000-0000-000000000002", sku: "MS1401F-K", qty: 1, sourcePo: null }],

@@ -100,10 +100,13 @@ function calendarOf(opts: PoWindowCalendar) {
 export function poWindowCalendarOf(
   poDays: readonly number[],
   holidays?: ReadonlySet<string>,
+  /** The STORED Office calendar's non-working weekdays (Settings → Office,
+   *  `officeOffDays`). Absent ⇒ Saturday and Sunday (the owner default). */
+  officeOffDays: readonly number[] = PURCHASING_OFFICE_OFF_DAYS,
 ): PoWindowCalendar {
   const ticked = new Set(poDays.map(Number));
   const offDays = [0, 1, 2, 3, 4, 5, 6].filter(
-    (day) => PURCHASING_OFFICE_OFF_DAYS.includes(day) || (ticked.size > 0 && !ticked.has(day)),
+    (day) => officeOffDays.includes(day) || (ticked.size > 0 && !ticked.has(day)),
   );
   return { offDays, ...(holidays ? { holidays } : {}) };
 }
@@ -212,6 +215,7 @@ export interface ExpectedArrivalLine {
   id: string;
   qty: number;
   receivedQty: number;
+  cancelledQty?: number;
 }
 
 export interface ExpectedArrival {
@@ -243,7 +247,7 @@ export function poExpectedArrivalsOf(po: {
   const poLevel = rows.filter((p) => !p.po_line_id).sort((a, b) => b.recorded_at.localeCompare(a.recorded_at))[0] ?? null;
   const out: ExpectedArrival[] = [];
   for (const line of po.lines) {
-    const still = Number(line.qty) - Number(line.receivedQty);
+    const still = Number(line.qty) - Number(line.receivedQty) - Number(line.cancelledQty??0);
     if (!(still > 0)) continue;
     const own = rows.filter((p) => p.po_line_id === line.id).sort((a, b) => b.recorded_at.localeCompare(a.recorded_at));
     const newest = own[0];

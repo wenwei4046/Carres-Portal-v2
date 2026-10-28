@@ -233,7 +233,7 @@ describe("GET /api/operation/pos/:id/print-data", () => {
        the same paper (0383). The only reads left are the three inputs of the
        two paper facts (owner 2026-09-22): nothing else, no other column. */
     expect(reads.sort((a, b) => a.table.localeCompare(b.table))).toEqual([
-      { table: "purchase_orders", columns: "supplier_id" },
+      { table: "purchase_orders", columns: "supplier_id, is_consignment" },
       { table: "purchasing_supplier_settings", columns: "off_days" },
       { table: "suppliers", columns: "kind" },
     ]);
@@ -528,6 +528,34 @@ describe("GET /api/operation/pos/:id/print-data — paper facts", () => {
     );
     const { body } = await get();
     expect(body.delivery_working_days).toBeNull();
+  });
+
+  it("a Consignment Order adds its Unit Prices beside the document; two prices on one SKU print none (Weisiang 2026-10-22)", async () => {
+    const rpc = vi.fn(() => Promise.resolve({ data: makeDocument(), error: null }));
+    const lineRows = [{ sku: "CODY-Q", cost: "1200.00" }, { sku: "JAGER-K", cost: 800 }, { sku: "JAGER-K", cost: 900 }, { sku: "JAGER-K", cost: 800 }];
+    const from = vi.fn((table: string) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const chain: any = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn(() => Promise.resolve({ data: table === "purchase_orders" ? { supplier_id: null, is_consignment: true } : null, error: null })),
+        then: (ok: (v: unknown) => unknown) => Promise.resolve({ data: table === "purchase_order_lines" ? lineRows : [], error: null }).then(ok),
+      };
+      return chain;
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc, from } as any);
+    const { body } = await get();
+    expect(body.consignment).toBe(true);
+    expect(body.line_prices).toEqual({ "CODY-Q": 1200, "JAGER-K": null });
+    expect(body.lines).toEqual(makeDocument().lines);
+  });
+
+  it("an ordinary PO stays money-free: no consignment facts", async () => {
+    mockTables({ purchase_orders: { supplier_id: "sup-nf", is_consignment: false }, suppliers: { kind: "factory" } });
+    const { body } = await get();
+    expect(body).not.toHaveProperty("consignment");
+    expect(body).not.toHaveProperty("line_prices");
   });
 
   it("a KEPT version reprints exactly what was sent — no paper facts are added to it", async () => {

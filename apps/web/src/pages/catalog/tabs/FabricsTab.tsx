@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Edit3, History, Plus, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Download, Edit3, History, Plus, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import type { CatalogFabricDto, CatalogResponse, FabricTier, ProductModelDto } from "@carres/shared";
 import { ApiError } from "@/lib/api";
@@ -15,6 +15,8 @@ import MaintenanceSidebar, {
   type MaintenanceSidebarGroup,
 } from "../components/MaintenanceSidebar";
 import FabricTierDeltasCard from "./FabricTierDeltasCard";
+import { buildFabricCsv, mergeFabricImport, type FabricCsvRow } from "@/lib/fabric-csv";
+import { downloadCsv, readFileToRecords } from "@/lib/sku-csv";
 
 /**
  * Fabrics tab (0202) — the 2990s "Products › Fabrics" port. Left sidebar
@@ -60,6 +62,7 @@ interface DraftRow {
   sofaTier: FabricTier;
   bedframeTier: FabricTier;
   active: boolean;
+  stock?: FabricCsvRow["stock"];
 }
 
 function toDraft(rows: CatalogFabricDto[]): DraftRow[] {
@@ -71,6 +74,7 @@ function toDraft(rows: CatalogFabricDto[]): DraftRow[] {
     sofaTier: f.sofaTier,
     bedframeTier: f.bedframeTier,
     active: f.active,
+    stock: f.stock,
   }));
 }
 
@@ -560,18 +564,52 @@ function FabricsPanel({
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState<DraftRow[] | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  // Follows Houzs frontend/src/pages/scm-v2/FabricTracking.tsx:49-58 per
+  // Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+  // Retired fabrics are hidden by default, one click away.
+  const [showRetired, setShowRetired] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const editing = draft !== null;
+  const retiredCount = fabrics.filter((f) => !f.active).length;
+
+  // Follows Houzs frontend/src/pages/scm-v2/FabricTracking.tsx:66-87 per
+  // Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+  // Export is always the full list; Import merges by fabric code into the
+  // Edit draft, and Save writes it through the same batch save + history.
+  function onExport() {
+    if (fabrics.length === 0) return void toast.error("No fabrics to export.");
+    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    downloadCsv(`fabrics-${stamp}.csv`, buildFabricCsv(toDraft(fabrics)));
+  }
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    let records: Record<string, string>[];
+    try {
+      records = await readFileToRecords(file);
+    } catch {
+      return void toast.error("Could not read that file. Use a CSV or Excel file.");
+    }
+    const res = mergeFabricImport(draft ?? toDraft(fabrics), records);
+    if (res.errors.length > 0) {
+      return void toast.error(`Nothing imported. ${res.errors.slice(0, 3).join(" ")}`);
+    }
+    setDraft(res.rows);
+    toast.success(`${res.added} new, ${res.updated} updated. Check the list, then press Save.`);
+  }
 
   const q = search.trim().toLowerCase();
+  const shown = showRetired ? fabrics : fabrics.filter((f) => f.active);
   const visible = q
-    ? fabrics.filter(
+    ? shown.filter(
         (f) =>
           f.fabricCode.toLowerCase().includes(q) ||
           (f.description ?? "").toLowerCase().includes(q) ||
           (f.series ?? "").toLowerCase().includes(q) ||
           (f.supplierCode ?? "").toLowerCase().includes(q),
       )
-    : fabrics;
+    : shown;
 
   // --- draft helpers -------------------------------------------------------
   const patchRow = (i: number, up: Partial<DraftRow>) =>
@@ -642,6 +680,9 @@ function FabricsPanel({
             sofaTier: r.sofaTier,
             bedframeTier: r.bedframeTier,
             active: r.active,
+            // Follows Houzs fabric-tracking.ts:264-275 per Weisiang's ruling
+            // (2026-10-22): stock columns ride the save; absent ones are kept.
+            ...r.stock,
           })),
       },
       {
@@ -701,6 +742,35 @@ function FabricsPanel({
           )}
           <button
             type="button"
+            onClick={onExport}
+            className="btn-ghost text-meta inline-flex items-center gap-1.5"
+            data-testid="fabrics-export"
+          >
+            <Download size={13} strokeWidth={2} /> Export CSV
+          </button>
+          {isPrincipal && (
+            <>
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="btn-ghost text-meta inline-flex items-center gap-1.5"
+                data-testid="fabrics-import"
+              >
+                <Upload size={13} strokeWidth={2} /> Import
+              </button>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                className="hidden"
+                aria-label="Import fabrics file"
+                data-testid="fabrics-import-file"
+                onChange={onFile}
+              />
+            </>
+          )}
+          <button
+            type="button"
             onClick={() => setShowHistory(true)}
             className="btn-ghost text-meta inline-flex items-center gap-1.5"
             data-testid="fabrics-history"
@@ -725,6 +795,17 @@ function FabricsPanel({
           <span className="text-label uppercase tracking-[0.05em] text-base-400">
             {visible.length} of {fabrics.length} records
           </span>
+          {retiredCount > 0 && (
+            <label className="flex items-center gap-2 text-meta text-base-500 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showRetired}
+                onChange={(e) => setShowRetired(e.target.checked)}
+                data-testid="fabrics-show-retired"
+              />
+              {showRetired ? `Showing ${retiredCount} retired` : `${retiredCount} retired hidden`}
+            </label>
+          )}
         </div>
       )}
 

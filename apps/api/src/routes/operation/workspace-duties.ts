@@ -5,6 +5,7 @@ import {
   workspaceCoverDutyInput,
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
+import { requireSettingsEditor } from "../../lib/settings-editor";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import { resolveActorNames } from "../../lib/actor-names";
@@ -61,19 +62,64 @@ function refusal(error: { code?: string; message?: string; details?: string }) {
   return { status, body: { error: code, code, message: code } };
 }
 
+workspaceDutiesRouter.get("/:duty/history", requireOperation, async (c) => {
+  const before = c.req.query("before");
+  if (before !== undefined && (!/^\d+$/.test(before) || !Number.isSafeInteger(Number(before)) || Number(before) < 1)) {
+    return c.json({ error: "invalid_cursor" }, 400);
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("workspace_assignment_history", {
+    p_duty_key: c.req.param("duty"), p_before: before ? Number(before) : null, p_limit: 50,
+  });
+  if (error) { const mapped = mapPgError(error); return c.json(mapped.body, mapped.status); }
+  return c.json({ records: data ?? [] });
+});
+
+type AssignmentRow = {
+  id: string;
+  duty_key: string;
+  holder_id: string;
+  effective_from: string;
+  effective_until: string | null;
+  assigned_by: string | null;
+  note: string | null;
+  created_at: string;
+  origin: string;
+};
+
+/** The assignment rows, with `origin` (0671) so a monthly-rotation row reads
+ *  `Assigned by system`. The Worker deploys on merge and the migration applies
+ *  through its governed path: until 0671 is on the database the column does
+ *  not exist (42703), and the page reads exactly as before (every row manual)
+ *  rather than failing. */
+async function readAssignments(
+  sb: ReturnType<typeof userClient>,
+): Promise<{ data: AssignmentRow[] | null; error: { code?: string; message?: string; details?: string } | null }> {
+  const first = await sb
+    .from("workspace_duty_assignments")
+    .select("id, duty_key, holder_id, effective_from, effective_until, assigned_by, note, created_at, origin")
+    .order("effective_from", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(200);
+  if (first.error?.code !== "42703") return { data: first.data as AssignmentRow[] | null, error: first.error };
+  const before0671 = await sb
+    .from("workspace_duty_assignments")
+    .select("id, duty_key, holder_id, effective_from, effective_until, assigned_by, note, created_at")
+    .order("effective_from", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(200);
+  return {
+    data: before0671.data ? (before0671.data as Omit<AssignmentRow, "origin">[]).map((r) => ({ ...r, origin: "manual" })) : null,
+    error: before0671.error,
+  };
+}
+
 workspaceDutiesRouter.get("/", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
 
   const [canAssignRes, assignments, covers] = await Promise.all([
     sb.rpc("workspace_can_assign_duties"),
-    sb
-      .from("workspace_duty_assignments")
-      .select(
-        "id, duty_key, holder_id, effective_from, effective_until, assigned_by, note, created_at",
-      )
-      .order("effective_from", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(200),
+    readAssignments(sb),
     sb
       .from("workspace_duty_covers")
       .select(
@@ -150,6 +196,22 @@ workspaceDutiesRouter.get("/", requireOperation, async (c) => {
     scheduledCoverIds[d.key] = typeof coverId === "string" ? coverId : null;
   }
 
+  const nextAssignmentIds: Record<string, string | null> = {};
+  for (const duty of DUTIES) {
+    nextAssignmentIds[duty.key] = null;
+    const today = (resolutions[duty.key] as Record<string, unknown>)?.on_date;
+    if (typeof today !== "string") continue;
+    const future = (assignments.data ?? []).filter(a => a.duty_key === duty.key && a.effective_from > today)
+      .sort((a,b) => a.effective_from.localeCompare(b.effective_from) || b.created_at.localeCompare(a.created_at));
+    for (const candidate of future) {
+      const resolved = await sb.rpc("workspace_resolve_duty", { p_duty_key: duty.key, p_on: candidate.effective_from });
+      if (resolved.error) { const mapped = mapPgError(resolved.error); return c.json(mapped.body, mapped.status); }
+      if ((resolved.data as Record<string, unknown> | null)?.normal_user_id === candidate.holder_id) {
+        nextAssignmentIds[duty.key] = candidate.id; break;
+      }
+    }
+  }
+
   const names = await resolveActorNames(sb, ids);
   const name = (v: unknown) =>
     typeof v === "string" && v.length > 0 ? (names.get(v) ?? null) : null;
@@ -162,6 +224,7 @@ workspaceDutiesRouter.get("/", requireOperation, async (c) => {
         key: d.key,
         label: d.label,
         scheduled_cover_id: scheduledCoverIds[d.key] ?? null,
+        next_assignment_id: nextAssignmentIds[d.key] ?? null,
         resolution: {
           ...r,
           normal_user_name: name(r?.normal_user_id),
@@ -187,7 +250,7 @@ workspaceDutiesRouter.get("/", requireOperation, async (c) => {
   });
 });
 
-workspaceDutiesRouter.post("/assign", requireOperation, async (c) => {
+workspaceDutiesRouter.post("/assign", requireOperation, requireSettingsEditor("staff_duties"), async (c) => {
   const parsed = await parseJsonBody(c, workspaceAssignDutyInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -213,7 +276,7 @@ workspaceDutiesRouter.post("/assign", requireOperation, async (c) => {
   );
 });
 
-workspaceDutiesRouter.post("/cover", requireOperation, async (c) => {
+workspaceDutiesRouter.post("/cover", requireOperation, requireSettingsEditor("staff_duties"), async (c) => {
   const parsed = await parseJsonBody(c, workspaceCoverDutyInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);

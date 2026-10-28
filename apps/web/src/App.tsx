@@ -2,6 +2,9 @@ import { Suspense, lazy, useEffect, type ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 import { useAuth } from "@/lib/auth";
+import { useWorkActivity } from "@/lib/use-work-activity";
+import { useProfileAppearance } from "@/lib/appearance";
+import { useCompanyIdentitySync } from "@/lib/company-identity";
 import { RequireRole } from "@/lib/require-role";
 import { loginState } from "@/lib/return-to";
 import { roleAllowedOnPortal } from "@/lib/portal";
@@ -12,7 +15,7 @@ import UpdatePassword from "@/pages/UpdatePassword";
 import Me from "@/pages/Me";
 import DealerApp from "@/pages/dealer/DealerApp";
 import PrincipalApp from "@/pages/principal/PrincipalApp";
-import OperationApp from "@/pages/operation/OperationApp";
+import RequestFlowOperationApp from "@/pages/operation/RequestFlowOperationApp";
 import PartnerApp from "@/pages/partner/PartnerApp";
 import FinanceApp from "@/pages/finance/FinanceApp";
 import SupplierApp from "@/pages/supplier/SupplierApp";
@@ -21,6 +24,7 @@ import BDApp from "@/pages/bd/BDApp";
 import HrApp from "@/pages/hr/HrApp";
 import PickupEventPrintPage from "@/pages/print/PickupEventPrintPage";
 import ServiceNotePrintPage from "@/pages/print/ServiceNotePrintPage";
+import FleetRunSheetPrintPage from "@/pages/print/FleetRunSheetPrintPage";
 import { PayCancelled, PaySuccess } from "@/pages/pay/PayResult";
 
 /* `/ui` — UI-KIT's third body (card D0.5a). LAZY on purpose: it is a kit
@@ -81,6 +85,11 @@ function RequireAuth({ children }: { children: ReactNode }) {
 }
 
 export default function App() {
+  useWorkActivity();
+  /* Each person's own theme and focus outline (handoff v4, UI Kit §9). */
+  useProfileAppearance();
+  /* The company identity every printed document carries (Settings → Company). */
+  useCompanyIdentitySync();
   const hydrate = useAuth((s) => s.hydrate);
   const location = useLocation();
   useEffect(() => {
@@ -132,7 +141,7 @@ export default function App() {
                   area is reachable by the boss. DB twin: migration 0189 widens
                   is_operation(); API twin: requireOperation admits principal. */}
               <RequireRole roles={["operation", "principal"]}>
-                <OperationApp />
+                <RequestFlowOperationApp />
               </RequireRole>
             </RequireAuth>
           }
@@ -154,8 +163,10 @@ export default function App() {
               {/* Payment MASTER §12 — the Responsible Delivery Operation
                   (role: operation) do daily collection, so the Payments and
                   Invoices destinations must open for them. FinanceApp itself
-                  bounces operation off the finance-only pages. */}
-              <RequireRole roles={["finance", "principal", "operation"]}>
+                  bounces operation off the finance-only pages. HR and BD reach
+                  Payment Requests only (0687, Chew 2026-10-12, Finance MASTER
+                  §3.3); FinanceApp sends them nowhere else. */}
+              <RequireRole roles={["finance", "principal", "operation", "hr", "bd"]}>
                 <FinanceApp />
               </RequireRole>
             </RequireAuth>
@@ -214,6 +225,15 @@ export default function App() {
           element={
             <RequireAuth>
               <PickupEventPrintPage />
+            </RequireAuth>
+          }
+        />
+        {/* 0724 — a Carres lorry's run sheet (Weisiang's decision 2026-10-22, Houzs FleetRunSheet). */}
+        <Route
+          path="/print/run-sheet"
+          element={
+            <RequireAuth>
+              <FleetRunSheetPrintPage />
             </RequireAuth>
           }
         />

@@ -729,3 +729,86 @@ describe("POST /:id/handover-proof/sign-upload", () => {
     expect(body.token).toBe("t");
   });
 });
+
+/* New Delivery Order — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22):
+   office staff open a DO from a Sales Order's lines. Jess was not part of it. */
+vi.mock("../../lib/delivery-order-issue", async (orig) => ({
+  ...(await orig<typeof import("../../lib/delivery-order-issue")>()),
+  attemptDeliveryOrderIssue: vi.fn(),
+}));
+import { attemptDeliveryOrderIssue } from "../../lib/delivery-order-issue";
+
+const SO_ORDER = {
+  id: "00000000-0000-0000-0000-0000000a0710",
+  so: 1710,
+  customer_name: "TEST 0710",
+  order_lines: [
+    { id: "l1", sku: "MS12 Firmcare 10inch Queen", qty: 1, attrs: null },
+    { id: "l2", sku: "SF03 Muro 2 Seater", qty: 1, attrs: null },
+    { id: "l3", sku: "Memory Pillow", qty: 2, attrs: null },
+  ],
+};
+
+describe("New Delivery Order — office staff open a DO from SO lines", () => {
+  it("offers only the lines not already on a live DO", async () => {
+    mockSb([{ data: SO_ORDER }, { data: [{ leg: 0, trip_groups: ["bed"], voided_at: null }] }]);
+    const res = await call("/offer/SO-1710", "operation");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { order: { so: number }; lines: Array<{ id: string; group: string | null }> };
+    expect(body.order.so).toBe(1710);
+    expect(body.lines.map((l) => l.id)).toEqual(["l2"]);
+  });
+
+  it("an untouched order offers every line, accessories too", async () => {
+    mockSb([{ data: SO_ORDER }, { data: [] }]);
+    const res = await call("/offer/1710", "operation");
+    const body = (await res.json()) as { lines: Array<{ id: string }> };
+    expect(body.lines.map((l) => l.id)).toEqual(["l1", "l2", "l3"]);
+  });
+
+  it("creates through the one issuing path with the picked scope", async () => {
+    mockSb([{ data: SO_ORDER }, { data: [] }]);
+    vi.mocked(attemptDeliveryOrderIssue).mockResolvedValueOnce({ outcome: "issued", doNumber: "DO2610-1234" });
+    const res = await call("", "operation", { method: "POST", body: JSON.stringify({ orderId: SO_ORDER.id, groups: ["bed"] }) });
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({ doNumber: "DO2610-1234" });
+    expect(attemptDeliveryOrderIssue).toHaveBeenCalledWith(expect.anything(), SO_ORDER.id, {
+      waitBookingConfirm: false,
+      groups: ["bed"],
+    });
+  });
+
+  it("refuses goods already on a live DO before anything is drawn", async () => {
+    mockSb([{ data: SO_ORDER }, { data: [{ leg: 0, trip_groups: ["bed"], voided_at: null }] }]);
+    vi.mocked(attemptDeliveryOrderIssue).mockClear();
+    const res = await call("", "operation", { method: "POST", body: JSON.stringify({ orderId: SO_ORDER.id, groups: ["bed"] }) });
+    expect(res.status).toBe(409);
+    expect(attemptDeliveryOrderIssue).not.toHaveBeenCalled();
+  });
+
+  it("a gate refusal names what is still open", async () => {
+    mockSb([{ data: SO_ORDER }, { data: [] }]);
+    vi.mocked(attemptDeliveryOrderIssue).mockResolvedValueOnce({ outcome: "blocked", reasons: ["RM 100.00 unpaid"] });
+    const res = await call("", "operation", { method: "POST", body: JSON.stringify({ orderId: SO_ORDER.id, groups: ["bed", "sofa"] }) });
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { reasons: string[] }).reasons).toEqual(["RM 100.00 unpaid"]);
+  });
+
+  it("a create that lost a race to the same goods says so in the dialog's words", async () => {
+    mockSb([{ data: SO_ORDER }, { data: [] }]);
+    vi.mocked(attemptDeliveryOrderIssue).mockResolvedValueOnce({
+      outcome: "error",
+      body: { message: "these goods are already on a Delivery Order", detail: "already_on_a_delivery_order" },
+      status: 409,
+    });
+    const res = await call("", "operation", { method: "POST", body: JSON.stringify({ orderId: SO_ORDER.id, groups: ["bed"] }) });
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { message: string }).message).toBe("These goods are already on a Delivery Order.");
+  });
+
+  it("refuses a role outside operation/principal", async () => {
+    mockSb([]);
+    const res = await call("", "supplier", { method: "POST", body: JSON.stringify({ orderId: SO_ORDER.id, groups: [] }) });
+    expect([401, 403]).toContain(res.status);
+  });
+});

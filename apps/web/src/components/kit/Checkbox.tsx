@@ -2,7 +2,8 @@
  * Checkbox — a box, a tick, and a word (UI-KIT §6, card D0.5b).
  *
  * §4.2 puts a checkbox on `rounded-pill` (4) by name, so this is the one control
- * that does not take the 6px control radius.
+ * that does not take the 8px corner. v4 (01 §3): a 16 × 16 drawing whose
+ * ticked fill is the person's theme accent, `--c-select-fg`.
  *
  * **It has a third state and that state means something.** `indeterminate` is
  * what a table's select-all shows when some rows are picked — Radix models it as
@@ -47,11 +48,11 @@ export default function Checkbox({
         data-kit="checkbox"
         className={
           "flex h-4 w-4 shrink-0 items-center justify-center rounded-pill border " +
-          "border-kit-slate-4 bg-white " +
-          "data-[state=checked]:border-kit-blue-9 data-[state=checked]:bg-kit-blue-9 " +
-          "data-[state=indeterminate]:border-kit-blue-9 data-[state=indeterminate]:bg-kit-blue-9 " +
+          "border-c-input-border bg-c-card " +
+          "data-[state=checked]:border-c-select-fg data-[state=checked]:bg-c-select-fg " +
+          "data-[state=indeterminate]:border-c-select-fg data-[state=indeterminate]:bg-c-select-fg " +
           "disabled:opacity-40 disabled:cursor-not-allowed " +
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 focus-visible:ring-offset-1"
+          "focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:2px]"
         }
       >
         <RadixCheckbox.Indicator className="text-white">
@@ -65,7 +66,7 @@ export default function Checkbox({
         </RadixCheckbox.Indicator>
       </RadixCheckbox.Root>
       {label && (
-        <label htmlFor={id} className="text-body text-kit-slate-12 cursor-pointer">
+        <label htmlFor={id} className="text-body text-c-ink cursor-pointer">
           {label}
         </label>
       )}

@@ -304,6 +304,14 @@ export const serviceCaseSchema = z.object({
    * a web build newer than the Worker reads an empty clock, never a crash.
    */
   slaEvents:       z.array(caseSlaEventSchema).optional(),
+
+  /**
+   * 0711 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): the Sales Order
+   * PIC picks an admin to own the case. `ownerPickable` is answered by the
+   * server on the single-case read only: may THIS caller pick the owner.
+   */
+  ownerUserId:     z.string().uuid().nullable().optional(),
+  ownerPickable:   z.boolean().optional(),
 });
 export type ServiceCase = z.infer<typeof serviceCaseSchema>;
 
@@ -358,7 +366,13 @@ export type CreateServiceCaseInput = z.infer<typeof createServiceCaseInputSchema
  */
 export const updateServiceCaseInputSchema = createServiceCaseInputSchema
   .omit({ evidence: true, draftId: true })
-  .partial();
+  .partial()
+  // 0711 — Weisiang's decision (WhatsApp 2026-10-22): staff edit the priority
+  // and the Sales Order PIC picks the case owner (Houzs way).
+  .extend({
+    priority:    z.enum(["low", "normal", "high"]).nullable().optional(),
+    ownerUserId: z.string().uuid().nullable().optional(),
+  });
 export type UpdateServiceCaseInput = z.infer<typeof updateServiceCaseInputSchema>;
 
 // ── The numbers (S5, NO migration) ───────────────────────────────────────────
@@ -460,3 +474,35 @@ export const caseLookupResponseSchema = z.object({
   matches: z.number().int(),
 });
 export type CaseLookupResponse = z.infer<typeof caseLookupResponseSchema>;
+
+/**
+ * 0711 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): "sales own the
+ * order and sales assign an admin to own the case". The Sales Order PIC picks
+ * the case owner; the principal may always. A case with no PIC to ask (no order,
+ * or an order nobody owns yet) may be given an owner by any office person.
+ */
+export function mayPickCaseOwner(args: {
+  role: string;
+  callerId: string;
+  soPicUserId: string | null;
+}): boolean {
+  if (args.role === "principal") return true;
+  if (args.role !== "operation") return false;
+  return args.soPicUserId === null || args.soPicUserId === args.callerId;
+}
+
+/** 0711 — Service settings (Houzs Service Maintenance): the default case owner
+ *  and the two pick lists staff choose from on a case. */
+export const SERVICE_PICK_LISTS = ["types", "statuses"] as const;
+export type ServicePickList = (typeof SERVICE_PICK_LISTS)[number];
+
+export const serviceSettingsPatchSchema = z.object({
+  defaultOwnerUserId: z.string().uuid().nullable(),
+});
+export const servicePickItemCreateSchema = z.object({
+  label:    z.string().trim().min(1).max(60),
+});
+export const servicePickItemPatchSchema = z.object({
+  label:  z.string().trim().min(1).max(60).optional(),
+  active: z.boolean().optional(),
+});

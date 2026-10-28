@@ -52,6 +52,22 @@ import {
  */
 export const PURCHASING_OFFICE_OFF_DAYS: readonly number[] = [0, 6];
 
+/**
+ * The Office calendar a Purchasing record counts on. Pass the STORED Office
+ * calendar's options (`officeWorkingDayOptions(cal)`, Settings → Office) so
+ * the record follows its weekdays AND its holidays. A bare holiday set (an
+ * older caller) keeps Monday–Friday with those holidays; nothing at all
+ * keeps Monday–Friday with the built-in list — the owner defaults.
+ */
+export type PurchasingOfficeDays = ReadonlySet<string> | WorkingDayOptions;
+
+export function purchasingOfficeDays(cal?: PurchasingOfficeDays | null): WorkingDayOptions {
+  if (!cal) return { offDays: PURCHASING_OFFICE_OFF_DAYS, holidays: myHolidaySet() };
+  if (cal instanceof Set) return { offDays: PURCHASING_OFFICE_OFF_DAYS, holidays: cal };
+  const opts = cal as WorkingDayOptions;
+  return { offDays: opts.offDays ?? PURCHASING_OFFICE_OFF_DAYS, holidays: opts.holidays ?? myHolidaySet() };
+}
+
 export type PurchasingSupplierCallKey =
   | "confirm_ready_date"
   | "confirm_tomorrows_delivery"
@@ -65,6 +81,7 @@ export interface SupplierCallLine {
   sku: string;
   qty: number;
   receivedQty: number;
+  cancelledQty?: number;
   /**
    * `purchase_order_lines.short_since` (0306) — the day this line last took a
    * SHORT delivery, stamped server-side by a trigger so every door that writes
@@ -131,8 +148,11 @@ export interface SupplierCallPo {
 
 export interface SupplierCallOptions {
   todayIso: IsoDate;
-  /** Malaysian public holidays. Omitted → the live Selangor set. */
+  /** The Office holidays (Settings → Office). Omitted → the built-in set. */
   holidays?: ReadonlySet<string>;
+  /** The stored Office calendar's off days (`officeOffDays`). Omitted → the
+   *  owner default, Saturday and Sunday (`PURCHASING_OFFICE_OFF_DAYS`). */
+  offDays?: readonly number[];
 }
 
 export interface PurchasingOpenCall {
@@ -151,7 +171,7 @@ export interface PurchasingOpenCall {
 
 function wd(opts: SupplierCallOptions): WorkingDayOptions {
   return {
-    offDays: PURCHASING_OFFICE_OFF_DAYS,
+    offDays: opts.offDays ?? PURCHASING_OFFICE_OFF_DAYS,
     holidays: opts.holidays ?? myHolidaySet(),
   };
 }
@@ -164,7 +184,7 @@ function day(iso: string | null | undefined): string | null {
 /** Units this line still owes. Clamped, so a stray over-receipt cannot make a
  *  balance read as negative (the same guard `poReceivingProgress` applies). */
 function outstandingOf(l: SupplierCallLine): number {
-  const q = Math.max(0, Number(l.qty ?? 0));
+  const q = Math.max(0, Number(l.qty ?? 0)-Number(l.cancelledQty ?? 0));
   const r = Math.max(0, Math.min(q, Number(l.receivedQty ?? 0)));
   return q - r;
 }
@@ -330,7 +350,7 @@ export function balanceDeliveryCallsOf(
 
   const out: PurchasingOpenCall[] = [];
   for (const l of po.lines) {
-    const q = Math.max(0, Number(l.qty ?? 0));
+    const q = Math.max(0, Number(l.qty ?? 0)-Number(l.cancelledQty ?? 0));
     const r = Math.max(0, Math.min(q, Number(l.receivedQty ?? 0)));
     // §9: part-received = SOME good units in and some still owed. A line with
     // nothing in has no balance yet; a full line has no balance left.

@@ -22,12 +22,13 @@ import { useMemo, useState } from "react";
 import {
   PURCHASE_RETURN_TO_FROM_WORD,
   ISSUE_PURCHASE_RETURN,
+  ISSUE_CONSIGNMENT_RETURN,
   purchaseReturnIssueMissing,
   type PurchaseReturnIssueSource,
   type PurchaseReturnPrintData,
 } from "@carres/shared";
 import { ApiError } from "@/lib/api";
-import { usePurchaseReturnIssueSource, usePurchaseReturnWrite } from "@/lib/queries";
+import { useConsignmentReturnSource, useOperationSuppliers, usePurchaseReturnIssueSource, usePurchaseReturnWrite } from "@/lib/queries";
 import { usePurchaseReturnPdfUrl } from "@/lib/pdf/purchase-return-pdf";
 import { appTodayIso } from "@/lib/fmt-date";
 import Block from "@/components/kit/Block";
@@ -36,6 +37,7 @@ import Checkbox from "@/components/kit/Checkbox";
 import DatePicker from "@/components/kit/DatePicker";
 import EmptyState from "@/components/kit/EmptyState";
 import Input from "@/components/kit/Input";
+import Select from "@/components/kit/Select";
 import PdfPreview from "@/components/kit/PdfPreview";
 import { Fact } from "../SalesOrderWorkspace";
 
@@ -51,6 +53,7 @@ export function purchaseReturnDraftPrint(
   const byId = new Map(source.units.map((u) => [u.stock_item_id, u]));
   return {
     pr_no: null,
+    is_consignment: source.claim_id === null ? true : undefined,
     pr_doc_date: new Date().toISOString(),
     supplier: { name: source.supplier_name ?? "", contact: null },
     return_to: source.return_to,
@@ -65,13 +68,37 @@ export function purchaseReturnDraftPrint(
   };
 }
 
-export default function PurchaseReturnIssue({ claimId, onClose, onIssued }: { claimId: string; onClose: () => void; onIssued: (id: string) => void }) {
-  const read = usePurchaseReturnIssueSource(claimId);
+/** `claimId` — issued from a claim. `supplierId` with no claim — `New Purchase
+ *  Return`, Weisiang's decision (Mr Lim, WhatsApp 2026-10-22), overturning
+ *  Jess's "only after an approved claim"; Jess was not part of it. */
+export default function PurchaseReturnIssue({ claimId = null, supplierId = null, onClose, onIssued }: { claimId?: string | null; supplierId?: string | null; onClose: () => void; onIssued: (id: string) => void }) {
+  const read = usePurchaseReturnIssueSource(claimId, supplierId);
   if (read.isError) {
     return <div role="alert"><EmptyState title="Some information could not be refreshed." action={<Button variant="neutral" onClick={() => void read.refetch()}>Try again</Button>} /></div>;
   }
   if (read.isLoading || !read.data) return <EmptyState title="Loading…" />;
   return <IssueForm source={read.data.source} onClose={onClose} onIssued={onIssued} />;
+}
+
+/** ⭐ NEW CONSIGNMENT RETURN (0706 §2) — straight from the supplier's consigned
+ *  stock, no Supplier Claim. Follows Houzs
+ *  frontend/src/pages/scm-v2/PurchaseConsignmentReturnNew.tsx:12-15 and
+ *  PurchaseConsignmentReturnFromReceive.tsx (pick a supplier, tick its lines)
+ *  per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */
+export function ConsignmentReturnIssue({ onClose, onIssued }: { onClose: () => void; onIssued: (id: string) => void }) {
+  const [supplierId, setSupplierId] = useState<string | undefined>(undefined);
+  const suppliers = useOperationSuppliers();
+  const read = useConsignmentReturnSource(supplierId ?? null);
+  return <div className="flex min-h-0 flex-1 flex-col gap-3" data-testid="consignment-return-new">
+    <div className="max-w-[360px]">
+      <Select id="crtn-supplier" label="Supplier" value={supplierId} onValueChange={setSupplierId}
+        options={(suppliers.data?.suppliers ?? []).map((s) => ({ value: s.id, label: s.name }))} />
+    </div>
+    {!supplierId ? <div className="flex justify-end"><Button variant="neutral" onClick={onClose}>Cancel</Button></div>
+      : read.isError ? <div role="alert"><EmptyState title="Some information could not be refreshed." action={<Button variant="neutral" onClick={() => void read.refetch()}>Try again</Button>} /></div>
+      : read.isLoading || !read.data ? <EmptyState title="Loading…" />
+      : <IssueForm key={supplierId} source={read.data.source} onClose={onClose} onIssued={onIssued} />}
+  </div>;
 }
 
 export function IssueForm({ source, onClose, onIssued }: { source: PurchaseReturnIssueSource; onClose: () => void; onIssued: (id: string) => void }) {
@@ -80,7 +107,12 @@ export function IssueForm({ source, onClose, onIssued }: { source: PurchaseRetur
   const [pickup, setPickup] = useState<Record<string, string>>({});
   const [confirmed, setConfirmed] = useState<string | null>(null);
   const [tried, setTried] = useState(false);
-  const door = usePurchaseReturnWrite<{ id: string }>("/api/operation/purchase-returns");
+  const claimless = source.claim_id === null;
+  /* Claimless is either main's Consignment Return (0706 §2) or this branch's
+     New Purchase Return (0713); `consignment` tells them apart. */
+  const consignmentReturn = source.consignment === true;
+  const door = usePurchaseReturnWrite<{ id: string }>(consignmentReturn ? "/api/operation/purchase-returns/consignment" : "/api/operation/purchase-returns");
+  const title = consignmentReturn ? ISSUE_CONSIGNMENT_RETURN : ISSUE_PURCHASE_RETURN;
   const missing = purchaseReturnIssueMissing(source, picked);
   const supplier = source.supplier_name ?? "the supplier";
 
@@ -93,7 +125,7 @@ export function IssueForm({ source, onClose, onIssued }: { source: PurchaseRetur
     if (missing.length) return;
     const byId = new Map(source.units.map((u) => [u.stock_item_id, u]));
     door.mutate({
-      claim_id: source.claim_id,
+      ...(claimless ? { supplier_id: source.supplier_id } : { claim_id: source.claim_id }),
       units: picked.map((id) => ({ stock_item_id: id, seen: byId.get(id)?.seen ?? "", pickup_location: (pickup[id] ?? byId.get(id)?.pickup_location ?? "").trim() || null })),
       confirmed_pickup_date: confirmed,
     }, { onSuccess: (out) => onIssued(out.id) });
@@ -102,12 +134,12 @@ export function IssueForm({ source, onClose, onIssued }: { source: PurchaseRetur
 
   return <div className="flex min-h-0 flex-1 flex-col gap-4 min-[1180px]:flex-row" data-testid="purchase-return-issue">
     <div className="flex min-w-0 flex-col gap-3 min-[1180px]:w-1/2" data-testid="purchase-return-issue-form">
-      <p className="text-meta text-kit-slate-11">{source.claim_no ?? "Supplier Claim"}</p>
-      <h1 className="text-page text-kit-slate-12">{ISSUE_PURCHASE_RETURN}</h1>
+      <p className="text-meta text-kit-slate-11">{source.claim_no ?? (claimless ? supplier : "Supplier Claim")}</p>
+      <h1 className="text-page text-kit-slate-12">{title}</h1>
       {refusal ? <p role="alert" className="rounded-control border border-kit-red-9 bg-kit-red-3 px-3 py-2 text-body text-kit-red-11" data-testid="purchase-return-issue-refusal">{refusal}</p> : null}
       <Block title="Units to return">
         <div className="grid gap-1" data-testid="purchase-return-units">
-          {source.units.length === 0 ? <p className="text-body text-kit-slate-11">No tracked Units on this claim.</p> : null}
+          {source.units.length === 0 ? <p className="text-body text-kit-slate-11">{consignmentReturn ? `No consigned Units from ${supplier}.` : claimless ? "No Units of this supplier in stock." : "No tracked Units on this claim."}</p> : null}
           {source.units.map((u) => <div key={u.stock_item_id} className="flex min-h-[40px] flex-col justify-center border-b border-kit-slate-4 py-1 last:border-b-0">
             <Checkbox id={`pr-unit-${u.stock_item_id}`} label={u.unit_code} disabled={Boolean(u.refusal)}
               checked={picked.includes(u.stock_item_id)}
@@ -125,7 +157,7 @@ export function IssueForm({ source, onClose, onIssued }: { source: PurchaseRetur
             return <Input key={id} id={`pr-pickup-${id}`} label={u.unit_code} value={pickup[id] ?? u.pickup_location ?? ""}
               onChange={(e) => setPickup((prev) => ({ ...prev, [id]: e.target.value }))} />;
           })}
-          <p className="text-meta text-kit-slate-11">Editing the Pickup Location moves nothing.</p>
+          <p className="text-meta text-kit-slate-11">{claimless ? "Issuing takes these Units out of stock." : "Editing the Pickup Location moves nothing."}</p>
         </div>
       </Block>
       <Block title="Return To">
@@ -142,7 +174,7 @@ export function IssueForm({ source, onClose, onIssued }: { source: PurchaseRetur
       {tried && missing.length > 0 ? <ul className="text-body text-kit-red-11" data-testid="purchase-return-missing">{missing.map((m) => <li key={m}>{m}</li>)}</ul> : null}
       <div className="sticky bottom-0 flex justify-end gap-2 bg-background py-2 [&_button]:min-h-[40px] min-[1180px]:static min-[1180px]:[&_button]:min-h-0">
         <Button variant="neutral" onClick={onClose} disabled={door.isPending}>Cancel</Button>
-        <Button variant="primary" loading={door.isPending} onClick={issue} data-testid="purchase-return-issue-save">{ISSUE_PURCHASE_RETURN}</Button>
+        <Button variant="primary" loading={door.isPending} onClick={issue} data-testid="purchase-return-issue-save">{title}</Button>
       </div>
     </div>
     <div className="flex min-h-[640px] min-w-0 flex-col min-[1180px]:w-1/2" data-testid="purchase-return-issue-preview">

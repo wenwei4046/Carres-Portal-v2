@@ -15,7 +15,18 @@ import type {
   MoneyAccountRow,
   MoneyAccountUpdateInput,
 } from "@carres/shared/money-accounts";
-import type { LedgerAccountAddInput, LedgerAccountMoveInput, LedgerAccountReorderInput } from "@carres/shared";
+import type {
+  LedgerAccountAddInSectionInput,
+  LedgerAccountEditInput,
+  LedgerBooksClosed,
+  LedgerChartImportInput,
+  LedgerChartImportResult,
+  LedgerItemGroupPlaceInput,
+  LedgerItemGroupSaveInput,
+  LedgerItemGroups,
+  LedgerPostingAccountSetInput,
+  LedgerPostingAccounts,
+} from "@carres/shared";
 
 import { apiFetch } from "@/lib/api";
 
@@ -77,43 +88,116 @@ export function useSaveAccount() {
   });
 }
 
-/**
- * Move accounts inside one heading (0557). The account NUMBER is untouched —
- * this writes display order only.
- *
- * BOTH ORDERS GO UP: `was` is what the screen read, `now` is what it wants. The
- * database refuses with 409 when `was` is no longer the stored order, which is
- * the only thing standing between two draggers and last-write-wins. Passing
- * `now` as `was` would disable that check without any error to show for it.
- */
-export function useReorderAccounts() {
+/** 0656 — add an account or heading in one of AutoCount's sections. The drag
+ *  that reordered and moved accounts (0557, 0570) is gone from the screen:
+ *  the chart reads by number, and the heading an account sits under is
+ *  changed in its edit window (useEditAccount). */
+export function useAddAccountInSection() {
   const qc = useQueryClient();
-  return useMutation<{ moved: number }, Error, LedgerAccountReorderInput>({
-    mutationFn: (v) =>
-      apiFetch("/api/finance/ledger/accounts/reorder", { method: "POST", body: JSON.stringify(v) }),
+  return useMutation<{ code: string }, Error, LedgerAccountAddInSectionInput>({
+    mutationFn: (v) => apiFetch("/api/finance/ledger/accounts/in-section", { method: "POST", body: JSON.stringify(v) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["finance"] }),
   });
 }
 
-/**
- * Put one account under another heading (0570). The number and name stay; the
- * parent and the order under both headings change. Both headings' `was` go up,
- * and the database refuses with 409 when either is no longer the stored order.
- */
-export function useMoveAccount() {
+/** 0656 — edit one account in one act: name, number, section and the heading
+ *  it sits under. A new number is carried everywhere, so the whole ["finance"]
+ *  tree is read again. */
+export function useEditAccount() {
   const qc = useQueryClient();
-  return useMutation<{ code: string }, Error, LedgerAccountMoveInput>({
-    mutationFn: (v) =>
-      apiFetch("/api/finance/ledger/accounts/move", { method: "POST", body: JSON.stringify(v) }),
+  return useMutation<{ code: string }, Error, { code: string; input: LedgerAccountEditInput }>({
+    mutationFn: (v) => apiFetch(`/api/finance/ledger/accounts/${v.code}`, { method: "PUT", body: JSON.stringify(v.input) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["finance"] }),
   });
 }
 
-/** Add an account under a heading, or a heading with its first account (0577). */
-export function useAddAccount() {
+/** 0656 — retire an account the ledger never posted to, or bring one back. */
+export function useSetAccountActive() {
   const qc = useQueryClient();
-  return useMutation<{ code: string }, Error, LedgerAccountAddInput>({
-    mutationFn: (v) => apiFetch("/api/finance/ledger/accounts", { method: "POST", body: JSON.stringify(v) }),
+  return useMutation<{ code: string; active: boolean }, Error, { code: string; active: boolean }>({
+    mutationFn: (v) =>
+      apiFetch(`/api/finance/ledger/accounts/${v.code}/active`, { method: "POST", body: JSON.stringify({ active: v.active }) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["finance"] }),
+  });
+}
+
+/** 0657 — the account each posting the system makes goes to, and the latest changes. */
+/** 0659 — Finance Settings → Item groups: the groups and their accounts, every
+ *  product and its group, the sales that went to the goods account, the changes. */
+export function useItemGroups() {
+  return useQuery({
+    queryKey: ["finance", "item-groups"] as const,
+    queryFn: () => apiFetch<LedgerItemGroups>("/api/finance/ledger/item-groups"),
+  });
+}
+
+/** 0659 — add an item group (no id) or change one. `was` is the group the
+ *  screen showed; the database refuses with 409 when someone changed it since. */
+export function useSaveItemGroup() {
+  const qc = useQueryClient();
+  return useMutation<{ id: string; changed: boolean }, Error, { id: string | null } & LedgerItemGroupSaveInput>({
+    mutationFn: ({ id, ...v }) =>
+      apiFetch(id ? `/api/finance/ledger/item-groups/${id}` : "/api/finance/ledger/item-groups", {
+        method: id ? "PUT" : "POST",
+        body: JSON.stringify(v),
+      }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["finance"] }),
+  });
+}
+
+/** 0659 — move a product into another item group. */
+export function usePlaceProduct() {
+  const qc = useQueryClient();
+  return useMutation<{ changed: boolean }, Error, LedgerItemGroupPlaceInput>({
+    mutationFn: (v) => apiFetch("/api/finance/ledger/item-groups/place", { method: "POST", body: JSON.stringify(v) }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["finance"] }),
+  });
+}
+
+export function usePostingAccounts() {
+  return useQuery({
+    queryKey: ["finance", "posting-accounts"] as const,
+    queryFn: () => apiFetch<LedgerPostingAccounts>("/api/finance/ledger/posting-accounts"),
+  });
+}
+
+/** 0657 — change the account one posting goes to. `was` is the account the
+ *  screen showed; the database refuses with 409 when someone changed it
+ *  since. Everything under ["finance"] is read again: a report or picker that
+ *  reads a role must see the new account at once. */
+export function useSetPostingAccount() {
+  const qc = useQueryClient();
+  return useMutation<{ changed: boolean }, Error, LedgerPostingAccountSetInput>({
+    mutationFn: (v) => apiFetch("/api/finance/ledger/posting-accounts", { method: "PUT", body: JSON.stringify(v) }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["finance"] }),
+  });
+}
+
+/** 0655 — AutoCount's printed chart. `apply: false` only asks what the import
+ *  would do, so nothing is refreshed; `apply: true` makes accounts, and the
+ *  whole ["finance"] tree is read again, as after any chart change. */
+export function useImportChart() {
+  const qc = useQueryClient();
+  return useMutation<LedgerChartImportResult, Error, LedgerChartImportInput>({
+    mutationFn: (v) => apiFetch("/api/finance/ledger/accounts/import", { method: "POST", body: JSON.stringify(v) }),
+    onSuccess: (_d, v) => {
+      if (v.apply) void qc.invalidateQueries({ queryKey: ["finance"] });
+    },
+  });
+}
+
+/** 0622 — the last closed day. Finance and principal read it; only the principal saves it. */
+export function useBooksClosed() {
+  return useQuery({
+    queryKey: ["finance", "books-closed"] as const,
+    queryFn: () => apiFetch<LedgerBooksClosed>("/api/finance/ledger/books-closed"),
+  });
+}
+
+export function useSaveBooksClosed() {
+  const qc = useQueryClient();
+  return useMutation<LedgerBooksClosed, Error, LedgerBooksClosed>({
+    mutationFn: (v) => apiFetch("/api/finance/ledger/books-closed", { method: "PUT", body: JSON.stringify(v) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["finance", "books-closed"] }),
   });
 }

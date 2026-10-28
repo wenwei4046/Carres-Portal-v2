@@ -101,6 +101,22 @@ export const DOR_COPY = {
   emptyRegister:
     "No delivery orders yet. The system issues one when a trip's goods, logistics and date are ready. The Order Route on each Sales Order shows what is still open.",
   emptyFiltered: "No matching delivery orders.",
+  /* New Delivery Order: Weisiang's decision (Mr Lim, WhatsApp 2026-10-22),
+     office staff open a DO from a Sales Order's lines. COPY-STANDARD
+     "New Delivery Order words". */
+  newDo: "New Delivery Order",
+  newDoHelp: "Pick a Sales Order and the goods to deliver.",
+  soNo: "SO No",
+  find: "Find",
+  soNotFound: "Sales Order not found.",
+  otherItems: "Other items",
+  otherItemsHelp: "Go with the whole order, when every group is ticked.",
+  nothingLeft: "Everything on this Sales Order is already on a Delivery Order.",
+  journeyOrder: "This order travels on a Delivery Journey. Each leg issues its own Delivery Order.",
+  qty: "Qty",
+  cancel: "Cancel",
+  createDo: "Create Delivery Order",
+  created: (doNumber: string) => `${doNumber} created`,
 } as const;
 
 /** The result an attempt records, in the governed three words (MASTER §6). */

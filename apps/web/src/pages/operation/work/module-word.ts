@@ -8,4 +8,5 @@ export const WORK_MODULE_WORD: Record<OperationWorkModule, string> = {
   delivery: "Delivery",
   payment: "Payment",
   issue_tracker: "Issue Tracker",
+  workspace: "Staff tasks",
 };

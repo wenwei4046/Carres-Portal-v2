@@ -39,21 +39,22 @@ const unit = (n: number, status: "sold" | "reserved", orderN: number) => ({
   sold_order_id: status === "sold" ? id(orderN) : null,
 });
 
-/** Each table answers its rows; `ops_stock_items` answers by its `status` filter. */
+/** Each table answers its rows; `ops_stock_items` answers by its `status` filter (one value or a list). */
 function mockSb(rows: Record<string, unknown[]>, fail: string[] = []) {
   const from = vi.fn((table: string) => {
     const chain: Record<string, unknown> = {};
-    let status: unknown = null;
+    let status: unknown[] = [];
     for (const method of ["select", "eq", "in", "or", "not", "order", "range"]) {
       chain[method] = vi.fn((...args: unknown[]) => {
-        if (method === "eq" && args[0] === "status") status = args[1];
+        if (method === "eq" && args[0] === "status") status = [args[1]];
+        if (method === "in" && args[0] === "status") status = args[1] as unknown[];
         return chain;
       });
     }
     chain.then = (resolve: (v: unknown) => unknown) => {
       if (fail.includes(table)) return resolve({ data: null, error: { code: "XX000", message: "boom" } });
       const all = rows[table] ?? [];
-      const data = table === "ops_stock_items" ? all.filter((u) => (u as { status: unknown }).status === status) : all;
+      const data = table === "ops_stock_items" ? all.filter((u) => status.includes((u as { status: unknown }).status)) : all;
       return resolve({ data, error: null });
     };
     return chain;
@@ -84,6 +85,7 @@ describe("GET /api/operation/orders/register-facts", () => {
         order(3),                     // paid, not delivered
       ],
       ops_stock_items: [unit(1, "sold", 1), unit(2, "sold", 2), unit(3, "reserved", 3)],
+      receiving_unit_results: [{ id: "r1", stock_item_id: "u1", outcome: "received" }, { id: "r2", stock_item_id: "u2", outcome: "received_with_issue" }],
       service_cases: [
         { id: "c1", order_id: id(2), status: { is_closed: false } },
         { id: "c2", order_id: id(3), status: { is_closed: true } },
@@ -92,18 +94,164 @@ describe("GET /api/operation/orders/register-facts", () => {
     const res = await read();
     expect(res.status).toBe(200);
     const body = (await res.json()) as { facts: Record<string, unknown>; failed: unknown };
-    expect(body.facts[id(1)]).toEqual({ obligations: "none", cases: "none" });
-    expect(body.facts[id(2)]).toEqual({ obligations: "outstanding", cases: "open" });
-    expect(body.facts[id(3)]).toEqual({ obligations: "outstanding", cases: "closed" });
-    expect(body.failed).toEqual({ obligations: false, cases: false });
+    expect(body.facts[id(1)]).toMatchObject({ obligations: "none", cases: "none", stock: { MS12: "unknown" } });
+    expect(body.facts[id(2)]).toMatchObject({ obligations: "outstanding", cases: "open", stock: { MS12: "unknown" } });
+    expect(body.facts[id(3)]).toMatchObject({ obligations: "outstanding", cases: "closed", stock: { MS12: "unknown" } });
+    expect(body.failed).toMatchObject({ obligations: false, cases: false });
   });
 
   it("an unreadable read leaves its fact unknown, never 'none'", async () => {
     mockSb({ orders: [order(1)], ops_stock_items: [unit(1, "sold", 1)] }, ["service_cases", "order_refunds"]);
     const res = await read();
     const body = (await res.json()) as { facts: Record<string, unknown>; failed: unknown };
-    expect(body.facts[id(1)]).toEqual({ obligations: null, cases: null });
-    expect(body.failed).toEqual({ obligations: true, cases: true });
+    expect(body.facts[id(1)]).toMatchObject({ obligations: null, cases: null, stock: { MS12: "unknown" } });
+    expect(body.failed).toMatchObject({ obligations: true, cases: true });
+  });
+
+  it("answers the Outright list's owner facts from each owner's own record", async () => {
+    const pic = "22222222-2222-2222-2222-000000000001";
+    mockSb({
+      orders: [
+        order(1, { ops_order_control: { assigned_staff: pic }, delivery_partner_id: "p-order" }),
+        order(2, {
+        ops_order_control: { assigned_staff: "33333333-3333-3333-3333-000000000002" },
+        order_lines: [{ id: "ol2", sku: "MS12", qty: 1, unit_price: 100 }],
+      }),
+      ],
+      // Order 1's Unit by its SO ref; order 2's by its order line (0471).
+      ops_stock_items: [
+        { ...unit(3, "reserved", 1), warehouse_id: "w1" },
+        { ...unit(4, "reserved", 9), reserved_ref: null, reserved_order_line_id: "ol2", warehouse_id: "w2" },
+      ],
+      app_users: [{ id: pic, name: "Shasha" }], // order 2's PIC is not readable to this caller
+      po_line_sources: [
+        { id: "s1", order_id: id(1), po_id: "po1", po_line_id: "pl1" },
+        { id: "s2", order_id: id(2), po_id: "po2", po_line_id: "pl2" },
+      ],
+      purchase_orders: [{ id: "po1", do_number: " DO-778 " }, { id: "po2", do_number: null }],
+      warehouse_receipts: [
+        { id: "r1", po_id: "po1", grn_no: "GRN-11", lines: [{ id: "pl1", sku: "MS12" }], status: "posted" },
+        { id: "r2", po_id: "po1", grn_no: "GRN-12", lines: [{ id: "pl-other", sku: "MS12" }], status: "posted" },
+      ],
+      ops_delivery_arrangements: [{ id: "a1", order_id: id(1), leg: 0, partner_id: "p-arr", confirmed_date: "2026-10-20", confirmed_time: "AM" }],
+      ops_delivery_orders: [{ id: "do1", order_id: id(1), leg: 0, delivery_date: null, time_slot: null, issued_at: "2026-10-01T00:00:00Z", voided_at: null }],
+      delivery_handover_events: [
+        { id: "h1", delivery_order_id: "do1", kind: "ready_for_handover", recorded_at: "2026-10-02T01:00:00Z" },
+        { id: "h2", delivery_order_id: "do1", kind: "handed_over", recorded_at: "2026-10-02T03:00:00Z" },
+      ],
+      delivery_partners: [{ id: "p-arr", name: "NETS" }],
+      warehouses: [{ id: "w1", name: "Klang" }, { id: "w2", name: "PJ Showroom" }],
+      order_finance_exceptions: [
+        { id: "f1", order_id: id(1), status: "open", reason: "Cheque not cleared", opened_at: "2026-10-01T00:00:00Z" },
+        { id: "f2", order_id: id(1), status: "open", reason: "Refund under review", opened_at: "2026-10-03T00:00:00Z" },
+      ],
+    });
+    const res = await read();
+    const body = (await res.json()) as { facts: Record<string, { owned: unknown }>; failed: unknown };
+    expect(body.facts[id(1)].owned).toEqual({
+      pic: { userId: pic, name: "Shasha" },
+      poCount: 1,
+      supplierDos: ["DO-778"],
+      grns: ["GRN-11"], // GRN-12 counted another order's line
+      delivery: { dateIso: "2026-10-20", time: "AM", source: "arrangement", partnerId: "p-arr", partnerName: "NETS" },
+      loading: { hasDo: true, kind: "handed_over", at: "2026-10-02T03:00:00Z" },
+      locations: ["Klang"],
+      financeHold: { reason: "Refund under review" }, // the newest open one
+      lineSuppliers: {}, // its line carries no id
+    });
+    expect(body.facts[id(2)].owned).toMatchObject({
+      pic: { userId: "33333333-3333-3333-3333-000000000002", name: null },
+      poCount: 1,
+      supplierDos: [],
+      grns: [],
+      delivery: { dateIso: null, source: null, partnerId: null },
+      loading: { hasDo: false, kind: null },
+      locations: ["PJ Showroom"],
+      financeHold: null,
+    });
+    expect(body.failed).toEqual({
+      obligations: false, cases: false,
+      pic: false, purchasing: false, delivery: false, loading: false, location: false, finance: false, suppliers: false,
+    });
+  });
+
+  it("names each line's supplier by the line's own lineage: its PO, else its Unit's PO, else no PO yet — never the Catalog", async () => {
+    const lines = [
+      { id: "l-po", sku: "B1201S-K", qty: 1, unit_price: 100 },
+      { id: "l-cancelled", sku: "CODY-SK", qty: 1, unit_price: 100 },
+      { id: "l-unit", sku: "JAGER-SS", qty: 1, unit_price: 100 },
+      { id: "l-none", sku: "MEMORY-FOAM-PILLOW", qty: 2, unit_price: 10 },
+      { id: "l-hidden", sku: "TRION-Q", qty: 1, unit_price: 100 },
+      { id: "l-two", sku: "CODY-SK", qty: 2, unit_price: 100 },
+      { id: "l-dup", sku: "H1401F-K", qty: 1, unit_price: 100 },
+    ];
+    mockSb({
+      orders: [order(1, { order_lines: lines })],
+      po_line_sources: [
+        { id: "s1", order_id: id(1), po_id: "po-nf", po_line_id: "pl1", order_line_id: "l-po" },
+        { id: "s2", order_id: id(1), po_id: "po-x", po_line_id: "pl2", order_line_id: "l-cancelled" },
+        { id: "s3", order_id: id(1), po_id: "po-h", po_line_id: "pl3", order_line_id: "l-hidden" },
+        // One line on two suppliers' POs.
+        { id: "s4", order_id: id(1), po_id: "po-nf", po_line_id: "pl4", order_line_id: "l-two" },
+        { id: "s5", order_id: id(1), po_id: "po-oh", po_line_id: "pl5", order_line_id: "l-two" },
+        // SO-1340's shape: one qty-1 line on three open POs of one supplier — one name.
+        { id: "s6", order_id: id(1), po_id: "po-d1", po_line_id: "pl6", order_line_id: "l-dup" },
+        { id: "s7", order_id: id(1), po_id: "po-d2", po_line_id: "pl7", order_line_id: "l-dup" },
+        { id: "s8", order_id: id(1), po_id: "po-d3", po_line_id: "pl8", order_line_id: "l-dup" },
+      ],
+      purchase_orders: [
+        { id: "po-nf", do_number: null, supplier_id: "sup-nf", status: "open" },
+        { id: "po-x", do_number: null, supplier_id: "sup-oh", status: "cancelled" },
+        { id: "po-h", do_number: null, supplier_id: "sup-hidden", status: "open" },
+        { id: "po-unit", supplier_id: "sup-oh" },
+        { id: "po-oh", do_number: null, supplier_id: "sup-oh", status: "open" },
+        { id: "po-d1", do_number: null, supplier_id: "sup-nf", status: "open" },
+        { id: "po-d2", do_number: null, supplier_id: "sup-nf", status: "open" },
+        { id: "po-d3", do_number: null, supplier_id: "sup-nf", status: "received" },
+      ],
+      // A sold Unit still names its line; its supplier is its own PO's.
+      ops_stock_items: [{ ...unit(7, "sold", 1), reserved_order_line_id: "l-unit", po_line_id: "pl-unit" }],
+      purchase_order_lines: [{ id: "pl-unit", po_id: "po-unit" }],
+      // The Catalog knows the pillow's supplier; the list must not borrow it.
+      product_skus: [{ id: "c1", sku: "MEMORY-FOAM-PILLOW", supplier_id: "sup-catalog" }],
+      suppliers: [{ id: "sup-nf", name: "Nice Future" }, { id: "sup-oh", name: "Ohana" }, { id: "sup-catalog", name: "Catalog Supplier" }],
+    });
+    const res = await read();
+    const body = (await res.json()) as { facts: Record<string, { owned: { lineSuppliers: unknown } }>; failed: Record<string, boolean> };
+    expect(body.facts[id(1)].owned.lineSuppliers).toEqual({
+      "l-po": { from: "po", names: ["Nice Future"] },
+      "l-cancelled": { from: "none", names: [] }, // its only PO is cancelled
+      "l-unit": { from: "unit", names: ["Ohana"] },
+      "l-none": { from: "none", names: [] },
+      "l-hidden": { from: "po", names: [null] }, // a supplier this caller may not read
+      "l-two": { from: "po", names: ["Nice Future", "Ohana"] },
+      "l-dup": { from: "po", names: ["Nice Future"] }, // three POs, one supplier, a received one included
+    });
+    expect(body.failed.suppliers).toBe(false);
+  });
+
+  it("a failed supplier read is flagged, never printed as no PO", async () => {
+    mockSb(
+      {
+        orders: [order(1, { order_lines: [{ id: "l1", sku: "MS12", qty: 1, unit_price: 100 }] })],
+        po_line_sources: [{ id: "s1", order_id: id(1), po_id: "po1", po_line_id: "pl1", order_line_id: "l1" }],
+        purchase_orders: [{ id: "po1", do_number: null, supplier_id: "sup1", status: "open" }],
+      },
+      ["suppliers"],
+    );
+    const res = await read();
+    const body = (await res.json()) as { failed: Record<string, boolean> };
+    expect(body.failed.suppliers).toBe(true);
+  });
+
+  it("a failed owner read is flagged, so the screen says it could not read — never 'not recorded' or 'no hold'", async () => {
+    mockSb(
+      { orders: [order(1, { ops_order_control: { assigned_staff: "x" } })] },
+      ["order_finance_exceptions", "po_line_sources", "app_users", "ops_delivery_orders"],
+    );
+    const res = await read();
+    const body = (await res.json()) as { failed: Record<string, boolean> };
+    expect(body.failed).toMatchObject({ pic: true, purchasing: true, delivery: true, loading: true, finance: true, location: false });
   });
 
   it("is refused to a role that may not read the Register", async () => {

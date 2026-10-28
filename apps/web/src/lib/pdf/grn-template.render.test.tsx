@@ -89,7 +89,7 @@ it("repeats the complete letterhead on continuation pages and keeps instruction 
     const text = content.items.flatMap((item) => "str" in item ? [item.str] : []).join(" ").replace(/\s+/g, " ");
     expect(text).toContain("CARRES SDN. BHD.");
     expect(text).toContain("GRN-20260924-0042");
-    expect(text).toContain("59200 Kuala Lumpur, Wilayah Persekutuan KL.");
+    expect(text).toContain("59200 KUALA LUMPUR"); // the owner's verified address (Settings → Company, 9 Oct 2026)
     expect(text).toContain(`Page ${n} of ${doc.numPages}`);
     if (n === 1) {
       expect(text).toContain("AL Sungai Buloh");

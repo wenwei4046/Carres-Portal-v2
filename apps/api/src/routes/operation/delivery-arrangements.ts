@@ -3,9 +3,9 @@ import {
   assignLogisticsInputSchema,
   deliveryContactInputSchema,
   deliveryWarehouseScheduleEvents,
-  isSundayIso,
+  deliveryDayRefusal,
   laterThanRequested,
-  myHolidaySet,
+  type DeliveryCalendar,
   operationCannotDeliverInput,
   saveDeliveryArrangementInputSchema,
   signHandoverProofUploadInput,
@@ -16,6 +16,7 @@ import {
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { mapPgError } from "../../lib/route-helpers";
 import { attemptLegDocumentIssue } from "../../lib/delivery-order-issue";
+import { readDeliveryCalendar } from "../../lib/delivery-calendar";
 import { adminClient, userClient } from "../../lib/supabase";
 import { revokeLinksForOtherPartners } from "./delivery-links";
 import type { AppEnv } from "../../types";
@@ -155,10 +156,13 @@ async function recordContact(
     .single();
 }
 
-/** A delivery day is never a Sunday or a Malaysian public holiday (§8.6). */
-function refusedDeliveryDay(dateIso: string): string | null {
-  if (isSundayIso(dateIso)) return "Sunday is not a delivery day";
-  if (myHolidaySet().has(dateIso)) return "A Malaysian public holiday is not a delivery day";
+/** A delivery day is never a Sunday or a Malaysian public holiday (§8.6) —
+ *  the holidays of the ONE Delivery calendar (the stored Selangor calendar,
+ *  else the built-in list), never the Office list. */
+function refusedDeliveryDay(dateIso: string, calendar: DeliveryCalendar): string | null {
+  const refusal = deliveryDayRefusal(calendar, dateIso);
+  if (refusal === "sunday") return "Sunday is not a delivery day";
+  if (refusal === "holiday") return "A Malaysian public holiday is not a delivery day";
   return null;
 }
 
@@ -743,11 +747,11 @@ async function currentPartners(
 }
 
 /**
- * ASSIGN LOGISTICS — one partner onto one or many scopes, in one transaction.
+ * ASSIGN LOGISTICS — one partner onto eligible unassigned scopes.
  *
- * Refuses the WHOLE request when any scope would be silently overwritten. All
- * or nothing is deliberate: a partly-applied assignment across eleven scopes is
- * a state the operator cannot read back off the screen.
+ * Refuses the whole selection before writing when any scope is ineligible.
+ * The existing source writes are sequential; this validation is not an atomic
+ * transaction guarantee. Transport/write failures must not be called success.
  */
 deliveryArrangementsRouter.post("/assign", requireOperationOrPrincipal, async (c) => {
   const parsed = assignLogisticsInputSchema.safeParse(await c.req.json().catch(() => null));
@@ -769,6 +773,21 @@ deliveryArrangementsRouter.post("/assign", requireOperationOrPrincipal, async (c
   if (!partner) return c.json({ error: "That logistics partner does not exist" }, 404);
 
   const current = await currentPartners(sb, scopes);
+
+  // Bulk assignment is only for unassigned scopes. A reason never authorises a
+  // bulk change, including a mixed selection or a same-company re-selection.
+  if (scopes.length > 1) {
+    const assigned = scopes.filter((scope) =>
+      current.get(`${scope.orderId}#${scope.leg}`)?.partnerId,
+    );
+    if (assigned.length) {
+      return c.json({
+        error: "Some of these already have a logistics partner",
+        code: "bulk_requires_unassigned",
+        scopes: assigned,
+      }, 409);
+    }
+  }
 
   /* THE GATE. A change needs its reason, and the refusal NAMES the scopes so
      the operator can see which of their eleven picks already had a carrier. */
@@ -873,7 +892,8 @@ deliveryArrangementsRouter.put("/:orderId", requireOperationOrPrincipal, async (
 
   /* ⭐ A DELIVERY DAY IS NEVER A SUNDAY OR A PUBLIC HOLIDAY (§8.6). */
   if (input.confirmedDate) {
-    const refused = refusedDeliveryDay(input.confirmedDate);
+    const { calendar } = await readDeliveryCalendar(userClient(c.env, c.var.auth.jwt));
+    const refused = refusedDeliveryDay(input.confirmedDate, calendar);
     if (refused) return c.json({ error: refused, code: "not_a_delivery_day" }, 400);
   }
 

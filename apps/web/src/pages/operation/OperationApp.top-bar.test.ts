@@ -17,6 +17,10 @@
  * mount `OperationApp` at all. A walk is not a test: it happens once, at the
  * end, on whatever somebody happened to click.
  *
+ * ⭐ 2026-10-08 (Carres Layout Standard §1): the suppression list is gone. The
+ * shell mounts no GlobalTopBar and draws ONE ShellHeader for every page; a
+ * page's ModuleHeader portals into it. The tests below bind that instead.
+ *
  * ── SO THIS TEST BINDS THE RULE, NOT THE SIX INSTANCES ──────────────────────
  * It reads the dispatch in `OperationApp.tsx`, finds every `tab === "x" &&
  * <Component />`, resolves that component's file, and asks one question: does
@@ -66,30 +70,34 @@ describe("the operation shell draws ONE top row", () => {
     expect(dispatched.map((d) => d.tab)).toContain("purchase-returns");
   });
 
-  it("suppresses GlobalTopBar on every tab whose page draws its own header", () => {
-    const offenders: string[] = [];
-
-    for (const { tab, component } of dispatched) {
-      const file = importPath.get(component);
-      if (!file) continue; // lazily loaded or aliased; the two checks below still bind
-      if (!DRAWS_OWN_HEADER.test(readFileSync(file, "utf8"))) continue;
-      if (!source.includes(`tab !== "${tab}"`)) {
-        offenders.push(
-          `${tab} → <${component}/> draws its own Destination Header, so ` +
-            `\`tab !== "${tab}" &&\` must join the GlobalTopBar suppression list ` +
-            `in OperationApp.tsx — otherwise that screen shows two Jump to boxes, ` +
-            `two bells, two Help buttons and two gears.`,
-        );
-      }
-    }
-
-    expect(offenders, offenders.join("\n")).toEqual([]);
+  /* RETIRED (2026-10-08): the per-tab `tab !== "x"` GlobalTopBar suppression
+   * list and its "Purchase Returns stays suppressed" pin. The shell no longer
+   * mounts GlobalTopBar at all — it draws ONE ShellHeader for every page, and a
+   * page's ModuleHeader portals its identity into that header's slot instead of
+   * drawing a second row (Carres Layout Standard §1). The rule this file binds
+   * is the same — one top row, never two — so it now binds it at the source. */
+  it("never mounts GlobalTopBar — no page can grow a second top row", () => {
+    expect(source).not.toMatch(/<GlobalTopBar\b/);
+    expect(source).not.toMatch(/import\s+GlobalTopBar\b/);
   });
 
-  it("keeps Purchase Returns suppressed — the sixth instance, named", () => {
-    // Pinned by name as well as by rule: the rule above depends on a regex
-    // over source, and a rule that silently stops matching is a rule that
-    // stops protecting. This one line fails loudly if that happens.
-    expect(source).toContain('tab !== "purchase-returns"');
+  it("draws exactly ONE ShellHeader, outside the page dispatch", () => {
+    expect(source.match(/<ShellHeader\b/g) ?? []).toHaveLength(1);
+    // The header sits before <main>, so no tab branch can render a second one.
+    expect(source.indexOf("<ShellHeader")).toBeLessThan(source.indexOf("<main"));
+  });
+
+  it("every page that names itself does so through ModuleHeader, into the shell slot", () => {
+    const named: string[] = [];
+    for (const { tab, component } of dispatched) {
+      const file = importPath.get(component);
+      if (!file) continue;
+      const page = readFileSync(file, "utf8");
+      if (DRAWS_OWN_HEADER.test(page)) named.push(tab);
+    }
+    // The pages that drew their own Destination Header still name themselves —
+    // and the shell provides the slot they portal into.
+    expect(named.length).toBeGreaterThan(0);
+    expect(source).toContain("<ShellHeaderContext.Provider");
   });
 });

@@ -95,7 +95,11 @@ export function servicesWords(
 ): string {
   const parts = live(addons).map((a) => {
     const config = configWords(a.attrs);
-    return `${nameOf(a.addon_key)}${config ? ` · ${config}` : ""}${a.qty > 1 ? ` ×${a.qty}` : ""}`;
+    // A structured per-unit size summary already carries its quantities.
+    const sizes = a.attrs?.sizes;
+    const legacyCount = typeof a.attrs?.size === "string" ? a.attrs.size.match(/^[^+]+ ×(\d+)$/) : null;
+    const countedSize = (legacyCount && Number(legacyCount[1]) === a.qty) || Array.isArray(sizes) && sizes.length === a.qty && sizes.every(size => typeof size === "string" && !!size) && new Set(sizes).size < sizes.length && a.attrs?.size === composeDisposalSizeSummary(sizes as string[]);
+    return `${nameOf(a.addon_key)}${config ? ` · ${config}` : ""}${a.qty > 1 && !countedSize ? ` ×${a.qty}` : ""}`;
   });
   return parts.length ? parts.join(" · ") : "None";
 }

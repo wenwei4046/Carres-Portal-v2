@@ -184,24 +184,23 @@ export default function EvidenceUploadField<E extends { path: string; kind: stri
       <input
         type="file"
         accept={[...imageMimes, ...videoMimes, ...pdfMimes].join(",")}
-        multiple
+        multiple={maxFiles > 1}
         onChange={handlePick}
         disabled={disabled}
         aria-label={ariaLabel}
-        className="text-label"
+        className="text-meta"
         data-testid={testId ? `${testId}-input` : undefined}
       />
       {/* The limits are stated BEFORE a file is chosen (§9). */}
-      <p className="mt-0.5 text-label text-base-500">
+      <p className="mt-0.5 text-meta text-base-500">
         {/* Only the kinds this field accepts are named — a field that takes
             no video never promises a 0 MB video. Unchanged for every caller
             that passes photos and videos. */}
         {[
-          imageMimes.length ? `Photos (JPG, PNG, WEBP) up to ${mb(imageMaxBytes)}` : null,
+          imageMimes.length ? `Photos (${imageMimes.map(mime => (({ "image/jpeg": "JPG", "image/png": "PNG", "image/webp": "WEBP" } as Record<string, string>)[mime] ?? mime)).join(", ")}) up to ${mb(imageMaxBytes)}` : null,
           videoMimes.length ? `videos (MP4, MOV, WEBM) up to ${mb(videoMaxBytes)}` : null,
           pdfMimes.length ? `PDF up to ${mb(pdfMaxBytes ?? imageMaxBytes)}` : null,
-        ].filter(Boolean).join(" · ")} · up to {maxFiles} files. Pick several
-        at once, or add more later.
+        ].filter(Boolean).join(" · ")} · {maxFiles === 1 ? "1 file." : `up to ${maxFiles} files. Pick several at once, or add more later.`}
       </p>
       {files.length > 0 && (
         <ul className="mt-1 grid gap-1">
@@ -218,7 +217,7 @@ export default function EvidenceUploadField<E extends { path: string; kind: stri
                   className="h-10 w-10 rounded border border-kit-slate-5 object-cover"
                 />
               ) : f.kind === "pdf" ? (
-                <span className="flex h-10 w-10 items-center justify-center rounded border border-kit-slate-5 text-label text-kit-slate-11">PDF</span>
+                <span className="flex h-10 w-10 items-center justify-center rounded border border-kit-slate-5 text-label tracking-[0.06em] text-kit-slate-11">PDF</span>
               ) : (
                 <video
                   src={f.previewUrl}
@@ -227,24 +226,24 @@ export default function EvidenceUploadField<E extends { path: string; kind: stri
                   className="h-10 w-16 rounded border border-kit-slate-5"
                 />
               )}
-              <span className="max-w-[200px] truncate text-label text-base-600">
+              <span className="max-w-[200px] truncate text-meta text-base-600">
                 {f.name}
               </span>
-              <span className="text-label text-base-400">{f.kind}</span>
+              <span className="text-meta text-base-500">{f.kind}</span>
               {f.status === "uploading" && (
-                <span className="text-label text-base-500">Uploading…</span>
+                <span className="text-meta text-base-500">Uploading…</span>
               )}
               {f.status === "done" && (
-                <span className="text-label text-success">Uploaded</span>
+                <span className="text-meta text-success">Uploaded</span>
               )}
               {f.status === "failed" && (
                 <>
-                  <span className="text-label text-danger">
+                  <span className="text-meta text-danger">
                     {f.error ?? "Upload failed"}
                   </span>
                   <button
                     type="button"
-                    className="btn-ghost px-1.5 py-0 text-label"
+                    className="btn-ghost px-1.5 py-0 text-body font-medium"
                     onClick={() => void upload(f)}
                   >
                     Retry
@@ -253,7 +252,7 @@ export default function EvidenceUploadField<E extends { path: string; kind: stri
               )}
               <button
                 type="button"
-                className="btn-ghost px-1.5 py-0 text-label"
+                className="btn-ghost px-1.5 py-0 text-body font-medium"
                 onClick={() => remove(f)}
               >
                 Remove
@@ -264,7 +263,7 @@ export default function EvidenceUploadField<E extends { path: string; kind: stri
       )}
       {(photos > 0 || videos > 0 || pdfs > 0) && (
         <p
-          className="mt-0.5 text-label text-success"
+          className="mt-0.5 text-meta text-success"
           data-testid={testId ? `${testId}-count` : undefined}
         >
           {[
@@ -278,7 +277,7 @@ export default function EvidenceUploadField<E extends { path: string; kind: stri
         </p>
       )}
       {pickError && (
-        <p className="mt-0.5 text-label text-danger font-body">{pickError}</p>
+        <p className="mt-0.5 text-meta text-danger font-body">{pickError}</p>
       )}
     </div>
   );

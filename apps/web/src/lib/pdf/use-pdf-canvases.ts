@@ -25,6 +25,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
  * memoise it.
  */
 export function usePdfCanvases(key: string | null, render: () => Promise<Blob>) {
+  const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const paneRef = useRef<HTMLDivElement | null>(null);
   const renderRef = useRef(render);
@@ -42,9 +43,11 @@ export function usePdfCanvases(key: string | null, render: () => Promise<Blob>) 
   useEffect(() => {
     let cancelled = false;
     if (key == null) {
+      setPdfLoading(false);
       paneRef.current?.replaceChildren();
       return;
     }
+    setPdfLoading(true);
     (async () => {
       try {
         const blob = await renderRef.current();
@@ -66,8 +69,10 @@ export function usePdfCanvases(key: string | null, render: () => Promise<Blob>) 
           const canvas = document.createElement("canvas");
           canvas.width = viewport.width;
           canvas.height = viewport.height;
-          canvas.style.width = `${Math.round(viewport.width / dpr)}px`;
-          canvas.style.height = `${Math.round(viewport.height / dpr)}px`;
+          // Keep paper inside its current pane when the viewport changes;
+          // bitmap dimensions preserve rendering detail and the aspect ratio.
+          canvas.style.width = "100%";
+          canvas.style.height = "auto";
           canvas.style.display = "block";
           canvas.style.margin = "0 auto 16px";
           canvas.style.boxShadow = "0 1px 4px rgba(0,0,0,0.18)";
@@ -77,9 +82,12 @@ export function usePdfCanvases(key: string | null, render: () => Promise<Blob>) 
           canvas.setAttribute("data-testid", `pdf-page-${n}`);
           pane.appendChild(canvas);
           await page.render({ canvasContext: canvas.getContext("2d")!, viewport }).promise;
+          canvas.setAttribute("data-pdf-rendered", "true");
         }
       } catch (e) {
         if (!cancelled) setPdfError(e instanceof Error ? e.message : String(e));
+      } finally {
+        if (!cancelled) setPdfLoading(false);
       }
     })();
     return () => {
@@ -87,5 +95,5 @@ export function usePdfCanvases(key: string | null, render: () => Promise<Blob>) 
     };
   }, [key, paneEpoch]);
 
-  return { pdfError, setPane, retry };
+  return { pdfLoading, pdfError, setPane, retry };
 }

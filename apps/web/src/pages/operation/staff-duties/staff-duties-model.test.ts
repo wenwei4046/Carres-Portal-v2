@@ -278,12 +278,12 @@ describe("dutyRefusalSentence — nobody names themself (0533)", () => {
   const refused = (code: string) => ({ body: { code } });
   it("a self-assignment reads as the holder sentence", () => {
     expect(dutyRefusalSentence("assign", refused("self_assignment_refused"), facts)).toBe(
-      "Jess cannot hold Purchasing Approver. Choose an eligible active staff member.",
+      "Jess cannot be assigned to Purchasing Approver. Choose an eligible active staff member.",
     );
   });
   it("a self-cover reads as the cover sentence", () => {
     expect(dutyRefusalSentence("cover", refused("self_assignment_refused"), facts)).toBe(
-      "Jess can no longer cover Purchasing Approver. Choose another eligible staff member.",
+      "Jess cannot be assigned to Purchasing Approver. Choose an eligible active staff member.",
     );
   });
 });

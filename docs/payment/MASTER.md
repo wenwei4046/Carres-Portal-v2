@@ -1,5 +1,18 @@
 # PAYMENT — MASTER
 
+**SO amendment commercial exception boundary — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT.**
+Sales Approver must approve a customer price decrease, a customer refund or whole-SO
+cancellation after Proceed before it takes effect, under Orders MASTER § Staff amendments and
+Sales Approver. Ordinary SO amendments need no owner approval. This SO commercial decision does
+not itself send money, post a refund or rewrite a receipt/invoice. Existing money execution,
+accounting controls and audit ownership remain with their owning workflows; no second ledger
+or refund writer is created. **System-priced delivery charges — owner-confirmed 2026-10-01 /
+TARGET NOT BUILT:** address/delivery-service changes recalculate through the existing system price;
+Operation cannot manually override it, so there is no charge-approval lane on that SO path. A lower
+correct system charge is not a discretionary product discount, but any resulting customer refund
+still requires Sales Approver and the existing money execution controls. No automatic payout or
+live refund/build is authorised. See Orders MASTER § System-priced delivery charges.
+
 **All listing appearance — APPROVED / NOT BUILT (Jess, 2026-09-17):** follow
 [UI MASTER §6.7 Portal-wide listing readability](../ui/MASTER.md#portal-wide-listing-readability--built-2026-09-17-slice-1--authenticated-walk-owed).
 This is the shared default, not a PO visual pilot. Preserve this module's filter content,
@@ -12,6 +25,11 @@ control types, special schedules and business behavior; no page-local appearance
 > model, and the former `Payments · Invoices` two-listing destination. Git is the history.
 > **Customer payment posting convergence is PRODUCTION-VERIFIED.** The rest of this Blueprint is
 > approved target truth and is not claimed built by that closure.
+>
+> **Persisted 2026-10-05:** the owner rulings of 2026-09-25/26 (the money rule, `Balance due` words,
+> Status rail, Sales Order-keyed row, Invoice at RM 0, documents, Payment inside Work) were held in
+> draft PR #1638 and are merged here unchanged in substance. They are APPROVED / NOT BUILT; the
+> 2026-09-26 row presentation carries the 2026-10-05 REAL GAP in §3.
 >
 > Read `CLAUDE.md` → `docs/ERP-ARCHITECTURE.md` → this MASTER. Sales Orders owns the delivery
 > money gate; Workspace owns people/duties; Payment never creates a second owner, calendar,
@@ -59,8 +77,44 @@ All entry paths use one Payment posting service and idempotency key. Operation m
 received in delivery/storage; the Responsible Delivery Operation — the order's collection owner —
 may post normal collection. Neither writes a second `orders.paid` truth or receipt identity.
 
-`outstanding = issued live invoice obligations − canonical allocated money received`.
-Unknown and zero differ. No screen recalculates outstanding or storage independently.
+**THE MONEY RULE — OWNER RULING (Jess, 2026-09-25) · APPROVED / LOCKED. This overwrites the
+former invoice-keyed model completely.**
+
+```text
+1  The customer pays (the deposit) → the order Proceeds → Operation receives the order
+2  A balance remains → collect it before delivery (the collection clock below)
+3  Balance due reaches RM 0 → the system issues the Invoice and Operation sends Receipt + Invoice
+   to the customer together, in one message
+```
+
+`Balance due = Sales Order total payable − money received` — the Sales Order's own `orderMoney`,
+the same figure the Sales Order page and PDF print as `Balance due`. **An Invoice never asks for
+money.** The customer is asked to pay against the Sales Order (`SO No` and its `Balance due`); the
+Invoice is the closing document, issued automatically the moment `Balance due` reaches RM 0 and sent
+with the Receipt. ~~There is no manual `Generate invoice` door and no draft/issue step for staff.~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp): office staff (operation, finance, principal) open a Sales Invoice by hand from Payment Monitor → `New Sales Invoice`, found by SO No or DO No, and may invoice part of the goods now and the rest later (Houzs `SalesInvoiceFromDo` way; migration `0712`). The automatic issue above still runs for an order no one has invoiced by hand. Jess was not part of this decision.
+Unknown and zero differ. No screen recalculates `Balance due` or storage independently.
+
+**`Balance due` IS THE GOODS MONEY ONLY; STORAGE KEEPS ITS OWN PAPER — OWNER RULING (Jess,
+2026-10-06) · APPROVED / NOT BUILT.** `Balance due` means one thing on every surface: what the
+customer still owes on the Sales Order's goods and services, the figure the Sales Order page and PDF
+print. It never includes storage. Storage money is asked for by its own paper, the Storage Invoice /
+Additional Storage Invoice (§4, §7 — unchanged); the 2026-09-25 PROPOSAL to fold storage into
+`Balance due` is withdrawn. "An Invoice never asks for money" above is the Sales Invoice, the closing
+document. Payment shows the parts and their sum, never one blended figure:
+
+```text
+Balance due                 RM 1,379.00     the Sales Order's goods money (orderMoney)
+Storage Invoice unpaid        RM 400.00     each live issued storage paper, still unpaid
+────────────────────────────────────────
+Pay before delivery         RM 1,779.00     what the Delivery Order gate needs paid (0441)
+```
+
+`Pay before delivery` = `Balance due` + every live issued Storage / Additional Storage Invoice still
+unpaid — the same sum the DO money gate already blocks on (0441), so the screen and the gate agree.
+The storage line is drawn only when a storage paper is unpaid; with no storage, `Balance due` is the
+last line. An accrued, not yet issued storage charge stays in `Storage` as `RM {amount} so far` and
+enters neither figure. Measured 2026-10-06 (BUILD gap): the built Monitor prints one blended figure
+(`soRemaining`, goods + storage papers − paid) under the money word; the build splits it as above.
 
 One successful `Record payment` atomically creates Payment, allocates it, updates derived
 outstanding, mints one receipt, appends SO activity, and closes/recalculates Work. Failure rolls
@@ -101,36 +155,42 @@ Workspace          duties, cover, working calendars
 
 ### Payment Monitor
 
-Payment Monitor is a full-width control listing keyed on the Sales Order: one row per SO that
-still needs customer money. It is not a calendar, a document register, a KPI dashboard or a
+Payment Monitor is a full-width control listing keyed on the Sales Order: one row per Proceeded SO
+whose `Pay before delivery` is above RM 0 — goods money or an unpaid storage paper (owner ruling 2026-09-25; the sum named 2026-10-06 — the row is the Sales Order, never an
+Invoice; an order with no Invoice is still a row). It is not a calendar, a document register, a KPI dashboard or a
 second My Work.
 
-**THE LISTING IS DELIVERY'S LISTING (owner ruling 2026-09-16 — this overwrites the seven-column
-`Goods` / `Customer delivery` listing completely).** It reuses the Delivery Monitor's shared
-register: the same DataGrid, type sizes, spacing, toolbar (`Search` · `Export` · `Columns`),
-sorting, per-column filters and fixed 32px footer. **Every parent row is a fixed 72px with at most
-two lines per cell** — one primary fact, one supporting line; a cell never grows or shrinks the row
-and never shows a third line, an overlap or a cut glyph. The listing is not a card list. It has no
-selection checkbox, because it has no bulk act. **`SO No` and `Customer` are sticky**; the sheet
-scrolls sideways inside itself (eight columns need ≈1,600px against ≈950px of sheet). On a phone
-(below 768px — also a 200% browser zoom) only `SO No` pins, because the two pins together are wider
-than the sheet. A long value (a customer's name, a reference) may be cut to fit the row, and its
-complete value opens by click or keyboard, never by hover alone. The Finance frame is a fixed
-viewport (like Operation's), so the sheet — not the window — scrolls and the rail and footer stay.
+**THE LISTING IS THE SALES ORDERS REGISTER'S DENSITY — owner direction 2026-09-25 (Payment
+Blueprint segment 3; this overwrites the 2026-09-16 72px two-line row completely).** The Monitor reuses
+the shared DataGrid exactly as the Sales Orders Register does: **the Sales Orders row (the SO-derived
+template, UI MASTER §6.0 — 32px since the owner accepted it on 2026-10-01), one fact per cell on one
+line**, the template's cell and header type, the same toolbar (search field · `Export` · `Columns`), sorting,
+per-column filters and fixed 32px footer. Supporting facts (the customer's phone and references,
+`includes storage`, the delivery time, the Logistics company) live in the row's expansion, not in a
+second cell line. `SO No` and `Customer` are sticky; the sheet scrolls sideways inside itself;
+content decides each column's width, never the sheet. Colour appears in ONE column only — `Payment
+timing` (red past the deadline, amber for a promise/ask day) — every other cell is plain text, with
+`Not ready` in amber as the single goods exception. Design record:
+`docs/payment/design/monitor-status-rail.html`.
 
 Columns, in exactly this order:
 
 ```text
-SO No | Customer | Amount needed | Items & Stock | Storage | Requested Delivery Date | Scheduled delivery | Payment timing
+SO No | Customer | Balance due | Items & Stock | Storage | Requested Delivery Date | Scheduled delivery | Payment timing | Collection owner
 ```
 
-- **SO No** — line 1 the SO number, which opens the formal Sales Order; line 2 the customer's own
-  reference(s) when recorded, else nothing. Never joined into one number.
-- **Customer** — line 1 the name; line 2 the phone on record.
-- **Amount needed** = issued live Invoice obligations − canonical allocated money (`soRemaining`,
-  the one arithmetic), right-aligned. Line 2 `includes storage RM {amount}` only while an issued
-  Storage Invoice is inside it. An accrued, not yet issued storage charge stays in `Storage` as
-  `RM {amount} so far` and never enters Amount needed.
+- **Collection owner** (new, 2026-09-25; the dictionary forbids a bare `Owner`) — the acting person as avatar + name from the shared Work item (cover
+  ring when covered; `Not assigned` link when nobody resolves); empty on a `Wait` row. The action
+  word is not repeated here: it is the expansion's blue door and the Work card's line.
+
+- **SO No** — the SO number on one line (owner direction 2026-09-25: one fact per cell); the
+  customer's own reference(s) move to the opened order, never joined into one number.
+- **Customer** — the name on one line; the phone moves to the opened order (2026-09-25).
+- **Balance due** = the Sales Order's total payable − money received (the one arithmetic; owner
+  ruling 2026-09-25 — the word was `Amount needed` until then), right-aligned, goods money only
+  (owner ruling 2026-10-06 — never includes storage). An unpaid storage paper shows in the `Storage`
+  column (`Storage Invoice issued · RM {x} not paid`) and in the opened order's `Pay before delivery`
+  sum (§2), never inside this cell.
 - **Items & Stock** — Delivery's own cell, Delivery's own arithmetic (`monitorGoodsOf` over the
   Stock register's allocated Units and Purchasing's recorded arrivals), for the whole Sales Order:
   `Ready` (green) / `Not ready` (orange) over `2 of 2` · `1 of 2 · 1 short` · `Arriving after the
@@ -155,67 +215,60 @@ SO No | Customer | Amount needed | Items & Stock | Storage | Requested Delivery 
   overlay's `confirmed_date` alone, which Delivery's `Save confirmed delivery` never writes, so a
   day Delivery agreed never started the clock. A day with a door opens the §17 Calendar at that
   week. The clock anchors on the agreed day; the requested day is never taken as confirmed.
-- **Payment timing** — the two-line fact/action surface. Line 1 the fact: `Payment due today` ·
-  `Ask customer today` · `Customer promised to pay today` · `Payment should have been received` ·
-  `Arrival not confirmed` · `Storage Invoice not paid` · `No delivery date` · `Payment due
-  {day}`. Line 2 **the shared Work item's own action** beside its owner avatar — when an order
-  carries two items, the one whose work is the printed fact (`Storage Invoice not paid` → the
-  storage item). **No Work item ⇒ no action and no person**; only `Wait` stands alone, for the
-  waiting facts. The assignment uses `Assigned to {name}` in its readable/accessibility presentation; completed
-  work separately names `Completed by`. No normal/acting/cover tooltip remains (Workspace §3). When no owner resolves
-  the avatar is `Not assigned`, whose name is `Nobody is assigned to this order. Assign it in
-  Sales Orders → Team` and whose door is the Sales Orders Team (0504: the owner is the individual
-  the Sales Order was dealt to). This is the ruled exception to the fact-only register cell (UI
-  MASTER).
+- **Payment timing** — ONE fact on one line (owner direction 2026-09-25: one fact per cell, the
+  acting person in its own `Collection owner` column, the action not repeated in the cell; this
+  overwrites the 2026-09-12/16 two-line fact/action cell and its ruled exception to the fact-only
+  register cell). The fact: `Payment due today` · `Ask customer today` · `Customer promised to pay
+  today` · `Payment should have been received` · `Arrival not confirmed` · `Storage Invoice not
+  paid` · `No delivery date` · `Payment due {day}` · `Paid`. When an order carries two Work items
+  (e.g. its balance and a Storage Invoice), the cell prints the fact that comes first in the risk
+  order below. The Work item's action (`Ask customer to pay` · `Wait` · `Send the invoice and
+  collect payment`) lives on the opened order and on the Work card, never in this cell. The person
+  and the assignment grammar (`Assigned to {name}` · `Completed by {name}` · `Not assigned` →
+  `Nobody assigned to this order` over `Manager assigns in Settings → Staff & Duties` (owner ruling 2026-09-26);
+  0504: the owner is the individual the Sales Order was dealt to) live in `Collection owner`.
 - Rows sort by risk: should have been paid · Storage Invoice not paid · promised today · due today
   · ask today · due later · waiting · no date · value not recorded. Sorting `Payment timing`
-  returns to that order. The footer says `{n} orders · RM {x} still needed`.
-- **A row opens below itself (owner ruling 2026-09-16).** The chevron `Show payment details`, the
-  `Items & Stock` cell and the `Storage` cell open the SAME collection workspace inside the
-  listing, the way a Delivery row opens its brief; the picked day, filters, search, scroll and the
-  row's place never move. The main row stays 72px; the details below it grow freely. Shared Work's
-  `?invoice=` opens that order's row the same way on `All unpaid orders`; only money no longer on
-  the Monitor (already paid) opens the full-page workspace.
-- **The rail is the Monday–Friday follow-up plan (owner ruling 2026-09-16 — this replaces the
-  seven rail filters and the summary sentences completely).** It answers *what do I do today, and
-  this week*:
+  returns to that order. The footer says `{n} orders · RM {x} unpaid`.
+- **Opening a row — owner approval 2026-09-26 (this overwrites the 2026-09-16 row-below-itself
+  workspace).** The row's `▸` is a read-only History look and `SO No` opens the Payment page; Work's
+  `?order=` opens the same page. See *The collection workspace* below, including its 2026-10-05 REAL GAP.
+- **THE RAIL IS THE STATUS RAIL — owner ruling 2026-09-25 (Payment Blueprint segment 2; this
+  overwrites the 2026-09-16 Monday–Friday follow-up plan completely).** The collection desk asks
+  *which orders need my hands now*; the week view (`what day`) belongs to Work's own Date rail with
+  Module = Payment, so the two never repeat each other. One row per status, every status shown, a
+  count of ORDERS on each, in four groups:
 
   ```text
-  ‹  Mon, 14 Sep – Fri, 18 Sep  ›          previous / next week · `This week` when elsewhere
-  Mon, 14 Sep                              No follow-up planned
-  Tue, 15 Sep  [Today]                     Ask 3 customers to pay
-                                           Check 2 promised payments
-                                           Includes 2 not done since Thu, 10 Sep
-  Wed, 16 Sep                              Public holiday · Malaysia Day
-  ──────────────
-  All unpaid orders                  42
+  Status
+  今天要动手 (Needs action)     Payment should have been received (red) · Ask customer today · Payment due today ·
+                                Customer promised to pay today · Storage Invoice not paid*
+  不用动，在等 (Waiting)        Payment due later · No delivery date · Waiting for goods
+  别人的事 (Someone else's)     Finance hold · Needs review
+  完成 (Done)                   Paid orders
+  ──────────────────────────
+  All unpaid orders
   ```
 
-  - **One source: the shared Work Engine.** A day's lines are the collection Work items the engine
-    already raised — `payment.collect_customer_balance` → `Ask {n} customer(s) to pay`,
-    `payment.missed_promise` → `Check {n} promised payment(s)`, `payment.send_storage_invoice` →
-    `Collect {n} storage payment(s)` — placed on the item's own due day. The engine's admission
-    (催钱前先看货), company calendar, the owner's working day and today's cover therefore apply
-    unchanged. The rail creates no work, stores no schedule and has no manual planning. A count is
-    ORDERS: one order with two invoices under one rule is one customer.
-  - **Picking a day narrows the listing beside it to that day's orders** (`?day=YYYY-MM-DD`); the
-    count and the listing are one set by construction — an item that resolves to no Monitor row is
-    not counted. The default is the plan day. `All unpaid orders` (`?day=all`) keeps every unpaid SO
-    reachable, including orders the engine has not placed (waiting for goods, no delivery date).
-  - **The plan day and Today.** The plan day is today when Operation works today (Mon–Fri, not a
-    public holiday), else the next such day. Only a working today wears the blue ring and the word
-    `Today`; another date, a weekend or a public holiday never does. The picked day is the blue
-    fill; the two never compete (UI MASTER). A public holiday is named on its card.
-  - **Unfinished earlier work** stays open on the plan day, counted once, with its original day
-    (`Includes {n} not done since {day}`); its own past day never re-counts it and says
-    `{n} not done · counted under Today` (or the plan day's date), and still lists those orders when
-    picked. No due date is ever changed.
-  - An empty day says `No follow-up planned`; an unanswered feed says `Reading the collection desk…`
-    (never a quiet week); a failed feed says `The follow-up plan could not be loaded.` with `Try
-    again`. A role that cannot read the Work feed (Finance) sees `The follow-up plan is
-    Operation's.` and lands on `All unpaid orders`.
-  - Every line wraps inside the 240px rail — no truncation, clipping or sideways scroll. The rail
-    keeps the governed collapse; collapsed, the sheet header repeats the picked day and its lines.
+  - Picking a row narrows the listing to those Sales Orders (`?status=`); the count and the listing
+    are one set by construction. Default = `Payment should have been received` when it is above 0, else `Ask customer today`,
+    else `All unpaid orders`. A count is ORDERS; every row prints its number, `0` included.
+  - `Payment should have been received` = the deadline, or the customer's promised day,
+    has passed with money still owed (the cell's own fact names the row; the row word `Missed` is
+    retired by the owner time-word ruling of 12 Oct 2026, and `Late` stays banned on this rail). `Payment due later` = a clock exists but the ask day has not
+    come. `Waiting for goods` = `Arrival not confirmed` (催钱前先看货). `Finance hold` and `Needs
+    review` are other people's work shown so the desk is complete; they carry no Operation action.
+    `Paid orders` = `Pay before delivery` RM 0 (goods and every storage paper paid) — the row that gives a paid Sales Order its home: the listing
+    prints `Paid` in `Payment timing` and its expansion holds the Documents (Receipts · Invoice ·
+    Statement) and Communication History. `Storage Invoice not paid` stays a status: storage keeps
+    its own paper (owner ruling 2026-10-06, §2).
+  - The group headings are the four English words above in the rail's governed group style (UI
+    MASTER §6.7 rail style C); the Chinese here is the explanation, never on screen.
+  - The rail keeps the governed collapse (below 1100px a 44px strip with `Show filters`; a drawer on
+    a phone); collapsed, the sheet header repeats the picked status and its count. A role that
+    cannot read the Work feed (Finance) sees the same statuses computed from Payment's own read and
+    no owner avatars; an unanswered read prints no numbers (`Reading the collection desk…`); a failed
+    read says `The collection desk could not be loaded.` with `Try again`.
 - Completed payment work leaves the Monitor; historical money remains in Payment Records. A
   scoped `?order=` for a paid SO says `SO-{n} needs no payment right now. Its money is in
   Payment Records.`
@@ -227,12 +280,78 @@ spelled `Mon, 21 Sep` through `fmtDate`, so the Monitor said `Sunday, 4 Oct` and
 row opens said `Sun, 4 Oct` for the same day. COPY-STANDARD is explicit that a second date spelling
 is itself the defect, and the date law outranks a module's examples.
 
+### States, responsive behaviour and history — segments 7–9, persisted 2026-09-26
+
+**History (segment 7).** One append-only table per Sales Order, the same rows on the Monitor
+expansion, the Payment page and the Work Customer card: `Date · Event · Amount · By · Document`.
+Events and their documents: `Proceed` (SO No) · `Payment recorded` (Receipt No · `Print` · `Send
+receipt`) · `Payment message sent` (`WhatsApp screenshot`) · `Customer will pay on a date · promised
+{day}` · `Customer did not answer` · `Customer needs help` · `Customer disputes the amount` ·
+`Customer paid` (the customer's word, not money) · `Receipt and invoice sent` · `Invoice issued`
+(Invoice No · `Print`) · storage events (`Storage started` · `Free storage approved until {day}` ·
+`Stored goods checked`) · `Collection handed over · {from} → {to}` · `Payment voided` · `Allocation
+corrected`. `By` is the actual actor, `POS` for the deposit, `System` for an automatic Invoice.
+Newest first; the Monitor expansion shows the latest 5 with `Show all` opening the page.
+
+**Responsive (segment 8).** Monitor: 1440/1180 rail open, sheet scrolls sideways, `SO No` +
+`Customer` pinned; 820/743 rail collapsed to the 44px strip with the picked day/status repeated
+above the sheet; 390 rail as a drawer, `SO No` alone pinned, no page-level sideways scroll. Payment
+page: ≥1024 two halves (work left, paper right, 16px gap); below 1024 the paper stacks under the
+work; the header keeps the SO number whole and lets the customer name truncate; 390 buttons 40px,
+the `⋮` holds every secondary act.
+
+**States (segment 9).** Loading: skeleton rows at the listing's row height and `Reading the collection desk…`, never a
+zero. Empty: `No customer money is needed right now.` / `No follow-up planned on {day}.` /
+`No paid orders yet.` Error: `The collection desk could not be loaded.` + `Try again`, the last
+good list kept. Permission (Finance): the same statuses from Payment's own read, no owner avatars,
+`Stock facts are Operation's.`, `Owner facts are Operation's.`; the page's acts hidden, the paper
+readable. Missing data: `No delivery date` · `Not assigned` → `Manager assigns in Settings → Staff & Duties` ·
+`No reference` · `No phone recorded`. A failed posting keeps everything typed and writes nothing.
+
 ### Monitor versus shared Work
 
 Shared `My Work / Team Work` remains the one owner-resolved daily Work Engine. Monitor is the full
 collection control overview; My Work and Team Work show the same authoritative actions filtered by
 owner and date. No second action record, completion fact, owner calculation or manual `Done`.
-Work deep-links to the same collection workspace the Monitor row opens (`/finance/monitor?invoice=`).
+Work deep-links to the same collection workspace the Monitor row opens (`/finance/monitor?order=`).
+
+### Payment inside Work — owner ruling 2026-09-25 · APPROVED / LOCKED (composition), NOT BUILT
+
+**FACT, 13 Oct 2026:** the Work page this composition was drawn for was replaced by the Workspace
+task table and the one task view (Workspace MASTER §5.10, owner's round 3 brief). The business
+rules below stand. Where they sit in the task view is not designed, so the composition named in
+this heading is no longer a drawing to build from.
+
+Staff finish collection from Work OR from the Monitor; both open the same Work item, the same
+Payment components and the same completion fact (`Balance due` = RM 0). Work's standard right
+panel (`../workspace/MASTER.md` §5.10) is not changed; Payment occupies exactly three places in it,
+and **one fact appears in one place**:
+
+```text
+Middle card (104px)   PAYMENT · {customer}          module · recipient
+                      RM 1,800.00 unpaid            the problem — the money, once (#1635's word)
+                      Ask customer to pay           the action
+                      SO-1404                  ↗    the object is the Sales Order, never an Invoice
+Summary               RM 1,800.00 unpaid / Ask customer to pay · {customer} / [Ask customer to pay] [Open SO-1404]
+Order Route           Payment due Wed, 23 Sep       the deadline, once — the exception line under the route
+                      (owner reconciliation 2026-09-25: `by {date}` and `Hold delivery` on Payment
+                      surfaces are retired; `Hold delivery` stays Delivery's, Warehouse's and
+                      Logistics' word, whose question is *can this be delivered*)
+Customer card         collapsed: Delivery's own line, unchanged (no money repeated)
+                      expanded PAYMENT section: [Ask customer to pay] [Record the result] [Record payment]
+                      · Last answer {result · day} · Payment's Communication History (read, not copied)
+```
+
+**ONE PAYMENT SECTION, TWO FRAMES — owner approval 2026-09-25.** The three doors, the Documents
+list (Receipts · Invoice · Statement) and Communication History are ONE shared component, the
+`Payment section`: the Work Customer card renders it when expanded, and the Monitor row renders it
+below its fact grid. Same Work item, same completion fact (`Balance due` RM 0), same forms; only
+the frame differs — Work is the mission view of one Sales Order (all parties), the Monitor is the
+money view (status rail + fact grid). The doors open Payment's own compositions in place (the way
+the Logistics card embeds Delivery's forms); Work draws no form and stores nothing. The Monitor's
+door strip is `Record payment` · `Ask customer to pay` (the blue) · `⋯` (Statement · Print ·
+Create payment link); the rail group `Someone else's` is spelt `Other owners`. The card and the Summary print the
+Monitor's `Payment timing` fact family and the one money spelling `RM {amount} unpaid` (#1635) — one dictionary.
 
 ### Collection admission — 催钱前先看货
 
@@ -253,24 +372,42 @@ Start asking the customer to pay   {n} working days before Scheduled delivery   
 Payment must be complete           {m} working days before Scheduled delivery   (ruled default 2)
 ```
 
-**Outstation row — owner ruling 2026-09-24 (APPROVED TARGET / NOT BUILT; `../ERP-ARCHITECTURE.md`
-§6.5):** an outstation order's `Payment must be complete` is **3 working days before Scheduled
+**Outstation row — owner ruling 2026-09-24 (BUILT ON BRANCH `build/settings-completion` 9 Oct 2026,
+0672 APPLIED 10 Oct 2026; `../ERP-ARCHITECTURE.md` §6.5):** an outstation order's `Payment must be complete` is **3 working days before Scheduled
 Delivery** (the customer's delivery date). Its ask day follows the same n > m rule; the default
 ask day is an engineering setting, not an owner ruling. Same one clock, same calendar.
 
 Editable by authorised Manager permission; asking must start earlier than the deadline (n > m).
 
 **The Work right panel reads this clock (owner approval 2026-09-25, `../workspace/MASTER.md` §5.10):**
-the Order Route's one payment line `Payment · Hold delivery · RM {amount} unpaid · by {deadline}` and the
+the Order Route's one payment line `Payment due {day}` (owner reconciliation 2026-09-25) and the
 Logistics card's day-before money gap use the same deadline (`paymentDeadlineOf`, `packages/shared`). Payment is
 never a route point and never `Blocked`. **The hold is told to Payment with its reason (owner ruling
 2026-09-25, `../delivery/MASTER.md` §3 · APPROVED TARGET / NOT BUILT):** while a Scheduled delivery
 exists and the DO cannot issue, the Payment Monitor row, the collection workspace and the `Ask the
-customer to pay` Work item print `Hold delivery` over `RM {amount} unpaid · by {date}` or `Finance
-hold · {reason}`, beside the doors `Record payment` and, for Finance only, `Remove hold`. The reason
-is this module's own record; Delivery, Warehouse and Work read it. Paying in full or removing the
-hold lets the system issue the DO, and the hold leaves every surface in the same read. **Gap:** both still use the ruled default m = 2 (3 outstation)
-rather than the effective-dated rule row, because Operation cannot read the Payment settings payload.
+customer to pay` Work item print `Payment due {day}` over `RM {amount} unpaid` (or `Finance
+hold · {reason}`) — owner reconciliation 2026-09-25: the collection desk's first line is its deadline
+fact, never `Hold delivery` — beside the doors `Record payment` and, for Finance only, `Remove hold`. The reason
+is this module's own record; Delivery, Warehouse and Work read it. Money completion and Finance hold clearance are independent requirements: RM 0 never clears
+a Finance hold, and removing a hold never settles money. Only when both and all other Delivery
+gates pass may the system issue the DO; each surface reads the same source facts. **Built on branch
+#1996 (deployed 10 Oct 2026; 0672 APPLIED):** the outstation pair is stored in the same
+effective-dated rule row (default ask 4 · deadline 3; n > m in each pair) and edited in Settings → Payments;
+`paymentDeadlineOf` counts through `collectionClock` with the rule in force on the order's clock start
+(the live Sales Invoice's issue day, else today), so the Work right panel, the Order Route, the Logistics
+card, the Monitor and Work's payment items read one arithmetic. One `isOutstation` reading: a company is
+assigned and it is not the Klang Valley default. **Calendars (built on branch
+#1996, deployed 10 Oct 2026; 0678 APPLIED):** the payment-due and ask-day FACTS count
+on THE Delivery calendar — Monday–Saturday with the Selangor public holidays Warehouse Settings stores
+for the dispatching Site, else the built-in list (`delivery-working-calendar.ts`); the ACTION day follows
+the responsible person's working days (Office weekdays when none are recorded) with the Office holidays
+(`personOwnerCalendar`). **Staff working days decide only when to chase the customer; they never change
+the customer's payment due date or ask day.** In code the facts come from `collectionFactDays`, which
+takes no owner calendar; a test proves a Saturday-working or a short-week owner leaves `dueIso` unchanged.
+**Cross-module rule-version start reconciliation — 9 October 2026 / REAL GAP.** §2's approved 25 September law collects against the SO and issues the closing Sales Invoice only when goods balance reaches zero. The delivery-date anchor is already governed: §3's Scheduled delivery fact and the owning shared timing contract determine the date from which lead days are counted. That is different from the date selecting the effective Settings version. The inherited invoice-issue start below and Workspace's historical issued-Invoice prerequisite cannot serve unpaid SO collection. The residual gap is the SO obligation's rule-version start/snapshot event, migration and source door; do not substitute SO creation, deposit date or booking-recorded timestamp without a governed contract. Existing historic invoice snapshots remain evidence. Workspace §6.1 reflects SO goods collection and keeps storage/Finance hold separate.
+
+**Local source evidence, read-only 9 October:** `packages/shared/src/payment-monitor.ts` selects `issued_at` or today's date as `clockStart`; `apps/api/src/routes/operation/work.ts` does the same for invoice-derived occurrences. `collectionTimingFor` selects the newest effective rule at that supplied date, while `resolveCollectionAnchor` separately reads confirmed date then promised date. Those code paths demonstrate the legacy coupling, not approval of the fallback or production behavior. The promised-date fallback must be reconciled against the current §3 distinction between Requested and Scheduled dates at the actual caller; an absent confirmed date must not be presented as confirmed by assumption. Acceptance requires separate evidence for deadline anchor, stored rule-version start, company versus actor calendar, rebooking treatment and old/new obligation versions; unrelated aging dates do not resolve this gap. No code, clock, payment or production data changed; no runtime test executed.
+
 Every change records old value · new value · effective from · changed by · changed on · reason.
 A clock runs under the rule in force on the day it started — the invoice's issue day — so an
 existing clock keeps its snapshot by construction and a new rule affects only new clocks from its
@@ -284,9 +421,37 @@ Schedule the actual customer-contact ACTION on the resolved action owner's gover
   working day.
 ```
 
-Operation does not work on Saturday, so an Operation collection owner acts on Friday for a
-Saturday deadline while the Monitor still names the Saturday (`Payment due Sat, 12 Sep`) and
-the Work item is due Friday. That is a property of the owner's calendar, not a global rule: a
+Use the resolved person’s effective working/cover calendar. A person not working Saturday acts
+on the previous working day while the Monitor retains the Saturday deadline. **Staff working days
+decide only when to chase the customer; they never change the customer's payment due date or ask
+day** (owner boundary, 9 Oct 2026).
+
+How the person's calendar is derived (built 9 Oct 2026, branch `build/settings-completion`) — two
+derived rules, each with its sources, not new law:
+
+- **No personal working days recorded → the Operation/Office weekdays.** Sources:
+  `docs/ACTION-FLOW-STANDARD.md:154` (the Office calendar, Monday–Friday, counts for Purchasing ·
+  Operation · Finance …); this MASTER's build record "The calendar rule corrected" ("the resolved owner's
+  governed working days (`OwnerCalendar`, default the Operation week)"); `docs/workspace/MASTER.md:2943` ("resolved
+  owner's governed working days (Operation: Mon–Fri)"). The weekdays are the STORED Office calendar
+  (Settings → Office, OFF-01).
+- **Personal working days combined with the Office holidays.** Sources:
+  `docs/workspace/MASTER.md:272–274` ("People/HR also owns each employee's normal working-week
+  eligibility. Module calendars own business-open days and public-holiday/special-date rules. The
+  Shared Duty Resolver combines the person calendar with the module calendar for the resolved
+  actor"); `docs/ACTION-FLOW-STANDARD.md:154` (Operation's module calendar is Office); Settings List
+  OFF-05 (Office holidays = Kuala Lumpur).
+- The person's week is People/HR's fact (`hr_employees.work_days`, 0678), edited only in the HR
+  person drawer (`Working days`); Workspace and Payment read it and never edit it. The resolved
+  person is the collection owner's acting person today (the cover when covered), else the normal
+  owner — the "resolved person's effective working/cover calendar" above.
+- **PROPOSAL / NOT LAW — the Work feed admits an order to collection work on the Office calendar
+  before it reads the person's week** (the owner must exist before their week can be read). For a
+  person whose recorded week is narrower than the Office's, an order can therefore appear one day
+  later than their own week would place it. Falsifier: an observed collection item for a
+  short-week owner that first appears after that owner's action ask day. The approved
+Saturday support rota (09:00–18:00, editable) does not make Saturday an ordinary Office working
+day for everyone, nor does it reset the collection responsibility ledger. That is a property of the owner's calendar, not a global rule: a
 future duty holder who works Saturdays keeps a Saturday action. A Sunday or public-holiday fact
 day gives each owner its own governed previous working day. Logistics Partner DO lead time is
 Delivery's own setting (`Delivery Settings → Logistics → Delivery Order needed {n}
@@ -294,16 +459,76 @@ working day(s) before Scheduled delivery`) and does not live here.
 
 ### The collection workspace
 
-The Monitor row opens one one-scroll object for the SO's collection below itself (Work's
-`?invoice=` opens the same row): Money → Delivery Dates → Items, Services & Stock → Storage → What
-to do → Collection owner → Invoice → Related Payments → Communication History. The doors sit on one
-strip above it (`Statement` · `Print` · `Create payment link` · `Record payment`); a full-page
-object with the `Monitor` back word remains only for money already off the Monitor. Its doors are `Record payment` (the canonical posting), `Ask customer to pay`, `Record the
+**REAL GAP — 2026-10-05: two current owner rulings conflict; only Jess resolves it, through the UI
+MASTER §0.3 item 11 combined review.** The 2026-09-26 approval below (`▸` = read-only History; `SO No`
+opens a separate 50/50 Payment page) conflicts with the owner ruling of 2026-10-05 (UI MASTER §0.2 ·
+§4.3): every module's row opens the shared right Working Panel with `Info` and the page's own main work
+tab, and `▸` opens goods. Building either now would build one ruling against the other, so BUILD
+implements neither presentation until the combined review decides. **PROPOSAL / NOT LAW (Payment PLAN
+2026-10-05, sent to the combined review):** the row opens the standalone SO card, tabs `Info · Payment ·
+Delivery`, opening on `Payment`; the tab carries the current act (fact · acting person · one blue) and
+the cells `Balance due ▾` (Record payment) · `Customer answer ▾` (Record the result) · `Invoice`; ↗ is
+the SO page; the separate Payment page retires; Payment Work items in `Tasks` open the same card and
+tab. Falsifier: Jess keeps the 2026-09-26 Payment page in the combined review. The money rule, words,
+statuses, documents, history events and Work object below are not affected by this gap.
+
+**Owner approval 2026-09-26 (segments 1, 4, 5 and 6 of the Payment Blueprint review) · APPROVED /
+NOT BUILT — the Sales Orders / Purchase Orders pattern.** The register row's `▸` expansion is a LOOK,
+not a workplace: one nested read-only table in the register's own grammar (11px grey header, 13px
+cells, tabular numbers), the order's HISTORY newest first — `Date · Event · Amount · By ·
+Document`. Nothing is done there. **Clicking `SO No` opens the Payment page**
+(`/finance/monitor/{orderId}`, back word `Monitor`, which restores the picked day, status, filters
+and scroll). The page follows the Sales Order page's kit exactly (owner instruction 2026-09-26):
+
+- **Header** (one row, the SO page's own slots): `← Monitor` · `SO-{n} · {customer}` · `Print ▾` ·
+  `⋮` (`Record payment` · `Create payment link` · `Statement`). Identity only.
+- **Action bar (owner approval 2026-09-26)** — one row under the header, above every block, drawn
+  ONLY when the order needs a hand today: the `Payment timing` fact on the left (`{fact} ·
+  RM {x} unpaid · Payment due {day}`), the acts on the right, the ONE blue among them. Tone is one
+  status colour: red for `Payment should have been received`, amber for `Ask customer today` ·
+  `Payment due today` · `Customer promised to pay today` · `Storage Invoice not paid`, green for
+  `Paid in full` with `Send receipt and invoice`. `Ask customer to pay` (blue) · `Record the result`
+  are its acts; `Record payment` stays in `⋮` unless the fact is money received. A waiting order
+  (`Arrival not confirmed` · `No delivery date` · `Payment due later`) has NO bar — one grey line
+  under Money says why. The same sentence is the Monitor cell, this bar and the Work card.
+- **Left half, top to bottom — the Sales Order page's own blocks, boxes included (owner correction
+  2026-09-26: the SO page shows its facts in the kit's readonly-field boxes, so the Payment page
+  does too):** `Payment` (the word is `Payment`, never `Money` — the SO page renamed MONEY →
+  Payment on 2026-09-21): three boxes `Payment due` · `Collection owner` · `Today's cover`, then
+  the SO page's payment table `Date · Payment received · Approval code · Collected by · Amount
+  (RM)`, then the totals `Goods · Storage · Total payable · Paid to date · Balance due` →
+  `Customer` (second, as on the SO page: `Full name` · `Phone` · `Email` · `Reference` ·
+  `Customer Requested Delivery Date` · `Scheduled delivery`; block-header door `Existing customer
+  · {n} orders ›`) → `Storage` (only when a case exists; boxes `Storage` (`{Group} · Day {n} · RM
+  {x} so far`) · `Free until` · `Charge`; block-header doors `Request more free days` · `Check
+  stored goods`) → `History` (`Date · Event · Amount · By · Document`).
+- **No buttons in a block body:** acts live in the action bar and in a block's own header line.
+- **Right half:** the paper the customer receives, one sheet with four tabs — `Sales Order`
+  (default; the REAL Sales Order document, `sales-order-template.tsx`: Bill To · Sales Order Info ·
+  Deliver To · items with Goods/Services · `Total payable` · `Paid to date` · `BALANCE DUE` ·
+  Payments Received · Terms & Conditions) → `Message` while `Ask customer to pay` is open → `Receipt` while `Record payment` is
+  open → `Invoice` once `Balance due` is RM 0. Below 1024px the paper stacks under the work.
+- `Ask customer to pay`, `Record the result` and `Record payment` replace the LEFT half with their
+  existing compositions; the right half is their live paper. A recorded act adds one History row
+  and returns the left half. After a successful posting the blue becomes `Send receipt and
+  invoice`.
+- The Work Customer card's Payment section = the header's act and the History table (no paper);
+  its `Open SO-{n} in Payments` door opens this page. Design records `docs/payment/design/`.
+
+The Monitor row opens one one-scroll object for the SO's collection below itself (Work's `?order=`
+opens the Payment page; `?invoice=` is retired with the Invoice-keyed row): Delivery's `Items,
+Services & Stock` panel opens from the `Items & Stock` cell as today. **There is no `Invoice` section**: the Invoice is the closing document and
+lives with the Receipt in Payment Records. The doors sit on one strip above it (`Statement` ·
+`Print` · `Create payment link` · `Record payment` · `Ask customer to pay`); **one blue** — `Ask
+customer to pay` once the clock admits asking, otherwise `Record payment`. Money reads
+`RM {x} unpaid` over `Total payable RM {t} · Paid RM {p}`. There is no full-page workspace: a paid
+SO has left the Monitor and its money is in Payment Records (`SO-{n} needs no payment right now. Its
+money is in Payment Records.`). The row's facts and Work's card are one read of one Work item. Its doors are `Record payment` (the canonical posting), `Ask customer to pay`, `Record the
 result`, `Create payment link`, the §6/§7 storage doors, `Statement` and `Print`. Staff record a
 structured result: `Customer paid` · `Customer will pay on a date` · `Customer needs help` ·
 `Customer disputes the amount` · `Customer did not answer`; the system creates the next action.
 `Done` never replaces authoritative completion. The posting form pre-fills SO, customer, invoice,
-current Amount needed, today and the oldest valid unpaid allocation; staff confirm amount, date,
+current Balance due, today and the oldest valid unpaid allocation; staff confirm amount, date,
 method, reference and evidence; Review writes nothing and says `This records customer money.` /
 `This does not confirm the bank account.` The result is **Payment recorded**, never **Bank
 confirmed**. Operation uploads evidence; Finance checks the bank outside daily Payment; delivery
@@ -332,6 +557,16 @@ called a Receipt. Inspect is read-only (Receipt/customer/amount once · allocate
 amounts · Evidence `View` · paid date and time · actual recorder · `Open payment`) with no Record,
 Edit, Correct, Void or WhatsApp control.
 
+### Payment Records and Settings — reviewed 2026-09-26, three corrections, otherwise unchanged
+
+Payment Records (the per-receipt ledger) and `Settings → Payments` keep their 2026-09-12 rulings.
+The 2026-09-26 review changes three things: (1) the Payment Record object's `Actions` section
+offers `Send receipt and invoice` once the order is paid in full (before that, `Send receipt`);
+(2) `Hold delivery` / `Remove hold` (the Finance exception) leave the Payment Record's overflow
+and sit on the Payment PAGE's `⋮`, because the hold is about the order, not one receipt;
+(3) `Void and replace` on an Invoice resolves the Payment Approver duty the same way Payment
+Records already does, not principal-only.
+
 ### The Payment Record object
 
 Full-width, one scroll, no tabs. Header: `Receipt No · Customer` / `SO No` / `Payment recorded`
@@ -356,7 +591,20 @@ evidence. A voided Receipt cannot be sent as a valid Receipt.
 
 ## 4 · Documents
 
-- Invoice asks for money; Receipt proves money was recorded.
+**THE CUSTOMER MONEY DOCUMENTS — OWNER CONFIRMED 2026-09-25 (Payment Blueprint review).**
+
+| Document | State | What was confirmed |
+|---|---|---|
+| Receipt — one per payment received, the deposit included | BUILT (0449 snapshot) · **no document standard** | keep; write its standard in `docs/pdf/DOCUMENT-KIT.md` |
+| Invoice — ONE per Sales Order, issued by the system when `Balance due` reaches RM 0, sent with the Receipt | BUILT as a template · **must change** | no SST rows and no `TAX INVOICE` mode (Carres is not SST-registered); the `Payment request` mode is RETIRED (an Invoice never asks for money); write its standard |
+| Customer Statement | read BUILT, **PDF MISSING** | build the printed statement (`GET /invoices/statement/:orderId` already derives it) |
+| Credit Note | numbering approved (`CN2609-4827`), **NOT BUILT** | build it: an amendment that lowers the price after money was paid, and the exceptional refund, need it |
+| Sales Order document (prints `Balance due`) | Sales Orders' | the paper the customer pays against; Payment references it, never re-prints it |
+| Storage Invoice · Additional Storage Invoice | BUILT | KEPT — the storage paper that asks for storage money (§7; owner ruling 2026-10-06, §2: the fold PROPOSAL is withdrawn; `Balance due` never includes storage; Payment shows `Storage Invoice unpaid` and the `Pay before delivery` sum) |
+
+
+- Receipt proves money was recorded; the Invoice is the closing document issued at `Balance due`
+  RM 0 and sent with the Receipt (owner ruling 2026-09-25). Neither asks for money.
 - Sales Invoice, Storage Invoice and Additional Storage Invoice use one governed numbering and
   immutable document service.
 - An issued invoice is never edited; correction voids it and issues a linked replacement.
@@ -382,6 +630,19 @@ Storage begins only when both facts exist: **Carres can complete the agreed deli
 Supplier/Carres delay and goods-not-ready days are never charged. The system derives the date;
 staff cannot key an earlier one.
 
+**Early receipt declined — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT OR VERIFIED.**
+When Carres becomes ready earlier and Logistics offers earlier receipt, a customer who declines
+that offer but retains the original agreed receipt date/window is **not delaying**. Early goods
+readiness alone cannot start storage charges; that refusal is not a customer-delay witness. Keep
+the agreed-scope readiness AND actual customer-delay rule above. Existing valid Storage Start
+facts are not reset. Orders/Delivery MASTER record the readiness, customer evidence and unchanged
+SO Requested Delivery Date boundary. No rate, free period, waiver authority or live charge changes
+are authorised here. **Customer-requested later-date amendments — OWNER-APPROVED 2026-10-01 /
+TARGET NOT BUILT:** staff submit with customer evidence and the SO date change takes effect, per
+Orders MASTER. This does not remove the written-request/storage evidence requirements below,
+automatically start storage, or grant a waiver. Customer date changes require no PO Duty or
+supplier confirmation; money execution and storage authority remain unchanged.
+
 The first valid Storage Start is permanent. Later delay never resets it, a free period or a cycle.
 
 During the delivery-window call, Operation sends the prepared `Request a later delivery date`
@@ -399,6 +660,20 @@ configured inspection interval (currently 30 days) raises `Check the stored furn
 opens Service Case/Issue, not a Payment note.
 
 ## 7 · Storage commercial rule
+
+**Authority conflict — unresolved as of 9 Oct 2026.** The owner clarification “Operations
+approves no money” restricts Operations to customer notification and submission of requests.
+The older day-21 concession in the table and §8 below, also observed in live Settings on 9 Oct,
+conflicts with that boundary. Those limits are retained as the specific unresolved authority
+record, not permission to exercise Operations money approval. Do not infer a new approver,
+change the free days/rates, or silently treat the conflict as resolved.
+
+**Customer storage-charge notification — APPROVED / implementation UNVERIFIED.** Owner answered
+Same day on 8 Oct: Operations informs the customer on the same day the customer needs to pay
+storage charges and records notification evidence. This governs notification only, not charge
+creation, invoice timing, waiver authority or payment completion. Reconcile the exact payable
+source event and existing action identity before implementation; no duplicate task or second due.
+Source: OWNER-CLARIFICATIONS “Storage charge customer notification deadline”; Settings index PAY-08.
 
 Rates apply per customer order and **product group**, never quantity:
 
@@ -431,7 +706,9 @@ evidence. Planned date is not completion. Carres-caused non-delivery days are ex
 in mixed/partial delivery ends separately.
 
 During storage show `Storage charge so far`. Once delivery is confirmed, calculate through that
-date, issue Storage Invoice and collect before delivery. If customer delays after issue/payment,
+date, issue Storage Invoice and collect before delivery. **Measured 2026-10-06 (BUILD gap, the rule stands):** the
+built charge door (0438, `POST /finance/payment-storage/charge`) mints every commenced period whenever
+staff press it, before delivery is confirmed; the build gates it on the confirmed delivery day. If customer delays after issue/payment,
 keep the old invoice immutable and issue Additional Storage Invoice for only the new amount. A
 live storage invoice holds the DO. Under the locked 2026-09-01 Sales Order money gate, full money
 must be in before delivery and there is no live unpaid-release request door.
@@ -500,6 +777,7 @@ object · Cover rule. Object identity is row/card header; owner is metadata/avat
 | Free request day 22–30 | Storage Waiver Approver | same | decision exists |
 | Overpaid/unallocated money | Payment Approver | `Review RM {amount}` | allocated/classified |
 | Suspected wrong/duplicate | Payment Approver | `Review payment RM {amount}` | distinct/corrected/voided |
+| Paid date more than 14 days ago (`payment.approve_backdated_payment`, 0707, awaits Jess's review) | Payment Approver; a principal when the acting approver keyed it (Houzs own_request rule) | `Approve RM {amount} paid on {weekday}, {day} {month}` | approved or refused |
 | Finance Exception | Finance Control Duty | `Review payment evidence` | exception resolved |
 
 **ONE SALES ORDER, ONE COLLECTION OWNER — AND IT IS THE PERSON THE ORDER WAS DEALT TO (owner
@@ -517,9 +795,10 @@ handover, when its person is still an active individual
   else  nobody
 ```
 
-**Contact history and the Delivery Duty holder are not collection-owner sources.** The normal
-owner is the Sales Order PIC in `ops_order_control.assigned_staff`, or the current formal handover
-record when one exists. An order without a PIC remains an ownership exception; Payment never
+**Contact history and the Delivery Duty holder are not collection-owner sources.** Resolve the
+effective formal responsibility ledger first, then the active individual SO PIC in
+`ops_order_control.assigned_staff`, then nobody. Ordinary helping or answering a customer does not
+reset the ledger or constitute formal handover. An order without a PIC remains an ownership exception; Payment never
 establishes its collection owner from Delivery Duty.
 
 **WORK ASSIGNMENT — OWNER RULING 2026-09-29 / APPROVED TARGET / NOT BUILT.**
@@ -544,15 +823,17 @@ else, a filter or a page reload never changes it, and a split delivery has one o
 owner is keyed by the Sales Order. Work assignment can change through the shared recorded policy; source PIC changes require a
 formal handover (`payment_collection_owner_handover`, gated like Staff & Duties), which now moves
 the assignment with it and refuses a new owner who is not an individual. Nobody resolvable →
-nothing is established and the action stays visible with its governed failure: `Nobody is
-assigned to this order.` with the door `Assign it in Sales Orders → Team` (owner instruction
-2026-09-16; the Monitor row's short word is `Not assigned`). Staff & Duties is not named, because
-it cannot fix an unassigned order. `Payment Duty` is RETIRED: no caller remained,
+nothing is established and the action stays visible with its governed failure: `Nobody assigned
+to this order` over `Manager assigns in Settings → Staff & Duties` (owner ruling 2026-09-26, which
+overwrites the 2026-09-16 `Assign it in Sales Orders → Team` door: the system deals every order, an
+unassigned order is a system error, and only a manager adds a person or assigns the order; the
+Team door does not exist on the current register; the Monitor row's short word is `Not assigned`;
+built PR #1950: the Collection owner section and the Monitor chip print the two lines and open `/operation/settings/staff-duties`). `Payment Duty` is RETIRED: no caller remained,
 so the catalogue no longer offers it. There is no universal Sales Order Owner.
 
 My Work omits self avatar; Team Work groups by owner. Cover preserves normal owner, today's cover
-and actor. Every Payment item deep-links to `/finance/monitor?invoice={id}` — the same collection
-workspace the Monitor row opens. The Monitor reads these items for its owner avatar and never
+and actor. Every Payment item deep-links to `/finance/monitor?order={orderId}` — the same collection
+workspace the Monitor row opens (owner approval 2026-09-25; `?invoice=` retired). The Monitor reads these items for its owner avatar and never
 resolves an owner itself. Summaries name work: `3 customer balances need collection today`,
 `1 payment should have been received already`, `2 storage payments need collection`. `8 open ·
 2 late` is forbidden. Shared Calendar may show `Payment deadline` · `Customer promised to pay` ·
@@ -573,6 +854,27 @@ with reason/approver · Payment corrections · Money needing review. No Refund r
 Matching workspace.
 
 ## 12 · Settings, duties and permissions
+
+**9 Oct 2026 dependency/settings reconciliation — approved directions versus observations.**
+Ordinary collection retains the three admission conditions in §3 and the 3/2-working-day rule;
+outstation timing remains separately governed. Owner wording is `Start chasing payment` (setting)
+and `Chase payment` (task); COPY/runtime adoption remains unverified. RM 0 and Finance hold remain
+separate. Responsibility resolution remains formal ledger → active individual SO PIC → unassigned
+(§10); Settings delegation grants neither money approval nor a new owner roster.
+
+**Authenticated read-only observation, not a new owner ruling:** `Carres Settings List.md`,
+“Receiving bank accounts” and “Read-only authenticated page” record on 9 Oct at
+`https://erp.carresofficial.com/operation/settings/payment`:
+- PJ own-showroom → Hong Leong Bank · CARRES SDN BHD · `177-003-23633`.
+- Dealer → RHB · CARRES SDN BHD · `26219 3000 29076`.
+
+This supersedes the historical claim that the two receiving-account numbers are missing.
+No Settings write/payment occurred; end-to-end message/payment routing is untested. An unresolved
+`310-2000` ledger-account mapping is a separate accounting/method dependency, not evidence that
+these receiving bank details are absent. Verify that mapping before asserting its meaning.
+Live audit also found six of eight template purposes empty, two reminder templates present,
+and changes with missing staff identity. These are observations, not newly approved defaults.
+Storage day-21 authority remains unresolved (§7); notification Same day does not settle it.
 
 `Settings → Payments` is a maintenance surface, not daily Work. Its final section order:
 
@@ -598,7 +900,7 @@ owner change.
 Payment reads Calendar, Catalog category, Workspace duty/cover, Delivery/Order facts and
 Stock/Warehouse facts; it never duplicates them.
 
-Sales Orders owns the hard gate and reads Payment's one answer: the DO requires Amount needed =
+Sales Orders owns the hard gate and reads Payment's one answer: the DO requires Balance due =
 RM0 and no open Finance Exception, beside Delivery's own facts (Scheduled delivery with its
 optional time, valid scope, goods, Logistics Partner, address and handling). There is no live
 unpaid-delivery approval or Payment Exception release door — the 0362 request/decide RPCs lost
@@ -614,7 +916,7 @@ release. A live unpaid Storage Invoice prevents Delivery Order creation.
 | Responsible Delivery Operation (the order's collection owner — the individual the Sales Order was dealt to, 0504) | ordinary balance collection, storage-invoice collection, free-storage requests through Operation authority, delivery/storage contact, evidence, normal posting/receipt |
 | Finance Control Duty | bank/payment evidence exception |
 | Storage Waiver Approver | mattress/bedframe day 22–30 decision |
-| Payment Approver | void, reallocation, overpayment review |
+| Payment Approver | void, reallocation, overpayment review, a payment whose paid date is more than 14 days ago (0707: keyed by Operation it waits in `payment_backdate_requests` and counts only once approved; the person who recorded it cannot approve it; Finance and a principal record it directly, and Finance has the Record payment door. Follows Houzs backend/src/services/backdateRequestNotify.ts:5-8 and mfg-sales-orders.ts:3915 per Weisiang's ruling 2026-10-22 (clear Carres rules, implement Houzs); YH 2026-10-26, Q14) |
 | Finance | read/export, external bank control, Finance Exception |
 | Manager | Payment settings; Workspace still owns duty assignment |
 
@@ -627,6 +929,11 @@ delete Payment; or universal SO Owner.
 Carres has no-refund policy. The single known mattress-sagging refund was exceptional: Service
 Case/Operation handled customer/application, Management decided, Finance transferred externally,
 Operation informed customer. Payment may show linked read-only history; it does not generalise it.
+
+**Refund amount — OWNER RULING 2026-10-11 / TARGET NOT BUILT.** Payments does not decide a refund
+amount. The approval of a refund states the exact amount and the basis for it. Payments pays the
+approved amount, no more and no less. A refund whose amount is not recorded cannot become payable:
+it does not reach Payments as work to pay.
 
 ## 14 · Current build truth
 
@@ -1017,7 +1324,7 @@ Migration `0429` is APPLIED (tracker tail confirmed) and PR #1108 merged as `60e
 the ERP page, POS page and API Worker converged that exact SHA and the served bundle carries
 the Invoices Register's own strings. `invoices` now carries the governed lifecycle: kind
 (Sales/Storage/Additional Storage), draft → issued → voided status, immutable issue snapshot,
-void reason/actors and the replacement lineage; one live Sales Invoice per order; allocations
+void reason/actors and the replacement lineage; ~~one live Sales Invoice per order~~ OVERTURNED 2026-10-22 by Weisiang (Mr Lim, WhatsApp): one live automatic (whole-order) Sales Invoice per order, but an order may carry several office part Sales Invoices, each billing only its own lines, never more than the order holds (`0712`; Jess was not part of this decision); allocations
 may name an invoice. `payment_invoice_prepare` drafts idempotently, `payment_invoice_issue`
 mints the governed `INV-DDMMYY-NNNN` number and freezes the snapshot, and
 `payment_invoice_void_replace` — Payment Approver duty via the Shared Duty Resolver, or
@@ -2040,8 +2347,9 @@ exercised on live rows — its verification is probe/test based, as recorded in 
   owner's words and neither may be invented, so §16's customer message is incomplete until
   they exist. They are: (a) the approved **Important Notes** wording that goes on the payment
   message — the sentences Carres wants every customer to read before paying; and (b) the
-  **receiving bank account numbers** for the two bank rows already configured, which today
-  hold a bank name and NO account number. They can be entered directly in
+  **receiving bank account numbers** were historically absent; the 9 Oct authenticated read
+  now establishes both numbers and channel mappings (§12). That part is no longer a missing-content
+  blocker; end-to-end routing remains untested. Important Notes remains subject to content verification in
   `Settings → Payment` (the manager-permission surface, 0431) — no engineering step waits on
   anything else.
 - **Who holds the Payment Approver duty.** Measured 2026-09-08: `workspace_duty_assignments`
@@ -2054,8 +2362,8 @@ exercised on live rows — its verification is probe/test based, as recorded in 
 **Overall status: PARTIALLY DELIVERED.** Every approved CAPABILITY in the table above is now
 built. What keeps the module short of DELIVERED is not engineering:
 
-1. **#20 — owner content.** The approved Important Notes wording and the receiving bank account
-   numbers. Entered in `Settings → Payment`; never invented here.
+1. **#20 — owner content.** Verify approved Important Notes wording in Settings. Receiving bank
+   numbers are observed on 9 Oct (§12), not missing; message/payment routing is still untested.
 2. **#22 — Stripe test-mode keys**, so the provider end-to-end walk can run against the isolated
    local environment documented in `apps/api/.dev.vars.example`.
 3. **#30 — the acceptance that needs a person**: the production visual pass, the native 200%
@@ -2109,8 +2417,8 @@ SO and factual state (`Payment recorded` · `VOIDED`). Print is direct output. A
 allocation / Void payment live in header overflow; unauthorised staff never see them. A void
 preserves the original Receipt with VOIDED, reason and history.
 
-Collection workspace order (§3): Money → Delivery Dates → Items, Services & Stock → Storage → What to do →
-Collection owner → Invoice → Related Payments → Communication History. Check money, goods readiness/arrival and customer Delivery before creating collection Work.
+Collection workspace order (§3, owner approval 2026-09-25): Money → Delivery Dates → Items, Services & Stock →
+Storage → What to do → Collection owner → Related Payments → Communication History (no Invoice section). Check money, goods readiness/arrival and customer Delivery before creating collection Work.
 When goods are not ready and arrival is unknown, show `Wait`; never create a blind payment chase.
 Draft may be edited and issued. Issued Invoice has no ordinary Edit; correction voids the old
 Invoice and creates a linked replacement. (0476 · BUILT: `Void and replace` sits in the Invoice
@@ -2120,6 +2428,12 @@ replacement draft is issued from the order's `Generate invoice`, which draws a n
 
 50/50 is used only while editing a customer-facing message/Invoice, recording Payment, or sending
 Invoice/Receipt. Narrow widths stack action/form first, customer document/message preview second.
+**On the Payment page (owner approval 2026-09-26, supersedes the 2026-09-25 in-row wording):** `Ask
+customer to pay`, `Record the result` and `Record payment` run on the Payment page — the left half
+is the form, the right half the paper — and inside the Work Customer card's Payment section (form
+only). The same components. After a successful
+posting the door strip's blue becomes `Send receipt and invoice` (one message, two documents); a
+recorded message adds one Communication History line and moves the Work card to `Waiting`.
 
 ### Bank transfer and evidence
 
@@ -2163,7 +2477,7 @@ Converge existing Stripe-hosted checkout through the canonical posting service. 
 shows amount, `Waiting for payment`, exact expiry → Copy payment message → Open WhatsApp → Upload
 sent screenshot → Record link sent. Created/sent/opened is not Payment. Only successful provider
 callback/poll posts Payment and Receipt atomically. Unpaid expiry says `Payment link expired`,
-`Amount needed remains unchanged`, `Create a new payment link`. No general Customer Portal.
+`Balance due remains unchanged`, `Create a new payment link`. No general Customer Portal.
 
 Successful posting shows Payment recorded, Receipt number, Amount still needed, Open receipt,
 Send receipt. Receipt message includes amount received, Receipt number, actual remainder,

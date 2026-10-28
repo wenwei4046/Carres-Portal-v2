@@ -22,7 +22,7 @@
  * `generatedOn`; nothing here counts days.
  */
 import type { HTMLAttributes, KeyboardEvent, ReactNode } from "react";
-import { CircleAlert, ClipboardList, Lock, PackageCheck, Route, ShoppingBag, Wallet, type LucideIcon } from "lucide-react";
+import { CircleAlert, ClipboardList, ListChecks, Lock, PackageCheck, Route, ShoppingBag, Wallet, type LucideIcon } from "lucide-react";
 import type { OperationWorkModule } from "@carres/shared";
 import Icon from "@/components/kit/Icon";
 import type { WorkRow } from "../use-open-work";
@@ -35,12 +35,13 @@ const MODULE_ICON: Record<OperationWorkModule, LucideIcon> = {
   delivery: Route,
   payment: Wallet,
   issue_tracker: CircleAlert,
+  workspace: ListChecks,
 };
 
 export type WorkDateStatus = "missed" | "today" | "upcoming" | "no_date";
 
 const STATUS_WORD: Record<WorkDateStatus, string> = {
-  missed: "Missed",
+  missed: "Late",
   today: "Today",
   /* COPY-STANDARD Work timing bans `Upcoming`: a future day is its own
      weekday + date, and needs no word beside it. The badge keeps its height
@@ -129,10 +130,10 @@ export default function WorkCard({
       <span className="flex min-w-0 flex-col items-center justify-center gap-1 border-r border-work-line px-1.5 py-2">
         {parts ? (
           <span aria-hidden className="grid h-11 w-12 grid-rows-[14px_24px] content-center gap-0.5 text-center" data-testid="work-card-date">
-            <span className={`grid place-items-center text-[11px] font-semibold uppercase leading-[14px] tracking-[0.06em] ${status === "today" ? "text-kit-blue-11" : "text-work-muted"}`}>
+            <span className={`grid place-items-center text-label uppercase leading-[14px] tracking-[0.06em] ${status === "today" ? "text-kit-blue-11" : "text-work-muted"}`}>
               {parts.weekday}
             </span>
-            <span className="grid place-items-center text-[22px] font-semibold leading-6 text-work-ink">{parts.day}</span>
+            <span className="grid place-items-center text-strong leading-6 text-work-ink">{parts.day}</span>
           </span>
         ) : (
           <span aria-hidden className="grid h-11 w-12 place-items-center text-work-muted">
@@ -140,7 +141,7 @@ export default function WorkCard({
           </span>
         )}
         {STATUS_WORD[status] ? (
-          <span className={`max-h-[17px] whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase leading-[11px] tracking-[0.06em] ${STATUS_CLASS[status]}`}>
+          <span className={`max-h-[17px] whitespace-nowrap rounded-full border px-1.5 py-0.5 text-label uppercase leading-[11px] tracking-[0.06em] ${STATUS_CLASS[status]}`}>
             {STATUS_WORD[status]}
           </span>
         ) : (
@@ -148,24 +149,24 @@ export default function WorkCard({
         )}
       </span>
       <span className="flex min-w-0 flex-col px-3 pt-2">
-        <span className="flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[10px] font-semibold uppercase leading-[14px] tracking-[0.06em] text-work-slate" data-testid="work-card-module">
+        <span className="flex min-w-0 items-center gap-1.5 whitespace-nowrap text-label uppercase leading-[14px] tracking-[0.06em] text-work-slate" data-testid="work-card-module">
           <ModuleIcon aria-hidden size={14} strokeWidth={1.8} className="shrink-0 text-kit-blue-9" />
           <span className="shrink-0">{moduleLabel}</span>
           {item.recipient ? (
-            <span className="min-w-0 truncate text-[11px] font-medium leading-[14px] normal-case tracking-normal text-work-muted">· {item.recipient}</span>
+            <span className="min-w-0 truncate text-meta leading-[14px] normal-case tracking-normal text-work-muted">· {item.recipient}</span>
           ) : null}
         </span>
-        <span title={item.problem} className="mt-0.5 truncate text-[15px] font-semibold leading-5 text-work-ink" data-testid="work-card-problem">
+        <span title={item.problem} className="mt-0.5 truncate text-strong leading-5 text-work-ink" data-testid="work-card-problem">
           {item.problem}
         </span>
-        <span title={action} className="truncate text-[12px] font-medium leading-4 text-work-slate" data-testid="work-card-action">
+        <span title={action} className="truncate text-meta text-work-slate" data-testid="work-card-action">
           {item.locked ? <Lock size={12} strokeWidth={2.5} className="-mt-0.5 mr-1 inline" aria-label="Held by Finance" /> : null}
           {action}
         </span>
         <span className="-mx-3 mt-auto flex h-7 shrink-0 items-center gap-2 border-t border-work-line pl-3 pr-2" data-testid="work-card-footer">
           {/* The number never shrinks; only the assigned name may, and its tooltip
               keeps the whole sentence. */}
-          <span title={`${item.soRef} · ${assigned}`} className="flex min-w-0 items-baseline gap-1 whitespace-nowrap text-[11px] leading-4 text-work-muted">
+          <span title={`${item.soRef} · ${assigned}`} className="flex min-w-0 items-baseline gap-1 whitespace-nowrap text-meta text-work-muted">
             <span className="shrink-0">{item.soRef}</span>
             <span className="min-w-0 truncate">· {assigned}</span>
           </span>

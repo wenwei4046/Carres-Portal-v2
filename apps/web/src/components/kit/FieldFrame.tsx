@@ -36,9 +36,9 @@ export default function FieldFrame({
   return (
     <div className="flex flex-col gap-1">
       {label && (
-        <label htmlFor={id} className="text-label text-kit-slate-11">
+        <label htmlFor={id} className="text-meta text-c-secondary">
           {label}
-          {required && <span className="text-kit-red-11"> *</span>}
+          {required && <span className="text-c-warn-fg"> *</span>}
         </label>
       )}
       {children}
@@ -46,7 +46,7 @@ export default function FieldFrame({
         <FieldError id={`${id}-msg`}>{error}</FieldError>
       ) : (
         hint && (
-          <p id={`${id}-msg`} className="text-meta text-kit-slate-11">
+          <p id={`${id}-msg`} className="text-meta text-c-secondary">
             {hint}
           </p>
         )
@@ -59,6 +59,7 @@ export default function FieldFrame({
  * The ONE error voice for an input error or a save failure (UI MASTER §6.7,
  * Jess 2026-09-17): 13px, error colour, text AND icon — colour alone never
  * carries it. Block by default; `inline` for a message that sits in a row.
+ * v4 (01 §1): the form error colour is the amber ink, never the Problem red.
  */
 export function FieldError({
   id,
@@ -80,9 +81,9 @@ export function FieldError({
       id={id}
       role={alert ? "alert" : undefined}
       data-testid={testId}
-      className={`${inline ? "inline-flex" : "flex"} items-start gap-1.5 text-body text-kit-red-11`}
+      className={`${inline ? "inline-flex" : "flex"} items-start gap-1.5 text-body text-c-warn-fg`}
     >
-      <span className="mt-0.5 shrink-0">
+      <span className="mt-px shrink-0">
         <Icon name="late" size={14} />
       </span>
       <span className="min-w-0 break-words">{children}</span>

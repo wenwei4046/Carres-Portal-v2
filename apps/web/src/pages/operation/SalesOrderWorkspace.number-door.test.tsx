@@ -27,7 +27,7 @@ const ID = "db9c939a-ebb7-4836-a2b8-866770728822";
 
 function LocationProbe() {
   const location = useLocation();
-  return <div data-testid="location">{location.pathname + location.search}</div>;
+  return <><div data-testid="location">{location.pathname + location.search}</div><div data-testid="return-context">{location.state?.salesOrderRegisterReturn ?? ""}</div></>;
 }
 
 /* The id route is stubbed on purpose: the object page behind it is the whole
@@ -38,11 +38,11 @@ function IdGate() {
   return /^[0-9a-f-]{36}$/i.test(orderId) ? <div data-testid="object-page">{orderId}</div> : <SalesOrderWorkspace />;
 }
 
-function mount(url: string) {
+function mount(url: string, state?: Record<string, string>) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={[url]}>
+      <MemoryRouter initialEntries={[{ pathname: url.split("?")[0]!, search: url.includes("?") ? `?${url.split("?")[1]}` : "", state }]}>
         <LocationProbe />
         <Routes>
           <Route path="/operation/orders/so/:orderId" element={<IdGate />} />
@@ -59,13 +59,14 @@ describe("SalesOrderWorkspace — the number door (Card 19)", () => {
       if (path === "/api/operation/orders/by-number/1362") return Promise.resolve({ id: ID, so: 1362 });
       return new Promise(() => {});
     });
-    mount("/operation/orders/so/SO-1362?route=1");
+    mount("/operation/orders/so/SO-1362?route=1", { salesOrderRegisterReturn: "/operation/orders?search=1362&view=cards" });
     expect(screen.getByTestId("so-number-door")).toBeInTheDocument();
     expect(screen.getByText("Opening SO-1362")).toBeInTheDocument();
     await waitFor(() =>
       expect(screen.getByTestId("location").textContent).toBe(`/operation/orders/so/${ID}?route=1`),
     );
     expect(screen.getByTestId("object-page")).toHaveTextContent(ID);
+    expect(screen.getByTestId("return-context")).toHaveTextContent("/operation/orders?search=1362&view=cards");
     const paths = apiFetch.mock.calls.map(([p]) => p).filter((p): p is string => typeof p === "string");
     expect(paths.filter((p) => p.includes("/by-number/"))).toHaveLength(1);
     /* Every other door is the object page's own; it only ever sees the id —

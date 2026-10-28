@@ -54,7 +54,7 @@ describe("Purchase Order Register authority", () => {
     expect(facts.filters).toContain("supplier_update_required");
     expect(facts.sentToSupplier).toBe("PO V1");
     expect(purchaseOrderWork({ ...base, version: 2, sends: base.sends }, facts)).toEqual({
-      problem: "PO-20260828-4827 V2 has not been sent",
+      problem: "Sending not confirmed",
       /* Owner 2026-09-25 send line: the PO is issued; the act is to SEND it. */
       action: "Send PO-20260828-4827 V2 to Hooka",
     });
@@ -117,7 +117,32 @@ describe("Purchase Order Register authority", () => {
     });
   });
 
-  it("completed and cancelled documents do not create supplier work", () => {
+  /* Round 3 brief of 13 Oct 2026, point 4: "Goods arrived" closes the
+     supplier follow-ups on that PO. No act closes them: they exist only while
+     goods are still pending, so a full receipt removes them by itself. */
+  it("goods arrived in full: the passed date and the day-before check ask nothing more of the supplier", () => {
+    const sent = { kind: "confirmed_sent" as const, channel: "whatsapp", sentAt: "2026-08-20T09:00:00Z", poVersion: 1 };
+    const chasing: PurchaseOrderRegisterInput = { ...base, supplierDate: "2026-08-27", arrivalCheckOpen: true, sends: [sent] };
+    const before = purchaseOrderRegisterFacts(chasing, "2026-08-28");
+    expect(before.filters).toEqual(expect.arrayContaining(["supplier_date_passed", "confirm_tomorrows_delivery"]));
+    expect(purchaseOrderReplyWorkItems(chasing, null, "2026-08-28")).toHaveLength(1);
+
+    const arrived: PurchaseOrderRegisterInput = { ...chasing, status: "received", lines: [{ qty: 3, receivedQty: 3 }] };
+    const after = purchaseOrderRegisterFacts(arrived, "2026-08-28");
+    expect(after.filters).not.toContain("supplier_date_passed");
+    expect(after.filters).not.toContain("confirm_tomorrows_delivery");
+    expect(after.filters).not.toContain("supplier_date_missing");
+    expect(purchaseOrderReplyWorkItems(arrived, null, "2026-08-28")).toEqual([]);
+  });
+
+  it("a part receipt keeps the follow-up for the balance still owed", () => {
+    const sent = { kind: "confirmed_sent" as const, channel: "whatsapp", sentAt: "2026-08-20T09:00:00Z", poVersion: 1 };
+    const part: PurchaseOrderRegisterInput = { ...base, supplierDate: "2026-08-27", sends: [sent], lines: [{ qty: 3, receivedQty: 1 }] };
+    expect(purchaseOrderRegisterFacts(part, "2026-08-28").filters).toEqual(expect.arrayContaining(["supplier_date_passed", "partly_received"]));
+    expect(purchaseOrderReplyWorkItems(part, null, "2026-08-28")).toHaveLength(1);
+  });
+
+  it("completed goods retain sending work while cancelled documents retain their separate guard", () => {
     const completed = purchaseOrderRegisterFacts({
       ...base,
       status: "received",
@@ -127,23 +152,22 @@ describe("Purchase Order Register authority", () => {
 
     expect(completed.operationStatus).toBe("Completed");
     expect(completed.filters).toContain("completed");
-    expect(purchaseOrderWork(base, completed)).toBeNull();
+    expect(purchaseOrderWork(base, completed)?.action).toContain("Send");
     expect(cancelled.operationStatus).toBe("Cancelled");
     expect(purchaseOrderWork(base, cancelled)).toBeNull();
   });
 
   it("a completed PO without sending evidence leaves work but never fabricates a send", () => {
     /* Correction card §5 — receiving completion and sending evidence are two
-       facts. Completed goods close the send WORK (no PDF is owed), while the
-       Sent to Supplier fact stays an honest `Not sent`. */
+       facts. Completed goods do not close outstanding send work. */
     const facts = purchaseOrderRegisterFacts({
       ...base,
       status: "received",
       lines: [{ qty: 3, receivedQty: 3 }],
       sends: [],
     }, "2026-08-28");
-    expect(facts.filters).toEqual(["completed"]);
-    expect(facts.filters).not.toContain("pdf_not_sent");
+    expect(facts.filters).toEqual(["pdf_not_sent", "completed"]);
+    expect(purchaseOrderWork(base, facts)?.action).toContain("Send");
     expect(facts.sentToSupplier).toBe("Sending not confirmed");
   });
 
@@ -269,4 +293,16 @@ describe("Purchase Orders listing groups and Expected Delivery Date", () => {
     expect(purchaseOrderRegisterFacts({ ...base, originalDate: "2026-09-25", supplierDate: "2026-09-25", sends: [marked] }, today).filters)
       .not.toContain("supplier_date_changed");
   });
+});
+
+
+describe("effective cancelled balance preserves its exact-version send",()=> {
+ it("retains ordered/received truth, closes only goods and keeps current cancellation sending",()=> {
+  const input={id:"PO261018-0001",supplierName:"TEST supplier",status:"cancelled",version:3,cancellationVersion:3,lines:[{qty:2,receivedQty:0,cancelledQty:2}],sends:[{kind:"confirmed_sent",poVersion:1,sentAt:"2026-10-18T00:00:00Z",channel:"email",recipient:"TEST@example.test"}]} as Parameters<typeof purchaseOrderRegisterFacts>[0];
+  const facts=purchaseOrderRegisterFacts(input,"2026-10-18");
+  expect(facts.quantities).toEqual({ordered:2,received:0,open:0});expect(facts.operationStatus).toBe("Cancelled");expect(facts.filters).toContain("pdf_not_sent");
+  expect(purchaseOrderWork(input,facts)?.action).toContain("Send");
+  const sent=purchaseOrderRegisterFacts({...input,sends:[...input.sends,{...input.sends[0],poVersion:3}]},"2026-10-18");
+  expect(sent.filters).not.toContain("pdf_not_sent");expect(purchaseOrderWork({...input,sends:[...input.sends,{...input.sends[0],poVersion:3}]},sent)).toBeNull();
+ });
 });

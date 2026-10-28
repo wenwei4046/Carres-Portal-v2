@@ -60,7 +60,7 @@ export interface WorkCommunication {
 }
 
 const MODULE_ICON: Record<OperationWorkItem["module"], IconName> = {
-  orders: "order", purchasing: "supplier", receiving: "warehouse", delivery: "delivery", payment: "money", issue_tracker: "flag",
+  orders: "order", purchasing: "supplier", receiving: "warehouse", delivery: "delivery", payment: "money", issue_tracker: "flag", workspace: "confirm",
 };
 
 export default function WorkActionPanel({
@@ -118,19 +118,19 @@ export default function WorkActionPanel({
       className="shrink-0 rounded-work border border-work-line bg-white px-3 py-3 min-[768px]:px-4"
       data-testid="work-detail-header"
     >
-      <div className="flex items-start gap-3">
+      <div className="flex flex-wrap items-start gap-3">
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-kit-slate-3 text-kit-slate-11" aria-hidden="true">
           <Icon name={communication ? "message" : MODULE_ICON[item.module]} size={16} />
         </span>
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex min-w-[200px] flex-1 basis-[200px] flex-col gap-1">
           <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-            <h2 className="text-[15px] font-semibold leading-5 text-kit-slate-12" data-testid="work-detail-title">{item.action}</h2>
+            <h2 className="text-strong leading-5 text-kit-slate-12" data-testid="work-detail-title">{item.action}</h2>
             {timingLine ? (
-              <span className={`text-[12px] leading-4 ${missed ? "font-semibold text-danger" : "text-kit-slate-11"}`} data-testid="work-detail-action">{timingLine}</span>
+              <span className={`text-meta ${missed ? "font-medium text-danger" : "text-kit-slate-11"}`} data-testid="work-detail-action">{timingLine}</span>
             ) : null}
-            {!hasParties ? <span className="text-[12px] leading-4 text-kit-slate-11">{item.object.label} · {WORK_MODULE_WORD[item.module]}</span> : null}
+            {!hasParties ? <span className="text-meta text-kit-slate-11">{item.object.label} · {WORK_MODULE_WORD[item.module]}</span> : null}
           </div>
-          <p className="text-[13px] leading-[18px] text-kit-slate-11">
+          <p className="text-body text-kit-slate-11">
             <span data-testid="work-detail-fact" className="text-kit-slate-12">{item.problem}</span>
             {!isEmbedded ? <> · {ACTION_COPY.finishWhen}: <span data-testid="work-detail-result">{finish}</span></> : null}
             {item.nextConsequence ? <> · <span data-testid="work-detail-next">{item.nextConsequence}</span></> : null}
@@ -138,33 +138,33 @@ export default function WorkActionPanel({
           {communication && template ? (
             <div className="mt-1 flex flex-col gap-2" data-testid="work-detail-communication">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                <span className="text-[12px] leading-4 text-kit-slate-11">{ACTION_COPY.template}</span>
+                <span className="text-meta text-kit-slate-11">{ACTION_COPY.template}</span>
                 <div className="w-[200px]">
                   <Select id={`work-template-${item.id}`} toolbar options={communication.templates.map((t) => ({ value: t.key, label: t.label }))} value={template.key} onValueChange={setTemplateKey} />
                 </div>
-                <button type="button" className="text-[12px] leading-4 text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" onClick={() => setShowMessage((v) => !v)} data-testid="work-detail-toggle-message">
+                <button type="button" className="text-meta text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" onClick={() => setShowMessage((v) => !v)} data-testid="work-detail-toggle-message">
                   {showMessage ? ACTION_COPY.hideMessage : ACTION_COPY.showMessage}
                 </button>
                 {communication.recordDoor ? (
-                  <Link className="inline-flex items-center gap-1 text-[12px] leading-4 text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" to={communication.recordDoor.to} data-testid="work-detail-record-door">
+                  <Link className="inline-flex items-center gap-1 text-meta text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" to={communication.recordDoor.to} data-testid="work-detail-record-door">
                     {communication.recordDoor.label}
                     <Icon name="open" size={14} />
                   </Link>
                 ) : null}
               </div>
               {showMessage ? (
-                <pre className="whitespace-pre-wrap break-words rounded-control border border-kit-slate-4 bg-kit-slate-2 px-3 py-2 font-sans text-[12px] leading-4 text-kit-slate-12" data-testid="work-detail-message">{template.message}</pre>
+                <pre className="whitespace-pre-wrap break-words rounded-control border border-kit-slate-4 bg-kit-slate-2 px-3 py-2 font-sans text-body text-kit-slate-12" data-testid="work-detail-message">{template.message}</pre>
               ) : null}
             </div>
           ) : null}
         </div>
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2" data-testid="work-detail-open-row">
+        <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2" data-testid="work-detail-open-row">
           {communication?.href && template ? (
             <a
               href={communication.href}
               target="_blank"
               rel="noreferrer"
-              className={`inline-flex h-9 items-center gap-1.5 rounded-control px-3 text-[13px] font-semibold leading-[18px] ${blueIsMessage ? "bg-kit-blue-9 text-white hover:brightness-95" : "border border-kit-slate-4 bg-white text-kit-slate-12 hover:bg-kit-slate-3"}`}
+              className={`inline-flex h-9 items-center gap-1.5 rounded-control px-3 text-body ${blueIsMessage ? "bg-c-ink font-semibold text-white hover:brightness-125" : "border border-kit-slate-4 bg-white font-medium text-kit-slate-12 hover:bg-kit-slate-3"}`}
               data-testid="work-detail-open-chat"
             >
               <Icon name="message" size={14} />
@@ -182,7 +182,7 @@ export default function WorkActionPanel({
       </div>
       {isEmbedded ? (
         <section aria-label="Do this work" className="mt-3 flex max-w-[760px] flex-col gap-3" data-testid="work-detail-task">
-          <p className="text-label text-kit-slate-11">Finish when: {item.completionStatement}</p>
+          <p className="text-meta text-kit-slate-11">Finish when: {item.completionStatement}</p>
           {embedded ?? owningForm}
         </section>
       ) : null}

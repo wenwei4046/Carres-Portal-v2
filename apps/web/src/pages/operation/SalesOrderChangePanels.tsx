@@ -32,9 +32,9 @@ function DiffTable({ rows, label }: { rows: DiffRow[]; label: string }) {
       <table aria-label={label} className="w-full border-collapse text-body">
         <thead>
           <tr className="border-b border-kit-slate-5">
-            <th className="px-2 py-1.5 text-left text-label font-medium text-kit-slate-11">Change</th>
-            <th className="px-2 py-1.5 text-left text-label font-medium text-kit-slate-11">Before</th>
-            <th className="px-2 py-1.5 text-left text-label font-medium text-kit-slate-11">After</th>
+            <th className="px-2 py-1.5 text-left text-meta font-medium text-kit-slate-11">Change</th>
+            <th className="px-2 py-1.5 text-left text-meta font-medium text-kit-slate-11">Before</th>
+            <th className="px-2 py-1.5 text-left text-meta font-medium text-kit-slate-11">After</th>
           </tr>
         </thead>
         <tbody>
@@ -42,7 +42,7 @@ function DiffTable({ rows, label }: { rows: DiffRow[]; label: string }) {
             <tr key={`${r.what}-${i}`} className="border-b border-kit-slate-5 align-top">
               <td className="px-2 py-1.5 text-kit-slate-11">{r.what}</td>
               <td className="px-2 py-1.5 text-kit-slate-11">{r.before}</td>
-              <td className="px-2 py-1.5 font-semibold text-kit-slate-12">{r.after}</td>
+              <td className="px-2 py-1.5 font-medium text-kit-slate-12">{r.after}</td>
             </tr>
           ))}
         </tbody>
@@ -86,7 +86,7 @@ export function DraftReview(props: {
       data-testid="draft-review"
       aria-label="Your changes"
     >
-      <p className="mb-2 text-body font-semibold text-kit-slate-12">
+      <p className="mb-2 text-body font-medium text-kit-slate-12">
         {props.blocked
           ? props.blocked
           : props.commercial
@@ -103,7 +103,7 @@ export function DraftReview(props: {
         </div>
         {props.commercial && (
           <div className="sm:col-span-3 border-t border-kit-blue-6 pt-3">
-            <p className="text-label text-kit-slate-11">Customer agreement</p>
+            <p className="text-meta text-kit-slate-11">Customer agreement</p>
             <p className="mt-1 text-meta text-kit-slate-11">
               You can send the request without it, but management cannot approve until it is
               recorded.
@@ -164,7 +164,7 @@ export function WaitingRequest(props: {
           <DiffTable rows={props.rows} label="Before and after" />
           <Consequences items={props.consequences} />
           <div className="mt-3 border-t border-kit-amber-6 pt-3" data-testid="amendment-agreement">
-            <p className="text-label text-kit-slate-11">Customer agreement</p>
+            <p className="text-meta text-kit-slate-11">Customer agreement</p>
             <AgreementOnRecord
               kind={a.customer_agreement_kind}
               reference={a.customer_agreement_reference}

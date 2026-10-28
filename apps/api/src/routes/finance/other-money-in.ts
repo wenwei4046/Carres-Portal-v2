@@ -11,6 +11,8 @@ import { requireFinance } from "../../lib/auth-guards";
 import { fail, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import { departmentQuery, keepByDepartment, tooManyDepartmentLines, withLineDepartments } from "../../lib/line-departments";
+import { readPartyCodes } from "../../lib/party-codes";
+import { partyCodeInput } from "@carres/shared/schemas/finance-ap";
 import type { AppEnv } from "../../types";
 
 /**
@@ -24,9 +26,10 @@ import type { AppEnv } from "../../types";
  *
  *   GET    /me                       may this person cancel? (the finance approver)
  *   GET    /accounts                 which accounts each form may offer
- *   GET    /parties                  every party, with what it owes
+ *   GET    /parties                  every party, with what it owes and (0691) its code
  *   POST   /parties                  add a party
  *   PATCH  /parties/:id              edit a party (retiring one that owes is refused)
+ *   PUT    /parties/:id/code         fin_party_code_set (0691) — Finance changes a party's code
  *   GET    /invoices                 the other debtor invoice register
  *   POST   /invoices                 save a draft (issue: true issues it too)
  *   GET    /invoices/:id             one invoice, its lines and its receipts
@@ -74,7 +77,26 @@ financeOtherMoneyInRouter.get("/parties", requireFinance, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("other_debtor_outstanding", { p_party_id: null });
   if (error) return fail(c, error);
-  return c.json(data ?? []);
+  // 0691: each party's code, like 305-A001.
+  const codes = await readPartyCodes(sb);
+  return c.json(((data ?? []) as Array<{ party_id: string }>)
+    .map((r) => ({ ...r, code: codes.byParty.get(r.party_id) ?? null })));
+});
+
+// 0691 (Chew 2026-10-12): Finance changes a party's code.
+financeOtherMoneyInRouter.put("/parties/:id/code", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!uuid.safeParse(id).success) return notFound(c, "Party");
+  const body = await parseJsonBody(c, partyCodeInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("fin_party_code_set", {
+    p_supplier_id: null,
+    p_party_id: id,
+    p_code: body.data.code,
+  });
+  if (error) return fail(c, error);
+  return c.json({ code: data as string });
 });
 
 financeOtherMoneyInRouter.post("/parties", requireFinance, async (c) => {

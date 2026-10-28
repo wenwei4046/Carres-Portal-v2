@@ -11,7 +11,7 @@ import { z } from "zod";
 import { DELIVERY_CONTACT_PURPOSES } from "./delivery-contact";
 
 export const DELIVERY_SETTINGS_SECTIONS = [
-  { slug: "partners", label: "Logistics Partners" },
+  { slug: "partners", label: "Logistics" },
   { slug: "rules", label: "Delivery Rules" },
   { slug: "templates", label: "Message Templates" },
   { slug: "access", label: "Access" },
@@ -20,10 +20,10 @@ export type DeliverySettingsSection = (typeof DELIVERY_SETTINGS_SECTIONS)[number
 
 /** The partner object's sections (§11 · Logistics Partners). */
 export const PARTNER_SECTIONS = [
-  { slug: "details", label: "Partner details" },
+  { slug: "details", label: "Company details" },
   { slug: "coverage", label: "Coverage" },
   { slug: "schedule", label: "Schedule" },
-  { slug: "handover", label: "Warehouses & handover points" },
+  { slug: "handover", label: "Transit points" },
   { slug: "fleet", label: "Drivers and Vehicles" },
   { slug: "services", label: "Services & charges" },
   { slug: "access", label: "Portal access" },
@@ -114,11 +114,25 @@ export const DEFAULT_PROOF_RULES: ProofRules = {
 
 export const partnerRulesInput = z.object({
   partnerId: uuid,
-  customerContactBy: z.enum(["partner", "operation"]),
+  customerContactBy: z.literal("partner"),
   recordOnBehalfAllowed: z.boolean(),
-  proofRules: proofRulesSchema.nullable(),
+  proofRules: proofRulesSchema.extend({
+    deliveredPhoto: z.literal(true),
+    deliveredSignedDo: z.literal(true),
+    partialSignedDo: z.literal(true),
+  }).nullable(),
 });
 export type PartnerRulesInput = z.infer<typeof partnerRulesInput>;
+
+/** DEL-04 · Delivery Rules → `Assign logistics by` (0673): working days
+ *  before Scheduled delivery, else Requested delivery. 1–30; default 3. */
+export const DEFAULT_ASSIGNMENT_LEAD_WORKING_DAYS = 3;
+export const deliveryAssignmentLeadInput = z.object({
+  workingDays: z.number().int().min(1, "Choose between 1 and 30 working days.").max(30, "Choose between 1 and 30 working days."),
+  revision: z.number().int().min(1),
+  reason: z.string().trim().max(500).nullish(),
+}).strict();
+export type DeliveryAssignmentLeadInput = z.infer<typeof deliveryAssignmentLeadInput>;
 
 export const partnerDriverInput = z.object({
   partnerId: uuid,
@@ -126,6 +140,8 @@ export const partnerDriverInput = z.object({
   name: trimmed(120).min(1, "The driver name is required."),
   phone: optionalText(40),
   active: z.boolean().default(true),
+  /* 0724 (Weisiang's decision 2026-10-22): a crew member drives or helps. */
+  role: z.enum(["driver", "helper"]).nullish(),
 });
 export type PartnerDriverInput = z.infer<typeof partnerDriverInput>;
 
@@ -138,6 +154,8 @@ export const partnerVehicleInput = z.object({
   driverName: optionalText(120),
   driverPhone: optionalText(40),
   active: z.boolean().default(true),
+  /* 0724 (YH 2026-10-26): the Radius Velocity device on a Carres lorry; null clears it. */
+  velocityDeviceId: optionalText(64),
 });
 export type PartnerVehicleInput = z.infer<typeof partnerVehicleInput>;
 

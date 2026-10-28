@@ -39,9 +39,10 @@
  *   No price yet / Paid in full                     the money states
  *   No date yet    a promise with no date on it
  */
-import { parseEmergencyContact } from "@carres/shared";
+import { parseEmergencyContact, REGISTER_DELIVERY_CONDITIONS, registerDeliveryConditionOf } from "@carres/shared";
 
 import { REGISTER_FIELD_WIDTH as W } from "@/components/register/register-field-widths";
+import { poNumberLinks, poNumberLinksText } from "@/components/register/po-number-links";
 import { fmtDate } from "@/lib/fmt-date";
 import { displayCustomerName } from "@/lib/customer-name";
 import type { DeliveryOrderRow, operationOrderListRow } from "@/lib/queries";
@@ -128,6 +129,12 @@ export function requestedDeliveryOf(o: {
   return { iso: tbd ? null : o.delivery_date ?? null, tbd };
 }
 
+/** Original request only: current delivery_date can change after issue. */
+export function originalRequestedDeliveryOf(o: Pick<operationOrderListRow, "original_request">): string | null {
+  const first = o.original_request?.find(r => r.revision === 1)?.snapshot.header;
+  return first ? requestedDeliveryOf(first).iso : null;
+}
+
 /**
  * ⭐ AND ONE SPELLING OF ITS CELL. Three different things can be true of a
  * requested date — a day, `To be confirmed`, or nothing asked for — and the
@@ -169,10 +176,11 @@ export function salesLocationOf(o: {
  * absence — it is the head of a governed two-line action, and §0.1 already
  * rules how it paints.
  */
-export const MUTED_ABSENCES: ReadonlySet<string> = new Set([NOT_RECORDED, NO_PO_YET, NO_DO_YET, NOT_IN_CATALOG]);
+export const MUTED_ABSENCES: ReadonlySet<string> = new Set([NOT_RECORDED, NO_PO_YET, NO_DO_YET, NOT_IN_CATALOG, "No amendment", "Receipt not recorded"]);
 
 /** One register row: the order, plus every fact already resolved to a string. */
 export interface RegisterRow {
+  stockFacts?: Record<string, string>;
   o: operationOrderListRow;
   id: string;
   so: number;
@@ -198,6 +206,8 @@ export interface RegisterRow {
      dot-separated schema dump COPY-STANDARD bans. Parsed ONCE here, at the
      row, for the same reason `customer` is cased once here. */
   emergency: { name: string; phone: string; relationship: string };
+  receipts: { id: string; receipt_no: string | null }[] | undefined;
+  invoices: { id: string; invoice_no: string | null }[] | undefined;
   needle: string;
   phoneDigits: string;
 }
@@ -222,7 +232,7 @@ export function buildRegisterRow(
     items: registerItemsSummary(o, itemNameOf),
     proceeded: o.proceeded_at ?? null,
     ordered: o.placed_at,
-    customerDelivery: requestedDeliveryOf(o).iso,
+    customerDelivery: originalRequestedDeliveryOf(o),
     /* A required fact (2026-09-21): an empty locality prints nothing, never
        the locality helper's `Not recorded`. */
     deliveryLocation:
@@ -238,6 +248,10 @@ export function buildRegisterRow(
     paid: { kind: "amount", value: money.paid },
     balance: outstandingState(money),
     emergency: parseEmergencyContact(o.customer_emergency),
+    receipts: o.receipt_documents === undefined && o.allocated_receipts === undefined ? undefined : [...new Map([
+      ...(o.receipt_documents ?? []), ...(o.allocated_receipts ?? []).flatMap(a => a.order_payments ? [a.order_payments] : []),
+    ].map(p => [p.id, p])).values()],
+    invoices: o.invoice_documents,
     needle: searchHaystack(o),
     phoneDigits: digits(phone),
   };
@@ -325,7 +339,7 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
   { key: "salesperson", label: "Salesperson", width: W.salesperson, group: "Sales ownership", on: true,
     text: (r) => r.o.salespersons?.name ?? "" },
   /* A required fact: a date, never `To be confirmed` / `No delivery date`. */
-  { key: "customer_delivery", label: "Customer Requested Delivery Date", width: W.customerRequestedDeliveryDate,
+  { key: "customer_delivery", label: "Customer’s original requested delivery", width: W.customerRequestedDeliveryDate,
     group: "Dates", on: true,
     text: (r) => (r.customerDelivery ? fmtDate(r.customerDelivery) : ""),
     sortBy: (r) => r.customerDelivery ?? "",
@@ -337,17 +351,22 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
     text: (r) => r.customer, sortBy: (r) => r.customer },
   { key: "items", label: "Items", width: W.items, group: "Items", on: true,
     text: (r) => r.items },
+  /* ⭐ EVERY LINKED PO, ON ONE LINE — owner ruling 2026-10-06 (Jess): every
+     number, comma-separated, in the shared short form; the same text the cell
+     prints (`po-number-links.ts`), so the filter and Export agree with it. */
   { key: "po_number", label: "PO No", width: W.documentNo, group: "Document", on: true,
-    text: (r) => r.poNumbers.join(" · ") || NO_PO_YET },
+    text: (r) => poNumberLinksText(poNumberLinks(r.poNumbers.map((poId) => ({ poId })))) || NO_PO_YET },
   { key: "do_number", label: "DO No", width: W.documentNo, group: "Document", on: true,
     text: (r) =>
       r.deliveryOrders.length === 0
         ? NO_DO_YET
         : r.deliveryOrders.length === 1
           ? r.deliveryOrders[0]!.do_number
-          : `${r.deliveryOrders.length} Delivery Orders` },
+          : r.deliveryOrders.map(d => d.do_number).join(" · ") },
 
   /* ── OPTIONAL — hidden by default, openable from Columns ────────────────── */
+  { key: "delivery_status", label: "Delivery Status", width: W.placeWord, group: "Delivery",
+    text: (r) => REGISTER_DELIVERY_CONDITIONS.find((condition) => condition.key === registerDeliveryConditionOf(r.o.order_lines ?? [], r.o.allocated_units ?? []))?.label ?? NOT_RECORDED },
   { key: "total", label: "Total", width: W.amount, align: "right", numeric: true,
     group: "Money", text: (r) => moneyText(r.total),
     sortBy: (r) => (r.total.kind === "amount" ? r.total.value : -1),
@@ -358,7 +377,7 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
      label is presentation, an identifier is a contract, and renaming it would
      silently reset every saved column layout (01-design-tokens §0). `balance`
      remains the ruled GOODS word for short-delivery quantity elsewhere. */
-  { key: "balance", label: "Outstanding", width: W.amount, align: "right", numeric: true,
+  { key: "balance", label: "Balance Due", width: W.amount, align: "right", numeric: true,
     group: "Money", text: (r) => moneyText(r.balance),
     sortBy: (r) => (r.balance.kind === "amount" ? r.balance.value : -1),
     kind: "number",
@@ -381,7 +400,11 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
   { key: "source_ref", label: "Customer reference", width: W.reference, group: "Document",
     text: (r) => (r.o.source_ref ?? []).filter(Boolean).join(" · ") || NOT_RECORDED },
   { key: "invoice_no", label: "Invoice No", width: W.reference, group: "Document",
-    text: (r) => r.o.invoice_no || NOT_RECORDED },
+    text: (r) => [...new Set([...(r.invoices ?? []).map(i => i.invoice_no).filter(Boolean), r.o.invoice_no].filter(Boolean))].join(" · ") || (r.invoices === undefined ? "Unavailable" : NOT_RECORDED) },
+  { key: "receipt_no", label: "Receipt No", width: W.documentNo, group: "Document",
+    text: (r) => r.receipts === undefined ? "Unavailable" : r.receipts.map(p => p.receipt_no || NOT_RECORDED).join(" · ") || "Receipt not recorded" },
+  { key: "amendment_no", label: "Amendment No", width: W.documentNo, group: "Document",
+    text: (r) => r.o.amendment_documents === undefined ? "Unavailable" : r.o.amendment_documents.length ? NOT_RECORDED : "No amendment" },
 
   /* ── CUSTOMER — the customer's own facts (BUILD-QUEUE "STRUCTURED ADDRESS":
      raw fallback + the five structured parts + Building Type) ─────────────── */
@@ -478,7 +501,7 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
     kind: "number", num: (r) => r.o.installment_months ?? null },
 
   /* ── DATES — every stamp, whatever act produced it ──────────────────────── */
-  { key: "proceed_date", label: "Proceed date", width: W.date, group: "Dates",
+  { key: "proceed_date", label: "Planned production start", width: W.date, group: "Dates",
     text: (r) => date(r.o.proceed_date, NOT_RECORDED), sortBy: (r) => r.o.proceed_date ?? "",
     kind: "date", iso: (r) => r.o.proceed_date ?? null },
   { key: "dispatched", label: "Dispatched", width: W.date, group: "Dates",

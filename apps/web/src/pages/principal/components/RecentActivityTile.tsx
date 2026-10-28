@@ -17,7 +17,7 @@ interface Props {
 export default function RecentActivityTile({ rows }: Props) {
   return (
     <div className="bg-white border border-base-200 rounded-md">
-      <div className="px-[18px] py-3.5 border-b border-base-100 font-display text-strong font-semibold">
+      <div className="px-[18px] py-3.5 border-b border-base-100 font-display text-strong">
         Recent activity
       </div>
       {rows.length === 0 ? (
@@ -35,7 +35,7 @@ export default function RecentActivityTile({ rows }: Props) {
                 <span className="text-base-900">{e.action}</span>
                 <span className="text-base-500"> &middot; {e.actor_text}</span>
               </div>
-              <div className="font-mono text-label text-base-400 whitespace-nowrap">
+              <div className="font-mono text-meta text-base-500 whitespace-nowrap">
                 {new Date(e.occurred_at).toLocaleDateString()}
               </div>
             </div>

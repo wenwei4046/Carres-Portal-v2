@@ -31,6 +31,7 @@ const CARD: PartnerDeliveryCard = {
   expectedArrival: null,
   note: null,
   cannotDeliverReported: false,
+  holdDelivery: false,
 };
 
 function wrap() {
@@ -107,6 +108,41 @@ describe("the ruled partner screen", () => {
     const card = await screen.findByTestId(`partner-delivery-${CARD.orderId}-0`);
     expect(within(card).getByTestId("partner-cannot-deliver-reported")).toBeTruthy();
     expect(within(card).queryByTestId("partner-save-arrangement")).toBeNull();
+  });
+
+  it("labels the form in the 2026-09-26 words and keeps the inputs as they were", async () => {
+    apiFetchMock.mockResolvedValue({ partner: "NETS", deliveries: [CARD] });
+    wrap();
+    const card = await screen.findByTestId(`partner-delivery-${CARD.orderId}-0`);
+    for (const label of ["Scheduled date", "Scheduled time (optional)", "ETA (optional)", "Note"]) {
+      expect(within(card).getByText(label)).toBeTruthy();
+    }
+    expect(within(card).getByTestId("partner-save-arrangement").textContent).toBe("Save delivery date");
+    expect(card.textContent).not.toMatch(/Confirmed date|Time window|Save Delivery Arrangement/);
+    /* Behaviour unchanged: a date field, a free time field, a clock ETA. */
+    expect((within(card).getByTestId("partner-confirmed-date") as HTMLInputElement).type).toBe("date");
+    expect((within(card).getByTestId("partner-confirmed-time") as HTMLInputElement).type).toBe("text");
+    expect((within(card).getByTestId("partner-eta") as HTMLInputElement).type).toBe("time");
+  });
+
+  it("prints Hold delivery, and nothing more, only when the server holds the scope", async () => {
+    apiFetchMock.mockResolvedValue({
+      partner: "NETS",
+      deliveries: [
+        { ...CARD, confirmedDate: "2026-09-05", holdDelivery: true },
+        { ...CARD, orderId: "00000000-0000-0000-0000-0000000a0002", confirmedDate: "2026-09-05", holdDelivery: false },
+      ],
+    });
+    wrap();
+    const held = await screen.findByTestId(`partner-delivery-${CARD.orderId}-0`);
+    expect(within(held).getByTestId("partner-hold-delivery").textContent).toBe("Hold delivery");
+    /* Never an amount, never the reason, never a door. */
+    expect(held.textContent).not.toMatch(/RM\s?\d|unpaid|Finance|Payment/);
+    expect(within(held).getAllByRole("button").map((b) => b.textContent)).toEqual(["Save delivery date", "Cannot Deliver"]);
+    /* The form stays usable while held. */
+    expect((within(held).getByTestId("partner-save-arrangement") as HTMLButtonElement).disabled).toBe(false);
+    const free = screen.getByTestId("partner-delivery-00000000-0000-0000-0000-0000000a0002-0");
+    expect(within(free).queryByTestId("partner-hold-delivery")).toBeNull();
   });
 
   it("says so plainly when nothing is waiting", async () => {

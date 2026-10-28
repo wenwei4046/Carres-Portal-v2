@@ -60,12 +60,12 @@ export default function AddCoverForm({
     setRefusal(null);
     if (!duty.resolution.normal_user_id) {
       return setRefusal(
-        `${duty.label} has no normal holder for all these dates. Assign the holder first.`,
+        `${duty.label} has no assignment for all these dates. Assign it first.`,
       );
     }
-    if (!actingUserId) return setRefusal("Choose who will cover this duty.");
+    if (!actingUserId) return setRefusal("Choose a person.");
     if (!startsOn || !endsOn || endsOn < startsOn) {
-      return setRefusal("Choose valid cover dates.");
+      return setRefusal("Choose valid assignment dates.");
     }
     cover.mutate(
       { dutyKey: duty.key, actingUserId, startsOn, endsOn, ...(reason.trim() ? { reason: reason.trim() } : {}) },
@@ -84,9 +84,8 @@ export default function AddCoverForm({
             row.acting_user_name ??
             eligible.find((s) => s.user_id === actingUserId)?.name ??
             actingUserId;
-          const normal = row.normal_user_name ?? normalOwner;
           onDone(
-            `${acting} covers ${normal} for ${duty.label}, ${fmtDate(startsOn)} to ${fmtDate(endsOn)}`,
+            `${duty.label} assigned to ${acting}, ${fmtDate(startsOn)} to ${fmtDate(endsOn)}`,
           );
           onClose();
         },
@@ -100,9 +99,9 @@ export default function AddCoverForm({
       onOpenChange={(next) => {
         if (!next) onClose();
       }}
-      title="Add cover"
+      title="Assign"
       dutyLabel={duty.label}
-      submitLabel="Add cover"
+      submitLabel="Assign"
       submitTestId="cover-submit"
       pending={cover.isPending}
       error={
@@ -121,17 +120,17 @@ export default function AddCoverForm({
       {/* Who is being covered FOR — a fact of this act, never a field. */}
       <div className="flex flex-wrap items-baseline gap-x-3">
         <span className="w-28 shrink-0 text-label text-kit-slate-9">
-          Normal owner
+          Assigned to
         </span>
         <span className="text-body text-kit-slate-12">{normalOwner}</span>
       </div>
       <Select
         id="cover-acting"
-        label="Acting person"
+        label="Assigned to"
         required
         value={actingUserId}
         onValueChange={setActingUserId}
-        placeholder="Choose who will cover"
+        placeholder="Choose a person."
         options={eligible.map((s) => ({
           value: s.user_id,
           label: s.name ?? s.email,

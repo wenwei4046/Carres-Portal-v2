@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { RefObject, ReactNode } from "react";
 import Button from "@/components/kit/Button";
 import Modal from "@/components/kit/Modal";
 
@@ -27,6 +27,7 @@ export default function DutyActionDialog({
   error,
   onSubmit,
   children,
+  returnFocusRef,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -40,12 +41,14 @@ export default function DutyActionDialog({
   error: string | null;
   onSubmit: () => void;
   children: ReactNode;
+  returnFocusRef?: RefObject<HTMLElement>;
 }) {
   return (
     <Modal
       open={open}
       onOpenChange={onOpenChange}
       title={title}
+      returnFocusRef={returnFocusRef}
       footer={
         <>
           <Button onClick={() => onOpenChange(false)}>Cancel</Button>

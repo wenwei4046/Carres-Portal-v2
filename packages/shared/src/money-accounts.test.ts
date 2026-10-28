@@ -34,8 +34,8 @@ describe("the money-account rule (0512)", () => {
     expect(moneyAccountAddInput.safeParse({ name: "  ", kind: "BANK" }).success).toBe(false);
   });
 
-  it("says each kind in the standard's pay-method words, never the key", () => {
-    expect(MONEY_ACCOUNT_KIND_WORD).toEqual({ CASH: "Cash", BANK: "Bank transfer", HOLDING: "Online payment" });
+  it("says each kind in its own word, never the key or a pay-method word", () => {
+    expect(MONEY_ACCOUNT_KIND_WORD).toEqual({ CASH: "Cash", BANK: "Bank account", HOLDING: "Card and online holding" });
   });
 });
 

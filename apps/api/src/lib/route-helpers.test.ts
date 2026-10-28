@@ -58,10 +58,28 @@ describe("mapPgError", () => {
     ["payment_method_required", "choose how the customer paid"],
     ["payment_account_unmapped",
       'payment method "grab_pay" has no money account — add it in Settings → Payment → Payment methods, then record this payment'],
+    // 0622: the closed-month guard on gl_entries, which every posting door reaches.
+    ["books_closed", "The books are closed up to 31 Aug 2026. Date this in an open month."],
   ])("a 22023 tagged %s reaches the caller as that code and its own sentence", (tag, sentence) => {
     const m = mapPgError({ code: "22023", message: sentence, details: tag });
     expect(m.status).toBe(422);
     expect(m.body).toEqual({ error: "invalid_param", code: tag, message: sentence });
+  });
+
+  /* TWO DATES, TWO NAMES (owner ruling 2026-10-06). The database still raises
+   * the planned date's pre-ruling sentences; the door answers by DETAIL tag in
+   * the governed words, and keeps the tag as `code`. */
+  it.each([
+    ["proceed_date_required", "Proceed date — pick the day production should start", "Planned production start: pick the day production should start"],
+    ["invalid_proceed_date", "Proceed date is required", "Planned production start: pick the day production should start"],
+    ["proceed_after_delivery", "proceed date must be on or before delivery date", "Planned production start: must be on or before the delivery date"],
+    ["proceed_date_recorded", "The proceed date is already recorded and cannot be changed here", "The planned production start is already recorded and cannot be changed here"],
+    ["proceed_date_passed", "The proceed date has passed", "The planned production start has passed"],
+  ])("a 22023 tagged %s answers in the planned production start's words", (tag, dbSentence, governed) => {
+    const m = mapPgError({ code: "22023", message: dbSentence, details: tag });
+    expect(m.status).toBe(422);
+    expect(m.body).toEqual({ error: "invalid_param", code: tag, message: governed });
+    expect(m.body.message).not.toMatch(/proceed date/i);
   });
 
   it("falls back to 'invalid param' message when 22023 has no message", () => {

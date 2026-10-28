@@ -28,6 +28,9 @@ import { apiFetch } from "@/lib/api";
 import { buildInfo, checkForUpdate, shortCommit, type UpdateCheck } from "@/lib/build-info";
 import { TASKS_KEY } from "./rail/TasksPanel";
 import JumpTo from "./JumpTo";
+import TeamButton from "./TeamButton";
+import MIcon from "@/components/carres/MIcon";
+import { useShellHeader } from "./shell-header-context";
 import type { OpsTasksListResponse } from "@carres/shared";
 
 /** ops_order_control is sometimes an array (embed) — normalise to the row. */
@@ -76,6 +79,11 @@ const WAREHOUSE_TABS = new Set([
   "warehouse-monitor",
   "warehouse-dashboard",
   "stock-onhand",
+  // Weisiang's decision 2026-10-22: the Houzs-way Warehouses page.
+  "warehouses",
+  "stock-adjustments",
+  "stock-transfers",
+  "stock-takes",
 ]);
 
 function moduleSettingsFor(
@@ -100,7 +108,20 @@ function moduleSettingsFor(
 /** The Bell / HelpCircle / Settings cluster (Lucide, no emoji) with popovers —
  *  reusable: sits in the slim bar on most pages, and inline in the Orders
  *  header's right cluster. */
-export function TopBarIcons() {
+export function TopBarIcons({ inShell = false }: {
+  /** Drawn by the Operations shell header (Carres Layout Standard §1, owner-
+   *  confirmed 2026-10-08): search pill · Team · Bell, nothing else — Settings
+   *  lives at the bottom of the side menu. */
+  inShell?: boolean;
+} = {}) {
+  const shell = useShellHeader();
+  /* Inside the shell the header is drawn ONCE, by the shell; a page that
+     still embeds this cluster draws nothing here. */
+  if (shell && !inShell) return null;
+  return <TopBarIconsBody inShell={inShell} />;
+}
+
+function TopBarIconsBody({ inShell }: { inShell: boolean }) {
   const navigate = useNavigate();
   const location = useLocation();
   const moduleSettings = moduleSettingsFor(location.pathname, location.search);
@@ -156,13 +177,14 @@ export function TopBarIcons() {
   };
 
   return (
-    <div ref={barRef} className="flex items-center gap-1">
+    <div ref={barRef} className={`flex items-center ${inShell ? "ml-auto min-w-0 gap-3.5" : "gap-1"}`}>
       {/* Jump to… — the ONE global command surface, and the first utility in
           the locked Page Header order. It owns its own overlay and its own ⌘K
           listener, so it needs nothing from this bar's popover state: the
           three menus below are mutually exclusive with each other, never with
           a surface that takes the screen. */}
-      <JumpTo />
+      {inShell ? <JumpTo pill /> : <JumpTo />}
+      {inShell && <TeamButton />}
 
       {/* Bell · Alerts — real counts from the order book + tasks feed. */}
       <div className="relative">
@@ -173,11 +195,14 @@ export function TopBarIcons() {
           title="Alerts"
           aria-haspopup="menu"
           aria-expanded={open === "alerts"}
-          className="relative p-2 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"
+          className={inShell
+            ? "relative grid h-[34px] w-[34px] place-items-center rounded-full border border-c-head-line bg-white text-c-ink hover:bg-c-search-bg"
+            : "relative flex items-center justify-center h-10 w-10 min-[768px]:h-8 min-[768px]:w-8 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"}
         >
-          <Bell size={18} />
+          {inShell ? <MIcon name="notifications" size={20} /> : <Bell size={16} aria-hidden />}
           {alerts.total > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 rounded-full bg-danger text-white text-label font-semibold leading-[16px] text-center">
+            /* Bell = charcoal: it needs action (Layout Standard §4.1). */
+            <span className={`absolute min-w-[16px] h-[16px] px-1 rounded-full text-white text-label font-semibold leading-[16px] text-center tabular-nums ${inShell ? "-top-[3px] -right-[3px] bg-c-ink !font-bold !leading-4 !min-w-0 !h-auto px-[5px]" : "-top-0.5 -right-0.5 bg-danger"}`}>
               {alerts.total > 99 ? "99+" : alerts.total}
             </span>
           )}
@@ -192,11 +217,11 @@ export function TopBarIcons() {
             </div>
             <div className="max-h-[380px] overflow-auto">
               <AlertGroup
-                title="Overdue"
+                title="Late"
                 tone="text-danger"
                 rows={alerts.overdue}
                 onOpen={goOrders}
-                empty="Nothing overdue"
+                empty="Nothing late"
               />
               <AlertGroup
                 title="Confirm delivery date: no date yet"
@@ -227,6 +252,7 @@ export function TopBarIcons() {
         )}
       </div>
 
+      {!inShell && (<>
       {/* HelpCircle — a two-item menu: Help · Training / SOP (both placeholders;
           the SOP library fills in later). */}
       <div className="relative">
@@ -237,10 +263,9 @@ export function TopBarIcons() {
           title="Help"
           aria-haspopup="menu"
           aria-expanded={open === "help"}
-          className="flex items-center gap-1.5 p-2 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"
+          className="flex items-center justify-center h-10 w-10 min-[768px]:h-8 min-[768px]:w-8 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"
         >
-          <HelpCircle size={18} />
-          <span className="hidden sm:inline text-meta">Help</span>
+          <HelpCircle size={16} aria-hidden />
         </button>
         {open === "help" && (
           <div className="absolute right-0 top-full mt-1 z-40 w-56 bg-card text-card-foreground border border-base-200 rounded-lg shadow-lg py-1">
@@ -328,10 +353,9 @@ export function TopBarIcons() {
           title="Settings"
           aria-haspopup="menu"
           aria-expanded={open === "settings"}
-          className="flex items-center gap-1.5 p-2 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"
+          className="flex items-center justify-center h-10 w-10 min-[768px]:h-8 min-[768px]:w-8 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"
         >
-          <Settings size={18} />
-          <span className="hidden sm:inline text-meta">Settings</span>
+          <Settings size={16} aria-hidden />
         </button>
         {open === "settings" && (
           <div
@@ -370,6 +394,7 @@ export function TopBarIcons() {
           </div>
         )}
       </div>
+      </>)}
     </div>
   );
 }

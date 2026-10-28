@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { signTestJwt, useTestJwks } from "../../test/jwt";
 import { poDeliveryDateOf, purchasingRefusal } from "@carres/shared";
 import { todayIsoMYT } from "../../lib/delivery-order-issue";
@@ -15,6 +15,15 @@ vi.mock("../../lib/duties", () => ({
 vi.mock("../../lib/purchase-demand-read", () => ({
   readFreeStock: vi.fn(),
 }));
+/* The forecast recheck before a PO (owner ruling 2026-10-14, A) has its own
+   tests (`forecast-purchase.test.ts`, `manual-purchase.forecast-issue.test.ts`).
+   No request in this file was asked for by Forecast Purchase, so here it lets
+   every issue through and makes no database call of its own: this file reads
+   the creation payload by its position among the calls. */
+vi.mock("../../lib/forecast-purchase-read", () => ({
+  forecastIssueRefusal: vi.fn().mockResolvedValue(null),
+  forecastItemWord: vi.fn(),
+}));
 vi.mock("../../lib/purchasing-settings", () => ({
   // The frozen ETA arithmetic is the SHARED function; the loader is mocked to
   // a minimal settings shape whose arithmetic degrades to `today` — this test
@@ -25,7 +34,7 @@ vi.mock("../../lib/purchasing-settings", () => ({
     logisticsCallWorkingDays: 1,
     poDays: [1, 3, 5],
     suppliers: [],
-    productionDays: [],
+    productionDays: [{ supplierId: "bbbbbbbb-0000-0000-0000-000000000001", category: "sofa", workingDays: 14 }],
     lastChanges: [],
   }),
 }));
@@ -59,6 +68,8 @@ const env = {
 async function makeJwt(role: string) {
   return signTestJwt("11111111-1111-1111-1111-000000000999", { email: `${role}@carres.com`, app_metadata: { role } });
 }
+
+afterEach(() => vi.useRealTimers());
 
 beforeEach(() => {
   useTestJwks();
@@ -96,7 +107,15 @@ const LINES = [
  *  resolves to the canned result for its table. */
 function tableStub(result: unknown, opts?: { filterInBy?: string }) {
   const q: Record<string, unknown> = {};
-  let rows = result;
+  /* A configured Catalog row (it has `product_models`) always carries its
+     Stock identity (0442); a fixture that wants `Not set` writes `null`. */
+  let rows = Array.isArray(result)
+    ? (result as Record<string, unknown>[]).map((r) =>
+        r && typeof r === "object" && "sku" in r && "product_models" in r
+          ? { stock_identity_mode: "unit", ...r }
+          : r,
+      )
+    : result;
   const chain = () => q;
   for (const m of ["select", "eq", "order", "limit", "not", "gt", "is", "maybeSingle"]) {
     q[m] = vi.fn(chain);
@@ -269,12 +288,7 @@ describe("POST /purchasing/requests/issue — the reason rides to the authority"
     }
   });
 
-  it("no production number, no PO date — and the purchase order is still raised", async () => {
-    /* The PO's own delivery date rests on the Settings production number. With
-       none recorded the document is born with NO date and the paper prints the
-       governed absence; a guessed date would be read downstream as a
-       measurement (P1's law). The goods matter more than the estimate, so the
-       order still goes out. */
+  it("missing production number names the blocker before issuing", async () => {
     const rpc = vi.fn().mockResolvedValue({ data: { po_ids: ["PO-9001"] }, error: null });
     vi.mocked(loadPurchasingSettings).mockResolvedValueOnce({
       ...CARD06_SETTINGS,
@@ -284,9 +298,9 @@ describe("POST /purchasing/requests/issue — the reason rides to the authority"
       { requestIds: [REQ_A, REQ_B], together: true, expectedCosts: REVIEWED },
       rpc,
     );
-    expect(res.status).toBe(200);
-    const pos = rpc.mock.calls[0][1].p_pos as Array<Record<string, unknown>>;
-    expect(pos.every((po) => po.eta_date === null)).toBe(true);
+    expect(res.status).toBe(422);
+    expect(JSON.stringify(await res.json())).toContain("production_days_required");
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it("answers with the issued documents in the shape the shared review reads", async () => {
@@ -391,7 +405,7 @@ describe("closure §2 · Catalog is the manual lane's normal price authority", (
     expect(res.status).toBe(403);
     const body = (await res.json()) as { code?: string; message?: string; action?: string };
     expect(body.code).toBe("not_po_duty");
-    expect(body.message).toBe("You do not hold PO duty today.");
+    expect(body.message).toBe("Only Operation staff may issue a purchase order.");
     expect(body.action?.length).toBeGreaterThan(0);
   });
 });
@@ -1244,7 +1258,7 @@ const CARD06_SETTINGS = {
   poDays: [1, 3, 5],
   manualPurchaseMinDeliveryDays: 0,
   suppliers: [
-    { id: SUP, name: "Hooka", categories: ["sofa"], offDays: [0], transitDays: 1 },
+    { id: SUP, name: "Hooka", categories: ["sofa"], offDays: [0] },
   ],
   productionDays: [{ supplierId: SUP, category: "sofa", workingDays: 5 }],
   destinations: [],
@@ -1322,7 +1336,7 @@ describe("Card 06 · GET /purchasing/requests — the server date projection", (
     const body = (await res.json()) as {
       lines: Array<{
         delivery_date: string | null; order_by: string | null;
-        production_days_missing: boolean; transit_days_missing: boolean;
+        production_days_missing: boolean;
       }>;
       todayIso: string;
       planUnavailable: boolean;
@@ -1338,16 +1352,18 @@ describe("Card 06 · GET /purchasing/requests — the server date projection", (
         deliveryDateIso: "2026-10-16",
       }),
     );
-    expect(body.lines[0].order_by).not.toBeNull();
+    // Fri 16 Oct − 5 Hooka working days (Mon to Sat) = Sat 10 Oct: production
+    // only, no transit leg (owner ruling 2026-09-29).
+    expect(body.lines[0].order_by).toBe("2026-10-10");
     expect(body.lines[0].production_days_missing).toBe(false);
-    expect(body.lines[0].transit_days_missing).toBe(false);
+    expect(body.lines[0]).not.toHaveProperty("transit_days_missing");
   });
 
   it("missing Settings produce NO guessed date — the exact gap is named instead", async () => {
     vi.mocked(loadPurchasingSettings).mockResolvedValueOnce({
       ...CARD06_SETTINGS,
       suppliers: [
-        { id: SUP, name: "Hooka", categories: ["sofa"], offDays: [0], transitDays: null },
+        { id: SUP, name: "Hooka", categories: ["sofa"], offDays: [0] },
       ],
       productionDays: [],
     } as Awaited<ReturnType<typeof loadPurchasingSettings>>);
@@ -1355,12 +1371,13 @@ describe("Card 06 · GET /purchasing/requests — the server date projection", (
     const body = (await (await readRegister()).json()) as {
       lines: Array<{
         order_by: string | null;
-        production_days_missing: boolean; transit_days_missing: boolean;
+        production_days_missing: boolean;
       }>;
     };
     expect(body.lines[0].order_by).toBeNull();
     expect(body.lines[0].production_days_missing).toBe(true);
-    expect(body.lines[0].transit_days_missing).toBe(true);
+    // The transit gap no longer exists (owner ruling 2026-09-29).
+    expect(body.lines[0]).not.toHaveProperty("transit_days_missing");
   });
 
   it("a numbered PO is not `sent` — only the CURRENT version's confirmed-sent evidence", async () => {
@@ -1437,7 +1454,7 @@ describe("Card 06 · POST /purchasing/requests/plan — the create form's date p
       proceedDate: string;
       lines: Array<{
         sku: string; supplierName: string | null; category: string | null;
-        productionDays: number | null; transitDays: number | null; arrival: string | null;
+        productionDays: number | null; arrival: string | null;
       }>;
       deliveryDateDefault: string | null;
     };
@@ -1446,8 +1463,8 @@ describe("Card 06 · POST /purchasing/requests/plan — the create form's date p
       supplierName: "Hooka",
       category: "sofa",
       productionDays: 5,
-      transitDays: 1,
     });
+    expect(body.lines[0]).not.toHaveProperty("transitDays");
     // Agreement with the shared arithmetic from the same Proceed Date.
     expect(body.lines[0].arrival).toBe(
       expectedArrivalOf(CARD06_SETTINGS, {
@@ -1527,6 +1544,9 @@ describe("Card 06 · POST /issue — Delivery Date joins the document partition"
   }
 
   it("two Delivery Dates still create two POs — and neither prints the requested date", async () => {
+    // A real October clock can legitimately calculate one of the fixture dates.
+    // Fix the PO date so this tests date ownership rather than calendar coincidence.
+    vi.useFakeTimers({ now: new Date("2026-09-22T04:00:00Z"), toFake: ["Date"] });
     /**
      * ⭐ THE OWNER CORRECTION OF 2026-09-22, IN ONE TEST.
      *

@@ -4,11 +4,18 @@ import type { PurchasingSettingsResponse } from "@carres/shared";
 import type { AppEnv } from "../../types";
 
 vi.mock("../../lib/supabase", () => ({ userClient: vi.fn() }));
+/* The Settings editor gate (TEAM-02, 0668/0674) has its own tests in
+ * settings-core.test.ts; here it answers like the database does while nobody
+ * is named: the owner may edit, the route is otherwise unchanged. */
+vi.mock("../../lib/settings-editor", () => ({
+  canEditSettings: vi.fn(async (_env: unknown, _jwt: unknown, _section: unknown, role?: string | null) => role === "principal"),
+  requireSettingsEditor: () => async (_c: unknown, next: () => Promise<void>) => { await next(); },
+}));
 vi.mock("../../lib/duties", () => ({ myDuties: vi.fn().mockResolvedValue([]) }));
-vi.mock("../../lib/purchasing-settings", () => ({ loadPurchasingSettings: vi.fn(), loadPoWindows: vi.fn() }));
+vi.mock("../../lib/purchasing-settings", () => ({ loadPurchasingSettings: vi.fn(), loadPoWindows: vi.fn(), loadPurchaseRequestSettings: vi.fn() }));
 
 import { userClient } from "../../lib/supabase";
-import { loadPoWindows, loadPurchasingSettings } from "../../lib/purchasing-settings";
+import { loadPoWindows, loadPurchasingSettings, loadPurchaseRequestSettings } from "../../lib/purchasing-settings";
 import purchasingSettingsRouter from "./purchasing-settings";
 
 const DESTINATION_ID = "33333333-0000-0000-0000-000000000003";
@@ -58,6 +65,7 @@ function testApp(who: { role: string; email: string } = { role: "principal", ema
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(loadPurchaseRequestSettings).mockRejectedValue(new Error("unavailable"));
   vi.mocked(loadPurchasingSettings).mockResolvedValue(response);
   vi.mocked(loadPoWindows).mockResolvedValue({
     settings: { first: "11:30", second: "16:00", secondEnabled: true },
@@ -101,6 +109,29 @@ describe("Purchasing Settings — PO windows (0585, MASTER §5.6.1)", () => {
     });
     expect(res.status).toBe(422);
     expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("Purchasing Settings — Ready Stock priority", () => {
+  it("uses the existing manager-gated SQL door and returns persisted source facts", async () => {
+    const rpc = vi.fn().mockResolvedValue({ error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    vi.mocked(loadPurchasingSettings).mockResolvedValue({ ...response, readyStockPriority: "proceed_date" });
+    const res = await testApp().request("/settings/ready-stock-priority", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ priority: "proceed_date" }) });
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_set_ready_stock_priority", { p_priority: "proceed_date" });
+    expect(((await res.json()) as PurchasingSettingsResponse).readyStockPriority).toBe("proceed_date");
+  });
+  it("refuses an unsupported priority before calling SQL", async () => {
+    const rpc = vi.fn(); vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const res = await testApp().request("/settings/ready-stock-priority", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ priority: "supplier" }) });
+    expect(res.status).toBe(422); expect(rpc).not.toHaveBeenCalled();
+  });
+  it("preserves SQL's permission refusal instead of reporting a saved value", async () => {
+    const rpc = vi.fn().mockResolvedValue({ error: { code: "42501", message: "forbidden" } });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const res = await testApp().request("/settings/ready-stock-priority", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ priority: "proceed_date" }) });
+    expect(res.status).toBe(403);
   });
 });
 
@@ -251,9 +282,9 @@ describe("Purchasing Settings — the earliest Delivery Date a Manual Purchase m
   });
 });
 
-describe("Purchasing Settings — Transit days (0318's write door, finally on a screen)", () => {
-  it("PUT /transit-days reaches purchasing_set_supplier_transit_days", async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+describe("Purchasing Settings — supplier transit leg removed (owner ruling 2026-09-29)", () => {
+  it("PUT /transit-days no longer exists and never reaches the database", async () => {
+    const rpc = vi.fn();
     vi.mocked(userClient).mockReturnValue({ rpc } as never);
 
     const res = await testApp().request("/settings/transit-days", {
@@ -262,41 +293,7 @@ describe("Purchasing Settings — Transit days (0318's write door, finally on a 
       body: JSON.stringify({ supplierId: SUPPLIER_ID, days: 2 }),
     });
 
-    expect(res.status).toBe(200);
-    expect(rpc).toHaveBeenCalledWith("purchasing_set_supplier_transit_days", {
-      p_supplier_id: SUPPLIER_ID,
-      p_days: 2,
-    });
-    // The answer is the whole settings object, so the screen can never drift
-    // from the stored truth after a save.
-    expect(await res.json()).toMatchObject({ poDays: [1, 3, 5] });
-  });
-
-  it("refuses a number outside 0..60 before any database call", async () => {
-    const rpc = vi.fn();
-    vi.mocked(userClient).mockReturnValue({ rpc } as never);
-
-    const res = await testApp().request("/settings/transit-days", {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ supplierId: SUPPLIER_ID, days: 61 }),
-    });
-
-    expect(res.status).toBe(422);
-    expect(rpc).not.toHaveBeenCalled();
-  });
-
-  it("refuses a null day count — an unknown lorry leg stays unknown, never 0", async () => {
-    const rpc = vi.fn();
-    vi.mocked(userClient).mockReturnValue({ rpc } as never);
-
-    const res = await testApp().request("/settings/transit-days", {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ supplierId: SUPPLIER_ID, days: null }),
-    });
-
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(404);
     expect(rpc).not.toHaveBeenCalled();
   });
 });
@@ -320,7 +317,7 @@ describe("Purchasing Settings — a supplier's Last PO time (0585)", () => {
   it("carries each supplier's own time from the one window reader", async () => {
     vi.mocked(loadPurchasingSettings).mockResolvedValue({
       ...response,
-      suppliers: [{ id: SUPPLIER_ID, name: "Ohana", categories: [], offDays: null, transitDays: null }],
+      suppliers: [{ id: SUPPLIER_ID, name: "Ohana", categories: [], offDays: null }],
     });
     vi.mocked(loadPoWindows).mockResolvedValue({
       settings: { first: "11:30", second: "16:00", secondEnabled: true },
@@ -430,5 +427,69 @@ describe("Purchasing Settings — Supplier addresses (0611)", () => {
       expect(res.status).toBeGreaterThanOrEqual(400);
     }
     expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("Supplier channels", () => {
+  it.each([
+    ["contactEmail", "contact_email", "supplier@example.com"],
+    ["whatsappGroupUrl", "whatsapp_group_url", "https://chat.whatsapp.com/AbC123"],
+    ["poSendChannel", "po_send_channel", "email"],
+    ["contactEmail", "contact_email", ""],
+  ])("saves only %s through the audited door", async (kind, p_kind, text) => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const res = await testApp().request("/settings/supplier-channel", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ supplierId: SUPPLIER_ID, kind, text }),
+    });
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_set_supplier_channel", { p_supplier_id: SUPPLIER_ID, p_kind, p_text: text });
+  });
+  it("refuses malformed channels before writing", async () => {
+    const rpc = vi.fn();
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    for (const [kind, text] of [["contactEmail", "not-email"], ["whatsappGroupUrl", "https://evil.test/group"], ["address", "somewhere"]]) {
+      const res = await testApp().request("/settings/supplier-channel", {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ supplierId: SUPPLIER_ID, kind, text }),
+      });
+      expect(res.status).toBe(422);
+    }
+    expect(rpc).not.toHaveBeenCalled();
+  });
+  it("preserves a database permission refusal", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: { code: "42501", message: "forbidden" } });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const res = await testApp({ role: "operation", email: "person@example.com" }).request("/settings/supplier-channel", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ supplierId: SUPPLIER_ID, kind: "contactEmail", text: "supplier@example.com" }),
+    });
+    expect(res.ok).toBe(false);
+  });
+});
+
+
+describe("context request Settings · guarded adoption", () => {
+  it("reads actual zero days and Inactive without inventing defaults", async () => {
+    vi.mocked(loadPurchaseRequestSettings).mockResolvedValue({ normalCalendarDays: 0, serviceCalendarDays: 14, manualWhatsappScreenshotRequired: false });
+    const result = await testApp().request("/settings");
+    expect(result.status).toBe(200);
+    const body = await result.json() as { requestSettings: unknown };
+    expect(body.requestSettings).toEqual({ normalDays: 0, serviceDays: 14, manualWhatsappScreenshotRequired: false });
+  });
+  it("submits all three facts to one audited writer and reads them back", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    vi.mocked(loadPurchaseRequestSettings).mockResolvedValue({ normalCalendarDays: 30, serviceCalendarDays: 14, manualWhatsappScreenshotRequired: true });
+    const result = await testApp().request("/settings/request-settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ normalDays: 30, serviceDays: 14, manualWhatsappScreenshotRequired: true }) });
+    expect(result.status).toBe(200);
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith("purchasing_set_request_settings", { p_normal_days: 30, p_service_days: 14, p_manual_whatsapp_screenshot_required: true });
+  });
+  it("refuses negative days before calling a writer", async () => {
+    const rpc = vi.fn(); vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const result = await testApp().request("/settings/request-settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ normalDays: -1, serviceDays: 14, manualWhatsappScreenshotRequired: true }) });
+    expect(result.status).toBe(422); expect(rpc).not.toHaveBeenCalled();
   });
 });

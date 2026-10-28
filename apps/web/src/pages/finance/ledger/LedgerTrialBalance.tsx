@@ -14,6 +14,14 @@
  * footer; a ② band appears only while debits and credits differ. The ledger
  * holds no opening balances, so Row 2 says the figures are movement since the
  * ledger started — never a full position.
+ *
+ * FINANCE LOOK (Chew 2026-10-13): the code and the name are two columns, only
+ * the code is the account's link, and every heading line reads as a subtotal.
+ *
+ * REPORT DRILL-DOWN (Chew 2026-10-21): an account line's chevron opens the
+ * ledger entries behind it, from the ledger's first day to the as-of day, for
+ * the department chosen, on the side the line shows its balance. A heading
+ * line does not drill. The entries are the General Ledger's (ReportDrill.tsx).
  */
 import { useCallback, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -26,8 +34,12 @@ import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { useTrialBalance } from "./ledger-queries";
+import { openingWords, useOpeningPosted } from "./opening-balances-queries";
 import { DepartmentFilter, useDepartmentParam } from "../department";
 import { headingWalk, indent } from "../reports/StatementTable";
+import { FINANCE_WIDTH, amountCell } from "../finance-widths";
+import { useFinancePersonalLayouts } from "../finance-layouts";
+import ReportDrill from "../reports/ReportDrill";
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -90,6 +102,8 @@ const money = (n: number) => (n > 0 ? rm(n) : "");
 export const trialBalanceLabel = (r: TrialBalanceLine) => "  ".repeat(r.depth - 1) + (r.heading ? r.name : `${r.code} ${r.name}`);
 
 export default function LedgerTrialBalance() {
+  const personalLayouts = useFinancePersonalLayouts("finance_trial_balance");
+  const posted = useOpeningPosted();
   const [params, setParams] = useSearchParams();
   const asked = params.get("asOf");
   const asOf = asked && ISO_DAY.test(asked) ? asked : appTodayIso();
@@ -119,25 +133,27 @@ export default function LedgerTrialBalance() {
   const goLive = report?.go_live_on ?? null;
 
   const columns = useMemo<DataGridColumn<TrialBalanceLine>[]>(() => [
-    { key: "account", label: "Account", width: 300,
-      accessor: (r) => r.heading
-        ? <span className={`font-semibold ${indent(r.depth)}`}>{r.name}</span>
-        : <span className={indent(r.depth)}><Link className="underline underline-offset-2"
-          to={ledgerAccountHref(r.code, goLive, asOf)}>{r.code} {r.name}</Link></span>,
+    { key: "code", label: "Code", width: FINANCE_WIDTH.code,
+      accessor: (r) => (r.heading ? "" : <Link className="underline decoration-dotted underline-offset-[3px]"
+        to={ledgerAccountHref(r.code, goLive, asOf)}>{r.code}</Link>),
       // Search looks through accounts only; a heading never matches.
-      searchValue: (r) => (r.heading ? "" : `${r.code} ${r.name}`),
-      exportValue: trialBalanceLabel },
+      searchValue: (r) => (r.heading ? "" : r.code),
+      exportValue: (r) => (r.heading ? "" : r.code) },
+    { key: "account", label: "Account", width: 380, wrap: true,
+      accessor: (r) => <span className={indent(r.depth)}>{r.name}</span>,
+      searchValue: (r) => (r.heading ? "" : r.name),
+      exportValue: (r) => "  ".repeat(r.depth - 1) + r.name },
     { key: "kind", label: "Kind", width: 130, accessor: (r) => ledgerKindWord(r.kind),
       groupValue: (r) => ledgerKindWord(r.kind), filterType: "enum" },
-    { key: "debit", label: "Debit", width: 150, align: "right",
-      accessor: (r) => (r.heading ? <span className="font-semibold">{money(r.debit)}</span> : money(r.debit)),
+    { key: "debit", label: "Debit", width: FINANCE_WIDTH.amount, align: "right",
+      accessor: (r) => money(r.debit),
       // A heading's subtotal stays out of the export, so a column sum adds each account once.
       numberValue: (r) => r.debit, exportValue: (r) => (r.heading ? "" : r.debit),
-      footerTotal: (visible) => rm(sum(visible, "debit")) },
-    { key: "credit", label: "Credit", width: 150, align: "right",
-      accessor: (r) => (r.heading ? <span className="font-semibold">{money(r.credit)}</span> : money(r.credit)),
+      footerTotal: (visible) => amountCell(sum(visible, "debit")) },
+    { key: "credit", label: "Credit", width: FINANCE_WIDTH.amount, align: "right",
+      accessor: (r) => money(r.credit),
       numberValue: (r) => r.credit, exportValue: (r) => (r.heading ? "" : r.credit),
-      footerTotal: (visible) => rm(sum(visible, "credit")) },
+      footerTotal: (visible) => amountCell(sum(visible, "credit")) },
   ], [goLive, asOf]);
 
   const difference = report?.status === "ok" ? report.difference : null;
@@ -159,16 +175,29 @@ export default function LedgerTrialBalance() {
       </div>}
       <ListPageShell register>
         <DataGrid rows={rows} columns={columns} rowKey={(r) => `${r.heading ? "heading" : "account"}:${r.code}`}
-          storageKey="carres.finance.trial-balance.v1" appearance="reference" exportName="Trial Balance"
+          storageKey="carres.finance.trial-balance.v2" appearance="reference" exportName="Trial Balance"
+          look="finance" personalLayouts={personalLayouts} fillColumn="account" rowTone={(r) => (r.heading ? "subtotal" : null)}
           initialGroupBy={["kind"]} groupBanner={false} stickyIdentity isLoading={!query.isSuccess}
           onSortChange={onSortChange} onSearchChange={onSearchChange} countsInGroup={isAccount}
+          expandTitle="Show entries"
+          expandable={{
+            canExpand: (r) => !r.heading && goLive !== null,
+            testId: (r) => `trial-balance-expand-${r.code}`,
+            label: (_r, open) => (open ? "Hide entries" : "Show entries"),
+            renderExpansion: (r) => (r.heading || goLive === null ? null
+              : <ReportDrill testId={`trial-balance-drill-${r.code}`}
+                scope={{ account: r.code, from: goLive, to: asOf, dept }} label={`${r.code} ${r.name}`}
+                side={r.credit > 0 ? "credit" : "debit"} expected={r.credit > 0 ? r.credit : r.debit}
+                carried empty="No entries up to this day." />),
+          }}
           searchPlaceholder="Search accounts…"
+          wrapToolbar
           toolbarStart={<span className="flex items-center gap-3 text-body">
             <span>As of</span>
             <span className="w-40"><DateField value={asOf} onChange={setAsOf} aria-label="As of" /></span>
             <DepartmentFilter value={dept} onChange={setDept} />
             {goLive && <span data-testid="trial-balance-go-live">
-              Since {fmtDate(goLive)} · No opening balances
+              Since {fmtDate(goLive)} · {openingWords(posted)}
             </span>}
           </span>}
           emptyMessage={report?.status === "before_go_live"

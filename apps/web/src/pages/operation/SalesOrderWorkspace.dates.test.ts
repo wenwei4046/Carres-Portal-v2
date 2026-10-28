@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { earliestPromiseISO } from "./SalesOrderWorkspace";
+import { earliestPromiseISO, isContactOnlyCorrection } from "./SalesOrderWorkspace";
 
 /**
  * THE OFFICE DOOR PROMISES THE SAME DATES THE POS CAN (2026-08-21).
@@ -49,5 +49,19 @@ describe("earliestPromiseISO", () => {
     // applying a remembered default.
     expect(earliestPromiseISO(["sofa"], undefined, TODAY)).toBeNull();
     expect(earliestPromiseISO(["sofa"], 0, TODAY)).toBeNull();
+  });
+});
+
+
+describe("contact correction validation scope", () => {
+  it("allows phone and emergency-contact corrections without renewing delivery", () => {
+    expect(isContactOnlyCorrection(["emergency_phone"])).toBe(true);
+    expect(isContactOnlyCorrection(["customer_phone", "customer_email"])).toBe(true);
+  });
+  it("retains full validation for mixed delivery and commercial changes", () => {
+    for (const field of ["delivery_date", "proceed_date", "lines", "addons", "building_type", "customer_address_line1"]) {
+      expect(isContactOnlyCorrection(["emergency_phone", field])).toBe(false);
+    }
+    expect(isContactOnlyCorrection([])).toBe(false);
   });
 });

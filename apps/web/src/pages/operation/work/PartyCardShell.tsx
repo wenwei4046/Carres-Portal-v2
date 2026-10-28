@@ -2,13 +2,13 @@
  * THE PARTY-CARD SHELL — Customer and Supplier (Workspace MASTER §5.10).
  *
  * Collapsed it is EXACTLY 72px at every width (a 70px row inside the 1px edge): the heading row
- * `{Party} · {name}` 15/20/600 with its progress (12/16) on the right, then
+ * `{Party} · {name}` 15/500 on a 20 line with its progress (12/16) on the right, then
  * ONE status line 12/16 — nothing else. The whole row is one button
  * (`aria-expanded` / `aria-controls`) with a 40×40 chevron target. Open or
  * closed is decided by the right panel (one card at a time); Escape
  * collapses the open card and returns focus to its heading.
  *
- * Expanded sections: 11/14/600 uppercase titles, 10px section padding.
+ * Expanded sections: plain-case 15/500 section titles (01 §2), 10px section padding.
  * Colour always sits beside words and an icon, never alone.
  */
 import { createContext, useContext, useId, useRef, type ReactNode } from "react";
@@ -38,7 +38,7 @@ export const TONE_ICON: Record<PartyTone, IconName | null> = {
 export function ToneLine({ tone, children, testId }: { tone: PartyTone; children: ReactNode; testId?: string }) {
   const icon = TONE_ICON[tone];
   return (
-    <span className={`inline-flex min-w-0 items-center gap-1 text-[12px] font-normal leading-4 ${TONE_TEXT[tone]}`} data-testid={testId}>
+    <span className={`inline-flex min-w-0 items-center gap-1 text-meta ${TONE_TEXT[tone]}`} data-testid={testId}>
       {icon ? <Icon name={icon} size={14} /> : null}
       <span className="min-w-0">{children}</span>
     </span>
@@ -46,15 +46,15 @@ export function ToneLine({ tone, children, testId }: { tone: PartyTone; children
 }
 
 export function SectionTitle({ children }: { children: ReactNode }) {
-  /* Plain case, 12/16 (Jess, 2026-09-27: no small uppercase titles). */
-  return <h4 className="text-[12px] font-semibold leading-4 text-kit-slate-11">{children}</h4>;
+  /* Plain case (Jess, 2026-09-27: no small uppercase titles); a section title inside a card is 15/500 (01 §2). */
+  return <h4 className="text-strong text-kit-slate-12">{children}</h4>;
 }
 
 export function Fact({ label, children, testId }: { label: string; children: ReactNode; testId?: string }) {
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 py-0.5" data-testid={testId}>
-      <span className="text-label text-kit-slate-11">{label}</span>
-      <span className="min-w-0 text-right text-body text-kit-slate-12">{children}</span>
+      <span className="text-meta text-kit-slate-11">{label}</span>
+      <span className="min-w-0 text-right text-body font-medium text-kit-slate-12">{children}</span>
     </div>
   );
 }
@@ -134,10 +134,10 @@ export function PartyCardShell({ testId, anchorId, party, heading, headingTone =
             data-testid={`${testId}-toggle`}
           >
             <span className="flex w-full min-w-0 items-baseline justify-between gap-3">
-              <span className={`min-w-0 truncate text-[14px] font-semibold leading-5 ${headingTone}`} data-testid={`${testId}-heading`}>{heading}</span>
-              {pill ? <span className={`shrink-0 text-[12px] font-semibold leading-4 ${toneText}`} data-testid={`${testId}-pill`}>{pill.text}</span> : null}
+              <span className={`min-w-0 truncate text-strong leading-5 ${headingTone}`} data-testid={`${testId}-heading`}>{heading}</span>
+              {pill ? <span className={`shrink-0 text-meta font-medium ${toneText}`} data-testid={`${testId}-pill`}>{pill.text}</span> : null}
             </span>
-            <span className="flex w-full min-w-0 text-[12px] leading-4 text-kit-slate-11" data-testid={`${testId}-status`}>{status}</span>
+            <span className="flex w-full min-w-0 text-meta text-kit-slate-11" data-testid={`${testId}-status`}>{status}</span>
             <span className="sr-only">{`${open ? "Hide" : "Show"} ${party} details`}</span>
           </button>
           {trailing ? <div className="flex shrink-0 items-center gap-2" data-testid={`${testId}-trailing`}>{trailing}</div> : null}
@@ -158,7 +158,7 @@ export function PartyCardShell({ testId, anchorId, party, heading, headingTone =
             {facts && facts.length > 0 ? (
               <ul className="flex flex-wrap items-center gap-x-4 gap-y-1" data-testid={`${testId}-facts`}>
                 {facts.map((f, i) => (
-                  <li key={i} className={`inline-flex min-w-0 items-center gap-1.5 text-[12px] leading-4 ${f.tone === "danger" ? "font-semibold text-danger" : "text-kit-slate-11"}`}>
+                  <li key={i} className={`inline-flex min-w-0 items-center gap-1.5 text-meta ${f.tone === "danger" ? "font-medium text-danger" : "text-kit-slate-11"}`}>
                     <Icon name={f.icon} size={14} />
                     <span className="min-w-0">{f.text}</span>
                   </li>
@@ -197,9 +197,9 @@ export function PartyCardShell({ testId, anchorId, party, heading, headingTone =
             className="flex min-w-0 flex-1 items-center gap-2 rounded-control py-1 text-left focus-visible:ring-2 focus-visible:ring-kit-blue-9"
             data-testid={`${testId}-toggle`}
           >
-            <span className={`min-w-0 truncate text-[14px] font-semibold leading-5 ${headingTone}`} data-testid={`${testId}-heading`}>{heading}</span>
+            <span className={`min-w-0 truncate text-strong leading-5 ${headingTone}`} data-testid={`${testId}-heading`}>{heading}</span>
             {pill ? <StatusPill tone={partyPillTone(pill.tone)}>{pill.text}</StatusPill> : null}
-            {progress ? <span className="text-[12px] leading-4 tabular-nums text-kit-slate-11" data-testid={`${testId}-progress`}>{progress}</span> : null}
+            {progress ? <span className="text-meta tabular-nums text-kit-slate-11" data-testid={`${testId}-progress`}>{progress}</span> : null}
             <span className="sr-only">{`${open ? "Hide" : "Show"} ${party} details`}</span>
           </button>
           {trailing ? <div className="flex shrink-0 items-center gap-2" data-testid={`${testId}-trailing`}>{trailing}</div> : null}
@@ -218,7 +218,7 @@ export function PartyCardShell({ testId, anchorId, party, heading, headingTone =
         {facts && facts.length > 0 ? (
           <ul className="flex flex-wrap items-center gap-x-4 gap-y-1" data-testid={`${testId}-facts`}>
             {facts.map((f, i) => (
-              <li key={i} className={`inline-flex min-w-0 items-center gap-1.5 text-[12px] leading-4 ${f.tone === "danger" ? "font-semibold text-danger" : f.tone === "muted" ? "text-kit-slate-9" : "text-kit-slate-11"}`}>
+              <li key={i} className={`inline-flex min-w-0 items-center gap-1.5 text-meta ${f.tone === "danger" ? "font-medium text-danger" : f.tone === "muted" ? "text-kit-slate-9" : "text-kit-slate-11"}`}>
                 <Icon name={f.icon} size={14} />
                 <span className="min-w-0 truncate">{f.text}</span>
               </li>

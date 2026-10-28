@@ -77,3 +77,34 @@ describe("manualPurchaseDraftPos — the create page's draft PO paper", () => {
     expect(draft([line()], ["Hooka"])[0]!.data.delivery_method).toBe("we_collect");
   });
 });
+
+describe("context draft papers retain the owning allocation walls", () => {
+  it("prints residual purchase quantities per destination/date without recipient data or official dates", async () => {
+    const { contextPurchaseDraftPos } = await import("./manual-purchase-draft-po");
+    const context = { version: 1, origin: "manual", purpose: "general_purchase", proceedDate: "2026-10-18", stockDeliveryDate: null,
+      serviceCaseId: null, reason: "company_use", companyPersonName: "", projectReference: "", explanation: "", forecastChangeReason: "",
+      recipients: [{ name: "PRIVATE TEST RECIPIENT", phone: "PRIVATE TEST PHONE" }], lines: [{ id: "TEST-line", sku: "TEST-SKU", qty: 5, attrs: { fabric: "TEST" },
+        recipientNeeds: [], stockProposals: [{ qty: 1 }], allocations: [
+          { id: "TEST-a", destinationId: "TEST-A", supplierDeliveryDate: "2026-11-20", qty: 2, recipients: [] },
+          { id: "TEST-b", destinationId: "TEST-B", supplierDeliveryDate: "2026-11-20", qty: 1, recipients: [] },
+          { id: "TEST-c", destinationId: "TEST-A", supplierDeliveryDate: "2026-11-21", qty: 1, recipients: [] },
+        ] }] } as unknown as import("@carres/shared").PurchaseRequestContext;
+    const papers = contextPurchaseDraftPos({ context, items: [{ sku: "TEST-SKU", label: "TEST goods", supplier: "TEST supplier" }],
+      destinations: [{ id: "TEST-A", name: "TEST A", address: "TEST address A" }, { id: "TEST-B", name: "TEST B", address: "TEST address B" }],
+      suppliers: [{ name: "TEST supplier" }], plan: [{ sku: "TEST-SKU", category: "sofa" }], collectedSupplierNames: new Set() });
+    expect(papers).toHaveLength(3);
+    expect(papers.map(p => p.data.lines[0].qty)).toEqual([2,1,1]);
+    expect(papers.map(p => p.data.destination.name)).toEqual(["TEST A","TEST B","TEST A"]);
+    for (const paper of papers) expect(paper.data).toMatchObject({ draft: true, issue_date: "", eta_date: null, so_refs: [] });
+    expect(JSON.stringify(papers)).not.toContain("PRIVATE TEST");
+    expect(new Set(papers.map(p => p.key)).size).toBe(3);
+    const repeated = structuredClone(context.lines[0]); repeated.id = "TEST-second-line";
+    repeated.allocations = [{ ...repeated.allocations[0], id: "TEST-second-source", qty: 1 }];
+    const merged = contextPurchaseDraftPos({ context: { ...context, lines: [...context.lines, repeated] },
+      items: [{ sku: "TEST-SKU", label: "TEST goods", supplier: "TEST supplier" }],
+      destinations: [{ id: "TEST-A", name: "TEST A" }, { id: "TEST-B", name: "TEST B" }], suppliers: [],
+      plan: [{ sku: "TEST-SKU", category: "sofa" }], collectedSupplierNames: new Set() });
+    expect(merged[0].data.lines).toHaveLength(1);
+    expect(merged[0].data.lines[0].qty).toBe(3);
+  });
+});

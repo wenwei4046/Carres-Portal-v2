@@ -97,7 +97,7 @@ names, no caps labels, no size bouncing (round 8: "not like you up and down").
   Wrapped values return to the value X. Empty rows vanish.
 - **SALES ORDER INFO** (renamed from ORDER DETAILS, owner 2026-09-21):
   colon-aligned, 46mm label gutter, in THIS order —
-  `SO No · SO Doc Date · Proceed Date · Customer Requested Delivery Date ·
+  `SO No · SO Doc Date · Planned production start · Customer Requested Delivery Date ·
   Sales Location · Salesperson`. Body dates are mixed-case `Mon, 21 Sep 2026` — FOUR-DIGIT YEAR (owner,
   Jess 2026-09-23; DOCUMENT-KIT.md §4). The `Mon, 21 Sep 26` form is retired:
   it contradicted the kit and disagreed with the PO on the same day's paper.
@@ -392,6 +392,7 @@ cell printed the `ADD-ON` placeholder on every issued SO. Nothing is upper-cased
 
 | Date | Change | Approved |
 |---|---|---|
+| 2026-10-06 | SALES ORDER INFO: the planned production-start date (`proceed_date`) prints as **`Planned production start`**; `Proceed Date` is the actual hand-off and is not on this paper. Name only, same value (owner ruling, Orders MASTER § Two dates, two names). | Jess |
 | 2026-08-09 | Initial law — codifies 17 owner review rounds on rendered PDFs (v1–v15): 2990 skeleton adopted verbatim then amended; fixed zones; bottom-anchored money; three-state lift gate; no-tax ruling; every rule above. | Loo |
 | 2026-08-09 | §7 round 18: amount-in-words becomes 2990's inline one-liner (`Amount in words: …` 8pt grey) — caps block label and `(ITEMS TOTAL)` clarifier removed. | Loo |
 | 2026-08-09 | Rounds 19–21: §8.5 conversion law added — 2990 sizes −0.5pt, row pitches locked to 2990's mm; totals renamed to 2990's `Subtotal`; signature moved after BALANCE DUE with one-line caption. | Loo |

@@ -24,6 +24,7 @@ vi.mock("xlsx", () => ({
     book_append_sheet: vi.fn() },
   writeFile: vi.fn(),
 }));
+vi.mock("@/pages/operation/components/GlobalTopBar", () => ({ TopBarIcons: () => null }));
 vi.mock("@/lib/queries", () => ({
   usePaymentRegister: () => state.payments,
   useInvoiceRegister: () => state.invoices,
@@ -100,6 +101,12 @@ describe("the report derivations", () => {
 });
 
 describe("Reports → Payment", () => {
+  it("wears the same page header as the other reports, so the browser tab names it", () => {
+    show();
+    expect(screen.getByTestId("payment-report-header-module-word")).toHaveTextContent("Payment");
+    expect(document.title).toBe("Payment · Carres");
+    expect(screen.queryByText("Reports · Payment")).not.toBeInTheDocument();
+  });
   it("shows the six approved sections and never a rejected one", () => {
     show();
     for (const head of [
@@ -185,6 +192,12 @@ describe("Reports → Payment", () => {
     show();
     await waitFor(() => expect(screen.getByTestId("report-storage-waived"))
       .toHaveTextContent("No free storage has been approved."));
+  });
+  it("the waiver note reads as a sentence, with no document section number on screen", () => {
+    show();
+    const card = screen.getByTestId("report-storage-waived");
+    expect(card).toHaveTextContent("each with its reason and approver. The written request stays on the case.");
+    expect(card).not.toHaveTextContent("§");
   });
   it("Export Excel writes one sheet per section from the same reads", async () => {
     show();

@@ -256,7 +256,7 @@ export const POS_FORM_BUILTINS: readonly PosBuiltinField[] = [
   // proceedDate is LOCKED: create_order + the ops production engine require it
   // whenever the delivery date is set (Phase 11.1) — relaxing it client-side
   // would only produce server 422s.
-  { tab: "target", key: "proceedDate", label: "Proceed date · production start", locked: true, defaultEnabled: true, defaultRequired: true, requiredToggleable: false },
+  { tab: "target", key: "proceedDate", label: "Planned production start", locked: true, defaultEnabled: true, defaultRequired: true, requiredToggleable: false },
   { tab: "target", key: "stairCarry", label: "Delivery access (floor / lift / stair carry)", locked: true, defaultEnabled: true, defaultRequired: true, requiredToggleable: false },
   { tab: "target", key: "orderAddons", label: "Order add-ons", locked: true, defaultEnabled: true, defaultRequired: false, requiredToggleable: false },
 ];

@@ -71,7 +71,7 @@ export function SendPoForm({ poId, documentNo, supplierName, onDone, onCancel }:
   if (row.isLoading || suppliers.isLoading) return <p className="text-body text-kit-slate-11" role="status">{LOADING}</p>;
   if (!found) return <p className="text-body text-kit-slate-11" role="status">{FAILED}</p>;
   const supplier = (suppliers.data?.suppliers ?? []).find((s) => s.id === found.supplier_id) as
-    | { whatsapp_group_url?: string | null; contact_email?: string | null; contact?: string | null }
+    | { whatsapp_group_url?: string | null; contact_email?: string | null; po_send_channel?: string | null; contact?: string | null }
     | undefined;
   const destinations = [...(row.data?.destinations ?? []), ...(row.data?.referencedDestinations ?? [])];
   const issued: IssuedPo = {
@@ -82,6 +82,7 @@ export function SendPoForm({ poId, documentNo, supplierName, onDone, onCancel }:
     destination: destinations.find((d) => d.id === found.destination_id)?.name ?? null,
     whatsappGroupUrl: supplier?.whatsapp_group_url ?? null,
     contactEmail: supplier?.contact_email ?? null,
+    poSendChannel: supplier?.po_send_channel ?? null,
     contact: supplier?.contact ?? null,
   };
   return (

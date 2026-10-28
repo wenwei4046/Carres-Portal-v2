@@ -5,7 +5,7 @@ import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
 /**
- * Finance · cancelled orders that still hold customer money (migration 0690).
+ * Finance · cancelled orders that still hold customer money (migration 0729).
  *
  * Mounted at `/api/finance/cancelled-money`, above the `/finance` catch-all.
  * READ ONLY: one definer function checks the caller; there is no write route,

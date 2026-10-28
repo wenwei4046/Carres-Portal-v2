@@ -1,15 +1,22 @@
 /**
  * DELIVERY DATES — the ruled partner screen (Delivery Card 07, 0413).
- * `docs/delivery/MASTER.md` §5 + §13, owner rulings 2026-09-01.
+ * `docs/delivery/MASTER.md` §5.4 + §13, owner rulings 2026-09-01, words
+ * 2026-09-26 (COPY "NETS arrange page").
  *
  * One phone-first column. Each card is one delivery this partner carries, with
  * the ruled minimum facts and exactly TWO acts:
  *
- *   [ Save Delivery Arrangement ]   confirmed date · time window · ETA · note
- *   [ Cannot Deliver ]              governed reason (+ note), append-only
+ *   [ Save delivery date ]   scheduled date · scheduled time (optional) ·
+ *                            ETA (optional) · note
+ *   [ Cannot Deliver ]       governed reason (+ note), append-only
  *
  * No Accept (the partner is responsible without one), no money, no other
  * partner's work, no reassignment. Primary-school English throughout.
+ *
+ * `Hold delivery` (owner ruling 2026-09-25, §3): while a Scheduled delivery
+ * exists and the DO money gate holds, the card prints those two words and
+ * nothing more — no amount, no reason, no door. The server decides
+ * (`holdDelivery`); the form and `Cannot Deliver` stay usable.
  */
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -36,11 +43,15 @@ export const PA = {
   phone: "Phone",
   doNo: "DO No",
   noDo: "No delivery order yet",
-  confirmedDate: "Confirmed date",
-  timeWindow: "Time window",
-  eta: "ETA",
+  /* Owner ruling 2026-09-26 (§5.4): the three older field and act words are
+     retired; `hold-delivery-words.test.ts` keeps them out. The inputs, their
+     types and the stored values are unchanged. */
+  scheduledDate: "Scheduled date",
+  scheduledTime: "Scheduled time (optional)",
+  eta: "ETA (optional)",
   note: "Note",
-  save: "Save Delivery Arrangement",
+  save: "Save delivery date",
+  holdDelivery: "Hold delivery",
   saving: "Saving…",
   saved: "Arrangement saved",
   cannotDeliver: "Cannot Deliver",
@@ -147,6 +158,11 @@ function DeliveryCard({ card }: { card: PartnerDeliveryCard }) {
           ? `${PA.customerAsked}: ${fmtDate(card.requestedDate)}`
           : PA.noCustomerDate}
       </div>
+      {card.holdDelivery ? (
+        <div className="text-meta font-semibold text-kit-red-11" data-testid="partner-hold-delivery">
+          {PA.holdDelivery}
+        </div>
+      ) : null}
 
       {card.cannotDeliverReported ? (
         <div
@@ -159,7 +175,7 @@ function DeliveryCard({ card }: { card: PartnerDeliveryCard }) {
         <>
           <div className="grid grid-cols-2 gap-2">
             <label className="flex flex-col gap-1 text-label text-muted-foreground">
-              {PA.confirmedDate}
+              {PA.scheduledDate}
               <input
                 type="date"
                 className={FIELD}
@@ -169,7 +185,7 @@ function DeliveryCard({ card }: { card: PartnerDeliveryCard }) {
               />
             </label>
             <label className="flex flex-col gap-1 text-label text-muted-foreground">
-              {PA.timeWindow}
+              {PA.scheduledTime}
               <input
                 className={FIELD}
                 placeholder="2pm to 5pm"

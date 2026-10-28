@@ -40,7 +40,7 @@ export default function PickupHistoryList({ poId }: { poId: string }) {
         >
           <div className="min-w-0">
             <div className="text-body font-mono font-semibold">{e.do_number}</div>
-            <div className="text-label text-muted-foreground">
+            <div className="text-meta text-muted-foreground">
               {new Date(e.picked_up_at).toLocaleString()} · {e.ack_role} ·{" "}
               {e.thread_count} thread{e.thread_count === 1 ? "" : "s"}
             </div>
@@ -48,7 +48,7 @@ export default function PickupHistoryList({ poId }: { poId: string }) {
           <button
             type="button"
             onClick={() => window.open(`/print/pickup-event/${e.id}`, "_blank")}
-            className="text-meta px-3 py-1.5 border border-border rounded-md hover:border-primary transition-colors flex-shrink-0 ml-3"
+            className="text-body font-medium px-3 py-1.5 border border-border rounded-md hover:border-primary transition-colors flex-shrink-0 ml-3"
             data-testid={`reprint-do-${e.id}`}
           >
             Reprint DO

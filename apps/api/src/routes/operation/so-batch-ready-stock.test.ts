@@ -91,12 +91,26 @@ function client(tables: Record<string, { data: unknown; error: unknown }>) {
       data: Array.isArray(result.data) ? (result.data[0] ?? null) : result.data,
       error: result.error,
     });
+    b.range = vi.fn((from: number, to: number) => Promise.resolve({
+      data: Array.isArray(result.data) ? result.data.slice(from, to + 1) : result.data,
+      error: result.error,
+    }));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     b.then = (res: any, rej: any) => Promise.resolve(result).then(res, rej);
     return b;
   });
   const rpc = vi.fn(async (fn: string, args: Record<string, unknown>) => {
     rpcCalls.push({ fn, args });
+    if (fn === "so_line_remaining_requirement") {
+      if (tables.canonical_remainder) return tables.canonical_remainder;
+      const id = args.p_order_line_id;
+      const lines = tables.order_lines?.data as Array<{ id: string; qty: number }>;
+      const bound = tables.ops_stock_items?.data as Array<{ reserved_order_line_id: string; qty: number }>;
+      const sources = tables.po_line_sources?.data as Array<{ order_line_id: string; qty: number }>;
+      return { data: Math.max(0, (lines.find(line => line.id === id)?.qty ?? 0) -
+        bound.filter(unit => unit.reserved_order_line_id === id).reduce((sum, unit) => sum + unit.qty, 0) -
+        sources.filter(source => source.order_line_id === id).reduce((sum, source) => sum + source.qty, 0)), error: null };
+    }
     return { data: { reserved: 1, reference: "SO-1251", units: [] }, error: null };
   });
   return { from, rpc, rpcCalls };
@@ -118,6 +132,43 @@ async function read(tables = fixture()) {
 beforeEach(() => vi.mocked(userClient).mockReset());
 
 describe("GET …/:orderId/ready-stock", () => {
+  it("reads available candidates beyond the first server page", async () => {
+    const sample = fixture().stock_unit_register_v.data[0];
+    const { res, body } = await read(fixture({ stock_unit_register_v: {
+      data: Array.from({ length: 1001 }, (_, index) => ({ ...sample, id: `unit-${index}`, unit_code: `U1-${index}` })), error: null,
+    } }));
+    expect(res.status).toBe(200);
+    expect(body.units).toHaveLength(1001);
+    expect(body.units.some(unit => unit.itemId === "unit-1000")).toBe(true);
+  });
+  it("refuses an unreadable candidate pool instead of reporting no stock", async () => {
+    const { res } = await read(fixture({ stock_unit_register_v: { data: null, error: { message: "unavailable" } } }));
+    expect(res.status).toBe(503);
+  });
+  it("uses canonical remainder and counts a Unit on its own linked PO only once", async () => {
+    const tables = fixture({
+      order_lines: { data: [{ id: LINE_A, sku: QUEEN, qty: 2, attrs: null }], error: null },
+      ops_stock_items: { data: [{ unit_code: "U1-000-009", qty: 1, po_line_id: "po-line-a", reserved_order_line_id: LINE_A }], error: null },
+      po_line_sources: { data: [{ order_line_id: LINE_A, po_line_id: "po-line-a", qty: 1 }], error: null },
+      canonical_remainder: { data: 1, error: null },
+    });
+    const { res, body, c } = await read(tables);
+    expect(res.status).toBe(200);
+    expect(body.lines[0]).toMatchObject({ qty: 2, reservedQty: 0, onPoQty: 1, remainingQty: 1 });
+    expect(c.rpc).toHaveBeenCalledWith("so_line_remaining_requirement", { p_order_line_id: LINE_A });
+    expect(body.units.find(unit => unit.itemId === "unit-queen-1")?.matchingLineIds).toContain(LINE_A);
+  });
+
+  it.each([
+    { data: null, error: { message: "coverage unavailable" } },
+    { data: null, error: null },
+    { data: "0", error: null },
+    { data: -1, error: null },
+  ])("refuses unreadable canonical demand instead of presenting covered demand", async result => {
+    const { res } = await read(fixture({ canonical_remainder: result }));
+    expect(res.status).toBe(503);
+  });
+
   it("offers a Unit against EVERY item line whose goods it matches", async () => {
     const { res, body } = await read();
     expect(res.status).toBe(200);
@@ -126,6 +177,7 @@ describe("GET …/:orderId/ready-stock", () => {
     /* Two lines of one SKU both still need goods, so the operator must choose. */
     expect(queen.matchingLineIds).toEqual([LINE_A, LINE_B]);
     expect(queen.blocked).toBeNull();
+    expect(queen.warehouseId).toBe("wh-1");
   });
 
   it("never offers a Unit against a line of different goods", async () => {
@@ -145,6 +197,7 @@ describe("GET …/:orderId/ready-stock", () => {
     const { body } = await read();
     const consign = body.units.find((u) => u.itemId === "unit-consign")!;
     expect(consign.ownership).toBe("supplier_consignment");
+    expect(consign.blocked).toBe("supplier_owned");
     expect(consign.supplier).toBe("Dorsettloft");
     /* A second site is offered, not filtered away. */
     expect(consign.siteName).toBe("Ohana");

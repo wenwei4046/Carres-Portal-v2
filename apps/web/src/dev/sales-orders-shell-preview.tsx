@@ -18,6 +18,19 @@ import OperationApp from "@/pages/operation/OperationApp";
 import type { SoBatchPurchaseResponse } from "@carres/shared";
 import { appTodayIso } from "@/lib/fmt-date";
 import "@/index.css";
+import { supabase } from "@/lib/supabase";
+import { testTasksFeed } from "./tasks-feed-fixture";
+
+/* The signed-in TEST person: a UUID, as the Tasks feed needs. */
+const ME = "00000000-0000-4000-8000-0000000000aa";
+
+/* DEV ONLY: Appearance saves to the person's profile; the preview has no real
+   session, so the save is answered here and only the page changes. */
+/* Like Supabase: the signed-in user comes back with the merged metadata. */
+supabase.auth.updateUser = (async (attrs: { data?: Record<string, unknown> }) => ({
+  data: { user: { id: ME, email: "preview@carres.local", user_metadata: { ...(attrs.data ?? {}) } } },
+  error: null,
+})) as never;
 
 const CUSTOMERS = [
   "Kimmy", "LIM KUAN YANG", "Nurul Aisyah binti Abdul Rahman", "PETER", "ANNE", "Tan Ah Kow",
@@ -32,7 +45,13 @@ const CITIES: Array<[string, string]> = [
    real name, so the one-line cell's ellipsis and its open-whole door are walked. */
 const SALESPEOPLE = ["Khoo Aik Yean", "Mayson", "Alvin", "Nur Syafiqah Binti Mohd Zulkifli", "tan qu qu"];
 
-const orders = Array.from({ length: 24 }, (_, n) => {
+/* `?rows=600` seeds a population past one 500-order page (SO A3-3), so the
+   Register's page-by-page read is walked and measured; 72 by default. */
+const previewParams = new URLSearchParams(window.location.search);
+const ROWS = Math.min(5000, Math.max(1, Number(previewParams.get("rows")) || 72));
+/* `?latency=400` holds every list page that long, as a network would. */
+const PAGE_LATENCY_MS = Math.max(0, Number(previewParams.get("latency")) || 0);
+const orders = Array.from({ length: ROWS }, (_, n) => {
   const i = n + 1;
   const [city, state] = CITIES[i % CITIES.length]!;
   return {
@@ -45,6 +64,9 @@ const orders = Array.from({ length: 24 }, (_, n) => {
     customer_phone: `01${i % 10}-34789${String(10 + i).slice(-2)}`,
     customer_address_city: city,
     customer_address_state: state,
+    // The register read embeds receipts; every fourth order has one.
+    receipt_documents: i % 4 === 0 ? [{ id: `rc${i}`, receipt_no: `OR-26${String(i).padStart(4, "0")}` }] : [],
+    allocated_receipts: [],
     // One order from an earlier year: the widest date the column must hold.
     placed_at: i === 7 ? "2025-05-28T02:00:00Z" : `2026-09-${String(1 + (i % 16)).padStart(2, "0")}T02:00:00Z`,
     proceeded_at: i === 7 ? "2025-06-02T02:00:00Z" : `2026-09-${String(2 + (i % 16)).padStart(2, "0")}T06:00:00Z`,
@@ -52,6 +74,7 @@ const orders = Array.from({ length: 24 }, (_, n) => {
     salespersons: { name: SALESPEOPLE[i % SALESPEOPLE.length] },
     delivery_date: `2026-10-${String(1 + (i % 27)).padStart(2, "0")}`,
     delivery_date_tbd: false,
+    original_request: [{ revision: 1, snapshot: { header: { delivery_date: `2026-10-${String(1 + (i % 27)).padStart(2, "0")}`, delivery_date_tbd: false } } }],
     delivery_partner_id: null,
     request_for_delivery_at: null,
     partner_accepted_at: null,
@@ -74,8 +97,9 @@ const orders = Array.from({ length: 24 }, (_, n) => {
     ops_delivery_orders: i % 5 === 0 ? [{ do_number: `DO-20260915-${7000 + i}` }] : [],
     order_lines: [
       { id: `line-${i}-1`, sku: i % 2 ? "CODY-SK" : "B1201S-K", qty: 1, unit_price: 2499, attrs: { category: "mattress", fabric_code: "BF-10 Charcoal Velvet", colour: "Deep Ocean Blue" } },
-      ...(i % 3 === 0 ? [{ id: `line-${i}-2`, sku: "MEMORY-FOAM-PILLOW-asd", qty: 2, unit_price: 99, attrs: { category: "accessory" } }] : []),
+      ...(i === 15 ? Array.from({ length: 9 }, (_, k) => ({ id: `line-${i}-${k + 2}`, sku: "MEMORY-FOAM-PILLOW-asd", qty: k + 1, unit_price: 99, attrs: { category: "accessory" } })) : i % 3 === 0 ? [{ id: `line-${i}-2`, sku: "MEMORY-FOAM-PILLOW-asd", qty: 2, unit_price: 99, attrs: { category: "accessory" } }] : []),
     ],
+    allocated_units: i % 8 === 0 ? undefined : [{ sku: i % 2 ? "CODY-SK" : "B1201S-K", status: i % 3 === 0 ? "sold" : "reserved", qty: 1 }],
     order_addons: [],
   };
 });
@@ -138,9 +162,16 @@ const demandPurchase: SoBatchPurchaseResponse = {
 } as unknown as SoBatchPurchaseResponse;
 
 const realFetch = window.fetch.bind(window);
+let populationReadAttempts = 0;
 window.fetch = async (input, init) => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-  if (!url.includes("127.0.0.1:88") && !url.includes("localhost:88")) return realFetch(input, init);
+  const path = new URL(url, window.location.href).pathname;
+  if (!path.startsWith("/api/") && !path.startsWith("/rest/")) return realFetch(input, init);
+  if ((init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase() !== "GET") return new Response(JSON.stringify({ error: "preview_read_only" }), { status: 405 });
+  const scenario = new URLSearchParams(window.location.search).get("scenario");
+  if (scenario === "loading" && path === "/api/operation/orders") return new Promise<Response>(() => {});
+  if (scenario === "failed" && /\/api\/operation\/orders(?:\?|$)/.test(url)) return new Response(JSON.stringify({ error: "read_failed" }), { status: 500 });
+  if (scenario === "denied" && /\/api\/operation\/orders(?:\?|$)/.test(url)) return new Response(JSON.stringify({ error: "forbidden" }), { status: 403 });
   const expansion = /\/api\/operation\/orders\/([^/]+)\/expansion/.exec(url);
   const order = expansion ? orders.find((o) => o.id === expansion[1]) : undefined;
   if (/\/api\/operation\/orders\/monthly-demand/.test(url)) {
@@ -148,17 +179,134 @@ window.fetch = async (input, init) => {
   }
   /* The Order list's server facts: a spread so every rail value has rows. */
   if (/\/api\/operation\/orders\/register-facts/.test(url)) {
+    /* Owner facts shaped on real test orders (SO-1362 · SO-1358 · SO-1333,
+       read-only SQL 2026-10-09); `?fail=finance,delivery` fails those reads. */
+    const fail = new Set((new URLSearchParams(window.location.search).get("fail") ?? "").split(",").filter(Boolean));
+    const noDelivery = { dateIso: null, time: null, source: null, partnerId: null, partnerName: null };
+    const ownedOf = (i: number) => {
+      const k = i % 6;
+      return {
+        pic: k === 3 ? null : { userId: `u${k}`, name: k === 2 ? null : k === 1 ? "Yu Jun" : "Shasha" },
+        poCount: k === 0 ? 2 : 0,
+        supplierDos: [], grns: [],
+        delivery: k === 0 ? { dateIso: "2026-09-29", time: "Afternoon (12pm to 3pm)", source: "arrangement", partnerId: "p1", partnerName: "NETS" }
+          : k === 1 ? { dateIso: "2026-09-30", time: "Morning (9am\u201312pm)", source: "arrangement", partnerId: "p1", partnerName: "NETS" }
+          : k === 4 ? { dateIso: "2026-10-17", time: "2 PM to 5 PM", source: "document", partnerId: "p2", partnerName: "AL" }
+          : noDelivery,
+        loading: k === 4 ? { hasDo: true, kind: "handed_over", at: "2026-10-16T03:00:00Z" } : { hasDo: false, kind: null, at: null },
+        locations: [],
+        financeHold: k === 5 ? { reason: "Cheque not cleared" } : null,
+      };
+    };
     const facts = Object.fromEntries(orders.map((o, i) => [o.id, {
       obligations: i % 3 === 0 ? "none" : "outstanding",
       cases: i % 5 === 0 ? "open" : i % 7 === 0 ? "closed" : "none",
+      owned: ownedOf(i),
     }]));
-    return new Response(JSON.stringify({ facts, failed: { obligations: false, cases: false } }), { status: 200, headers: { "content-type": "application/json" } });
+    const failed = { obligations: false, cases: false, pic: fail.has("pic"), purchasing: fail.has("purchasing"), delivery: fail.has("delivery"),
+      loading: fail.has("delivery"), location: fail.has("location"), finance: fail.has("finance") };
+    return new Response(JSON.stringify({ facts, failed }), { status: 200, headers: { "content-type": "application/json" } });
   }
   if (/\/api\/operation\/purchase\/demands/.test(url)) {
     return new Response(JSON.stringify(demandPurchase), { status: 200, headers: { "content-type": "application/json" } });
   }
+  const pdfOrderId = /\/api\/orders\/([^/]+)\/sales-order-data/.exec(path)?.[1];
+  const pdfOrder = orders.find(o=>o.id===pdfOrderId);
+  if (pdfOrder) {
+    const total=pdfOrder.order_lines.reduce((sum,line)=>sum+line.qty*line.unit_price,0);
+    return new Response(JSON.stringify({so_number:`SO-${pdfOrder.so}`, issue_date:pdfOrder.placed_at,order_id:pdfOrder.id,order_code:`SO-${pdfOrder.so}`,status_label:"Confirmed",channel:"showroom",
+      customer:{name:pdfOrder.customer_name,address:`${pdfOrder.customer_address_city}, ${pdfOrder.customer_address_state}`,phone:pdfOrder.customer_phone},
+      dealer:{name:pdfOrder.dealers.name,contact:null,address:null,outlet_name:pdfOrder.outlets?.name??null,outlet_address:null,salesperson_name:pdfOrder.salespersons.name,salesperson_phone:null},
+      delivery:{date:pdfOrder.delivery_date,floor:null,has_lift:null},proceed_date:pdfOrder.proceeded_at,
+      lines:pdfOrder.order_lines.map(line=>({sku:line.sku,description:line.sku==="CODY-SK"?"AKEMI IMMORTAL MATTRESS":"Latex Pillow",qty:line.qty,unit_price:line.unit_price,line_total:line.qty*line.unit_price,attrs:line.attrs,category:line.attrs.category})),addons:[],payments:[],subtotal:total,total,paid:pdfOrder.paid,balance_due:total-pdfOrder.paid,currency:"MYR",signed:false}),{status:200,headers:{"content-type":"application/json"}});
+  }
+  const detailId = /\/api\/operation\/orders\/([^/?]+)/.exec(path)?.[1];
+  const detail = orders.find(o => o.id === detailId);
+  const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
+  if (detail && path.endsWith(detail.id)) return json({ order: detail, lines: detail.order_lines, addons: [], total: 2499, warehouse: null, stockBalances: [], freeUnits: [], pos: [], threads: [],
+    picRead: "ok", pic: { userId: "u0", name: "Shasha" },
+    history: [
+      { text: "Sales Order created at Sales Portal", occurred_at: detail.placed_at, actor_kind: "system" },
+      { text: "Operations received the order", occurred_at: detail.proceeded_at, actor_kind: "system" },
+      { text: "Delivery date checked with TEST Logistics", occurred_at: "2026-10-06T06:30:00Z", actor: "TEST · Staff D", actor_kind: "human" },
+    ] });
+  if (path === "/api/ops/service-cases") return json({ items: [], total: 0 });
+  /* Delivery's reads for the Order Route (shaped on SO-1333: NETS, 29 Sep). */
+  if (detail && path.endsWith("/booking-brief")) return json({ brief: null });
+  if (detail && path.endsWith("/delivery-attempts")) return json({ attempts: [] });
+  if (path.startsWith("/api/finance/exceptions/") || path.startsWith("/api/operation/payment-approvals/")) return json([]);
+  if (path === "/api/operation/delivery-arrangements") {
+    const orderId = new URL(url, window.location.href).searchParams.get("order");
+    return json({ arrangements: [{ id: "a1", order_id: orderId, leg: 0, partner_id: "p1", confirmed_date: "2026-09-29", confirmed_time: "Afternoon (12pm to 3pm)" }] });
+  }
+  if (path === "/api/operation/delivery-orders") return json({ deliveryOrders: [], attempts: [], handoverEvents: [] });
+  /* Payments' four reads for `Pay by` (no invoices recorded in this preview). */
+  if (path === "/api/finance/invoices/register") return json({ rows: [], total: 0 });
+  if (path === "/api/finance/payment-storage") return json({ cases: [] });
+  if (path === "/api/finance/payment-storage/later-delivery-requests") return json({ requests: [] });
+  if (path === "/api/finance/payment-settings") return json({ bank_accounts: [], manual_methods: [], rules: [], collection_timing: [], changes: [] });
+  if (detail && path.endsWith("/refunds")) return json({ refunds: [] });
+  if (detail && path.endsWith("/payments")) return json({ payments: [] });
+  if (detail && path.endsWith("/amendment")) return json({ amendment: null });
+  if (detail && path.endsWith("/correction-work")) return json({ work: [] });
+  if (detail && path.endsWith("/service-cases")) return json({ items: [] });
+  /* DEV ONLY · TEST facts so Order Route and Timeline draw (screenshots 3–4). */
+  if (detail && path.endsWith("/revisions")) return json({ revisions: [{
+    revision: 1, created_at: detail.placed_at, created_by: null, actor_kind: "system",
+    snapshot: { header: { delivery_date: detail.delivery_date, delivery_date_tbd: false, customer_name: detail.customer_name }, lines: detail.order_lines, addons: [] },
+  }] });
+  if (detail && path.endsWith("/allocation")) return json({ allocation: { orderId: detail.id, soRef: `SO-${detail.so}`, lines: [], unmatchedUnits: [],
+    totals: { committedQty: detail.order_lines.reduce((n, l) => n + l.qty, 0), reservedQty: 0, soldQty: 0, outstandingQty: detail.order_lines.reduce((n, l) => n + l.qty, 0) } } });
+  if (detail && path.endsWith("/loans")) return json({ loans: [] });
+  if (detail && path.endsWith("/loan-offers")) return json({ offers: [] });
+  if (path === "/api/operation/supplier-claims") return json({ claims: [] });
+
+  if (path.endsWith("/workspace-duties")) return json({ duties: [] });
+  if (path.endsWith("/customer-type")) return json({ existing: false, matches: 0 });
+  /* The server's paged contract (`paged=1`): 500 per page, placed_at desc then
+     id desc, `nextCursor` = the page's last row, the total on page one only. */
+  if (/\/api\/operation\/orders(\?|$)/.test(url) && new URL(url, window.location.href).searchParams.get("paged") === "1") {
+    const query = new URL(url, window.location.href).searchParams;
+    const after = query.get("after");
+    /* Declared TEST read states, not a second implementation of business search.
+       An empty searched response keeps the same permitted unsearched population. */
+    if (scenario === "population-retry" && !query.get("search") && populationReadAttempts++ === 0) {
+      return new Response(JSON.stringify({ error: "TEST population read failed" }), { status: 503 });
+    }
+    /* Every page read is recorded, so a measurement can show the walk. */
+    const reads = ((window as unknown as { __soListPageReads?: string[] }).__soListPageReads ??= []);
+    reads.push(new URL(url, window.location.href).search);
+    const population = scenario === "empty" ? [] : [...orders].sort((a, b) =>
+      b.placed_at.localeCompare(a.placed_at) || b.id.localeCompare(a.id));
+    const answer = query.get("search") && (scenario === "search-empty" || scenario === "population-retry") ? [] : population;
+    const keyOf = (o: (typeof orders)[number]) => `${o.placed_at}|${o.id}`;
+    const start = after ? answer.findIndex((o) => keyOf(o) === after) + 1 : 0;
+    const page = answer.slice(start, start + 500);
+    if (PAGE_LATENCY_MS) await new Promise((resolve) => setTimeout(resolve, PAGE_LATENCY_MS));
+    return json({
+      orders: page,
+      ...(after ? {} : { salesOrderTotal: previewParams.get("total") === "unknown" ? null : population.length }),
+      nextCursor: page.length === 500 ? keyOf(page[page.length - 1]!) : null,
+    });
+  }
+  /* The Tasks panel reads the same TEST feed as the other shell previews. */
+  if (/\/api\/operation\/work(\?|$)/.test(url)) return json(testTasksFeed({ id: ME, name: "TEST · Staff A", email: "preview@carres.local" }));
+  /* The header's Team list (0663). TEST people, never real staff. */
+  if (path === "/api/operation/work-activity/team-today") {
+    const now = Date.now();
+    const at = (min: number) => new Date(now - min * 60_000).toISOString();
+    const member = (n: string, state: string, idle: number | null) => ({
+      userId: `00000000-0000-4000-9000-${String(n.charCodeAt(0)).padStart(12, "0")}`,
+      name: `TEST · Staff ${n}`, role: "operation", state,
+      lastActiveAt: idle == null ? null : at(idle), idleMinutes: idle,
+    });
+    return json({ asOf: new Date(now).toISOString(), onlineMinutes: 15, members: [
+      member("A", "online", 0), member("B", "off", null), member("C", "away", 34), member("D", "online", 2),
+      member("E", "not_seen", null), member("F", "online", 1), member("G", "online", 5), member("H", "away", 12),
+    ] });
+  }
   const body = /\/api\/operation\/orders(\?|$)/.test(url)
-    ? { orders, salesOrderTotal: orders.length }
+    ? { orders: scenario === "empty" ? [] : orders, salesOrderTotal: scenario === "empty" ? 0 : orders.length }
     : order
       ? { lines: order.order_lines.map((l, k) => ({
           lineId: l.id, sku: l.sku, unitIds: k === 0 && order.so % 2 ? ["KLG-M-240915-01"] : [],
@@ -166,28 +314,35 @@ window.fetch = async (input, init) => {
           deliverTo: order.po_numbers.length ? [{ name: "Carres Klang", qty: l.qty }] : [],
         })) }
       : /\/api\/catalog(\?|$)/.test(url)
-        ? { models: [{ id: "m-cody", name: "Cody" }, { id: "m-b12", name: "Booqit Hybrid" }, { id: "m-pl", name: "Latex Pillow" }],
+        ? { models: [{ id: "m-cody", name: "AKEMI IMMORTAL MATTRESS (183X190X36CM)" }, { id: "m-b12", name: "Booqit Hybrid" }, { id: "m-pl", name: "Latex Pillow" }],
             skus: [
               { id: "s1", modelId: "m-cody", sku: "CODY-SK", variant: "Super King" },
               { id: "s2", modelId: "m-b12", sku: "B1201S-K", variant: "King" },
               { id: "s3", modelId: "m-pl", sku: "MEMORY-FOAM-PILLOW-asd", variant: "Standard" },
             ],
             sofaFabrics: [], addons: [], floorConfig: {} }
-        : url.includes("/rest/") ? [] : {};
+        : null;
+  if (body === null) return new Response(JSON.stringify({ error: "fixture_endpoint_unavailable" }), { status: 404 });
   return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
 };
 
+/* The first-entry `Pending work` reminder is its own surface: it shows here
+   only when asked for (`?reminder=1`), so the page under it can be walked. */
+if (new URLSearchParams(window.location.search).get("reminder") !== "1") {
+  try { window.localStorage.setItem(`carres.pendingWork.shownOn.${ME}`, appTodayIso()); } catch { /* a private window: the reminder shows */ }
+}
+
 useAuth.setState({
   role: "operation", hydrated: true, loading: false,
-  user: { id: "u-op", email: "preview@carres.local" } as never,
-  session: { access_token: "preview", user: { id: "u-op", email: "preview@carres.local" } } as never,
+  user: { id: ME, email: "preview@carres.local" } as never,
+  session: { access_token: "preview", user: { id: ME, email: "preview@carres.local" } } as never,
 });
 
 const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[`/operation/orders${window.location.search}`]}>
+      <MemoryRouter initialEntries={[previewParams.get("path") ?? `/operation/orders${window.location.search}`]}>
         <Routes>
           <Route path="/operation/*" element={<OperationApp />} />
         </Routes>

@@ -77,7 +77,7 @@ afterEach(() => {
 describe("Columns · Reset columns", () => {
   it("names the reset act `Reset columns`, not a bare `Reset`", () => {
     mount({ appearance: "reference", labelledToolbar: true });
-    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+    (fireEvent.click(screen.getByRole("button", { name: "Page tools" })), fireEvent.click(screen.getByRole("menuitem", { name: "Columns" })));
     expect(screen.getByRole("button", { name: "Reset columns" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Reset" })).toBeNull();
   });
@@ -382,5 +382,24 @@ describe("an empty cell is empty", () => {
     const max = screen.getByLabelText("Max");
     expect(min).toHaveAttribute("placeholder", "Min");
     expect(max).toHaveAttribute("placeholder", "Max");
+  });
+});
+
+
+describe("the opt-in fixed condition row", () => {
+  it("keeps the same slot before filtering and after Clear all without empty controls", () => {
+    mount({ reserveConditionRow: true, searchPresentation: "responsive" });
+    const slot = screen.getByTestId("active-conditions");
+    expect(slot).toHaveClass(styles.conditionBarReserved);
+    expect(screen.queryByRole("button", { name: "Clear all" })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText("Search…"), { target: { value: "SO-1301" } });
+    expect(screen.getByTestId("active-conditions")).toBe(slot);
+    fireEvent.click(screen.getByRole("button", { name: "Clear all" }));
+    expect(screen.getByTestId("active-conditions")).toBe(slot);
+    expect(slot).toBeEmptyDOMElement();
+  });
+  it("leaves registers without the opt-in free of an empty strip", () => {
+    mount();
+    expect(screen.queryByTestId("active-conditions")).not.toBeInTheDocument();
   });
 });

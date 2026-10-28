@@ -135,9 +135,9 @@ export default function ImportStockDialog({
       {stage === "pick" && (
         <div className="flex flex-col gap-3">
           <p className="text-body text-base-600">
-            Upload your <span className="font-semibold">Klg Warehouse</span>{" "}
+            Upload your <span className="font-medium">Klg Warehouse</span>{" "}
             sheet (.xlsx). Each row is one physical unit; we book them in at{" "}
-            <span className="font-semibold">Carres Klang</span>. You&rsquo;ll see
+            <span className="font-medium">Carres Klang</span>. You&rsquo;ll see
             the counts (new vs already-in) before anything saves.
           </p>
           <p className="text-meta text-base-500">
@@ -179,25 +179,25 @@ export default function ImportStockDialog({
         <div className="flex flex-col gap-3">
           <div className="text-body text-base-700">
             <span className="font-mono text-meta">{fileName}</span> ·{" "}
-            <span className="font-semibold text-base-900">{rows.length}</span>{" "}
+            <span className="font-medium text-base-900">{rows.length}</span>{" "}
             lines ·{" "}
-            <span className="font-semibold text-base-900">{unitsOf(rows)}</span>{" "}
+            <span className="font-medium text-base-900">{unitsOf(rows)}</span>{" "}
             units in sheet
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-[6px] bg-base-50 px-3 py-2">
               <div className="text-strong text-green-700">{fresh.length}</div>
-              <div className="text-label uppercase tracking-[0.05em] text-base-500">new lines, will add</div>
+              <div className="text-label uppercase tracking-[0.06em] text-base-500">new lines, will add</div>
             </div>
             <div className="rounded-[6px] bg-base-50 px-3 py-2">
               <div className="text-strong text-base-900">{alreadyIn}</div>
-              <div className="text-label uppercase tracking-[0.05em] text-base-500">already in, skipped</div>
+              <div className="text-label uppercase tracking-[0.06em] text-base-500">already in, skipped</div>
             </div>
           </div>
 
           <div className="rounded-[4px] border border-base-200 bg-base-50 px-3 py-2 text-meta text-base-600">
-            Booking in <span className="font-semibold">{fresh.length}</span> new
+            Booking in <span className="font-medium">{fresh.length}</span> new
             line(s) at Carres Klang. Condition, PO, supplier, reserved-ref, qty +
             date-in come straight from the sheet. Bulk lines (e.g. accessories)
             stay as one record carrying their quantity.

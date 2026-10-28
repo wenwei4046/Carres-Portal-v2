@@ -124,7 +124,7 @@ export default function SupplierPOs() {
     <div className="p-9 max-w-[1400px] mx-auto">
       <header className="mb-7 flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">
+          <div className="text-label uppercase tracking-[0.06em] text-muted-foreground">
             Operations
           </div>
           <h1 className="font-display text-page mt-1.5 mb-1 text-foreground tracking-[-0.02em]">
@@ -135,7 +135,7 @@ export default function SupplierPOs() {
           </div>
         </div>
         <label className="flex items-center gap-2 text-label text-muted-foreground self-end">
-          <span className="uppercase tracking-[0.08em]">Sort</span>
+          <span className="uppercase tracking-[0.06em]">Sort</span>
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as SortKey)}
@@ -168,14 +168,14 @@ export default function SupplierPOs() {
           >
             <div className="flex items-baseline gap-2.5">
               <span
-                className={`text-strong font-semibold ${
+                className={`text-strong ${
                   active === t.key ? "text-foreground" : "text-muted-foreground"
                 }`}
               >
                 {t.label}
               </span>
             </div>
-            <div className="text-label text-muted-foreground mt-0.5">
+            <div className="text-meta text-muted-foreground mt-0.5">
               {TAB_HINTS[t.key](supplierKind)}
             </div>
           </button>
@@ -226,22 +226,22 @@ function ThreadStateSubtitle({
 }) {
   if (stage === "po" && counts.producing > 0) {
     return (
-      <span className="text-label text-muted-foreground">
-        <strong className="text-foreground">{counts.producing} of {counts.total}</strong> still producing
+      <span className="text-meta text-muted-foreground">
+        <strong className="text-foreground font-medium">{counts.producing} of {counts.total}</strong> still producing
       </span>
     );
   }
   if (stage === "ready" && counts.ready > 0) {
     return (
-      <span className="text-label text-primary">
-        <strong>{counts.ready} of {counts.total}</strong> ready · partner can pickup
+      <span className="text-meta text-primary">
+        <strong className="font-medium">{counts.ready} of {counts.total}</strong> ready · partner can pickup
       </span>
     );
   }
   if (stage === "delivered" && counts.picked > 0) {
     return (
-      <span className="text-label text-success">
-        <strong>{counts.picked} of {counts.total}</strong> picked up
+      <span className="text-meta text-success">
+        <strong className="font-medium">{counts.picked} of {counts.total}</strong> picked up
       </span>
     );
   }
@@ -278,7 +278,7 @@ function StatusPill({
         : "bg-blue-100 text-blue-800";
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-label font-semibold ${cls}`}
+      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-meta font-medium ${cls}`}
     >
       <span className="w-1.5 h-1.5 rounded-full bg-current" />
       {label}
@@ -340,7 +340,7 @@ function POCard({
                 Null when no threads (forecast/stockpile PO) → hidden. */}
             {po.urgency && (
               <span
-                className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-label font-semibold uppercase tracking-[0.06em] ${
+                className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-label uppercase tracking-[0.06em] ${
                   po.urgency === "critical"
                     ? "bg-destructive/10 text-destructive"
                     : po.urgency === "urgent"
@@ -357,7 +357,7 @@ function POCard({
               </span>
             )}
           </div>
-          <div className="text-label text-muted-foreground mt-0.5">
+          <div className="text-meta text-muted-foreground mt-0.5">
             Placed {new Date(po.placed_at).toLocaleDateString()}
           </div>
         </div>
@@ -383,9 +383,9 @@ function POCard({
             )}
           </div>
           {po.expected_ready_date && (
-            <div className="text-label text-muted-foreground flex flex-col">
-              <span className="text-label uppercase tracking-[0.12em]">Ready by</span>
-              <span className="font-semibold text-primary">
+            <div className="text-body text-muted-foreground flex flex-col">
+              <span className="text-label uppercase tracking-[0.06em]">Ready by</span>
+              <span className="font-medium text-primary">
                 {po.expected_ready_date}
               </span>
             </div>
@@ -394,15 +394,15 @@ function POCard({
               Sits next to "Ready by" so supplier sees their PO ETA vs the
               customer's required date side-by-side. */}
           {po.customer_eta_min && (
-            <div className="text-label text-muted-foreground flex flex-col">
-              <span className="text-label uppercase tracking-[0.12em]">
+            <div className="text-body text-muted-foreground flex flex-col">
+              <span className="text-label uppercase tracking-[0.06em]">
                 Customer ETA
               </span>
-              <span className="font-mono font-semibold text-foreground">
+              <span className="font-mono font-medium text-foreground">
                 {po.customer_eta_min}
               </span>
               {po.behind_schedule && (
-                <span className="text-label text-destructive font-semibold mt-0.5">
+                <span className="text-meta text-destructive mt-0.5">
                   ⚠ Behind schedule
                 </span>
               )}
@@ -410,11 +410,11 @@ function POCard({
           )}
           {po.warehouses && (
             <div
-              className="text-label text-muted-foreground flex flex-col"
+              className="text-body text-muted-foreground flex flex-col"
               data-testid={`po-destination-${po.id}`}
             >
-              <span className="text-label uppercase tracking-[0.12em]">Send to</span>
-              <span className="font-semibold text-foreground">
+              <span className="text-label uppercase tracking-[0.06em]">Send to</span>
+              <span className="font-medium text-foreground">
                 {po.warehouses.name}
                 {po.warehouses.owner && (
                   <span className="text-muted-foreground font-normal">
@@ -423,7 +423,7 @@ function POCard({
                 )}
               </span>
               {po.warehouses.address && (
-                <span className="text-label text-muted-foreground mt-0.5 max-w-[280px] truncate">
+                <span className="text-meta text-muted-foreground mt-0.5 max-w-[280px] truncate">
                   {po.warehouses.address}
                   {po.warehouses.owner?.contact && (
                     <span> · {po.warehouses.owner.contact}</span>
@@ -446,7 +446,7 @@ function POCard({
                   onError: (err) => toast.error(err.message),
                 });
               }}
-              className="px-4 py-2 text-meta font-semibold rounded-md bg-primary text-primary-foreground disabled:opacity-50"
+              className="px-4 py-2 text-body font-semibold rounded-md bg-primary text-primary-foreground disabled:opacity-50"
             >
               Acknowledge PO
             </button>
@@ -464,8 +464,8 @@ function POCard({
               }}
               className={
                 supplierKind === "factory_pickup"
-                  ? "px-4 py-2 text-meta font-semibold rounded-md bg-primary text-primary-foreground disabled:opacity-50"
-                  : "px-3 py-2 text-meta font-medium rounded-md border border-border"
+                  ? "px-4 py-2 text-body font-semibold rounded-md bg-primary text-primary-foreground disabled:opacity-50"
+                  : "px-3 py-2 text-body font-medium rounded-md border border-border"
               }
               title={
                 supplierKind === "factory_pickup"
@@ -487,7 +487,7 @@ function POCard({
                   onError: (err) => toast.error(err.message),
                 });
               }}
-              className="px-4 py-2 text-meta font-semibold rounded-md bg-primary text-primary-foreground disabled:opacity-50"
+              className="px-4 py-2 text-body font-semibold rounded-md bg-primary text-primary-foreground disabled:opacity-50"
             >
               Start production
             </button>
@@ -510,7 +510,7 @@ function POCard({
                   onError: (err) => toast.error(err.message),
                 });
               }}
-              className="px-4 py-2 text-meta font-semibold rounded-md bg-primary text-primary-foreground disabled:opacity-50"
+              className="px-4 py-2 text-body font-semibold rounded-md bg-primary text-primary-foreground disabled:opacity-50"
             >
               Mark Ready for Pickup
             </button>
@@ -524,7 +524,7 @@ function POCard({
                 e.stopPropagation();
                 onOpen(po);
               }}
-              className="px-4 py-2 text-meta font-semibold rounded-md border border-primary text-primary"
+              className="px-4 py-2 text-body font-medium rounded-md border border-primary text-primary"
               title="Open the PO drawer to mark individual SOs ready"
             >
               Tick SOs ready →
@@ -563,7 +563,7 @@ function POCard({
               <div className="min-w-0">
                 <div className="font-semibold text-foreground truncate">{l.sku}</div>
                 {variantBits.length > 0 && (
-                  <div className="text-label text-primary font-semibold mt-0.5">
+                  <div className="text-meta text-primary mt-0.5">
                     {variantBits.join(" · ")}
                   </div>
                 )}
@@ -600,7 +600,7 @@ function POCard({
               className="mt-3 pt-2.5 border-t border-dashed border-border/60"
               data-testid={`eta-spread-${po.id}`}
             >
-              <div className="text-label uppercase tracking-[0.14em] text-muted-foreground font-semibold mb-1.5">
+              <div className="text-label uppercase tracking-[0.06em] text-muted-foreground mb-1.5">
                 Customer deadline spread
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-1 text-meta">
@@ -612,12 +612,12 @@ function POCard({
                     <span className="font-mono text-muted-foreground">
                       {count} SO{count > 1 ? "s" : ""}
                       {i === 0 && (
-                        <span className="ml-1 text-label font-semibold text-destructive uppercase tracking-[0.1em]">
+                        <span className="ml-1 text-label text-destructive uppercase tracking-[0.06em]">
                           earliest
                         </span>
                       )}
                     </span>
-                    <span className="font-mono font-semibold text-foreground whitespace-nowrap">
+                    <span className="font-mono font-medium text-foreground whitespace-nowrap">
                       {date}
                     </span>
                   </div>
@@ -633,11 +633,11 @@ function POCard({
             per-SO customer ETAs above. DO# stays inline when present. */}
         <div className="mt-3 pt-2.5 border-t border-dashed border-border/60 flex items-end justify-between gap-3">
           <div>
-            <div className="text-label uppercase tracking-[0.14em] text-muted-foreground font-semibold">
+            <div className="text-label uppercase tracking-[0.06em] text-muted-foreground">
               Collection ETA
             </div>
             <div
-              className="font-mono text-body font-semibold text-foreground mt-0.5"
+              className="font-mono text-body font-medium text-foreground mt-0.5"
               data-testid={`collection-eta-${po.id}`}
             >
               {po.eta_date ?? ""}
@@ -645,10 +645,10 @@ function POCard({
           </div>
           {po.do_number && (
             <div className="text-right">
-              <div className="text-label uppercase tracking-[0.14em] text-muted-foreground font-semibold">
+              <div className="text-label uppercase tracking-[0.06em] text-muted-foreground">
                 DO
               </div>
-              <div className="font-mono text-meta font-semibold text-foreground mt-0.5">
+              <div className="font-mono text-body font-medium text-foreground mt-0.5">
                 {po.do_number}
               </div>
             </div>
@@ -659,7 +659,7 @@ function POCard({
             even when the multi-line block above is collapsed. */}
         {po.sku_summary && po.sku_summary.length > 0 && (
           <div
-            className="text-label text-muted-foreground mt-2"
+            className="text-meta text-muted-foreground mt-2"
             data-testid={`sku-summary-${po.id}`}
           >
             {po.sku_summary.map((l) => `${l.sku} × ${l.qty}`).join(" · ")}
@@ -738,14 +738,14 @@ function PODrawer({
       >
         <div className="px-6 py-5 border-b border-border flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">
+            <div className="text-label uppercase tracking-[0.06em] text-muted-foreground">
               Purchase Order
             </div>
             <div className="font-mono font-display text-title mt-1">{po.id}</div>
             <div className="text-meta text-muted-foreground mt-1">
               {(po.lines ?? []).length} line
               {(po.lines ?? []).length === 1 ? "" : "s"} ·{" "}
-              <strong>
+              <strong className="font-medium">
                 {(po.lines ?? []).reduce((s, l) => s + (l.qty ?? 0), 0)}
               </strong>{" "}
               unit
@@ -766,7 +766,7 @@ function PODrawer({
 
         <div className="px-6 py-5 flex-1 overflow-y-auto">
           <div className="mb-5">
-            <div className="text-label uppercase tracking-[0.12em] text-muted-foreground mb-2">
+            <div className="text-label uppercase tracking-[0.06em] text-muted-foreground mb-2">
               Status
             </div>
             <StatusPill ss={po.sup_status} kind={supplierKind} />
@@ -774,14 +774,14 @@ function PODrawer({
 
           {po.warehouses && (
             <div className="mb-5">
-              <div className="text-label uppercase tracking-[0.12em] text-muted-foreground mb-2">
+              <div className="text-label uppercase tracking-[0.06em] text-muted-foreground mb-2">
                 Send to
               </div>
               <div className="border border-border rounded-md p-3 bg-card">
-                <div className="font-display text-strong font-semibold text-foreground">
+                <div className="font-display text-strong text-foreground">
                   {po.warehouses.name}
                   {po.warehouses.kind === "operation_partner" && (
-                    <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-label font-mono bg-warning/15 text-warning">
+                    <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-label tracking-[0.06em] font-mono bg-warning/15 text-warning">
                       LP-OWNED
                     </span>
                   )}
@@ -792,9 +792,9 @@ function PODrawer({
                   </div>
                 )}
                 {po.warehouses.owner && (
-                  <div className="text-label mt-2 pt-2 border-t border-border">
+                  <div className="text-meta mt-2 pt-2 border-t border-border">
                     <span className="text-muted-foreground">operation Partner: </span>
-                    <span className="font-semibold text-foreground">
+                    <span className="font-medium text-foreground">
                       {po.warehouses.owner.name}
                     </span>
                     {po.warehouses.owner.contact && (
@@ -831,7 +831,7 @@ function PODrawer({
               unmark-ready RPCs (migrations 0107/0108). Forecast / stockpile
               POs (no threads) render an empty-state hint. */}
           <section className="mb-5">
-            <h3 className="text-label uppercase tracking-[0.12em] text-muted-foreground mb-3">
+            <h3 className="text-label uppercase tracking-[0.06em] text-muted-foreground mb-3">
               Production checklist
             </h3>
             <PODrawerThreadList poId={po.id} />
@@ -843,7 +843,7 @@ function PODrawer({
               tab. PDF rendered browser-side per Workers WASM constraint
               (commit `fa47433`). */}
           <section className="mb-5">
-            <h3 className="text-label uppercase tracking-[0.12em] text-muted-foreground mb-3">
+            <h3 className="text-label uppercase tracking-[0.06em] text-muted-foreground mb-3">
               Pickup history
             </h3>
             <PickupHistoryList poId={po.id} />
@@ -855,7 +855,7 @@ function PODrawer({
               className="mb-5 p-4 border-2 border-primary rounded-md bg-primary/5"
               data-testid="do-form"
             >
-              <div className="text-label uppercase tracking-[0.12em] text-primary mb-3">
+              <div className="text-label uppercase tracking-[0.06em] text-primary mb-3">
                 Upload Delivery Order
               </div>
               <div className="flex flex-col gap-3">
@@ -901,7 +901,7 @@ function PODrawer({
                         className="text-meta text-muted-foreground cursor-not-allowed"
                         data-testid="do-file-locked"
                       />
-                      <div className="text-label text-primary mt-1.5 font-semibold">
+                      <div className="text-meta text-primary mt-1.5">
                         ↑ Locked. Enter the DO number above first (min 3 characters).
                       </div>
                     </>
@@ -933,7 +933,7 @@ function PODrawer({
                   <button
                     type="button"
                     onClick={() => setShowDOForm(false)}
-                    className="px-4 py-2 border border-border rounded-md text-body"
+                    className="px-4 py-2 border border-border rounded-md text-body font-medium"
                   >
                     Cancel
                   </button>
@@ -977,7 +977,7 @@ function LineItemsPanel({ po }: { po: SupplierPoRow }) {
   if (threadsQ.isPending) {
     return (
       <div className="mb-5">
-        <div className="text-label uppercase tracking-[0.12em] text-muted-foreground mb-2">
+        <div className="text-label uppercase tracking-[0.06em] text-muted-foreground mb-2">
           Line items
         </div>
         <div className="border border-border rounded-md p-3 text-body text-muted-foreground">
@@ -1014,7 +1014,7 @@ function LineItemsPanel({ po }: { po: SupplierPoRow }) {
 
   return (
     <div className="mb-5">
-      <div className="text-label uppercase tracking-[0.12em] text-muted-foreground mb-2">
+      <div className="text-label uppercase tracking-[0.06em] text-muted-foreground mb-2">
         Line items
       </div>
       <div className="border border-border rounded-md divide-y divide-border">
@@ -1028,14 +1028,14 @@ function LineItemsPanel({ po }: { po: SupplierPoRow }) {
             >
               <div className="min-w-0">
                 <div className="text-body font-semibold truncate">{r.sku}</div>
-                <div className="text-label mt-0.5 flex items-center gap-2 flex-wrap">
+                <div className="text-meta mt-0.5 flex items-center gap-2 flex-wrap">
                   {allDone ? (
-                    <span className="text-success font-semibold">
+                    <span className="text-success font-medium">
                       ✓ All {r.total} ready
                     </span>
                   ) : (
                     <>
-                      <span className="text-foreground font-semibold">
+                      <span className="text-foreground font-medium">
                         {r.remaining} remaining
                       </span>
                       {r.ready > 0 && (
@@ -1063,7 +1063,7 @@ function LineItemsPanel({ po }: { po: SupplierPoRow }) {
 function StockpileLineItems({ po }: { po: SupplierPoRow }) {
   return (
     <div className="mb-5">
-      <div className="text-label uppercase tracking-[0.12em] text-muted-foreground mb-2">
+      <div className="text-label uppercase tracking-[0.06em] text-muted-foreground mb-2">
         Line items
       </div>
       <div className="border border-border rounded-md divide-y divide-border">
@@ -1092,7 +1092,7 @@ function StockpileLineItems({ po }: { po: SupplierPoRow }) {
               <div className="min-w-0">
                 <div className="text-body font-semibold truncate">{l.sku}</div>
                 {variantBits.length > 0 && (
-                  <div className="text-label text-primary mt-0.5">
+                  <div className="text-meta text-primary mt-0.5">
                     {variantBits.join(" · ")}
                   </div>
                 )}
@@ -1100,7 +1100,7 @@ function StockpileLineItems({ po }: { po: SupplierPoRow }) {
               <div className="font-mono text-body text-foreground whitespace-nowrap">
                 ×{l.qty}
                 {l.received_qty > 0 && (
-                  <span className="text-muted-foreground text-label ml-2">
+                  <span className="text-muted-foreground text-meta ml-2">
                     ({l.received_qty} rcv)
                   </span>
                 )}
@@ -1119,7 +1119,7 @@ function Field({ label, value }: { label: string; value: string }) {
       <div className="text-label uppercase tracking-[0.06em] text-muted-foreground mb-1">
         {label}
       </div>
-      <div className="text-body text-foreground">{value}</div>
+      <div className="text-body font-medium text-foreground">{value}</div>
     </div>
   );
 }

@@ -72,6 +72,33 @@ export function financeExceptionHolds(
 }
 
 /**
+ * ⭐ THE OPERATION'S SECOND LINE UNDER `Hold delivery` — owner ruling
+ * 2026-09-25 (`docs/delivery/MASTER.md` §3, COPY-STANDARD "Hold delivery").
+ *
+ * ```
+ * one open     Finance hold · {reason}
+ * several      Finance hold · {n} reasons
+ * no reason    Finance hold            (the table refuses a blank reason; an
+ *                                        older Worker may not carry it at all)
+ * none open    null
+ * ```
+ *
+ * ONE spelling (Law D): the Monitor `Payment` column, the Order Route and the
+ * Delivery Order's Exceptions all print this, so the line cannot be written
+ * three ways. It is Operation's line only — Logistics sees `Hold delivery`
+ * and never why, Warehouse never the reason.
+ */
+export function financeHoldLineOf(
+  exceptions: readonly (Pick<FinanceException, "status"> & { reason?: string | null })[],
+): string | null {
+  const open = openFinanceExceptions(exceptions);
+  if (open.length === 0) return null;
+  if (open.length > 1) return `Finance hold · ${open.length} reasons`;
+  const reason = open[0]!.reason?.trim();
+  return reason ? `Finance hold · ${reason}` : "Finance hold";
+}
+
+/**
  * What the gate SAYS when it refuses, in the governed voice.
  *
  * `COPY-STANDARD.md`'s error pattern: a refusal names the thing that is missing

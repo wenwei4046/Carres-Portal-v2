@@ -11,6 +11,7 @@ import { PurchaseReturnPanel } from "./PurchaseReturnRecord";
  */
 const mutate = vi.fn();
 let doorError: unknown = null;
+vi.mock("@/lib/deadline-queries", async () => (await import("@/test/deadline-queries-mock")).deadlineQueriesMock());
 vi.mock("@/lib/queries", () => ({
   usePurchaseReturnWrite: (path: string) => ({ mutate: (body: unknown, opts?: { onSuccess?: (o: unknown) => void }) => { mutate(path, body); opts?.onSuccess?.({ id: "pr1" }); }, isPending: false, error: doorError }),
   usePurchaseReturn: () => ({ data: undefined, isLoading: true }),
@@ -58,6 +59,15 @@ describe("Issue Purchase Return", () => {
       claim_id: "c1", units: [{ stock_item_id: "a", seen: "t-a", pickup_location: "Bay 3" }], confirmed_pickup_date: null,
     });
     expect(issued).toHaveBeenCalledWith("pr1");
+  });
+
+  it("with no claim, issues to the chosen supplier (Weisiang, Mr Lim, WhatsApp 2026-10-22)", () => {
+    render(<MemoryRouter><IssueForm source={SOURCE({ claim_id: null, claim_no: null, supplier_id: "s1" })} onClose={() => undefined} onIssued={() => undefined} /></MemoryRouter>);
+    expect(screen.getByTestId("purchase-return-issue-form")).toHaveTextContent("Ohana");
+    fireEvent.click(screen.getByTestId("purchase-return-issue-save"));
+    expect(mutate).toHaveBeenCalledWith("/api/operation/purchase-returns", {
+      supplier_id: "s1", units: [{ stock_item_id: "a", seen: "t-a", pickup_location: "Carres Klang" }], confirmed_pickup_date: null,
+    });
   });
 
   it("with neither address recorded, names it and issues nothing", () => {
@@ -116,7 +126,7 @@ describe("the Purchase Return record", () => {
   it("a passed date with nothing collected reads `Pickup missed · Follow up supplier`", () => {
     const passed = PR({ confirmed_pickup_date: "2026-10-01", sends: [{ id: "d", channel: "email", recipient: "x", sent_at: "2026-09-29T03:00:00Z", sent_by_name: null }] });
     render(<MemoryRouter><PurchaseReturnPanel pr={passed} today="2026-10-02" /></MemoryRouter>);
-    expect(screen.getByTestId("purchase-return-current-action")).toHaveTextContent("Pickup missed");
+    expect(screen.getByTestId("purchase-return-current-action")).toHaveTextContent("Pickup date passed");
     expect(screen.getByTestId("purchase-return-current-action")).toHaveTextContent("Follow up supplier");
   });
 });

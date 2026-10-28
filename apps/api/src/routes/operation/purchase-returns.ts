@@ -32,6 +32,7 @@ import type { AppEnv } from "../../types";
  *   POST /:id/send                `Return document sent to supplier`
  *   POST /:id/pickup-confirmation `Confirmed Pickup` (evidenced)
  *   POST /:id/supplier-receipt    `Record supplier receipt` (0614)
+ *   POST /:id/cancel              `Cancel return` — a claimless return not yet collected (0713, YH 2026-10-26)
  *
  * Every write is a thin door onto a SECURITY DEFINER function; there is no
  * table write here (ERP-ARCHITECTURE law C). Issuing moves no stock (§7.4):
@@ -97,7 +98,7 @@ async function readAllIn(
 function failDoor(c: Context, error: { code?: string; message?: string; details?: string; detail?: string }) {
   const detail = error.details ?? error.detail;
   if (error.code === "23514" || error.code === "22023") {
-    const byName = detail === "unit_not_eligible" || detail === "unit_changed" || detail === "unit_twice" || detail === "unit_not_tracked";
+    const byName = detail === "unit_not_eligible" || detail === "unit_changed" || detail === "unit_twice" || detail === "unit_not_tracked" || detail === "not_suppliers_goods" || detail === "mixed_ownership";
     const message = byName ? `${error.message ?? "refused"}. ${NO_RETURN_WAS_ISSUED}` : (error.message ?? "refused");
     return c.json({ error: "refused", code: detail ?? "invalid_param", message }, error.code === "23514" ? 409 : 422);
   }
@@ -105,7 +106,7 @@ function failDoor(c: Context, error: { code?: string; message?: string; details?
   return c.json(m.body, m.status);
 }
 
-const DOCUMENT_COLUMNS = "id, pr_no, pr_doc_date, supplier_id, supplier_claim_id, warehouse_receipt_id, confirmed_pickup_date, created_by";
+const DOCUMENT_COLUMNS = "id, pr_no, pr_doc_date, supplier_id, supplier_claim_id, warehouse_receipt_id, confirmed_pickup_date, created_by, is_consignment, cancelled_at, cancelled_by, cancel_reason";
 
 /** Everything the register, the record and Work print, for these returns. */
 async function assemble(c: Context<AppEnv>, documents: Row[]): Promise<{ rows: PurchaseReturnDetail[]; error: unknown }> {
@@ -149,6 +150,7 @@ async function assemble(c: Context<AppEnv>, documents: Row[]): Promise<{ rows: P
       ...sends.rows.map((s) => s.sent_by as string | null),
       ...confirmations.rows.map((r) => r.recorded_by as string | null),
       ...receipts.rows.map((r) => r.recorded_by as string | null),
+      ...documents.map((d) => d.cancelled_by as string | null),
     ]),
   ]);
   for (const r of [supplierRes, claimRes, receiptRes]) if (r.error) return { rows: [], error: r.error };
@@ -182,6 +184,7 @@ async function assemble(c: Context<AppEnv>, documents: Row[]): Promise<{ rows: P
     return {
       id,
       pr_no: str(row.pr_no),
+      is_consignment: row.is_consignment === true,
       pr_doc_date: str(row.pr_doc_date),
       supplier_id: str(row.supplier_id),
       supplier_name: supplierName.get(row.supplier_id as string) || null,
@@ -191,6 +194,9 @@ async function assemble(c: Context<AppEnv>, documents: Row[]): Promise<{ rows: P
       // The ledger is the fact (0609); the 0548 column is not read.
       sent_at: docSends[0]?.sent_at ?? null,
       confirmed_pickup_date: str(row.confirmed_pickup_date),
+      cancelled_at: str(row.cancelled_at),
+      cancelled_by_name: row.cancelled_by ? actorNames.get(row.cancelled_by as string) ?? null : null,
+      cancel_reason: str(row.cancel_reason),
       sends: docSends,
       confirmations: (confirmationsBy.get(id) ?? []).map((r) => ({
         confirmed_pickup_date: r.confirmed_pickup_date as string,
@@ -233,12 +239,13 @@ async function assemble(c: Context<AppEnv>, documents: Row[]): Promise<{ rows: P
   return { rows, error: null };
 }
 
-async function readReturns(c: Context<AppEnv>, filter?: { id?: string; claimId?: string }) {
+async function readReturns(c: Context<AppEnv>, filter?: { id?: string; claimId?: string; consignment?: boolean }) {
   const sb = userClient(c.env, c.var.auth.jwt);
   const documents = await readAll((from, to) => {
     let q = sb.from("purchase_returns").select(DOCUMENT_COLUMNS);
     if (filter?.id) q = q.eq("id", filter.id);
     if (filter?.claimId) q = q.eq("supplier_claim_id", filter.claimId);
+    if (filter?.consignment !== undefined) q = q.eq("is_consignment", filter.consignment);
     return q.order("pr_doc_date", { ascending: false }).order("id", { ascending: false }).range(from, to);
   });
   if (documents.error) return { rows: [] as PurchaseReturnDetail[], error: documents.error };
@@ -248,11 +255,14 @@ async function readReturns(c: Context<AppEnv>, filter?: { id?: string; claimId?:
 // ----- GET / -----
 //
 // `?claim=<claim_no>` narrows to one Supplier Claim's returns, so the claim
-// record links straight into its own paperwork.
+// record links straight into its own paperwork. `?consignment=1` lists the
+// Consignment Returns (0706) and nothing else; the default lists none of them.
 purchaseReturnsRouter.get("/", async (c) => {
   gate(c);
   const claimParam = c.req.query("claim")?.trim() || null;
-  const { rows, error } = await readReturns(c);
+  // A claim's own view (`?claim=`) shows whatever it issued, either kind.
+  const consignment = c.req.query("consignment") === "1" ? true : claimParam ? undefined : false;
+  const { rows, error } = await readReturns(c, { consignment });
   if (error) {
     const mapped = mapPgError(error as never);
     return c.json(mapped.body, mapped.status);
@@ -299,39 +309,65 @@ purchaseReturnsRouter.get("/work-source", async (c) => {
 /** The form's facts, read as the caller: the claim, Supplier Master's return
  *  address, and every tracked Unit with the door's own refusal words. The
  *  catalog snapshot (Category · Items) is read here, never taken from the
- *  browser. */
-async function readIssueSource(c: Context<AppEnv>, claimId: string): Promise<{ source: PurchaseReturnIssueSource | null; error: unknown }> {
+ *  browser.
+ *
+ *  0713 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): `{ supplierId }`
+ *  reads the same facts for a Purchase Return with no claim — the supplier's
+ *  Units in stock (`purchase_return_supplier_units`). Overturns Jess's "only
+ *  after an approved claim" (§9.6); Jess was not part of the decision. */
+async function readIssueSource(c: Context<AppEnv>, from: { claimId: string } | { supplierId: string }): Promise<{ source: PurchaseReturnIssueSource | null; error: unknown }> {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const claim = await sb.from("supplier_claims").select("id, claim_no, supplier_id, warehouse_receipt_id").eq("id", claimId).maybeSingle();
-  if (claim.error) return { source: null, error: claim.error };
-  if (!claim.data) return { source: null, error: null };
-  const row = claim.data as Row;
+  let row: Row;
+  if ("claimId" in from) {
+    const claim = await sb.from("supplier_claims").select("id, claim_no, supplier_id, warehouse_receipt_id").eq("id", from.claimId).maybeSingle();
+    if (claim.error) return { source: null, error: claim.error };
+    if (!claim.data) return { source: null, error: null };
+    row = claim.data as Row;
+  } else {
+    row = { id: null, claim_no: null, supplier_id: from.supplierId, warehouse_receipt_id: null };
+  }
   const [supplier, grn, units] = await Promise.all([
     sb.from("suppliers").select("name, return_address, address").eq("id", row.supplier_id as string).maybeSingle(),
     row.warehouse_receipt_id
       ? sb.from("warehouse_receipts").select("grn_no").eq("id", row.warehouse_receipt_id as string).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
-    sb.rpc("purchase_return_eligible_units", { p_claim: claimId }),
+    "claimId" in from
+      ? sb.rpc("purchase_return_eligible_units", { p_claim: from.claimId })
+      : sb.rpc("purchase_return_supplier_units", { p_supplier: from.supplierId }),
   ]);
   for (const r of [supplier, grn, units]) if (r.error) return { source: null, error: r.error };
+  if (!("claimId" in from) && !supplier.data) return { source: null, error: null };
   const unitRows = ((units.data ?? []) as Row[]);
-  const skus = [...new Set(unitRows.map((u) => u.sku as string).filter(Boolean))];
-  const catalog = await readAllIn(skus, (b, f, t) => sb.from("product_skus").select("sku, variant, product_models(name, category)").in("sku", b).range(f, t));
-  if (catalog.error) return { source: null, error: catalog.error };
-  const bySku = new Map(catalog.rows.map((r) => {
-    const model = (Array.isArray(r.product_models) ? (r.product_models as Row[])[0] : r.product_models) as Row | null;
-    return [r.sku as string, { item: str(model?.name), category: str(model?.category), spec: str(r.variant) }];
-  }));
+  const mapped = await unitsWithCatalog(sb, unitRows);
+  if (mapped.error) return { source: null, error: mapped.error };
   const s = supplier.data as { name?: string | null; return_address?: string | null; address?: string | null } | null;
   return {
     source: {
-      claim_id: claimId,
+      claim_id: str(row.id),
+      supplier_id: row.supplier_id as string,
       claim_no: str(row.claim_no),
       supplier_name: s?.name ?? null,
       // Owner ruling 2026-09-29: the door's own resolution, shown with its source.
       ...purchaseReturnResolvedReturnTo(s ?? {}),
       grn_no: str((grn.data as Row | null)?.grn_no),
-      units: unitRows.map((u) => {
+      units: mapped.units,
+    },
+    error: null,
+  };
+}
+
+/** Each eligible Unit with its catalog snapshot (Category · Items), read here,
+ *  never taken from the browser. Shared by the claim door and 0706 §2. */
+async function unitsWithCatalog(sb: ReturnType<typeof userClient>, unitRows: Row[]): Promise<{ units: PurchaseReturnIssueSource["units"]; error: unknown }> {
+  const skus = [...new Set(unitRows.map((u) => u.sku as string).filter(Boolean))];
+  const catalog = await readAllIn(skus, (b, f, t) => sb.from("product_skus").select("sku, variant, product_models(name, category)").in("sku", b).range(f, t));
+  if (catalog.error) return { units: [], error: catalog.error };
+  const bySku = new Map(catalog.rows.map((r) => {
+    const model = (Array.isArray(r.product_models) ? (r.product_models as Row[])[0] : r.product_models) as Row | null;
+    return [r.sku as string, { item: str(model?.name), category: str(model?.category), spec: str(r.variant) }];
+  }));
+  return {
+    units: unitRows.map((u) => {
         const cat = bySku.get(u.sku as string);
         return {
           stock_item_id: u.stock_item_id as string,
@@ -345,7 +381,28 @@ async function readIssueSource(c: Context<AppEnv>, claimId: string): Promise<{ s
           refusal: str(u.refusal),
         };
       }),
-    },
+    error: null,
+  };
+}
+
+/** 0706 §2: the claimless Consignment Return form's facts — the supplier's
+ *  consigned Units with the door's own refusal words. Follows Houzs
+ *  backend/src/scm/routes/purchase-consignment-returns.ts:323-356 (the
+ *  returnable-receive-lines picker) per Weisiang's ruling (2026-10-22): clear
+ *  Carres rules, implement Houzs. */
+async function readConsignmentSource(c: Context<AppEnv>, supplierId: string): Promise<{ source: PurchaseReturnIssueSource | null; error: unknown }> {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const [supplier, units] = await Promise.all([
+    sb.from("suppliers").select("name, return_address, address").eq("id", supplierId).maybeSingle(),
+    sb.rpc("consignment_return_eligible_units", { p_supplier: supplierId }),
+  ]);
+  for (const r of [supplier, units]) if (r.error) return { source: null, error: r.error };
+  if (!supplier.data) return { source: null, error: null };
+  const mapped = await unitsWithCatalog(sb, (units.data ?? []) as Row[]);
+  if (mapped.error) return { source: null, error: mapped.error };
+  const s = supplier.data as { name?: string | null; return_address?: string | null; address?: string | null };
+  return {
+    source: { claim_id: null, consignment: true, supplier_id: supplierId, claim_no: null, supplier_name: s.name ?? null, ...purchaseReturnResolvedReturnTo(s), grn_no: null, units: mapped.units },
     error: null,
   };
 }
@@ -353,17 +410,33 @@ async function readIssueSource(c: Context<AppEnv>, claimId: string): Promise<{ s
 purchaseReturnsRouter.get("/issue-source", async (c) => {
   gate(c);
   const claimId = c.req.query("claim")?.trim() ?? "";
-  if (!/^[0-9a-f-]{36}$/i.test(claimId)) return c.json({ error: "invalid_input", code: "invalid_param", message: "claim is required" }, 422);
-  const { source, error } = await readIssueSource(c, claimId);
+  const supplierId = c.req.query("supplier")?.trim() ?? "";
+  const uuid = /^[0-9a-f-]{36}$/i;
+  if (!uuid.test(claimId) && !uuid.test(supplierId)) return c.json({ error: "invalid_input", code: "invalid_param", message: "claim or supplier is required" }, 422);
+  const { source, error } = await readIssueSource(c, uuid.test(claimId) ? { claimId } : { supplierId });
   if (error) return failDoor(c, error as never);
-  if (!source) throw new HTTPException(404, { message: "claim not found" });
+  if (!source) throw new HTTPException(404, { message: uuid.test(claimId) ? "claim not found" : "supplier not found" });
+  return c.json({ source });
+});
+
+purchaseReturnsRouter.get("/consignment-source", async (c) => {
+  gate(c);
+  const supplierId = c.req.query("supplier")?.trim() ?? "";
+  if (!/^[0-9a-f-]{36}$/i.test(supplierId)) return c.json({ error: "invalid_input", code: "invalid_param", message: "supplier is required" }, 422);
+  const { source, error } = await readConsignmentSource(c, supplierId);
+  if (error) return failDoor(c, error as never);
+  if (!source) throw new HTTPException(404, { message: "supplier not found" });
   return c.json({ source });
 });
 
 // ----- POST / — `Issue Purchase Return` -----
+//
+// From a claim (`claim_id`), or — Weisiang's decision (Mr Lim, WhatsApp
+// 2026-10-22) — with no claim (`supplier_id`): `New Purchase Return`. One door.
 
-const issueSchema = z.object({
-  claim_id: z.string().uuid(),
+const issueBodySchema = z.object({
+  claim_id: z.string().uuid().optional(),
+  supplier_id: z.string().uuid().optional(),
   units: z.array(z.object({
     stock_item_id: z.string().uuid(),
     seen: z.string().min(1).max(64),
@@ -371,14 +444,16 @@ const issueSchema = z.object({
   })).min(1).max(200),
   confirmed_pickup_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
 });
+const issueSchema = issueBodySchema.refine((b) => Boolean(b.claim_id) !== Boolean(b.supplier_id), { message: "name a claim or a supplier" });
 
 purchaseReturnsRouter.post("/", purchaseReturnWorkCompletion("issue"), async (c) => {
   gate(c);
   const parsed = await parseJsonBody(c, issueSchema);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
-  const { source, error } = await readIssueSource(c, parsed.data.claim_id);
+  const { claim_id: claimId, supplier_id: supplierId } = parsed.data;
+  const { source, error } = await readIssueSource(c, claimId ? { claimId } : { supplierId: supplierId! });
   if (error) return failDoor(c, error as never);
-  if (!source) throw new HTTPException(404, { message: "claim not found" });
+  if (!source) throw new HTTPException(404, { message: claimId ? "claim not found" : "supplier not found" });
   const facts = new Map(source.units.map((u) => [u.stock_item_id, u]));
   const units = parsed.data.units.map((u) => {
     const f = facts.get(u.stock_item_id);
@@ -392,7 +467,37 @@ purchaseReturnsRouter.post("/", purchaseReturnWorkCompletion("issue"), async (c)
     };
   });
   const { data, error: doorError } = await userClient(c.env, c.var.auth.jwt).rpc("purchasing_issue_purchase_return", {
-    p_claim_id: parsed.data.claim_id,
+    p_claim_id: claimId ?? null,
+    p_units: units,
+    p_confirmed_pickup_date: parsed.data.confirmed_pickup_date ?? null,
+    ...(claimId ? {} : { p_supplier_id: supplierId }),
+  });
+  if (doorError) return failDoor(c, doorError);
+  return c.json({ id: data as string }, 201);
+});
+
+// ----- POST /consignment — a Consignment Return straight from consigned stock (0706 §2) -----
+// Follows Houzs backend/src/scm/routes/purchase-consignment-returns.ts:442 (a
+// supplier and lines, no claim) per Weisiang's ruling (2026-10-22): clear
+// Carres rules, implement Houzs.
+
+const consignmentIssueSchema = issueBodySchema.omit({ claim_id: true }).extend({ supplier_id: z.string().uuid() });
+
+// No Work completion: a claimless return answers no Work card (the issue card is a claim's).
+purchaseReturnsRouter.post("/consignment", async (c) => {
+  gate(c);
+  const parsed = await parseJsonBody(c, consignmentIssueSchema);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const { source, error } = await readConsignmentSource(c, parsed.data.supplier_id);
+  if (error) return failDoor(c, error as never);
+  if (!source) throw new HTTPException(404, { message: "supplier not found" });
+  const facts = new Map(source.units.map((u) => [u.stock_item_id, u]));
+  const units = parsed.data.units.map((u) => {
+    const f = facts.get(u.stock_item_id);
+    return { stock_item_id: u.stock_item_id, seen: u.seen, pickup_location: u.pickup_location?.trim() || null, category: f?.category ?? null, item: f?.item ?? null, item_spec: f?.item_spec ?? null };
+  });
+  const { data, error: doorError } = await userClient(c.env, c.var.auth.jwt).rpc("purchasing_issue_consignment_return", {
+    p_supplier_id: parsed.data.supplier_id,
     p_units: units,
     p_confirmed_pickup_date: parsed.data.confirmed_pickup_date ?? null,
   });
@@ -433,6 +538,7 @@ purchaseReturnsRouter.get("/:id/print-data", async (c) => {
   // Money-free (DOCUMENT-KIT §4): the payload carries no figure at all.
   const print: PurchaseReturnPrintData = {
     pr_no: row.pr_no,
+    is_consignment: row.is_consignment,
     pr_doc_date: row.pr_doc_date ?? new Date().toISOString(),
     supplier: { name: s?.name ?? row.supplier_name ?? "", contact: s?.contact ?? null },
     return_to: row.units[0]?.return_to ?? null,
@@ -462,6 +568,27 @@ purchaseReturnsRouter.post("/:id/send", purchaseReturnWorkCompletion("send"), as
     p_channel: parsed.data.channel,
     p_recipient: parsed.data.recipient,
     p_note: parsed.data.note || null,
+  });
+  if (error) return failDoor(c, error);
+  return c.json({ id: data ?? null });
+});
+
+// ----- POST /:id/cancel — `Cancel return` (0713, YH 2026-10-26) -----
+//
+// A claimless return whose Unit was sold before the supplier came. The door
+// refuses a claim return and one with any Unit collected; a second cancel
+// answers as cancelled (Houzs purchase-returns.ts:1486-1489).
+// Follows Houzs backend/src/scm/routes/purchase-returns.ts:1558 (PATCH /:id/cancel) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs.
+
+const cancelSchema = z.object({ reason: z.string().trim().min(1).max(500) });
+
+purchaseReturnsRouter.post("/:id/cancel", purchaseReturnWorkCompletion("cancel"), async (c) => {
+  gate(c);
+  const parsed = await parseJsonBody(c, cancelSchema);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("purchasing_cancel_purchase_return", {
+    p_return_id: c.req.param("id"),
+    p_reason: parsed.data.reason,
   });
   if (error) return failDoor(c, error);
   return c.json({ id: data ?? null });

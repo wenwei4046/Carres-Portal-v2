@@ -128,7 +128,7 @@ export default function OperationDashboard({ setTab, goWarehouse }: Props) {
           onClick={() => setTab("procurement")}
         />
         <OperationKpiTile
-          label="Overdue"
+          label="Late"
           value={kpis.overdue_orders}
           hint={
             kpis.overdue_orders === 0 ? "all on track" : "past delivery date"

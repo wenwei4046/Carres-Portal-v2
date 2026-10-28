@@ -48,7 +48,7 @@ export default function GuaranteeCoverStrip({ orderId }: { orderId: string }) {
     <div className="mt-2 rounded border border-primary/30 bg-primary/5 px-2.5 py-2">
       <div className="flex items-center gap-1.5 mb-1.5">
         <ShieldCheck size={14} strokeWidth={2} className="text-primary" />
-        <span className="text-meta font-semibold uppercase tracking-wide text-primary">
+        <span className="text-label uppercase tracking-[0.06em] text-primary">
           Guarantee
         </span>
       </div>

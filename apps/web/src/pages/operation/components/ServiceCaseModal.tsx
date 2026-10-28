@@ -5,9 +5,7 @@ import { apiFetch } from "@/lib/api";
 import { appTodayIso } from "@/lib/fmt-date";
 import {
   CASE_REPORTERS,
-  caseFollowUpPlan,
   caseIssueLabel,
-  caseMayClose,
   caseNeedsManager,
   caseProductCategoryLabel,
   caseUsableLabel,
@@ -21,6 +19,10 @@ import CaseOrderLink from "./CaseOrderLink";
 import CaseEvidenceGallery from "./CaseEvidenceGallery";
 import CaseFollowUps from "./CaseFollowUps";
 import CaseDeadline from "./CaseDeadline";
+import CaseRemedyApproval from "./CaseRemedyApproval";
+import Modal from "@/components/kit/Modal";
+import Button from "@/components/kit/Button";
+import Select from "@/components/kit/Select";
 
 /**
  * Create / edit a Service Case (病历).
@@ -43,6 +45,10 @@ export default function ServiceCaseModal({
   onSaved: () => void;
 }) {
   const qc = useQueryClient();
+  const [remedyDirty,setRemedyDirty]=useState(false);
+  const [remedyBusy,setRemedyBusy]=useState(false);
+  const [discardRemedy,setDiscardRemedy]=useState(false);
+  const requestClose=()=>{if(remedyBusy)return;if(remedyDirty)setDiscardRemedy(true);else onClose();};
 
   const configQ = useQuery<ServiceCaseConfig>({
     queryKey: ["ops", "service-cases", "config"],
@@ -69,6 +75,16 @@ export default function ServiceCaseModal({
   const [whatAffected, setWhatAffected]       = useState("");
   const [incurredCharges, setIncurredCharges] = useState("");
   const [openedAt, setOpenedAt] = useState(appTodayIso());
+  // 0711 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22), Houzs way: the
+  // Sales Order PIC picks the case owner; staff set the priority by hand.
+  const [ownerUserId, setOwnerUserId] = useState<string | null>(null);
+  const [priority, setPriority] = useState<string | null>(null);
+  const staffQ = useQuery<{ staff?: Array<{ user_id: string; name: string | null }> }>({
+    queryKey: ["operation", "staff"],
+    queryFn: () => apiFetch("/api/operation/staff"),
+    staleTime: 60_000,
+    enabled: mode === "edit",
+  });
 
   // lookup state
   const [lookupTerm, setLookupTerm] = useState("");
@@ -91,6 +107,8 @@ export default function ServiceCaseModal({
     setWhatAffected(d.whatAffected ?? "");
     setIncurredCharges(d.incurredCharges ?? "");
     setOpenedAt(d.openedAt ?? appTodayIso());
+    setOwnerUserId(d.ownerUserId ?? null);
+    setPriority(d.priority ?? null);
   }, [existingQ.data]);
 
   // default status to first config status on create
@@ -140,6 +158,10 @@ export default function ServiceCaseModal({
         whatAffected:    whatAffected.trim() || undefined,
         incurredCharges: incurredCharges.trim() || undefined,
         openedAt,
+        // 0711 — sent only when changed, so a save by someone who is not the
+        // PIC never trips the owner check over a field they did not touch.
+        ...(mode === "edit" && ownerUserId !== (existingQ.data?.ownerUserId ?? null) ? { ownerUserId } : {}),
+        ...(mode === "edit" && priority !== (existingQ.data?.priority ?? null) ? { priority } : {}),
       };
       return mode === "create"
         ? apiFetch("/api/ops/service-cases", { method: "POST", body: JSON.stringify(body) })
@@ -147,28 +169,23 @@ export default function ServiceCaseModal({
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["ops", "service-cases"] });
-      onSaved();
+      if (!remedyDirty) onSaved();
     },
   });
 
-  const canSave = customerName.trim().length > 0 && !saveMut.isPending;
+  const canSave = customerName.trim().length > 0 && !saveMut.isPending && !remedyBusy;
 
-  /**
-   * S3 — may this case be closed? The same shared answer the server's gate
-   * gives, so the greyed-out option and the refusal cannot disagree. A case
-   * that is ALREADY closed keeps its closing statuses selectable: the rule is
-   * about entering the state, not about staying in it.
-   */
-  const canClose =
-    (existingQ.data?.statusIsClosed ?? false) ||
-    caseMayClose(
-      caseFollowUpPlan({
-        customerWants: existingQ.data?.customerWants ?? [],
-        customerName:  existingQ.data?.customerName,
-        supplierName:  existingQ.data?.supplierName ?? null,
-      }),
-      existingQ.data?.progress ?? [],
-    );
+  // 0711 — Close Case on every open case (Houzs ServiceCases.tsx), Weisiang's
+  // decision 2026-10-22: no wait for the customer's confirmation.
+  const closedStage = configQ.data?.statuses.find((st) => st.isClosed);
+  const closeMut = useMutation({
+    mutationFn: () =>
+      apiFetch(`/api/ops/service-cases/${id}`, { method: "PATCH", body: JSON.stringify({ statusId: closedStage?.id }) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ops", "service-cases"] });
+      onSaved();
+    },
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:p-8">
@@ -178,7 +195,7 @@ export default function ServiceCaseModal({
           <h2 className="text-strong text-base-900">
             {mode === "create" ? "New Case" : "Edit Case"}
           </h2>
-          <button type="button" onClick={onClose} className="text-base-400 hover:text-base-700">
+          <button type="button" onClick={requestClose} disabled={remedyBusy} className="text-base-400 hover:text-base-700">
             <X size={20} />
           </button>
         </div>
@@ -261,17 +278,14 @@ export default function ServiceCaseModal({
                 ))}
               </select>
             </Field>
-            <Field label="Status">
-              {/* S3 — a closing status is not offered while the chain is still
-                  open. The server refuses it either way (`case_steps_open`);
-                  this is the courtesy that stops a new hire meeting a refusal
-                  they could have seen coming. Already-closed cases keep every
-                  option: the gate is the transition, not a lock on the row. */}
+            <Field label="Stage">
+              {/* 0711 — staff set the stage by hand, any stage (Houzs), by
+                  Weisiang's decision 2026-10-22. */}
               <select value={statusId} onChange={(e) => setStatusId(e.target.value)}
                 className="w-full rounded border border-base-300 px-2 py-1.5 text-body bg-white">
-                <option value="">Status</option>
+                <option value="">Stage</option>
                 {configQ.data?.statuses.map((s) => (
-                  <option key={s.id} value={s.id} disabled={s.isClosed && !canClose}>
+                  <option key={s.id} value={s.id}>
                     {s.label}
                   </option>
                 ))}
@@ -282,6 +296,36 @@ export default function ServiceCaseModal({
                 className="w-full rounded border border-base-300 px-2 py-1.5 text-body" />
             </Field>
           </div>
+
+          {/* 0711 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): the
+              Sales Order PIC picks the admin who owns the case; staff edit
+              the priority. */}
+          {mode === "edit" && existingQ.data && (
+            <div className="grid grid-cols-2 gap-3">
+              <Select
+                id="case-owner"
+                label="Case owner"
+                hint={existingQ.data.ownerPickable ? undefined : "The sales order PIC picks the case owner"}
+                disabled={!existingQ.data.ownerPickable}
+                value={ownerUserId ?? undefined}
+                onValueChange={setOwnerUserId}
+                placeholder="No owner yet"
+                options={(staffQ.data?.staff ?? []).map((p) => ({ value: p.user_id, label: p.name ?? "" }))}
+              />
+              <Select
+                id="case-priority"
+                label="Priority"
+                value={priority ?? undefined}
+                onValueChange={setPriority}
+                placeholder="Priority"
+                options={[
+                  { value: "high", label: "Urgent" },
+                  { value: "normal", label: "Normal" },
+                  { value: "low", label: "Low" },
+                ]}
+              />
+            </div>
+          )}
 
           {/* S1 — the guided intake's answers, read-only.
               They are shown, not edited: the five questions are asked once, at
@@ -363,6 +407,12 @@ export default function ServiceCaseModal({
             />
           )}
 
+          {mode === "edit" && id && existingQ.data && <CaseRemedyApproval caseId={id} onDirtyChange={setRemedyDirty} onBusyChange={setRemedyBusy} disabled={
+            carresAction !== (existingQ.data.carresAction ?? "") || whatAffected !== (existingQ.data.whatAffected ?? "") || incurredCharges !== (existingQ.data.incurredCharges ?? "") ||
+            customerName !== (existingQ.data.customerName ?? "") || customerPhone !== (existingQ.data.customerPhone ?? "") || customerAddress !== (existingQ.data.customerAddress ?? "") ||
+            caseTypeId !== (existingQ.data.caseTypeId ?? "") || statusId !== (existingQ.data.statusId ?? "") || whatHappened !== (existingQ.data.whatHappened ?? "") || openedAt !== (existingQ.data.openedAt ?? appTodayIso())
+          }/>}
+
           {/* S2 — the evidence the case was filed with, each file naming who
               uploaded it and when. Edit mode only: on create the wizard owns
               the checklist, and this modal no longer creates cases anyway. */}
@@ -394,6 +444,11 @@ export default function ServiceCaseModal({
             </Field>
           </div>
 
+          {closeMut.isError && (
+            <p className="text-meta text-error-700 break-words">
+              Close failed: {(closeMut.error as Error)?.message ?? "unknown error"}
+            </p>
+          )}
           {saveMut.isError && (
             <p className="text-meta text-error-700 break-words">
               Save failed: {(saveMut.error as Error)?.message ?? "unknown error"}
@@ -403,7 +458,12 @@ export default function ServiceCaseModal({
 
         {/* Footer */}
         <div className="flex justify-end gap-2 border-t border-base-200 px-6 py-4">
-          <button type="button" onClick={onClose} className="btn-secondary text-body py-1.5">
+          {mode === "edit" && existingQ.data && !existingQ.data.statusIsClosed && closedStage && (
+            <Button onClick={() => closeMut.mutate()} loading={closeMut.isPending} disabled={remedyBusy}>
+              Close Case
+            </Button>
+          )}
+          <button type="button" onClick={requestClose} disabled={remedyBusy} className="btn-secondary text-body py-1.5">
             Cancel
           </button>
           <button type="button" onClick={() => saveMut.mutate()} disabled={!canSave}
@@ -412,6 +472,7 @@ export default function ServiceCaseModal({
           </button>
         </div>
       </div>
+      <Modal open={discardRemedy} onOpenChange={setDiscardRemedy} title="Discard" footer={<><Button onClick={()=>setDiscardRemedy(false)}>Cancel</Button><Button variant="primary" onClick={onClose}>Discard</Button></>}>Not saved</Modal>
     </div>
   );
 }

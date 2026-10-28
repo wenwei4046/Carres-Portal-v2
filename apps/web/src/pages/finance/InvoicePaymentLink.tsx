@@ -232,27 +232,27 @@ export default function InvoicePaymentLink({ invoice, rows, onClose }: {
             Payment links could not be loaded. Try again.</p>}
 
           {currentStatus === "paid" && current && <div data-testid="link-paid">
-            <p className="font-semibold">Payment recorded</p>
+            <p className="font-medium">Payment recorded</p>
             <p>{rm(current.amount)} received through the payment link.</p>
             <p>{money.known ? `${rm(money.outstanding)} still needed` : "Value not recorded"}</p>
           </div>}
 
           {currentStatus === "expired" && current && <div data-testid="link-expired">
-            <p className="font-semibold">Payment link expired</p>
+            <p className="font-medium">Payment link expired</p>
             <p>Amount needed remains unchanged.</p>
           </div>}
 
           {currentStatus === "open" && current && <div data-testid="link-open">
-            <p className="font-semibold">Waiting for payment</p>
+            <p className="font-medium">Waiting for payment</p>
             <p>{rm(current.amount)} · expires {expiryWord(current.expiresAt)}</p>
-            <p className="text-label font-normal break-all">{current.url}</p>
-            <p className="text-label font-normal">
+            <p className="text-meta break-all">{current.url}</p>
+            <p className="text-meta">
               Created or sent is not payment. The receipt appears only when the customer pays.</p>
           </div>}
 
           {currentStatus !== "open" && <div>
             <label className="block">
-              <span className="text-label">Amount to collect (RM)</span>
+              <span className="text-meta text-kit-slate-11">Amount to collect (RM)</span>
               <input value={amountText} onChange={(e) => setAmountText(e.target.value)}
                 inputMode="decimal" aria-label="Amount to collect"
                 className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body" />
@@ -265,7 +265,7 @@ export default function InvoicePaymentLink({ invoice, rows, onClose }: {
 
           {currentStatus === "open" && <>
             {activeHeads.length > 0 ? <label className="block">
-              <span className="text-label">Template</span>
+              <span className="text-meta text-kit-slate-11">Template</span>
               <select value={chosen?.template_key ?? ""} aria-label="Change template"
                 onChange={(e) => { setChosenKey(e.target.value || null); setEditedByHand(false); }}
                 className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body">
@@ -274,11 +274,11 @@ export default function InvoicePaymentLink({ invoice, rows, onClose }: {
                   {recommended?.template_key === t.template_key ? " (recommended)" : ""}
                 </option>)}
               </select>
-            </label> : <p className="text-label font-normal" data-testid="link-no-template">
+            </label> : <p className="text-meta" data-testid="link-no-template">
               No payment link template yet. The approved wording must come from its owner.
               A manager can add it in Settings. The bare link can still be copied.</p>}
             {activeHeads.length > 0 && <label className="block">
-              <span className="text-label">Message</span>
+              <span className="text-meta text-kit-slate-11">Message</span>
               <textarea value={shown}
                 onChange={(e) => { setText(e.target.value); setEditedByHand(true); }}
                 rows={7} aria-label="Message"
@@ -291,11 +291,11 @@ export default function InvoicePaymentLink({ invoice, rows, onClose }: {
               <button className="btn-secondary" onClick={openWa}>Open WhatsApp</button>
             </div>
             <label className="block">
-              <span className="text-label">Sent screenshot</span>
+              <span className="text-meta text-kit-slate-11">Sent screenshot</span>
               <input type="file" accept="image/*"
                 onChange={(e) => acceptFile(e.target.files?.[0])}
                 aria-label="Sent screenshot" className="mt-0.5 block w-full text-meta" />
-              <span className="text-label font-normal">
+              <span className="text-meta">
                 {file ? file.name : "Opening WhatsApp is not sent. Add the sent screenshot to record it."}
               </span>
             </label>

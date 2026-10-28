@@ -1,5 +1,6 @@
 import type { operationOrderListRow } from "@/lib/queries";
 import { cjkClassName } from "@/lib/cjk";
+import { fmtDate } from "@/lib/fmt-date";
 
 /**
  * Active-pipeline column for the operation dashboard. Renders a card with a
@@ -132,13 +133,20 @@ interface OrderCardProps {
 function PipelineOrderCard({ order, onClick }: OrderCardProps) {
   const customerName = order.customer_name;
   const dealerName = order.dealers?.name ?? "";
-  const deliveryDate = order.delivery_date ?? "TBD";
+  /* The customer's requested day in the ONE date spelling (`Fri, 30 Oct`);
+     COPY: an unsettled day is `To be confirmed`, a missing one `No delivery
+     date` (`TBD` and raw ISO dates are banned on screen). */
+  const deliveryDate = (order as { delivery_date_tbd?: boolean | null }).delivery_date_tbd
+    ? "To be confirmed"
+    : order.delivery_date
+      ? fmtDate(order.delivery_date)
+      : "No delivery date";
 
   // Mirror proto: white card, base-100 border, hover swaps to brand-signature.
   const baseCls =
-    "block w-full text-left bg-white border border-base-100 rounded-[4px] px-3 py-2.5 mb-1.5 last:mb-0 transition-colors";
+    "block w-full text-left bg-white border border-base-200 rounded-lg px-3 py-2.5 mb-1.5 last:mb-0 transition-colors";
   const interactiveCls = onClick
-    ? "cursor-pointer hover:border-primary"
+    ? "cursor-pointer hover:bg-hovertint"
     : "";
 
   // The proto's right-hand "total RM" requires the order's grand total, but
@@ -148,22 +156,16 @@ function PipelineOrderCard({ order, onClick }: OrderCardProps) {
   // M5 task 2 (OperationOrders) wires the kanban + drawer.
   const inner = (
     <>
-      <div className="flex items-baseline justify-between">
-        <span className="font-mono text-label font-semibold text-base-900">
-          #{order.so}
-        </span>
-        <span className="font-mono text-label text-base-500">
-          {deliveryDate === "TBD" ? "TBD" : deliveryDate}
-        </span>
-      </div>
+      {/* The SO number never breaks; the date sits under it so a narrow
+          column keeps both whole. */}
+      <div className="whitespace-nowrap text-label font-semibold tabular-nums text-base-900">SO-{order.so}</div>
+      <div className="whitespace-nowrap text-label tabular-nums text-base-500">{deliveryDate}</div>
       <div
         className={`${cjkClassName(customerName)} text-body font-medium text-base-900 mt-0.5`}
       >
         {customerName}
       </div>
-      <div className="text-label text-base-500 mt-1">
-        {dealerName} · {deliveryDate === "TBD" ? "TBD" : `→ ${deliveryDate}`}
-      </div>
+      {dealerName && <div className="text-label text-base-500 mt-1">{dealerName}</div>}
     </>
   );
 

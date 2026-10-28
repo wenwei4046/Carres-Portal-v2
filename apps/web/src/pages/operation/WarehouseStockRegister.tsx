@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   applyRailSelection,
@@ -26,7 +26,7 @@ import { fmtDate } from "@/lib/fmt-date";
 import { useStockRegister } from "@/lib/queries";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import ModuleHeader from "./components/ModuleHeader";
-import { FilterRail, FilterRailGroup, FilterRailRow } from "./components/workspace-rail";
+import { FilterRail, FilterRailGroup, FilterRailRow, useFilterRailOpen } from "./components/workspace-rail";
 import Button from "@/components/kit/Button";
 import WarehouseUnitDetail from "./WarehouseUnitDetail";
 
@@ -110,18 +110,26 @@ function SoCell({ u }: { u: StockRegisterUnit }) {
   );
 }
 
-export default function WarehouseStockRegister() {
+export default function WarehouseStockRegister({ showroom = false }: { showroom?: boolean } = {}) {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const selectedUnit = params.get("unit");
   const unitHref = (code: string) => {
     const next = new URLSearchParams(params);
-    next.set("tab", "stock-onhand");
+    next.set("tab", showroom ? "showroom" : "stock-onhand");
     next.set("unit", code);
     return `/operation?${next}`;
   };
-  const { data, isLoading, isError, error, refetch } = useStockRegister();
-  const [railOpen, setRailOpen] = useState(true);
+  const { data, isLoading, isError, error, refetch } = useStockRegister(showroom ? "PJ Showroom" : undefined);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  /* Below an 896px available canvas the rail starts hidden and the register
+     takes the width (UI MASTER §6.1); the browser remembers the choice. The
+     Inventory page used a fixed open rail here and left one column of the
+     grid visible on a phone. */
+  const [railOpen, setRailOpen] = useFilterRailOpen(
+    showroom ? "carres.showroom.filterRail" : "carres.warehouse.inventory.filterRail",
+    canvasRef,
+  );
   const requestedView = params.get("view");
   const view: InventoryView =
     params.get("history") === "1" || requestedView === "history"
@@ -137,7 +145,7 @@ export default function WarehouseStockRegister() {
 
   function setView(next: InventoryView) {
     const updated = new URLSearchParams(params);
-    updated.set("tab", "stock-onhand");
+    updated.set("tab", showroom ? "showroom" : "stock-onhand");
     updated.delete("history");
     updated.delete("status");
     if (next === "all") updated.delete("view");
@@ -146,7 +154,7 @@ export default function WarehouseStockRegister() {
   }
   function setStatus(next: InventoryStatus) {
     const updated = new URLSearchParams(params);
-    updated.set("tab", "stock-onhand");
+    updated.set("tab", showroom ? "showroom" : "stock-onhand");
     updated.delete("view");
     updated.delete("history");
     if (status === next) updated.delete("status");
@@ -171,9 +179,16 @@ export default function WarehouseStockRegister() {
   );
 
   const [search, setSearch] = useState("");
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [gridRevision, setGridRevision] = useState(0);
   const now = useMemo(() => new Date(), []);
-  const allUnits = useMemo(() => data?.units ?? [], [data]);
+  const allUnits = useMemo(() => {
+    const units = data?.units ?? [];
+    // Showroom is a scoped reader of the owning register, never opening stock.
+    // Actual Site identity decides presence; display condition/purchase purpose
+    // cannot put goods still in Klang into a showroom's current list.
+    return showroom ? units.filter((unit) => unit.siteName === "PJ Showroom") : units;
+  }, [data, showroom]);
 
   function setRail(key: "ownership" | "category" | "site", value: string | null) {
     const next = new URLSearchParams(params);
@@ -183,7 +198,7 @@ export default function WarehouseStockRegister() {
   }
 
   function clearAll() {
-    setParams(new URLSearchParams({ tab: "stock-onhand" }), { replace: true });
+    setParams(new URLSearchParams({ tab: showroom ? "showroom" : "stock-onhand" }), { replace: true });
     setSearch("");
     setGridRevision((revision) => revision + 1);
   }
@@ -470,8 +485,15 @@ export default function WarehouseStockRegister() {
       dateColumn("lastEventAt", "Last moved", { defaultHidden: true, chooserGroup: "Dates", absent: "Not moved yet" }),
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [navigate, params],
+    [navigate, params, showroom],
   );
+
+  const displayColumns = useMemo(() => {
+    if (!showroom) return columns;
+    const first = ["item", "unitCode", "stockCondition", "inventoryStatus"];
+    return [...first.flatMap((key) => columns.filter((column) => column.key === key)),
+      ...columns.filter((column) => !first.includes(column.key)).map((column) => ({ ...column, defaultHidden: true }))];
+  }, [columns, showroom]);
 
   const filtered = isRailFiltered({ ...sel, query: search }) || !!status || view !== "all";
 
@@ -480,6 +502,13 @@ export default function WarehouseStockRegister() {
       {selectedUnit && (
         <WarehouseUnitDetail
           unitCode={selectedUnit}
+          backTo={(() => {
+            const next = new URLSearchParams(params);
+            next.delete("unit");
+            next.set("tab", showroom ? "showroom" : "stock-onhand");
+            return `/operation?${next}`;
+          })()}
+          backLabel={showroom ? "Showroom" : "Inventory"}
           onBack={() => {
             const next = new URLSearchParams(params);
             next.delete("unit");
@@ -493,17 +522,12 @@ export default function WarehouseStockRegister() {
         {!selectedUnit && (
           <ModuleHeader
             testId="stock-register-destination-header"
-            word="Inventory"
-            docTitle="Inventory · Warehouse — Carres"
-            right={
-              <Link className="text-kit-blue-11 text-body" to="/operation?tab=arrival-source&kind=transfer">
-                Request Transfer
-              </Link>
-            }
+            word={showroom ? "Showroom" : "Inventory"}
+            docTitle={showroom ? "Showroom · Carres" : "Inventory · Warehouse — Carres"}
             destinationHeader
           />
         )}
-        <div className="flex min-h-0 flex-1" data-testid="stock-register">
+        <div ref={canvasRef} className="flex min-h-0 flex-1" data-testid="stock-register">
           {railOpen ? (
             <FilterRail testId="stock-rail" onHide={() => setRailOpen(false)}>
               <FilterRailGroup title="Stock" icon="order">
@@ -609,10 +633,53 @@ export default function WarehouseStockRegister() {
                 key={gridRevision}
                 appearance="reference"
                 rows={rows}
-                columns={columns}
-                storageKey="carres.warehouse.inventory.v5"
+                columns={displayColumns}
+                storageKey={showroom ? "carres.showroom.inventory.v1" : "carres.warehouse.inventory.v5"}
                 rowKey={(u) => u.id}
+                selectable={showroom ? {
+                  selectedKeys,
+                  onToggle: (key) => setSelectedKeys((previous) => {
+                    const next = new Set(previous);
+                    if (next.has(key)) next.delete(key); else next.add(key);
+                    return next;
+                  }),
+                  onToggleAll: (keys, all) => setSelectedKeys((previous) => {
+                    const next = new Set(previous);
+                    keys.forEach((key) => { if (all) next.delete(key); else next.add(key); });
+                    return next;
+                  }),
+                  isSelectable: (row) => {
+                    const unit = row as StockRegisterUnit;
+                    return unit.identityScope !== "quantity" && unit.qty === 1 && isHeldUnit(unit);
+                  },
+                } : undefined}
+                selectionActions={showroom ? [{
+                  label: () => "Request Transfer",
+                  kind: "write",
+                  visible: (count) => count <= 100,
+                  onClick: (selected) => {
+                    const units = selected as StockRegisterUnit[];
+                    const query = new URLSearchParams({ tab: "arrival-source", kind: "transfer", source: "showroom" });
+                    units.forEach((unit) => query.append("unit", unit.id));
+                    navigate(`/operation?${query}`);
+                  },
+                }] : undefined}
                 exportName="Inventory"
+                /* The create door lives in the toolbar, never in the Shell
+                   header row (UI MASTER §4): a Transfer is born in Stock. */
+                toolbarEnd={
+                  showroom ? undefined : (
+                    <Button
+                      variant="primary"
+                      shape="pill"
+                      icon="add"
+                      onClick={() => navigate("/operation?tab=arrival-source&kind=transfer")}
+                      data-testid="request-transfer"
+                    >
+                      Request Transfer
+                    </Button>
+                  )
+                }
                 searchPlaceholder="Unit ID, item, SO No, PO No or supplier…"
                 isLoading={isLoading || !data}
                 onSearchChange={setSearch}
@@ -635,8 +702,8 @@ export default function WarehouseStockRegister() {
                 statusSummary={(visibleRows) => {
                   /* UI MASTER §6.0: the 32px footer carries the summary; the
                      second fact is how many goods are still owed. */
-                  const line = registerSummaryLine(summariseRegister(visibleRows), scopedRows.length);
-                  const owed = view === "all" && !status ? stillToArriveLine(incomingCount) : null;
+                  const line = showroom ? `${visibleRows.length} records` : registerSummaryLine(summariseRegister(visibleRows), scopedRows.length);
+                  const owed = !showroom && view === "all" && !status ? stillToArriveLine(incomingCount) : null;
                   const text = owed ? `${line} · ${owed}` : line;
                   return (
                     <span className="block truncate" title={text}>

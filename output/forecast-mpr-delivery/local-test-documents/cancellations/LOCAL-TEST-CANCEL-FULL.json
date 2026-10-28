@@ -1,0 +1,52 @@
+{
+  "lines": [
+    {
+      "qty": 2,
+      "sku": "2008(A) TRION",
+      "unit": "pc",
+      "attrs": {},
+      "sources": [
+        {
+          "so": null,
+          "qty": 1
+        },
+        {
+          "so": null,
+          "qty": 1
+        }
+      ],
+      "unit_codes": [],
+      "description": "Headboard Straight",
+      "destination": {
+        "name": "HOUZS",
+        "address": "TEST isolated replay destination address"
+      },
+      "pending_qty": 0,
+      "received_qty": 0,
+      "cancelled_qty": 2,
+      "identity_mode": "exact_unit",
+      "cancelled_unit_codes": [
+        "U1-000-001",
+        "U1-000-002"
+      ]
+    }
+  ],
+  "po_id": "PO261018-5655",
+  "terms": null,
+  "so_refs": [],
+  "version": 3,
+  "eta_date": "2026-10-26",
+  "supplier": {
+    "name": "Ohana",
+    "address": "TEST isolated replay supplier address",
+    "contact": null
+  },
+  "issued_by": "TEST Requester",
+  "po_number": "PO261018-5655",
+  "issue_date": "2026-10-18",
+  "destination": {
+    "name": "HOUZS",
+    "address": "TEST isolated replay destination address"
+  },
+  "delivery_instructions": null
+}

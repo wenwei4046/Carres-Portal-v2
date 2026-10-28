@@ -28,7 +28,9 @@
  *
  * PURE — no I/O, no clock.
  */
+import { poLineReportable } from "./po-receiving";
 import { docNumber } from "./doc-number";
+import { documentDisplayNumber } from "./document-display";
 import { catalogCategoryWordOf } from "./line-category";
 import {
   receiveLineClaimProblems,
@@ -439,12 +441,15 @@ export function receivingRecordNo(
  */
 export function receivingDisplayNo(r: {
   id: string;
+  /** Explicit unposted reports never own a formal or derived GRN number. */
+  status?: string | null;
   grn_no?: string | null;
   goods_received_at?: string;
   submitted_at?: string;
 }): string {
+  if (r.status != null && r.status !== "posted" && r.status !== "voided") return "";
   const stored = (r.grn_no ?? "").trim();
-  if (stored) return stored;
+  if (stored) return documentDisplayNumber(stored);
   return receivingRecordNo(r);
 }
 
@@ -494,7 +499,7 @@ export function receivingExtraQty(
 }
 
 /**
- * RECEIVING SUMMARY — the five governed quantity words for a source's lines
+ * RECEIVING SUMMARY — the governed quantity words, including effective cancellation for a source's lines
  * (`purchasing/MASTER.md` §5.8 / COPY-STANDARD): each fact prints its own
  * number; the operator never subtracts. Damaged/wrong never reduce
  * `Pending Delivery Qty`.
@@ -505,12 +510,14 @@ export interface ReceivingSummary {
   damagedQty: number;
   wrongItemQty: number;
   pendingDeliveryQty: number;
+  cancelledQty?: number;
 }
 
 export function receivingSummaryOf(
   poLines: readonly {
     qty: number;
     received_qty: number;
+    cancelled_qty?: number | null;
     damaged_qty?: number | null;
     wrong_item_qty?: number | null;
   }[],
@@ -519,7 +526,11 @@ export function receivingSummaryOf(
   let receivedQty = 0;
   let damagedQty = 0;
   let wrongItemQty = 0;
+  let cancelledQty = 0;
+  let pendingDeliveryQty = 0;
   for (const l of poLines) {
+    cancelledQty += Math.max(0,num(l.cancelled_qty));
+    pendingDeliveryQty += poLineReportable(l);
     orderQty += Math.max(0, num(l.qty));
     receivedQty += Math.max(0, num(l.received_qty));
     damagedQty += Math.max(0, num(l.damaged_qty));
@@ -530,7 +541,8 @@ export function receivingSummaryOf(
     receivedQty,
     damagedQty,
     wrongItemQty,
-    pendingDeliveryQty: Math.max(0, orderQty - receivedQty),
+    pendingDeliveryQty,
+    ...(cancelledQty > 0 ? {cancelledQty} : {}),
   };
 }
 
@@ -663,22 +675,16 @@ export const RECEIVING_WORK_WORDS = {
 } as const;
 
 export interface ReceivingWorkSource {
-  /** Warehouse counts waiting for the Carres check — always executable. */
+  /** Actual submitted physical reports awaiting the existing receipt action. */
   submitted: readonly {
     id: string;
     po_id: string;
     supplier_name: string | null;
     goods_received_at?: string;
     submitted_at: string;
-  }[];
-  /** Open POs whose supplier date has arrived and which still owe goods —
-   *  the arrival/physical trigger (the anti-spam rule: outstanding quantity
-   *  alone never makes a row). */
-  arrivalsDue: readonly {
-    po_id: string;
-    supplier_name: string | null;
-    eta_date: string | null;
-    pending_qty: number;
+    /** The Site that physically received (`actual_site_id`, else the PO's
+     *  `warehouse_id`) — its own receiving calendar counts the lateness. */
+    site_id?: string | null;
   }[];
 }
 
@@ -691,7 +697,9 @@ export function receivingWorkItems(
   src: ReceivingWorkSource,
   ctx: { grnDuty: { userId: string; name: string | null } | null },
   todayIso: string,
-  workingDaysLate: (dueIso: string) => number,
+  /** Counted on the receiving Site's own calendar (`warehouseReceivingDaysLate`);
+   *  the row is handed in so the caller can read its Site. */
+  workingDaysLate: (dueIso: string, row: ReceivingWorkSource["submitted"][number]) => number,
 ): Array<{
   ruleKey: "receiving.check_in";
   module: "receiving";
@@ -706,8 +714,8 @@ export function receivingWorkItems(
   broken: boolean;
   dueIso: string | null;
   workingDaysLate: number;
-  /** The exact deep link — the session when one exists, else the source PO. */
-  receiptId: string | null;
+  /** The exact submitted physical report; a PO date is never a receipt. */
+  receiptId: string;
   poId: string;
 }> {
   const today = todayIso.slice(0, 10);
@@ -715,9 +723,7 @@ export function receivingWorkItems(
     ? { ownerName: ctx.grnDuty.name, ownerUserId: ctx.grnDuty.userId }
     : { ownerName: null, ownerUserId: null, ownerDuty: "GRN Duty" };
   const out: ReturnType<typeof receivingWorkItems> = [];
-  const covered = new Set<string>();
   for (const r of src.submitted) {
-    covered.add(r.po_id);
     const due = r.goods_received_at ?? r.submitted_at.slice(0, 10);
     out.push({
       ruleKey: "receiving.check_in",
@@ -730,28 +736,9 @@ export function receivingWorkItems(
       locked: false,
       broken: false,
       dueIso: due,
-      workingDaysLate: due && today > due ? workingDaysLate(due) : 0,
+      workingDaysLate: due && today > due ? workingDaysLate(due, r) : 0,
       receiptId: r.id,
       poId: r.po_id,
-    });
-  }
-  for (const p of src.arrivalsDue) {
-    if (covered.has(p.po_id)) continue;
-    if (!p.eta_date || p.eta_date > today || p.pending_qty <= 0) continue;
-    out.push({
-      ruleKey: "receiving.check_in",
-      module: "receiving",
-      soRef: `Receiving · ${p.supplier_name ?? p.po_id}`,
-      orderId: p.po_id,
-      action: RECEIVING_WORK_WORDS.rowLine(p.po_id, p.supplier_name ?? "the supplier"),
-      ...owner,
-      tone: "info",
-      locked: false,
-      broken: false,
-      dueIso: p.eta_date,
-      workingDaysLate: today > p.eta_date ? workingDaysLate(p.eta_date) : 0,
-      receiptId: null,
-      poId: p.po_id,
     });
   }
   return out;
