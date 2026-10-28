@@ -111,8 +111,8 @@ export default function PaymentCorrectAllocation({ payment, onClose }: {
         </label>
 
         <div className="flex gap-2 pt-1">
-          <button className="btn-primary" disabled={!ready || correct.isPending}
-            onClick={() => correct.mutate()}>Correct allocation</button>
+          <button className="btn-danger" disabled={!ready || correct.isPending}
+            onClick={() => correct.mutate()}>{correct.isPending ? "Correcting…" : "Correct allocation"}</button>
           <button className="btn-secondary" onClick={onClose}>Back</button>
         </div>
       </div>

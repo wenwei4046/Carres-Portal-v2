@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { ArrowLeft, Check, Search, X } from "lucide-react";
+import { Check, Search } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import {
   CASE_REPORTERS,
@@ -27,6 +27,9 @@ import {
   type CaseWantKey,
   type ServiceCaseConfig,
 } from "@carres/shared";
+import Modal from "@/components/kit/Modal";
+import Button from "@/components/kit/Button";
+import ConfirmActionDialog from "./ConfirmActionDialog";
 import CaseEvidenceChecklist from "./CaseEvidenceChecklist";
 import type { UploadedEvidence } from "@/lib/case-evidence-upload";
 
@@ -235,46 +238,42 @@ export default function ServiceCaseWizard({
     setIssueType(null);
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:p-8">
-      <div className="w-full max-w-2xl rounded-lg bg-white shadow-xl">
-        {/* Header + progress */}
-        <div className="border-b border-base-200 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {step > 1 && (
-                <button
-                  type="button"
-                  onClick={() => setStep((step - 1) as Step)}
-                  className="text-base-400 hover:text-base-700"
-                  aria-label="Back"
-                >
-                  <ArrowLeft size={18} />
-                </button>
-              )}
-              <h2 className="text-strong text-base-900">New Case</h2>
-            </div>
-            <button type="button" onClick={onClose} className="text-base-400 hover:text-base-700" aria-label="Close">
-              <X size={18} />
-            </button>
-          </div>
+  // Anything answered or uploaded and not yet filed: closing then asks "Discard?".
+  const dirty = !!(reportedBy || issueType || usable || wants.length || note.trim() || manualName.trim() ||
+    manualCategory || evidence.length || (order && order !== initialOrder));
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const requestClose = () => {
+    if (saveMut.isPending) return;
+    if (dirty) setDiscardOpen(true); else onClose();
+  };
 
-          <div className="mt-3 flex items-center gap-1.5">
-            {STEPS.map((s) => (
-              <span
-                key={s}
-                className={`h-1 flex-1 rounded-full ${
-                  s < step ? "bg-base-900" : s === step ? "bg-primary" : "bg-base-200"
-                }`}
-              />
-            ))}
-          </div>
-          <p className="text-meta mt-2 text-base-500">
-            Step {step} of {LAST_STEP}
-          </p>
+  return (
+    <>
+    <Modal open onOpenChange={(o) => { if (!o) requestClose(); }} width="wide" title="New Case"
+      description={`Step ${step} of ${LAST_STEP}`}
+      footer={<>
+        <Button variant="neutral" onClick={requestClose}>Cancel</Button>
+        {step > 1 && <Button variant="neutral" onClick={() => setStep((step - 1) as Step)}>Back</Button>}
+        {step < LAST_STEP ? (
+          <Button variant="primary" onClick={goNext} disabled={!canAdvance[step]}>Next</Button>
+        ) : (
+          <Button variant="primary" onClick={() => saveMut.mutate()} disabled={!canAdvance[LAST_STEP]} loading={saveMut.isPending}>
+            Create Case
+          </Button>
+        )}
+      </>}>
+        <div className="flex items-center gap-1.5" aria-hidden="true">
+          {STEPS.map((s) => (
+            <span
+              key={s}
+              className={`h-1 flex-1 rounded-full ${
+                s < step ? "bg-base-900" : s === step ? "bg-primary" : "bg-base-200"
+              }`}
+            />
+          ))}
         </div>
 
-        <div className="px-6 py-5">
+        <div className="pt-4">
           <h3 className="text-strong mb-4 text-base-900">{STEP_TITLE[step]}</h3>
 
           {/* ── 1 · who found it ─────────────────────────────────────────── */}
@@ -336,6 +335,7 @@ export default function ServiceCaseWizard({
                           <button
                             key={l.id}
                             type="button"
+                            aria-pressed={lineId === l.id}
                             onClick={() => pickLine(l.id)}
                             className={`flex w-full items-center gap-3 rounded border px-3 py-2 text-left ${
                               lineId === l.id
@@ -428,6 +428,7 @@ export default function ServiceCaseWizard({
                 <button
                   key={o.key}
                   type="button"
+                  aria-pressed={usable === o.key}
                   onClick={() => { setUsable(o.key); setStep(5); }}
                   className={`flex w-full items-center gap-3 rounded border px-3 py-2.5 text-left ${
                     usable === o.key
@@ -458,6 +459,7 @@ export default function ServiceCaseWizard({
                     <button
                       key={w.key}
                       type="button"
+                      aria-pressed={on}
                       onClick={() =>
                         setWants(on ? wants.filter((x) => x !== w.key) : [...wants, w.key])
                       }
@@ -560,33 +562,12 @@ export default function ServiceCaseWizard({
           )}
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between border-t border-base-200 px-6 py-4">
-          <button type="button" onClick={onClose} className="btn-secondary py-1.5 text-body">
-            Cancel
-          </button>
-          {step < LAST_STEP ? (
-            <button
-              type="button"
-              onClick={goNext}
-              disabled={!canAdvance[step]}
-              className="btn-primary py-1.5 text-body disabled:opacity-40"
-            >
-              Next
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => saveMut.mutate()}
-              disabled={!canAdvance[LAST_STEP] || saveMut.isPending}
-              className="btn-hero py-1.5 text-body disabled:opacity-40"
-            >
-              {saveMut.isPending ? "Saving…" : "Create Case"}
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
+    </Modal>
+    <ConfirmActionDialog open={discardOpen} title="Discard this case?"
+      message="The answers and photos you added have not been filed."
+      confirmLabel="Discard" cancelLabel="Keep editing"
+      onConfirm={() => { setDiscardOpen(false); onClose(); }} onCancel={() => setDiscardOpen(false)} />
+    </>
   );
 }
 
@@ -602,6 +583,7 @@ function ChoiceButton({
   return (
     <button
       type="button"
+      aria-pressed={selected}
       onClick={onClick}
       className={`rounded border px-3 py-2.5 text-body font-medium ${
         selected

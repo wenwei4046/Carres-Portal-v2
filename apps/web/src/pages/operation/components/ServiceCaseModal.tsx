@@ -14,13 +14,14 @@ import {
   type ServiceCase,
   type ServiceCaseConfig,
 } from "@carres/shared";
-import { Search, X } from "lucide-react";
+import { Search } from "lucide-react";
 import CaseOrderLink from "./CaseOrderLink";
 import CaseEvidenceGallery from "./CaseEvidenceGallery";
 import CaseFollowUps from "./CaseFollowUps";
 import CaseDeadline from "./CaseDeadline";
 import CaseRemedyApproval from "./CaseRemedyApproval";
 import Modal from "@/components/kit/Modal";
+import ConfirmActionDialog from "./ConfirmActionDialog";
 import Button from "@/components/kit/Button";
 import Select from "@/components/kit/Select";
 
@@ -47,8 +48,7 @@ export default function ServiceCaseModal({
   const qc = useQueryClient();
   const [remedyDirty,setRemedyDirty]=useState(false);
   const [remedyBusy,setRemedyBusy]=useState(false);
-  const [discardRemedy,setDiscardRemedy]=useState(false);
-  const requestClose=()=>{if(remedyBusy)return;if(remedyDirty)setDiscardRemedy(true);else onClose();};
+  const [discardOpen, setDiscardOpen] = useState(false);
 
   const configQ = useQuery<ServiceCaseConfig>({
     queryKey: ["ops", "service-cases", "config"],
@@ -173,6 +173,22 @@ export default function ServiceCaseModal({
     },
   });
 
+  // Anything typed or changed and not yet saved: closing then asks "Discard?".
+  const d = existingQ.data;
+  const formDirty = mode === "edit"
+    ? !!d && (
+      refNo !== (d.refNo ?? "") || customerName !== (d.customerName ?? "") || customerPhone !== (d.customerPhone ?? "") ||
+      customerAddress !== (d.customerAddress ?? "") || caseTypeId !== (d.caseTypeId ?? "") || statusId !== (d.statusId ?? "") ||
+      whatHappened !== (d.whatHappened ?? "") || carresAction !== (d.carresAction ?? "") || whatAffected !== (d.whatAffected ?? "") ||
+      incurredCharges !== (d.incurredCharges ?? "") || openedAt !== (d.openedAt ?? appTodayIso()) ||
+      ownerUserId !== (d.ownerUserId ?? null) || priority !== (d.priority ?? null))
+    : !!(refNo.trim() || customerName.trim() || customerPhone.trim() || customerAddress.trim() || whatHappened.trim() ||
+      carresAction.trim() || whatAffected.trim() || incurredCharges.trim());
+  const requestClose = () => {
+    if (remedyBusy || saveMut.isPending) return;
+    if (formDirty || remedyDirty) setDiscardOpen(true); else onClose();
+  };
+
   const canSave = customerName.trim().length > 0 && !saveMut.isPending && !remedyBusy;
 
   // 0711 — Close Case on every open case (Houzs ServiceCases.tsx), Weisiang's
@@ -188,28 +204,30 @@ export default function ServiceCaseModal({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:p-8">
-      <div className="w-full max-w-2xl rounded-lg bg-white shadow-xl">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-base-200 px-6 py-4">
-          <h2 className="text-strong text-base-900">
-            {mode === "create" ? "New Case" : "Edit Case"}
-          </h2>
-          <button type="button" onClick={requestClose} disabled={remedyBusy} className="text-base-400 hover:text-base-700">
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="space-y-5 px-6 py-5">
+    <>
+    <Modal open onOpenChange={(o) => { if (!o) requestClose(); }} width="wide" title={mode === "create" ? "New Case" : "Edit Case"}
+      footer={<>
+        {mode === "edit" && existingQ.data && !existingQ.data.statusIsClosed && closedStage && (
+          <Button onClick={() => closeMut.mutate()} loading={closeMut.isPending} disabled={remedyBusy}>
+            Close Case
+          </Button>
+        )}
+        <Button variant="neutral" onClick={requestClose} disabled={remedyBusy}>Cancel</Button>
+        <Button variant="primary" onClick={() => saveMut.mutate()} disabled={!canSave} loading={saveMut.isPending}>
+          {mode === "create" ? "Create Case" : "Save"}
+        </Button>
+      </>}>
+        <div className="space-y-5">
           {mode === "edit" && id && <div className="flex flex-wrap gap-4 text-body"><Link className="text-kit-blue-11" to={`/operation?tab=arrival-source&kind=customer-return&case=${id}`}>Plan Customer Return</Link><Link className="text-kit-blue-11" to={`/operation?tab=arrival-source&kind=failed-delivery-return&case=${id}`}>Plan Failed Delivery return</Link><Link className="text-kit-blue-11" to={`/operation?tab=arrival-source&kind=repair-return&case=${id}`}>Plan Repair</Link></div>}
           {/* Lookup */}
           {mode === "create" && (
             <div className="rounded border border-base-200 bg-base-50 p-3">
-              <label className="text-meta text-base-500 uppercase tracking-wider">
+              <label htmlFor="scm-lookup" className="text-meta text-base-500 uppercase tracking-wider">
                 Look up by Ref No or Order ID
               </label>
               <div className="mt-1.5 flex gap-2">
                 <input
+                  id="scm-lookup"
                   value={lookupTerm}
                   onChange={(e) => setLookupTerm(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") lookupMut.mutate(lookupTerm); }}
@@ -230,9 +248,9 @@ export default function ServiceCaseModal({
           )}
 
           {/* Order / Ref binding */}
-          <div className="grid grid-cols-2 gap-3">
-            <Field label={`Ref No${mode === "create" ? " (alias)" : ""}`}>
-              <input value={refNo} onChange={(e) => setRefNo(e.target.value)}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label={`Ref No${mode === "create" ? " (alias)" : ""}`} htmlFor="scm-ref">
+              <input id="scm-ref" value={refNo} onChange={(e) => setRefNo(e.target.value)}
                 className="w-full rounded border border-base-300 px-2.5 py-1.5 text-body font-mono" />
             </Field>
             <Field label="Linked Order">
@@ -252,25 +270,25 @@ export default function ServiceCaseModal({
           </div>
 
           {/* Customer */}
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Customer Name *">
-              <input value={customerName} onChange={(e) => setCustomerName(e.target.value)}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label="Customer Name *" htmlFor="scm-name">
+              <input id="scm-name" value={customerName} onChange={(e) => setCustomerName(e.target.value)}
                 className="w-full rounded border border-base-300 px-2.5 py-1.5 text-body" />
             </Field>
-            <Field label="Phone">
-              <input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)}
+            <Field label="Phone" htmlFor="scm-phone">
+              <input id="scm-phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)}
                 className="w-full rounded border border-base-300 px-2.5 py-1.5 text-body" />
             </Field>
           </div>
-          <Field label="Address">
-            <input value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)}
+          <Field label="Address" htmlFor="scm-address">
+            <input id="scm-address" value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)}
               className="w-full rounded border border-base-300 px-2.5 py-1.5 text-body" />
           </Field>
 
           {/* Classification */}
-          <div className="grid grid-cols-3 gap-3">
-            <Field label="Case Type">
-              <select value={caseTypeId} onChange={(e) => setCaseTypeId(e.target.value)}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <Field label="Case Type" htmlFor="scm-type">
+              <select id="scm-type" value={caseTypeId} onChange={(e) => setCaseTypeId(e.target.value)}
                 className="w-full rounded border border-base-300 px-2 py-1.5 text-body bg-white">
                 <option value="">Case Type</option>
                 {configQ.data?.types.map((t) => (
@@ -278,10 +296,10 @@ export default function ServiceCaseModal({
                 ))}
               </select>
             </Field>
-            <Field label="Stage">
+            <Field label="Stage" htmlFor="scm-stage">
               {/* 0711 — staff set the stage by hand, any stage (Houzs), by
                   Weisiang's decision 2026-10-22. */}
-              <select value={statusId} onChange={(e) => setStatusId(e.target.value)}
+              <select id="scm-stage" value={statusId} onChange={(e) => setStatusId(e.target.value)}
                 className="w-full rounded border border-base-300 px-2 py-1.5 text-body bg-white">
                 <option value="">Stage</option>
                 {configQ.data?.statuses.map((s) => (
@@ -291,8 +309,8 @@ export default function ServiceCaseModal({
                 ))}
               </select>
             </Field>
-            <Field label="Opened">
-              <input type="date" value={openedAt} onChange={(e) => setOpenedAt(e.target.value)}
+            <Field label="Opened" htmlFor="scm-opened">
+              <input id="scm-opened" type="date" value={openedAt} onChange={(e) => setOpenedAt(e.target.value)}
                 className="w-full rounded border border-base-300 px-2 py-1.5 text-body" />
             </Field>
           </div>
@@ -301,7 +319,7 @@ export default function ServiceCaseModal({
               Sales Order PIC picks the admin who owns the case; staff edit
               the priority. */}
           {mode === "edit" && existingQ.data && (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Select
                 id="case-owner"
                 label="Case owner"
@@ -353,7 +371,7 @@ export default function ServiceCaseModal({
                   </span>
                 )}
               </div>
-              <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-body">
+              <dl className="mt-2 grid grid-cols-1 gap-x-4 sm:grid-cols-2 gap-y-1.5 text-body">
                 <IntakeRow label="Found by" value={reporterLabel(existingQ.data.reportedBy)} />
                 <IntakeRow
                   label="Product"
@@ -425,21 +443,21 @@ export default function ServiceCaseModal({
           )}
 
           {/* Medical record */}
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="What happened">
-              <textarea value={whatHappened} onChange={(e) => setWhatHappened(e.target.value)} rows={3}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label="What happened" htmlFor="scm-happened">
+              <textarea id="scm-happened" value={whatHappened} onChange={(e) => setWhatHappened(e.target.value)} rows={3}
                 className="w-full rounded border border-base-300 px-2.5 py-1.5 text-body" />
             </Field>
-            <Field label="Carres action">
-              <textarea value={carresAction} onChange={(e) => setCarresAction(e.target.value)} rows={3}
+            <Field label="Carres action" htmlFor="scm-action">
+              <textarea id="scm-action" value={carresAction} onChange={(e) => setCarresAction(e.target.value)} rows={3}
                 className="w-full rounded border border-base-300 px-2.5 py-1.5 text-body" />
             </Field>
-            <Field label="What was affected">
-              <textarea value={whatAffected} onChange={(e) => setWhatAffected(e.target.value)} rows={2}
+            <Field label="What was affected" htmlFor="scm-affected">
+              <textarea id="scm-affected" value={whatAffected} onChange={(e) => setWhatAffected(e.target.value)} rows={2}
                 className="w-full rounded border border-base-300 px-2.5 py-1.5 text-body" />
             </Field>
-            <Field label="Incurred charges">
-              <textarea value={incurredCharges} onChange={(e) => setIncurredCharges(e.target.value)} rows={2}
+            <Field label="Incurred charges" htmlFor="scm-charges">
+              <textarea id="scm-charges" value={incurredCharges} onChange={(e) => setIncurredCharges(e.target.value)} rows={2}
                 className="w-full rounded border border-base-300 px-2.5 py-1.5 text-body" />
             </Field>
           </div>
@@ -456,31 +474,21 @@ export default function ServiceCaseModal({
           )}
         </div>
 
-        {/* Footer */}
-        <div className="flex justify-end gap-2 border-t border-base-200 px-6 py-4">
-          {mode === "edit" && existingQ.data && !existingQ.data.statusIsClosed && closedStage && (
-            <Button onClick={() => closeMut.mutate()} loading={closeMut.isPending} disabled={remedyBusy}>
-              Close Case
-            </Button>
-          )}
-          <button type="button" onClick={requestClose} disabled={remedyBusy} className="btn-secondary text-body py-1.5">
-            Cancel
-          </button>
-          <button type="button" onClick={() => saveMut.mutate()} disabled={!canSave}
-            className="btn-hero text-body py-1.5 disabled:opacity-40">
-            {saveMut.isPending ? "Saving…" : mode === "create" ? "Create Case" : "Save"}
-          </button>
-        </div>
-      </div>
-      <Modal open={discardRemedy} onOpenChange={setDiscardRemedy} title="Discard" footer={<><Button onClick={()=>setDiscardRemedy(false)}>Cancel</Button><Button variant="primary" onClick={onClose}>Discard</Button></>}>Not saved</Modal>
-    </div>
+      </Modal>
+      <ConfirmActionDialog open={discardOpen} title="Discard changes?"
+        message="What you changed on this case has not been saved."
+        confirmLabel="Discard" cancelLabel="Keep editing"
+        onConfirm={() => { setDiscardOpen(false); onClose(); }} onCancel={() => setDiscardOpen(false)} />
+    </>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, htmlFor, children }: { label: string; htmlFor?: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="text-meta text-base-500 uppercase tracking-wider">{label}</label>
+      {htmlFor
+        ? <label htmlFor={htmlFor} className="text-meta text-base-500 uppercase tracking-wider">{label}</label>
+        : <span className="text-meta text-base-500 uppercase tracking-wider">{label}</span>}
       <div className="mt-1">{children}</div>
     </div>
   );
