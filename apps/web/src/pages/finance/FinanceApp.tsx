@@ -18,6 +18,7 @@ import OtherReceiptsPage from "./other-money-in/OtherReceiptsPage";
 import MoneyMovesPage from "./money-moves/MoneyMovesPage";
 import CardSettlementPage from "./card-settlement/CardSettlementPage";
 // The read-only Finance Ledger — three destinations, three nav rows.
+import FinanceCreditNotes from "./FinanceCreditNotes";
 import LedgerJournal from "./ledger/LedgerJournal";
 import LedgerTrialBalance from "./ledger/LedgerTrialBalance";
 import LedgerSelfCheck from "./ledger/LedgerSelfCheck";
@@ -120,6 +121,7 @@ export default function FinanceApp() {
               stay principal-only, not off for everyone on this address). */}
           <Route path="dealers" element={financeOnly(<PrincipalDealers channel="dealer" financeView={role !== "principal"} />)} />
           {/* The Finance Ledger (read-only). `?entry=JE-…` opens one entry. */}
+          <Route path="credit-notes" element={financeOnly(<FinanceCreditNotes />)} />
           <Route path="ledger" element={financeOnly(<LedgerJournal />)} />
           <Route path="ledger/trial-balance" element={financeOnly(<LedgerTrialBalance />)} />
           <Route path="ledger/self-check" element={financeOnly(<LedgerSelfCheck />)} />

@@ -154,3 +154,26 @@ describe("orderMoney — a released storage fee is owed and does not hold", () =
     expect(Number.isNaN(m.outstanding)).toBe(false);
   });
 });
+
+describe("orderMoney — credit notes (0627)", () => {
+  it("a credit lowers what the order is worth and what it still owes", () => {
+    const m = orderMoney({ lineSum: 1000, paid: 400, credited: 250 });
+    expect(m.total).toBe(750);
+    expect(m.goodsOwing).toBe(350);
+  });
+
+  it("a credit equal to what is owed settles the order, and never goes below zero", () => {
+    expect(orderMoney({ lineSum: 1000, paid: 400, credited: 600 }).owing).toBe(false);
+    expect(orderMoney({ lineSum: 1000, paid: 400, credited: 5000 }).goodsOwing).toBe(0);
+  });
+
+  it("an imported keyed outstanding also comes down by the credit", () => {
+    const m = orderMoney({ lineSum: 0, paid: 100, controlBalance: 500, credited: 200 });
+    expect(m.goodsOwing).toBe(300);
+    expect(m.total).toBe(400);
+  });
+
+  it("no credit changes nothing", () => {
+    expect(orderMoney({ lineSum: 1000, paid: 400 })).toEqual(orderMoney({ lineSum: 1000, paid: 400, credited: 0 }));
+  });
+});

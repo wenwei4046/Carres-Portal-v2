@@ -44,6 +44,9 @@ export interface OrderMoneyInput {
   /** `ops_order_control.balance` (0165) — a hand-keyed OUTSTANDING, used only
    *  when the lines carry no prices. */
   controlBalance?: number | string | null;
+  /** `orders.credited` (0627) — the sum of the order's issued credit notes.
+   *  It lowers what the order is worth; it is never cash and never paid out. */
+  credited?: number | string | null;
   /** Chargeable storage still owed. Storage has its own clock and its own
    *  collection flag, so the caller computes it (`storageHold`) and this
    *  function only carries it. */
@@ -93,10 +96,12 @@ export function orderMoney({
   addonSum = 0,
   paid,
   controlBalance,
+  credited,
   storageOwing = 0,
   storageReleased = false,
 }: OrderMoneyInput): OrderMoney {
   const paidNum = Math.max(0, n(paid));
+  const credit = Math.max(0, n(credited));
   const priced = n(lineSum) + n(addonSum);
   const keyed =
     controlBalance == null || controlBalance === "" ? null : n(controlBalance);
@@ -108,14 +113,14 @@ export function orderMoney({
   if (priced > 0) {
     // Priced lines are computed from what was sold — they win over any keyed
     // number, and they are the case for every one of the 19 native orders.
-    total = priced;
-    goodsOwing = Math.max(0, priced - paidNum);
+    total = Math.max(0, priced - credit);
+    goodsOwing = Math.max(0, total - paidNum);
     source = "lines";
   } else if (keyed !== null) {
     // An imported row: the human keyed what is STILL OWED, so that figure is
     // the outstanding as it stands. The order's worth is what they have paid
     // plus what they still owe.
-    goodsOwing = Math.max(0, keyed);
+    goodsOwing = Math.max(0, keyed - credit);
     total = paidNum + goodsOwing;
     source = "keyed";
   } else {

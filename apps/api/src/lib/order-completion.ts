@@ -24,6 +24,8 @@ export interface CompletionOrderRow {
   so: number;
   status: string;
   paid: number | string | null;
+  /** 0627 — issued credit notes; lowers what the order is worth. */
+  credited?: number | string | null;
   delivery_date: string | null;
   order_lines?: Array<{ sku: string; qty: number; unit_price: number | string | null }> | null;
   order_addons?: Array<{ qty: number; unit_price: number | string | null }> | null;
@@ -110,7 +112,7 @@ export function completionOfOrder(r: CompletionReads): OrderCompletion {
   const addonSum = addons.reduce((s, a) => s + price(a), 0);
   const storage = storageObligation({
     invoiceStorageSum: invoiceStorageSumOf(r.invoices),
-    goodsTotal: lineSum + addonSum,
+    goodsTotal: Math.max(0, lineSum + addonSum - Number(ord.credited ?? 0)),
     paid: ord.paid,
     legacyOwing: hold.owing,
     legacyReleased: hold.released,
@@ -119,6 +121,7 @@ export function completionOfOrder(r: CompletionReads): OrderCompletion {
     lineSum,
     addonSum,
     paid: ord.paid,
+    credited: ord.credited ?? null,
     controlBalance: (ctrl?.balance as number | string | null) ?? null,
     storageOwing: storage.owing,
     storageReleased: storage.released,

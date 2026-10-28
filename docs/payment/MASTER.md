@@ -1382,6 +1382,18 @@ separate cases per 0436; automatic close on delivery completion is Delivery-side
 stays a named next step. Closure: migration `0439` is APPLIED (tracker tail confirmed) and
 PR #1147 merged as `7b47adbf`; production converged it.
 
+### Credit Notes against a Sales Invoice — BUILT ON BRANCH 2026-10-28 (migration 0627 NOT APPLIED)
+
+Finance → Credit Notes issues a credit note against ONE Sales Invoice (`issue_credit_note`), posts
+`Dr` the income accounts the invoice credited, in the proportion it credited them / `Cr` receivables
+(customer party) through `gl_post`, and adds the amount to `orders.credited`. `orderMoney` subtracts
+`credited` (the ONE arithmetic), so the credit comes off what the order still owes. A credit above
+what is still owed is refused: Carres does not refund, so a credit is never paid out and never
+creates an overpayment. Void reverses the entry (`gl_reverse`) and gives the credit back. An invoice
+with a live credit note cannot be voided. NOT built: refund payout (Q14 awaits Finance), storage-invoice
+credits, an invoice-side chip listing its credit notes, and `credited` on the remaining `orders.paid`
+readers (register, completion and booking-context use it; analytics and dealer feeds still show gross).
+
 ### Deployed — export, waivers on the report, the visible Reports door, and the §13 convergence, 2026-09-07
 
 Reports → Payment gains: **Export Excel** (one sheet per section, computed at export time

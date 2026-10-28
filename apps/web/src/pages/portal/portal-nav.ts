@@ -8,6 +8,7 @@ import {
   ArrowLeftRight,
   Wallet,
   BookOpen,
+  FileMinus,
   Calculator,
   Truck,
   Route,
@@ -636,6 +637,8 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // the Trial Balance and the Self-check are three different objects
       // (entries · account balances · checks), and UI MASTER §6.5 keeps tabs
       // for views of ONE object.
+      // 0627 — credit notes against Sales Invoices; Finance issues them.
+      { key: "credit-notes", label: "Credit Notes", icon: FileMinus, financePath: "/finance/credit-notes" },
       { key: "ledger", label: "Journal", icon: BookOpen, financePath: "/finance/ledger" },
       { key: "trial-balance", label: "Trial Balance", icon: Scale, financePath: "/finance/ledger/trial-balance" },
       { key: "self-check", label: "Self-check", icon: BadgeCheck, financePath: "/finance/ledger/self-check" },

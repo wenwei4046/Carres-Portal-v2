@@ -98,6 +98,7 @@ import financeLedgerRouter from "./routes/finance/ledger";
 import financeDealerCommissionRouter from "./routes/finance/dealer-commission";
 // The manual journal door — the principal's one write to the ledger (0462).
 import financeManualJournalsRouter from "./routes/finance/manual-journals";
+import financeCreditNotesRouter from "./routes/finance/credit-notes";
 import financeMoneyMovesRouter from "./routes/finance/money-moves";
 import financeCardSettlementRouter from "./routes/finance/card-settlement";
 import supplierActivityRouter from "./routes/supplier/activity";
@@ -301,6 +302,8 @@ api.route("/finance/ledger", financeLedgerRouter);
 api.route("/finance/dealer-commission", financeDealerCommissionRouter);
 // The manual journal (principal only). Before the catch-all as well.
 api.route("/finance/manual-journals", financeManualJournalsRouter);
+// Credit notes against Sales Invoices (0627). Before the catch-all as well.
+api.route("/finance/credit-notes", financeCreditNotesRouter);
 // Bank transfers and card payouts (0529). Before the catch-all as well.
 api.route("/finance/money-moves", financeMoneyMovesRouter);
 // Card settlement files and their matching (0572). Before the catch-all as well.
