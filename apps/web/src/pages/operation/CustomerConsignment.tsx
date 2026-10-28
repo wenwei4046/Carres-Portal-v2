@@ -10,6 +10,7 @@ import Modal from "@/components/kit/Modal";
 import Select from "@/components/kit/Select";
 import Textarea from "@/components/kit/Textarea";
 import { FieldError } from "@/components/kit/FieldFrame";
+import ConfirmActionDialog from "@/pages/operation/components/ConfirmActionDialog";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
@@ -159,9 +160,10 @@ function Payments({ path, money, payments, onSaved }: { path: string; money: Mon
     }),
     onSuccess: () => { setAmount(""); setReference(""); onSaved(); },
   });
+  const [removing, setRemoving] = useState<Payment | null>(null);
   const remove = useMutation({
     mutationFn: (id: string) => apiFetch(`${BASE}${path}/payments/${id}`, { method: "DELETE" }),
-    onSuccess: onSaved,
+    onSuccess: () => { setRemoving(null); onSaved(); },
   });
   return (
     <section className="flex flex-col gap-2" aria-label="Payments">
@@ -171,7 +173,7 @@ function Payments({ path, money, payments, onSaved }: { path: string; money: Mon
       {payments.map((p) => (
         <div key={p.id} className="flex items-center justify-between gap-2 text-body">
           <span>{fmtDate(p.paid_at)} · {m.label(p.method)} · {rm(Number(p.amount))}{p.reference ? ` · ${p.reference}` : ""}</span>
-          <Button variant="neutral" loading={remove.isPending && remove.variables === p.id} onClick={() => remove.mutate(p.id)}>Remove</Button>
+          <Button variant="neutral" onClick={() => { remove.reset(); setRemoving(p); }}>Remove</Button>
         </div>
       ))}
       <Input id="ccp-amount" label="Amount (RM)" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)}
@@ -180,11 +182,15 @@ function Payments({ path, money, payments, onSaved }: { path: string; money: Mon
         options={m.methods.map((x) => ({ value: x.value, label: x.label }))} />
       <DatePicker id="ccp-date" label="Payment Date" value={paidAt || null} onChange={(v) => setPaidAt(v ?? "")} />
       <Input id="ccp-ref" label="Reference" value={reference} onChange={(e) => setReference(e.target.value)} />
-      {(add.isError || remove.isError) && <FieldError>{errorText(add.error ?? remove.error)}</FieldError>}
+      {add.isError && <FieldError>{errorText(add.error)}</FieldError>}
       <div>
         <Button variant="primary" loading={add.isPending} disabled={!PRICE_RE.test(amount) || Number(amount) <= 0 || !method}
           onClick={() => add.mutate()}>Add Payment</Button>
       </div>
+      <ConfirmActionDialog open={removing !== null} title="Remove this payment?"
+        message={removing ? `The ${rm(Number(removing.amount))} payment of ${fmtDate(removing.paid_at)} will be removed and the balance goes back up.` : ""}
+        confirmLabel="Remove payment" pending={remove.isPending} error={remove.isError ? errorText(remove.error) : null}
+        onConfirm={() => removing && remove.mutate(removing.id)} onCancel={() => setRemoving(null)} />
     </section>
   );
 }

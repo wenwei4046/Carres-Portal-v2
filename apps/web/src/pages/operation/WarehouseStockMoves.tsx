@@ -9,6 +9,7 @@ import Modal from "@/components/kit/Modal";
 import Select from "@/components/kit/Select";
 import Textarea from "@/components/kit/Textarea";
 import { FieldError } from "@/components/kit/FieldFrame";
+import ConfirmActionDialog from "@/pages/operation/components/ConfirmActionDialog";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
@@ -134,10 +135,11 @@ export function StockAdjustments() {
   const [reason, setReason] = useState("");
   const [minus, setMinus] = useState<string[]>([]);
   const [plus, setPlus] = useState<PlusLine[]>([]);
+  const [confirming, setConfirming] = useState(false);
   const save = useMutation({
     mutationFn: () => post("/adjustments", { siteId, reason, minusUnitIds: minus, plus: plusPayload(plus) }),
     onSuccess: () => {
-      setOpen(false); setMinus([]); setPlus([]); setReason("");
+      setConfirming(false); setOpen(false); setMinus([]); setPlus([]); setReason("");
       void qc.invalidateQueries({ queryKey: ["stock-moves"] });
     },
   });
@@ -165,7 +167,8 @@ export function StockAdjustments() {
       <Modal open={open} onOpenChange={setOpen} width="wide" title="New Stock Adjustment"
         footer={<>
           <Button variant="neutral" onClick={() => setOpen(false)}>Close</Button>
-          <Button variant="primary" loading={save.isPending} disabled={!siteId || !reason.trim() || (minus.length === 0 && plusPayload(plus).length === 0)} onClick={() => save.mutate()}>Save</Button>
+          <Button variant="primary" loading={save.isPending} disabled={!siteId || !reason.trim() || (minus.length === 0 && plusPayload(plus).length === 0)}
+            onClick={() => (minus.length > 0 ? setConfirming(true) : save.mutate())}>Save</Button>
         </>}>
         <div className="flex flex-col gap-3">
           <SiteSelect id="adj-site" label="Site" value={siteId} onChange={(v) => { setSiteId(v); setMinus([]); }} sites={sites.data?.sites ?? []} />
@@ -174,9 +177,13 @@ export function StockAdjustments() {
           <UnitPicker siteId={siteId} picked={minus} onChange={setMinus} allowReserved={false} />
           <p className="text-body font-semibold">Add</p>
           <PlusLines lines={plus} onChange={setPlus} />
-          {save.isError && <FieldError>{errorText(save.error)}</FieldError>}
+          {!confirming && save.isError && <FieldError>{errorText(save.error)}</FieldError>}
         </div>
       </Modal>
+      <ConfirmActionDialog open={confirming} title="Write off Units?"
+        message={`${minus.length} ${minus.length === 1 ? "Unit" : "Units"} will be written off. This cannot be undone.`}
+        confirmLabel="Write off and save" pending={save.isPending} error={save.isError ? errorText(save.error) : null}
+        onConfirm={() => save.mutate()} onCancel={() => setConfirming(false)} />
     </Page>
   );
 }
@@ -275,8 +282,11 @@ function CountSheet({ id, onClose }: { id: string; onClose: () => void }) {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["stock-moves", "count", id], queryFn: () => apiFetch<CountDetail>(`${BASE}/counts/${id}`) });
   const [found, setFound] = useState<string[] | null>(null);
+  // Blind count: keep what was typed as raw text, so a scanner's Enter is not eaten. Split only on save.
+  const [rawCodes, setRawCodes] = useState<string | null>(null);
+  const [confirmingPost, setConfirmingPost] = useState(false);
   const [extras, setExtras] = useState<PlusLine[] | null>(null);
-  const codes = found ?? q.data?.foundCodes ?? [];
+  const codes = rawCodes !== null ? rawCodes.split(/\s+/).filter(Boolean) : found ?? q.data?.foundCodes ?? [];
   const lines = extras ?? (q.data?.count.extras ?? []).map((e) => ({ sku: e.sku, qty: String(e.qty) }));
   const record = useMutation({
     mutationFn: (postIt: boolean) => post(`/counts/${id}`, { found: codes, extras: plusPayload(lines), post: postIt }),
@@ -284,20 +294,22 @@ function CountSheet({ id, onClose }: { id: string; onClose: () => void }) {
   });
   const c = q.data?.count;
   const isOpen = c?.status === "open";
+  // Units on the sheet that have not been counted: Post writes these off.
+  const uncounted = (q.data?.units ?? []).filter((u) => u.ops_stock_items && !codes.includes(u.ops_stock_items.unit_code)).length;
   return (
     <Modal open onOpenChange={(o) => !o && onClose()} width="wide" title={c ? `Stock Take ${c.count_no}` : "Stock Take"}
       description={isOpen ? "Post writes off every Unit not counted and adds the goods with no Unit ID." : undefined}
       footer={<>
         <Button variant="neutral" onClick={onClose}>Close</Button>
         {isOpen && <Button variant="neutral" loading={record.isPending && record.variables === false} onClick={() => record.mutate(false)}>Save</Button>}
-        {isOpen && <Button variant="primary" loading={record.isPending && record.variables === true} onClick={() => record.mutate(true)}>Post</Button>}
+        {isOpen && <Button variant="primary" loading={record.isPending && record.variables === true} onClick={() => setConfirmingPost(true)}>Post</Button>}
       </>}>
       {q.isError && <FieldError>The Stock Take could not be loaded. Try again.</FieldError>}
       {c && (
         <div className="flex flex-col gap-3">
           {c.blind && isOpen ? (
             <Textarea id="count-codes" label="Unit IDs counted" hint="One Unit ID per line, or scan them." rows={8}
-              value={codes.join("\n")} onChange={(e) => setFound(e.target.value.split(/\s+/).filter(Boolean))} />
+              value={rawCodes ?? codes.join("\n")} onChange={(e) => setRawCodes(e.target.value)} />
           ) : (
             <div className="max-h-72 overflow-auto rounded-control border border-c-line p-2" aria-label="Units">
               {(q.data?.units ?? []).map((u) => u.ops_stock_items && (
@@ -314,9 +326,15 @@ function CountSheet({ id, onClose }: { id: string; onClose: () => void }) {
           <p className="text-body text-c-muted">{codes.length} Units counted</p>
           <p className="text-body font-semibold">Goods with no Unit ID</p>
           {isOpen ? <PlusLines lines={lines} onChange={setExtras} /> : <p className="text-body">{lines.map((l) => `${l.sku} ×${l.qty}`).join(", ")}</p>}
-          {record.isError && <FieldError>{errorText(record.error)}</FieldError>}
+          {!confirmingPost && record.isError && <FieldError>{errorText(record.error)}</FieldError>}
         </div>
       )}
+      <ConfirmActionDialog open={confirmingPost} title="Post this Stock Take?"
+        message={c?.blind
+          ? `Every Unit at this Site that is not in your ${codes.length} counted will be written off. This cannot be undone.`
+          : `${uncounted} ${uncounted === 1 ? "Unit" : "Units"} will be written off. This cannot be undone.`}
+        confirmLabel="Post Stock Take" pending={record.isPending} error={record.isError ? errorText(record.error) : null}
+        onConfirm={() => record.mutate(true)} onCancel={() => setConfirmingPost(false)} />
     </Modal>
   );
 }
