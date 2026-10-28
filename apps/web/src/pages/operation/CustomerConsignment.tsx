@@ -11,6 +11,7 @@ import Select from "@/components/kit/Select";
 import Textarea from "@/components/kit/Textarea";
 import { FieldError } from "@/components/kit/FieldFrame";
 import ConfirmActionDialog from "@/pages/operation/components/ConfirmActionDialog";
+import LoadError from "@/pages/operation/components/LoadError";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
@@ -102,7 +103,7 @@ function StockPicker({ sites, picked, onChange, prices, setPrices }: {
       <Select id="cs-site" label="Pickup Location" value={siteId || undefined} onValueChange={(v) => { setSiteId(v); onChange([]); }}
         options={sites.map((s) => ({ value: s.id, label: s.name }))} />
       {siteId && <Input id="cs-find" label="Find Unit" value={find} onChange={(e) => setFind(e.target.value)} />}
-      {q.isError && <FieldError>The Units could not be loaded. Try again.</FieldError>}
+      {q.isError && <LoadError message="The Units could not be loaded." onRetry={() => void q.refetch()} />}
       {q.isSuccess && <Ticks list={list} picked={picked} onChange={onChange} empty="No Units here." />}
       {prices && setPrices && (q.data?.units ?? []).filter((u) => picked.includes(u.id)).map((u) => (
         <Input key={u.id} id={`price-${u.id}`} label={`Price (RM) · ${u.unit_code}`} inputMode="decimal"
@@ -128,6 +129,11 @@ function CustomerFields({ dealers, dealerId, setDealerId, c, setC }: {
 }
 const EMPTY: Customer = { name: "", phone: "", address: "" };
 const hasCustomer = (dealerId: string, c: Customer) => dealerId !== NO_DEALER || c.name.trim().length > 0;
+/** Why Save is off, in one line; null when nothing is missing. */
+const consignHint = (dealerId: string, c: Customer, picked: string[], prices: Record<string, string>) =>
+  !hasCustomer(dealerId, c) ? "Pick a dealer or type the customer's name."
+  : picked.length === 0 ? "Pick at least one Unit."
+  : !picked.every((id) => PRICE_RE.test(prices[id] ?? "")) ? "Enter a price on every picked Unit." : null;
 const dealerOrNull = (dealerId: string) => (dealerId === NO_DEALER ? null : dealerId);
 
 // ── Customer Consignment Order ────────────────────────────────────────────────
@@ -184,7 +190,7 @@ function Payments({ path, money, payments, onSaved }: { path: string; money: Mon
       <Input id="ccp-ref" label="Reference" value={reference} onChange={(e) => setReference(e.target.value)} />
       {add.isError && <FieldError>{errorText(add.error)}</FieldError>}
       <div>
-        <Button variant="primary" loading={add.isPending} disabled={!PRICE_RE.test(amount) || Number(amount) <= 0 || !method}
+        <Button variant="neutral" loading={add.isPending} disabled={!PRICE_RE.test(amount) || Number(amount) <= 0 || !method}
           onClick={() => add.mutate()}>Add Payment</Button>
       </div>
       <ConfirmActionDialog open={removing !== null} title="Remove this payment?"
@@ -238,7 +244,7 @@ export function CustomerConsignmentOrders() {
 
   return (
     <Page word="Customer Consignment Orders" testId="customer-consignment-orders">
-      {list.isError ? <p role="alert" className="p-4 text-body">The customer consignment orders could not be loaded. Try again.</p> : (
+      {list.isError ? <LoadError message="The customer consignment orders could not be loaded." onRetry={() => void list.refetch()} /> : (
         <ListPageShell register>
           <DataGrid rows={list.data?.orders ?? []} columns={columns} rowKey={(r) => r.id}
             storageKey="carres.delivery.customer-consignment-orders.v1" appearance="reference" exportName="Customer Consignment Orders"
@@ -258,6 +264,7 @@ export function CustomerConsignmentOrders() {
           <CustomerFields dealers={choices.data?.dealers ?? []} dealerId={dealerId} setDealerId={setDealerId} c={c} setC={setC} />
           <StockPicker sites={choices.data?.sites ?? []} picked={picked} onChange={setPicked} prices={prices} setPrices={setPrices} />
           <Textarea id="cco-note" label="Note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
+          {consignHint(dealerId, c, picked, prices) && <p className="text-body text-c-muted" role="status">Save is off: {consignHint(dealerId, c, picked, prices)}</p>}
           {save.isError && <FieldError>{errorText(save.error)}</FieldError>}
         </div>
       </Modal>
@@ -335,7 +342,7 @@ export function ConsignmentNotes() {
 
   return (
     <Page word="Consignment Notes" testId="consignment-notes">
-      {list.isError ? <p role="alert" className="p-4 text-body">The consignment notes could not be loaded. Try again.</p> : (
+      {list.isError ? <LoadError message="The consignment notes could not be loaded." onRetry={() => void list.refetch()} /> : (
         <ListPageShell register>
           <DataGrid rows={list.data?.notes ?? []} columns={columns} rowKey={(r) => r.id}
             storageKey="carres.delivery.consignment-notes.v1" appearance="reference" exportName="Consignment Notes"
@@ -356,6 +363,7 @@ export function ConsignmentNotes() {
           <DatePicker id="csn-date" label="Delivery Date" value={date || null} onChange={(v) => setDate(v ?? "")} />
           <StockPicker sites={choices.data?.sites ?? []} picked={picked} onChange={setPicked} prices={prices} setPrices={setPrices} />
           <Textarea id="csn-note" label="Note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
+          {consignHint(dealerId, c, picked, prices) && <p className="text-body text-c-muted" role="status">Save is off: {consignHint(dealerId, c, picked, prices)}</p>}
           {save.isError && <FieldError>{errorText(save.error)}</FieldError>}
         </div>
       </Modal>
@@ -416,7 +424,7 @@ export function CustomerConsignmentReturns() {
 
   return (
     <Page word="Customer Consignment Returns" testId="customer-consignment-returns">
-      {list.isError ? <p role="alert" className="p-4 text-body">The customer consignment returns could not be loaded. Try again.</p> : (
+      {list.isError ? <LoadError message="The customer consignment returns could not be loaded." onRetry={() => void list.refetch()} /> : (
         <ListPageShell register>
           <DataGrid rows={list.data?.returns ?? []} columns={columns} rowKey={(r) => r.id}
             storageKey="carres.delivery.customer-consignment-returns.v1" appearance="reference" exportName="Customer Consignment Returns"
@@ -434,7 +442,7 @@ export function CustomerConsignmentReturns() {
         <div className="flex flex-col gap-3">
           <Select id="ccr-site" label="Delivery Location" value={siteId || undefined} onValueChange={setSiteId}
             options={(choices.data?.sites ?? []).map((s) => ({ value: s.id, label: s.name }))} />
-          {notes.isError && <FieldError>The Units could not be loaded. Try again.</FieldError>}
+          {notes.isError && <LoadError message="The Units could not be loaded." onRetry={() => void notes.refetch()} />}
           <Ticks list={out} picked={picked} onChange={setPicked} empty="No Units are at a customer." />
           <Textarea id="ccr-note" label="Note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
           {save.isError && <FieldError>{errorText(save.error)}</FieldError>}
