@@ -160,7 +160,8 @@ export default function OperationSupplierItems() {
           searchPlaceholder={W.search}
           isLoading={catalogQ.isLoading || suppliersQ.isLoading}
           errorState={
-            catalogQ.isError || suppliersQ.isError || offersQ.isError ? (
+            // A failed background refetch keeps the last good rows; only a read with nothing to show fails.
+            (catalogQ.isError && !catalogQ.data) || (suppliersQ.isError && !suppliersQ.data) || (offersQ.isError && !offersQ.data) ? (
               <div role="alert">
                 <EmptyState
                   title="Could not be loaded"

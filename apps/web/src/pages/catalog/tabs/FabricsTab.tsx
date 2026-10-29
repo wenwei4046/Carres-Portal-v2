@@ -994,7 +994,7 @@ function FabricsPanel({
         <Modal title="History: Fabrics" onClose={() => setShowHistory(false)}>
           <div className="flex flex-col gap-3 max-h-[60vh] overflow-y-auto pr-1">
             {historyQ.isLoading && <Loading variant="skeleton" label="Loading history" />}
-            {historyQ.isError && (
+            {historyQ.isError && !historyQ.data && (
               <p role="alert" className="text-body text-base-700">
                 Could not be loaded.{" "}
                 <Button variant="ghost" onClick={() => void historyQ.refetch()}>
@@ -1002,7 +1002,7 @@ function FabricsPanel({
                 </Button>
               </p>
             )}
-            {!historyQ.isLoading && !historyQ.isError && history.length === 0 && (
+            {historyQ.data && history.length === 0 && (
               <p className="text-body text-base-500">No history yet. The first Edit save writes one.</p>
             )}
             {history.map((h) => (

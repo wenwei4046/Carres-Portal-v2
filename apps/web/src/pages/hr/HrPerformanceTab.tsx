@@ -437,7 +437,7 @@ export default function HrPerformanceTab({
       .sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom));
   }, [data, kpiKey]);
 
-  if (isError) {
+  if (isError && !data) {
     return (
       <div role="alert" className="py-12">
         <EmptyState

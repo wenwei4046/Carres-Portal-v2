@@ -118,7 +118,7 @@ export default function ProductMaintenancePage({
           that is otherwise pure catalog work. */}
 
       {catalogQ.isLoading && <Loading variant="skeleton" label="Loading catalog" />}
-      {catalogQ.isError && !catalogQ.isLoading && (
+      {catalogQ.isError && !catalogQ.data && (
         <div role="alert">
           <EmptyState
             title="Could not be loaded"

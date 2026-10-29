@@ -250,7 +250,7 @@ export default function HrPeopleCostTab({
   const [edit, setEdit] = useState<EditState | null>(null);
   const { data, isLoading, isError, refetch } = useHrComp(year, month);
 
-  if (isError) {
+  if (isError && !data) {
     return (
       <div role="alert" className="py-12">
         <EmptyState

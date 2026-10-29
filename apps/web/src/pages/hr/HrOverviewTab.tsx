@@ -72,7 +72,7 @@ export default function HrOverviewTab({
 }) {
   const { data, isLoading, isError, refetch } = useHrReport(year, month);
 
-  if (isError) {
+  if (isError && !data) {
     return (
       <div role="alert" className="py-12">
         <EmptyState

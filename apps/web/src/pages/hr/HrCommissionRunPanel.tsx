@@ -279,7 +279,7 @@ export default function HrCommissionRunPanel({
     );
   }
   // Without the run state the banner would read as an open month; say the read failed instead.
-  if (isError) {
+  if (isError && !state) {
     return (
       <SectionCard>
         <div role="alert">

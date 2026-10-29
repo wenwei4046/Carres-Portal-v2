@@ -350,6 +350,21 @@ describe("RentalSettingPage — sections + empty states", () => {
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(refetch).toHaveBeenCalledTimes(1);
   });
+
+  it("a failed background refetch keeps the last good config on screen", () => {
+    setConfig();
+    configState = { ...configState, error: new Error("boom") };
+    renderPage({ isPrincipal: true });
+    expect(screen.getByText("Bed frame offers")).toBeInTheDocument();
+    expect(screen.queryByText("Could not be loaded")).not.toBeInTheDocument();
+  });
+
+  it("a failed catalog read does not block the page (only the config read does)", () => {
+    catalogState = { data: undefined, isPending: false, error: new Error("boom") };
+    renderPage({ isPrincipal: true });
+    expect(screen.getByText("Bed frame offers")).toBeInTheDocument();
+    expect(screen.queryByText("Could not be loaded")).not.toBeInTheDocument();
+  });
 });
 
 // ---------------------------------------------------------------------------

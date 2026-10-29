@@ -231,7 +231,7 @@ export default function HrCommissionTab({
   year: number;
   month: number;
 }) {
-  const { data, isLoading, isError, refetch } = useHrReport(year, month);
+  const { data, isLoading, refetch } = useHrReport(year, month);
   const role = useAuth((st) => st.role);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
@@ -246,7 +246,7 @@ export default function HrCommissionTab({
   if (isLoading) {
     return <div className="py-12"><Loading variant="skeleton" label="Loading the month report" /></div>;
   }
-  if (isError || !data) {
+  if (!data) {
     return (
       <div role="alert" className="py-12">
         <EmptyState

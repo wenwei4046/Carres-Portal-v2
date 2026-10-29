@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import HrTeamTab from "./HrTeamTab";
@@ -159,6 +159,35 @@ const TEAM = {
 };
 
 describe("HrTeamTab", () => {
+  it("a failed background refetch keeps the team on screen, with no error view", async () => {
+    vi.mocked(apiFetch).mockImplementation(async (url: string) => {
+      if (url === "/api/hr/team") return TEAM;
+      throw new Error(`unexpected fetch ${url}`);
+    });
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <HrTeamTab />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(screen.getAllByText("Loo").length).toBeGreaterThanOrEqual(1));
+    vi.mocked(apiFetch).mockRejectedValue(new Error("boom"));
+    await act(async () => {
+      await qc.refetchQueries();
+    });
+    expect(screen.getAllByText("Loo").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("Could not be loaded")).not.toBeInTheDocument();
+  });
+
+  it("a failed first read says so with Try again", async () => {
+    vi.mocked(apiFetch).mockRejectedValue(new Error("boom"));
+    render(wrap(<HrTeamTab />));
+    expect(await screen.findByText("Could not be loaded")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+  });
+
   it("renders bands, staff codes, showroom ladder and history", async () => {
     vi.mocked(apiFetch).mockImplementation(async (url: string) => {
       if (url === "/api/hr/team") return TEAM;

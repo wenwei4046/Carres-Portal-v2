@@ -1193,7 +1193,7 @@ export default function HrTeamTab() {
     return [...groups.entries()];
   }, [data]);
 
-  if (isError) {
+  if (isError && !data) {
     return (
       <div role="alert" className="py-10">
         <EmptyState

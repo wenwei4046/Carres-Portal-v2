@@ -65,7 +65,8 @@ export default function OperationCatalogPage() {
       <div className="flex justify-between items-end mb-6 gap-4 flex-wrap">
         <div>
           <div className="kicker">Catalog</div>
-          {/* The shell header already prints the page's h1. */}
+          {/* Desktop: the shell header prints the page's h1. Phone: OperationApp's phone bar prints none, so this one does. */}
+          <h1 className="sr-only md:hidden">Operation Catalog</h1>
           <h2 className="text-page font-display mt-1.5 text-base-900">Operation Catalog</h2>
           {/* ⭐ THE PAGE SAYS WHAT IT IS FOR (Jess, 2026-08-26). She could not
               be told apart the three catalog-ish destinations, and that was a
@@ -80,7 +81,7 @@ export default function OperationCatalogPage() {
       </div>
 
       {catalogQ.isLoading && <Loading variant="skeleton" label="Loading catalog" />}
-      {catalogQ.isError && !catalogQ.isLoading && (
+      {catalogQ.isError && !catalogQ.data && (
         <div role="alert">
           <EmptyState
             title="Could not be loaded"

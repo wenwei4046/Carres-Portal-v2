@@ -110,20 +110,15 @@ export default function RentalSettingPage({ isPrincipal }: { isPrincipal: boolea
   }, []);
 
   // A failed read answers before the pending check: a failed query is not pending, but its partner may be.
-  if (configQ.error || catalogQ.error) {
+  // A failed background refetch keeps the last good config on screen.
+  if (configQ.error && !configQ.data) {
     return (
       <div role="alert">
         <EmptyState
           title="Could not be loaded"
-          detail="The rental config or catalog did not arrive. Your session may have expired."
+          detail="The rental config did not arrive. Your session may have expired."
           action={
-            <Button
-              variant="neutral"
-              onClick={() => {
-                if (configQ.error) void configQ.refetch();
-                if (catalogQ.error) void catalogQ.refetch();
-              }}
-            >
+            <Button variant="neutral" onClick={() => void configQ.refetch()}>
               Try again
             </Button>
           }

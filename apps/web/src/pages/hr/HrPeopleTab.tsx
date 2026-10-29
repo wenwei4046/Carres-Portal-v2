@@ -131,7 +131,7 @@ function GroupBand({ title, count }: { title: string; count: number }) {
 }
 
 export default function HrPeopleTab() {
-  const { data, isLoading, isError, refetch } = useHrPeople();
+  const { data, isLoading, refetch } = useHrPeople();
   const [openId, setOpenId] = useState<string | null>(null);
 
   const people = useMemo(() => data?.people ?? [], [data]);
@@ -174,7 +174,7 @@ export default function HrPeopleTab() {
   if (isLoading) {
     return <div className="py-10"><Loading variant="skeleton" label="Loading people" /></div>;
   }
-  if (isError || !data) {
+  if (!data) {
     // A browser on this build against an older Worker gets a 404 here. Say so
     // instead of showing an empty register, which would read as "no staff".
     return (

@@ -114,7 +114,7 @@ export function SupplierOffersStrip({
     >
       {offersQ.isLoading ? (
         <Loading label="Loading offers" />
-      ) : offersQ.isError ? (
+      ) : offersQ.isError && !offersQ.data ? (
         <span role="alert" className="flex items-center gap-2 text-meta text-base-700">
           Could not be loaded.
           <Button variant="ghost" onClick={() => void offersQ.refetch()} data-testid={`opcost-offers-retry-${sku.sku}`}>
@@ -203,7 +203,7 @@ export function SupplierOffersStrip({
             ))}
           </select>
           <input
-            aria-label={`${sku.sku} offer supplier code`}
+            aria-label={`${sku.sku} their code`}
             value={code}
             onChange={(e) => setCode(e.target.value)}
             placeholder="Their code"

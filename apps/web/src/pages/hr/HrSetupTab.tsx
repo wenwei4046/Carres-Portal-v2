@@ -468,7 +468,7 @@ export default function HrSetupTab({
   year: number;
   month: number;
 }) {
-  const { data, isLoading, isError, refetch } = useHrReport(year, month);
+  const { data, isLoading, refetch } = useHrReport(year, month);
 
   const setScheme = useHrSetScheme();
   const setStaffRate = useHrSetStaffRate();
@@ -533,7 +533,7 @@ export default function HrSetupTab({
   if (isLoading) {
     return <div className="py-12"><Loading variant="skeleton" label="Loading commission setup" /></div>;
   }
-  if (isError || !data || !config) {
+  if (!data || !config) {
     return (
       <div role="alert" className="py-12">
         <EmptyState

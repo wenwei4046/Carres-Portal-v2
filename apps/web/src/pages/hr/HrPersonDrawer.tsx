@@ -552,7 +552,7 @@ export default function HrPersonDrawer({
           )}
         </div>
 
-        {isError ? (
+        {isError && !detail ? (
           <div role="alert" className="flex-1 py-12">
             <EmptyState
               title="Could not be loaded"

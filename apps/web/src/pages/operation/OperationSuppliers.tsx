@@ -109,13 +109,16 @@ export default function OperationSuppliers() {
     <div className="px-9 py-8 pb-14">
       <div className="mb-[22px]">
         <div className="kicker">HQ · Network</div>
-        {/* The shell header already prints "Suppliers" as the page's h1. */}
+        {/* Desktop: the shell header prints the page's h1. Phone: OperationApp's phone bar prints none, so this one does. */}
+        <h1 className="sr-only md:hidden">Suppliers</h1>
         <h2 className="text-page font-display mt-1.5">
           Suppliers
         </h2>
-        <div className="text-body text-base-600 mt-1.5">
-          {suppliers.length} active · upstream of stock pipeline.
-        </div>
+        {data && (
+          <div className="text-body text-base-600 mt-1.5">
+            {suppliers.length} active · upstream of stock pipeline.
+          </div>
+        )}
         {win && (
           <div className="text-meta text-base-500 mt-1">
             Delivery record covers the last {win.days} days, to {fmtDate(win.asOf)}.
@@ -128,7 +131,7 @@ export default function OperationSuppliers() {
 
       {isLoading && <Loading variant="skeleton" label="Loading suppliers" />}
 
-      {isError && (
+      {isError && !data && (
         <div role="alert">
           <EmptyState
             title="Could not be loaded"
@@ -138,7 +141,7 @@ export default function OperationSuppliers() {
         </div>
       )}
 
-      {!isLoading && !isError && suppliers.length === 0 && (
+      {data && suppliers.length === 0 && (
         <div className="text-body text-base-500">No suppliers yet.</div>
       )}
 
@@ -277,7 +280,7 @@ function SupplierDrawer({ supplier, onClose }: { supplier: SupplierRow; onClose:
         </div>
         <div className="border border-base-200 rounded">
           {isLoading && <div className="p-4"><Loading variant="skeleton" label="Loading recent POs" /></div>}
-          {isError && (
+          {isError && !data && (
             <div role="alert">
               <EmptyState
                 title="Could not be loaded"
@@ -286,7 +289,7 @@ function SupplierDrawer({ supplier, onClose }: { supplier: SupplierRow; onClose:
               />
             </div>
           )}
-          {!isLoading && !isError && pos.length === 0 && (
+          {data && pos.length === 0 && (
             <div className="p-4 text-meta text-base-500">No POs yet.</div>
           )}
           {pos.map((p, i) => (
