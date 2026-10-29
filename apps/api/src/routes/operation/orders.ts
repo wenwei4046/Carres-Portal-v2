@@ -3583,6 +3583,20 @@ operationOrdersRouter.post("/:id/attach-do", requireOperation, async (c) => {
   // allocator — never a number the browser made up.
   let doNumber = parsed.data.doNumber;
   if (!doNumber) {
+    // A live document is the number to attach even when the orders mirror
+    // column is empty; drawing a fresh one would name a paper that is not
+    // on the order, and the RPC would then refuse the handover check.
+    const { data: live } = await sb
+      .from("ops_delivery_orders")
+      .select("do_number")
+      .eq("order_id", c.req.param("id"))
+      .is("voided_at", null)
+      .order("issued_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    doNumber = (live?.do_number as string | undefined) ?? undefined;
+  }
+  if (!doNumber) {
     const drawn = await drawDeliveryOrderNumber(sb, c.req.param("id"));
     if (!drawn.ok) return c.json(drawn.body, drawn.status);
     doNumber = drawn.doNumber;

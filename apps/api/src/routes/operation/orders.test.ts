@@ -1408,6 +1408,15 @@ describe("POST /api/operation/orders/:id/attach-do", () => {
     signerName: "Mr Tan",
   };
 
+  // The live (not voided) document lookup the route runs before it draws.
+  const liveDoc = (doNumber: string | null) => () => {
+    const q = {
+      select: () => q, eq: () => q, is: () => q, order: () => q, limit: () => q,
+      maybeSingle: () => Promise.resolve({ data: doNumber ? { do_number: doNumber } : null, error: null }),
+    };
+    return q;
+  };
+
   it("returns 200 on success and calls RPC with snake_case args", async () => {
     const rpc = vi.fn().mockResolvedValue({
       data: { id: ORDER_ID, delivered_at: "2026-05-03T11:00:00Z" }, error: null,
@@ -1453,7 +1462,7 @@ describe("POST /api/operation/orders/:id/attach-do", () => {
       ),
     );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    vi.mocked(userClient).mockReturnValue({ rpc, from: liveDoc(null) } as any);
     const jwt = await makeJwt("operation");
     const { doNumber: _omitted, ...withoutNumber } = VALID;
     const res = await app.fetch(
@@ -1469,6 +1478,28 @@ describe("POST /api/operation/orders/:id/attach-do", () => {
     expect(rpc).toHaveBeenCalledWith(
       "operation_attach_do_and_deliver",
       expect.objectContaining({ p_do_number: "DO2609-0042" }),
+    );
+  });
+
+  it("an order whose mirror column is empty but has a live document attaches THAT number, never a drawn one", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { id: ORDER_ID }, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc, from: liveDoc("DO2610-4075") } as any);
+    const jwt = await makeJwt("operation");
+    const { doNumber: _omitted, ...withoutNumber } = VALID;
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/attach-do`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(withoutNumber),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpc).not.toHaveBeenCalledWith("delivery_document_number_draw", expect.anything());
+    expect(rpc).toHaveBeenCalledWith(
+      "operation_attach_do_and_deliver",
+      expect.objectContaining({ p_do_number: "DO2610-4075" }),
     );
   });
 
