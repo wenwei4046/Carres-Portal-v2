@@ -203,7 +203,7 @@ describe("POST /api/hr/people/:id/access — the HR disable door", () => {
   it("resolves the account from the employee row, not from the client", async () => {
     mockUserRpc({ data: { employeeId: EMPLOYEE, appUserId: APP_USER, salespersonId: null } });
 
-    const signOut = vi.fn(async () => ({}));
+    const updateUserById = vi.fn(async () => ({ data: {}, error: null }));
     const update = vi.fn(() => ({ eq: vi.fn(async () => ({ error: null })) }));
     const insert = vi.fn(async () => ({ error: null }));
     const from = vi.fn((table: string) =>
@@ -228,7 +228,7 @@ describe("POST /api/hr/people/:id/access — the HR disable door", () => {
     );
     vi.mocked(adminClient).mockReturnValue({
       from,
-      auth: { admin: { signOut } },
+      auth: { admin: { updateUserById } },
     } as never);
 
     const res = await authed(`/api/hr/people/${EMPLOYEE}/access`, "hr", {
@@ -238,8 +238,8 @@ describe("POST /api/hr/people/:id/access — the HR disable door", () => {
 
     expect(res.status).toBe(200);
     expect(update).toHaveBeenCalledWith({ status: "disabled" });
-    // the promise the dialog makes: signed out NOW, not at token expiry
-    expect(signOut).toHaveBeenCalledWith(APP_USER);
+    // the promise the dialog makes: no new token or refresh from NOW (0731 ban)
+    expect(updateUserById).toHaveBeenCalledWith(APP_USER, { ban_duration: "876000h" });
     expect(insert).toHaveBeenCalledWith(
       expect.objectContaining({
         role: "hr",

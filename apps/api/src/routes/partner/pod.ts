@@ -152,6 +152,15 @@ partnerPodRouter.post("/:threadId/attach", async (c) => {
     );
   }
 
+  // 0731: proof binds to this thread — the same rule partner_attach_pod
+  // enforces (and the handover route's own prefix check).
+  if (![parsed.data.podPath, parsed.data.signaturePath].every((p) => p.startsWith(`${threadId}/`))) {
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: "File does not belong to this delivery" },
+      422,
+    );
+  }
+
   const sb = userClient(c.env, auth.jwt);
   const { data, error } = await sb.rpc("partner_attach_pod", {
     p_thread_id: threadId,
