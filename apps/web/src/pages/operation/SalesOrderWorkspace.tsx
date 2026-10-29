@@ -2030,7 +2030,7 @@ function SalesOrderWorkspaceBody() {
         (s, a) => s + Number(a.qty) * Number(a.unit_price),
         0,
       );
-      return { ...orderMoney({ lineSum, addonSum, paid: base?.paid ?? 0, controlBalance: null }), goods: lineSum, services: addonSum };
+      return { ...orderMoney({ lineSum, addonSum, paid: base?.paid ?? 0, credited: order?.credited, controlBalance: null }), goods: lineSum, services: addonSum };
     }
 
     const lines = detailQ.data?.lines ?? [];
@@ -2043,7 +2043,7 @@ function SalesOrderWorkspaceBody() {
     const lineSum = lines.reduce((s, l) => s + Number(l.unit_price ?? 0) * Number(l.qty ?? 0), 0);
     const addonSum = addons.reduce((s, a) => s + Number(a.unit_price ?? 0) * Number(a.qty ?? 0), 0);
     return {
-      ...orderMoney({ lineSum, addonSum, paid: order?.paid, controlBalance: null }),
+      ...orderMoney({ lineSum, addonSum, paid: order?.paid, credited: order?.credited, controlBalance: null }),
       goods: lineSum,
       services: addonSum,
     };

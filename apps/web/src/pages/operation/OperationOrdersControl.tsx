@@ -956,6 +956,7 @@ export function moneyOf(o: operationOrderListRow): OrderMoney {
     lineSum: lines.reduce((s, l) => s + price(l), 0),
     addonSum: (o.order_addons ?? []).reduce((s, a) => s + price(a), 0),
     paid: o.paid,
+    credited: o.credited,
     controlBalance: ovl?.balance ?? null,
     storageOwing: hold.owing,
     storageReleased: hold.released,

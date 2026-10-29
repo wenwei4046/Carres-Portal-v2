@@ -245,6 +245,7 @@ interface SalesOrderModuleRow {
    *  files whose arrival can reopen the review question. */
   do_uploaded_at?: string | null;
   paid?: number | string | null;
+  credited?: number | string | null;
   ops_assigned_logistic?: string | null;
   delivery_partner_id?: string | null;
   salesperson_id?: string | null;
@@ -425,7 +426,7 @@ export function projectSalesOrdersFromModuleFacts(input: {
     // `storageObligation` precedence law the Delivery gate reads too.
     const storage = storageObligation({
       invoiceStorageSum: input.invoiceStorageByOrder?.get(row.id) ?? 0,
-      goodsTotal: lineTotal == null || addonTotal == null ? null : lineTotal + addonTotal,
+      goodsTotal: lineTotal == null || addonTotal == null ? null : Math.max(0, lineTotal + addonTotal - Number(row.credited ?? 0)),
       paid: row.paid ?? null,
       legacyOwing: hold.owing,
       legacyReleased: hold.released,
@@ -452,6 +453,7 @@ export function projectSalesOrdersFromModuleFacts(input: {
       lineTotal,
       addonTotal,
       paid: row.paid == null ? null : Number(row.paid),
+      credited: row.credited == null ? null : Number(row.credited),
       storageOwing: storage.owing,
       delayDecision: control?.delay_decision ?? null,
       delayDecisionEta: control?.delay_decision_eta ?? null,

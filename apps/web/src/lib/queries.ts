@@ -2793,6 +2793,8 @@ export interface operationOrderListRow {
    *  order's value is then UNKNOWN, and unknown holds nothing — which is
    *  exactly what shipped before this card. */
   paid?: number | string | null;
+  /** 0730 — issued credit notes; `orderMoney` takes them off what is owed. */
+  credited?: number | string | null;
   order_addons?: { addon_key?: string | null; qty: number; unit_price?: number | string | null }[];
   /**
    * D1 (2026-08-06) — the SKUs a real PURCHASE ORDER covers for this order,
@@ -3200,6 +3202,8 @@ export interface operationOrderDetailOrder {
    *  ready_to_dispatch / dispatched stages (operation records the customer's
    *  final balance payment at delivery). */
   paid: number;
+  /** 0730 — issued credit notes; `orderMoney` takes them off what is owed. */
+  credited?: number | string | null;
   /** Saved at-sale facts; never synthesized into a ledger transaction. */
   payment_method?: string | null;
   installment_months?: number | null;

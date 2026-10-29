@@ -1770,6 +1770,7 @@ function DrawerBody({
   const money = orderMoney({
     lineSum: hasLineTotal ? grandTotal : 0,
     paid: order.paid,
+    credited: order.credited,
     controlBalance: keyedBalance,
     storageOwing: storageOwingAmount,
     storageReleased,

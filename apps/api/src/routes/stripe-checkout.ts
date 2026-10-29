@@ -3,7 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import { createStripeCheckoutInputSchema } from "@carres/shared";
 import { parseJsonBody, fail } from "../lib/route-helpers";
-import { describePaymentMethod, receiptUrlOf, stripeClient, stripeConfigured } from "../lib/stripe";
+import { describePaymentMethod, expireOpenCheckoutLinks, receiptUrlOf, stripeClient, stripeConfigured } from "../lib/stripe";
 import { adminClient, userClient } from "../lib/supabase";
 import type { AppEnv } from "../types";
 
@@ -93,7 +93,7 @@ async function fetchOrderScoped(c: Context<AppEnv>, id: string) {
   const { data, error } = await sb
     .from("orders")
     .select(
-      "id, so, dealer_id, status, paid, customer_name, customer_email, order_lines(unit_price, qty), order_addons(unit_price, qty), invoices(kind, status, amount, tax_amount, voided_at, replaces_invoice_id)",
+      "id, so, dealer_id, status, paid, credited, customer_name, customer_email, order_lines(unit_price, qty), order_addons(unit_price, qty), invoices(kind, status, amount, tax_amount, voided_at, replaces_invoice_id)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -105,6 +105,7 @@ async function fetchOrderScoped(c: Context<AppEnv>, id: string) {
     dealer_id: string;
     status: string;
     paid: number | string;
+    credited: number | string | null;
     customer_name: string | null;
     customer_email: string | null;
     order_lines: Array<{ unit_price: number | string; qty: number }>;
@@ -177,7 +178,8 @@ stripeCheckoutRouter.post("/:id/stripe/checkout", async (c) => {
       422,
     );
   }
-  const outstanding = Math.max(0, total + storageObligations(order) - Number(order.paid));
+  // A credit note (0730) lowers what is owed.
+  const outstanding = Math.max(0, total - Number(order.credited ?? 0) + storageObligations(order) - Number(order.paid));
   if (outstanding <= 0) {
     return c.json(
       { error: "stripe_checkout_blocked", code: "already_paid", message: "Order is already fully paid." },
@@ -193,6 +195,16 @@ stripeCheckoutRouter.post("/:id/stripe/checkout", async (c) => {
         message: `Amount is above the outstanding balance (RM ${outstanding.toFixed(2)}).`,
         maxAmount: Number(outstanding.toFixed(2)),
       },
+      422,
+    );
+  }
+
+  // One live link per order: an earlier open link is expired first, so two
+  // links can never both collect the balance, and a failed card can be retried.
+  const admin = adminClient(c.env);
+  if (!(await expireOpenCheckoutLinks(stripeClient(c.env), admin, order.id))) {
+    return c.json(
+      { error: "stripe_checkout_blocked", code: "link_in_use", message: "An earlier payment link is being paid right now. Wait a minute and check the order." },
       422,
     );
   }
@@ -233,7 +245,6 @@ stripeCheckoutRouter.post("/:id/stripe/checkout", async (c) => {
   }
 
   // Track the link. Service client — RLS has no client write policy (0223).
-  const admin = adminClient(c.env);
   const { data: row, error: insErr } = await admin
     .from("stripe_checkout_sessions")
     .insert({

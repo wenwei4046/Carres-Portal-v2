@@ -52,7 +52,7 @@ export function holdKey(orderId: string, leg: number): string {
 }
 
 const HOLD_SELECT =
-  "id, paid, delivery_stops, " +
+  "id, paid, credited, delivery_stops, " +
   "order_lines(sku, qty, unit_price), order_addons(qty, unit_price), " +
   "ops_order_control(booking_stage, confirmed_date, confirmed_time_slot, balance, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_collected_at, storage_waiver_status), " +
   "invoices(kind, status, amount, tax_amount, voided_at), " +
@@ -64,6 +64,7 @@ const ID_CHUNK = 80;
 type HoldOrderRow = {
   id: string;
   paid: number | string | null;
+  credited?: number | string | null;
   delivery_stops: Array<{ leg?: number | null; scheduled_at?: string | null }> | null;
   order_lines: Array<{ sku: string; qty: number; unit_price: number | null }> | null;
   order_addons: Array<{ qty: number; unit_price: number | null }> | null;
@@ -156,6 +157,7 @@ export async function heldDeliveryScopes(
       lines: row.order_lines ?? [],
       addons: row.order_addons ?? [],
       paid: row.paid ?? 0,
+      credited: row.credited ?? null,
       control: controlOf(row),
       invoices: row.invoices ?? [],
       storageCategories,

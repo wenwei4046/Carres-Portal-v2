@@ -53,6 +53,8 @@ export interface BookingMoneyRows {
   addons: ReadonlyArray<{ qty: number; unit_price: number | null }>;
   /** `orders.paid` — the money truth (C5). */
   paid: number | string | null;
+  /** `orders.credited` (0730) — issued credit notes lower what the order is worth. */
+  credited?: number | string | null;
   /** `ops_order_control` — the keyed balance and the storage columns. */
   control: Record<string, unknown> | null;
   /** The SO's own `invoices` rows (kind, status, amount, tax_amount, voided_at). */
@@ -99,7 +101,7 @@ export function bookingMoneyOf(rows: BookingMoneyRows): BookingGateInput["money"
   const paid = rows.paid ?? 0;
   const storage = storageObligation({
     invoiceStorageSum: invoiceStorageSumOf(rows.invoices),
-    goodsTotal: lineSum + addonSum,
+    goodsTotal: Math.max(0, lineSum + addonSum - Number(rows.credited ?? 0)),
     paid,
     legacyOwing: hold.owing,
     legacyReleased: hold.released,
@@ -108,6 +110,7 @@ export function bookingMoneyOf(rows: BookingMoneyRows): BookingGateInput["money"
     lineSum,
     addonSum,
     paid,
+    credited: rows.credited ?? null,
     controlBalance: (ctrl?.balance as number | string | null) ?? null,
     storageOwing: storage.owing,
     storageReleased: storage.released,
@@ -127,7 +130,7 @@ export async function loadBookingContext(
     .from("orders")
     // CARD 3 (0346): the assignment rides this select so the confirm door can
     // stamp the carrier the customer's appointment is agreed WITH.
-    .select("id, so, paid, do_number, ops_assigned_logistic, delivery_partner_id")
+    .select("id, so, paid, credited, do_number, ops_assigned_logistic, delivery_partner_id")
     .eq("id", orderId)
     .maybeSingle();
   if (orderErr) {
@@ -185,6 +188,7 @@ export async function loadBookingContext(
     lines,
     addons: (addonsRes.data ?? []) as { qty: number; unit_price: number | null }[],
     paid: (order as { paid?: number | string | null }).paid ?? 0,
+    credited: (order as { credited?: number | string | null }).credited ?? null,
     control: ctrl,
     invoices: (invoicesRes.data ?? []) as BookingMoneyRows["invoices"],
     storageCategories: storageCats,

@@ -8,7 +8,8 @@ import {
 } from "@carres/shared/schemas/finance-credit-note";
 import { requireFinance } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
-import { userClient } from "../../lib/supabase";
+import { adminClient, userClient } from "../../lib/supabase";
+import { expireOpenCheckoutLinks, stripeClient, stripeConfigured } from "../../lib/stripe";
 import type { AppEnv } from "../../types";
 
 /**
@@ -120,6 +121,11 @@ financeCreditNotesRouter.post("/", requireFinance, async (c) => {
   if (error) {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
+  }
+  // An open payment link was minted for the old balance; paying it would
+  // overpay. Best effort: the credit note itself is already posted.
+  if (stripeConfigured(c.env)) {
+    await expireOpenCheckoutLinks(stripeClient(c.env), adminClient(c.env), (data as { order_id: string }).order_id).catch(() => false);
   }
   return c.json(data, 201);
 });
