@@ -814,6 +814,8 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // (a sister company, a lender) is billed on Other debtors; a loan in,
       // other income or money against those invoices is an Other receipt.
       // 0729 — cancelled orders whose customer money is still held. Read only.
+      // 0730 — a credit note to a customer, against one Sales Invoice.
+      { key: "customer-credit-notes", label: "Customer Credit Notes", icon: ReceiptText, financePath: "/finance/customer-credit-notes", section: "Receivables" },
       { key: "cancelled-money", label: "Cancelled orders holding money", icon: Undo2, financePath: "/finance/cancelled-money", section: "Receivables" },
       { key: "other-debtors", label: "Other debtors", icon: Users, financePath: "/finance/other-debtors", section: "Receivables" },
       { key: "other-receipts", label: "Other receipts", icon: HandCoins, financePath: "/finance/other-receipts", section: "Receivables" },

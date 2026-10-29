@@ -45,7 +45,7 @@ export default function FinanceCreditNotes() {
   return (
     <ListPageShell
       register
-      title="Credit Notes"
+      title="Customer Credit Notes"
       actions={<Button variant="primary" onClick={() => setIssuing(true)}>Issue credit note</Button>}
     >
       <div className="bg-card rounded-md border border-border overflow-auto">
