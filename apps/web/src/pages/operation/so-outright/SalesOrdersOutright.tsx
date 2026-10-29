@@ -636,7 +636,7 @@ export default function SalesOrdersOutright() {
         ) : (
           <div
             ref={toolbarRef}
-            className={`flex h-9 min-w-0 flex-nowrap items-center ${compact >= 3 ? "gap-1" : "gap-2"}`}
+            className={`flex h-9 min-w-0 flex-nowrap items-center max-md:h-auto max-md:min-h-9 max-md:flex-wrap ${compact >= 3 ? "gap-1" : "gap-2"}`}
             data-testid="outright-toolbar"
           >
             {!summaryOpen && <CShowPanelButton label="Summary" compact={compact >= 1} onShow={() => setSummaryOpen(true)} />}
