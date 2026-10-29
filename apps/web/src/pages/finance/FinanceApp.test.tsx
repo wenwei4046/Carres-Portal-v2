@@ -76,6 +76,13 @@ vi.mock("../principal/PrincipalDealers", () => ({
     <div data-testid="dealers-page">{financeView ? "finance view" : "principal view"}</div>
   ),
 }));
+// Which credit-note register a path opens is all that matters here (#2144).
+vi.mock("./payables/SupplierCreditNotes", () => ({
+  default: () => <div data-testid="supplier-credit-notes" />,
+}));
+vi.mock("./FinanceCreditNotes", () => ({
+  default: () => <div data-testid="customer-credit-notes" />,
+}));
 const auth = vi.hoisted(() => ({ role: "finance" as string }));
 vi.mock("@/lib/auth", () => ({
   useAuth: (selector: (s: { role: string; user: { id: string } | null }) => unknown) =>
@@ -96,6 +103,15 @@ function show(path: string) {
 }
 
 describe("Finance routing", () => {
+  it("/finance/credit-notes opens the supplier register; /finance/customer-credit-notes the customer one", () => {
+    show("/finance/credit-notes");
+    expect(screen.getByTestId("supplier-credit-notes")).toBeInTheDocument();
+    expect(screen.queryByTestId("customer-credit-notes")).not.toBeInTheDocument();
+    cleanup();
+    show("/finance/customer-credit-notes");
+    expect(screen.getByTestId("customer-credit-notes")).toBeInTheDocument();
+    expect(screen.queryByTestId("supplier-credit-notes")).not.toBeInTheDocument();
+  });
   it("opens Payment Records at /finance/payments", () => {
     show("/finance/payments");
     expect(screen.getByTestId("payment-records-destination-header")).toBeInTheDocument();

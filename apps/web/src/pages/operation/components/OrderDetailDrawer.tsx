@@ -69,6 +69,8 @@ import {
   type OpsOrderControl,
   type OrderActionTrack,
   requiredPaymentReference,
+  assignedLogisticsIdOf,
+  scheduledDeliveryOf,
 } from "@carres/shared";
 import { apiFetch, ApiError } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
@@ -96,6 +98,7 @@ import {
   useLoanSofa,
   useOperationSuppliers,
   useDeliveryPartners,
+  useOrderDeliveryArrangements,
   useUpdateOrder,
   useOrderPayments,
   useRecordPayment,
@@ -199,6 +202,7 @@ import OrderJourneyHeader, {
 import DelayPlanningPanel from "./DelayPlanningPanel";
 import OrderActionList from "./OrderActionList";
 import TopUpDepositModal from "@/pages/dealer/order-actions/TopUpDepositModal";
+import { collectByIso, collectByPassed } from "../collect-by";
 
 /**
  * OrderDetailDrawer — slide-in panel from the right edge that shows full
@@ -1445,9 +1449,29 @@ function DrawerBody({
   // The order's assigned logistic NAME (ops_assigned_logistic is a partner id) —
   // drives the default stock Location (final consolidation point, not supplier).
   const { data: partnersData } = useDeliveryPartners();
+  // Delivery's whole-order arrangement (leg 0) is what the Monitor and the DO
+  // read. The partner and the day come from the SAME shared readers, so this
+  // drawer cannot say "Logistics not assigned" while the Monitor names one.
+  const arrangementsQ = useOrderDeliveryArrangements(order.id);
+  const arrangement = arrangementsQ.data?.arrangements.find((a) => a.leg === 0) ?? null;
+  const assignedLogisticId = assignedLogisticsIdOf({
+    arrangementPartnerId: arrangement?.partner_id,
+    orderPartnerId: order.delivery_partner_id,
+    triagePartnerId: order.ops_assigned_logistic,
+  });
+  const scheduled = scheduledDeliveryOf({
+    arrangement: arrangement
+      ? { confirmedDate: arrangement.confirmed_date, confirmedTime: arrangement.confirmed_time }
+      : null,
+    booking: {
+      stage: form.control?.booking_stage ?? null,
+      confirmedDate: form.control?.confirmed_date ?? null,
+      confirmedSlot: form.control?.confirmed_time_slot ?? null,
+    },
+  });
   const assignedLogisticName =
     (partnersData?.partners ?? []).find(
-      (p) => p.id === order.ops_assigned_logistic,
+      (p) => p.id === assignedLogisticId,
     )?.name ?? null;
   // Loaners against this order (migration 0209 + generalized 0217). A loan is
   // "live" while out (on_loan) OR a supplier borrow still owed back.
@@ -1521,15 +1545,9 @@ function DrawerBody({
         ).split(", ")[0]
       : null;
   // Collect-before-delivery reminder dates (Jess): ideal collect ≥7 days before the
-  // logistic ETA (delivery date); last-call at ETA−1 (after which delivery holds).
-  const deliveryMs =
-    !order.delivery_date_tbd && order.delivery_date
-      ? new Date(order.delivery_date).getTime()
-      : null;
-  const collectByLabel =
-    deliveryMs !== null
-      ? fmtDate(new Date(deliveryMs - 7 * 86_400_000).toISOString().slice(0, 10))
-      : null;
+  // logistic ETA (delivery date), floored at the day the order was placed.
+  const collectByDate = collectByIso(order.delivery_date, !!order.delivery_date_tbd, order.placed_at);
+  const collectByLabel = collectByDate ? fmtDate(collectByDate) : null;
   // (lastCallLabel dropped with the old hold/warn strip — the §3.2 delivery-eve
   //  flag + the step-3 On-hold alert row carry the last-call signal now.)
   // Readiness per goods line (locked vocab): Ready (free stock ≥ qty) → Waiting
@@ -1794,8 +1812,7 @@ function DrawerBody({
   const balanceDue = money.outstanding;
   // Collect-by = delivery − 7d (the date collectByLabel shows) — past it and
   // still owing ⇒ the dial family reads Overdue.
-  const collectByPast =
-    deliveryMs !== null && Date.now() > deliveryMs - 7 * 86_400_000;
+  const collectByPast = collectByPassed(collectByDate);
   // Payment status dial family (STATUS-STANDARD §1): Unpaid / Deposit /
   // Overdue / Paid. "Sent" is omitted — no invoice-sent signal exists today.
   const payStatus: "Unpaid" | "Deposit" | "Late" | "Paid" | null = !totalSet
@@ -1972,6 +1989,8 @@ function DrawerBody({
   // LOGISTICS — green booked or >3 days left · amber ≤3 days & no date · red
   // deadline passed & no date confirmed.
   const bookedEta = form.control?.logistic_eta ?? null;
+  // Any day on record — the scheduled one first, else the carrier's own.
+  const deliveryDay = scheduled.iso ?? bookedEta;
 
   // ═══ Detail tabs (Jess 2026-07-17) — Items+Warehouse share one tab. ═══
   const [tab, setTab] = useState<DrawerTab>("items");
@@ -2271,7 +2290,7 @@ function DrawerBody({
     chaseStamp.mutate({ last_chased_at: new Date().toISOString() });
   };
   const logisticTone: KpiTone =
-    pipelineStatus === "completed" || bookedEta
+    pipelineStatus === "completed" || deliveryDay
       ? "success"
       : daysToDelivery === null
         ? "neutral"
@@ -2361,7 +2380,7 @@ function DrawerBody({
       onOpen: () => setTab("items"),
     };
   });
-  if (chasePartnerName && !deliveredDone && (!bookedEta || overDeadline)) {
+  if (chasePartnerName && !deliveredDone && (!deliveryDay || overDeadline)) {
     const lateDays = daysToDelivery !== null && daysToDelivery < 0 ? -daysToDelivery : null;
     chaseRows.push({
       key: "logistic",
@@ -2369,7 +2388,7 @@ function DrawerBody({
       // A fact may state an ABSENCE ("no date confirmed") but never a to-do
       // word — "not booked" is banned (C1, Jess 2026-07-27).
       sub: overDeadline
-        ? `${bookedEta ? `logistics said ${fmtDate(bookedEta).split(",")[0]}` : "no date confirmed"} · ${lateDays}d late`
+        ? `${deliveryDay ? `${scheduled.iso ? "scheduled" : "logistics said"} ${fmtDate(deliveryDay).split(",")[0]}` : "no date confirmed"} · ${lateDays}d late`
         : `no date confirmed · due ${deadlineLabel}`,
       urgency: overDeadline ? "overdue" : "attention",
       onAct: (tone) => copyChase("logistic", tone),
@@ -2439,7 +2458,7 @@ function DrawerBody({
     });
   }
   // 🚚 DELIVERY — a fact may state an ABSENCE but never a to-do word (C1).
-  if (!deliveredDone && !bookedEta) {
+  if (!deliveredDone && !deliveryDay) {
     currentIssues.push({
       key: "delivery-nodate",
       track: "delivery",
@@ -4099,16 +4118,11 @@ function DrawerBody({
                   // for the CUSTOMER's confirmation; a logistics date alone must
                   // never read as done — that mislabel is the 68% stuck-order
                   // root the two-stage booking exists to fix.
-                  if (
-                    form.control?.booking_stage === "confirmed" &&
-                    form.control.confirmed_date
-                  )
+                  if (scheduled.iso)
                     return (
                       <MiniBadge tone="ready">
-                        confirmed {fmtDateShort(form.control.confirmed_date)}
-                        {form.control.confirmed_time_slot
-                          ? ` · ${shortSlot(form.control.confirmed_time_slot)}`
-                          : ""}
+                        confirmed {fmtDateShort(scheduled.iso)}
+                        {scheduled.time ? ` · ${shortSlot(scheduled.time)}` : ""}
                       </MiniBadge>
                     );
                   const eta = form.control?.logistic_eta ?? null;
@@ -4123,7 +4137,7 @@ function DrawerBody({
                   // that hides a to-do inside a fact ("need" = the reader still
                   // has to work out what to do). The badge states the ACTION
                   // that closes the gap instead, with the party named.
-                  if (order.ops_assigned_logistic)
+                  if (assignedLogisticId)
                     return (
                       <MiniBadge tone="waiting">
                         {deliveryDateGapFact(chasePartnerName)}
@@ -4154,9 +4168,7 @@ function DrawerBody({
                 // exists · logistics assigned with no date at all = the ACTION
                 // that closes it (C1 banned the gap-word that used to sit here)
                 // · Delivered = done (grey, never alarms).
-                const bookingConfirmed =
-                  form.control?.booking_stage === "confirmed" &&
-                  !!form.control.confirmed_date;
+                const bookingConfirmed = !!scheduled.iso;
                 const statusWord = deliveredDone
                   ? "Delivered"
                   : onHold
@@ -4167,7 +4179,7 @@ function DrawerBody({
                         ? "Confirmed"
                         : eta
                           ? "Not confirmed"
-                          : order.ops_assigned_logistic
+                          : assignedLogisticId
                             ? deliveryDateGapFact(chasePartnerName)
                             : "Logistics not assigned";
                 return (
@@ -4247,7 +4259,7 @@ function DrawerBody({
                       customerAddress={order.customer_address ?? null}
                       deliveryDate={order.delivery_date}
                       proceedDate={order.proceed_date ?? null}
-                      opsAssignedLogistic={order.ops_assigned_logistic ?? null}
+                      opsAssignedLogistic={assignedLogisticId}
                       form={form}
                       hideRegion
                       hideDeadline
@@ -4338,7 +4350,7 @@ function DrawerBody({
                       )}
                       {/* Confirm delivery date — the two message tones:
                           Remind (gentle, pre-deadline) / Call (firm). */}
-                      {order.ops_assigned_logistic && !deliveredDone && (
+                      {assignedLogisticId && !deliveredDone && (
                         <DRow k="Confirm delivery date">
                           <span className="flex items-center gap-1.5">
                             <Btn
@@ -4374,7 +4386,17 @@ function DrawerBody({
                           // here and not on the drawer, so S4 survives.
                           key={order.id}
                           orderId={order.id}
-                          control={form.control}
+                          // The day Delivery scheduled shows here as booked too (one reader).
+                          control={
+                            scheduled.source === "arrangement"
+                              ? ({
+                                  ...form.control,
+                                  booking_stage: "confirmed",
+                                  confirmed_date: scheduled.iso,
+                                  confirmed_time_slot: scheduled.time,
+                                } as OpsOrderControl)
+                              : form.control
+                          }
                           doNumber={order.do_number ?? null}
                           goodsReadyHint={allReceived}
                           balanceOwingHint={balanceOwing}
@@ -4513,7 +4535,7 @@ function DrawerBody({
                     orderId={order.id}
                     stops={order.delivery_stops ?? null}
                     fallbackPartnerId={
-                      order.ops_assigned_logistic ?? order.delivery_partner_id
+                      assignedLogisticId
                     }
                   />
                 </div>
@@ -7031,7 +7053,9 @@ function ActionsMenu({
                     }}
                   />
                 )}
-                {pipelineStatus === "scheduled" && (
+                {/* A live DO is what delivery needs — an in-stock order reads
+                    "ready" (goods outrank scheduled) and still needs this. */}
+                {(pipelineStatus === "scheduled" || (!!order.do_number && order.status !== "cancelled")) && (
                   <MenuItem
                     icon={<CheckCircle2 className="w-4 h-4" />}
                     // C3 reported this as C7's rename and read it as

@@ -159,7 +159,7 @@ async function recordContact(
 /** A delivery day is never a Sunday or a Malaysian public holiday (§8.6) —
  *  the holidays of the ONE Delivery calendar (the stored Selangor calendar,
  *  else the built-in list), never the Office list. */
-function refusedDeliveryDay(dateIso: string, calendar: DeliveryCalendar): string | null {
+export function refusedDeliveryDay(dateIso: string, calendar: DeliveryCalendar): string | null {
   const refusal = deliveryDayRefusal(calendar, dateIso);
   if (refusal === "sunday") return "Sunday is not a delivery day";
   if (refusal === "holiday") return "A Malaysian public holiday is not a delivery day";
@@ -696,6 +696,22 @@ deliveryArrangementsRouter.get("/:orderId", requireOperationOrPrincipal, async (
   });
 });
 
+/**
+ * Leg 0 is the whole order. The drawer, the invoice page, the booking door and
+ * the DO mint (0356) still read `orders.ops_assigned_logistic`, so Delivery's
+ * whole-order carrier is mirrored there — otherwise those screens say
+ * `Logistics not assigned` for an order the Monitor shows as assigned.
+ */
+async function mirrorWholeOrderPartner(
+  sb: ReturnType<typeof adminClient>,
+  orderIds: string[],
+  partnerId: string | null,
+) {
+  if (orderIds.length === 0) return null;
+  const { error } = await sb.from("orders").update({ ops_assigned_logistic: partnerId }).in("id", orderIds);
+  return error;
+}
+
 /** The current partner on each named scope — arrangement first, order as fallback. */
 async function currentPartners(
   sb: ReturnType<typeof adminClient>,
@@ -854,6 +870,16 @@ deliveryArrangementsRouter.post("/assign", requireOperationOrPrincipal, async (c
     if (event === "changed") await revokeLinksForOtherPartners(sb, s.orderId, s.leg, partnerId, userId);
   }
 
+  const mirrorErr = await mirrorWholeOrderPartner(
+    sb,
+    scopes.filter((s) => s.leg === 0).map((s) => s.orderId),
+    partnerId,
+  );
+  if (mirrorErr) {
+    const m = mapPgError(mirrorErr);
+    return c.json(m.body, m.status);
+  }
+
   return c.json({ assigned: results.length, partner: partner.name, results });
 });
 
@@ -881,7 +907,7 @@ deliveryArrangementsRouter.put("/:orderId", requireOperationOrPrincipal, async (
 
   const { data: order, error: orderErr } = await sb
     .from("orders")
-    .select("id, delivery_date, delivery_date_tbd")
+    .select("id, delivery_date, delivery_date_tbd, do_number")
     .eq("id", orderId)
     .maybeSingle();
   if (orderErr) {
@@ -1011,6 +1037,38 @@ deliveryArrangementsRouter.put("/:orderId", requireOperationOrPrincipal, async (
       return c.json(m.body, m.status);
     }
     contact = contactRow;
+  }
+
+  if (leg === 0) {
+    const mirrorErr = await mirrorWholeOrderPartner(sb, [orderId], nextPartner);
+    if (mirrorErr) {
+      const m = mapPgError(mirrorErr);
+      return c.json(m.body, m.status);
+    }
+  }
+
+  /* An undated whole-order DO (opened before the day was agreed) takes the day
+     just scheduled and keeps its number — the same fill the booking door does
+     (0710). FAIL-SOFT: the arrangement is already saved. */
+  if (leg === 0 && input.confirmedDate && order.do_number) {
+    try {
+      const { data: doc } = await sb
+        .from("ops_delivery_orders")
+        .select("id")
+        .eq("do_number", order.do_number as string)
+        .is("voided_at", null)
+        .is("delivery_date", null)
+        .maybeSingle();
+      if (doc) {
+        await userClient(c.env, c.var.auth.jwt).rpc("delivery_document_date_fill", {
+          p_do_id: (doc as { id: string }).id,
+          p_date: input.confirmedDate,
+          p_time_slot: input.confirmedTime ?? null,
+        });
+      }
+    } catch {
+      /* not dated yet — the next save tries again */
+    }
   }
 
   /* 0491 — A JOURNEY LEG ISSUES ITS OWN DOCUMENT the moment its partner and

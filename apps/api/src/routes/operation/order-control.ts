@@ -4,6 +4,7 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import {
   updateOpsOrderControlInput,
+  laterThanRequested,
   confirmBookingInput,
   delayDecisionInput,
   signDeliveryPhotoUploadInput,
@@ -51,6 +52,7 @@ import { requireDuty } from "../../lib/duties";
 import { mapPgError, fail } from "../../lib/route-helpers";
 import { adminClient, userClient } from "../../lib/supabase";
 import { readDeliveryCalendar } from "../../lib/delivery-calendar";
+import { refusedDeliveryDay } from "./delivery-arrangements";
 import type { AppEnv } from "../../types";
 
 /**
@@ -426,6 +428,40 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
     .single();
   if (error) return fail(c, error);
 
+  // Delivery's whole-order arrangement outranks this overlay in the shared
+  // day reader (scheduledDeliveryOf), so a day agreed here moves it too —
+  // otherwise the drawer and the Monitor keep the old day. Only an existing
+  // row, only a whole-order booking, and never a day the arrangement door would
+  // refuse (later than requested needs reply proof there; holidays). FAIL-SOFT
+  // like the writes below.
+  try {
+    const admin = adminClient(c.env);
+    const { data: ord } = await admin
+      .from("orders")
+      .select("delivery_date, delivery_date_tbd")
+      .eq("id", idCheck.data)
+      .maybeSingle();
+    const requested = ord?.delivery_date_tbd ? null : ((ord?.delivery_date as string | null) ?? null);
+    const { calendar } = await readDeliveryCalendar(sb);
+    const mayMirror =
+      scope === null &&
+      !laterThanRequested(confirmedDate, requested) &&
+      !refusedDeliveryDay(confirmedDate, calendar);
+    if (mayMirror) await admin
+      .from("ops_delivery_arrangements")
+      .update({
+        confirmed_date: confirmedDate,
+        confirmed_time: confirmedTimeSlot ?? null,
+        updated_at: new Date().toISOString(),
+        updated_by: auth.id,
+        updated_via: "operation",
+      })
+      .eq("order_id", idCheck.data)
+      .eq("leg", 0);
+  } catch {
+    // The booking stands; the Monitor shows the arrangement's day until the next save.
+  }
+
   // T8 — a split is the fact an operator must be able to find later ("why did
   // only the bed set go?"). The 0282 trigger logs the scope CHANGE; this adds
   // the human sentence naming what is still owed. FAIL-SOFT (same door and
@@ -499,11 +535,13 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
           p_time_slot: confirmedTimeSlot ?? null,
         });
       } else if (doc && !doc.voided_at && !sameBooking) {
-        const { data: runs } = await sb
-          .from("delivery_attempts")
-          .select("result")
-          .eq("do_number", activeNumber);
-        const hasRun = (runs ?? []).length > 0;
+        const [{ data: runs }, { data: handovers, error: handoverErr }] = await Promise.all([
+          sb.from("delivery_attempts").select("result").eq("do_number", activeNumber),
+          sb.from("delivery_handover_events").select("id").eq("delivery_order_id", doc.id).in("kind", ["handed_over", "received_by_logistics"]).limit(1),
+        ]);
+        // Goods already handed to the carrier mean the trip ran: never void that DO.
+        // An unreadable handover read counts as run too — voiding is the irreversible side.
+        const hasRun = (runs ?? []).length > 0 || (handovers ?? []).length > 0 || !!handoverErr;
         if (!hasRun) {
           // Un-run document: the trip it authorised no longer exists.
           await sb.rpc("delivery_order_void", {

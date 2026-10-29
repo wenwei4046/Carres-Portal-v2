@@ -291,6 +291,11 @@ describe("STOCK reads the Units bound to the line", () => {
     );
     expect(lines.map((l) => l.unitCodes)).toEqual([["U1"], ["U2"]]);
   });
+
+  it("SO-1372: an accessory with no Unit and no PO is ready, as the DO gate reads it", () => {
+    const [line] = routeGoodsLinesOf(facts({ lines: [{ id: "L1", sku: "Memory Foam Pillow", label: "x", qty: 1 }] }));
+    expect(line).toMatchObject({ readyQty: 1, uncoveredQty: 0, shortBecause: null, readyStockQty: 0 });
+  });
 });
 
 describe("PURCHASING reads the send mark of the CURRENT version (Purchasing §5.6)", () => {

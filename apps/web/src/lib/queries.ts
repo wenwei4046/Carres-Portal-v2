@@ -7576,6 +7576,8 @@ export function useConfirmBooking(
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: qk.operation.orderControl(orderId), exact: true });
       await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      // The booking door moves Delivery's arrangement day too.
+      await qc.invalidateQueries({ queryKey: ["operation", "delivery-arrangements"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -7752,6 +7754,19 @@ export function useDeliveryArrangements() {
     queryKey: ["operation", "delivery-arrangements"],
     queryFn: () =>
       apiFetch<DeliveryArrangementsPayload>("/api/operation/delivery-arrangements"),
+    staleTime: 30_000,
+  });
+}
+
+/** One order's arrangements — the same door, narrowed (`?order=`). Under the
+ *  list's key so every Delivery save refreshes it too. */
+export function useOrderDeliveryArrangements(orderId: string) {
+  return useQuery<DeliveryArrangementsPayload, ApiError>({
+    queryKey: ["operation", "delivery-arrangements", "order", orderId],
+    queryFn: () =>
+      apiFetch<DeliveryArrangementsPayload>(
+        `/api/operation/delivery-arrangements?order=${encodeURIComponent(orderId)}`,
+      ),
     staleTime: 30_000,
   });
 }

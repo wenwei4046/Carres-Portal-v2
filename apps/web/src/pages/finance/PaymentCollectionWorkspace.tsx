@@ -244,7 +244,10 @@ function InvoiceObject({ invoice, facts: f, onAsk, onResult, correctionInFlight,
     }, 0);
     return () => clearTimeout(timer);
   }, [focus]);
-  const partner = invoice.orders?.delivery_partners?.name ?? invoice.orders?.ops_assigned_logistic ?? null;
+  // Delivery's own arrangement (leg 0) is the carrier the Monitor names; the
+  // order's own company is the fallback. (ops_assigned_logistic is an ID, never a name.)
+  const arrangedName = invoice.orders?.ops_delivery_arrangements?.find((a) => a.leg === 0)?.delivery_partners?.name ?? null;
+  const partner = arrangedName ?? invoice.orders?.delivery_partners?.name ?? null;
   const contact = invoice.orders?.delivery_partners?.contact ?? null;
   const payments = (invoice.orders?.order_payments ?? [])
     .slice()
