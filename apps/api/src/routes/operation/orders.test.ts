@@ -1409,11 +1409,9 @@ describe("POST /api/operation/orders/:id/attach-do", () => {
   };
 
   // The live (not voided) document lookup the route runs before it draws.
-  const liveDoc = (doNumber: string | null) => () => {
-    const q = {
-      select: () => q, eq: () => q, is: () => q, order: () => q, limit: () => q,
-      maybeSingle: () => Promise.resolve({ data: doNumber ? { do_number: doNumber } : null, error: null }),
-    };
+  const liveDoc = (doNumber: string | null, voided = false) => () => {
+    const rows = doNumber ? [{ do_number: doNumber, voided_at: voided ? "2026-10-01" : null, issued_at: "2026-10-01" }] : [];
+    const q = { select: () => q, eq: () => Promise.resolve({ data: rows, error: null }) };
     return q;
   };
 
@@ -1501,6 +1499,19 @@ describe("POST /api/operation/orders/:id/attach-do", () => {
       "operation_attach_do_and_deliver",
       expect.objectContaining({ p_do_number: "DO2610-4075" }),
     );
+  });
+
+  it("a voided document is not attached: a fresh number is drawn", async () => {
+    const rpc = vi.fn().mockImplementation((fn: string) =>
+      Promise.resolve(fn === "delivery_document_number_draw" ? { data: "DO2610-9999", error: null } : { data: { id: ORDER_ID }, error: null }));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc, from: liveDoc("DO2610-4075", true) } as any);
+    const jwt = await makeJwt("operation");
+    const { doNumber: _omitted, ...withoutNumber } = VALID;
+    await app.fetch(new Request(`http://t/api/operation/orders/${ORDER_ID}/attach-do`, {
+      method: "POST", headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+      body: JSON.stringify(withoutNumber) }), env);
+    expect(rpc).not.toHaveBeenCalledWith("operation_attach_do_and_deliver", expect.objectContaining({ p_do_number: "DO2610-4075" }));
   });
 
   it("rejects when signed is false", async () => {

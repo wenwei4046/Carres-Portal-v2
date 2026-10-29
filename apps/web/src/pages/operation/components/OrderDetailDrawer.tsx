@@ -71,6 +71,7 @@ import {
   requiredPaymentReference,
   assignedLogisticsIdOf,
   scheduledDeliveryOf,
+  canMarkDelivered,
 } from "@carres/shared";
 import { apiFetch, ApiError } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
@@ -7055,7 +7056,7 @@ function ActionsMenu({
                 )}
                 {/* A live DO is what delivery needs — an in-stock order reads
                     "ready" (goods outrank scheduled) and still needs this. */}
-                {(pipelineStatus === "scheduled" || (!!order.do_number && order.status !== "cancelled")) && (
+                {(pipelineStatus === "scheduled" || canMarkDelivered(order)) && (
                   <MenuItem
                     icon={<CheckCircle2 className="w-4 h-4" />}
                     // C3 reported this as C7's rename and read it as

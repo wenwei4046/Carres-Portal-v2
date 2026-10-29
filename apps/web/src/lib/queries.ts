@@ -3176,6 +3176,8 @@ export interface operationOrderDetailOrder {
   proceed_date?: string | null;
   placed_at: string;
   do_number: string | null;
+  /** Embedded on the detail read; voided rows ride along so the UI applies the shared live rule. */
+  ops_delivery_orders?: { do_number: string; voided_at?: string | null; issued_at?: string | null }[];
   do_note: string | null;
   dispatched_at: string | null;
   delivered_at: string | null;
