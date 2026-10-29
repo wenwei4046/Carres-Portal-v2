@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { useApprovals, type ApprovalRow as ApprovalRowDto } from "@/lib/queries";
 import ApprovalRow from "./components/ApprovalRow";
 import ApprovalDrawer from "./components/ApprovalDrawer";
+import ReadFailed from "./components/ReadFailed";
+import Loading from "@/components/kit/Loading";
 
 type Filter = "pending" | "approved" | "rejected" | "all";
 
@@ -34,8 +36,19 @@ export default function PrincipalApprovals() {
     };
   }, [all.data]);
 
+  if (list.isError) {
+    return (
+      <div className="px-9 py-8">
+        <ReadFailed what="Approvals" onRetry={() => void list.refetch()} />
+      </div>
+    );
+  }
   if (list.isLoading || !list.data) {
-    return <div className="px-9 py-8 text-body text-muted-foreground">Loading…</div>;
+    return (
+      <div className="px-9 py-8">
+        <Loading variant="skeleton" lines={6} label="Loading approvals" />
+      </div>
+    );
   }
   const items = list.data.approvals;
 

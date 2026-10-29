@@ -18,6 +18,18 @@ import PrincipalSalesAnalysis from "./PrincipalSalesAnalysis";
 import ProductMaintenancePage from "@/pages/catalog/ProductMaintenancePage";
 import RentalSettingPage from "@/pages/rental/RentalSettingPage";
 
+const TAB_TITLES: Record<string, string> = {
+  dashboard: "Overview",
+  approvals: "Approvals",
+  dealers: "Dealers",
+  showrooms: "Showrooms",
+  partners: "Partners",
+  accounts: "Accounts",
+  audit: "Audit log",
+  "sales-analysis": "Sales analysis",
+  "rental-setting": "Rental setting",
+};
+
 /**
  * Principal shell — sidebar + main routing area. Mirrors the proto's tab-state
  * pattern (`React.useState("dashboard")`) rather than React Router segments,
@@ -41,6 +53,17 @@ export default function PrincipalApp() {
   useEffect(() => {
     if (urlTab) setTab(urlTab);
   }, [urlTab]);
+
+  // Browser tab title, the way ModuleHeader does it. Tabs not listed (catalog,
+  // POS, new order) own their title or keep the default.
+  useEffect(() => {
+    const page = TAB_TITLES[tab];
+    if (!page) return;
+    document.title = `${page} · Admin · Carres`;
+    return () => {
+      document.title = "Carres Portal";
+    };
+  }, [tab]);
 
   return (
     <div

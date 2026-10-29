@@ -13,6 +13,8 @@ import {
   summarizeOverview,
   type Distribution,
 } from "@/lib/sales-analysis";
+import Loading from "@/components/kit/Loading";
+import ReadFailed from "./components/ReadFailed";
 
 /**
  * MAINTAIN → Sales analysis (POS-parity with the 2990s SalesAnalysis page).
@@ -68,6 +70,7 @@ export default function PrincipalSalesAnalysis() {
           value={months}
           onChange={(e) => setMonths(Number(e.target.value))}
           data-testid="sa-period"
+          aria-label="Period"
           className="rounded-md border border-base-300 bg-white px-3 py-2 text-body"
         >
           {PERIODS.map((p) => (
@@ -105,11 +108,9 @@ export default function PrincipalSalesAnalysis() {
       </div>
 
       {analyticsQ.isLoading ? (
-        <p className="text-body text-base-500 py-16 text-center">Loading analytics…</p>
+        <Loading variant="skeleton" lines={6} label="Loading analytics" />
       ) : analyticsQ.error ? (
-        <p className="text-body text-destructive py-16 text-center">
-          Couldn't load analytics: {(analyticsQ.error as Error).message}
-        </p>
+        <ReadFailed what="Sales analysis" onRetry={() => void analyticsQ.refetch()} />
       ) : orders.length === 0 ? (
         <p className="text-body text-base-500 py-16 text-center">
           No orders in this period yet.

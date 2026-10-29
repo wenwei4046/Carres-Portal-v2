@@ -206,6 +206,7 @@ export default function ApprovalDrawer({ approval, onClose }: Props) {
                   value={method}
                   onChange={(e) => setMethod(e.target.value as TopupMethod)}
                   data-testid="topup-method"
+                  aria-label="Method"
                   className="w-full px-2.5 py-2 border border-base-200 rounded text-meta outline-none mb-3 font-sans bg-white"
                 >
                   {TOPUP_METHODS.map((m) => (
@@ -223,6 +224,7 @@ export default function ApprovalDrawer({ approval, onClose }: Props) {
                   onChange={(e) => setReference(e.target.value)}
                   placeholder="Bank slip / cheque no / txn ID…"
                   data-testid="topup-reference"
+                  aria-label={refWord ?? "Reference"}
                   className="w-full px-2.5 py-2 border border-base-200 rounded text-meta outline-none mb-3 font-sans"
                 />
               </>
@@ -234,6 +236,7 @@ export default function ApprovalDrawer({ approval, onClose }: Props) {
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder={isTopup ? "Why rejecting?" : "Reason or condition…"}
+              aria-label={isTopup ? "Reject reason" : "Note"}
               className="w-full px-2.5 py-2 border border-base-200 rounded text-meta resize-y outline-none mb-3 font-sans"
               style={{ minHeight: 60 }}
             />

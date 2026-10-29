@@ -2,6 +2,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queries";
 import { apiFetch } from "@/lib/api";
 import CreateLpAccountForm from "./components/CreateLpAccountForm";
+import Loading from "@/components/kit/Loading";
+import ReadFailed from "./components/ReadFailed";
 
 /**
  * Principal · operation Partners admin — Phase 4.5 Chunk 1 Task 22.
@@ -29,7 +31,7 @@ type LpRow = {
 
 export default function PrincipalPartners() {
   const qc = useQueryClient();
-  const { data: lps, isLoading } = useQuery({
+  const { data: lps, isLoading, isError, refetch } = useQuery({
     queryKey: qk.principal.partners(),
     queryFn: () => apiFetch<LpRow[]>("/api/principal/partners"),
   });
@@ -57,7 +59,9 @@ export default function PrincipalPartners() {
       <section>
         <h2 className="text-strong mb-2.5">All LPs</h2>
         {isLoading ? (
-          <p className="text-body text-base-600">Loading…</p>
+          <Loading variant="skeleton" label="Loading partners" />
+        ) : isError ? (
+          <ReadFailed what="Partners" onRetry={() => void refetch()} />
         ) : !lps || lps.length === 0 ? (
           <p className="text-body text-base-500">
             No operation partners yet.

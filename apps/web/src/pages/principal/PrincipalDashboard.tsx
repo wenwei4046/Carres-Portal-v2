@@ -4,6 +4,8 @@ import DealerLeaderboard from "./components/DealerLeaderboard";
 import ApprovalsTile from "./components/ApprovalsTile";
 import AlertsTile from "./components/AlertsTile";
 import RecentActivityTile from "./components/RecentActivityTile";
+import ReadFailed from "./components/ReadFailed";
+import Loading from "@/components/kit/Loading";
 
 interface Props {
   setTab: (t: string) => void;
@@ -16,17 +18,21 @@ interface Props {
  * scope for Phase 3 MVP — comes back in Phase 5+.
  */
 export default function PrincipalDashboard({ setTab }: Props) {
-  const { data, isLoading, isError, error } = usePrincipalDashboard();
+  const { data, isLoading, isError, refetch } = usePrincipalDashboard();
 
-  if (isLoading || !data) {
-    return <div className="px-9 py-8 text-body text-muted-foreground">Loading…</div>;
-  }
+  // Error first: on a failed read `data` is undefined, so the loading branch
+  // would otherwise spin forever.
   if (isError) {
     return (
       <div className="px-9 py-8">
-        <p className="rounded-md bg-destructive/10 px-3 py-2 text-body text-destructive">
-          Couldn&rsquo;t load dashboard: {(error as Error).message}
-        </p>
+        <ReadFailed what="The overview" onRetry={() => void refetch()} />
+      </div>
+    );
+  }
+  if (isLoading || !data) {
+    return (
+      <div className="px-9 py-8">
+        <Loading variant="skeleton" lines={6} label="Loading overview" />
       </div>
     );
   }

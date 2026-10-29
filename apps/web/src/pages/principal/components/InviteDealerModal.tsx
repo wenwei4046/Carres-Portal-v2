@@ -130,6 +130,7 @@ function Field({
         value={v}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        aria-label={label}
         className="w-full px-3 py-2.5 border border-base-200 rounded text-body outline-none box-border"
       />
     </div>
