@@ -130,7 +130,7 @@ partnerPodRouter.post("/:threadId/attach", async (c) => {
   if (auth.role !== "partner") {
     throw new HTTPException(403, { message: "Partner role required" });
   }
-  const threadId = c.req.param("threadId");
+  const threadId = c.req.param("threadId")?.toLowerCase();
   if (!threadId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(threadId)) {
     return c.json(
       { error: "invalid_id", code: "invalid_param", message: "threadId must be a uuid" },
@@ -148,6 +148,15 @@ partnerPodRouter.post("/:threadId/attach", async (c) => {
         message: issue?.message ?? "invalid input",
         field: issue?.path.join(".") ?? "unknown",
       },
+      422,
+    );
+  }
+
+  // 0731: proof binds to this thread — the same rule partner_attach_pod
+  // enforces (and the handover route's own prefix check).
+  if (![parsed.data.podPath, parsed.data.signaturePath].every((p) => p.startsWith(`${threadId}/`))) {
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: "File does not belong to this delivery" },
       422,
     );
   }

@@ -12,16 +12,18 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  *                                so RLS and every hr_* DEFINER function deny
  *                                them from the next query onward, and the auth
  *                                hook stops minting a role at the next login.
- *   2. GoTrue admin signOut    — kills the refresh tokens NOW. Without it the
- *                                access token they are already holding lives out
- *                                its ~1h. That residual is the documented,
- *                                accepted gap.
+ *   2. GoTrue admin ban        — (0731) no new token and no refresh from NOW;
+ *                                re-enable lifts it. The access token they are
+ *                                already holding lives out its ~1h, and the
+ *                                hook (0731) strips the role from any token
+ *                                minted for a non-active row. That residual is
+ *                                the documented, accepted gap.
  *   3. audit                   — one row, always.
  *
  * Step 2's failure is LOGGED, never swallowed. It used to be an empty catch, and
  * that is exactly how samantha@carres.com sat "disabled" with a live session for
  * two months (found 2026-07-26). The status flip has still applied by then, so a
- * signOut failure degrades to "revoked at the next query" rather than "not
+ * ban failure degrades to "revoked at the next query" rather than "not
  * revoked" — but it must be visible.
  *
  * NOTE the deliberate asymmetry: HR gets this one power, not the whole principal
@@ -32,7 +34,7 @@ export type SetAccountStatusResult =
   | { ok: true; email: string; name: string }
   | {
       ok: false;
-      code: "not_found" | "cannot_disable_principal" | "status_update_failed";
+      code: "not_found" | "cannot_disable_principal" | "status_update_failed" | "unban_failed";
       message: string;
     };
 
@@ -76,21 +78,32 @@ export async function setAccountStatus(
     return { ok: false, code: "status_update_failed", message: upd.error.message };
   }
 
-  if (status === "disabled") {
-    try {
-      await admin.auth.admin.signOut(userId);
-    } catch (err) {
-      console.log(
-        JSON.stringify({
-          event: "disable_signout_failed",
-          userId,
-          email: target.data.email,
-          actorRole,
-          message: err instanceof Error ? err.message : String(err),
-          note: "status flip still applied; RLS denies from the next query (0266)",
-        }),
-      );
-    }
+  // 0731: a ban stops GoTrue issuing or refreshing tokens. signOut(userId) was
+  // a no-op — it takes the user's JWT, not their id — and it RETURNS its error.
+  const ban = await admin.auth.admin
+    .updateUserById(userId, { ban_duration: status === "disabled" ? "876000h" : "none" })
+    .catch((err: unknown) => ({ error: err }));
+  if (ban.error && status === "active") {
+    // A failed unban would leave an "active" account GoTrue still refuses:
+    // put the flag back so the admin sees the failure and can retry.
+    await admin.from("app_users").update({ status: "disabled" }).eq("id", userId);
+    return {
+      ok: false,
+      code: "unban_failed",
+      message: "Could not lift the login ban; the account is still disabled. Try again.",
+    };
+  }
+  if (ban.error) {
+    console.log(
+      JSON.stringify({
+        event: status === "disabled" ? "disable_ban_failed" : "enable_unban_failed",
+        userId,
+        email: target.data.email,
+        actorRole,
+        message: ban.error instanceof Error ? ban.error.message : String(ban.error),
+        note: "status flip still applied; RLS denies from the next query (0266)",
+      }),
+    );
   }
 
   const verb = status === "disabled" ? "Disabled" : "Re-enabled";

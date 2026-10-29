@@ -98,6 +98,21 @@ describe("GET /api/auth/me", () => {
     expect(res.status).toBe(403);
   });
 
+  it("401 for a disabled account (token shape the 0731 hook mints: no role)", async () => {
+    // What custom_access_token_hook (0731) returns for a non-active app_users
+    // row: createUser's role/dealer_id stripped, provider fields kept.
+    const jwt = await makeJwt({
+      sub: "11111111-1111-1111-1111-000000000097",
+      email: "disabled@carres.com",
+      app_metadata: { provider: "email", providers: ["email"] },
+    });
+    const res = await app.fetch(
+      new Request("http://t/api/auth/me", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(401);
+  });
+
   it("401 when JWT has invalid role in app_metadata", async () => {
     const jwt = await makeJwt({
       sub: "11111111-1111-1111-1111-000000000099",
