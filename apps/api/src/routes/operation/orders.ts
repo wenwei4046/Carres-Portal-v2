@@ -37,6 +37,7 @@ import {
   SALES_ORDER_EDIT_HEADER_KEYS,
   type SalesOrderChangeSide,
   stockMatchKey,
+  liveDeliveryOrderNumber,
 } from "@carres/shared";
 import { findSalesOrderDocuments } from "../../lib/sales-order-document-search";
 import { findOrdersByPhone, phoneSearchDigits } from "../../lib/sales-order-phone-search";
@@ -1261,7 +1262,7 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
       // Portal's form, so every question the portal asks must ride this wire
       // or the field would render blank and a Save would null it: the 0200
       // demographics and the 0104 stair-carry count.
-      "id, so, source_ref, source_system, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_email, customer_address, customer_address_unknown, customer_address_line1, customer_address_line2, customer_address_city, customer_address_state, customer_address_postcode, customer_emergency, customer_billing, customer_billing_same, customer_race, customer_gender, customer_birthday, entry_data, delivery_date, delivery_date_tbd, proceed_date, delivery_floor, delivery_has_lift, delivery_stair_items, placed_at, do_number, do_note, dispatched_at, delivered_at, delivery_partner_id, ops_assigned_logistic, delivery_stops, dealer_id, outlet_id, invoice_no, invoiced_at, paid, credited, payment_method, installment_months, approval_code, payment_slip_url, salesperson_id, dealers(name), outlets(name), salespersons(name)",
+      "id, so, source_ref, source_system, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_email, customer_address, customer_address_unknown, customer_address_line1, customer_address_line2, customer_address_city, customer_address_state, customer_address_postcode, customer_emergency, customer_billing, customer_billing_same, customer_race, customer_gender, customer_birthday, entry_data, delivery_date, delivery_date_tbd, proceed_date, delivery_floor, delivery_has_lift, delivery_stair_items, placed_at, do_number, do_note, dispatched_at, delivered_at, delivery_partner_id, ops_assigned_logistic, delivery_stops, dealer_id, outlet_id, invoice_no, invoiced_at, paid, credited, payment_method, installment_months, approval_code, payment_slip_url, salesperson_id, dealers(name), outlets(name), salespersons(name), ops_delivery_orders(do_number, voided_at, issued_at)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -3582,6 +3583,16 @@ operationOrdersRouter.post("/:id/attach-do", requireOperation, async (c) => {
   // 0575 · An order with no document yet gets its number from the one
   // allocator — never a number the browser made up.
   let doNumber = parsed.data.doNumber;
+  if (!doNumber) {
+    // A live document is the number to attach even when the orders mirror
+    // column is empty; drawing a fresh one would name a paper that is not
+    // on the order, and the RPC would then refuse the handover check.
+    const { data: docs } = await sb
+      .from("ops_delivery_orders")
+      .select("do_number, voided_at, issued_at")
+      .eq("order_id", c.req.param("id"));
+    doNumber = liveDeliveryOrderNumber(docs) ?? undefined;
+  }
   if (!doNumber) {
     const drawn = await drawDeliveryOrderNumber(sb, c.req.param("id"));
     if (!drawn.ok) return c.json(drawn.body, drawn.status);
