@@ -251,7 +251,7 @@ export default function WarehouseUnitDetail({ unitCode: selectedCode, onBack, ba
             <Block title="Current work">
               {issuesQ.isLoading ? (
                 <Loading variant="skeleton" lines={2} label="Loading work for this Unit" />
-              ) : issuesQ.isError ? (
+              ) : issuesQ.isError && !issuesQ.data ? (
                 <p className="text-meta text-base-500">
                   Work for this Unit could not be loaded.{" "}
                   <button type="button" className="text-kit-blue-11 hover:underline" onClick={() => void issuesQ.refetch()}>Try again</button>
@@ -288,7 +288,7 @@ export default function WarehouseUnitDetail({ unitCode: selectedCode, onBack, ba
                   <h3 className="text-label uppercase tracking-[0.06em] text-kit-slate-11">Site visits</h3>
                   {physical.isLoading ? (
                     <p className="mt-1 text-meta text-base-500">Loading physical receipts and departures…</p>
-                  ) : physical.isError ? (
+                  ) : physical.isError && !physical.data ? (
                     <p className="mt-1 text-meta text-base-500">
                       Physical receipt and departure evidence could not be loaded.{" "}
                       <button type="button" className="text-kit-blue-11 hover:underline" onClick={() => void physical.refetch()}>Try again</button>
