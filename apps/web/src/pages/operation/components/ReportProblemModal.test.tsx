@@ -9,10 +9,10 @@ vi.mock("@/lib/api", async () => {
 });
 import { apiFetch } from "@/lib/api";
 
-function renderModal() {
+function renderModal(onClose: () => void = () => {}) {
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { mutations: { retry: false } } })}>
-      <ReportProblemModal open onClose={() => {}} />
+      <ReportProblemModal open onClose={onClose} />
     </QueryClientProvider>,
   );
 }
@@ -47,5 +47,26 @@ describe("ReportProblemModal", () => {
     fireEvent.change(screen.getByLabelText(/What went wrong/), { target: { value: "x" } });
     fireEvent.click(screen.getByTestId("report-problem-send"));
     expect(await screen.findByRole("alert")).toHaveTextContent("could not be reached");
+  });
+
+  it("cannot be closed with Esc while sending, so a late reply cannot leak into the next report", async () => {
+    let answer!: (v: unknown) => void;
+    vi.mocked(apiFetch).mockImplementation(() => new Promise((r) => { answer = r; }));
+    const onClose = vi.fn();
+    renderModal(onClose);
+    fireEvent.change(screen.getByLabelText(/What went wrong/), { target: { value: "x" } });
+    fireEvent.click(screen.getByTestId("report-problem-send"));
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    expect(onClose).not.toHaveBeenCalled();
+    answer({ code: "CARRES-0008" });
+    await waitFor(() => expect(screen.getByTestId("report-problem-sent")).toHaveTextContent("CARRES-0008"));
+  });
+
+  it("says it was sent even when no request number came back", async () => {
+    vi.mocked(apiFetch).mockResolvedValue({});
+    renderModal();
+    fireEvent.change(screen.getByLabelText(/What went wrong/), { target: { value: "x" } });
+    fireEvent.click(screen.getByTestId("report-problem-send"));
+    await waitFor(() => expect(screen.getByTestId("report-problem-sent")).toHaveTextContent(/^Sent to IT\.$/));
   });
 });

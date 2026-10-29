@@ -65,7 +65,7 @@ export default function ReportProblemModal({ open, onClose }: { open: boolean; o
   return (
     <Modal
       open={open}
-      onOpenChange={(o) => !o && close()}
+      onOpenChange={(o) => { if (!o && !busy) close(); }}
       title="Report a problem to IT"
       description={code !== null ? undefined : "Say what went wrong. IT will see the page you are on."}
       footer={
