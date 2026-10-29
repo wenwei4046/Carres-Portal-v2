@@ -1,4 +1,6 @@
-import { Link, NavLink } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, NavLink, useLocation } from "react-router-dom";
+import Drawer from "@/components/kit/Drawer";
 import { useAuth } from "@/lib/auth";
 import CarresLockup from "@/components/CarresLockup";
 import { useSupplierPos } from "@/lib/queries";
@@ -30,9 +32,13 @@ export default function SupplierSidebar() {
   const pendingCount = (pendingPos ?? []).filter(
     (p) => p.sup_status === "pending",
   ).length;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const { pathname } = useLocation();
+  useEffect(() => setMenuOpen(false), [pathname]); // a chosen page closes the drawer
 
   return (
-    <aside className="fixed left-0 top-0 bottom-0 w-[240px] bg-card border-r border-border flex flex-col py-[22px] z-10 overflow-auto">
+    <>
+    <aside className="hidden md:flex fixed left-0 top-0 bottom-0 w-[240px] bg-card border-r border-border flex-col py-[22px] z-10 overflow-auto">
       <div className="px-[22px] pb-[18px] border-b border-border">
         <Link to="/supplier/dashboard" className="block">
           <CarresLockup />
@@ -65,6 +71,49 @@ export default function SupplierSidebar() {
         </div>
       </Link>
     </aside>
+      {/* Below 768px the fixed sidebar would leave ~155px for content: a top bar
+          with a menu button opens the same links in a Drawer instead. */}
+      <header className="sticky top-0 z-10 flex h-12 items-center gap-2 border-b border-border bg-card px-3 md:hidden">
+        <button
+          type="button"
+          aria-label="Open menu"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen(true)}
+          className="grid h-9 w-9 place-items-center rounded-md text-body hover:bg-accent/50"
+        >
+          ☰
+        </button>
+        <Link to="/supplier/dashboard" className="block">
+          <CarresLockup />
+        </Link>
+      </header>
+      <Drawer open={menuOpen} onOpenChange={setMenuOpen} title="Menu">
+        <nav className="flex-1 px-3 pt-5 pb-1 flex flex-col gap-px">
+        {NAV_ITEMS.map((it) => (
+          <NavItem
+            key={it.to}
+            item={it}
+            badge={it.badgeKey === "pending" ? pendingCount : 0}
+          />
+        ))}
+      </nav>
+      <Link
+        to="/me"
+        title="Profile · Sign out"
+        className="px-[18px] pt-3 pb-1 border-t border-border flex items-center gap-2.5 hover:bg-accent/40 transition-colors"
+      >
+        <div className="w-[30px] h-[30px] rounded bg-primary text-primary-foreground grid place-items-center text-label font-bold flex-shrink-0">
+          {initials || "SP"}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-body font-medium truncate">{email || "Supplier"}</div>
+          <div className="text-label uppercase tracking-[0.06em] text-muted-foreground mt-px">
+            Supplier · Production
+          </div>
+        </div>
+      </Link>
+      </Drawer>
+    </>
   );
 }
 

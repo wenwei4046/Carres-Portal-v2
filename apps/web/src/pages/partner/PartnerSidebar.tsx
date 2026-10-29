@@ -1,4 +1,6 @@
-import { Link, NavLink } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, NavLink, useLocation } from "react-router-dom";
+import Drawer from "@/components/kit/Drawer";
 import { useAuth } from "@/lib/auth";
 import CarresLockup from "@/components/CarresLockup";
 
@@ -31,9 +33,13 @@ export default function PartnerSidebar() {
   const session = useAuth((s) => s.session);
   const email = session?.user?.email ?? "";
   const initials = email.slice(0, 2).toUpperCase();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const { pathname } = useLocation();
+  useEffect(() => setMenuOpen(false), [pathname]); // a chosen page closes the drawer
 
   return (
-    <aside className="fixed left-0 top-0 bottom-0 w-[220px] bg-card border-r border-border flex flex-col py-[22px] z-10">
+    <>
+    <aside className="hidden md:flex fixed left-0 top-0 bottom-0 w-[220px] bg-card border-r border-border flex-col py-[22px] z-10">
       <div className="px-[22px] pb-6 border-b border-border mb-[14px]">
         <Link to="/delivery-partner/dashboard" className="block">
           <CarresLockup />
@@ -60,6 +66,43 @@ export default function PartnerSidebar() {
         </div>
       </Link>
     </aside>
+      {/* Below 768px the fixed sidebar would leave ~155px for content: a top bar
+          with a menu button opens the same links in a Drawer instead. */}
+      <header className="sticky top-0 z-10 flex h-12 items-center gap-2 border-b border-border bg-card px-3 md:hidden">
+        <button
+          type="button"
+          aria-label="Open menu"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen(true)}
+          className="grid h-9 w-9 place-items-center rounded-md text-body hover:bg-accent/50"
+        >
+          ☰
+        </button>
+        <Link to="/delivery-partner/dashboard" className="block">
+          <CarresLockup />
+        </Link>
+      </header>
+      <Drawer open={menuOpen} onOpenChange={setMenuOpen} title="Menu">
+        <nav className="flex-1 px-3 pt-5 pb-1 flex flex-col gap-0.5">
+        {NAV_ITEMS.map((item) => (
+          <NavItem key={item.to} item={item} />
+        ))}
+      </nav>
+      <Link
+        to="/me"
+        title="Profile · Sign out"
+        className="px-[18px] pt-[14px] pb-1 border-t border-border flex items-center gap-2.5 hover:bg-accent/40 transition-colors"
+      >
+        <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground grid place-items-center text-meta font-semibold flex-shrink-0">
+          {initials}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-meta font-semibold truncate">{email}</div>
+          <div className="text-label text-muted-foreground">Delivery Partner</div>
+        </div>
+      </Link>
+      </Drawer>
+    </>
   );
 }
 
