@@ -101,6 +101,13 @@ describe("Service Cases — stage cards, My cases and the owner", () => {
     expect(screen.getByText("SC-C")).toBeInTheDocument();
   });
 
+  it("names the browser tab and leaves the h1 to the shell header", async () => {
+    mount();
+    expect(document.title).toBe("Service Cases · Carres");
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+    expect(await screen.findByText("SC-A")).toBeInTheDocument();
+  });
+
   it("names the case owner on the row", async () => {
     mount();
     expect(await screen.findByText("Shasha")).toBeInTheDocument();

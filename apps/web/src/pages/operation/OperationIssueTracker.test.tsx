@@ -41,6 +41,23 @@ describe("Issue Tracker workspace", () => {
     expect(screen.queryByText(/Issue Triage Duty · Ask supplier/)).not.toBeInTheDocument();
   });
 
+  it("names the browser tab", () => {
+    mount();
+    expect(document.title).toBe("Issue Tracker · Carres");
+  });
+
+  it("a failed read says so, shows no count, and Try again reads again", async () => {
+    apiFetch.mockReset();
+    apiFetch.mockRejectedValueOnce(new Error("offline"));
+    mount();
+    expect(await screen.findByText("Could not be loaded")).toBeInTheDocument();
+    expect(screen.queryByText("0 issues")).toBeNull();
+    apiFetch.mockResolvedValueOnce({ items: [], total: 0 });
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText("0 issues")).toBeInTheDocument();
+    expect(apiFetch).toHaveBeenCalledTimes(2);
+  });
+
   it("opens the authoritative result door from the Issue action", async () => {
     mount();
     fireEvent.click(await screen.findByText("IS-2608-0001"));

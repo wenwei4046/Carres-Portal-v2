@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
+import Loading from "@/components/kit/Loading";
 
 /** ⭐ A PRINTED DOCUMENT ALWAYS CARRIES ITS YEAR — owner ruling 2026-08-15.
  *  THE YEAR RULE drops the year from a current-year date because a SCREEN is
@@ -35,7 +36,7 @@ export default function ServiceNotePrintPage() {
     }
   }, [q.data]);
 
-  if (q.isLoading) return <div className="p-8 text-sm text-gray-500">Loading…</div>;
+  if (q.isLoading) return <div className="p-8"><Loading variant="skeleton" label="Loading the service note" /></div>;
   if (!q.data) return <div className="p-8 text-sm text-red-600">Service note not found.</div>;
 
   const sn = q.data;
