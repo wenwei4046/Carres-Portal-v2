@@ -884,7 +884,7 @@ describe("OperationReceiving — the formal GRN Register", () => {
     h.pos = [];
     h.posLoading = true;
     renderPage("/operation?tab=receiving&po=PO-2001");
-    expect(screen.getByText("Loading…")).toHaveAttribute("role", "status");
+    expect(screen.getByText("Loading the purchase order").closest("[role=status]")).not.toBeNull();
     expect(screen.queryByTestId("receiving-po-missing")).not.toBeInTheDocument();
     expect(screen.queryByTestId("receiving-po-view")).not.toBeInTheDocument();
   });
@@ -895,14 +895,14 @@ describe("OperationReceiving — the formal GRN Register", () => {
     expect(screen.getByTestId("receiving-po-missing")).toHaveTextContent(
       "This purchase order could not be opened",
     );
-    expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
+    expect(screen.queryByText("Loading the purchase order")).not.toBeInTheDocument();
   });
 
   it("opens the requested PO when its data is available", () => {
     renderPage("/operation?tab=receiving&po=PO-2001");
     expect(screen.getByTestId("receiving-po-view")).toBeInTheDocument();
     expect(screen.queryByTestId("receiving-po-missing")).not.toBeInTheDocument();
-    expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
+    expect(screen.queryByText("Loading the purchase order")).not.toBeInTheDocument();
   });
 
   it("Start Receiving opens Find PO or CO, and typing narrows the candidates", async () => {

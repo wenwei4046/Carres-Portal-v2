@@ -19,6 +19,7 @@ import { fmtMoney } from "@carres/shared";
 import CompactModuleCard from "@/components/kit/CompactModuleCard";
 import DocumentTable, { type DocumentTableColumn, type DocumentTableRow } from "@/components/kit/DocumentTable";
 import Button from "@/components/kit/Button";
+import Loading from "@/components/kit/Loading";
 import { apiFetch, ApiError } from "@/lib/api";
 import type { operationOrdersListResponse } from "@/lib/queries";
 import type { SalesOrderTemplateData } from "@/lib/pdf/types";
@@ -75,7 +76,7 @@ function SalesOrderItems({ orderId, reference }: { orderId: string; reference: s
     staleTime: 10_000,
     retry: retryUnlessRefused,
   });
-  if (doc.isPending) return <p role="status">Loading…</p>;
+  if (doc.isPending) return <Loading />;
   if (doc.isError) return <ReadFailed onRetry={() => void doc.refetch()} />;
   return <SalesOrderItemsTable reference={reference} data={doc.data} />;
 }
@@ -96,7 +97,7 @@ function EmbeddedSalesOrder({ orderId }: { orderId: string }) {
     retry: retryUnlessRefused,
   });
   const state = (text: string) => <p role="status" className="text-body text-kit-slate-11">{text}</p>;
-  if (order.isPending) return state("Loading…");
+  if (order.isPending) return <Loading />;
   if (order.isError) {
     return order.error instanceof ApiError && order.error.status === 403
       ? state("You cannot view this record")

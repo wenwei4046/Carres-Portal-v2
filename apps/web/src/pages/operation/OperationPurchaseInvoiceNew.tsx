@@ -6,6 +6,8 @@ import type { DepartmentType } from "@carres/shared";
 import { toast } from "sonner";
 import { defaultBillDueDate } from "@carres/shared/schemas/finance-ap";
 import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
 import { controlClass } from "@/components/kit/field-recipe";
 import { apiFetch } from "@/lib/api";
 import { appTodayIso } from "@/lib/fmt-date";
@@ -65,8 +67,11 @@ export function OperationPurchaseInvoiceEdit() {
     queryKey: ["operation", "purchase-invoices", id],
     queryFn: () => apiFetch(`/api/operation/purchase-invoices/${id}`),
   });
-  if (draft.isLoading) return <p className="p-4">Loading the bill…</p>;
-  if (draft.isError || !draft.data) return <p className="p-4">This bill could not be opened. You can change only your own bill, until a payment is recorded.</p>;
+  if (draft.isLoading) return <div className="p-4"><Loading variant="skeleton" label="Loading the bill" /></div>;
+  if (draft.isError || !draft.data) {
+    return <div role="alert"><EmptyState title="This bill could not be opened" detail="You can change only your own bill, until a payment is recorded."
+      action={<Button variant="neutral" onClick={() => void draft.refetch()}>Try again</Button>} /></div>;
+  }
   return <OperationPurchaseInvoiceNew draft={draft.data} />;
 }
 

@@ -20,6 +20,8 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
 import { REGISTER_FIELD_WIDTH } from "@/components/register/register-field-widths";
 import { fmtDate } from "@/lib/fmt-date";
 import { useAmendmentQueue, type AmendmentQueueRow } from "@/lib/queries";
@@ -65,21 +67,22 @@ export default function SalesOrderAmendments() {
     <ModuleHeader destinationHeader testId="amendments-destination-header" word="Amendments"
       docTitle="Amendments · Carres" />
     <ListPageShell register>
-      {query.isError
-        ? <div role="alert" className="p-4 text-body">
-            The amendments could not be opened.{" "}
-            <button type="button" className="underline underline-offset-2" onClick={() => void query.refetch()}>Try again</button>
-          </div>
-        : <DataGrid rows={rows} columns={columns} rowKey={(r) => r.id}
+      <DataGrid rows={rows} columns={columns} rowKey={(r) => r.id}
             rowTestId={(r) => `amendment-row-${r.id}`}
             storageKey="carres.operation.amendments.v1" appearance="reference" fillColumn="reason" exportName="Amendments"
             groupBanner={false} stickyIdentity isLoading={query.isLoading} wrapToolbar
             onRowClick={open}
             searchPlaceholder="Search amendments…"
             emptyMessage="No amendments yet."
+            errorState={query.isError ? (
+              <div role="alert">
+                <EmptyState title="Could not be loaded" detail="The amendments could not be opened."
+                  action={<Button variant="neutral" onClick={() => void query.refetch()}>Try again</Button>} />
+              </div>
+            ) : undefined}
             statusSummary={(visible) => <span data-testid="amendments-summary">
               {visible.length} {visible.length === 1 ? "amendment" : "amendments"} · {waiting} waiting for management
-            </span>} />}
+            </span>} />
     </ListPageShell>
   </div>;
 }

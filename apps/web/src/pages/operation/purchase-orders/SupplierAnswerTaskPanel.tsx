@@ -16,6 +16,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { documentDisplayNumber } from "@carres/shared";
 import Button from "@/components/kit/Button";
+import Loading from "@/components/kit/Loading";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
 import { useOperationSuppliers, type operationPosListResponse, type SupplierRow } from "@/lib/queries";
@@ -50,7 +51,7 @@ export default function SupplierAnswerTaskPanel({ item, host }: { item: Supplier
   });
   const suppliersQ = useOperationSuppliers();
   const po = poQ.data?.pos.find((p) => p.id === poId) ?? null;
-  if (poQ.isPending) return <State text="Loading…" />;
+  if (poQ.isPending) return <div className="p-3.5"><Loading label="Loading the purchase order" /></div>;
   if (poQ.isError || !po) return <State text="This purchase order could not be opened" alert />;
 
   const supplier = (suppliersQ.data?.suppliers ?? []).find((s) => s.id === po.supplier_id) as SupplierRow | undefined;

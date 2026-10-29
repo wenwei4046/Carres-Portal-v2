@@ -331,7 +331,7 @@ describe("ProcurementTabContent — list rendering + filter chips", () => {
     ).toBeInTheDocument();
   });
 
-  it("error state renders Retry button which calls refetch", () => {
+  it("error state renders Try again which calls refetch", () => {
     tabHookState = {
       data: undefined,
       isLoading: false,
@@ -355,9 +355,10 @@ describe("ProcurementTabContent — list rendering + filter chips", () => {
     };
     render(wrap(<ProcurementTabContent slug="nice-future" />));
     expect(
-      screen.getByText(/Couldn.+t load purchase orders/),
+      screen.getByText("Could not be loaded"),
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Retry/ }));
+    expect(screen.getByRole("alert")).toHaveTextContent("boom");
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(refetchSpy).toHaveBeenCalledTimes(1);
   });
 });

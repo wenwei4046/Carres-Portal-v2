@@ -70,6 +70,7 @@ import Button from "@/components/kit/Button";
 import Checkbox from "@/components/kit/Checkbox";
 import DatePicker from "@/components/kit/DatePicker";
 import Input from "@/components/kit/Input";
+import Loading from "@/components/kit/Loading";
 import Modal from "@/components/kit/Modal";
 import Select from "@/components/kit/Select";
 import Textarea from "@/components/kit/Textarea";
@@ -225,7 +226,7 @@ function ProblemSection({ claim }: { claim: SupplierClaimListRow }) {
       {claim.note && <p className="whitespace-pre-wrap">{claim.note}</p>}
       <p>{`Claim Reported ${claim.reported_at ? fmtDate(claim.reported_at) : absent} · ${claim.reported_by_name || "Staff identity not recorded"}`}</p>
       {!claim.photo_count ? null : photos.isError ? <div role="alert"><p>Evidence could not be loaded</p><Button variant="neutral" onClick={() => void photos.refetch()}>Try again</Button></div>
-        : photos.isLoading ? <p>Loading…</p>
+        : photos.isLoading ? <Loading label="Loading evidence" />
         : <div className="flex flex-wrap gap-3">{photos.data?.photos.map((photo, index) => <div key={photo.path} className="space-y-1">
           <button type="button" onClick={() => setEvidenceId(photo.path)} className="text-kit-blue-11 underline">Photo {index + 1}</button>
           {photo.at && <p className="text-label text-kit-slate-11">{fmtDate(photo.at)}</p>}
@@ -355,7 +356,7 @@ function ResultSection({ claim, record, open, onNext, onIssue }: {
                 <p>{send?.sent ? `${send.text} · ${fmtDate(send.date)}` : "Sending not confirmed"}</p>
                 <p>{pr.confirmed_pickup_date ? `Confirmed Pickup Date ${fmtDate(pr.confirmed_pickup_date)}` : "Pickup date not confirmed"}{` · ${purchaseReturnPickupState(pr)}`}</p>
                 <p className="text-kit-slate-11">{`Supplier Received Date ${received ? fmtDate(received) : absent}`}</p>
-              </> : <p className="text-kit-slate-11">Loading…</p>}
+              </> : <Loading label="Loading the Purchase Return" />}
             </div>;
           })}
       </div>}
@@ -395,7 +396,7 @@ function DocumentsSection({ record, open, onSend }: { record: ReturnType<typeof 
   const sends = record.data?.sends ?? [];
   return <Block title="Documents" headerSlot={open ? <Button variant="neutral" onClick={onSend} data-testid="claim-record-send">Claim sent to supplier</Button> : undefined}>
     <div className="space-y-1 text-body text-kit-slate-12">
-      {record.isLoading ? <p>Loading…</p> : sends.length === 0 ? <p className="text-kit-slate-11">{`Claim sent to supplier · ${absent}`}</p>
+      {record.isLoading ? <Loading label="Loading documents" /> : sends.length === 0 ? <p className="text-kit-slate-11">{`Claim sent to supplier · ${absent}`}</p>
         : sends.map((s) => <p key={s.id}>{`Claim sent to supplier · ${CHANNEL_WORD[s.channel] ?? s.channel} · ${s.recipient} · ${s.sent_by_name ?? "Staff identity not recorded"} · ${fmtDate(s.sent_at, { time: true })}`}</p>)}
     </div>
   </Block>;

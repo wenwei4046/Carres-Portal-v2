@@ -185,6 +185,12 @@ export default function OperationNewSalesOrder() {
       .map((s) => ({ value: s.sku, label: `${s.sku} · ${models.get(s.modelId) ?? ""} ${s.variant}`.trim(), price: s.price }));
   }, [catalogQ.data]);
 
+  // PageShell sets no tab title; same pattern as ModuleHeader.
+  useEffect(() => {
+    document.title = "New Sales Order · Sales Orders · Carres";
+    return () => { document.title = "Carres Portal"; };
+  }, []);
+
   // Dirty guard (same pattern as SalesOrderWorkspace): a half-keyed, signed
   // order is not lost to Cancel or a tab close.
   const dirty = f !== initial;

@@ -28,6 +28,7 @@ import DOFileUploadField from "@/components/DOFileUploadField";
 import ClaimPhotoUploadField from "@/components/ClaimPhotoUploadField";
 import ArrivalEvidenceUploadField from "@/components/ArrivalEvidenceUploadField";
 import Checkbox from "@/components/kit/Checkbox";
+import Loading from "@/components/kit/Loading";
 import { CONTROL_BASE, CONTROL_BORDER } from "@/components/kit/field-recipe";
 import { DOC_BTN, DOC_TH, DocSection as Section, Prop } from "./workspace-doc";
 
@@ -353,7 +354,7 @@ function ReadMode({
       {/* ACTIVITY reads the Event Ledger and nothing else (§6). */}
       <Section title="Activity">
         {loadingEvents ? (
-          <div className="text-meta text-kit-slate-11">Loading…</div>
+          <Loading label="Loading receiving activity" />
         ) : events.length === 0 ? (
           <div className="text-meta text-kit-slate-11" data-testid="receiving-activity-empty">
             No receiving activity yet.

@@ -889,7 +889,7 @@ describe("Purchase Orders Register", () => {
   it("does not report empty facts while the required register reads are loading", () => {
     requiredLoading = true;
     renderPage();
-    expect(screen.getByText("Loading purchase orders…")).toBeInTheDocument();
+    expect(screen.getByText("Loading purchase orders")).toBeInTheDocument();
     expect(screen.queryByTestId("register-grid")).not.toBeInTheDocument();
   });
 });
@@ -1100,7 +1100,7 @@ describe("Purchase Order object", () => {
   it("does not call loading connections empty", () => {
     connectionLoading = true;
     renderPage("/operation/procurement?po=PO-20260828-4827");
-    expect(screen.getAllByText("Loading…")).toHaveLength(3);
+    expect(screen.getAllByTestId("kit-loading-spinner")).toHaveLength(3);
     expect(screen.queryByText("No Unit ID")).not.toBeInTheDocument();
   });
 

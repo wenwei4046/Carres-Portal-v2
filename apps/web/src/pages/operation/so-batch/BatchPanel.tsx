@@ -46,6 +46,7 @@ import Button from "@/components/kit/Button";
 import Checkbox from "@/components/kit/Checkbox";
 import Icon from "@/components/kit/Icon";
 import Input from "@/components/kit/Input";
+import Loading from "@/components/kit/Loading";
 import Modal from "@/components/kit/Modal";
 import Select from "@/components/kit/Select";
 import StepList, { Step } from "@/components/kit/StepList";
@@ -575,7 +576,7 @@ export function BatchPanel({ item, windowKey, host }: { item: BatchPanelItem; wi
   );
 
   const purchaseContent = batch.isPending || full.isPending || (pos.length > 0 && (facts.isPending || (facts.isPlaceholderData && rows.length !== pos.length)))
-    ? <p role="status" className="text-body text-kit-slate-11">Loading…</p>
+    ? <Loading label="Loading purchase orders" />
     : batch.isError || facts.isError
       ? <div role="alert" className="flex items-center gap-2 text-body text-kit-slate-11"><span>Could not be loaded</span>
           <Button size="sm" onClick={() => { void batch.refetch(); void facts.refetch(); }}>Try again</Button></div>
@@ -650,7 +651,7 @@ export function BatchPanel({ item, windowKey, host }: { item: BatchPanelItem; wi
       ]}
       orders={taskOrders}
       /* The contract opens `Sales Order` only when one is linked; loading never reads as none. */
-      salesOrders={batch.isPending ? <p role="status" className="text-body text-kit-slate-11">Loading…</p> : orderIds.length ? salesContent : undefined}
+      salesOrders={batch.isPending ? <Loading label="Loading sales orders" /> : orderIds.length ? salesContent : undefined}
       history={[...sendEvents, ...emailEvents]}
       files={purchasingFileStages(taskOrders, taskPos)}
       steps={<div className="flex flex-col gap-3">{purchaseContent}{doneWhen}</div>}

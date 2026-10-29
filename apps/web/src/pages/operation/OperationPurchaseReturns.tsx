@@ -685,7 +685,8 @@ function NewPurchaseReturn({ onClose, onIssued }: { onClose: () => void; onIssue
   if (supplierId) return <PurchaseReturnIssue supplierId={supplierId} onClose={onClose} onIssued={onIssued} />;
   return (
     <div className="flex max-w-md flex-col gap-3 p-4" data-testid="purchase-return-new">
-      <h1 className="text-page text-kit-slate-12">{NEW_PURCHASE_RETURN}</h1>
+      {/* h2: the shell header already holds the page's one h1. */}
+      <h2 className="text-page text-kit-slate-12">{NEW_PURCHASE_RETURN}</h2>
       {suppliers.isError ? (
         <div role="alert"><EmptyState title="Some information could not be refreshed." action={<Button variant="neutral" onClick={() => void suppliers.refetch()}>Try again</Button>} /></div>
       ) : (

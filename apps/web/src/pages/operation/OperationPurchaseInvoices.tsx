@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import ListPageShell from "@/components/ListPageShell";
 import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { fmtDate } from "@/lib/fmt-date";
@@ -97,9 +98,13 @@ export default function OperationPurchaseInvoices() {
           stickyIdentity
           isLoading={query.isLoading}
           searchPlaceholder="Search bill, supplier or PO…"
-          emptyMessage={query.isError
-            ? "Purchase invoices could not be read. Refresh to try again."
-            : "No purchase invoice yet. Enter one with New Bill or Bill from GRN."}
+          emptyMessage="No purchase invoice yet. Enter one with New Bill or Bill from GRN."
+          errorState={query.isError ? (
+            <div role="alert">
+              <EmptyState title="Could not be loaded" detail="The purchase invoices could not be read."
+                action={<Button variant="neutral" onClick={() => void query.refetch()}>Try again</Button>} />
+            </div>
+          ) : undefined}
         />
       </ListPageShell>
     </div>

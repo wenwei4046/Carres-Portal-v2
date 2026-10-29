@@ -140,10 +140,11 @@ describe("EmbeddedSalesOrders — one embedded block per linked SO", () => {
 });
 
 describe("EmbeddedSalesOrders — truthful read states", () => {
-  it("loading reads Loading…", () => {
+  it("loading shows the kit spinner", () => {
     fetchMock.mockImplementation(() => new Promise(() => {}));
     mount(["a"]);
-    expect(screen.getByRole("status").textContent).toBe("Loading…");
+    expect(screen.getByRole("status").textContent).toBe("Loading");
+    expect(screen.getByTestId("kit-loading-spinner")).toBeInTheDocument();
   });
 
   it("an SO the Operation list does not return is `Order details unavailable`, never a read failure", async () => {
