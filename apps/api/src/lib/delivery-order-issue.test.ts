@@ -88,6 +88,8 @@ function tables(over?: {
    *  input: a voided or failed document keeps its number forever, so a
    *  same-day re-issue must step to -B rather than resurrect it. */
   existingDocuments?: string[];
+  /** Units reserved to the order (`ops_stock_items`). */
+  units?: Array<{ id: string; sku: string; qty?: number }>;
 }) {
   const control =
     over?.control === null
@@ -123,7 +125,7 @@ function tables(over?: {
     }),
     order_addons: tableMock({ data: [], error: null }),
     ops_order_control: tableMock({ data: control, error: null }),
-    ops_stock_items: tableMock({ data: [], error: null }),
+    ops_stock_items: tableMock({ data: over?.units ?? [], error: null }),
     // Gate convergence (2026-09-07): the feeder reads the SO's storage papers.
     invoices: tableMock({ data: [], error: null }),
     order_finance_exceptions: tableMock({
@@ -483,6 +485,7 @@ describe("attemptDeliveryOrderIssue — New Delivery Order, opened by the office
       p_order_id: ORDER_ID,
       p_groups: ["bed"],
       p_do_number: DO_NUMBER,
+      p_item_ids: [],
     });
     expect(t.orders.update).not.toHaveBeenCalled();
     expect(sb.rpc).toHaveBeenCalledWith("operation_add_annotation", expect.objectContaining({
@@ -503,7 +506,26 @@ describe("attemptDeliveryOrderIssue — New Delivery Order, opened by the office
       p_order_id: ORDER_ID,
       p_groups: null,
       p_do_number: DO_NUMBER,
+      p_item_ids: null,
     });
+  });
+
+  it("a group DO carries only the reserved Units of its groups (0733), so it can be handed over", async () => {
+    const t = tables({
+      control: OFFICE,
+      units: [
+        { id: "unit-mattress", sku: MATTRESS },
+        { id: "unit-sofa", sku: "sofa:test-S" },
+        { id: "unit-pillow", sku: "pillow:Soft" },
+      ],
+    });
+    const sb = officeSb(t);
+    await attemptDeliveryOrderIssue(sb, ORDER_ID, { waitBookingConfirm: false, groups: ["bed"] });
+    expect(t.ops_stock_items.eq).toHaveBeenCalledWith("reserved_ref", "SO-1234");
+    expect(sb.rpc).toHaveBeenCalledWith("delivery_office_document_mint", expect.objectContaining({
+      p_groups: ["bed"],
+      p_item_ids: ["unit-mattress"],
+    }));
   });
 
   it("the money gate still refuses: payment before delivery is unchanged", async () => {

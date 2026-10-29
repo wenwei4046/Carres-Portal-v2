@@ -1,5 +1,6 @@
 import {
   deliveryOrderIssueGate,
+  deliveryGroupOf,
   deliveryHolidaySet,
   orderActionDone,
   type DeliveryGroupKey,
@@ -114,51 +115,15 @@ export async function attemptDeliveryOrderIssue(
   // figure against the approval record (0362), and Finance's exception (0355)
   // — each read from its one owning table, never derived from each other; the
   // gate words every refusal itself through the shared spellings.
-  const [feRes, paRes, delivery] = await Promise.all([
-    sb
-      .from("order_finance_exceptions")
-      .select("id, status, reason, opened_at, cleared_at, clear_evidence")
-      .eq("order_id", orderId),
-    sb
-      .from("order_delivery_payment_approvals")
-      .select("id, status, request_reason, requested_at, decided_at, decision_reason")
-      .eq("order_id", orderId),
-    // The Delivery calendar's holidays (stored Selangor, else built-in).
-    readDeliveryCalendar(sb),
-  ]);
-  if (feRes.error) {
-    return { outcome: "error", body: { message: feRes.error.message }, status: 500 };
-  }
-  if (paRes.error) {
-    return { outcome: "error", body: { message: paRes.error.message }, status: 500 };
-  }
+  const money = await readMoneyGateFacts(sb, orderId);
+  if (!money.ok) return money.error;
 
   const issue = deliveryOrderIssueGate({
     bookingConfirmed: (control?.booking_stage as string | null) === "confirmed",
     confirmedDateIso: (control?.confirmed_date as string | null) ?? null,
     confirmedTimeSlot: (control?.confirmed_time_slot as string | null) ?? null,
     gate,
-    financeExceptions: (feRes.data ?? []).map(
-      (row: Record<string, unknown>) => ({
-        id: row.id as string,
-        status: row.status as "open" | "cleared",
-        reason: row.reason as string,
-        openedAt: (row.opened_at as string | null) ?? null,
-        clearedAt: (row.cleared_at as string | null) ?? null,
-        clearEvidence: (row.clear_evidence as string | null) ?? null,
-      }),
-    ),
-    paymentApprovals: (paRes.data ?? []).map(
-      (row: Record<string, unknown>) => ({
-        id: row.id as string,
-        status: row.status as "pending" | "approved" | "refused",
-        requestReason: row.request_reason as string,
-        requestedAt: (row.requested_at as string | null) ?? null,
-        decidedAt: (row.decided_at as string | null) ?? null,
-        decisionReason: (row.decision_reason as string | null) ?? null,
-      }),
-    ),
-    holidays: deliveryHolidaySet(delivery.calendar),
+    ...money.facts,
     waitBookingConfirm: opts?.waitBookingConfirm ?? true,
   });
   if (!issue.ok) return { outcome: "blocked", reasons: issue.reasons };
@@ -174,10 +139,26 @@ export async function attemptDeliveryOrderIssue(
   // governed door: the one-live index is keyed by trip, so an earlier trip
   // that already ran keeps its document and this trip gets its own.
   if (office) {
+    // 0733 · a group DO carries the reserved Units of its groups, so Warehouse
+    // can hand it over (a whole-order DO is snapshotted by 0424's trigger).
+    let itemIds: string[] | null = null;
+    if (bookedScope) {
+      const { data: units, error: unitsError } = await sb
+        .from("ops_stock_items")
+        .select("id, sku")
+        .eq("status", "reserved")
+        .eq("qty", 1)
+        .eq("reserved_ref", `SO-${order.so}`);
+      if (unitsError) return { outcome: "error", body: { message: unitsError.message }, status: 500 };
+      itemIds = ((units ?? []) as { id: string; sku: string }[])
+        .filter((u) => bookedScope.includes(deliveryGroupOf(u.sku) as DeliveryGroupKey))
+        .map((u) => u.id);
+    }
     const { data, error } = await sb.rpc("delivery_office_document_mint", {
       p_order_id: orderId,
       p_groups: bookedScope,
       p_do_number: doNumber,
+      p_item_ids: itemIds,
     });
     if (error) {
       // 42501 role · P0001 money gate (0362) · 22023 a refused scope (0710).
@@ -304,35 +285,14 @@ export async function attemptLegDocumentIssue(
   // The order's money and goods gate — ONE booking context, ONE gate (Law D).
   const loaded = await loadBookingContext(sb, orderId, null);
   if (!loaded.ok) return { outcome: "error", body: loaded.body, status: loaded.status };
-  const [feRes, paRes, delivery] = await Promise.all([
-    sb.from("order_finance_exceptions").select("id, status, reason, opened_at, cleared_at, clear_evidence").eq("order_id", orderId),
-    sb.from("order_delivery_payment_approvals").select("id, status, request_reason, requested_at, decided_at, decision_reason").eq("order_id", orderId),
-    readDeliveryCalendar(sb),
-  ]);
-  if (feRes.error) return { outcome: "error", body: { message: feRes.error.message }, status: 500 };
-  if (paRes.error) return { outcome: "error", body: { message: paRes.error.message }, status: 500 };
+  const money = await readMoneyGateFacts(sb, orderId);
+  if (!money.ok) return money.error;
   const issue = deliveryOrderIssueGate({
     bookingConfirmed: true,
     confirmedDateIso: arrangement!.confirmed_date,
     confirmedTimeSlot: arrangement!.confirmed_time ?? "Anytime",
     gate: loaded.ctx.gate,
-    financeExceptions: (feRes.data ?? []).map((row: Record<string, unknown>) => ({
-      id: row.id as string,
-      status: row.status as "open" | "cleared",
-      reason: row.reason as string,
-      openedAt: (row.opened_at as string | null) ?? null,
-      clearedAt: (row.cleared_at as string | null) ?? null,
-      clearEvidence: (row.clear_evidence as string | null) ?? null,
-    })),
-    paymentApprovals: (paRes.data ?? []).map((row: Record<string, unknown>) => ({
-      id: row.id as string,
-      status: row.status as "pending" | "approved" | "refused",
-      requestReason: row.request_reason as string,
-      requestedAt: (row.requested_at as string | null) ?? null,
-      decidedAt: (row.decided_at as string | null) ?? null,
-      decisionReason: (row.decision_reason as string | null) ?? null,
-    })),
-    holidays: deliveryHolidaySet(delivery.calendar),
+    ...money.facts,
     waitBookingConfirm: false,
   });
   if (!issue.ok) return { outcome: "blocked", reasons: issue.reasons };
@@ -353,6 +313,49 @@ export async function attemptLegDocumentIssue(
   return minted === doNumber ? { outcome: "issued", doNumber } : { outcome: "already", doNumber: minted };
 }
 
+/**
+ * The gate's money and calendar facts, read the same way for every document:
+ * Finance's exceptions (0355), the Delivery Payment Approvals (0362) and the
+ * Delivery calendar's holidays (stored Selangor, else built-in).
+ */
+async function readMoneyGateFacts(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
+  orderId: string,
+): Promise<
+  | { ok: true; facts: Pick<Parameters<typeof deliveryOrderIssueGate>[0], "financeExceptions" | "paymentApprovals" | "holidays"> }
+  | { ok: false; error: DeliveryOrderAttempt }
+> {
+  const [feRes, paRes, delivery] = await Promise.all([
+    sb.from("order_finance_exceptions").select("id, status, reason, opened_at, cleared_at, clear_evidence").eq("order_id", orderId),
+    sb.from("order_delivery_payment_approvals").select("id, status, request_reason, requested_at, decided_at, decision_reason").eq("order_id", orderId),
+    readDeliveryCalendar(sb),
+  ]);
+  const failed = feRes.error ?? paRes.error;
+  if (failed) return { ok: false, error: { outcome: "error", body: { message: failed.message }, status: 500 } };
+  return {
+    ok: true,
+    facts: {
+      financeExceptions: (feRes.data ?? []).map((row: Record<string, unknown>) => ({
+        id: row.id as string,
+        status: row.status as "open" | "cleared",
+        reason: row.reason as string,
+        openedAt: (row.opened_at as string | null) ?? null,
+        clearedAt: (row.cleared_at as string | null) ?? null,
+        clearEvidence: (row.clear_evidence as string | null) ?? null,
+      })),
+      paymentApprovals: (paRes.data ?? []).map((row: Record<string, unknown>) => ({
+        id: row.id as string,
+        status: row.status as "pending" | "approved" | "refused",
+        requestReason: row.request_reason as string,
+        requestedAt: (row.requested_at as string | null) ?? null,
+        decidedAt: (row.decided_at as string | null) ?? null,
+        decisionReason: (row.decision_reason as string | null) ?? null,
+      })),
+      holidays: deliveryHolidaySet(delivery.calendar),
+    },
+  };
+}
 
 /**
  * 0575 · Draw one Delivery Order number from the database's one allocator.
