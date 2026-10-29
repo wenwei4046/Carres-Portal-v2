@@ -87,7 +87,7 @@ export default function PortalSidebar({ drawer = false, compactForCanvas = false
   /** Below 768px the rail is a slide-in drawer (owner review 2026-09-25):
    *  always the named rail, no collapse toggle of its own. */
   drawer?: boolean;
-  /** Current Operations shell:64px at every width; full tree in its overlay. */
+  /** Current Operations shell: 64px at every width; » opens it in place, temporarily. */
   compactForCanvas?: boolean;
   /** Uses the existing Tasks draft guard before making room for the menu. */
   onExpandForCanvas?: (expand: () => void) => void;
@@ -140,19 +140,14 @@ export default function PortalSidebar({ drawer = false, compactForCanvas = false
   const [reporting, setReporting] = useState(false);
   useEffect(() => setDetailExpanded(false), [location.pathname, narrowDetail]);
   const autoDetail = isSalesOrderDetail && narrowDetail;
-  const autoCanvas = !isSalesOrderDetail && compactForCanvas && narrowDetail;
+  const autoCanvas = compactForCanvas;
   /* A drawer is always the named rail. */
-  const collapsed = drawer ? false : autoCanvas ? true : autoDetail ? !detailExpanded : storedCollapsed;
+  const collapsed = drawer ? false : autoCanvas || autoDetail ? !detailExpanded : storedCollapsed;
   const toggleCollapse = () => {
-    if (autoCanvas && onExpandForCanvas) {
-      onExpandForCanvas(() => {
-        setCollapsed(false);
-        try { localStorage.setItem(COLLAPSE_KEY, "0"); } catch { /* blocked storage */ }
-      });
-      return;
-    }
-    if (autoDetail) {
-      setDetailExpanded((expanded) => !expanded);
+    // Compact rails open in place and only for now: the saved preference is untouched.
+    if (autoCanvas || autoDetail) {
+      if (autoCanvas && collapsed && onExpandForCanvas) onExpandForCanvas(() => setDetailExpanded(true));
+      else setDetailExpanded((expanded) => !expanded);
       return;
     }
     setCollapsed((c) => {
