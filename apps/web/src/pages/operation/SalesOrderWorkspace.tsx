@@ -3114,6 +3114,13 @@ function SalesOrderWorkspaceBody() {
         menu={menuGroups}
         docTitle={order ? `SO-${order.so} · Carres` : "Carres"}
       />
+      {/* proceed_order's payment_below_50 gate (0560) keeps such an order Placed and
+          off the Sales Orders register; rentals and AutoCount imports never pass that gate. */}
+      {order?.status === "place" && order.source_system !== "rental" && order.source_system !== "autocount" && money.total != null && money.total > 0 && money.paid < money.total * 0.5 && (
+        <span role="status" className="rounded-md bg-c-warn-bg px-2.5 py-1.5 text-[12px] text-c-warn-fg" data-testid="so-deposit-below-50">
+          Deposit below 50% — this order stays Placed and is not in Sales Orders until 50% is paid.
+        </span>
+      )}
       <PillTabs
         label="Sales Order views"
         value={objectView}

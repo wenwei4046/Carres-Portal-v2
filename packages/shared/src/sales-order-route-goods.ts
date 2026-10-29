@@ -15,6 +15,7 @@
  * and the only lineage is `po_line_sources` — never a SKU match.
  */
 import { poExpectedArrivalsOf, type EffectiveArrivalPromise } from "./po-windows";
+import { lineKind } from "./line-category";
 import { tomorrowDeliveryCallOf } from "./purchasing-supplier-calls";
 import { normalizeSkuKey } from "./sku-code";
 import { receivingSummaryOf } from "./warehouse-receipt";
@@ -275,7 +276,9 @@ export function routeGoodsLinesOf(facts: RouteGoodsFacts): RouteGoodsLine[] {
     }
 
     const unitCodes = (unitsByLine.get(line.id) ?? []).filter(Boolean);
-    const readyQty = Math.min(qty, (unitsByLine.get(line.id) ?? []).length);
+    /* An accessory is warehouse stock with no PO or reserve step: the DO gate
+       (`bookingConfirmGate` via `lineReadiness`) counts it ready, so does this. */
+    const readyQty = lineKind(line.sku) === "acc" ? qty : Math.min(qty, (unitsByLine.get(line.id) ?? []).length);
     /* Units that arrived through a Purchase Order are already counted as
        received; what is still ON ORDER is what has not arrived. */
     const onOrderQty = sources.reduce((sum, source) => sum + source.pendingQty, 0);

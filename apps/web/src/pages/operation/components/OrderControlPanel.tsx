@@ -15,13 +15,15 @@ import {
   type OpsOrderControl,
   type LineStockStatus,
   requiredPaymentReference,
+  CHANGE_LOGISTICS_REASONS,
+  type ChangeLogisticsReasonKey,
 } from "@carres/shared";
 import {
   useDeliveryPartners,
   useOperationSetDeliveryDate,
   useOrderControl,
   useSaveOrderControl,
-  useSetOpsAssignedLogistic,
+  useAssignLogistics,
   useCollectStorage,
   BACKDATE_WAITING_WORDS,
   useRequestStorageWaiver,
@@ -375,10 +377,24 @@ export function RoutingFields({
       ),
     [partnersData],
   );
-  const setLogistic = useSetOpsAssignedLogistic(_orderId, {
-    onSuccess: () => toast.success("Logistics updated"),
-    onError: (e) => toast.error(`Couldn't set logistic: ${e.message}`),
-  });
+  // Delivery's own door (the Delivery Monitor's) — any order status, and a
+  // change of carrier carries its reason. The old /ops-assign was Inbox-only.
+  const assign = useAssignLogistics();
+  const [changeTo, setChangeTo] = useState<string | null>(null);
+  const setLogistic = {
+    isPending: assign.isPending,
+    mutate: (partnerId: string, reason?: ChangeLogisticsReasonKey) =>
+      assign.mutate(
+        { scopes: [{ orderId: _orderId, leg: 0 }], partnerId, reason: reason ?? null },
+        {
+          onSuccess: () => {
+            setChangeTo(null);
+            toast.success("Logistics updated");
+          },
+          onError: (e) => toast.error(`Couldn't set logistic: ${e.message}`),
+        },
+      ),
+  };
   const setDate = useOperationSetDeliveryDate(_orderId, {
     onSuccess: () => toast.success("Delivery date updated"),
     onError: (e) => toast.error(`Couldn't set date: ${e.message}`),
@@ -404,27 +420,60 @@ export function RoutingFields({
         <div className="flex items-center gap-2 flex-wrap w-full px-1">
           <select
             id="fld-logistic"
-            value={opsAssignedLogistic ?? ""}
+            value={changeTo ?? opsAssignedLogistic ?? ""}
             disabled={setLogistic.isPending}
-            onChange={(e) =>
-              setLogistic.mutate({ deliveryPartnerId: e.target.value || null })
-            }
+            onChange={(e) => {
+              const next = e.target.value;
+              if (!next || next === opsAssignedLogistic) return setChangeTo(null);
+              if (opsAssignedLogistic) setChangeTo(next);
+              else setLogistic.mutate(next);
+            }}
             className={`${CELL_FIT} w-[240px] disabled:opacity-50`}
           >
-            <option value="">Logistics</option>
+            <option value="" disabled>
+              Logistics
+            </option>
             {partners.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>
             ))}
           </select>
+          {changeTo && (
+            <>
+              <select
+                aria-label="Why is this changing?"
+                defaultValue=""
+                disabled={setLogistic.isPending}
+                onChange={(e) =>
+                  e.target.value &&
+                  setLogistic.mutate(changeTo, e.target.value as ChangeLogisticsReasonKey)
+                }
+                className={`${CELL_FIT} w-[240px] disabled:opacity-50`}
+              >
+                <option value="" disabled>
+                  Why is this changing?
+                </option>
+                {CHANGE_LOGISTICS_REASONS.map((r) => (
+                  <option key={r.key} value={r.key}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setChangeTo(null)}
+                className="text-meta text-base-600 hover:text-base-900"
+              >
+                Cancel
+              </button>
+            </>
+          )}
           {!opsAssignedLogistic && suggestedPartner && (
             <button
               type="button"
               disabled={setLogistic.isPending}
-              onClick={() =>
-                setLogistic.mutate({ deliveryPartnerId: suggestedPartner.id })
-              }
+              onClick={() => setLogistic.mutate(suggestedPartner.id)}
               className="text-meta px-2 py-0.5 rounded border border-primary text-primary font-medium hover:bg-primary/5 disabled:opacity-50 whitespace-nowrap"
             >
               Apply {suggestedPartner.name}

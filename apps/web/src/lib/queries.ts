@@ -7752,6 +7752,19 @@ export function useDeliveryArrangements() {
   });
 }
 
+/** One order's arrangements — the same door, narrowed (`?order=`). Under the
+ *  list's key so every Delivery save refreshes it too. */
+export function useOrderDeliveryArrangements(orderId: string) {
+  return useQuery<DeliveryArrangementsPayload, ApiError>({
+    queryKey: ["operation", "delivery-arrangements", "order", orderId],
+    queryFn: () =>
+      apiFetch<DeliveryArrangementsPayload>(
+        `/api/operation/delivery-arrangements?order=${encodeURIComponent(orderId)}`,
+      ),
+    staleTime: 30_000,
+  });
+}
+
 /** Delivery's read-only event feed for the shared Warehouse Schedule. */
 export function useDeliveryWarehouseSchedule() {
   return useQuery<{ events: DeliveryWarehouseScheduleEvent[] }, ApiError>({

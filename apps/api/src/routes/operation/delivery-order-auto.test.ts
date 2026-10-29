@@ -44,6 +44,7 @@ function tableMock(read: Result) {
     is: vi.fn(() => b),
     upsert: vi.fn(() => b),
     order: vi.fn(() => b),
+    limit: vi.fn(() => b),
     maybeSingle: vi.fn().mockResolvedValue(read),
     single: vi.fn().mockResolvedValue(read),
     then: (res: (v: Result) => unknown, rej?: (e: unknown) => unknown) =>
@@ -129,6 +130,7 @@ function tables(over?: {
    *  rebooked-trip supersede path. */
   documentRow?: Record<string, unknown> | null;
   attemptRows?: Array<Record<string, unknown>>;
+  handoverRows?: Array<Record<string, unknown>>;
 }) {
   const control = {
     order_id: ORDER_ID,
@@ -193,6 +195,7 @@ function tables(over?: {
     error: null,
   });
   t.delivery_attempts = tableMock({ data: over?.attemptRows ?? [], error: null });
+  t.delivery_handover_events = tableMock({ data: over?.handoverRows ?? [], error: null });
   return t;
 }
 
@@ -261,6 +264,29 @@ describe("booking confirm — the door that completes the gate issues the docume
       p_reason: "rescheduled",
     });
     // The mirror emptied so the idempotent mint can write the new number.
+    expect(t.orders.update).toHaveBeenCalledWith({ do_number: null });
+  });
+
+  it("a document already handed to the carrier is never voided on rebooking", async () => {
+    const OLD = "DO-170826-9999";
+    const t = tables({
+      orderDoNumber: OLD,
+      documentRow: {
+        id: "00000000-0000-0000-0000-0000000d0aaa",
+        do_number: OLD,
+        delivery_date: "2026-08-20",
+        time_slot: "Morning (9am–12pm)",
+        voided_at: null,
+      },
+      attemptRows: [], // no attempt recorded yet…
+      handoverRows: [{ id: "00000000-0000-0000-0000-0000000e0001" }], // …but the goods left
+    });
+    const sb = makeSb(t);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post(await makeJwt("operation"));
+    expect(res.status).toBe(200);
+    expect(sb.rpc).not.toHaveBeenCalledWith("delivery_order_void", expect.anything());
     expect(t.orders.update).toHaveBeenCalledWith({ do_number: null });
   });
 
