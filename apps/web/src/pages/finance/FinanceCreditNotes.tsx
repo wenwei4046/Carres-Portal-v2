@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { CreditNoteRow } from "@carres/shared/schemas/finance-credit-note";
 import type { CreditNotePrintData } from "@carres/shared/schemas/finance-credit-note";
+import ListPageShell from "@/components/ListPageShell";
 import Button from "@/components/kit/Button";
 import Input from "@/components/kit/Input";
 import Modal from "@/components/kit/Modal";
@@ -42,18 +43,11 @@ export default function FinanceCreditNotes() {
 
   const rows = list.data ?? [];
   return (
-    <div className="p-9 max-w-[1200px] mx-auto">
-      <header className="flex items-end justify-between gap-4 flex-wrap mb-6">
-        <div>
-          <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">Finance · Documents</div>
-          <h1 className="font-display text-page mt-1.5 mb-1 text-foreground tracking-[-0.02em]">Credit Notes</h1>
-          <div className="text-body text-muted-foreground">
-            Each one comes off what the customer owes on a Sales Invoice. It is never paid out.
-          </div>
-        </div>
-        <Button variant="primary" onClick={() => setIssuing(true)}>Issue credit note</Button>
-      </header>
-
+    <ListPageShell
+      register
+      title="Credit Notes"
+      actions={<Button variant="primary" onClick={() => setIssuing(true)}>Issue credit note</Button>}
+    >
       <div className="bg-card rounded-md border border-border overflow-auto">
         <table className="w-full text-meta">
           <thead>
@@ -110,7 +104,7 @@ export default function FinanceCreditNotes() {
         onClose={() => setVoiding(null)}
         onDone={() => { setVoiding(null); qc.invalidateQueries({ queryKey: CREDIT_NOTES_KEY }); }}
       />
-    </div>
+    </ListPageShell>
   );
 }
 
