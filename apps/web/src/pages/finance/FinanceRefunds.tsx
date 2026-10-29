@@ -5,6 +5,8 @@ import {
 } from "@/lib/queries";
 import { rm } from "@/lib/format-currency";
 import { FinanceKpi } from "@/components/FinanceKpi";
+import Loading from "@/components/kit/Loading";
+import { LoadFailed } from "./other-money-in/parts";
 
 type RefundKind = "credit" | "refund";
 
@@ -111,9 +113,10 @@ export default function FinanceRefunds() {
       </div>
 
       <div className="grid grid-cols-3 gap-3.5 mb-6">
-        <FinanceKpi label="Issued" value={rm(totals.issued)} hint="Credit notes outstanding" tone="warn" />
-        <FinanceKpi label="Pending / approved" value={rm(totals.pending)} hint="Refunds awaiting bank release" tone="warn" accent />
-        <FinanceKpi label="Applied / paid" value={rm(totals.applied)} hint="Used or refunded" tone="ok" />
+        {/* Not read yet, or the read failed: no figure, never RM 0.00. */}
+        <FinanceKpi label="Issued" value={refundsQ.isSuccess ? rm(totals.issued) : null} hint="Credit notes outstanding" tone="warn" />
+        <FinanceKpi label="Pending / approved" value={refundsQ.isSuccess ? rm(totals.pending) : null} hint="Refunds awaiting bank release" tone="warn" accent />
+        <FinanceKpi label="Applied / paid" value={refundsQ.isSuccess ? rm(totals.applied) : null} hint="Used or refunded" tone="ok" />
       </div>
 
       <div className="bg-card rounded-md border border-border overflow-auto">
@@ -131,7 +134,9 @@ export default function FinanceRefunds() {
         </div>
 
         {refundsQ.isLoading ? (
-          <div className="p-12 text-center text-meta text-muted-foreground">Loading…</div>
+          <div className="p-12"><Loading variant="skeleton" label="Loading refunds and credit notes" /></div>
+        ) : refundsQ.isError ? (
+          <LoadFailed what="Refunds and credit notes" onRetry={() => void refundsQ.refetch()} />
         ) : enriched.length === 0 ? (
           <div className="p-12 text-center text-meta text-muted-foreground">
             No refunds or credit notes on record.
@@ -145,12 +150,6 @@ export default function FinanceRefunds() {
         <b className="font-medium">Credit note</b> reduces what a customer owes (applied to balance on next order).{" "}
         <b className="font-medium">Refund</b> moves cash back to customer's bank.
       </div>
-
-      {refundsQ.error && (
-        <div className="mt-5 p-3 text-meta rounded-md bg-destructive/5 text-destructive border border-destructive/30">
-          Could not read refunds. This does not mean there are none.
-        </div>
-      )}
     </div>
   );
 }

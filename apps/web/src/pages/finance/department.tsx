@@ -68,7 +68,8 @@ export function useDepartmentParam(): [string, (v: string) => void] {
 
 /** Filter: every department, one type, or one instance. */
 export function DepartmentFilter({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const { data = [] } = useDepartments();
+  const departments = useDepartments();
+  const data = departments.data ?? [];
   return <label className="flex items-center gap-2 text-body">
     <span>Department</span>
     <select aria-label="Department" className={`${fieldCls} w-56`} value={value} onChange={(e) => onChange(e.target.value)}>
@@ -83,6 +84,9 @@ export function DepartmentFilter({ value, onChange }: { value: string; onChange:
           </optgroup>;
       })}
     </select>
+    {/* A failed read still lists the types; say the single showrooms and dealers are missing. */}
+    {departments.isError && <button type="button" className="text-meta underline underline-offset-2"
+      onClick={() => void departments.refetch()}>Showrooms and dealers could not be loaded. Try again</button>}
   </label>;
 }
 
@@ -92,15 +96,15 @@ export function DepartmentPicker({ type, id, onChange, income = false, label, cl
   onChange: (c: { departmentType: DepartmentType | null; departmentId: string | null }) => void;
   income?: boolean; label: string; className?: string;
 }) {
-  const { data = [] } = useDepartments();
-  const rows = data.filter((d) => !(income && d.department_type === "OFFICE"));
+  const departments = useDepartments();
+  const rows = (departments.data ?? []).filter((d) => !(income && d.department_type === "OFFICE"));
   return <select aria-label={label} className={className ?? fieldCls}
     value={encodeDepartment(type, id)}
     onChange={(e) => {
       const c = decodeDepartment(e.target.value);
       onChange({ departmentType: c.departmentType ?? null, departmentId: c.departmentId ?? null });
     }}>
-    <option value="">Department…</option>
+    <option value="">{departments.isError ? "Departments could not be loaded" : "Department…"}</option>
     {DEPARTMENT_TYPES.map((t) => {
       const group = rows.filter((d) => d.department_type === t);
       if (group.length === 0) return null;

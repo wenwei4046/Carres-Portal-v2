@@ -29,6 +29,8 @@ import { renderInvoicePdf } from "@/lib/pdf/render";
 import type { InvoiceTemplateData } from "@/lib/pdf/types";
 import { toast } from "sonner";
 import { SectionCard } from "@/components/SectionPanel";
+import Loading from "@/components/kit/Loading";
+import { LoadFailed } from "./other-money-in/parts";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import SalesOrderTabs from "@/pages/operation/SalesOrderTabs";
@@ -359,7 +361,11 @@ function Communications({ invoice }: { invoice: InvoiceRegisterRow }) {
     key: `o-${o.id}`, at: o.recorded_at, kind: "outcome" as const, o,
   }));
   const rows = [...messages, ...outcomes].sort((a, b) => (a.at < b.at ? 1 : -1));
-  if (!rows.length) return <p>{outcomesQ.isLoading ? "Loading…" : "No messages or results recorded yet."}</p>;
+  if (!rows.length) {
+    if (outcomesQ.isLoading) return <Loading label="Loading messages and results" />;
+    if (outcomesQ.isError) return <LoadFailed what="Collection results" onRetry={() => void outcomesQ.refetch()} />;
+    return <p>No messages or results recorded yet.</p>;
+  }
   return <div className="space-y-2" data-testid="communication-history">
     {rows.map((row) => row.kind === "message"
       ? <details key={row.key}>

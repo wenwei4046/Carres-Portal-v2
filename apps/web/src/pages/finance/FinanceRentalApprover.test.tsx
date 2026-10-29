@@ -200,7 +200,7 @@ describe("FinanceRentalApprover", () => {
   it("surfaces a load failure instead of showing an empty queue", () => {
     approvalsState = { data: undefined, isLoading: false, error: new Error("boom") };
     render(<FinanceRentalApprover />);
-    expect(screen.getByText(/Could not read the approval queue/i)).toBeInTheDocument();
+    expect(screen.getByText(/The approval queue could not be loaded/i)).toBeInTheDocument();
     expect(screen.queryByTestId("approver-empty")).not.toBeInTheDocument();
   });
 

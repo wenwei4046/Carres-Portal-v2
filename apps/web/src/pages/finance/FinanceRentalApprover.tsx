@@ -4,6 +4,8 @@ import { useRentalApprovals, useDecideRentalAgreement, type RentalApproval } fro
 import { rm } from "@/lib/format-currency";
 import { fmtDate } from "@/lib/fmt-date";
 import { FinanceKpi } from "@/components/FinanceKpi";
+import Loading from "@/components/kit/Loading";
+import { LoadFailed } from "./other-money-in/parts";
 import { supabase } from "@/lib/supabase";
 
 /** The private evidence bucket 0267 created. No delete policy — a signed
@@ -104,23 +106,23 @@ export default function FinanceRentalApprover() {
       </header>
 
       <div className="grid grid-cols-3 gap-3.5 mb-6">
-        <FinanceKpi label="Waiting on you" value={String(totals.count)} hint="Applications undecided" />
+        <FinanceKpi label="Waiting on you" value={approvalsQ.data ? String(totals.count) : null} hint="Applications undecided" />
         <FinanceKpi
           label="Credit at stake"
-          value={rm(totals.credit)}
+          value={approvalsQ.data ? rm(totals.credit) : null}
           hint="Total over the full terms"
           accent
         />
-        <FinanceKpi label="Monthly if all approved" value={rm(totals.monthly)} hint="Combined monthly fee" />
+        <FinanceKpi label="Monthly if all approved" value={approvalsQ.data ? rm(totals.monthly) : null} hint="Combined monthly fee" />
       </div>
 
       {approvalsQ.isLoading ? (
-        <div className="bg-card rounded-md border border-border p-12 text-center text-meta text-muted-foreground">
-          Loading…
+        <div className="bg-card rounded-md border border-border p-12">
+          <Loading variant="skeleton" label="Loading the approval queue" />
         </div>
       ) : approvalsQ.error ? (
-        <div className="p-3 text-meta rounded-md bg-destructive/5 text-destructive border border-destructive/30">
-          Could not read the approval queue. This does not mean nothing is waiting.
+        <div className="bg-card rounded-md border border-border">
+          <LoadFailed what="The approval queue" onRetry={() => void approvalsQ.refetch()} />
         </div>
       ) : rows.length === 0 ? (
         <div
@@ -286,6 +288,7 @@ function ApplicationCard({ r }: { r: RentalApproval }) {
           <textarea
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-body"
             rows={2}
+            aria-label="Why is this rejected?"
             value={reason}
             autoFocus
             placeholder="e.g. adverse credit record · income not verified"

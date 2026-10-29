@@ -8,6 +8,7 @@ import {
   type CollectionOwnerContextRow,
 } from "@carres/shared/payment-collection-owner";
 import { SectionCard } from "@/components/SectionPanel";
+import Loading from "@/components/kit/Loading";
 import { apiFetch } from "@/lib/api";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { qk, useCollectionOwner, useOperationWork, useWorkspaceDuties } from "@/lib/queries";
@@ -40,7 +41,7 @@ export default function InvoiceCollectionOwner({ orderId, canRead }: {
     <h2 className="text-strong mb-2">Collection owner</h2>
     <div className="text-body">
       {!canRead ? <p>Owner facts are Operation's.</p>
-      : ownerQ.isLoading ? <p>Loading…</p>
+      : ownerQ.isLoading ? <Loading label="Loading owner facts" />
       : ownerQ.isError ? <p>Owner facts could not be loaded.</p>
       : !owner ? <>
           <p className="text-kit-red-11" data-testid="collection-owner-none">{NOBODY_ASSIGNED_TO_ORDER}</p>

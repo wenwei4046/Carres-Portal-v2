@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { FinanceKpi } from "@/components/FinanceKpi";
+import { LoadFailed } from "./other-money-in/parts";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
@@ -49,40 +50,38 @@ export default function FinanceSubscriptionMonth() {
         <FinanceKpi label="Collected" value={figure(q.data?.collected)} noValue="" />
         <FinanceKpi label="Outstanding" value={figure(q.data?.outstanding)} noValue="" accent />
       </div>
-      {q.isError ? (
-        <p role="alert" className="p-4 text-body">The subscription months could not be loaded. Try again.</p>
-      ) : (
-        <ListPageShell register>
-          <DataGrid
-            rows={rows}
-            columns={columns}
-            rowKey={(r) => r.billingId}
-            storageKey="carres.finance.subscription-month.v1"
-            appearance="reference"
-            exportName="Unpaid subscriptions"
-            groupBanner={false}
-            stickyIdentity
-            isLoading={!q.isSuccess}
-            searchPlaceholder="Search customer, SO or agreement…"
-            toolbarStart={
-              <input
-                type="month"
-                aria-label="Month"
-                className="h-8 rounded-md border border-border bg-background px-2 text-body"
-                value={month}
-                onChange={(e) => e.target.value && setMonth(e.target.value)}
-                data-testid="subscription-month-picker"
-              />
-            }
-            emptyMessage="Every subscription month due in this month is paid."
-            statusSummary={(visible) => (
-              <span data-testid="subscription-month-unpaid">
-                {visible.length} unpaid · {rm(visible.reduce((a, r) => a + r.amountDue, 0))}
-              </span>
-            )}
-          />
-        </ListPageShell>
-      )}
+      <ListPageShell register>
+        <DataGrid
+          rows={rows}
+          columns={columns}
+          rowKey={(r) => r.billingId}
+          storageKey="carres.finance.subscription-month.v1"
+          appearance="reference"
+          exportName="Unpaid subscriptions"
+          groupBanner={false}
+          stickyIdentity
+          isLoading={q.isPending}
+          /* The month picker stays, so another month can still be read. */
+          errorState={q.isError ? <LoadFailed what="The subscription months" onRetry={() => void q.refetch()} /> : undefined}
+          searchPlaceholder="Search customer, SO or agreement…"
+          toolbarStart={
+            <input
+              type="month"
+              aria-label="Month"
+              className="h-8 rounded-md border border-border bg-background px-2 text-body"
+              value={month}
+              onChange={(e) => e.target.value && setMonth(e.target.value)}
+              data-testid="subscription-month-picker"
+            />
+          }
+          emptyMessage="Every subscription month due in this month is paid."
+          statusSummary={(visible) => (
+            <span data-testid="subscription-month-unpaid">
+              {visible.length} unpaid · {rm(visible.reduce((a, r) => a + r.amountDue, 0))}
+            </span>
+          )}
+        />
+      </ListPageShell>
     </div>
   );
 }

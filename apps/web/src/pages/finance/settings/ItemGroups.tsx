@@ -133,6 +133,7 @@ export default function ItemGroups() {
           allowColumnGrouping={false}
           stickyIdentity
           isLoading={!query.isSuccess}
+          emptyMessage="No item group yet. Press Add item group."
           onRowDoubleClick={(g) => setOpen(g)}
           toolbarEnd={
             // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0659).

@@ -98,6 +98,7 @@ export default function CommissionStatement({
         exportName={`Commission statement ${statement?.dealer.name ?? ""}`.trim()}
         groupBanner={false}
         allowColumnGrouping={false}
+        emptyMessage="No commission or payment for this dealer yet."
         isLoading={!query.isSuccess}
         wrapToolbar
         toolbarStart={toolbarStart}
@@ -174,7 +175,9 @@ function AddPaymentModal({ dealer, onClose }: { dealer: { id: string; name: stri
       }
     >
       <div className="flex flex-col gap-3" data-testid="commission-payment-form">
-        {choices.isSuccess && options.length === 0 ? (
+        {choices.isError ? (
+          <LoadFailed what="The payment vouchers" onRetry={() => void choices.refetch()} />
+        ) : choices.isSuccess && options.length === 0 ? (
           <p className="text-body">No paid direct payment voucher is waiting. Pay the dealer with a payment voucher first.</p>
         ) : (
           <Select id="commission-payment-voucher" label="Payment voucher" required value={voucherId}

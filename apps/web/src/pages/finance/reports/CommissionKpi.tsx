@@ -83,6 +83,7 @@ export default function CommissionKpi({ toolbarStart }: { toolbarStart: React.Re
           groupBanner={false}
           allowColumnGrouping={false}
           exportName="KPI allowance"
+          emptyMessage="No KPI allowance yet. Press Add a KPI allowance."
           isLoading={!query.isSuccess}
           onRowDoubleClick={(r) => setOpen(r)}
           wrapToolbar

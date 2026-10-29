@@ -116,6 +116,7 @@ export default function CommissionRates({ toolbarStart }: { toolbarStart: React.
           groupBanner={false}
           allowColumnGrouping={false}
           exportName="Commission rates"
+          emptyMessage="No commission rate yet. Press Add a rate."
           fixedGroups={{
             groups: RULE_GROUPS.map((g) => ({ key: g.key, label: g.label, alwaysOpen: true, emptyLabel: g.emptyLabel })),
             groupOf: (r) => r.kind,

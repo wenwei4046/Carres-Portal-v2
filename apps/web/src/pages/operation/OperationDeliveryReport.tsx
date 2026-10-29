@@ -3,7 +3,9 @@ import { Link } from "react-router-dom";
 import * as XLSX from "xlsx";
 import { deliveryQueueLeads } from "@carres/shared";
 import { useDeliveryDays } from "../../lib/deadline-queries";
+import Button from "@/components/kit/Button";
 import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
 import Select from "@/components/kit/Select";
 import { SectionCard } from "@/components/SectionPanel";
 import {
@@ -253,7 +255,11 @@ export default function OperationDeliveryReport() {
       <ModuleHeader testId="delivery-report-destination-header" word={DR.page} docTitle={DR.docTitle} destinationHeader />
       {failedRead ? (
         <div className="p-6" data-testid="delivery-report-error">
-          <EmptyState title={DR.failed} detail={DR.tryAgain} />
+          <EmptyState
+            title={DR.failed}
+            detail="The orders or the delivery records could not be loaded."
+            action={<Button variant="neutral" onClick={() => { void ordersQ.refetch(); void docsQ.refetch(); void arrangementsQ.refetch(); void partnersQ.refetch(); }}>{DR.tryAgain}</Button>}
+          />
         </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto">
@@ -282,7 +288,7 @@ export default function OperationDeliveryReport() {
             </header>
 
             {loading ? (
-              <p className="text-body text-base-500">{DR.loading}</p>
+              <Loading variant="skeleton" label={DR.loading} />
             ) : (
               <div className="space-y-4">
                 {/* 1 · Delivery Commitment Performance */}

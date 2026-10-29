@@ -260,6 +260,8 @@ export default function PostingAccounts() {
   );
 
   if (query.isError) return <LoadFailed what="The posting accounts" onRetry={() => void query.refetch()} />;
+  // Without the payment methods the Customer money postings would just be missing.
+  if (registry.isError) return <LoadFailed what="The payment methods" onRetry={() => void registry.refetch()} />;
   return (
     <ListPageShell register>
       {/* One scrolling area: the postings take the rows they have, and a long
@@ -278,6 +280,7 @@ export default function PostingAccounts() {
           // The Customer money rows come from the payment methods; wait for them
           // too, so the group never appears a moment after the others.
           isLoading={!query.isSuccess || registry.isLoading}
+          emptyMessage="No posting yet."
           onRowDoubleClick={(r) => {
             if (r.change) setOpen(r);
           }}

@@ -125,6 +125,7 @@ function CardRoutes() {
           allowColumnGrouping={false}
           stickyIdentity
           isLoading={!routes.isSuccess || !accountQuery.isSuccess}
+          emptyMessage="No card payout bank yet. Press Add a card payout bank."
           onRowDoubleClick={(r) => setEditing(r)}
           /* The note says what the table is for, on the toolbar's left beside it. */
           toolbarStart={
