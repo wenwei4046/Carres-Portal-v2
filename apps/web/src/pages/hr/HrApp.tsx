@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 // Unified Internal Portal — shared role-aware rail (no props, self-owned state).
@@ -92,6 +92,17 @@ function MonthStepper({
   );
 }
 
+/** The browser-tab word per tab: the sidebar's word (portal-nav.ts "hr" group). */
+const TAB_WORD = {
+  overview: "Overview",
+  commission: "Commission",
+  setup: "Commission setup",
+  team: "Team",
+  people: "People",
+  performance: "Performance",
+  "people-cost": "People cost",
+} as const;
+
 export default function HrApp() {
   const [searchParams] = useSearchParams();
   const rawTab = searchParams.get("tab");
@@ -134,6 +145,15 @@ export default function HrApp() {
   // The Commission module = two sub-tabs behind ONE sidebar entry. Its own bar
   // carries the hairline, so the header drops its border (no double line).
   const inCommission = tab === "commission" || tab === "setup";
+
+  // HR draws its own PageHeader (no ModuleHeader), so it names the browser tab the same way.
+  const tabWord = TAB_WORD[tab];
+  useEffect(() => {
+    document.title = `${tabWord} · HR · Carres`;
+    return () => {
+      document.title = "Carres Portal";
+    };
+  }, [tabWord]);
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">

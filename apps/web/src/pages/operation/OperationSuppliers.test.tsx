@@ -202,3 +202,29 @@ describe("OperationSuppliers · the scorecard", () => {
     ).toBeInTheDocument();
   });
 });
+
+describe("OperationSuppliers · page states", () => {
+  it("a failed read says so and Try again reads again, never 'No suppliers yet'", async () => {
+    vi.mocked(apiFetch).mockRejectedValue(new Error("boom"));
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <OperationSuppliers />
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not be loaded");
+    expect(screen.queryByText("No suppliers yet.")).not.toBeInTheDocument();
+    const calls = vi.mocked(apiFetch).mock.calls.length;
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(vi.mocked(apiFetch).mock.calls.length).toBe(calls + 1));
+  });
+
+  it("names the browser tab and leaves the h1 to the shell", async () => {
+    const { unmount } = mount([]);
+    expect(await screen.findByText("No suppliers yet.")).toBeInTheDocument();
+    expect(document.title).toBe("Suppliers · Carres");
+    expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
+    unmount();
+    expect(document.title).toBe("Carres Portal");
+  });
+});

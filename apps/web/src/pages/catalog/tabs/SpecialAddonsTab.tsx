@@ -468,6 +468,7 @@ function SpecialAddonEditor({ draft, onClose }: { draft: Draft; onClose: () => v
               <div key={gi} className="border border-base-200 rounded-[4px] p-2.5 bg-base-50" data-testid={`special-group-${gi}`}>
                 <div className="flex items-center gap-2 mb-2">
                   <input
+                    aria-label={`Question ${gi + 1}`}
                     value={g.label}
                     onChange={(e) => patchGroup(gi, { label: e.target.value })}
                     placeholder="Thickness"
@@ -484,6 +485,7 @@ function SpecialAddonEditor({ draft, onClose }: { draft: Draft; onClose: () => v
                   {g.choices.map((c, ci) => (
                     <div key={ci} className="flex items-center gap-2">
                       <input
+                        aria-label={`Question ${gi + 1} choice ${ci + 1}`}
                         value={c.label}
                         onChange={(e) => patchChoice(gi, ci, { label: e.target.value })}
                         placeholder='10"'
@@ -491,6 +493,7 @@ function SpecialAddonEditor({ draft, onClose }: { draft: Draft; onClose: () => v
                         data-testid={`special-choice-label-${gi}-${ci}`}
                       />
                       <input
+                        aria-label={`Question ${gi + 1} choice ${ci + 1} extra RM`}
                         type="number"
                         step="0.01"
                         value={c.extra}

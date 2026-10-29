@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Repeat, Search, Sparkles } from "lucide-react";
 import { toast } from "sonner";
@@ -36,6 +36,9 @@ import { PillTabs } from "@/pages/catalog/components/PillTabs";
 import { INPUT_CLS, Modal, ModalActions } from "@/pages/operation/components/Modal";
 import AgreementsSection from "./AgreementsSection";
 import RentalOfferEditor from "./RentalOfferEditor";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
 
 /**
  * Rental setting — its OWN Admin tab (Loo 2026-07-26: the rental config had
@@ -98,16 +101,38 @@ export default function RentalSettingPage({ isPrincipal }: { isPrincipal: boolea
       next.set(RENTAL_SECTION_PARAM, key);
       return next;
     });
+  // No ModuleHeader on this page, so it names the browser tab itself (same as ModuleHeader).
+  useEffect(() => {
+    document.title = "Rental · Admin · Carres";
+    return () => {
+      document.title = "Carres Portal";
+    };
+  }, []);
 
-  if (configQ.isPending || catalogQ.isPending) {
-    return <div className="text-body text-base-500">Loading rental config…</div>;
-  }
-  if (configQ.error) {
+  // A failed read answers before the pending check: a failed query is not pending, but its partner may be.
+  if (configQ.error || catalogQ.error) {
     return (
-      <div className="text-body text-danger">
-        Failed to load the rental config. Try refreshing. Your session may have expired.
+      <div role="alert">
+        <EmptyState
+          title="Could not be loaded"
+          detail="The rental config or catalog did not arrive. Your session may have expired."
+          action={
+            <Button
+              variant="neutral"
+              onClick={() => {
+                if (configQ.error) void configQ.refetch();
+                if (catalogQ.error) void catalogQ.refetch();
+              }}
+            >
+              Try again
+            </Button>
+          }
+        />
       </div>
     );
+  }
+  if (configQ.isPending || catalogQ.isPending) {
+    return <Loading variant="skeleton" label="Loading rental config" />;
   }
 
   const servicePackages: ServicePackage[] = configQ.data?.servicePackages ?? [];
@@ -878,6 +903,7 @@ function PackageForm({ pkg, onDone }: { pkg?: ServicePackage; onDone: () => void
       <div>
         <div className="label mb-1">Package name</div>
         <input
+          aria-label="Package name"
           className={INPUT_CLS}
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -906,6 +932,7 @@ function PackageForm({ pkg, onDone }: { pkg?: ServicePackage; onDone: () => void
         <div>
           <div className="label mb-1">Service type</div>
           <select
+            aria-label="Service type"
             className={INPUT_CLS}
             value={serviceType}
             onChange={(e) => setServiceType(e.target.value as ServicePackage["serviceType"])}
@@ -919,6 +946,7 @@ function PackageForm({ pkg, onDone }: { pkg?: ServicePackage; onDone: () => void
         <div>
           <div className="label mb-1">Standalone price (RM)</div>
           <input
+            aria-label="Standalone price (RM)"
             className={INPUT_CLS}
             type="number"
             min={0}
@@ -944,6 +972,7 @@ function PackageForm({ pkg, onDone }: { pkg?: ServicePackage; onDone: () => void
             </button>
           ))}
           <input
+            aria-label="Duration (months)"
             className={`${INPUT_CLS} w-24`}
             type="number"
             min={1}
@@ -958,6 +987,7 @@ function PackageForm({ pkg, onDone }: { pkg?: ServicePackage; onDone: () => void
         <div className="label mb-1">Visits per year</div>
         <div className="flex items-center gap-2">
           <input
+            aria-label="Visits per year"
             className={`${INPUT_CLS} w-24`}
             type="number"
             min={1}

@@ -14,6 +14,9 @@ import { SectionCard } from "@/components/SectionPanel";
 import { rm } from "@/lib/format-currency";
 import { useHrComp, useHrDeleteStaffComp, useHrSetStaffComp } from "@/lib/queries";
 import { StatTile } from "./HrOverviewTab";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
 
 /**
  * People cost (HR-P7, migration 0278) — what the team costs, per month.
@@ -245,10 +248,21 @@ export default function HrPeopleCostTab({
   month: number;
 }) {
   const [edit, setEdit] = useState<EditState | null>(null);
-  const { data, isLoading } = useHrComp(year, month);
+  const { data, isLoading, isError, refetch } = useHrComp(year, month);
 
+  if (isError) {
+    return (
+      <div role="alert" className="py-12">
+        <EmptyState
+          title="Could not be loaded"
+          detail="People cost for this month did not arrive."
+          action={<Button variant="neutral" onClick={() => void refetch()}>Try again</Button>}
+        />
+      </div>
+    );
+  }
   if (isLoading || !data) {
-    return <div className="py-12 text-body text-base-500">Loading people cost…</div>;
+    return <div className="py-12"><Loading variant="skeleton" label="Loading people cost" /></div>;
   }
 
   const { cost } = data;

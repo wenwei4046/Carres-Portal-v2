@@ -1,4 +1,8 @@
+import { useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
 import { useCatalog } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
 import { PillTabs } from "./components/PillTabs";
@@ -77,6 +81,13 @@ export default function ProductMaintenancePage({
       return next;
     });
   };
+  // No ModuleHeader on this page, so it names the browser tab itself (same as ModuleHeader).
+  useEffect(() => {
+    document.title = "Product & Maintenance · Admin · Carres";
+    return () => {
+      document.title = "Carres Portal";
+    };
+  }, []);
 
   return (
     <div className="px-9 py-8 pb-14">
@@ -106,12 +117,14 @@ export default function ProductMaintenancePage({
           (`?tab=rental-setting`): the rental config had outgrown a tab strip
           that is otherwise pure catalog work. */}
 
-      {catalogQ.isLoading && (
-        <div className="text-body text-base-500">Loading catalog…</div>
-      )}
+      {catalogQ.isLoading && <Loading variant="skeleton" label="Loading catalog" />}
       {catalogQ.isError && !catalogQ.isLoading && (
-        <div className="text-body text-danger">
-          Failed to load the catalog. Try refreshing. Your session may have expired.
+        <div role="alert">
+          <EmptyState
+            title="Could not be loaded"
+            detail="The catalog did not arrive. Your session may have expired."
+            action={<Button variant="neutral" onClick={() => void catalogQ.refetch()}>Try again</Button>}
+          />
         </div>
       )}
 

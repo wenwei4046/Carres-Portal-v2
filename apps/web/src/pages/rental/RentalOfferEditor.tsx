@@ -463,6 +463,7 @@ export default function RentalOfferEditor({
                   {terms.map((term) => (
                     <div key={term} className="text-right">
                       <input
+                        aria-label={`${t.label} RM / mo · ${term}`}
                         className={`${INPUT_CLS} w-24 text-right`}
                         type="number"
                         min={0}
@@ -536,6 +537,7 @@ export default function RentalOfferEditor({
                   </div>
                   <div className="text-right">
                     <input
+                      aria-label={`${t.label} outright RM`}
                       className={`${INPUT_CLS} w-28 text-right`}
                       type="number"
                       min={0}
@@ -646,11 +648,13 @@ export default function RentalOfferEditor({
                         />
                       </div>
                       <PriceCell
+                        label={`${v.label} once RM`}
                         value={val.oneTime}
                         onChange={(n) => setOverlay((o) => setValue(o, g.key, v.value, { oneTime: n }))}
                         testid={`option-once-${g.key}-${v.value}`}
                       />
                       <PriceCell
+                        label={`${v.label} RM / month`}
                         value={val.monthly}
                         onChange={(n) => setOverlay((o) => setValue(o, g.key, v.value, { monthly: n }))}
                         testid={`option-monthly-${g.key}-${v.value}`}
@@ -724,6 +728,7 @@ export default function RentalOfferEditor({
             data-testid={`surcharge-row-${i}`}
           >
             <input
+              aria-label={`Surcharge ${i + 1} name`}
               className={`${INPUT_CLS} max-w-[240px]`}
               value={s.label}
               onChange={(e) =>
@@ -736,6 +741,7 @@ export default function RentalOfferEditor({
             />
             <span className="text-meta text-base-500">once</span>
             <input
+              aria-label={`Surcharge ${i + 1} once RM`}
               className={`${INPUT_CLS} w-24 text-right`}
               type="number"
               min={0}
@@ -750,6 +756,7 @@ export default function RentalOfferEditor({
             />
             <span className="text-meta text-base-500">/ month</span>
             <input
+              aria-label={`Surcharge ${i + 1} RM / month`}
               className={`${INPUT_CLS} w-24 text-right`}
               type="number"
               min={0}
@@ -861,6 +868,7 @@ export default function RentalOfferEditor({
                   </div>
                   <div>
                     <select
+                      aria-label={`${p.name} free with`}
                       className={`${INPUT_CLS} py-1`}
                       value={d.freeLane}
                       onChange={(e) => set({ freeLane: e.target.value as ServiceDraft["freeLane"] })}
@@ -874,6 +882,7 @@ export default function RentalOfferEditor({
                   </div>
                   <div className="text-right">
                     <input
+                      aria-label={`${p.name} free visits`}
                       className={`${INPUT_CLS} w-16 text-right`}
                       type="number"
                       min={0}
@@ -886,6 +895,7 @@ export default function RentalOfferEditor({
                   </div>
                   <div className="text-right">
                     <input
+                      aria-label={`${p.name} RM / month`}
                       className={`${INPUT_CLS} w-20 text-right`}
                       type="number"
                       min={0}
@@ -898,6 +908,7 @@ export default function RentalOfferEditor({
                   </div>
                   <div className="text-right">
                     <input
+                      aria-label={`${p.name} outright RM`}
                       className={`${INPUT_CLS} w-24 text-right`}
                       type="number"
                       min={0}
@@ -935,6 +946,7 @@ export default function RentalOfferEditor({
           <div>
             <div className="label mb-1">Supplier rate (%)</div>
             <input
+              aria-label="Supplier rate (%)"
               className={INPUT_CLS}
               type="number"
               min={0}
@@ -948,6 +960,7 @@ export default function RentalOfferEditor({
           <div>
             <div className="label mb-1">Commission base (%)</div>
             <input
+              aria-label="Commission base (%)"
               className={INPUT_CLS}
               type="number"
               min={0}
@@ -1043,6 +1056,7 @@ function TermChips({ terms, onChange }: { terms: number[]; onChange: (t: number[
         </button>
       ))}
       <input
+        aria-label="Custom term (months)"
         className={`${INPUT_CLS} w-20`}
         type="number"
         min={1}
@@ -1071,10 +1085,12 @@ function TermChips({ terms, onChange }: { terms: number[]; onChange: (t: number[
 
 /** A nullable money cell — blank means "inherit / free", never 0-by-accident. */
 function PriceCell({
+  label,
   value,
   onChange,
   testid,
 }: {
+  label: string;
   value: number | null;
   onChange: (n: number | null) => void;
   testid: string;
@@ -1082,6 +1098,7 @@ function PriceCell({
   return (
     <div className="text-right">
       <input
+        aria-label={label}
         className={`${INPUT_CLS} w-24 text-right`}
         type="number"
         min={0}
@@ -1148,12 +1165,14 @@ function FabricSeriesRow({
           />
           <span className="text-meta text-base-500">once</span>
           <PriceCell
+            label={`${series} series once RM`}
             value={s.oneTime}
             onChange={(n) => onOverlay((o) => setSeries(o, series, { oneTime: n }))}
             testid={`fabric-series-once-${series}`}
           />
           <span className="text-meta text-base-500">/ mo</span>
           <PriceCell
+            label={`${series} series RM / month`}
             value={s.monthly}
             onChange={(n) => onOverlay((o) => setSeries(o, series, { monthly: n }))}
             testid={`fabric-series-monthly-${series}`}
@@ -1206,11 +1225,13 @@ function FabricSeriesRow({
                   />
                 </div>
                 <PriceCell
+                  label={`${c.label} once RM`}
                   value={cv.oneTime}
                   onChange={(n) => onOverlay((o) => setColor(o, series, c.code, { oneTime: n }))}
                   testid={`fabric-color-once-${c.code}`}
                 />
                 <PriceCell
+                  label={`${c.label} RM / month`}
                   value={cv.monthly}
                   onChange={(n) => onOverlay((o) => setColor(o, series, c.code, { monthly: n }))}
                   testid={`fabric-color-monthly-${c.code}`}
@@ -1275,6 +1296,7 @@ function GiftCell({
       {adding ? (
         <span className="flex items-center gap-1">
           <select
+            aria-label="Free gift SKU"
             className={`${INPUT_CLS} py-1 max-w-[160px]`}
             value={sku}
             onChange={(e) => setSku(e.target.value)}

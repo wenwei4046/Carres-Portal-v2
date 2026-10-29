@@ -1394,6 +1394,7 @@ export default function NewSkuModal({
                     <div key={nm} className="flex items-center gap-2">
                       <span className="w-24 shrink-0 truncate text-meta text-base-500">{nm}</span>
                       <input
+                        aria-label={`${nm} price`}
                         type="number"
                         min={0}
                         step="0.01"
@@ -1408,6 +1409,7 @@ export default function NewSkuModal({
                         className={INPUT_CLS}
                       />
                       <input
+                        aria-label={`${nm} PWP price`}
                         type="number"
                         min={0}
                         step="0.01"

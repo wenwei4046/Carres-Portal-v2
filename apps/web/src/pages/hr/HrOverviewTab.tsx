@@ -5,6 +5,9 @@ import { AlertTriangle, Check } from "lucide-react";
 import { SectionCard } from "@/components/SectionPanel";
 import { rm } from "@/lib/format-currency";
 import { useHrReport } from "@/lib/queries";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
 
 /**
  * Overview (O1) — the HR landing page: what the month is worth, and what
@@ -67,10 +70,21 @@ export default function HrOverviewTab({
   year: number;
   month: number;
 }) {
-  const { data, isLoading } = useHrReport(year, month);
+  const { data, isLoading, isError, refetch } = useHrReport(year, month);
 
+  if (isError) {
+    return (
+      <div role="alert" className="py-12">
+        <EmptyState
+          title="Could not be loaded"
+          detail="The month report did not arrive."
+          action={<Button variant="neutral" onClick={() => void refetch()}>Try again</Button>}
+        />
+      </div>
+    );
+  }
   if (isLoading || !data) {
-    return <div className="py-12 text-body text-base-500">Loading overview…</div>;
+    return <div className="py-12"><Loading variant="skeleton" label="Loading overview" /></div>;
   }
 
   const { report, bdReport, staff, config } = data;

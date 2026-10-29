@@ -1,5 +1,7 @@
 import { useMemo } from "react";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
 import ModuleHeader from "./components/ModuleHeader";
 import { useAllSkuSupplierOffers, useCatalog, useOperationSuppliers } from "@/lib/queries";
 import { buildSupplierItems, missingSupplierCodeCount, type SupplierItemRow } from "./supplier-items";
@@ -157,6 +159,28 @@ export default function OperationSupplierItems() {
           exportName={W.page}
           searchPlaceholder={W.search}
           isLoading={catalogQ.isLoading || suppliersQ.isLoading}
+          errorState={
+            catalogQ.isError || suppliersQ.isError || offersQ.isError ? (
+              <div role="alert">
+                <EmptyState
+                  title="Could not be loaded"
+                  detail="The catalog, supplier list or offers did not arrive."
+                  action={
+                    <Button
+                      variant="neutral"
+                      onClick={() => {
+                        if (catalogQ.isError) void catalogQ.refetch();
+                        if (suppliersQ.isError) void suppliersQ.refetch();
+                        if (offersQ.isError) void offersQ.refetch();
+                      }}
+                    >
+                      Try again
+                    </Button>
+                  }
+                />
+              </div>
+            ) : undefined
+          }
           emptyMessage={W.empty}
           chooserGroupOrder={["Supplier", "Item"]}
           toolbarEnd={

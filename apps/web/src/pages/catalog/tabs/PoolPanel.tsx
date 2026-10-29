@@ -5,6 +5,8 @@ import type { CatalogOptionPoolDto, CatalogOptionPoolName } from "@carres/shared
 import { ApiError } from "@/lib/api";
 import { useBatchSaveOptionPool, useCatalogConfigHistory } from "@/lib/queries";
 import { INPUT_CLS, Modal } from "@/pages/operation/components/Modal";
+import Button from "@/components/kit/Button";
+import Loading from "@/components/kit/Loading";
 
 /**
  * PoolPanel (0201) — one global option pool as a 2990s-style maintenance panel:
@@ -347,8 +349,16 @@ export default function PoolPanel({
       {showHistory && (
         <Modal title={`History: ${title}`} onClose={() => setShowHistory(false)}>
           <div className="flex flex-col gap-3 max-h-[60vh] overflow-y-auto pr-1">
-            {historyQ.isLoading && <p className="text-body text-base-500">Loading history…</p>}
-            {!historyQ.isLoading && history.length === 0 && (
+            {historyQ.isLoading && <Loading variant="skeleton" label="Loading history" />}
+            {historyQ.isError && (
+              <p role="alert" className="text-body text-base-700">
+                Could not be loaded.{" "}
+                <Button variant="ghost" onClick={() => void historyQ.refetch()}>
+                  Try again
+                </Button>
+              </p>
+            )}
+            {!historyQ.isLoading && !historyQ.isError && history.length === 0 && (
               <p className="text-body text-base-500">No history yet. The first Edit save writes one.</p>
             )}
             {history.map((h) => (

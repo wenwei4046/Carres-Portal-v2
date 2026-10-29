@@ -25,6 +25,9 @@ import {
   useHrToggleChecklist,
 } from "@/lib/queries";
 import { personInitials } from "@/lib/staff-avatar";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
 
 /**
  * The employee record (HR-P4, migration 0269).
@@ -111,11 +114,14 @@ function TeamChip() {
 
 /** An HR-owned text field: shows the value, or an Add affordance when empty. */
 function EditableText({
+  label,
   value,
   placeholder,
   onChange,
   type = "text",
 }: {
+  /** The input's accessible name: the row label is a sibling span, not a <label>. */
+  label: string;
   value: string | null;
   placeholder: string;
   onChange: (v: string | null) => void;
@@ -147,6 +153,7 @@ function EditableText({
   }
   return (
     <input
+      aria-label={label}
       autoFocus
       type={type}
       className={`${fieldCls} h-8 max-w-[260px] text-body`}
@@ -324,6 +331,7 @@ function ExitBlock({
     >
       <Row label="Last working day">
         <input
+          aria-label="Last working day"
           type="date"
           className={`${fieldCls} h-8 max-w-[170px] text-body`}
           value={exitDate}
@@ -348,6 +356,7 @@ function ExitBlock({
       </Row>
       <Row label="Note">
         <input
+          aria-label="Exit note"
           className={`${fieldCls} h-8 text-body`}
           placeholder="Optional"
           value={note}
@@ -418,7 +427,7 @@ export default function HrPersonDrawer({
   person: HrPersonRow;
   onClose: () => void;
 }) {
-  const { data: detail, isLoading } = useHrEmployee(person.employeeId);
+  const { data: detail, isLoading, isError, refetch } = useHrEmployee(person.employeeId);
   const patch = useHrPatchEmployee(person.employeeId);
   const toggle = useHrToggleChecklist(person.employeeId);
   const [draft, setDraft] = useState<HrEmployeePatchInput>({});
@@ -543,8 +552,18 @@ export default function HrPersonDrawer({
           )}
         </div>
 
-        {isLoading || !detail ? (
-          <div className="text-body flex-1 py-12 text-center text-base-500">Loading record…</div>
+        {isError ? (
+          <div role="alert" className="flex-1 py-12">
+            <EmptyState
+              title="Could not be loaded"
+              detail="This person's record did not arrive."
+              action={<Button variant="neutral" onClick={() => void refetch()}>Try again</Button>}
+            />
+          </div>
+        ) : isLoading || !detail ? (
+          <div className="flex-1 py-12">
+            <Loading variant="skeleton" label="Loading record" />
+          </div>
         ) : (
           <>
             {needsExit && (
@@ -599,6 +618,7 @@ export default function HrPersonDrawer({
                 </Row>
                 <Row label="Nationality">
                   <EditableText
+                    label="Nationality"
                     value={val("nationality", "nationality")}
                     placeholder="Malaysian"
                     onChange={(v) => set("nationality", v)}
@@ -606,6 +626,7 @@ export default function HrPersonDrawer({
                 </Row>
                 <Row label="Marital status">
                   <select
+                    aria-label="Marital status"
                     className={`${fieldCls} h-8 max-w-[160px] text-body`}
                     value={val("maritalStatus", "marital_status") ?? ""}
                     onChange={(e) => set("marital_status", e.target.value || null)}
@@ -630,6 +651,7 @@ export default function HrPersonDrawer({
                 </Row>
                 <Row label="Personal email">
                   <EditableText
+                    label="Personal email"
                     type="email"
                     value={val("personalEmail", "personal_email")}
                     placeholder="name@example.com"
@@ -638,6 +660,7 @@ export default function HrPersonDrawer({
                 </Row>
                 <Row label="Personal phone">
                   <EditableText
+                    label="Personal phone"
                     value={val("personalPhone", "personal_phone")}
                     placeholder="+60…"
                     onChange={(v) => set("personal_phone", v)}
@@ -645,11 +668,13 @@ export default function HrPersonDrawer({
                 </Row>
                 <Row label="Emergency">
                   <EditableText
+                    label="Emergency contact name"
                     value={val("emergencyName", "emergency_name")}
                     placeholder="Name"
                     onChange={(v) => set("emergency_name", v)}
                   />
                   <EditableText
+                    label="Emergency contact phone"
                     value={val("emergencyPhone", "emergency_phone")}
                     placeholder="Phone"
                     onChange={(v) => set("emergency_phone", v)}
@@ -663,6 +688,7 @@ export default function HrPersonDrawer({
               >
                 <Row label="Bank">
                   <EditableText
+                    label="Bank"
                     value={val("bankName", "bank_name")}
                     placeholder="Maybank"
                     onChange={(v) => set("bank_name", v)}
@@ -678,6 +704,7 @@ export default function HrPersonDrawer({
                 </Row>
                 <Row label="EPF no.">
                   <EditableText
+                    label="EPF no."
                     value={val("epfNo", "epf_no")}
                     placeholder="Reference only"
                     onChange={(v) => set("epf_no", v)}
@@ -685,6 +712,7 @@ export default function HrPersonDrawer({
                 </Row>
                 <Row label="SOCSO no.">
                   <EditableText
+                    label="SOCSO no."
                     value={val("socsoNo", "socso_no")}
                     placeholder="Reference only"
                     onChange={(v) => set("socso_no", v)}
@@ -692,6 +720,7 @@ export default function HrPersonDrawer({
                 </Row>
                 <Row label="Tax no.">
                   <EditableText
+                    label="Tax no."
                     value={val("taxNo", "tax_no")}
                     placeholder="Reference only"
                     onChange={(v) => set("tax_no", v)}
@@ -706,6 +735,7 @@ export default function HrPersonDrawer({
               <Panel title="Employment" tag={detail.employmentType ? undefined : "incomplete"}>
                 <Row label="Join date">
                   <input
+                    aria-label="Join date"
                     type="date"
                     className={`${fieldCls} h-8 max-w-[170px] text-body`}
                     value={val("joinDate", "join_date") ?? ""}
@@ -714,6 +744,7 @@ export default function HrPersonDrawer({
                 </Row>
                 <Row label="Confirmed on">
                   <input
+                    aria-label="Confirmed on"
                     type="date"
                     className={`${fieldCls} h-8 max-w-[170px] text-body`}
                     value={val("confirmDate", "confirm_date") ?? ""}
@@ -722,6 +753,7 @@ export default function HrPersonDrawer({
                 </Row>
                 <Row label="Type">
                   <select
+                    aria-label="Employment type"
                     className={`${fieldCls} h-8 max-w-[170px] text-body`}
                     value={val("employmentType", "employment_type") ?? ""}
                     onChange={(e) => set("employment_type", e.target.value || null)}

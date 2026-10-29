@@ -35,6 +35,9 @@ import {
   useCommissionRunState,
   useCommissionRuns,
 } from "@/lib/queries";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
 
 /**
  * The month close (HR-P5, migrations 0272/0273).
@@ -122,6 +125,7 @@ function AdjustmentDialog({
           <div className="flex min-h-[36px] items-center gap-3 border-t border-base-100 py-2 first:border-t-0">
             <span className="text-meta w-[104px] shrink-0 text-base-400">Person</span>
             <select
+              aria-label="Person"
               className={`${fieldCls} h-8 flex-1 text-body`}
               value={subjectId}
               onChange={(e) => setSubjectId(e.target.value)}
@@ -156,6 +160,7 @@ function AdjustmentDialog({
           <div className="flex min-h-[36px] items-center gap-3 border-t border-base-100 py-2">
             <span className="text-meta w-[104px] shrink-0 text-base-400">Amount</span>
             <input
+              aria-label="Amount"
               className={`${fieldCls} h-8 max-w-[150px] font-mono text-body`}
               placeholder="-183.00"
               value={amount}
@@ -167,6 +172,7 @@ function AdjustmentDialog({
           <div className="flex min-h-[36px] items-center gap-3 border-t border-base-100 py-2">
             <span className="text-meta w-[104px] shrink-0 text-base-400">Originally</span>
             <input
+              aria-label="Originally"
               type="month"
               className={`${fieldCls} h-8 max-w-[170px] text-body`}
               value={originMonth}
@@ -178,6 +184,7 @@ function AdjustmentDialog({
           <div className="flex min-h-[36px] items-center gap-3 border-t border-base-100 py-2">
             <span className="text-meta w-[104px] shrink-0 text-base-400">Note</span>
             <input
+              aria-label="Note"
               className={`${fieldCls} h-8 flex-1 text-body`}
               placeholder="Optional"
               value={note}
@@ -245,7 +252,7 @@ export default function HrCommissionRunPanel({
   people: { id: string; name: string; staffCode?: string | null }[];
   isPrincipal: boolean;
 }) {
-  const { data: state, isLoading } = useCommissionRunState(year, month);
+  const { data: state, isLoading, isError, refetch } = useCommissionRunState(year, month);
   const { data: runsData } = useCommissionRuns();
   const close = useCloseCommissionMonth();
   const approve = useCommissionRunAction("approve");
@@ -265,7 +272,23 @@ export default function HrCommissionRunPanel({
   if (isLoading) {
     return (
       <SectionCard>
-        <div className="text-body px-4 py-6 text-center text-base-500">Checking the month…</div>
+        <div className="px-4 py-6">
+          <Loading variant="skeleton" lines={2} label="Checking the month" />
+        </div>
+      </SectionCard>
+    );
+  }
+  // Without the run state the banner would read as an open month; say the read failed instead.
+  if (isError) {
+    return (
+      <SectionCard>
+        <div role="alert">
+          <EmptyState
+            title="Could not be loaded"
+            detail="Whether this month is closed did not arrive."
+            action={<Button variant="neutral" onClick={() => void refetch()}>Try again</Button>}
+          />
+        </div>
       </SectionCard>
     );
   }

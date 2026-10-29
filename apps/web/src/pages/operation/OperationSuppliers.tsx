@@ -1,7 +1,7 @@
 import { GOODS_ABSENCE_WORDS } from "@carres/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   MIN_JUDGED_POS,
   SCORECARD_UNKNOWN_TEXT,
@@ -12,6 +12,8 @@ import {
 import { qk, useSetSupplierTermsDays } from "@/lib/queries";
 import Input from "@/components/kit/Input";
 import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
 
@@ -88,21 +90,29 @@ function rateWhy(r: ScorecardRate): string | null {
 }
 
 export default function OperationSuppliers() {
-  const { data, isLoading } = useQuery<OverviewResponse>({
+  const { data, isLoading, isError, refetch } = useQuery<OverviewResponse>({
     queryKey: qk.operation.suppliersOverview(),
     queryFn: () => apiFetch("/api/operation/suppliers-overview"),
   });
   const suppliers = data?.suppliers ?? [];
   const win = data?.scorecardWindow;
   const [open, setOpen] = useState<SupplierRow | null>(null);
+  // No ModuleHeader on this page, so it names the browser tab itself (same as ModuleHeader).
+  useEffect(() => {
+    document.title = "Suppliers · Carres";
+    return () => {
+      document.title = "Carres Portal";
+    };
+  }, []);
 
   return (
     <div className="px-9 py-8 pb-14">
       <div className="mb-[22px]">
         <div className="kicker">HQ · Network</div>
-        <h1 className="text-page font-display mt-1.5">
+        {/* The shell header already prints "Suppliers" as the page's h1. */}
+        <h2 className="text-page font-display mt-1.5">
           Suppliers
-        </h1>
+        </h2>
         <div className="text-body text-base-600 mt-1.5">
           {suppliers.length} active · upstream of stock pipeline.
         </div>
@@ -116,13 +126,23 @@ export default function OperationSuppliers() {
         )}
       </div>
 
-      {isLoading && <div className="text-body text-base-600">Loading…</div>}
+      {isLoading && <Loading variant="skeleton" label="Loading suppliers" />}
 
-      {!isLoading && suppliers.length === 0 && (
+      {isError && (
+        <div role="alert">
+          <EmptyState
+            title="Could not be loaded"
+            detail="The supplier list did not arrive."
+            action={<Button variant="neutral" onClick={() => void refetch()}>Try again</Button>}
+          />
+        </div>
+      )}
+
+      {!isLoading && !isError && suppliers.length === 0 && (
         <div className="text-body text-base-500">No suppliers yet.</div>
       )}
 
-      <div className="grid grid-cols-2 gap-3.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
         {suppliers.map((s) => (
           <button
             key={s.id}
@@ -217,7 +237,7 @@ function CardScorecard({ sc }: { sc: SupplierScorecard }) {
 }
 
 function SupplierDrawer({ supplier, onClose }: { supplier: SupplierRow; onClose: () => void }) {
-  const { data, isLoading } = useQuery<{ pos: PoRow[] }>({
+  const { data, isLoading, isError, refetch } = useQuery<{ pos: PoRow[] }>({
     queryKey: qk.operation.suppliersOverviewPos(supplier.id),
     queryFn: () => apiFetch(`/api/operation/suppliers-overview/${supplier.id}/pos`),
   });
@@ -226,7 +246,7 @@ function SupplierDrawer({ supplier, onClose }: { supplier: SupplierRow; onClose:
   return (
     <div className="fixed inset-0 z-[90] flex justify-end">
       <div onClick={onClose} className="absolute inset-0 bg-black/40" />
-      <div className="relative w-[480px] bg-white h-screen overflow-auto p-7">
+      <div className="relative w-full max-w-[480px] bg-white h-screen overflow-auto p-7">
         <div className="flex justify-between items-start mb-[18px]">
           <div>
             <div className="kicker">{supplier.slug ?? supplier.id.slice(0, 8)}</div>
@@ -241,6 +261,7 @@ function SupplierDrawer({ supplier, onClose }: { supplier: SupplierRow; onClose:
           </div>
           <button
             onClick={onClose}
+            aria-label="Close"
             className="text-strong text-base-500 hover:text-base-900 cursor-pointer"
           >
             ×
@@ -255,8 +276,17 @@ function SupplierDrawer({ supplier, onClose }: { supplier: SupplierRow; onClose:
           Recent POs
         </div>
         <div className="border border-base-200 rounded">
-          {isLoading && <div className="p-4 text-meta text-base-500">Loading…</div>}
-          {!isLoading && pos.length === 0 && (
+          {isLoading && <div className="p-4"><Loading variant="skeleton" label="Loading recent POs" /></div>}
+          {isError && (
+            <div role="alert">
+              <EmptyState
+                title="Could not be loaded"
+                detail="The recent POs did not arrive."
+                action={<Button variant="neutral" onClick={() => void refetch()}>Try again</Button>}
+              />
+            </div>
+          )}
+          {!isLoading && !isError && pos.length === 0 && (
             <div className="p-4 text-meta text-base-500">No POs yet.</div>
           )}
           {pos.map((p, i) => (

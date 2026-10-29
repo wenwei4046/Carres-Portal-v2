@@ -32,6 +32,9 @@ import {
   useHrUpsertPosition,
   useHrSetPositionDuty,
 } from "@/lib/queries";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
 
 /**
  * Team tab (HR hierarchy Phase 1, Loo 2026-07-25) — the org registry + THE
@@ -102,6 +105,7 @@ function StaffCodeCell({
   if (editing) {
     return (
       <input
+        aria-label="Staff code"
         autoFocus
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
@@ -834,6 +838,7 @@ function DepartmentsCard({ departments }: { departments: OrgDepartment[] }) {
           </div>
           <div className="flex items-center gap-2 pt-1 px-1">
             <input
+              aria-label="New department name"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && add()}
@@ -1095,6 +1100,7 @@ function PositionsCard({
           })}
           <div className="flex items-center gap-2 pt-1 px-1">
             <input
+              aria-label="New position name"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && add()}
@@ -1142,7 +1148,7 @@ function PositionsCard({
 
 export default function HrTeamTab() {
   const role = useAuth((s) => s.role);
-  const { data, isLoading } = useHrTeam();
+  const { data, isLoading, isError, refetch } = useHrTeam();
   const [addUserOpen, setAddUserOpen] = useState(false);
   const [addStaffOpen, setAddStaffOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -1187,8 +1193,19 @@ export default function HrTeamTab() {
     return [...groups.entries()];
   }, [data]);
 
+  if (isError) {
+    return (
+      <div role="alert" className="py-10">
+        <EmptyState
+          title="Could not be loaded"
+          detail="The team list did not arrive."
+          action={<Button variant="neutral" onClick={() => void refetch()}>Try again</Button>}
+        />
+      </div>
+    );
+  }
   if (isLoading || !data) {
-    return <div className="text-body text-base-500 py-10 text-center">Loading team…</div>;
+    return <div className="py-10"><Loading variant="skeleton" label="Loading team" /></div>;
   }
 
   return (
