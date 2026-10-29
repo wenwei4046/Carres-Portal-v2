@@ -159,7 +159,7 @@ async function recordContact(
 /** A delivery day is never a Sunday or a Malaysian public holiday (§8.6) —
  *  the holidays of the ONE Delivery calendar (the stored Selangor calendar,
  *  else the built-in list), never the Office list. */
-function refusedDeliveryDay(dateIso: string, calendar: DeliveryCalendar): string | null {
+export function refusedDeliveryDay(dateIso: string, calendar: DeliveryCalendar): string | null {
   const refusal = deliveryDayRefusal(calendar, dateIso);
   if (refusal === "sunday") return "Sunday is not a delivery day";
   if (refusal === "holiday") return "A Malaysian public holiday is not a delivery day";

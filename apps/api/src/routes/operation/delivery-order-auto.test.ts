@@ -45,6 +45,7 @@ function tableMock(read: Result) {
     upsert: vi.fn(() => b),
     order: vi.fn(() => b),
     limit: vi.fn(() => b),
+    in: vi.fn(() => b),
     maybeSingle: vi.fn().mockResolvedValue(read),
     single: vi.fn().mockResolvedValue(read),
     then: (res: (v: Result) => unknown, rej?: (e: unknown) => unknown) =>

@@ -120,7 +120,7 @@ export interface InvoiceRegisterRow {
       /** The company Delivery assigned to this leg, and whether it is the
        *  Klang Valley default — the outstation fact (`invoiceOutstation`). */
       partner_id?: string | null;
-      delivery_partners?: { kv_default: boolean | null } | null;
+      delivery_partners?: { name?: string; kv_default: boolean | null } | null;
     }>;
     /** Delivery Orders per leg — the issued snapshot outranks everything. */
     ops_delivery_orders?: Array<{

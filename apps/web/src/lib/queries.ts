@@ -7572,6 +7572,8 @@ export function useConfirmBooking(
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: qk.operation.orderControl(orderId), exact: true });
       await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      // The booking door moves Delivery's arrangement day too.
+      await qc.invalidateQueries({ queryKey: ["operation", "delivery-arrangements"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });

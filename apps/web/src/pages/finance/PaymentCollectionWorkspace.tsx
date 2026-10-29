@@ -23,7 +23,7 @@ import InvoiceCollectionOwner from "./InvoiceCollectionOwner";
 import CustomerStatement from "./CustomerStatement";
 import { useAuth } from "@/lib/auth";
 import { useDeliveryDays, usePersonOwnerCalendars } from "@/lib/deadline-queries";
-import { useCollectionOutcomes, useCollectionOwner, useDeliveryPartners } from "@/lib/queries";
+import { useCollectionOutcomes, useCollectionOwner } from "@/lib/queries";
 import { apiFetch } from "@/lib/api";
 import { renderInvoicePdf } from "@/lib/pdf/render";
 import type { InvoiceTemplateData } from "@/lib/pdf/types";
@@ -244,10 +244,10 @@ function InvoiceObject({ invoice, facts: f, onAsk, onResult, correctionInFlight,
     }, 0);
     return () => clearTimeout(timer);
   }, [focus]);
-  // ops_assigned_logistic is a partner ID — resolve it, never print the uuid.
-  const partnersQ = useDeliveryPartners();
-  const triageName = (partnersQ.data?.partners ?? []).find((p) => p.id === invoice.orders?.ops_assigned_logistic)?.name ?? null;
-  const partner = invoice.orders?.delivery_partners?.name ?? triageName;
+  // Delivery's own arrangement (leg 0) is the carrier the Monitor names; the
+  // order's own company is the fallback. (ops_assigned_logistic is an ID, never a name.)
+  const arrangedName = invoice.orders?.ops_delivery_arrangements?.find((a) => a.leg === 0)?.delivery_partners?.name ?? null;
+  const partner = arrangedName ?? invoice.orders?.delivery_partners?.name ?? null;
   const contact = invoice.orders?.delivery_partners?.contact ?? null;
   const payments = (invoice.orders?.order_payments ?? [])
     .slice()

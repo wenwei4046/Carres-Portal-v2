@@ -83,7 +83,7 @@ const INVOICE_REGISTER_SELECT =
   // the booking overlay only while its stage is `confirmed`. The shared
   // `invoiceConfirmedDelivery` reads these for the Monitor AND the Work feed,
   // so the clock starts on the day Delivery actually agreed.
-  "ops_delivery_arrangements(leg,confirmed_date,confirmed_time,partner_id,delivery_partners(kv_default))," +
+  "ops_delivery_arrangements(leg,confirmed_date,confirmed_time,partner_id,delivery_partners(name,kv_default))," +
   "ops_delivery_orders(leg,delivery_date,time_slot,voided_at,issued_at)," +
   "ops_order_control(balance,confirmed_date,booking_stage,confirmed_time_slot,line_etas,line_stock_status," +
   // The 2026-09-08 correction: the Payment screens must see the LEGACY
