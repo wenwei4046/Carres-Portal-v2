@@ -98,7 +98,7 @@ describe("GET /api/auth/me", () => {
     expect(res.status).toBe(403);
   });
 
-  it("401 for a disabled account: the 0731 hook mints its token with no role", async () => {
+  it("401 for a disabled account (token shape the 0731 hook mints: no role)", async () => {
     // What custom_access_token_hook (0731) returns for a non-active app_users
     // row: createUser's role/dealer_id stripped, provider fields kept.
     const jwt = await makeJwt({

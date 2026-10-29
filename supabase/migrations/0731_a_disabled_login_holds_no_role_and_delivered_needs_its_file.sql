@@ -309,7 +309,7 @@ update storage.buckets
  where id = 'proof-of-delivery';
 
 update storage.buckets
-   set file_size_limit    = 10485760,
+   set file_size_limit    = 20971520, -- 20 MiB: receipt pickers upload raw phone photos unchecked
        allowed_mime_types = array['application/pdf','image/jpeg','image/png','image/heic','image/heif']
  where id = 'orders-attachments';
 

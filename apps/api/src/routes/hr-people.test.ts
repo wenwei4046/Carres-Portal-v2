@@ -248,6 +248,60 @@ describe("POST /api/hr/people/:id/access — the HR disable door", () => {
     );
   });
 
+  function enableFixture(banResult: () => Promise<unknown>) {
+    mockUserRpc({ data: { employeeId: EMPLOYEE, appUserId: APP_USER, salespersonId: null } });
+    const updateUserById = vi.fn(banResult);
+    const update = vi.fn(() => ({ eq: vi.fn(async () => ({ error: null })) }));
+    const from = vi.fn((table: string) =>
+      table === "app_users"
+        ? {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: { id: APP_USER, email: "s@carres.com", name: "Samantha", role: "operation", dealer_id: null },
+                }),
+              }),
+            }),
+            update,
+          }
+        : { insert: vi.fn(async () => ({ error: null })) },
+    );
+    vi.mocked(adminClient).mockReturnValue({ from, auth: { admin: { updateUserById } } } as never);
+    return { updateUserById, update };
+  }
+
+  it("re-enable lifts the ban (0731)", async () => {
+    const { updateUserById } = enableFixture(async () => ({ data: {}, error: null }));
+    const res = await authed(`/api/hr/people/${EMPLOYEE}/access`, "hr", {
+      method: "POST",
+      body: JSON.stringify({ status: "active" }),
+    });
+    expect(res.status).toBe(200);
+    expect(updateUserById).toHaveBeenCalledWith(APP_USER, { ban_duration: "none" });
+  });
+
+  it("a failed unban fails the request and puts the account back to disabled (0731)", async () => {
+    const { update } = enableFixture(async () => ({ data: null, error: new Error("gotrue down") }));
+    const res = await authed(`/api/hr/people/${EMPLOYEE}/access`, "hr", {
+      method: "POST",
+      body: JSON.stringify({ status: "active" }),
+    });
+    expect(res.status).toBe(500);
+    expect(((await res.json()) as { code: string }).code).toBe("unban_failed");
+    expect(update).toHaveBeenLastCalledWith({ status: "disabled" });
+  });
+
+  it("a thrown ban error on disable is logged, not fatal (0731)", async () => {
+    enableFixture(async () => {
+      throw new Error("boom");
+    });
+    const res = await authed(`/api/hr/people/${EMPLOYEE}/access`, "hr", {
+      method: "POST",
+      body: JSON.stringify({ status: "disabled" }),
+    });
+    expect(res.status).toBe(200);
+  });
+
   it("cannot disable a principal", async () => {
     mockUserRpc({ data: { employeeId: EMPLOYEE, appUserId: APP_USER, salespersonId: null } });
     const update = vi.fn();

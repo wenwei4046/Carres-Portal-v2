@@ -130,7 +130,7 @@ partnerPodRouter.post("/:threadId/attach", async (c) => {
   if (auth.role !== "partner") {
     throw new HTTPException(403, { message: "Partner role required" });
   }
-  const threadId = c.req.param("threadId");
+  const threadId = c.req.param("threadId")?.toLowerCase();
   if (!threadId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(threadId)) {
     return c.json(
       { error: "invalid_id", code: "invalid_param", message: "threadId must be a uuid" },

@@ -34,7 +34,7 @@ export type SetAccountStatusResult =
   | { ok: true; email: string; name: string }
   | {
       ok: false;
-      code: "not_found" | "cannot_disable_principal" | "status_update_failed";
+      code: "not_found" | "cannot_disable_principal" | "status_update_failed" | "unban_failed";
       message: string;
     };
 
@@ -83,6 +83,16 @@ export async function setAccountStatus(
   const ban = await admin.auth.admin
     .updateUserById(userId, { ban_duration: status === "disabled" ? "876000h" : "none" })
     .catch((err: unknown) => ({ error: err }));
+  if (ban.error && status === "active") {
+    // A failed unban would leave an "active" account GoTrue still refuses:
+    // put the flag back so the admin sees the failure and can retry.
+    await admin.from("app_users").update({ status: "disabled" }).eq("id", userId);
+    return {
+      ok: false,
+      code: "unban_failed",
+      message: "Could not lift the login ban; the account is still disabled. Try again.",
+    };
+  }
   if (ban.error) {
     console.log(
       JSON.stringify({

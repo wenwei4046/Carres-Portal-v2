@@ -259,6 +259,23 @@ describe("POST /api/partner/pod/:threadId/attach", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
+  it("refuses a signature path from another thread (0731)", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("partner", { partnerId: PARTNER_ID });
+    const res = await app.fetch(
+      new Request(`http://t/api/partner/pod/${THREAD_ID}/attach`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ ...VALID, signaturePath: "00000000-0000-0000-0000-000000000001/x-signature.png" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
   it("rejects non-uuid threadId with 422", async () => {
     const jwt = await makeJwt("partner", { partnerId: PARTNER_ID });
     const res = await app.fetch(
