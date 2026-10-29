@@ -397,7 +397,7 @@ export default function PaymentMonitor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scopedRows, picked, pickedDay, workItems, orderById, addonNameByKey]);
 
-  const stockAbsence = !canReadWork ? STOCK_FACTS_ARE_OPERATIONS : ordersQ.isError ? STOCK_FACTS_FAILED : "";
+  const stockAbsence = !canReadWork ? STOCK_FACTS_ARE_OPERATIONS : ordersQ.isError && !ordersQ.data ? STOCK_FACTS_FAILED : "";
   const stockText = (r: MonitorRow) => r.stock
     ? joinLines(r.stock.line1, r.stock.line2)
     : stockAbsence;
@@ -509,11 +509,11 @@ export default function PaymentMonitor() {
      paid) keeps the full-page workspace. */
   const invoiceRow = invoice ? allRows.find((r) => r.orderId === invoice.order_id) ?? null : null;
   const revealKey = reveal?.key ?? invoiceRow?.orderId;
-  const isError = invoicesQ.isError || casesQ.isError || requestsQ.isError || settingsQ.isError;
-  const loaded = invoicesQ.isSuccess && casesQ.isSuccess && requestsQ.isSuccess && settingsQ.isSuccess
+  const isError = [invoicesQ, casesQ, requestsQ, settingsQ].some((q) => q.isError && !q.data);
+  const loaded = !!invoicesQ.data && !!casesQ.data && !!requestsQ.data && !!settingsQ.data
     && (!canReadWork || ordersQ.isSuccess || ordersQ.isError);
-  const planLoaded = loaded && canReadWork && workQ.isSuccess;
-  const planFailed = canReadWork && workQ.isError;
+  const planLoaded = loaded && canReadWork && !!workQ.data;
+  const planFailed = canReadWork && workQ.isError && !workQ.data;
   /** The day's words — the rail card and the collapsed sheet header say the same. */
   const dayWords = (d: PaymentWeekDay): string[] => {
     const words = d.lines.map(paymentWeekLineWord);

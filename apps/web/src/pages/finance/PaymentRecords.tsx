@@ -169,7 +169,7 @@ export default function PaymentRecords() {
   );
   return <div className="flex h-full min-h-0 flex-col">
     <h1 className="sr-only">Payment Records</h1>
-    {query.isError ? <>
+    {query.isError && !query.data ? <>
       <ModuleHeader destinationHeader testId="payment-records-destination-header" word="Payment Records" docTitle="Payment Records · Payments · Carres" />
       <div role="alert" className="p-6 text-body">
         <p>Payment Records could not be loaded. Try again.</p>

@@ -61,6 +61,8 @@ export default function OperationStock() {
     <div className="px-9 py-8 pb-14">
       <div className="mb-[22px]">
         <div className="text-label uppercase tracking-[0.06em] text-primary">HQ · Operations</div>
+        {/* Below 768px the shell prints no h1. */}
+        <h1 className="sr-only md:hidden">Stock</h1>
         {/* h2: the shell header already prints this page's h1. */}
         <h2 className="text-page font-display mt-1.5">
           Stock across the network

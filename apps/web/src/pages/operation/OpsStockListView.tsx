@@ -338,6 +338,8 @@ export default function OpsStockListView(props: Props) {
           <p className="text-label uppercase tracking-[0.06em] text-base-500 mb-1">
             {props.kicker}
           </p>
+          {/* Below 768px the shell prints no h1. */}
+          <h1 className="sr-only md:hidden">{props.title}</h1>
           {/* h2: the shell header already prints this page's h1. */}
           <h2 className="text-page text-base-900">{props.title}</h2>
           <p className="text-body text-base-600 mt-2">{props.blurb}</p>

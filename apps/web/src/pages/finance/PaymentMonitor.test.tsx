@@ -14,7 +14,7 @@ import PaymentMonitor from "./PaymentMonitor";
  * follow-up plan in the rail, and the payment workspace opened below the row.
  */
 const state = vi.hoisted(() => ({
-  invoices: { data: [] as unknown[], isLoading: false, isError: false, isSuccess: true, refetch: vi.fn(), error: null },
+  invoices: { data: [] as unknown[] | undefined, isLoading: false, isError: false, isSuccess: true, refetch: vi.fn(), error: null },
   cases: { data: { cases: [] as unknown[] }, isLoading: false, isError: false, isSuccess: true, refetch: vi.fn() },
   requests: { data: { requests: [] as unknown[] }, isLoading: false, isError: false, isSuccess: true, refetch: vi.fn() },
   settings: { data: { collection_timing: [] as unknown[], bank_accounts: [] }, isLoading: false, isError: false, isSuccess: true, refetch: vi.fn() },
@@ -696,7 +696,7 @@ describe("Payment Monitor — the payment workspace opens below the row", () => 
 
 describe("Payment Monitor — states", () => {
   it("a failed source shows recovery, never a zero desk", () => {
-    state.invoices.isError = true; state.invoices.data = [];
+    state.invoices.isError = true; state.invoices.data = undefined;
     show();
     expect(screen.getByRole("alert")).toHaveTextContent("The collection desk could not be loaded.");
     expect(screen.queryByTestId("payment-monitor-summary")).not.toBeInTheDocument();
@@ -704,7 +704,7 @@ describe("Payment Monitor — states", () => {
     expect(state.invoices.refetch).toHaveBeenCalled();
   });
   it("an unanswered read is a skeleton, not an empty message", () => {
-    state.invoices.isSuccess = false; state.invoices.data = [];
+    state.invoices.isSuccess = false; state.invoices.data = undefined;
     show();
     expect(screen.queryByText("No customer money is needed right now.")).not.toBeInTheDocument();
   });

@@ -65,7 +65,7 @@ vi.mock("./useWarehouseInbound", () => ({
   useWarehouseInbound: (params: URLSearchParams, offset: number) => {
     const view = buildInboundRegisterView(rows, params, offset, 50);
     return {
-      data: {
+      data: h.error ? undefined : {
         unresolvedSources: h.unresolvedSources,
         arrivals: view.rows,
         sites: [

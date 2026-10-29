@@ -126,6 +126,7 @@ export default function WarehouseOutboundWork() {
   const effectiveView = params.get("view") ?? (selectedDo ? "all" : "open");
 
   const { data, isLoading, error, refetch } = useDeliveryWarehouseSchedule();
+  const shownError = data ? null : error;
   const allCards = useMemo(
     () =>
       warehouseOutboundCards(
@@ -605,7 +606,7 @@ export default function WarehouseOutboundWork() {
                   active={effectiveView === value}
                   resets={value === "all"}
                   count={
-                    isLoading || error ? undefined : view.facets.view[value] ?? 0
+                    isLoading || shownError ? undefined : view.facets.view[value] ?? 0
                   }
                   testId={`wo-view-${value}`}
                   onClick={() => {
@@ -623,7 +624,7 @@ export default function WarehouseOutboundWork() {
                     label={name}
                     active={params.get("site") === name}
                     count={
-                      isLoading || error
+                      isLoading || shownError
                         ? undefined
                         : view.facets.site[name] ?? 0
                     }
@@ -644,13 +645,13 @@ export default function WarehouseOutboundWork() {
         <div
           className={`${showFilters ? "hidden md:flex" : "flex"} min-h-0 min-w-0 flex-1 flex-col p-2`}
         >
-          {error ? (
+          {shownError ? (
             <div
               role="alert"
               className="flex flex-1 flex-col items-center justify-center gap-3 bg-white"
             >
               <p>Outbound could not be opened</p>
-              <p>{error.message}</p>
+              <p>{shownError.message}</p>
               <button
                 className="rounded-control border border-base-200 px-3 py-1.5 text-body"
                 onClick={() => void refetch()}
