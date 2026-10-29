@@ -13,6 +13,7 @@ import { appTodayIso } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import { useDeliverySettings } from "@/lib/queries";
 import ModuleHeader from "./components/ModuleHeader";
+import CouldNotLoad from "./components/CouldNotLoad";
 import { ApiError } from "@/lib/api";
 import {
   FL, refusalOf, useFleet, useFleetWrite, usePricing, useReconcile, useSettingsWrite, type FleetPayload, type PricingPayload, type ReconcileRow,
@@ -32,11 +33,11 @@ import {
 const field = "h-8 rounded-md border border-border bg-background px-2 text-body";
 const stop = (e: React.MouseEvent) => e.stopPropagation();
 
-function Shell({ word, testId, failed, children }: { word: string; testId: string; failed: boolean; children: React.ReactNode }) {
+function Shell({ word, testId, failed, onRetry, children }: { word: string; testId: string; failed: boolean; onRetry: () => unknown; children: React.ReactNode }) {
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid={testId}>
       <ModuleHeader destinationHeader testId={`${testId}-destination-header`} word={word} docTitle={`${word} · Carres`} />
-      {failed ? <p role="alert" className="p-4 text-body">{FL.failed}</p> : <ListPageShell register>{children}</ListPageShell>}
+      {failed ? <CouldNotLoad detail={FL.failed} onRetry={() => void onRetry()} /> : <ListPageShell register>{children}</ListPageShell>}
     </div>
   );
 }
@@ -140,7 +141,7 @@ export function FleetPage() {
   ) : null;
 
   return (
-    <Shell word={FL.fleet} testId="fleet" failed={q.isError}>
+    <Shell word={FL.fleet} testId="fleet" failed={q.isError} onRetry={q.refetch}>
       {q.data && !q.data.company ? <p className="p-4 text-body">{FL.noOwnFleet}</p> : null}
       <Refusal text={message} />
       {view === "lorries" ? (
@@ -210,7 +211,7 @@ export function FleetHealthPage() {
   ];
 
   return (
-    <Shell word={FL.fleetHealth} testId="fleet-health" failed={q.isError}>
+    <Shell word={FL.fleetHealth} testId="fleet-health" failed={q.isError} onRetry={q.refetch}>
       <Refusal text={message} />
       <DataGrid rows={lorries} columns={columns} rowKey={(r) => r.id} storageKey="carres.operation.fleet-health.v1"
         appearance="reference" exportName={FL.fleetHealth} groupBanner={false} isLoading={!q.isSuccess && !q.isError}
@@ -266,7 +267,7 @@ export function DeliveryZonesPage() {
   ];
 
   return (
-    <Shell word={FL.zones} testId="delivery-zones" failed={q.isError}>
+    <Shell word={FL.zones} testId="delivery-zones" failed={q.isError} onRetry={q.refetch}>
       <div className="flex flex-wrap items-center gap-2 px-4 pb-2" data-testid="delivery-zones-lookup">
         <label className="text-body" htmlFor="zone-lookup">{FL.findZone}</label>
         <input id="zone-lookup" inputMode="numeric" maxLength={5} placeholder={FL.postcode} className={field} value={lookup}
@@ -385,7 +386,7 @@ function RateCardsView({ switcher }: { switcher: React.ReactNode }) {
   );
 
   return (
-    <Shell word={FL.rateCards} testId="rate-cards" failed={q.isError}>
+    <Shell word={FL.rateCards} testId="rate-cards" failed={q.isError} onRetry={q.refetch}>
       <Refusal text={message ?? (bands === null ? FL.sofaBandsBad : outstation === null ? FL.outstationBad : null)} />
       <DataGrid rows={rows} columns={columns} rowKey={(r) => r.id} storageKey="carres.operation.rate-cards.v2"
         appearance="reference" exportName={FL.rateCards} groupBanner={false} isLoading={!q.isSuccess && !q.isError}
@@ -489,7 +490,7 @@ function ReconcileView({ switcher }: { switcher: React.ReactNode }) {
     <input type="date" aria-label={word} className={field} value={range[k]} onChange={(e) => setRange({ ...range, [k]: e.target.value })} />
   );
   return (
-    <Shell word={FL.rateCards} testId="rate-reconcile" failed={q.isError && !refused}>
+    <Shell word={FL.rateCards} testId="rate-reconcile" failed={q.isError && !refused} onRetry={q.refetch}>
       <Refusal text={refused ? FL.reconRefused : null} />
       <p className="px-4 pb-2 text-body">{FL.reconNote}</p>
       <DataGrid rows={q.data?.rows ?? []} columns={columns} rowKey={(r) => r.doId} storageKey="carres.operation.rate-reconcile.v1"

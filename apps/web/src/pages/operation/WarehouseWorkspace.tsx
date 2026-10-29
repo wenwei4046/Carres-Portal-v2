@@ -3,6 +3,9 @@
 import { useEffect, useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import Button from "@/components/kit/Button";
+import Loading from "@/components/kit/Loading";
 import ModuleHeader from "./components/ModuleHeader";
 import WarehouseScheduleCard from "./WarehouseScheduleCard";
 import { useWarehouseSchedule } from "./useWarehouseSchedule";
@@ -102,6 +105,7 @@ export default function WarehouseWorkspace({
   const site = params.get("site") ?? lastContext.site ?? null;
 
   const schedule = useWarehouseSchedule({ direction, siteId: site, from });
+  const qc = useQueryClient();
   const dates = schedule.operatingDates;
   const selectedDate = params.get("date") ?? lastContext.date ?? dates[0] ?? from;
 
@@ -225,12 +229,18 @@ export default function WarehouseWorkspace({
           data-testid="ws-feed-error"
         >
           {schedule.errors.map((e) => e.message).join(" · ")}
+          <span className="ml-2 inline-block align-middle">
+            <Button size="sm" variant="neutral" onClick={() => {
+              for (const key of ["warehouse-schedule", "delivery-arrangements", "warehouse-settings"])
+                void qc.invalidateQueries({ queryKey: ["operation", key] });
+            }}>Try again</Button>
+          </span>
         </div>
       )}
 
       <div className="flex min-h-0 flex-1 flex-col">
         {schedule.loading ? (
-          <p className="p-4 text-body text-kit-slate-11">Loading…</p>
+          <div className="p-4"><Loading variant="skeleton" lines={6} label={`Loading ${word}`} /></div>
         ) : (
           <ScheduleBoard
             dates={dates}

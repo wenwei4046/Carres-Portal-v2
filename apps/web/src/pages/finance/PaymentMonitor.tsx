@@ -40,6 +40,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { rm } from "@/lib/format-currency";
 import { avatarColor, personInitials, personLabel } from "@/lib/staff-avatar";
+import Loading from "@/components/kit/Loading";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { FilterRail, FilterRailRow } from "@/pages/operation/components/workspace-rail";
 import { ItemsServicesStockPanel } from "@/pages/operation/components/DeliveryBrief";
@@ -601,6 +602,8 @@ export default function PaymentMonitor() {
           backLabel="Monitor" onClose={close} />
       : <>
         <ModuleHeader destinationHeader testId="payment-monitor-destination-header" word="Monitor" docTitle="Monitor · Payments · Carres" />
+        {/* Outside the Operations shell ModuleHeader draws no h1, so the page names itself once for screen readers. */}
+        <h1 className="sr-only">Payments Monitor</h1>
         {isError ? <div role="alert" className="p-6 text-body">
           <p>The collection desk could not be loaded. Try again.</p>
           <button className="btn-secondary mt-3" onClick={() => {
@@ -608,7 +611,8 @@ export default function PaymentMonitor() {
           }}>Try again</button>
         </div>
         : selected && !invoice ? <div className="p-6 text-body">
-          <p>{invoicesQ.isLoading ? "Loading the collection details…" : "This order's invoice is not available."}</p>
+          {invoicesQ.isLoading ? <Loading variant="skeleton" label="Loading the collection details" />
+            : <p>This order&apos;s invoice is not available.</p>}
           <button className="btn-secondary mt-3" onClick={close}>Back to Monitor</button>
         </div>
         : params.get("calendar") === "1"

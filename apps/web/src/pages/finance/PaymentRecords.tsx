@@ -32,6 +32,7 @@ import { Facts } from "./PaymentCollectionWorkspace";
 import { fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
+import Loading from "@/components/kit/Loading";
 import SalesOrderTabs from "@/pages/operation/SalesOrderTabs";
 import { apiFetch } from "@/lib/api";
 import { renderReceiptPdf } from "@/lib/pdf/render";
@@ -179,7 +180,7 @@ export default function PaymentRecords() {
           onPrint={() => void printReceipt(payment)} />
       : <>
         <ModuleHeader destinationHeader testId="payment-records-destination-header" word="Payment Records" docTitle="Payment Records · Payments · Carres" />
-        <div className="p-6 text-body"><p>{query.isLoading ? "Loading payment…" : "Payment not available."}</p>
+        <div className="p-6 text-body">{query.isLoading ? <Loading variant="skeleton" label="Loading the payment" /> : <p>Payment not available.</p>}
           <button className="btn-secondary mt-3" onClick={close}>Back to Payment Records</button></div>
       </>
     : <>

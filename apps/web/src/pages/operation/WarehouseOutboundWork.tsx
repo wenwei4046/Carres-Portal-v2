@@ -38,7 +38,9 @@ import {
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { REGISTER_FIELD_WIDTH } from "@/components/register/register-field-widths";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
+import Loading from "@/components/kit/Loading";
 import ModuleHeader from "./components/ModuleHeader";
+import CouldNotLoad from "./components/CouldNotLoad";
 import { Modal, ModalActions } from "./components/Modal";
 import {
   FilterRail,
@@ -577,7 +579,7 @@ export default function WarehouseOutboundWork() {
           <button type="button" className="text-body text-kit-blue-11" onClick={() => setFilter("loading", "")}>← Back to Outbound</button>
           {workCard && <span className="font-mono text-body">{workCard.doNumber}</span>}
         </div>
-        {isLoading ? <p role="status" className="p-3">Loading…</p> : error ? <div role="alert" className="p-3">{error.message}<button onClick={() => void refetch()}>Try again</button></div> : workCard ? <OutboundUnitWork card={workCard} /> : <p role="alert" className="p-3">This pickup could not be opened.</p>}
+        {isLoading ? <div className="p-3"><Loading variant="skeleton" label="Loading the pickup" /></div> : error ? <CouldNotLoad detail={error.message} onRetry={() => void refetch()} /> : workCard ? <OutboundUnitWork card={workCard} /> : <p role="alert" className="p-3">This pickup could not be opened.</p>}
       </div>}
       <div className={`flex min-h-0 min-w-0 flex-1 ${workId ? "hidden" : ""}`}>
         <div

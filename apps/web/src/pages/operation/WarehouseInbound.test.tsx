@@ -211,7 +211,7 @@ describe("Inbound · the Site strip", () => {
   it("waits for the requested PO before mounting the receiving view", () => {
     h.posLoading = true;
     mount("&receive=PO-1");
-    expect(screen.getByText("Loading…")).toBeInTheDocument();
+    expect(screen.getByTestId("kit-loading-skeleton")).toBeInTheDocument();
     expect(screen.queryByTestId("stage")).not.toBeInTheDocument();
   });
   it("opens on Carres Klang Warehouse and lists the governed Sites", async () => {

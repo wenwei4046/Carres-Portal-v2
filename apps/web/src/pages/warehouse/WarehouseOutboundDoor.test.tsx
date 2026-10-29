@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import WarehouseOutboundDoor from "./WarehouseOutboundDoor";
 
-const query = vi.hoisted(() => ({ data: undefined as unknown, isLoading: false, error: null as Error | null }));
+const query = vi.hoisted(() => ({ data: undefined as unknown, isLoading: false, error: null as Error | null, refetch: vi.fn() }));
 vi.mock("@/lib/queries", () => ({ useDeliveryWarehouseSchedule: () => query }));
 vi.mock("@/pages/operation/WarehouseOutboundWork", () => ({ OutboundUnitWork: () => <div>Exact Unit door</div> }));
 
@@ -26,7 +26,16 @@ describe("Warehouse Outbound exact destination", () => {
     query.data = undefined;
     query.error = null;
     render(<MemoryRouter><WarehouseOutboundDoor /></MemoryRouter>);
-    expect(screen.getByText("Loading…")).toBeInTheDocument();
+    expect(screen.getByTestId("kit-loading-skeleton")).toBeInTheDocument();
     expect(screen.queryByTestId("wod-empty")).toBeNull();
+  });
+  it("says a failed read could not be loaded, never empty, and Try again reads again", () => {
+    query.data = undefined;
+    query.error = new Error("TEST offline");
+    render(<MemoryRouter><WarehouseOutboundDoor /></MemoryRouter>);
+    expect(screen.getByRole("alert")).toHaveTextContent("Could not be loaded");
+    expect(screen.queryByTestId("wod-empty")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(query.refetch).toHaveBeenCalledTimes(1);
   });
 });

@@ -11,6 +11,7 @@ import Tabs from "@/components/kit/Tabs";
 import Textarea from "@/components/kit/Textarea";
 import { FieldError } from "@/components/kit/FieldFrame";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
+import CouldNotLoad from "@/pages/operation/components/CouldNotLoad";
 import { Link } from "react-router-dom";
 import { ApiError, apiFetch } from "@/lib/api";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
@@ -60,7 +61,7 @@ function Page({ word, testId, children }: { word: string; testId: string; childr
   );
 }
 
-const LOAD_ERROR = <p role="alert" className="p-4 text-body">The delivery plan could not be loaded. Try again.</p>;
+const loadError = (retry: () => unknown) => <CouldNotLoad detail="The delivery plan could not be loaded." onRetry={() => void retry()} />;
 
 const baseColumns: DataGridColumn<PlanRow>[] = [
   { key: "so", label: "SO No", width: 130, accessor: (r) => r.so },
@@ -235,7 +236,7 @@ export function DeliveryPlanning() {
         <Tabs label="Delivery Planning" variant="segmented" value={view} onValueChange={setView}
           tabs={[{ value: "board", label: "Board" }, { value: "regions", label: "Regions" }, { value: "rules", label: "Residence rules" }]} />
       </div>
-      {q.isError ? LOAD_ERROR : (
+      {q.isError ? loadError(q.refetch) : (
         <ListPageShell register>
           {view === "board" && (
             <DataGrid rows={rows} columns={columns} rowKey={(r) => r.key} storageKey="carres.delivery.planning.v1" appearance="reference"
@@ -289,7 +290,7 @@ export function DpOrders() {
   ], []);
   return (
     <Page word="DP Orders" testId="dp-orders">
-      {q.isError ? LOAD_ERROR : (
+      {q.isError ? loadError(q.refetch) : (
         <ListPageShell register>
           <DataGrid rows={jobs} columns={columns} rowKey={(r) => r.key} storageKey="carres.delivery.dp-orders.v1" appearance="reference"
             exportName="DP Orders" groupBanner={false} stickyIdentity isLoading={!q.isSuccess} sortDefault={{ key: "day", dir: "asc" }}
@@ -335,7 +336,7 @@ export function AutoSchedule() {
   const picked = waiting.filter((r) => selected.has(r.key));
   return (
     <Page word="Auto-schedule" testId="auto-schedule">
-      {q.isError ? LOAD_ERROR : (
+      {q.isError ? loadError(q.refetch) : (
         <ListPageShell register>
           <DataGrid rows={waiting} columns={columns} rowKey={(r) => r.key} storageKey="carres.delivery.auto-schedule.v1" appearance="reference"
             exportName="Auto-schedule" initialGroupBy={["region"]} stickyIdentity isLoading={!q.isSuccess}
@@ -399,7 +400,7 @@ export function Trips() {
   ], []);
   return (
     <Page word="Trips" testId="trips">
-      {q.isError ? LOAD_ERROR : (
+      {q.isError ? loadError(q.refetch) : (
         <ListPageShell register>
           <DataGrid rows={stops} columns={columns} rowKey={(r) => r.key} storageKey="carres.delivery.trips.v1" appearance="reference"
             exportName="Trips" stickyIdentity isLoading={!q.isSuccess} searchPlaceholder="Search SO, DO, customer or location…"

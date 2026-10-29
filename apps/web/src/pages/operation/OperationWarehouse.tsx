@@ -116,6 +116,11 @@ export default function OperationWarehouse({
 }: Props) {
   const warehouseQ = useOperationWarehouse();
   const catalogQ = useCatalog();
+  // No ModuleHeader here, so the tab title is set the way ModuleHeader sets it.
+  useEffect(() => {
+    document.title = "Stock balance · Warehouse · Carres";
+    return () => { document.title = "Carres Portal"; };
+  }, []);
 
   const warehouses = warehouseQ.data?.warehouses ?? [];
   const byWarehouse = warehouseQ.data?.byWarehouse ?? {};
@@ -248,9 +253,10 @@ export default function OperationWarehouse({
       <div className="flex justify-between items-start mb-[22px] gap-4">
         <div>
           <div className="text-label uppercase tracking-[0.06em] text-primary">Warehouse</div>
-          <h1 className="text-page font-display mt-1.5 text-base-900">
+          {/* h2: the shell header already prints this page's h1. */}
+          <h2 className="text-page font-display mt-1.5 text-base-900">
             Stock balance
-          </h1>
+          </h2>
           <div className="font-body text-body text-base-600 mt-1 max-w-[680px]">
             Auto-deducted on delivery, auto-incremented when supplier DO is
             received. Use <strong className="font-medium">Adjust</strong> for damage / loss / one-off

@@ -17,6 +17,8 @@ import {
   READY_STOCK_CONDITION_WORDS,
 } from "@carres/shared";
 import { AlertTriangle } from "lucide-react";
+import Loading from "@/components/kit/Loading";
+import CouldNotLoad from "./components/CouldNotLoad";
 
 /**
  * Shared list view for the 4 ops-stock pages (Ready / Reserved / Repair /
@@ -70,6 +72,12 @@ interface Props {
 export default function OpsStockListView(props: Props) {
   const qc = useQueryClient();
   const listKey = ["operation", "ops-stock", props.cacheKey] as const;
+  // No ModuleHeader here, so a standalone page sets the tab title the way ModuleHeader does.
+  useEffect(() => {
+    if (props.embedded) return;
+    document.title = `${props.title} · Warehouse · Carres`;
+    return () => { document.title = "Carres Portal"; };
+  }, [props.embedded, props.title]);
 
   const listQ = useQuery<OpsStockListResponse>({
     queryKey: listKey,
@@ -330,7 +338,8 @@ export default function OpsStockListView(props: Props) {
           <p className="text-label uppercase tracking-[0.06em] text-base-500 mb-1">
             {props.kicker}
           </p>
-          <h1 className="text-page text-base-900">{props.title}</h1>
+          {/* h2: the shell header already prints this page's h1. */}
+          <h2 className="text-page text-base-900">{props.title}</h2>
           <p className="text-body text-base-600 mt-2">{props.blurb}</p>
         </div>
       )}
@@ -555,7 +564,9 @@ export default function OpsStockListView(props: Props) {
       ) : null}
 
       {loading ? (
-        <p className="text-body text-base-500">Loading…</p>
+        <Loading variant="skeleton" label={`Loading ${props.title}`} />
+      ) : props.rows === undefined && listQ.isError ? (
+        <CouldNotLoad detail={`${props.title} could not be loaded.`} onRetry={() => void listQ.refetch()} />
       ) : rows.length === 0 ? (
         <div className="rounded border border-base-200 bg-white p-12 text-center">
           <p className="text-base-700 font-medium">Nothing here.</p>

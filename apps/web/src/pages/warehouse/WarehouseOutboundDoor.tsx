@@ -10,6 +10,8 @@ import {
 import { useDeliveryWarehouseSchedule } from "@/lib/queries";
 import { fmtDate } from "@/lib/fmt-date";
 import PageHeader from "@/components/PageHeader";
+import Loading from "@/components/kit/Loading";
+import CouldNotLoad from "@/pages/operation/components/CouldNotLoad";
 import { OutboundUnitWork } from "@/pages/operation/WarehouseOutboundWork";
 
 /**
@@ -23,7 +25,7 @@ import { OutboundUnitWork } from "@/pages/operation/WarehouseOutboundWork";
  */
 export default function WarehouseOutboundDoor() {
   const [params] = useSearchParams();
-  const { data, isLoading, error } = useDeliveryWarehouseSchedule();
+  const { data, isLoading, error, refetch } = useDeliveryWarehouseSchedule();
   const events = useMemo(
     () => (data?.events ?? []) as DeliveryWarehouseScheduleEvent[],
     [data],
@@ -39,11 +41,9 @@ export default function WarehouseOutboundDoor() {
         each Unit, then record which exact Units were loaded and attach proof.
       </div>
       {!error && (isLoading || !data) ? (
-        <p className="text-body text-base-500">Loading…</p>
+        <Loading variant="skeleton" label="Loading the schedule" />
       ) : error ? (
-        <p className="text-body text-base-600">
-          The schedule could not be loaded. {error.message}
-        </p>
+        <CouldNotLoad detail={`The schedule could not be loaded. ${error.message}`} onRetry={() => void refetch()} />
       ) : dates.length === 0 ? (
         <p className="text-body text-base-500" data-testid="wod-empty">
           No pickups are assigned to this warehouse.

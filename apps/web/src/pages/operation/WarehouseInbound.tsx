@@ -22,6 +22,7 @@ import {
   type SupplierRow,
 } from "@/lib/queries";
 import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
+import Loading from "@/components/kit/Loading";
 import ModuleHeader from "./components/ModuleHeader";
 import PoReceivingView from "./components/PoReceivingView";
 import {
@@ -757,7 +758,7 @@ export default function WarehouseInbound() {
       )}
 
       {receivePoId && posQ.isLoading ? (
-        <p role="status" className="p-4 text-body">Loading…</p>
+        <div className="p-4"><Loading variant="skeleton" label="Loading the purchase order" /></div>
       ) : receivePoId ? (
         <PoReceivingView
           poId={receivePoId}
