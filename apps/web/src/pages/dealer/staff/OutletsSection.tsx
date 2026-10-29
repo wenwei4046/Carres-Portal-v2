@@ -51,13 +51,13 @@ export default function OutletsSection() {
           </button>
         </div>
         {outletsQ.isPending && <Loading variant="skeleton" label={`Loading ${branch.toLowerCase()}s`} />}
-        {outletsQ.error && (
+        {outletsQ.error && !outletsQ.data && (
           <div role="alert">
             <EmptyState
               title="Could not be loaded"
               detail="This list did not load."
               action={
-                <Button variant="neutral" onClick={() => void outletsQ.refetch()}>
+                <Button variant="neutral" disabled={outletsQ.isFetching} onClick={() => void outletsQ.refetch()}>
                   Try again
                 </Button>
               }

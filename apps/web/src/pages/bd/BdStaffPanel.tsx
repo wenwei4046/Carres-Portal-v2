@@ -75,13 +75,13 @@ export default function BdStaffPanel({
           </div>
 
           {staffQ.isPending && <Loading variant="skeleton" label="Loading staff" />}
-          {staffQ.error && (
+          {staffQ.error && !staffQ.data && (
             <div role="alert">
               <EmptyState
                 title="Could not be loaded"
                 detail="This store's staff did not load."
                 action={
-                  <Button variant="neutral" onClick={() => void staffQ.refetch()}>
+                  <Button variant="neutral" disabled={staffQ.isFetching} onClick={() => void staffQ.refetch()}>
                     Try again
                   </Button>
                 }

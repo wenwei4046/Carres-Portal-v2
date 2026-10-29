@@ -88,7 +88,7 @@ export default function PartnerPickupsPage() {
       </div>
     );
   }
-  if (rfdQ.isError || toDeliverQ.isError) {
+  if ((rfdQ.isError && !rfdQ.data) || (toDeliverQ.isError && !toDeliverQ.data)) {
     return (
       <div className="px-9 py-8 pb-14" role="alert">
         <EmptyState
@@ -98,8 +98,8 @@ export default function PartnerPickupsPage() {
             <Button
               variant="neutral"
               onClick={() => {
-                if (rfdQ.isError) void rfdQ.refetch();
-                if (toDeliverQ.isError) void toDeliverQ.refetch();
+                if (rfdQ.isError && !rfdQ.data) void rfdQ.refetch();
+                if (toDeliverQ.isError && !toDeliverQ.data) void toDeliverQ.refetch();
               }}
             >
               Try again

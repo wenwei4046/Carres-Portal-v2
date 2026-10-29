@@ -166,13 +166,13 @@ export default function PartnerFleet() {
             <div className="p-4">
               <Loading variant="skeleton" label="Loading vehicles" />
             </div>
-          ) : fleet.isError ? (
+          ) : fleet.isError && !fleet.data ? (
             <div role="alert">
               <EmptyState
                 title="Could not be loaded"
                 detail="Your vehicles did not load."
                 action={
-                  <Button variant="neutral" onClick={() => void fleet.refetch()}>
+                  <Button variant="neutral" disabled={fleet.isFetching} onClick={() => void fleet.refetch()}>
                     Try again
                   </Button>
                 }

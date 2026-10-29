@@ -188,13 +188,13 @@ export default function SupplierPOs() {
       {/* Stage body */}
       {pos.isLoading ? (
         <Loading variant="skeleton" label="Loading purchase orders" />
-      ) : pos.isError ? (
+      ) : pos.isError && !pos.data ? (
         <div role="alert">
           <EmptyState
             title="Could not be loaded"
             detail="Your purchase orders did not load."
             action={
-              <Button variant="neutral" onClick={() => void pos.refetch()}>
+              <Button variant="neutral" disabled={pos.isFetching} onClick={() => void pos.refetch()}>
                 Try again
               </Button>
             }

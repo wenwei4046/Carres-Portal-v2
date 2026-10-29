@@ -24,14 +24,14 @@ export default function PickupHistoryList({ poId }: { poId: string }) {
   if (q.isPending) {
     return <Loading variant="skeleton" lines={2} label="Loading pickup history" />;
   }
-  if (q.isError) {
+  if (q.isError && !q.data) {
     return (
       <div role="alert">
         <EmptyState
           title="Could not be loaded"
           detail="The pickup history for this PO did not load."
           action={
-            <Button variant="neutral" onClick={() => void q.refetch()}>
+            <Button variant="neutral" disabled={q.isFetching} onClick={() => void q.refetch()}>
               Try again
             </Button>
           }

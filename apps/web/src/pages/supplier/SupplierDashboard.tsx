@@ -98,14 +98,14 @@ export default function SupplierDashboard() {
   const isLoading = pos.isLoading || demand.isLoading;
 
   // The KPIs and pipeline would read as zero on a failed read.
-  if (pos.isError || demand.isError) {
+  if ((pos.isError && !pos.data) || (demand.isError && !demand.data)) {
     return (
       <div className="p-9 max-w-[1400px] mx-auto" role="alert">
         <EmptyState
           title="Could not be loaded"
           detail="Your purchase orders and demand did not load."
           action={
-            <Button variant="neutral" onClick={() => { if (pos.isError) void pos.refetch(); if (demand.isError) void demand.refetch(); }}>
+            <Button variant="neutral" onClick={() => { if (pos.isError && !pos.data) void pos.refetch(); if (demand.isError && !demand.data) void demand.refetch(); }}>
               Try again
             </Button>
           }
@@ -300,13 +300,13 @@ export default function SupplierDashboard() {
         </div>
         {activity.isLoading ? (
           <Loading variant="skeleton" label="Loading recent activity" />
-        ) : activity.isError ? (
+        ) : activity.isError && !activity.data ? (
           <div role="alert">
             <EmptyState
               title="Could not be loaded"
               detail="Recent activity did not load."
               action={
-                <Button variant="neutral" onClick={() => void activity.refetch()}>
+                <Button variant="neutral" disabled={activity.isFetching} onClick={() => void activity.refetch()}>
                   Try again
                 </Button>
               }

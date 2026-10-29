@@ -179,7 +179,7 @@ export default function PartnerDashboard() {
     deliveryBuckets.out_for_delivery.length;
 
   // Any failed read would show zeros or empty columns, so the whole page answers "could not be loaded".
-  const failed = [counts, pickups, rfdPending, toDeliver].filter((q) => q.isError);
+  const failed = [counts, pickups, rfdPending, toDeliver].filter((q) => q.isError && !q.data);
   if (failed.length > 0) {
     return (
       <div className="px-9 py-8 pb-14" role="alert">

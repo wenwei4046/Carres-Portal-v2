@@ -137,7 +137,7 @@ export default function BdOrdersBoard({ onClose }: { onClose: () => void }) {
     [ordersQ.data, dealerIds],
   );
   const boardLoading = ordersQ.isLoading || dealersQ.isLoading;
-  const boardFailed = ordersQ.isError || dealersQ.isError;
+  const boardFailed = (ordersQ.isError && !ordersQ.data) || (dealersQ.isError && !dealersQ.data);
 
   const inPeriod = (o: Order) => (period === "range" ? true : sameMonth(o.placedAt, monthAnchor));
   // Network scope: AutoCount-archive imports stay off the all-dealers board
@@ -240,7 +240,7 @@ export default function BdOrdersBoard({ onClose }: { onClose: () => void }) {
               title="Could not be loaded"
               detail="Network orders did not load."
               action={
-                <Button variant="neutral" onClick={() => { if (ordersQ.isError) void ordersQ.refetch(); if (dealersQ.isError) void dealersQ.refetch(); }}>
+                <Button variant="neutral" onClick={() => { if (ordersQ.isError && !ordersQ.data) void ordersQ.refetch(); if (dealersQ.isError && !dealersQ.data) void dealersQ.refetch(); }}>
                   Try again
                 </Button>
               }

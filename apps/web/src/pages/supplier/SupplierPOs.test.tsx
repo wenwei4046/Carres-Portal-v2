@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { act, render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import SupplierPOs from "./SupplierPOs";
@@ -425,5 +425,23 @@ describe("SupplierPOs", () => {
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     await waitFor(() => expect(posCalls).toBeGreaterThan(before));
   });
-});
 
+  it("a failed background refetch keeps the loaded POs", async () => {
+    mockAll({ me: ME_OWN, pos: [PENDING_PO] });
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <SupplierPOs />
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByTestId("po-card-PO-2050")).toBeInTheDocument();
+    vi.mocked(apiFetch).mockImplementation(async () => {
+      throw new Error("boom");
+    });
+    await act(async () => {
+      await qc.refetchQueries();
+    });
+    expect(screen.getByTestId("po-card-PO-2050")).toBeInTheDocument();
+    expect(screen.queryByText("Could not be loaded")).not.toBeInTheDocument();
+  });
+});

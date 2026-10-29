@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import PartnerDashboard from "./PartnerDashboard";
@@ -76,5 +76,31 @@ describe("PartnerDashboard", () => {
     fail = false;
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     await waitFor(() => expect(screen.getByText("7")).toBeInTheDocument());
+  });
+
+  it("a failed background refetch keeps the loaded page", async () => {
+    let fail = false;
+    vi.mocked(apiFetch).mockImplementation(async (path: string) => {
+      if (fail) throw new Error("boom");
+      if (path.includes("/dashboard")) {
+        return { upcoming: 0, ready: 0, assigned: 7, accepted: 0, in_transit: 0, delivered: 0, total: 7 };
+      }
+      return [];
+    });
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <PartnerDashboard />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(screen.getByText("7")).toBeInTheDocument());
+    fail = true;
+    await act(async () => {
+      await qc.refetchQueries();
+    });
+    expect(screen.getByText("7")).toBeInTheDocument();
+    expect(screen.queryByText("Could not be loaded")).not.toBeInTheDocument();
   });
 });

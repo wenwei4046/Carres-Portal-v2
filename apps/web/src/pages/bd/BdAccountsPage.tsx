@@ -74,13 +74,13 @@ export default function BdAccountsPage({ onClose }: { onClose: () => void }) {
               Stores <span>{dealers.length}</span>
             </h4>
             {dealersQ.isLoading && <Loading variant="skeleton" label="Loading stores" />}
-            {dealersQ.error && (
+            {dealersQ.error && !dealersQ.data && (
               <div role="alert">
                 <EmptyState
                   title="Could not be loaded"
                   detail="Your dealer stores did not load."
                   action={
-                    <Button variant="neutral" onClick={() => void dealersQ.refetch()}>
+                    <Button variant="neutral" disabled={dealersQ.isFetching} onClick={() => void dealersQ.refetch()}>
                       Try again
                     </Button>
                   }

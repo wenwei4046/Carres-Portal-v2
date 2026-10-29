@@ -234,10 +234,11 @@ export default function PartnerFactoryPickupsPage() {
     });
   }
 
-  const { data: rows = [], isLoading, isError, refetch } = useQuery({
+  const { data, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: qk.partner.pickups(),
     queryFn: () => apiFetch<PickupRow[]>("/api/partner/pickups"),
   });
+  const rows = data ?? [];
 
   const accept = useMutation({
     mutationFn: (poId: string) =>
@@ -350,14 +351,14 @@ export default function PartnerFactoryPickupsPage() {
       </div>
     );
   }
-  if (isError) {
+  if (isError && !data) {
     return (
       <div className="px-9 py-8 pb-14" role="alert">
         <EmptyState
           title="Could not be loaded"
           detail="Your factory pickups did not load."
           action={
-            <Button variant="neutral" onClick={() => void refetch()}>
+            <Button variant="neutral" disabled={isFetching} onClick={() => void refetch()}>
               Try again
             </Button>
           }

@@ -342,13 +342,13 @@ export default function OrderStatusPage({
           </div>
 
           {/* A failed read would show RM 0 and empty lanes, so it answers "could not be loaded". */}
-          {ordersQ.isError ? (
+          {ordersQ.isError && !ordersQ.data ? (
             <div role="alert">
               <EmptyState
                 title="Could not be loaded"
                 detail="Your orders did not load."
                 action={
-                  <Button variant="neutral" onClick={() => void ordersQ.refetch()}>
+                  <Button variant="neutral" disabled={ordersQ.isFetching} onClick={() => void ordersQ.refetch()}>
                     Try again
                   </Button>
                 }

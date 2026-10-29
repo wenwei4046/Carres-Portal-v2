@@ -72,14 +72,14 @@ export default function SupplierSKU() {
     [demandMap],
   );
 
-  if (products.isError || demand.isError) {
+  if ((products.isError && !products.data) || (demand.isError && !demand.data)) {
     return (
       <div className="p-9 max-w-[1400px] mx-auto" role="alert">
         <EmptyState
           title="Could not be loaded"
           detail="Your SKUs did not load."
           action={
-            <Button variant="neutral" onClick={() => { if (products.isError) void products.refetch(); if (demand.isError) void demand.refetch(); }}>
+            <Button variant="neutral" onClick={() => { if (products.isError && !products.data) void products.refetch(); if (demand.isError && !demand.data) void demand.refetch(); }}>
               Try again
             </Button>
           }

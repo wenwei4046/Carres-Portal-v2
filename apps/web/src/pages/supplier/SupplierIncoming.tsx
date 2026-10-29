@@ -44,14 +44,14 @@ export default function SupplierIncoming() {
     byCat[cat].push(r);
   }
 
-  if (demand.isError) {
+  if (demand.isError && !demand.data) {
     return (
       <div className="p-9 max-w-[1400px] mx-auto" role="alert">
         <EmptyState
           title="Could not be loaded"
           detail="Your incoming demand did not load."
           action={
-            <Button variant="neutral" onClick={() => void demand.refetch()}>
+            <Button variant="neutral" disabled={demand.isFetching} onClick={() => void demand.refetch()}>
               Try again
             </Button>
           }
