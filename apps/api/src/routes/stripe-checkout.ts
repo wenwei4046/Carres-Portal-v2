@@ -93,7 +93,7 @@ async function fetchOrderScoped(c: Context<AppEnv>, id: string) {
   const { data, error } = await sb
     .from("orders")
     .select(
-      "id, so, dealer_id, status, paid, customer_name, customer_email, order_lines(unit_price, qty), order_addons(unit_price, qty), invoices(kind, status, amount, tax_amount, voided_at, replaces_invoice_id)",
+      "id, so, dealer_id, status, paid, credited, customer_name, customer_email, order_lines(unit_price, qty), order_addons(unit_price, qty), invoices(kind, status, amount, tax_amount, voided_at, replaces_invoice_id)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -105,6 +105,7 @@ async function fetchOrderScoped(c: Context<AppEnv>, id: string) {
     dealer_id: string;
     status: string;
     paid: number | string;
+    credited: number | string | null;
     customer_name: string | null;
     customer_email: string | null;
     order_lines: Array<{ unit_price: number | string; qty: number }>;
@@ -177,10 +178,33 @@ stripeCheckoutRouter.post("/:id/stripe/checkout", async (c) => {
       422,
     );
   }
-  const outstanding = Math.max(0, total + storageObligations(order) - Number(order.paid));
-  if (outstanding <= 0) {
+  // A credit note (0730) lowers what is owed; a link still open can be paid,
+  // so its amount is already spoken for. Without this two links for the same
+  // balance both collect.
+  const admin = adminClient(c.env);
+  const { data: openLinks, error: openErr } = await admin
+    .from("stripe_checkout_sessions")
+    .select("amount")
+    .eq("order_id", order.id)
+    .eq("status", "open")
+    .gt("expires_at", new Date().toISOString());
+  if (openErr) return fail(c, openErr);
+  const pending = (openLinks ?? []).reduce((s, r) => s + Number(r.amount), 0);
+  // shortcut: two requests in the same instant can still both pass this read; the 0223 RPC records what Stripe took either way.
+  const owed = Math.max(0, total - Number(order.credited ?? 0) + storageObligations(order) - Number(order.paid));
+  if (owed <= 0) {
     return c.json(
       { error: "stripe_checkout_blocked", code: "already_paid", message: "Order is already fully paid." },
+      422,
+    );
+  }
+  const outstanding = Math.max(0, owed - pending);
+  if (outstanding <= 0) {
+    return c.json(
+      {
+        error: "stripe_checkout_blocked", code: "open_link_covers_balance",
+        message: "A payment link for the whole balance is still open. Send that link, or wait for it to expire.",
+      },
       422,
     );
   }
@@ -190,7 +214,9 @@ stripeCheckoutRouter.post("/:id/stripe/checkout", async (c) => {
       {
         error: "stripe_checkout_blocked",
         code: "amount_exceeds_outstanding",
-        message: `Amount is above the outstanding balance (RM ${outstanding.toFixed(2)}).`,
+        message: pending > 0
+          ? `Amount is above the balance not yet on an open link (RM ${outstanding.toFixed(2)}).`
+          : `Amount is above the outstanding balance (RM ${outstanding.toFixed(2)}).`,
         maxAmount: Number(outstanding.toFixed(2)),
       },
       422,
@@ -233,7 +259,6 @@ stripeCheckoutRouter.post("/:id/stripe/checkout", async (c) => {
   }
 
   // Track the link. Service client — RLS has no client write policy (0223).
-  const admin = adminClient(c.env);
   const { data: row, error: insErr } = await admin
     .from("stripe_checkout_sessions")
     .insert({
