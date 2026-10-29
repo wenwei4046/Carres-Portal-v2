@@ -12,6 +12,9 @@ import {
   StaffAvatar,
   TierBadge,
 } from "./staff-ui";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
 
 /**
  * Staff & PINs management section (0233) — tier badges + colour avatar + PIN
@@ -66,9 +69,19 @@ export default function StaffSection() {
           )}
         </div>
 
-        {staffQ.isPending && <p className="text-sm text-muted-foreground">Loading…</p>}
+        {staffQ.isPending && <Loading variant="skeleton" label="Loading staff" />}
         {staffQ.error && (
-          <p className="text-sm text-destructive">Couldn&apos;t load: {staffQ.error.message}</p>
+          <div role="alert">
+            <EmptyState
+              title="Could not be loaded"
+              detail="Your staff list did not load."
+              action={
+                <Button variant="neutral" onClick={() => void staffQ.refetch()}>
+                  Try again
+                </Button>
+              }
+            />
+          </div>
         )}
         {staffQ.data && roster.length === 0 && (
           <p className="text-sm text-muted-foreground italic">

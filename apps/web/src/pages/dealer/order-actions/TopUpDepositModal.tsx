@@ -240,6 +240,7 @@ export default function TopUpDepositModal({ order, total, onClose }: Props) {
           <div className="flex items-center gap-2.5">
             <span className="font-mono text-[13px] text-base-500">RM</span>
             <input
+              aria-label="Top-up amount (RM)"
               type="number"
               value={amount || ""}
               placeholder="Amount"
@@ -386,6 +387,7 @@ export default function TopUpDepositModal({ order, total, onClose }: Props) {
             Note <span className="text-base-400 font-medium normal-case tracking-normal">(optional)</span>
           </label>
           <textarea
+            aria-label="Note"
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="e.g. Customer paid via Maybank2u to company account"

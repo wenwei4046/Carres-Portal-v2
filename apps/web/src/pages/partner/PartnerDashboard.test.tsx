@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import PartnerDashboard from "./PartnerDashboard";
@@ -59,5 +59,22 @@ describe("PartnerDashboard", () => {
     // "Delivered" appears in the KPI tile AND in the "Recently delivered"
     // side card title — both are intended.
     expect(screen.getAllByText(/delivered/i).length).toBeGreaterThan(0);
+  });
+
+  it("a failed read says Could not be loaded, not zero, and Try again refetches", async () => {
+    let fail = true;
+    vi.mocked(apiFetch).mockImplementation(async (path: string) => {
+      if (path.includes("/dashboard")) {
+        if (fail) throw new Error("boom");
+        return { upcoming: 0, ready: 0, assigned: 7, accepted: 0, in_transit: 0, delivered: 0, total: 7 };
+      }
+      return [];
+    });
+    render(wrap(<PartnerDashboard />));
+    expect(await screen.findByText("Could not be loaded")).toBeInTheDocument();
+    expect(screen.queryByText("Assigned")).not.toBeInTheDocument();
+    fail = false;
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(screen.getByText("7")).toBeInTheDocument());
   });
 });

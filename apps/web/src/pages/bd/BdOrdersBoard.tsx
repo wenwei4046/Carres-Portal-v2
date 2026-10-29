@@ -27,6 +27,9 @@ import {
   sumRevenue,
 } from "@/pages/dealer/pos/order-board-ui";
 import PosOrderDetail from "@/pages/dealer/pos/PosOrderDetail";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
 
 /**
  * BdOrdersBoard — the BD "My orders" view (Loo 2026-07-19): the WHOLE dealer
@@ -134,6 +137,7 @@ export default function BdOrdersBoard({ onClose }: { onClose: () => void }) {
     [ordersQ.data, dealerIds],
   );
   const boardLoading = ordersQ.isLoading || dealersQ.isLoading;
+  const boardFailed = ordersQ.isError || dealersQ.isError;
 
   const inPeriod = (o: Order) => (period === "range" ? true : sameMonth(o.placedAt, monthAnchor));
   // Network scope: AutoCount-archive imports stay off the all-dealers board
@@ -229,6 +233,21 @@ export default function BdOrdersBoard({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
+        {/* A failed read would show RM 0 and empty lanes, so it answers "could not be loaded". */}
+        {boardFailed ? (
+          <div role="alert">
+            <EmptyState
+              title="Could not be loaded"
+              detail="Network orders did not load."
+              action={
+                <Button variant="neutral" onClick={() => { if (ordersQ.isError) void ordersQ.refetch(); if (dealersQ.isError) void dealersQ.refetch(); }}>
+                  Try again
+                </Button>
+              }
+            />
+          </div>
+        ) : (
+        <>
         {/* Revenue summary */}
         <div className="os-summary">
           <SummaryCard
@@ -260,6 +279,7 @@ export default function BdOrdersBoard({ onClose }: { onClose: () => void }) {
           <div className="os-search">
             <Search size={14} strokeWidth={1.75} />
             <input
+              aria-label="Search orders"
               placeholder="Search SO no., customer or phone"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -342,7 +362,7 @@ export default function BdOrdersBoard({ onClose }: { onClose: () => void }) {
                 <div className="os-lane__body">
                   {boardLoading ? (
                     <div className="os-empty os-empty--plain">
-                      <p>Loading…</p>
+                      <Loading variant="skeleton" lines={2} label={`Loading ${lane.title}`} />
                     </div>
                   ) : list.length === 0 ? (
                     <div className="os-empty">
@@ -369,6 +389,8 @@ export default function BdOrdersBoard({ onClose }: { onClose: () => void }) {
             );
           })}
         </div>
+        </>
+        )}
       </div>
 
       {/* Full order detail — the SAME POS drawer a store uses; BD edits under

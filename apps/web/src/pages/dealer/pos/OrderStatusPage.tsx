@@ -36,6 +36,9 @@ import {
 } from "./order-board-ui";
 import PinPad from "./PinPad";
 import PosOrderDetail from "./PosOrderDetail";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
 
 /**
  * Order Status — the POS "My orders" sales view (design contract:
@@ -338,6 +341,21 @@ export default function OrderStatusPage({
             )}
           </div>
 
+          {/* A failed read would show RM 0 and empty lanes, so it answers "could not be loaded". */}
+          {ordersQ.isError ? (
+            <div role="alert">
+              <EmptyState
+                title="Could not be loaded"
+                detail="Your orders did not load."
+                action={
+                  <Button variant="neutral" onClick={() => void ordersQ.refetch()}>
+                    Try again
+                  </Button>
+                }
+              />
+            </div>
+          ) : (
+          <>
           {/* Revenue summary */}
           <div className="os-summary">
             <SummaryCard
@@ -372,6 +390,7 @@ export default function OrderStatusPage({
             <div className="os-search">
               <Search size={14} strokeWidth={1.75} />
               <input
+                aria-label="Search orders"
                 placeholder="Search SO no., customer or phone"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -466,7 +485,7 @@ export default function OrderStatusPage({
                   <div className="os-lane__body">
                     {ordersQ.isLoading ? (
                       <div className="os-empty os-empty--plain">
-                        <p>Loading…</p>
+                        <Loading variant="skeleton" lines={2} label={`Loading ${lane.title}`} />
                       </div>
                     ) : list.length === 0 ? (
                       <div className="os-empty">
@@ -497,6 +516,8 @@ export default function OrderStatusPage({
               );
             })}
           </div>
+          </>
+          )}
         </div>
       )}
 

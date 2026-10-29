@@ -1,4 +1,7 @@
 import { usePickupEventsForPo } from "@/lib/queries";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
 
 /**
  * Task 13 (2026-05-15) — pickup history list for the supplier PODrawer.
@@ -19,8 +22,21 @@ export default function PickupHistoryList({ poId }: { poId: string }) {
   const q = usePickupEventsForPo(poId);
 
   if (q.isPending) {
+    return <Loading variant="skeleton" lines={2} label="Loading pickup history" />;
+  }
+  if (q.isError) {
     return (
-      <div className="text-meta text-muted-foreground">Loading…</div>
+      <div role="alert">
+        <EmptyState
+          title="Could not be loaded"
+          detail="The pickup history for this PO did not load."
+          action={
+            <Button variant="neutral" onClick={() => void q.refetch()}>
+              Try again
+            </Button>
+          }
+        />
+      </div>
     );
   }
   const events = q.data ?? [];

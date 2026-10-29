@@ -376,6 +376,7 @@ export default function CustomerStep({
                 <span style={{ color: "var(--c-orange)" }}>*</span>
               </span>
               <select
+                aria-label={pickedStore ? storeNoun(pickedStore.channel) : "Dealer / Showroom"}
                 value={dealerPick.value ?? ""}
                 onChange={(e) => {
                   const d = dealerPick.dealers.find((x) => x.id === e.target.value);
@@ -431,6 +432,7 @@ export default function CustomerStep({
                   <div className="field">
                     <span className="field__label">{branchLabel} *</span>
                     <select
+                      aria-label={branchLabel}
                       value={draft.outletId ?? ""}
                       onChange={(e) => setOutlet(e.target.value)}
                       disabled={outletLockedByStaff || branchesEmpty}
@@ -464,6 +466,7 @@ export default function CustomerStep({
                   <div className="field">
                     <span className="field__label">Salesperson *</span>
                     <select
+                      aria-label="Salesperson"
                       value={draft.salespersonId ?? ""}
                       onChange={(e) =>
                         onChange({ ...draft, salespersonId: e.target.value || null })
@@ -487,6 +490,7 @@ export default function CustomerStep({
                     <span className="field__label">Full name *</span>
                     <div style={{ position: "relative", display: "flex", flexDirection: "column" }}>
                       <input
+                        aria-label="Full name"
                         value={c.name}
                         placeholder="e.g. Tan Mei Ling, Ahmad bin Yusof"
                         autoComplete="off"
@@ -531,6 +535,7 @@ export default function CustomerStep({
                   <div className="field">
                     <span className="field__label">Phone *</span>
                     <input
+                      aria-label="Phone"
                       value={c.phone}
                       placeholder="012-3456789"
                       onChange={(e) => setC({ phone: e.target.value })}
@@ -545,6 +550,7 @@ export default function CustomerStep({
                         )}
                       </span>
                       <input
+                        aria-label="Email"
                         type="email"
                         value={c.email}
                         placeholder="customer@example.com (for receipt & order updates)"
@@ -556,6 +562,7 @@ export default function CustomerStep({
                     <div className="field">
                       <span className="field__label">Customer type (auto)</span>
                       <input
+                        aria-label="Customer type"
                         value={customerType}
                         readOnly
                         disabled
@@ -573,6 +580,7 @@ export default function CustomerStep({
                     <div className="field">
                       <span className="field__label">Race{custB["race"]?.required ? " *" : ""}</span>
                       <select
+                        aria-label="Race"
                         value={c.race}
                         onChange={(e) => setC({ race: e.target.value })}
                         data-testid="pos-customer-race"
@@ -590,6 +598,7 @@ export default function CustomerStep({
                     <div className="field">
                       <span className="field__label">Gender{custB["gender"]?.required ? " *" : ""}</span>
                       <select
+                        aria-label="Gender"
                         value={c.gender}
                         onChange={(e) => setC({ gender: e.target.value })}
                         data-testid="pos-customer-gender"
@@ -788,6 +797,7 @@ export default function CustomerStep({
                   <div className="field">
                     <span className="field__label">Contact name *</span>
                     <input
+                      aria-label="Emergency contact name"
                       value={c.emergencyName}
                       placeholder="Name"
                       onChange={(e) => setC({ emergencyName: e.target.value })}
@@ -796,6 +806,7 @@ export default function CustomerStep({
                   <div className="field">
                     <span className="field__label">Relationship *</span>
                     <select
+                      aria-label="Emergency contact relationship"
                       value={c.emergencyRelationship}
                       onChange={(e) =>
                         setC({
@@ -817,6 +828,7 @@ export default function CustomerStep({
                   <div className="field field--span">
                     <span className="field__label">Phone *</span>
                     <input
+                      aria-label="Emergency contact phone"
                       value={c.emergencyPhone}
                       placeholder="012-9988776"
                       onChange={(e) => setC({ emergencyPhone: e.target.value })}
@@ -826,6 +838,7 @@ export default function CustomerStep({
                     <div className="field field--span">
                       <span className="field__label">Specify relationship *</span>
                       <input
+                        aria-label="Specify relationship"
                         value={c.emergencyRelationshipOther}
                         placeholder="Specify relationship"
                         onChange={(e) => setC({ emergencyRelationshipOther: e.target.value })}
@@ -959,7 +972,7 @@ function CustomFieldsInputs({
             {f.required && <span style={{ color: "var(--c-orange)" }}> *</span>}
           </span>
           {f.type === "select" ? (
-            <select value={values[f.key] ?? ""} onChange={(e) => onSet(f.key, e.target.value)}>
+            <select aria-label={f.label} value={values[f.key] ?? ""} onChange={(e) => onSet(f.key, e.target.value)}>
               <option value="">{f.label}</option>
               {f.options.map((o) => (
                 <option key={o} value={o}>
@@ -969,6 +982,7 @@ function CustomFieldsInputs({
             </select>
           ) : (
             <input
+              aria-label={f.label}
               type={f.type === "date" ? "date" : f.type === "number" ? "number" : "text"}
               value={values[f.key] ?? ""}
               onChange={(e) => onSet(f.key, e.target.value)}

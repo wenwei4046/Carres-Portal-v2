@@ -1600,6 +1600,7 @@ export default function SofaConfigurePage({
                 <span className="sof-qp__railDetail">± RM optional · adjusts the price</span>
               </div>
               <textarea
+                aria-label="Remark"
                 value={qpRemark}
                 onChange={(e) => setQpRemark(e.target.value)}
                 placeholder="e.g. deliver before CNY, match showroom unit…"

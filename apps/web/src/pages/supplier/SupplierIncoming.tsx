@@ -1,4 +1,6 @@
 import { useSupplierDemand } from "@/lib/queries";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
 
 /**
  * Supplier · Incoming — Phase 6 V1.
@@ -40,6 +42,22 @@ export default function SupplierIncoming() {
     const cat = r.category as string;
     if (!byCat[cat]) byCat[cat] = [];
     byCat[cat].push(r);
+  }
+
+  if (demand.isError) {
+    return (
+      <div className="p-9 max-w-[1400px] mx-auto" role="alert">
+        <EmptyState
+          title="Could not be loaded"
+          detail="Your incoming demand did not load."
+          action={
+            <Button variant="neutral" onClick={() => void demand.refetch()}>
+              Try again
+            </Button>
+          }
+        />
+      </div>
+    );
   }
 
   return (

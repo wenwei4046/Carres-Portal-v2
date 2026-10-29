@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
 import { toast } from "sonner";
 import { apiFetch, ApiError } from "@/lib/api";
 
@@ -160,7 +163,21 @@ export default function PartnerFleet() {
           data-testid="partner-fleet-list"
         >
           {fleet.isLoading ? (
-            <div className="p-4 text-meta text-base-500">Loading…</div>
+            <div className="p-4">
+              <Loading variant="skeleton" label="Loading vehicles" />
+            </div>
+          ) : fleet.isError ? (
+            <div role="alert">
+              <EmptyState
+                title="Could not be loaded"
+                detail="Your vehicles did not load."
+                action={
+                  <Button variant="neutral" onClick={() => void fleet.refetch()}>
+                    Try again
+                  </Button>
+                }
+              />
+            </div>
           ) : (fleet.data ?? []).length === 0 ? (
             <div className="p-4 text-meta text-base-500">
               No vehicles yet. Add one above.

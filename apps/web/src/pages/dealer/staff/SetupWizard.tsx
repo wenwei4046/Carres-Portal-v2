@@ -126,6 +126,7 @@ function ReauthStep({
         <input
           type="password"
           className="staff-wiz__input"
+          aria-label="Store password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           data-testid="staff-reauth-password"
@@ -217,6 +218,7 @@ function IdentityStep({
         <label className="staff-wiz__label">Your name</label>
         <input
           className="staff-wiz__input"
+          aria-label="Your name"
           value={name}
           onChange={(e) => setName(e.target.value)}
           disabled={!!selfStaff}

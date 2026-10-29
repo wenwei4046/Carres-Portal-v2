@@ -72,6 +72,7 @@ export default function StairCarryFields({
             <input
               type="text"
               inputMode="numeric"
+              aria-label="Floor"
               value={draft.delivery.floor}
               onChange={(e) => setFloor(parseInt(e.target.value, 10) || 1)}
               className="flex-1 min-w-0 text-center text-sm font-mono bg-transparent outline-none border-none py-1"
@@ -102,6 +103,7 @@ export default function StairCarryFields({
             <input
               type="text"
               inputMode="numeric"
+              aria-label="Stair-carry quantity"
               value={stairItemsEffective}
               onChange={(e) => {
                 const parsed = parseInt(e.target.value, 10);

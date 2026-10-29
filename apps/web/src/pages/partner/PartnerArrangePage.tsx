@@ -239,6 +239,7 @@ function DeliveryCard({ card }: { card: PartnerDeliveryCard }) {
               <span className="text-meta font-medium">{PA.cannotDeliverWhy}</span>
               <select
                 className={FIELD}
+                aria-label={PA.cannotDeliverWhy}
                 value={cdReason}
                 onChange={(e) => setCdReason(e.target.value)}
                 data-testid="partner-cannot-deliver-reason"
@@ -252,6 +253,7 @@ function DeliveryCard({ card }: { card: PartnerDeliveryCard }) {
               </select>
               <input
                 className={FIELD}
+                aria-label={PA.cannotDeliverNote}
                 placeholder={PA.cannotDeliverNote}
                 value={cdNote}
                 onChange={(e) => setCdNote(e.target.value)}

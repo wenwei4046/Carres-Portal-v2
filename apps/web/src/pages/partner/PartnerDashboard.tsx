@@ -3,6 +3,9 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { qk, usePartnerToDeliver, type PartnerToDeliverRow } from "@/lib/queries";
 import { apiFetch } from "@/lib/api";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
 
 /**
  * Partner · Today (dashboard).
@@ -175,8 +178,29 @@ export default function PartnerDashboard() {
     deliveryBuckets.scheduled.length +
     deliveryBuckets.out_for_delivery.length;
 
+  // Any failed read would show zeros or empty columns, so the whole page answers "could not be loaded".
+  const failed = [counts, pickups, rfdPending, toDeliver].filter((q) => q.isError);
+  if (failed.length > 0) {
+    return (
+      <div className="px-9 py-8 pb-14" role="alert">
+        <EmptyState
+          title="Could not be loaded"
+          detail="Today's pickups and deliveries did not load."
+          action={
+            <Button variant="neutral" onClick={() => failed.forEach((q) => void q.refetch())}>
+              Try again
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
   if (counts.isLoading || !counts.data) {
-    return <div className="px-9 py-8 pb-14 text-body text-base-600">Loading…</div>;
+    return (
+      <div className="px-9 py-8 pb-14">
+        <Loading variant="skeleton" label="Loading today" />
+      </div>
+    );
   }
   const c = counts.data;
 
@@ -209,7 +233,7 @@ export default function PartnerDashboard() {
 
       {/* Active pipeline preview — 3 columns matching proto. Cards click
           through to Factory pickups for the full work view. */}
-      <div className="flex justify-between items-end gap-4">
+      <div className="flex flex-wrap justify-between items-end gap-4">
         <div className="kicker text-base-500">Active pipeline</div>
         <Link
           to="/delivery-partner/factory-pickups"

@@ -249,6 +249,7 @@ function ForgotPinModal({
           <input
             type="password"
             className="staff-wiz__input"
+            aria-label="Store password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             data-testid="staff-forgot-password"

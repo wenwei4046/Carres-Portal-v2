@@ -408,4 +408,22 @@ describe("SupplierPOs", () => {
       screen.getByRole("button", { name: /Submit DO · Mark Delivered/i }),
     ).toBeDisabled();
   });
+
+  it("a failed PO read shows Could not be loaded and Try again refetches", async () => {
+    let posCalls = 0;
+    vi.mocked(apiFetch).mockImplementation(async (url: string) => {
+      if (url.includes("/api/supplier/me")) return ME_OWN;
+      if (url.includes("/api/supplier/pos")) {
+        posCalls += 1;
+        throw new Error("boom");
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    });
+    render(wrap(<SupplierPOs />));
+    expect(await screen.findByText("Could not be loaded")).toBeInTheDocument();
+    const before = posCalls;
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(posCalls).toBeGreaterThan(before));
+  });
 });
+
