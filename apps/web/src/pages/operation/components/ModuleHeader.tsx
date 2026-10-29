@@ -87,14 +87,14 @@ export default function ModuleHeader({
   if (shell) {
     if (!shell.el) return null;
     return createPortal(
-      <div className="flex min-w-0 flex-1 items-center gap-3.5" data-testid={testId}>
+      <div className="flex min-w-0 flex-1 items-center gap-3.5 max-md:flex-wrap" data-testid={testId}>
         <span data-testid={`${testId}-module-word`} className="contents">
           <ShellTitle crumb={page ? word : null} title={page ?? word} />
         </span>
         {children != null && <div className="flex min-w-0 items-center">{children}</div>}
         <div className="flex-1" />
         {right && (
-          <div className="flex shrink-0 items-center gap-2" data-testid={`${testId}-right`}>
+          <div className="flex shrink-0 items-center gap-2 max-md:flex-wrap max-md:shrink" data-testid={`${testId}-right`}>
             {right}
           </div>
         )}
@@ -134,7 +134,7 @@ export default function ModuleHeader({
       }`}
       data-testid={testId}
     >
-      <div className={`flex items-center ${destinationHeader ? "gap-1 sm:gap-4 min-h-[50px] py-1" : "gap-4 h-11"}`}>
+      <div className={`flex items-center ${destinationHeader ? "gap-1 sm:gap-4 min-h-[50px] py-1" : "gap-4 h-11 max-md:h-auto max-md:min-h-11 max-md:flex-wrap max-md:py-1"}`}>
         <span
           className={`flex items-center gap-1.5 font-semibold text-base-900 select-none cursor-default ${
             destinationHeader ? "min-w-0 break-words text-page" : "shrink-0 text-body"

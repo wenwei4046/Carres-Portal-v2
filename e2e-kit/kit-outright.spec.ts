@@ -297,3 +297,34 @@ test("Sales Order Outright opens from Monthly demand narrowed by the customer's 
   await expect(page.getByTestId("outright-toolbar").getByRole("button", { name: /Customer’s original requested delivery/ })).toHaveCount(0);
   await expect(footer).toHaveText(everyOrder);
 });
+
+test("Sales Order Outright toolbar at 375x812: New Sales Order, Views and More are inside the viewport, 24px+ high, no sideways scroll", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto(PAGE, { waitUntil: "networkidle" });
+  await page.locator('[data-testid^="outright-row-"]').first().waitFor();
+  const m = await page.evaluate(() => {
+    const bar = document.querySelector('[data-testid="outright-toolbar"]') as HTMLElement;
+    const pick = (match: (b: HTMLElement) => boolean) => {
+      const b = [...bar.querySelectorAll("button")].find((x) => match(x as HTMLElement)) as HTMLElement | undefined;
+      const r = b?.getBoundingClientRect();
+      return r && { left: r.left, right: r.right, height: r.height };
+    };
+    const label = (b: HTMLElement) => b.getAttribute("aria-label") ?? "";
+    return {
+      overflow: bar.scrollWidth - bar.clientWidth,
+      vw: document.documentElement.clientWidth,
+      pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      create: pick((b) => /New Sales Order/.test(b.textContent ?? "")),
+      views: pick((b) => label(b).startsWith("View") || /Views/.test(label(b))),
+      more: pick((b) => label(b) === "More actions"),
+    };
+  });
+  expect(m.overflow).toBeLessThanOrEqual(0);
+  expect(m.pageOverflow).toBeLessThanOrEqual(0);
+  for (const r of [m.create, m.views, m.more]) {
+    expect(r).toBeTruthy();
+    expect(r!.left).toBeGreaterThanOrEqual(0);
+    expect(r!.right).toBeLessThanOrEqual(m.vw);
+    expect(r!.height).toBeGreaterThanOrEqual(24);
+  }
+});

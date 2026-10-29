@@ -434,7 +434,9 @@ export default function SalesOrdersOutright() {
     const bar = toolbarRef.current;
     if (!bar) return;
     const most = chips.length > 0 ? 3 : 1;
+    /* On phones the bar wraps, so it never overflows: skip stepping and undo any desktop compaction. */
     const fit = () => {
+      if (window.matchMedia?.("(max-width:767.98px)").matches) { if (compact > 0) setCompact(0); return; }
       if (bar.scrollWidth > bar.clientWidth + 1 && compact < most) {
         need.current[compact] = bar.scrollWidth;
         setCompact(compact + 1);
