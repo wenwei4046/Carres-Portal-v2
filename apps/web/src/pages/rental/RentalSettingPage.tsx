@@ -184,6 +184,16 @@ export default function RentalSettingPage({ isPrincipal }: { isPrincipal: boolea
         />
       </div>
 
+      {/* Without the catalog no offer can be sorted into its family, so every section would read as empty. */}
+      {catalogQ.error && !catalogQ.data && (
+        <div role="alert" className="flex items-center gap-3 text-body text-base-700" data-testid="rental-catalog-failed">
+          The catalog could not be loaded, so offers cannot be shown by product family.
+          <Button variant="neutral" onClick={() => void catalogQ.refetch()}>
+            Try again
+          </Button>
+        </div>
+      )}
+
       <section className="flex items-start justify-between gap-4">
         <p className="text-meta text-base-500 max-w-[520px]">
           An <b>offer</b> says which model is on offer, in which variants, with which options and

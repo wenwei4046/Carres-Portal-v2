@@ -47,7 +47,7 @@ interface ConfigState {
   refetch?: () => void;
 }
 let configState: ConfigState;
-let catalogState: { data: unknown; isPending: boolean; error: unknown };
+let catalogState: { data: unknown; isPending: boolean; error: unknown; refetch?: () => void };
 
 const mockCreatePkg = vi.fn();
 const mockPatchPkg = vi.fn();
@@ -359,11 +359,15 @@ describe("RentalSettingPage — sections + empty states", () => {
     expect(screen.queryByText("Could not be loaded")).not.toBeInTheDocument();
   });
 
-  it("a failed catalog read does not block the page (only the config read does)", () => {
-    catalogState = { data: undefined, isPending: false, error: new Error("boom") };
+  it("a failed catalog read does not block the page but says so, with Try again", () => {
+    const refetch = vi.fn();
+    catalogState = { data: undefined, isPending: false, error: new Error("boom"), refetch };
     renderPage({ isPrincipal: true });
     expect(screen.getByText("Bed frame offers")).toBeInTheDocument();
     expect(screen.queryByText("Could not be loaded")).not.toBeInTheDocument();
+    expect(screen.getByTestId("rental-catalog-failed")).toHaveTextContent("The catalog could not be loaded");
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(refetch).toHaveBeenCalledTimes(1);
   });
 });
 
