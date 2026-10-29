@@ -40,3 +40,7 @@ STRIPE_WEBHOOK_SECRET=whsec_your-test-mode-webhook-signing-secret
 # Never paste a real value here, in a chat, a commit or a test.
 # VELOCITY_REFRESH_TOKEN=
 # VELOCITY_CUSTOMER_ID=
+
+# IT Support -> Houzs IT Hub (routes/it-support.ts). Production: wrangler secret put.
+IT_HUB_URL=https://support.houzscentury.com
+IT_HUB_API_KEY=issued-by-the-hub-for-system-CARRES

@@ -6183,3 +6183,7 @@ decision. These words are admitted for the Service Cases page, the case window a
 | Settings page and link | `Service Settings` · group `Service` |
 | Settings rows | `Default case owner` · `A new case goes to this person until the sales order PIC picks the case owner.` · `Stages` · `The stages staff pick on a case. A stage that closes the case cannot be added here.` · `Case types` · `The case types staff pick on a case.` · `In use` · `New stage` · `New case type` · `Add` |
 | Last closing stage, `In use` locked (YH, chat 2026-10-26) | hint `Close Case needs this stage.` · refused `Keep one stage that closes the case in use. Close Case needs it.` |
+
+### Report a problem to IT (side menu bottom)
+
+The row at the bottom of the side menu (above the person, beside `Settings`, on every module; the Layout Standard 1 top bar is unchanged) and its dialog send a request to the Houzs IT Hub (`/api/it-support/tickets`, Worker secrets `IT_HUB_URL` and `IT_HUB_API_KEY`). Words: **`Report a problem to IT`** · **`What went wrong?`** · **`Tell IT more`** · **`How urgent is it?`** (`Can wait` · `Soon` · `Blocking my work`) · **`Send to IT`** · **`Sent to IT. Your request number is {code}.`** · **`Done`**. This is IT's request, not a Service Case: do not mix it with the Unit and Service `Report a problem`.

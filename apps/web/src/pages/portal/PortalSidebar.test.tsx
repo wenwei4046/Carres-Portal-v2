@@ -1700,6 +1700,16 @@ describe("the one Settings row, at the bottom of the menu", () => {
     expect(screen.getByTestId("nav-settings")).toHaveAttribute("href", "/finance/settings");
   });
 
+  it("every module's menu has Report a problem to IT at the bottom, and it opens the dialog", () => {
+    for (const [role, path] of [["operation", "/operation"], ["finance", "/finance/dashboard"], ["principal", "/operation"]] as const) {
+      mockRole = role;
+      const view = renderAt(path);
+      fireEvent.click(screen.getByTestId("nav-report-problem"));
+      expect(screen.getByRole("dialog", { name: "Report a problem to IT" }), role).toBeInTheDocument();
+      view.unmount();
+    }
+  });
+
   it("finance has Finance Settings; People has no Settings page, so no row", () => {
     mockRole = "finance";
     const view = renderAt("/finance/dashboard");
