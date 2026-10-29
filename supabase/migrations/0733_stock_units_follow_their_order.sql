@@ -56,7 +56,7 @@ $rw$;
 -- neither does one the Unit was already returned from (0716).
 create or replace function public._stock_unit_stays_on_its_live_do()
 returns trigger
-language plpgsql
+language plpgsql security definer
 set search_path = public, pg_temp
 as $fn$
 declare
@@ -340,7 +340,7 @@ begin
     if exists (select 1 from unnest(p_item_ids) x(id)
                 where not exists (select 1 from ops_stock_items i
                                    where i.id = x.id and i.qty = 1
-                                     and (i.sold_order_id = p_order_id or i.reserved_ref = 'SO-' || v_order.so))) then
+                                     and i.status = 'reserved' and i.reserved_ref = 'SO-' || v_order.so)) then
       raise exception 'a picked Unit is not reserved to this order'
         using errcode = '22023', detail = 'unit_not_reserved_to_order';
     end if;
@@ -412,6 +412,7 @@ $new$  -- 0733 · a scanned Unit at this Site and in stock that reached it after
      and i.warehouse_id = c.warehouse_id
      and i.status in ('free','reserved','on_hold')
      and i.identity_scope = 'unit'
+     and not i.needs_repair
   on conflict (count_id, unit_id) do nothing;
 
   select string_agg(f, ', ') into v_unknown$new$);
