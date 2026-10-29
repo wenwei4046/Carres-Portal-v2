@@ -108,6 +108,7 @@ export default function CommissionOrders({
         stickyIdentity
         fixedGroups={{ groups: ORDER_GROUPS.map((g) => ({ key: g.key, label: g.label })), groupOf: (r) => r.group ?? "waiting", revealMatches: true }}
         isLoading={loading}
+        emptyMessage="No order earns or owes commission in this month."
         wrapToolbar
         toolbarStart={toolbarStart}
         onRowDoubleClick={(r) => setOpen(r)}

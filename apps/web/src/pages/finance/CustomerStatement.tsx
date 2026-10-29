@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { SectionCard } from "@/components/SectionPanel";
+import Loading from "@/components/kit/Loading";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
@@ -63,7 +64,7 @@ export default function CustomerStatement({ orderId, onClose }: {
     staleTime: 30_000,
   });
 
-  if (query.isError) {
+  if (query.isError && !query.data) {
     return <div className="flex-1 overflow-auto p-4" role="alert">
       <SectionCard><div className="p-4 text-body">
         <p>The statement could not be loaded. Try again.</p>
@@ -75,7 +76,7 @@ export default function CustomerStatement({ orderId, onClose }: {
   if (!query.data) {
     return <div className="flex-1 overflow-auto p-4">
       <SectionCard><div className="p-4 text-body">
-        <p>Loading statement…</p>
+        <Loading variant="skeleton" label="Loading statement…" />
       </div></SectionCard>
     </div>;
   }

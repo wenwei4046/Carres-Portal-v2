@@ -67,6 +67,8 @@ export default function NewSalesInvoiceDialog() {
   const [found, setFound] = useState<Offer | null>(null);
   const [picks, setPicks] = useState<Record<string, OfficeInvoicePick>>({});
   const [error, setError] = useState<string | null>(null);
+  /* The read itself failed (network or server), not "no such SO/DO": offer Try again. */
+  const [findFailed, setFindFailed] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const reset = (next: boolean) => {
@@ -75,11 +77,13 @@ export default function NewSalesInvoiceDialog() {
     setFound(null);
     setPicks({});
     setError(null);
+    setFindFailed(false);
   };
 
   const find = async () => {
     setBusy(true);
     setError(null);
+    setFindFailed(false);
     setFound(null);
     try {
       const offer = await apiFetch<Offer>(`/api/finance/invoices/office-offer/${encodeURIComponent(ref.trim())}`);
@@ -87,6 +91,7 @@ export default function NewSalesInvoiceDialog() {
       setPicks(officeInvoicePrefill(offer.lines, offer.delivery_order ? offer.delivery_order.groups : undefined));
     } catch (e) {
       setError(errorOf(e));
+      setFindFailed(!(e instanceof ApiError && e.status < 500));
     } finally {
       setBusy(false);
     }
@@ -161,9 +166,14 @@ export default function NewSalesInvoiceDialog() {
             </Button>
           </form>
           {error ? (
-            <p role="alert" className="text-kit-red-11">
-              {error}
-            </p>
+            <div role="alert" className="flex items-center gap-3">
+              <p className="text-kit-red-11">{error}</p>
+              {findFailed && (
+                <Button variant="neutral" onClick={() => void find()} disabled={busy}>
+                  Try again
+                </Button>
+              )}
+            </div>
           ) : null}
           {found ? (
             <div className="flex flex-col gap-3">
