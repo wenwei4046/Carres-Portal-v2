@@ -25,6 +25,37 @@ export function stripeClient(env: Bindings): Stripe {
   });
 }
 
+/**
+ * Expire every open Checkout link of one order, at Stripe and in our table.
+ * One live link per order is what stops two links collecting the same balance,
+ * and a re-mint (card failed, wrong amount) is never locked out by an old link.
+ * Returns false when Stripe refuses to expire one (it is being paid or already
+ * paid): the caller must not mint a twin then. Rows are marked only after
+ * Stripe agreed, so a paid link is never recorded as expired.
+ */
+export async function expireOpenCheckoutLinks(
+  stripe: Stripe,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  admin: any,
+  orderId: string,
+): Promise<boolean> {
+  const { data, error } = await admin
+    .from("stripe_checkout_sessions")
+    .select("session_id")
+    .eq("order_id", orderId)
+    .eq("status", "open");
+  if (error) return false;
+  for (const r of (data ?? []) as { session_id: string }[]) {
+    try {
+      await stripe.checkout.sessions.expire(r.session_id);
+    } catch {
+      return false;
+    }
+    await admin.from("stripe_checkout_sessions").update({ status: "expired" }).eq("session_id", r.session_id).eq("status", "open");
+  }
+  return true;
+}
+
 export const webCryptoProvider = Stripe.createSubtleCryptoProvider();
 
 /**

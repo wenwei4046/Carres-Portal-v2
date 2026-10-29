@@ -62,7 +62,7 @@ paymentStorageRouter.get("/", async (c) => {
       sb.from("ops_order_control")
         .select("storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_collected_at, storage_waiver_status")
         .eq("order_id", orderId).maybeSingle(),
-      sb.from("orders").select("paid, order_lines(sku, qty, unit_price), order_addons(qty, unit_price)")
+      sb.from("orders").select("paid, credited, order_lines(sku, qty, unit_price), order_addons(qty, unit_price)")
         .eq("id", orderId).maybeSingle(),
       sb.from("invoices").select("kind, status, amount, tax_amount, voided_at")
         .eq("order_id", orderId),
@@ -70,6 +70,7 @@ paymentStorageRouter.get("/", async (c) => {
     const ctrl = (ctrlRes.data ?? null) as Record<string, unknown> | null;
     const ord = (orderRes.data ?? null) as {
       paid?: number | string | null;
+      credited?: number | string | null;
       order_lines?: Array<{ sku: string; qty: number; unit_price: number | string | null }>;
       order_addons?: Array<{ qty: number; unit_price: number | string | null }>;
     } | null;
@@ -91,9 +92,9 @@ paymentStorageRouter.get("/", async (c) => {
       const invoiceRows = (invRes.data ?? []) as Parameters<typeof invoiceStorageSumOf>[0];
       unreconciledLegacy = storageObligation({
         invoiceStorageSum: invoiceStorageSumOf(invoiceRows),
-        goodsTotal:
+        goodsTotal: Math.max(0,
           (ord.order_lines ?? []).reduce((t, l) => t + price(l), 0) +
-          (ord.order_addons ?? []).reduce((t, a) => t + price(a), 0),
+          (ord.order_addons ?? []).reduce((t, a) => t + price(a), 0) - Number(ord.credited ?? 0)),
         paid: ord.paid ?? null,
         legacyOwing: hold.owing,
         legacyReleased: hold.released,

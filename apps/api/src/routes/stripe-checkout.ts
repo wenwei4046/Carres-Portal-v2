@@ -3,7 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import { createStripeCheckoutInputSchema } from "@carres/shared";
 import { parseJsonBody, fail } from "../lib/route-helpers";
-import { describePaymentMethod, receiptUrlOf, stripeClient, stripeConfigured } from "../lib/stripe";
+import { describePaymentMethod, expireOpenCheckoutLinks, receiptUrlOf, stripeClient, stripeConfigured } from "../lib/stripe";
 import { adminClient, userClient } from "../lib/supabase";
 import type { AppEnv } from "../types";
 
@@ -178,33 +178,11 @@ stripeCheckoutRouter.post("/:id/stripe/checkout", async (c) => {
       422,
     );
   }
-  // A credit note (0730) lowers what is owed; a link still open can be paid,
-  // so its amount is already spoken for. Without this two links for the same
-  // balance both collect.
-  const admin = adminClient(c.env);
-  const { data: openLinks, error: openErr } = await admin
-    .from("stripe_checkout_sessions")
-    .select("amount")
-    .eq("order_id", order.id)
-    .eq("status", "open")
-    .gt("expires_at", new Date().toISOString());
-  if (openErr) return fail(c, openErr);
-  const pending = (openLinks ?? []).reduce((s, r) => s + Number(r.amount), 0);
-  // shortcut: two requests in the same instant can still both pass this read; the 0223 RPC records what Stripe took either way.
-  const owed = Math.max(0, total - Number(order.credited ?? 0) + storageObligations(order) - Number(order.paid));
-  if (owed <= 0) {
-    return c.json(
-      { error: "stripe_checkout_blocked", code: "already_paid", message: "Order is already fully paid." },
-      422,
-    );
-  }
-  const outstanding = Math.max(0, owed - pending);
+  // A credit note (0730) lowers what is owed.
+  const outstanding = Math.max(0, total - Number(order.credited ?? 0) + storageObligations(order) - Number(order.paid));
   if (outstanding <= 0) {
     return c.json(
-      {
-        error: "stripe_checkout_blocked", code: "open_link_covers_balance",
-        message: "A payment link for the whole balance is still open. Send that link, or wait for it to expire.",
-      },
+      { error: "stripe_checkout_blocked", code: "already_paid", message: "Order is already fully paid." },
       422,
     );
   }
@@ -214,11 +192,19 @@ stripeCheckoutRouter.post("/:id/stripe/checkout", async (c) => {
       {
         error: "stripe_checkout_blocked",
         code: "amount_exceeds_outstanding",
-        message: pending > 0
-          ? `Amount is above the balance not yet on an open link (RM ${outstanding.toFixed(2)}).`
-          : `Amount is above the outstanding balance (RM ${outstanding.toFixed(2)}).`,
+        message: `Amount is above the outstanding balance (RM ${outstanding.toFixed(2)}).`,
         maxAmount: Number(outstanding.toFixed(2)),
       },
+      422,
+    );
+  }
+
+  // One live link per order: an earlier open link is expired first, so two
+  // links can never both collect the balance, and a failed card can be retried.
+  const admin = adminClient(c.env);
+  if (!(await expireOpenCheckoutLinks(stripeClient(c.env), admin, order.id))) {
+    return c.json(
+      { error: "stripe_checkout_blocked", code: "link_in_use", message: "An earlier payment link is being paid right now. Wait a minute and check the order." },
       422,
     );
   }

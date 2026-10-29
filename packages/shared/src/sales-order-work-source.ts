@@ -18,6 +18,8 @@ export interface SalesOrderWorkFacts {
   lineTotal: number | null;
   addonTotal: number | null;
   paid: number | null;
+  /** `orders.credited` (0730) — issued credit notes lower what is owed. */
+  credited?: number | null;
   storageOwing: number;
   delayDecision: "keep" | "new_date" | null;
   delayDecisionEta: string | null;
@@ -80,7 +82,7 @@ export function salesOrderActionSignalsFromFacts(
   const outstanding = moneyKnown
     ? Math.max(
         0,
-        facts.lineTotal! + facts.addonTotal! + facts.storageOwing - facts.paid!,
+        facts.lineTotal! + facts.addonTotal! - (facts.credited ?? 0) + facts.storageOwing - facts.paid!,
       )
     : 0;
 

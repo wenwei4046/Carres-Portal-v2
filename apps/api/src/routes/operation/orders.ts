@@ -2123,7 +2123,7 @@ operationOrdersRouter.get("/:id/completion", requireOperation, async (c) => {
   const { data: ord, error: ordErr } = await sb
     .from("orders")
     .select(
-      "id, so, status, paid, delivery_date, order_lines(sku, qty, unit_price), order_addons(qty, unit_price), ops_order_control(balance, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_collected_at, storage_waiver_status, extension_original_date)",
+      "id, so, status, paid, credited, delivery_date, order_lines(sku, qty, unit_price), order_addons(qty, unit_price), ops_order_control(balance, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_collected_at, storage_waiver_status, extension_original_date)",
     )
     .eq("id", id)
     .maybeSingle();

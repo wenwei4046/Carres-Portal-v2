@@ -98,6 +98,8 @@ describe.skipIf(!URL)("credit notes and the refund ceiling (real PostgreSQL, 073
 
   it("posts a balanced journal: Dr each income account in the invoice's proportion, Cr receivables", async () => {
     await actAs(U.finance);
+    // A session 19 hours behind KL: the old `current_date` would give the wrong day for most of the day.
+    await q("set local timezone = 'Pacific/Pago_Pago'");
     const r = await credit(110);
     expect(r).toEqual({ ok: true, row: expect.anything() });
     noteId = r.ok ? String(r.row.id) : "";

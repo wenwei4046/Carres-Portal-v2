@@ -14,6 +14,9 @@ vi.mock("../lib/stripe", () => ({
   webCryptoProvider: {},
   describePaymentMethod: () => "fpx (maybank2u)",
   receiptUrlOf: () => "https://pay.stripe.com/receipts/test",
+  // the real helper, run against whatever client the test passes
+  expireOpenCheckoutLinks: async (...a: unknown[]) =>
+    ((await vi.importActual("../lib/stripe")) as typeof import("../lib/stripe")).expireOpenCheckoutLinks(...(a as Parameters<typeof import("../lib/stripe").expireOpenCheckoutLinks>)),
 }));
 import { stripeClient } from "../lib/stripe";
 
@@ -210,7 +213,7 @@ describe("POST /:id/stripe/checkout", () => {
       new Request(`http://t/api/orders/${ORDER_ID}/stripe/checkout`, {
         method: "POST",
         headers: { Authorization: `Bearer ${await makeJwt("operation")}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: 1758 }),
+        body: JSON.stringify({ amount: 1600 }),
       }), env);
     expect(res.status).toBe(201);
     // …one ringgit above the combined obligation is refused with the cap named.
@@ -786,5 +789,65 @@ describe("POST /stripe/webhook", () => {
       expect(admin.calls.rpc).toHaveLength(1);
       expect((admin.calls.rpc[0].args as Record<string, unknown>).p_amount).toBe(59);
     });
+  });
+});
+
+describe("POST /:id/stripe/checkout · one live link per order", () => {
+  it("expires an earlier open link before minting, so a retry is never locked out", async () => {
+    const user = makeSb({ orders: { maybeSingle: { data: ORDER, error: null } } });
+    const admin = makeSb({
+      stripe_checkout_sessions: { single: { data: SESSION_ROW, error: null }, list: { data: [{ session_id: "cs_old" }], error: null } },
+    });
+    vi.mocked(userClient).mockReturnValue(user as never);
+    vi.mocked(adminClient).mockReturnValue(admin as never);
+    const stripe = makeStripe();
+    vi.mocked(stripeClient).mockReturnValue(stripe);
+    const res = await app.fetch(
+      new Request(`http://t/api/orders/${ORDER_ID}/stripe/checkout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("dealer")}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: 1600 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    expect(stripe.checkout.sessions.expire).toHaveBeenCalledWith("cs_old");
+  });
+
+  it("refuses to mint a twin when Stripe will not expire the old link (it may be paying)", async () => {
+    const user = makeSb({ orders: { maybeSingle: { data: ORDER, error: null } } });
+    const admin = makeSb({ stripe_checkout_sessions: { list: { data: [{ session_id: "cs_old" }], error: null } } });
+    vi.mocked(userClient).mockReturnValue(user as never);
+    vi.mocked(adminClient).mockReturnValue(admin as never);
+    const stripe = makeStripe();
+    stripe.checkout.sessions.expire.mockRejectedValue(new Error("already complete"));
+    vi.mocked(stripeClient).mockReturnValue(stripe);
+    const res = await app.fetch(
+      new Request(`http://t/api/orders/${ORDER_ID}/stripe/checkout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("dealer")}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: 1600 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
+  });
+
+  it("a credit note lowers the cap on the link", async () => {
+    const user = makeSb({ orders: { maybeSingle: { data: { ...ORDER, credited: 200 }, error: null } } });
+    vi.mocked(userClient).mockReturnValue(user as never);
+    vi.mocked(adminClient).mockReturnValue(makeSb({}) as never);
+    vi.mocked(stripeClient).mockReturnValue(makeStripe());
+    const res = await app.fetch(
+      new Request(`http://t/api/orders/${ORDER_ID}/stripe/checkout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("dealer")}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: 1600 }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { maxAmount: number }).maxAmount).toBe(1400);
   });
 });
