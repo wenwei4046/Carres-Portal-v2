@@ -36,6 +36,9 @@ export default function PrincipalApprovals() {
     };
   }, [all.data]);
 
+  // A failed counts query must not read as real zeros.
+  const countOf = (f: keyof typeof counts) => (all.isError ? "–" : counts[f]);
+
   if (list.isError) {
     return (
       <div className="px-9 py-8">
@@ -60,7 +63,7 @@ export default function PrincipalApprovals() {
           Decisions in your court
         </h1>
         <div className="text-body text-base-600 mt-1.5">
-          {counts.pending} pending · auto-routed from Finance, Sales and Catalog.
+          {countOf("pending")} pending · auto-routed from Finance, Sales and Catalog.
         </div>
       </div>
 
@@ -73,7 +76,7 @@ export default function PrincipalApprovals() {
           return (
             <button key={f} type="button" onClick={() => setFilter(f)} className={cls}>
               {f}
-              {f !== "all" ? ` · ${counts[f as keyof typeof counts]}` : ""}
+              {f !== "all" ? ` · ${countOf(f as keyof typeof counts)}` : ""}
             </button>
           );
         })}

@@ -229,14 +229,14 @@ export default function PrincipalAccounts() {
                 </td>
               </tr>
             )}
-            {isError && (
+            {isError && !data && (
               <tr>
                 <td colSpan={7}>
                   <ReadFailed what="Accounts" onRetry={() => void refetch()} />
                 </td>
               </tr>
             )}
-            {!isLoading && !isError && filtered.length === 0 && (
+            {!isLoading && !(isError && !data) && filtered.length === 0 && (
               <tr>
                 <td colSpan={7} className="p-10 text-center text-meta text-base-500">
                   No accounts match those filters.
@@ -1065,6 +1065,7 @@ function CreateAccountModal({
                     value={draft.companyName}
                     onChange={(v) => set("companyName", v)}
                     placeholder="e.g. Kota Damansara"
+                    ariaLabel="Showroom name"
                   />
                 ) : (
                   <Input
@@ -1094,6 +1095,7 @@ function CreateAccountModal({
                       value={draft.outletName}
                       onChange={(v) => set("outletName", v)}
                       placeholder="e.g. Mont Kiara"
+                      ariaLabel="Outlet name"
                     />
                   </Field>
                   <Field label="SSM code" hint="Required · company registration number (e.g. 201801234567 or 123456-A)" error={errors.ssmCode}>

@@ -98,13 +98,13 @@ export default function Me() {
             <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-body">
               <dt className="text-muted-foreground">Role</dt>
               <dd className="font-semibold text-primary">{me.role}</dd>
-              <dt className="text-muted-foreground">Dealer</dt>
+              <dt className="text-muted-foreground">Dealer ID</dt>
               <dd className="break-all">{me.dealerId ?? ""}</dd>
-              <dt className="text-muted-foreground">Supplier</dt>
+              <dt className="text-muted-foreground">Supplier ID</dt>
               <dd className="break-all">{me.supplierId ?? ""}</dd>
-              <dt className="text-muted-foreground">Partner</dt>
+              <dt className="text-muted-foreground">Partner ID</dt>
               <dd className="break-all">{me.partnerId ?? ""}</dd>
-              <dt className="text-muted-foreground">Outlet</dt>
+              <dt className="text-muted-foreground">Outlet ID</dt>
               <dd className="break-all">{me.outletId ?? ""}</dd>
             </dl>
           )}

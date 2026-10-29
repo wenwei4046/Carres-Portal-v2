@@ -125,8 +125,8 @@ export default function PrincipalAudit() {
             <Loading variant="skeleton" lines={5} label="Loading audit log" />
           </div>
         )}
-        {isError && <ReadFailed what="The audit log" onRetry={() => void refetch()} />}
-        {!isLoading && !isError && rows.length === 0 && (
+        {isError && !data && <ReadFailed what="The audit log" onRetry={() => void refetch()} />}
+        {!isLoading && !(isError && !data) && rows.length === 0 && (
           <div className="p-8 text-center text-meta text-base-500">No entries.</div>
         )}
         {rows.map((e, i) => (

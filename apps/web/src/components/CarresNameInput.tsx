@@ -13,12 +13,14 @@ export default function CarresNameInput({
   placeholder,
   autoFocus,
   testId,
+  ariaLabel,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   autoFocus?: boolean;
   testId?: string;
+  ariaLabel?: string;
 }) {
   return (
     <div className="flex items-stretch w-full border border-base-200 rounded bg-white overflow-hidden focus-within:border-base-700">
@@ -31,6 +33,7 @@ export default function CarresNameInput({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         autoFocus={autoFocus}
+        aria-label={ariaLabel}
         data-testid={testId}
         className="flex-1 min-w-0 px-3 py-2.5 text-body bg-transparent outline-none"
       />
