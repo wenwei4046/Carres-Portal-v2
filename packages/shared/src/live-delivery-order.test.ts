@@ -18,9 +18,15 @@ describe("live delivery order rule", () => {
   });
   it("picks the newest live one, skipping a voided newer one", () => {
     expect(liveDeliveryOrderNumber([
+      { do_number: "OLD", issued_at: "2026-10-01" },
       { do_number: "B", issued_at: "2026-10-03", voided_at: "x" },
       { do_number: "A", issued_at: "2026-10-02" },
-      { do_number: "OLD", issued_at: "2026-10-01" },
+    ])).toBe("A");
+  });
+  it("a null issued_at ranks oldest, never newest", () => {
+    expect(liveDeliveryOrderNumber([
+      { do_number: "NOSTAMP", issued_at: null },
+      { do_number: "A", issued_at: "2026-10-02" },
     ])).toBe("A");
   });
 });
