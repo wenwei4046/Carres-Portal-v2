@@ -135,9 +135,10 @@ export default function OperationGuarantees() {
 
   return (
     <div className="p-4 sm:p-8 max-w-7xl mx-auto w-full min-w-0">
-      {/* The shell header already prints the page name as the h1. */}
+      {/* The shell header prints the h1 from 768px up; on phones the sr-only h1 stands in. */}
       <div className="mb-6">
         <p className="text-meta uppercase tracking-wider text-base-500 mb-1">Operation</p>
+        <h1 className="sr-only md:hidden">Guarantees</h1>
         <h2 className="text-page text-base-900">Guarantees</h2>
         <p className="text-body text-base-600 mt-2">
           Every guarantee sold, newest first. Narrow by ID, Sales Order, customer name, phone or
@@ -180,12 +181,12 @@ export default function OperationGuarantees() {
       </div>
 
       {listQ.isPending && <Loading variant="skeleton" label="Loading guarantees" />}
-      {listQ.isError && (
+      {listQ.isError && !listQ.data && (
         <div className="rounded border border-base-200 bg-white">
           <ReadFailed what="The guarantees" onRetry={() => void listQ.refetch()} />
         </div>
       )}
-      {!listQ.isPending && !listQ.isError && rows.length === 0 && (
+      {!listQ.isPending && !(listQ.isError && !listQ.data) && rows.length === 0 && (
         <div className="rounded border border-dashed border-base-300 bg-white p-10 text-center">
           <ShieldCheck size={28} strokeWidth={1.5} className="mx-auto text-base-300 mb-3" />
           {filtered ? (

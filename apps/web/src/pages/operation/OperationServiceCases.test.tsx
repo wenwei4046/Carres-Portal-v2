@@ -73,6 +73,7 @@ describe("Deadline column — today is the Malaysian date", () => {
  * switch that asks the server for my team's cases, and the owner on each row.
  */
 describe("Service Cases — stage cards, My cases and the owner", () => {
+  afterEach(() => { document.title = "Carres Portal"; });
   const OWNER = "55555555-5555-5555-5555-555555555555";
   const cases = [
     { ...row, id: "a", caseNo: "SC-A", statusId: "s1", statusLabel: "Pending", ownerUserId: OWNER },
@@ -101,10 +102,13 @@ describe("Service Cases — stage cards, My cases and the owner", () => {
     expect(screen.getByText("SC-C")).toBeInTheDocument();
   });
 
-  it("names the browser tab and leaves the h1 to the shell header", async () => {
+  it("names the browser tab; phones get an sr-only h1 and the visible heading is an h2", async () => {
     mount();
     expect(document.title).toBe("Service Cases · Carres");
-    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+    // jsdom has no media queries: assert the class that hides it from md up.
+    const h1 = screen.getByRole("heading", { level: 1, name: "Service Cases" });
+    expect(h1).toHaveClass("sr-only", "md:hidden");
+    expect(screen.getByRole("heading", { level: 2, name: "Service Cases" })).toBeInTheDocument();
     expect(await screen.findByText("SC-A")).toBeInTheDocument();
   });
 
