@@ -82,4 +82,19 @@ describe("POST /api/it-support/tickets", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response('{"error":"Invalid API key"}', { status: 401 }));
     expect((await post(hubEnv, { title: "x" })).status).toBe(502);
   });
+
+  it("400 for a page address that is not http(s), and the hub is not called", async () => {
+    const spy = vi.spyOn(globalThis, "fetch");
+    for (const page_url of ["javascript:alert(1)", "not a url"]) {
+      expect((await post(hubEnv, { title: "x", page_url })).status).toBe(400);
+    }
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("201 when the hub took the request but its reply is unreadable (no duplicate re-send)", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("<html>ok</html>", { status: 201 }));
+    const res = await post(hubEnv, { title: "x", page_url: "http://localhost:5173/operation" });
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({});
+  });
 });

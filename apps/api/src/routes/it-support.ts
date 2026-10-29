@@ -37,7 +37,8 @@ const ticketInput = z.object({
   description: z.string().trim().max(10_000).optional(),
   type: z.enum(["bug", "development"]).optional(),
   priority: z.enum(["high", "medium", "low"]).optional(),
-  page_url: z.string().trim().max(1000).optional(),
+  // http(s) only: the Hub shows it as a link, so `javascript:` must not get through.
+  page_url: z.string().trim().max(1000).url().refine((u) => /^https?:\/\//i.test(u), "Page address must be a web address.").optional(),
   app_version: z.string().trim().max(60).optional(),
 });
 
@@ -74,7 +75,8 @@ itSupportRouter.post("/tickets", async (c) => {
   }
 
   const body = (await res.json().catch(() => null)) as Record<string, unknown> | null;
-  if (res.ok && body) return c.json(body, 201);
+  // The hub took it; an unreadable reply must not read as failure, or the user re-sends a duplicate.
+  if (res.ok) return c.json(body ?? {}, 201);
   if (res.status === 400 && typeof body?.error === "string") {
     return c.json({ error: "invalid_body", message: body.error }, 400);
   }
