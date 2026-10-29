@@ -73,7 +73,7 @@ export function purchaseReturnDraftPrint(
  *  Jess's "only after an approved claim"; Jess was not part of it. */
 export default function PurchaseReturnIssue({ claimId = null, supplierId = null, onClose, onIssued }: { claimId?: string | null; supplierId?: string | null; onClose: () => void; onIssued: (id: string) => void }) {
   const read = usePurchaseReturnIssueSource(claimId, supplierId);
-  if (read.isError) {
+  if (read.isError && !read.data) {
     return <div role="alert"><EmptyState title="Some information could not be refreshed." action={<Button variant="neutral" onClick={() => void read.refetch()}>Try again</Button>} /></div>;
   }
   if (read.isLoading || !read.data) return <div className="p-4"><Loading variant="skeleton" label="Loading the Purchase Return" /></div>;
@@ -95,7 +95,7 @@ export function ConsignmentReturnIssue({ onClose, onIssued }: { onClose: () => v
         options={(suppliers.data?.suppliers ?? []).map((s) => ({ value: s.id, label: s.name }))} />
     </div>
     {!supplierId ? <div className="flex justify-end"><Button variant="neutral" onClick={onClose}>Cancel</Button></div>
-      : read.isError ? <div role="alert"><EmptyState title="Some information could not be refreshed." action={<Button variant="neutral" onClick={() => void read.refetch()}>Try again</Button>} /></div>
+      : read.isError && !read.data ? <div role="alert"><EmptyState title="Some information could not be refreshed." action={<Button variant="neutral" onClick={() => void read.refetch()}>Try again</Button>} /></div>
       : read.isLoading || !read.data ? <Loading variant="skeleton" label="Loading the Purchase Return" />
       : <IssueForm key={supplierId} source={read.data.source} onClose={onClose} onIssued={onIssued} />}
   </div>;

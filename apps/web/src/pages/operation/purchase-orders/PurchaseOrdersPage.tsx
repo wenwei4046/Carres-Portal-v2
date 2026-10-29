@@ -649,7 +649,8 @@ export default function PurchaseOrdersPage() {
      be loaded. Its data feeds two decorative badges and nothing else, and
      `OwnerBadge` already degrades to "PO Duty not assigned" on a null holder,
      which is the right thing to show. */
-  const requiredReadError = posQ.isError || suppliersQ.isError || warehouseQ.isError;
+  // A failed refetch keeps the cached register; only a read with nothing cached replaces it.
+  const requiredReadError = (posQ.isError && !posQ.data) || (suppliersQ.isError && !suppliersQ.data) || (warehouseQ.isError && !warehouseQ.data);
   if (requiredReadError) {
     return (
       <div ref={canvasRef} className="flex h-full min-h-0 flex-col bg-kit-canvas">
@@ -1341,7 +1342,7 @@ export default function PurchaseOrdersPage() {
           {!railOpen && <div className="shrink-0 p-2"><ShowFiltersButton onShow={() => setRailVisible(true)} testId="purchase-orders-show-filters" /></div>}
           <SalesOrderMonthlyDemand view={demandView} focusMonth={focusMonth}
           onOpenMonth={openDemandMonth} loading={demandQ.isLoading}
-          error={demandQ.isError ? demandQ.error : undefined} onRetry={() => void demandQ.refetch()} /></div> :
+          error={demandQ.isError && !demandQ.data ? demandQ.error : undefined} onRetry={() => void demandQ.refetch()} /></div> :
         <div ref={overviewBox} className="flex min-h-0 min-w-0 flex-1 flex-col p-2" data-testid="po-register-content">
           {pdfProblem ? (
             <ReadProblem
@@ -1620,7 +1621,7 @@ function OrderedGoods({ row, destinations }: { row: RegisterRow; destinations: A
       unitIds: counted ? [] : unitIds,
       unitNode: counted
         ? <Absence>{GOODS_ABSENCE_WORDS.countedByQuantity}</Absence>
-        : unitsQ.isError
+        : unitsQ.isError && !unitsQ.data
         ? <span className="text-kit-amber-11">Unit IDs could not be read</span>
         : unitsQ.isLoading
         ? <Absence>Reading Unit IDs…</Absence>
@@ -1947,9 +1948,9 @@ function PurchaseOrderObject({
             unitLoading={unitsQ.isLoading}
             receivingLoading={receivingQ.isLoading}
             claimsLoading={claimsQ.isLoading}
-            unitError={unitsQ.isError}
-            receivingError={receivingQ.isError}
-            claimsError={claimsQ.isError}
+            unitError={unitsQ.isError && !unitsQ.data}
+            receivingError={receivingQ.isError && !receivingQ.data}
+            claimsError={claimsQ.isError && !claimsQ.data}
             onRetryUnits={() => void unitsQ.refetch()}
             onRetryReceiving={() => void receivingQ.refetch()}
             onRetryClaims={() => void claimsQ.refetch()}
@@ -1960,7 +1961,7 @@ function PurchaseOrderObject({
           <RecordList
             title="Revisions"
             empty="No revised version is recorded. PO V1 is the original purchase order."
-            problem={auditQ.isError ? "The PO revisions could not be loaded" : null}
+            problem={auditQ.isError && !auditQ.data ? "The PO revisions could not be loaded" : null}
             action="Try again. If it still fails, ask the system owner to check the PO history."
             onRetry={() => void auditQ.refetch()}
             rows={[
@@ -2008,7 +2009,7 @@ function PurchaseOrderObject({
           <RecordList
             title="History"
             empty="No history is recorded for this purchase order."
-            problem={auditQ.isError ? "The PO history could not be loaded" : null}
+            problem={auditQ.isError && !auditQ.data ? "The PO history could not be loaded" : null}
             action="Try again. If it still fails, ask the system owner to check the PO history."
             onRetry={() => void auditQ.refetch()}
             rows={[...(po.sends ?? []).flatMap((send) => {
@@ -2034,8 +2035,8 @@ function PurchaseOrderObject({
             claims={claimsQ.data?.claims ?? []}
             receivingLoading={receivingQ.isLoading}
             claimsLoading={claimsQ.isLoading}
-            receivingError={receivingQ.isError}
-            claimsError={claimsQ.isError}
+            receivingError={receivingQ.isError && !receivingQ.data}
+            claimsError={claimsQ.isError && !claimsQ.data}
             onRetryReceiving={() => void receivingQ.refetch()}
             onRetryClaims={() => void claimsQ.refetch()}
           />

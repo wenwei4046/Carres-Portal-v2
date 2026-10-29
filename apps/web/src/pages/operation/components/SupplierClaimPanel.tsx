@@ -225,7 +225,7 @@ function ProblemSection({ claim }: { claim: SupplierClaimListRow }) {
       <p className="font-semibold">{supplierClaimTypeLabel(claim.claim_type)}</p>
       {claim.note && <p className="whitespace-pre-wrap">{claim.note}</p>}
       <p>{`Claim Reported ${claim.reported_at ? fmtDate(claim.reported_at) : absent} · ${claim.reported_by_name || "Staff identity not recorded"}`}</p>
-      {!claim.photo_count ? null : photos.isError ? <div role="alert"><p>Evidence could not be loaded</p><Button variant="neutral" onClick={() => void photos.refetch()}>Try again</Button></div>
+      {!claim.photo_count ? null : photos.isError && !photos.data ? <div role="alert"><p>Evidence could not be loaded</p><Button variant="neutral" onClick={() => void photos.refetch()}>Try again</Button></div>
         : photos.isLoading ? <Loading label="Loading evidence" />
         : <div className="flex flex-wrap gap-3">{photos.data?.photos.map((photo, index) => <div key={photo.path} className="space-y-1">
           <button type="button" onClick={() => setEvidenceId(photo.path)} className="text-kit-blue-11 underline">Photo {index + 1}</button>
@@ -283,7 +283,7 @@ function SupplierSection({ claim, record, today, onAsk, onReply, open, inlineFor
     <div className="space-y-2 text-body text-kit-slate-12" data-testid="claim-supplier">
       <p>What we asked: {claim.requested_action && !systemAsk ? supplierClaimRequestLabel(claim.requested_action) : absent}
         {claim.requested_at && !systemAsk && <span className="text-kit-slate-11">{` · ${fmtDate(claim.requested_at)} · ${askedBy ?? "Staff identity not recorded"}`}</span>}</p>
-      {record.isError ? <div role="alert"><p>Some information could not be refreshed.</p><Button variant="neutral" onClick={() => void record.refetch()}>Try again</Button></div>
+      {record.isError && !record.data ? <div role="alert"><p>Some information could not be refreshed.</p><Button variant="neutral" onClick={() => void record.refetch()}>Try again</Button></div>
         : (data?.sends ?? []).map((s) => <p key={s.id} data-testid="claim-send-line">{`Claim sent · ${CHANNEL_WORD[s.channel] ?? s.channel} · ${s.recipient} · ${fmtDate(s.sent_at, { time: true })} · ${s.sent_by_name ?? "Staff identity not recorded"}`}</p>)}
       {stateLine && <p data-testid="claim-reply-state">{stateLine}</p>}
       {current ? <div data-testid="claim-answer">
@@ -345,7 +345,7 @@ function ResultSection({ claim, record, open, onNext, onIssue }: {
         <Button variant="neutral" onClick={onIssue} data-testid="claim-issue-return">{ISSUE_PURCHASE_RETURN}</Button>
       </div>}
       {prRefs.length > 0 && <div className="grid gap-2" data-testid="claim-purchase-returns">
-        {returns.isError ? <div role="alert"><p>Some information could not be refreshed.</p><Button variant="neutral" onClick={() => void returns.refetch()}>Try again</Button></div>
+        {returns.isError && !returns.data ? <div role="alert"><p>Some information could not be refreshed.</p><Button variant="neutral" onClick={() => void returns.refetch()}>Try again</Button></div>
           : prRefs.map((ref) => {
             const pr = prs.find((p) => p.id === ref.id);
             const send = pr ? purchaseReturnSendLine({ sends: pr.sends ?? [] }) : null;

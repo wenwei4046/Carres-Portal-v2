@@ -77,7 +77,8 @@ function SalesOrderItems({ orderId, reference }: { orderId: string; reference: s
     retry: retryUnlessRefused,
   });
   if (doc.isPending) return <Loading />;
-  if (doc.isError) return <ReadFailed onRetry={() => void doc.refetch()} />;
+  /* Not pending and no data is a failed read; a failed refetch keeps the table. */
+  if (!doc.data) return <ReadFailed onRetry={() => void doc.refetch()} />;
   return <SalesOrderItemsTable reference={reference} data={doc.data} />;
 }
 
@@ -98,7 +99,7 @@ function EmbeddedSalesOrder({ orderId }: { orderId: string }) {
   });
   const state = (text: string) => <p role="status" className="text-body text-kit-slate-11">{text}</p>;
   if (order.isPending) return <Loading />;
-  if (order.isError) {
+  if (!order.data) {
     return order.error instanceof ApiError && order.error.status === 403
       ? state("You cannot view this record")
       : <ReadFailed onRetry={() => void order.refetch()} />;

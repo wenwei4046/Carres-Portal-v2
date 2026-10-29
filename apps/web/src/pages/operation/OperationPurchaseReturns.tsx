@@ -654,7 +654,7 @@ export default function OperationPurchaseReturns({ consignment = false }: { cons
     <PurchaseReturnsRegister
       returns={query.data?.returns ?? []}
       isLoading={query.isLoading}
-      isError={query.isError}
+      isError={query.isError && !query.data}
       consignment={consignment}
       onNew={consignment ? () => setParams((previous) => {
         const next = new URLSearchParams(previous);
@@ -688,7 +688,7 @@ function NewPurchaseReturn({ onClose, onIssued }: { onClose: () => void; onIssue
       {/* h2: the shell header holds the page's one h1; phones have no shell header, so they get their own. */}
       <h1 className="sr-only md:hidden">{NEW_PURCHASE_RETURN}</h1>
       <h2 className="text-page text-kit-slate-12">{NEW_PURCHASE_RETURN}</h2>
-      {suppliers.isError ? (
+      {suppliers.isError && !suppliers.data ? (
         <div role="alert"><EmptyState title="Some information could not be refreshed." action={<Button variant="neutral" onClick={() => void suppliers.refetch()}>Try again</Button>} /></div>
       ) : (
         <Select id="purchase-return-new-supplier" label="Supplier" placeholder={suppliers.isLoading ? "Loading…" : "Choose the supplier"}

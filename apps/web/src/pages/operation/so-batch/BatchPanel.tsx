@@ -577,7 +577,7 @@ export function BatchPanel({ item, windowKey, host }: { item: BatchPanelItem; wi
 
   const purchaseContent = batch.isPending || full.isPending || (pos.length > 0 && (facts.isPending || (facts.isPlaceholderData && rows.length !== pos.length)))
     ? <Loading label="Loading purchase orders" />
-    : batch.isError || facts.isError
+    : (batch.isError && !batch.data) || (facts.isError && !facts.data)
       ? <div role="alert" className="flex items-center gap-2 text-body text-kit-slate-11"><span>Could not be loaded</span>
           <Button size="sm" onClick={() => { void batch.refetch(); void facts.refetch(); }}>Try again</Button></div>
       : <div className="flex flex-col gap-3" data-testid={`batch-panel-purchase-${item.id}`}>

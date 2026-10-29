@@ -52,7 +52,7 @@ export default function SupplierAnswerTaskPanel({ item, host }: { item: Supplier
   const suppliersQ = useOperationSuppliers();
   const po = poQ.data?.pos.find((p) => p.id === poId) ?? null;
   if (poQ.isPending) return <div className="p-3.5"><Loading label="Loading the purchase order" /></div>;
-  if (poQ.isError || !po) return <State text="This purchase order could not be opened" alert />;
+  if (!po) return <State text="This purchase order could not be opened" alert />;
 
   const supplier = (suppliersQ.data?.suppliers ?? []).find((s) => s.id === po.supplier_id) as SupplierRow | undefined;
   const supplierName = supplier?.name ?? "Supplier";
