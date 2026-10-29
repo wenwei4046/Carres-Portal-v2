@@ -70,6 +70,8 @@ export interface InvoiceRegisterRow {
     source_ref?: string[] | string | null;
     status: string;
     paid: number | string | null;
+    /** 0730 — the sum of the order's issued credit notes. */
+    credited?: number | string | null;
     delivery_date: string | null;
     delivery_date_tbd: boolean | null;
     delivered_at: string | null;
@@ -218,6 +220,7 @@ export function invoiceNeeded(row: InvoiceRegisterRow): ReturnType<typeof orderM
     lineSum,
     addonSum,
     paid: order?.paid ?? null,
+    credited: order?.credited ?? null,
     controlBalance: ctrlOf(row)?.balance ?? null,
   });
 }

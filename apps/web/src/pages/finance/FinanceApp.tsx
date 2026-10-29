@@ -22,6 +22,7 @@ import CardSettlementPage from "./card-settlement/CardSettlementPage";
 import CardMoneyWaiting from "./card-settlement/CardMoneyWaiting";
 import DailyBankPage from "./daily-bank/DailyBankPage";
 // The read-only Finance Ledger — three destinations, three nav rows.
+import FinanceCreditNotes from "./FinanceCreditNotes";
 import LedgerJournal from "./ledger/LedgerJournal";
 import LedgerTrialBalance from "./ledger/LedgerTrialBalance";
 import GeneralLedger from "./ledger/GeneralLedger";
@@ -188,6 +189,7 @@ export default function FinanceApp() {
               stay principal-only, not off for everyone on this address). */}
           <Route path="dealers" element={financeOnly(<PrincipalDealers channel="dealer" financeView={role !== "principal"} />)} />
           {/* The Finance Ledger (read-only). `?entry=JE-…` opens one entry. */}
+          <Route path="credit-notes" element={financeOnly(<FinanceCreditNotes />)} />
           <Route path="ledger" element={financeOnly(<LedgerJournal />)} />
           {/* 0705 — Finance's figures at go-live: a draft, posted once (Chew 2026-10-21/22). */}
           <Route path="ledger/opening-balances" element={financeOnly(<OpeningBalances />)} />

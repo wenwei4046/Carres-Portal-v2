@@ -65,7 +65,7 @@ const INVOICE_REGISTER_SELECT =
   // Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs — and falls back to the live order only when
   // the snapshot holds no lines (dispatch-issued / pre-0429 invoices).
   "snapshot_lines:snapshot->lines,snapshot_addons:snapshot->addons,snapshot_from:snapshot->>issued_from," +
-  "orders(id,so,customer_name,customer_phone,source_ref,status,paid,delivery_date,delivery_date_tbd,delivered_at," +
+  "orders(id,so,customer_name,customer_phone,source_ref,status,paid,credited,delivery_date,delivery_date_tbd,delivered_at," +
   // The Finance Dashboard's A/R Aging counts an order's age from the day it
   // was placed — the same date finance_ar_aging (0062/0125) aged it by.
   "placed_at," +

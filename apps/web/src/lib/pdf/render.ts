@@ -22,6 +22,7 @@ import { RepairOrderTemplate } from "./repair-order-template";
 import { PurchaseReturnTemplate } from "./purchase-return-template";
 import { PickupEventTemplate } from "./pickup-event-template";
 import { ReceiptTemplate } from "./receipt-template";
+import { CreditNoteTemplate } from "./credit-note-template";
 import { ExtensionAgreementTemplate } from "./extension-agreement-template";
 import { LoanNoteTemplate } from "./loan-note-template";
 import { OtherDebtorInvoiceTemplate } from "./other-debtor-invoice-template";
@@ -42,6 +43,7 @@ import type {
 } from "./types";
 import type { PickupEventPrintPayload } from "@/lib/queries";
 import type { PurchaseReturnPrintData, RepairOrderPrintData } from "@carres/shared";
+import type { CreditNotePrintData } from "@carres/shared/schemas/finance-credit-note";
 
 /** All four PDFs share the render pipeline; only the template differs. */
 async function toBlob(element: ReactElement): Promise<Blob> {
@@ -94,6 +96,11 @@ export function renderPaymentVoucherPdf(data: PaymentVoucherTemplateData): Promi
  *  on-demand from the order_payments row + order (no bucket persistence yet). */
 export function renderReceiptPdf(data: ReceiptTemplateData): Promise<Blob> {
   return toBlob(ReceiptTemplate(data));
+}
+
+/** 0627 — the Credit Note, read from the API's print-data (Finance owns it). */
+export function renderCreditNotePdf(data: CreditNotePrintData): Promise<Blob> {
+  return toBlob(CreditNoteTemplate(data));
 }
 
 /** Migration 0196 — storage delivery-extension agreement (the two Google Forms).
