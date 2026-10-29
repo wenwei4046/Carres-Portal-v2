@@ -300,7 +300,7 @@ export default function PartnerArrangePage() {
     <div className="mx-auto flex max-w-xl flex-col gap-3 p-4" data-testid="partner-arrange">
       <h1 className="text-page font-semibold">{PA.page}</h1>
       <p className="text-meta text-muted-foreground">{PA.intro}</p>
-      {q.isError ? (
+      {q.isError && !q.data ? (
         <div className="rounded-control border border-border bg-card p-4 text-meta">
           {PA.loadFailed}{" "}
           <button type="button" className="font-medium underline" onClick={() => void q.refetch()}>

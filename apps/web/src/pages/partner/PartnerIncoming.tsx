@@ -48,12 +48,13 @@ export default function PartnerIncoming() {
         <div className="rounded border border-dashed border-base-200 bg-card p-4">
           <Loading variant="skeleton" label="Loading incoming orders" />
         </div>
-      ) : incomingQ.isError ? (
+      ) : incomingQ.isError && !incomingQ.data ? (
         <div className="rounded border border-destructive/30 bg-destructive/5 p-4 text-meta text-destructive">
           Couldn&rsquo;t load incoming orders.
           <button
             type="button"
             className="ml-2 underline"
+            disabled={incomingQ.isFetching}
             onClick={() => void incomingQ.refetch()}
           >
             Retry

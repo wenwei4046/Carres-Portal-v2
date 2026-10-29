@@ -142,7 +142,7 @@ function DealerShowroomGate() {
   if (staffQ.isPending || outletsQ.isPending) {
     return <GateSpinner label="Loading…" />;
   }
-  if (staffQ.error) {
+  if (staffQ.error && !staffQ.data) {
     return <GateSpinner label={`Couldn't load staff: ${staffQ.error.message}`} />;
   }
 
