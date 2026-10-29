@@ -178,7 +178,7 @@ export default function WarehousesPage() {
             rows={sites}
             rowKey={(s) => s.id}
             isLoading={warehouses.isLoading}
-            errorState={warehouses.isError ? <CouldNotLoad onRetry={() => void warehouses.refetch()} /> : undefined}
+            errorState={warehouses.isError && !warehouses.data ? <CouldNotLoad onRetry={() => void warehouses.refetch()} /> : undefined}
             emptyMessage={W.noSites}
             exportName={W.page}
             toolbarStart={viewTabs}
@@ -205,7 +205,7 @@ export default function WarehousesPage() {
             rows={(warehouses.data?.byWarehouse[siteId] ?? []).filter((e) => e.qty > 0 || e.reserved > 0)}
             rowKey={(e) => e.sku}
             isLoading={warehouses.isLoading}
-            errorState={warehouses.isError ? <CouldNotLoad onRetry={() => void warehouses.refetch()} /> : undefined}
+            errorState={warehouses.isError && !warehouses.data ? <CouldNotLoad onRetry={() => void warehouses.refetch()} /> : undefined}
             emptyMessage={W.noStock}
             exportName={W.inventory}
             toolbarStart={<>{viewTabs}{sitePicker}</>}
@@ -248,7 +248,7 @@ function StockCard({ sku, siteId, sites, toolbar }: {
       rows={[...(q.data?.lines ?? [])].reverse()}
       rowKey={(l) => String(l.seq)}
       isLoading={q.isLoading}
-      errorState={q.isError ? <CouldNotLoad onRetry={() => void q.refetch()} /> : undefined}
+      errorState={q.isError && !q.data ? <CouldNotLoad onRetry={() => void q.refetch()} /> : undefined}
       emptyMessage={W.noLines}
       exportName={`${W.stockCard} ${sku}`}
       toolbarStart={<>{toolbar}<span className="text-body font-medium text-c-ink" data-testid="stock-card-item">{W.stockCard} · {sku}</span></>}
@@ -317,7 +317,7 @@ function RacksAndBins({ siteId, toolbar }: { siteId: string; toolbar: React.Reac
           </span>
         ))}
       </div>
-      {q.isLoading ? <Loading variant="skeleton" label={W.bins} /> : q.isError ? (
+      {q.isLoading ? <Loading variant="skeleton" label={W.bins} /> : q.isError && !q.data ? (
         <CouldNotLoad onRetry={() => void q.refetch()} />
       ) : racks.length === 0 ? (
         <p className="text-body text-c-secondary">{W.noBins}</p>
@@ -360,7 +360,7 @@ function LoadingList({ siteId, toolbar }: { siteId: string; toolbar: React.React
       rows={rows}
       rowKey={(r) => r.key}
       isLoading={q.isLoading}
-      errorState={q.isError ? <CouldNotLoad onRetry={() => void q.refetch()} /> : undefined}
+      errorState={q.isError && !q.data ? <CouldNotLoad onRetry={() => void q.refetch()} /> : undefined}
       emptyMessage={W.nothingToLoad}
       exportName={W.loading}
       toolbarStart={toolbar}

@@ -42,7 +42,7 @@ export default function WarehouseOutboundDoor() {
       </div>
       {!error && (isLoading || !data) ? (
         <Loading variant="skeleton" label="Loading the schedule" />
-      ) : error ? (
+      ) : error && !data ? (
         <CouldNotLoad detail={`The schedule could not be loaded. ${error.message}`} onRetry={() => void refetch()} />
       ) : dates.length === 0 ? (
         <p className="text-body text-base-500" data-testid="wod-empty">

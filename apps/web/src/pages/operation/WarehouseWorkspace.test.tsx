@@ -493,6 +493,17 @@ describe("a broken feed is never an empty day", () => {
     expect(screen.queryByText("Nothing arriving.")).toBeNull();
   });
 
+  it("Try again re-asks all three feeds", () => {
+    const spy = vi.spyOn(QueryClient.prototype, "invalidateQueries");
+    setSchedule({ cards: [], errors: [{ direction: "arrival", message: "The schedule could not be read." }] });
+    mount();
+    fireEvent.click(within(screen.getByTestId("ws-feed-error")).getByRole("button", { name: "Try again" }));
+    expect(spy.mock.calls.map((c) => (c[0] as { queryKey: string[] }).queryKey[1])).toEqual([
+      "warehouse-schedule", "delivery-arrangements", "warehouse-settings",
+    ]);
+    spy.mockRestore();
+  });
+
   it("a partial failure still renders the cards that DID arrive", () => {
     setSchedule({
       cards: [card()],

@@ -565,7 +565,7 @@ export default function OpsStockListView(props: Props) {
 
       {loading ? (
         <Loading variant="skeleton" label={`Loading ${props.title}`} />
-      ) : props.rows === undefined && listQ.isError ? (
+      ) : props.rows === undefined && listQ.isError && !listQ.data ? (
         <CouldNotLoad detail={`${props.title} could not be loaded.`} onRetry={() => void listQ.refetch()} />
       ) : rows.length === 0 ? (
         <div className="rounded border border-base-200 bg-white p-12 text-center">

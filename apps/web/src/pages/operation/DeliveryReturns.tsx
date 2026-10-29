@@ -116,7 +116,7 @@ export function DeliveryReturns() {
 
   return (
     <Page word="Delivery Returns" testId="delivery-returns">
-      {list.isError ? <CouldNotLoad detail="The delivery returns could not be loaded." onRetry={() => void list.refetch()} /> : (
+      {list.isError && !list.data ? <CouldNotLoad detail="The delivery returns could not be loaded." onRetry={() => void list.refetch()} /> : (
         <ListPageShell register>
           <DataGrid rows={list.data?.returns ?? []} columns={columns} rowKey={(r) => r.id}
             storageKey="carres.delivery.returns.v1" appearance="reference" exportName="Delivery Returns"

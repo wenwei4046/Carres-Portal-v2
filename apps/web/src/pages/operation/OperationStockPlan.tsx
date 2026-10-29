@@ -116,12 +116,12 @@ export default function OperationStockPlan() {
 
         {isLoading ? (
           <Loading variant="skeleton" label="Loading the plan" />
-        ) : isError ? (
+        ) : isError && !data ? (
           <CouldNotLoad
             detail={`The plan could not be loaded. ${(error as Error | undefined)?.message ?? ""}`.trim()}
             onRetry={() => void refetch()}
           />
-        ) :!data?.plan ? (
+        ) : !data?.plan ? (
           <NoPlanYet
             period={period}
             pending={openM.isPending}

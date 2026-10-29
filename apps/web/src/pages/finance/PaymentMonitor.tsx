@@ -597,13 +597,13 @@ export default function PaymentMonitor() {
   );
 
   return <div className="flex h-full min-h-0 flex-col" data-testid="payment-monitor">
+    {/* Outside the Operations shell ModuleHeader draws no h1, so the page names itself once for screen readers, in every branch. */}
+    <h1 className="sr-only">Payments Monitor</h1>
     {invoice && loaded && !invoiceRow
       ? <PaymentCollectionWorkspace invoice={invoice} rows={invoices} timingRules={timingRules}
           backLabel="Monitor" onClose={close} />
       : <>
         <ModuleHeader destinationHeader testId="payment-monitor-destination-header" word="Monitor" docTitle="Monitor · Payments · Carres" />
-        {/* Outside the Operations shell ModuleHeader draws no h1, so the page names itself once for screen readers. */}
-        <h1 className="sr-only">Payments Monitor</h1>
         {isError ? <div role="alert" className="p-6 text-body">
           <p>The collection desk could not be loaded. Try again.</p>
           <button className="btn-secondary mt-3" onClick={() => {

@@ -166,14 +166,14 @@ export default function WarehouseUnitDetail({ unitCode: selectedCode, onBack, ba
 
         {isLoading ? (
           <Loading variant="skeleton" label="Loading the Unit" />
-        ) : isError && (error as { status?: number } | undefined)?.status !== 404 ? (
+        ) : isError && !data && (error as { status?: number } | undefined)?.status !== 404 ? (
           <div className="rounded-card border border-kit-slate-5 bg-white">
             <CouldNotLoad
               detail={`This Unit could not be loaded. ${(error as Error | undefined)?.message ?? ""}`.trim()}
               onRetry={() => void refetch()}
             />
           </div>
-        ) : isError ? (
+        ) : isError && (error as { status?: number } | undefined)?.status === 404 ? (
           <div className="rounded-card border border-kit-slate-5 bg-white p-6">
             <p className="text-body text-base-800">No Unit carries that ID.</p>
             {(error as Error | undefined)?.message ? (

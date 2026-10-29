@@ -114,14 +114,14 @@ export default function OperationStock() {
                 </td>
               </tr>
             )}
-            {isError && (
+            {isError && !data && (
               <tr>
                 <td colSpan={warehouses.length + 4}>
                   <CouldNotLoad detail="Stock across the network could not be loaded." onRetry={() => void refetch()} />
                 </td>
               </tr>
             )}
-            {!isLoading && !isError && list.length === 0 && (
+            {!isLoading && !(isError && !data) && list.length === 0 && (
               <tr>
                 <td colSpan={warehouses.length + 4} className="p-10 text-center text-meta text-base-500">
                   {view === "low" ? "Everything is healthy. No low-stock SKUs." : "No SKUs."}

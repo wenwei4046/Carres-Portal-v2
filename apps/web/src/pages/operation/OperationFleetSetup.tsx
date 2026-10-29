@@ -141,7 +141,7 @@ export function FleetPage() {
   ) : null;
 
   return (
-    <Shell word={FL.fleet} testId="fleet" failed={q.isError} onRetry={q.refetch}>
+    <Shell word={FL.fleet} testId="fleet" failed={q.isError && !q.data} onRetry={q.refetch}>
       {q.data && !q.data.company ? <p className="p-4 text-body">{FL.noOwnFleet}</p> : null}
       <Refusal text={message} />
       {view === "lorries" ? (
@@ -211,7 +211,7 @@ export function FleetHealthPage() {
   ];
 
   return (
-    <Shell word={FL.fleetHealth} testId="fleet-health" failed={q.isError} onRetry={q.refetch}>
+    <Shell word={FL.fleetHealth} testId="fleet-health" failed={q.isError && !q.data} onRetry={q.refetch}>
       <Refusal text={message} />
       <DataGrid rows={lorries} columns={columns} rowKey={(r) => r.id} storageKey="carres.operation.fleet-health.v1"
         appearance="reference" exportName={FL.fleetHealth} groupBanner={false} isLoading={!q.isSuccess && !q.isError}
@@ -267,7 +267,7 @@ export function DeliveryZonesPage() {
   ];
 
   return (
-    <Shell word={FL.zones} testId="delivery-zones" failed={q.isError} onRetry={q.refetch}>
+    <Shell word={FL.zones} testId="delivery-zones" failed={q.isError && !q.data} onRetry={q.refetch}>
       <div className="flex flex-wrap items-center gap-2 px-4 pb-2" data-testid="delivery-zones-lookup">
         <label className="text-body" htmlFor="zone-lookup">{FL.findZone}</label>
         <input id="zone-lookup" inputMode="numeric" maxLength={5} placeholder={FL.postcode} className={field} value={lookup}
@@ -386,7 +386,7 @@ function RateCardsView({ switcher }: { switcher: React.ReactNode }) {
   );
 
   return (
-    <Shell word={FL.rateCards} testId="rate-cards" failed={q.isError} onRetry={q.refetch}>
+    <Shell word={FL.rateCards} testId="rate-cards" failed={q.isError && !q.data} onRetry={q.refetch}>
       <Refusal text={message ?? (bands === null ? FL.sofaBandsBad : outstation === null ? FL.outstationBad : null)} />
       <DataGrid rows={rows} columns={columns} rowKey={(r) => r.id} storageKey="carres.operation.rate-cards.v2"
         appearance="reference" exportName={FL.rateCards} groupBanner={false} isLoading={!q.isSuccess && !q.isError}
@@ -490,7 +490,7 @@ function ReconcileView({ switcher }: { switcher: React.ReactNode }) {
     <input type="date" aria-label={word} className={field} value={range[k]} onChange={(e) => setRange({ ...range, [k]: e.target.value })} />
   );
   return (
-    <Shell word={FL.rateCards} testId="rate-reconcile" failed={q.isError && !refused} onRetry={q.refetch}>
+    <Shell word={FL.rateCards} testId="rate-reconcile" failed={q.isError && !q.data && !refused} onRetry={q.refetch}>
       <Refusal text={refused ? FL.reconRefused : null} />
       <p className="px-4 pb-2 text-body">{FL.reconNote}</p>
       <DataGrid rows={q.data?.rows ?? []} columns={columns} rowKey={(r) => r.doId} storageKey="carres.operation.rate-reconcile.v1"

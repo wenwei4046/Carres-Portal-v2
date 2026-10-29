@@ -236,7 +236,7 @@ export function DeliveryPlanning() {
         <Tabs label="Delivery Planning" variant="segmented" value={view} onValueChange={setView}
           tabs={[{ value: "board", label: "Board" }, { value: "regions", label: "Regions" }, { value: "rules", label: "Residence rules" }]} />
       </div>
-      {q.isError ? loadError(q.refetch) : (
+      {q.isError && !q.data ? loadError(q.refetch) : (
         <ListPageShell register>
           {view === "board" && (
             <DataGrid rows={rows} columns={columns} rowKey={(r) => r.key} storageKey="carres.delivery.planning.v1" appearance="reference"
@@ -290,7 +290,7 @@ export function DpOrders() {
   ], []);
   return (
     <Page word="DP Orders" testId="dp-orders">
-      {q.isError ? loadError(q.refetch) : (
+      {q.isError && !q.data ? loadError(q.refetch) : (
         <ListPageShell register>
           <DataGrid rows={jobs} columns={columns} rowKey={(r) => r.key} storageKey="carres.delivery.dp-orders.v1" appearance="reference"
             exportName="DP Orders" groupBanner={false} stickyIdentity isLoading={!q.isSuccess} sortDefault={{ key: "day", dir: "asc" }}
@@ -336,7 +336,7 @@ export function AutoSchedule() {
   const picked = waiting.filter((r) => selected.has(r.key));
   return (
     <Page word="Auto-schedule" testId="auto-schedule">
-      {q.isError ? loadError(q.refetch) : (
+      {q.isError && !q.data ? loadError(q.refetch) : (
         <ListPageShell register>
           <DataGrid rows={waiting} columns={columns} rowKey={(r) => r.key} storageKey="carres.delivery.auto-schedule.v1" appearance="reference"
             exportName="Auto-schedule" initialGroupBy={["region"]} stickyIdentity isLoading={!q.isSuccess}
@@ -400,7 +400,7 @@ export function Trips() {
   ], []);
   return (
     <Page word="Trips" testId="trips">
-      {q.isError ? loadError(q.refetch) : (
+      {q.isError && !q.data ? loadError(q.refetch) : (
         <ListPageShell register>
           <DataGrid rows={stops} columns={columns} rowKey={(r) => r.key} storageKey="carres.delivery.trips.v1" appearance="reference"
             exportName="Trips" stickyIdentity isLoading={!q.isSuccess} searchPlaceholder="Search SO, DO, customer or location…"
