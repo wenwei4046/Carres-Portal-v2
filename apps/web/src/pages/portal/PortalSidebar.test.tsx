@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, act, screen, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 
 /**
@@ -1808,9 +1808,10 @@ describe("PortalSidebar — common Tasks canvas fit", () => {
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1025 });
     const expand = vi.fn();
     try {
-      render(<MemoryRouter initialEntries={["/operation?tab=purchase"]}>
-        <PortalSidebar compactForCanvas onExpandForCanvas={expand} />
-      </MemoryRouter>);
+      const ui = (compact: boolean) => <MemoryRouter initialEntries={["/operation?tab=purchase"]}>
+        <PortalSidebar compactForCanvas={compact} onExpandForCanvas={expand} />
+      </MemoryRouter>;
+      const { rerender } = render(ui(true));
       expect(screen.getByTestId("portal-sidebar")).toHaveStyle({ width: "64px" });
       expect(localStorage.getItem(COLLAPSE_KEY)).toBeNull();
       fireEvent.click(screen.getByRole("button", { name: "Expand menu" }));
@@ -1818,6 +1819,24 @@ describe("PortalSidebar — common Tasks canvas fit", () => {
       // The shared host may still be asking whether to keep an unsaved task.
       expect(screen.getByTestId("portal-sidebar")).toHaveStyle({ width: "64px" });
       expect(localStorage.getItem(COLLAPSE_KEY)).toBeNull();
+      // Once the host lets it through, the same sidebar opens in place.
+      act(() => expand.mock.calls[0][0]());
+      rerender(ui(false)); // the host closed Tasks, so the canvas no longer needs the rail
+      expect(screen.getByTestId("portal-sidebar")).toHaveStyle({ width: "220px" });
+      expect(localStorage.getItem(COLLAPSE_KEY)).toBe("0");
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: previousWidth });
+    }
+  });
+
+  it("is not compact at 1100 wide or more, so » never needs the host", () => {
+    const previousWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1280 });
+    try {
+      render(<MemoryRouter initialEntries={["/operation?tab=purchase"]}>
+        <PortalSidebar compactForCanvas onExpandForCanvas={vi.fn()} />
+      </MemoryRouter>);
+      expect(screen.getByTestId("portal-sidebar")).toHaveStyle({ width: "220px" });
     } finally {
       Object.defineProperty(window, "innerWidth", { configurable: true, value: previousWidth });
     }
@@ -1832,11 +1851,11 @@ describe("PortalSidebar — owner17Oct temporary module rail", () => {
     try {
       render(<MemoryRouter initialEntries={["/operation/orders/so/test-order"]}><PortalSidebar compactForCanvas /></MemoryRouter>);
       expect(screen.getByTestId("portal-sidebar")).toHaveStyle({ width: "64px" });
-      expect(screen.getByRole("button", { name: "Expand menu" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Expand menu" })).toBeEnabled();
       expect(localStorage.getItem(COLLAPSE_KEY)).toBe("0");
       Object.defineProperty(window, "innerWidth", { configurable: true, value: 1164 });
       fireEvent(window, new Event("resize"));
-      expect(screen.getByTestId("portal-sidebar")).toHaveStyle({ width: "64px" });
+      expect(screen.getByTestId("portal-sidebar")).toHaveStyle({ width: "220px" });
       expect(localStorage.getItem(COLLAPSE_KEY)).toBe("0");
     } finally { Object.defineProperty(window, "innerWidth", { configurable: true, value: previousWidth }); }
   });
