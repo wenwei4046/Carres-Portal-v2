@@ -188,8 +188,10 @@ export default function FinanceApp() {
               keeps Invite dealer, Suspend and Reactivate here (0543: those
               stay principal-only, not off for everyone on this address). */}
           <Route path="dealers" element={financeOnly(<PrincipalDealers channel="dealer" financeView={role !== "principal"} />)} />
+          {/* 0730 — a customer credit note against one Sales Invoice. Its own path:
+              "credit-notes/*" above is the supplier register. */}
+          <Route path="customer-credit-notes" element={financeOnly(<FinanceCreditNotes />)} />
           {/* The Finance Ledger (read-only). `?entry=JE-…` opens one entry. */}
-          <Route path="credit-notes" element={financeOnly(<FinanceCreditNotes />)} />
           <Route path="ledger" element={financeOnly(<LedgerJournal />)} />
           {/* 0705 — Finance's figures at go-live: a draft, posted once (Chew 2026-10-21/22). */}
           <Route path="ledger/opening-balances" element={financeOnly(<OpeningBalances />)} />
