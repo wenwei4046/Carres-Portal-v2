@@ -5368,6 +5368,21 @@ words".
 
 | Where | Use exactly | Do not use |
 |---|---|---|
+
+### Cancelled orders holding money (migration 0729)
+
+**PROPOSAL, PENDING APPROVAL.** Every word below is new. Page: `Cancelled orders holding money` at
+`/finance/cancelled-money` (Finance sidebar, before `Card settlement`). Read only: no refund and no
+move is offered; Finance has not ruled which (Q15).
+
+| Word | Where, meaning |
+|---|---|
+| `Cancelled orders holding money` | Sidebar row, page header and export name. |
+| `SO No` · `Customer` · `Paid` · `Refunded` · `Cancelled` | Columns, all reused. `Cancelled` is the day the order was cancelled. |
+| `Money held` | Column: paid minus refunds already paid out. |
+| `Search cancelled orders…` | Search placeholder. |
+| `No cancelled order is holding customer money.` | Empty state. |
+| `Cancelled orders holding money are for Finance.` | Database refusal. |
 | Act buttons | the owning form's own word: `PO sent to supplier` · `Record supplier answer` · `Update date and time` · `Assign logistics` · an act with no in-place form yet: `Open {record}` | a Workspace-invented button |
 | Communication | `Communication` · tabs `Supplier` · `Warehouse` · `Logistics` · `Customer` · `To` (recorded channels only: `{party} · WhatsApp group` · `{party} · WhatsApp` · `{party} · Email`) · `Template` · `Message` · `Message not available` · doors `Open WhatsApp` · `Open email` · `Copy message` · `Message copied` · `The message could not be copied.` · `History {n}` | a typed recipient · a message with a missing field · a dash |
 

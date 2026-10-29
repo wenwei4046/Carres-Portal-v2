@@ -813,6 +813,8 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // 0478 — money in that is not a sale. A party that is not a customer
       // (a sister company, a lender) is billed on Other debtors; a loan in,
       // other income or money against those invoices is an Other receipt.
+      // 0729 — cancelled orders whose customer money is still held. Read only.
+      { key: "cancelled-money", label: "Cancelled orders holding money", icon: Undo2, financePath: "/finance/cancelled-money", section: "Receivables" },
       { key: "other-debtors", label: "Other debtors", icon: Users, financePath: "/finance/other-debtors", section: "Receivables" },
       { key: "other-receipts", label: "Other receipts", icon: HandCoins, financePath: "/finance/other-receipts", section: "Receivables" },
       // 0637 — every money account on one day: the day before, money in and
