@@ -247,7 +247,7 @@ export default function OperationDeliveryReport() {
     XLSX.writeFile(wb, `Delivery report ${month ?? "all"}.xlsx`);
   };
 
-  const failedRead = ordersQ.isError || docsQ.isError || arrangementsQ.isError || partnersQ.isError;
+  const failedRead = [ordersQ, docsQ, arrangementsQ, partnersQ].some((q) => q.isError && !q.data);
   const loading = ordersQ.isLoading || docsQ.isLoading || arrangementsQ.isLoading || partnersQ.isLoading;
 
   return (

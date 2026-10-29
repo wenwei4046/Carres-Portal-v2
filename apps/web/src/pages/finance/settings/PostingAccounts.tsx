@@ -261,7 +261,7 @@ export default function PostingAccounts() {
 
   if (query.isError) return <LoadFailed what="The posting accounts" onRetry={() => void query.refetch()} />;
   // Without the payment methods the Customer money postings would just be missing.
-  if (registry.isError) return <LoadFailed what="The payment methods" onRetry={() => void registry.refetch()} />;
+  if (registry.isError && !registry.data) return <LoadFailed what="The payment methods" onRetry={() => void registry.refetch()} />;
   return (
     <ListPageShell register>
       {/* One scrolling area: the postings take the rows they have, and a long

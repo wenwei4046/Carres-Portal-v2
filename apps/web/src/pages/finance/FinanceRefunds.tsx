@@ -113,10 +113,10 @@ export default function FinanceRefunds() {
       </div>
 
       <div className="grid grid-cols-3 gap-3.5 mb-6">
-        {/* Not read yet, or the read failed: no figure, never RM 0.00. */}
-        <FinanceKpi label="Issued" value={refundsQ.isSuccess ? rm(totals.issued) : null} hint="Credit notes outstanding" tone="warn" />
-        <FinanceKpi label="Pending / approved" value={refundsQ.isSuccess ? rm(totals.pending) : null} hint="Refunds awaiting bank release" tone="warn" accent />
-        <FinanceKpi label="Applied / paid" value={refundsQ.isSuccess ? rm(totals.applied) : null} hint="Used or refunded" tone="ok" />
+        {/* Never read, or the first read failed: no figure, never RM 0.00. */}
+        <FinanceKpi label="Issued" value={refundsQ.data ? rm(totals.issued) : null} hint="Credit notes outstanding" tone="warn" />
+        <FinanceKpi label="Pending / approved" value={refundsQ.data ? rm(totals.pending) : null} hint="Refunds awaiting bank release" tone="warn" accent />
+        <FinanceKpi label="Applied / paid" value={refundsQ.data ? rm(totals.applied) : null} hint="Used or refunded" tone="ok" />
       </div>
 
       <div className="bg-card rounded-md border border-border overflow-auto">
@@ -135,7 +135,7 @@ export default function FinanceRefunds() {
 
         {refundsQ.isLoading ? (
           <div className="p-12"><Loading variant="skeleton" label="Loading refunds and credit notes" /></div>
-        ) : refundsQ.isError ? (
+        ) : refundsQ.isError && !refundsQ.data ? (
           <LoadFailed what="Refunds and credit notes" onRetry={() => void refundsQ.refetch()} />
         ) : enriched.length === 0 ? (
           <div className="p-12 text-center text-meta text-muted-foreground">

@@ -68,7 +68,7 @@ export default function FinanceCreditNotes() {
           <tbody>
             {list.isLoading ? (
               <tr><td colSpan={9} className="p-10"><Loading variant="skeleton" label="Loading credit notes" /></td></tr>
-            ) : list.isError ? (
+            ) : list.isError && !list.data ? (
               <tr><td colSpan={9}><LoadFailed what="The credit notes" onRetry={() => void list.refetch()} /></td></tr>
             ) : rows.length === 0 ? (
               <tr><td colSpan={9} className="p-10 text-center text-muted-foreground">No credit notes yet.</td></tr>

@@ -13,7 +13,7 @@
  *   · the changes are listed, newest first, in words, a way of being paid's
  *     included, and its row says when it last changed.
  */
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -22,6 +22,7 @@ import PostingAccounts, { incomeWord, postingAccountOptions } from "./PostingAcc
 const net = vi.hoisted(() => ({
   calls: [] as Array<{ method: string; path: string; body: Record<string, unknown> }>,
   refuse: null as string | null,
+  methodsDown: false,
 }));
 
 const acc = (code: string, name: string, kind: string, extra: Record<string, unknown> = {}) => ({
@@ -87,6 +88,7 @@ vi.mock("@/lib/api", () => ({
       if (path === "/api/finance/ledger/posting-accounts") return POSTINGS;
       if (path === "/api/finance/ledger/accounts") return { go_live_on: "2026-09-10", accounts: CHART, money_accounts: ["310-2000"] };
       if (path === "/api/finance/payment-settings/methods") {
+        if (net.methodsDown) throw new Error("down");
         return {
           methods: [{ method: "bank", label: "Bank transfer", account_code: "310-2000", account_name: "HONG LEONG BANK", active: true, sort: 1 }],
           money_accounts: [
@@ -109,11 +111,13 @@ vi.mock("@/pages/operation/components/GlobalTopBar", () => ({ TopBarIcons: () =>
 beforeEach(() => {
   net.calls = [];
   net.refuse = null;
+  net.methodsDown = false;
   localStorage.clear();
 });
 
+let qc: QueryClient;
 function show() {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
       <MemoryRouter>
@@ -324,5 +328,20 @@ describe("posting words and options", () => {
     expect(codes).toEqual(["500-0000", "500-2000", "500-3000", "500-4000", "580-0000"]);
     // 0675: a liability, never a control account.
     expect(postingAccountOptions("LIABILITY", CHART as never, ["310-2000"]).map((a) => a.code)).toEqual(["410-0061", "410-0099"]);
+  });
+
+  it("a failed payment-methods read says so, never drops the Customer money rows silently", async () => {
+    net.methodsDown = true;
+    show();
+    expect(await screen.findByRole("alert")).toHaveTextContent("The payment methods could not be loaded. Try again.");
+  });
+
+  it("a failed background refetch of the payment methods keeps the rows already read", async () => {
+    show();
+    await ready();
+    net.methodsDown = true;
+    await act(() => qc.refetchQueries());
+    expect(row("PAYMENT/bank/*")).toHaveTextContent("Bank transfer");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

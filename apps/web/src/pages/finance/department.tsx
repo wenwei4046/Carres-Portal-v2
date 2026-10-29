@@ -85,7 +85,7 @@ export function DepartmentFilter({ value, onChange }: { value: string; onChange:
       })}
     </select>
     {/* A failed read still lists the types; say the single showrooms and dealers are missing. */}
-    {departments.isError && <button type="button" className="text-meta underline underline-offset-2"
+    {departments.isError && !departments.data && <button type="button" className="text-meta underline underline-offset-2"
       onClick={() => void departments.refetch()}>Showrooms and dealers could not be loaded. Try again</button>}
   </label>;
 }
@@ -104,7 +104,7 @@ export function DepartmentPicker({ type, id, onChange, income = false, label, cl
       const c = decodeDepartment(e.target.value);
       onChange({ departmentType: c.departmentType ?? null, departmentId: c.departmentId ?? null });
     }}>
-    <option value="">{departments.isError ? "Departments could not be loaded" : "Department…"}</option>
+    <option value="">{departments.isError && !departments.data ? "Departments could not be loaded" : "Department…"}</option>
     {DEPARTMENT_TYPES.map((t) => {
       const group = rows.filter((d) => d.department_type === t);
       if (group.length === 0) return null;

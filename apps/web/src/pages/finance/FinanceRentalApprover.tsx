@@ -120,7 +120,7 @@ export default function FinanceRentalApprover() {
         <div className="bg-card rounded-md border border-border p-12">
           <Loading variant="skeleton" label="Loading the approval queue" />
         </div>
-      ) : approvalsQ.error ? (
+      ) : approvalsQ.error && !approvalsQ.data ? (
         <div className="bg-card rounded-md border border-border">
           <LoadFailed what="The approval queue" onRetry={() => void approvalsQ.refetch()} />
         </div>

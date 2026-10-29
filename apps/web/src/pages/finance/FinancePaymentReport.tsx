@@ -211,7 +211,7 @@ export default function FinancePaymentReport() {
   // browser tab name stay on this report too.
   const header = <ModuleHeader destinationHeader testId="payment-report-header" word="Payment"
     docTitle="Payment · Carres" />;
-  if (paymentsQ.isError || invoicesQ.isError) {
+  if ((paymentsQ.isError && !paymentsQ.data) || (invoicesQ.isError && !invoicesQ.data)) {
     return <div className="flex h-full min-h-0 flex-col">{header}<div className="p-6"><EmptyState
       title="This report could not be opened"
       detail="The payments or the invoices could not be loaded."

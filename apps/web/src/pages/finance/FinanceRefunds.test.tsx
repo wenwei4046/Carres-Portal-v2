@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import FinanceRefunds from "./FinanceRefunds";
@@ -118,5 +118,17 @@ describe("FinanceRefunds page", () => {
     vi.mocked(apiFetch).mockClear();
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     await waitFor(() => expect(apiFetch).toHaveBeenCalled());
+  });
+
+  it("a failed background refetch keeps the rows already read", async () => {
+    vi.mocked(apiFetch).mockResolvedValue([CN_ISSUED]);
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={qc}><FinanceRefunds /></QueryClientProvider>);
+    await screen.findByText("CN-0024");
+    vi.mocked(apiFetch).mockRejectedValue(new Error("down"));
+    await act(() => qc.refetchQueries());
+    expect(screen.getByText("CN-0024")).toBeInTheDocument();
+    expect(screen.getAllByText("RM 480.00").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

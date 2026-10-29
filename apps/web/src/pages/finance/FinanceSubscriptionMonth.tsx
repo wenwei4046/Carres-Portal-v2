@@ -39,7 +39,7 @@ export default function FinanceSubscriptionMonth() {
     { key: "salesperson", label: "Salesperson", width: 160, accessor: (r) => r.salespersonName ?? "", filterType: "enum" },
   ], []);
 
-  const figure = (n: number | undefined) => (q.isSuccess && n != null ? rm(n) : null);
+  const figure = (n: number | undefined) => (n != null ? rm(n) : null);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -62,7 +62,7 @@ export default function FinanceSubscriptionMonth() {
           stickyIdentity
           isLoading={q.isPending}
           /* The month picker stays, so another month can still be read. */
-          errorState={q.isError ? <LoadFailed what="The subscription months" onRetry={() => void q.refetch()} /> : undefined}
+          errorState={q.isError && !q.data ? <LoadFailed what="The subscription months" onRetry={() => void q.refetch()} /> : undefined}
           searchPlaceholder="Search customer, SO or agreement…"
           toolbarStart={
             <input
