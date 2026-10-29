@@ -31,6 +31,17 @@ describe("orderBookingDay", () => {
     expect(voided.date).toBe("2026-10-30");
   });
 
+  it("on a multi-leg order reads the customer leg (the highest), not leg 0", () => {
+    const day = orderBookingDay({
+      ops_order_control: untouchedOverlay,
+      ops_delivery_arrangements: [
+        { leg: 0, partner_id: "p1", confirmed_date: "2026-10-28", confirmed_time: null },
+        { leg: 2, partner_id: "p2", confirmed_date: "2026-11-03", confirmed_time: "Morning" },
+      ],
+    } as never);
+    expect(day).toEqual({ kind: "confirmed", date: "2026-11-03", slot: "Morning" });
+  });
+
   it("stays unconfirmed when neither Delivery nor the booking has a day", () => {
     expect(orderBookingDay({ ops_order_control: untouchedOverlay } as never).kind).toBe("none");
   });

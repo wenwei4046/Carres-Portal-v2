@@ -13,7 +13,7 @@
  * second copy of that unwrap is exactly how two screens start disagreeing.
  */
 
-import { bookingDayOf, scheduledDeliveryOf, type BookingDay, type BookingRead } from "@carres/shared";
+import { bookingDayOf, customerLegDeliveryOf, type BookingDay, type BookingRead } from "@carres/shared";
 import type { operationOrderListRow, opsRemarkEmbed } from "./queries";
 
 /** The 1:1 `ops_order_control` overlay, whichever shape PostgREST returned. */
@@ -40,13 +40,15 @@ export function orderBookingRead(
     confirmedSlot: ovl?.confirmed_time_slot ?? null,
     provisionalDate: ovl?.logistic_eta ?? null,
   };
-  const doc = o.ops_delivery_orders?.find((d) => (d.leg ?? 0) === 0 && !d.voided_at);
-  const arrangement = o.ops_delivery_arrangements?.find((a) => (a.leg ?? 0) === 0);
-  const scheduled = scheduledDeliveryOf({
-    document: doc ? { deliveryDate: doc.delivery_date, timeSlot: doc.time_slot } : null,
-    arrangement: arrangement
-      ? { confirmedDate: arrangement.confirmed_date, confirmedTime: arrangement.confirmed_time }
-      : null,
+  // The customer leg is the highest leg Delivery recorded (0 on an ordinary
+  // order) — the same pick the Work feed and the rail Calendar make.
+  const scheduled = customerLegDeliveryOf({
+    documents: (o.ops_delivery_orders ?? [])
+      .filter((d) => !d.voided_at)
+      .map((d) => ({ leg: d.leg, deliveryDate: d.delivery_date, timeSlot: d.time_slot })),
+    arrangements: (o.ops_delivery_arrangements ?? []).map((a) => ({
+      leg: a.leg, confirmedDate: a.confirmed_date, confirmedTime: a.confirmed_time,
+    })),
     booking,
   });
   if (scheduled.iso && scheduled.source !== "booking") {
