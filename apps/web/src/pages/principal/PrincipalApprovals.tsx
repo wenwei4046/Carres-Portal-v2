@@ -37,9 +37,9 @@ export default function PrincipalApprovals() {
   }, [all.data]);
 
   // A failed counts query must not read as real zeros.
-  const countOf = (f: keyof typeof counts) => (all.isError ? "–" : counts[f]);
+  const countOf = (f: keyof typeof counts) => (all.isError && !all.data ? "–" : counts[f]);
 
-  if (list.isError) {
+  if (list.isError && !list.data) {
     return (
       <div className="px-9 py-8">
         <ReadFailed what="Approvals" onRetry={() => void list.refetch()} />

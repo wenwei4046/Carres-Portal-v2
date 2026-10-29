@@ -109,7 +109,7 @@ export default function PrincipalSalesAnalysis() {
 
       {analyticsQ.isLoading ? (
         <Loading variant="skeleton" lines={6} label="Loading analytics" />
-      ) : analyticsQ.error ? (
+      ) : analyticsQ.error && !analyticsQ.data ? (
         <ReadFailed what="Sales analysis" onRetry={() => void analyticsQ.refetch()} />
       ) : orders.length === 0 ? (
         <p className="text-body text-base-500 py-16 text-center">

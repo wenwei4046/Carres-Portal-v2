@@ -22,7 +22,7 @@ export default function PrincipalDashboard({ setTab }: Props) {
 
   // Error first: on a failed read `data` is undefined, so the loading branch
   // would otherwise spin forever.
-  if (isError) {
+  if (isError && !data) {
     return (
       <div className="px-9 py-8">
         <ReadFailed what="The overview" onRetry={() => void refetch()} />

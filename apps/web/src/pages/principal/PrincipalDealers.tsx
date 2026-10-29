@@ -105,7 +105,7 @@ export default function PrincipalDealers({
     });
   }, [dealers, search, statusFilter]);
 
-  if (isError) {
+  if (isError && !data) {
     return (
       <div className="px-9 py-8">
         <ReadFailed what={t.title} onRetry={() => void refetch()} />

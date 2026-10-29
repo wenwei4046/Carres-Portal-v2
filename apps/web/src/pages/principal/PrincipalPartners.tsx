@@ -60,7 +60,7 @@ export default function PrincipalPartners() {
         <h2 className="text-strong mb-2.5">All LPs</h2>
         {isLoading ? (
           <Loading variant="skeleton" label="Loading partners" />
-        ) : isError ? (
+        ) : isError && !lps ? (
           <ReadFailed what="Partners" onRetry={() => void refetch()} />
         ) : !lps || lps.length === 0 ? (
           <p className="text-body text-base-500">
