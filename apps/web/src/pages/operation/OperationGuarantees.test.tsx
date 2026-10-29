@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi, beforeEach } from "vitest";
@@ -78,6 +78,17 @@ describe("OperationGuarantees", () => {
     expect(screen.getByText("SO-1258")).toBeInTheDocument();
     // …and it really did call the endpoint with no q / no status.
     expect(apiFetchMock).toHaveBeenCalledWith("/api/guarantees?");
+  });
+
+  it("a failed read says so and Try again reads again", async () => {
+    apiFetchMock.mockRejectedValueOnce(new Error("offline"));
+    wrap(<OperationGuarantees />);
+    expect(await screen.findByText("Could not be loaded")).toBeInTheDocument();
+    expect(screen.queryByText("No guarantees sold yet.")).not.toBeInTheDocument();
+    apiFetchMock.mockResolvedValueOnce({ items: [ROW], truncated: false });
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText("KQYZ939913")).toBeInTheDocument();
+    expect(apiFetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("says 'none sold yet' when the register is genuinely empty", async () => {
