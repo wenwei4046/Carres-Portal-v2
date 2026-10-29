@@ -42,7 +42,7 @@ export default function InvoiceCollectionOwner({ orderId, canRead }: {
     <div className="text-body">
       {!canRead ? <p>Owner facts are Operation's.</p>
       : ownerQ.isLoading ? <Loading label="Loading owner facts" />
-      : ownerQ.isError ? <p>Owner facts could not be loaded.</p>
+      : ownerQ.isError && !ownerQ.data ? <p>Owner facts could not be loaded.</p>
       : !owner ? <>
           <p className="text-kit-red-11" data-testid="collection-owner-none">{NOBODY_ASSIGNED_TO_ORDER}</p>
           <p className="text-meta">

@@ -363,7 +363,7 @@ function Communications({ invoice }: { invoice: InvoiceRegisterRow }) {
   const rows = [...messages, ...outcomes].sort((a, b) => (a.at < b.at ? 1 : -1));
   if (!rows.length) {
     if (outcomesQ.isLoading) return <Loading label="Loading messages and results" />;
-    if (outcomesQ.isError) return <LoadFailed what="Collection results" onRetry={() => void outcomesQ.refetch()} />;
+    if (outcomesQ.isError && !outcomesQ.data) return <LoadFailed what="Collection results" onRetry={() => void outcomesQ.refetch()} />;
     return <p>No messages or results recorded yet.</p>;
   }
   return <div className="space-y-2" data-testid="communication-history">

@@ -115,7 +115,7 @@ export default function ItemGroups() {
     [],
   );
 
-  if (query.isError) return <LoadFailed what="The item groups" onRetry={() => void query.refetch()} />;
+  if (query.isError && !query.data) return <LoadFailed what="The item groups" onRetry={() => void query.refetch()} />;
   return (
     <ListPageShell register>
       {/* One scrolling area: the groups take the rows they have, and the lists
@@ -132,19 +132,19 @@ export default function ItemGroups() {
           groupBanner={false}
           allowColumnGrouping={false}
           stickyIdentity
-          isLoading={!query.isSuccess}
+          isLoading={!query.data}
           emptyMessage="No item group yet. Press Add item group."
           onRowDoubleClick={(g) => setOpen(g)}
           toolbarEnd={
             // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0659).
-            <Button variant="neutral" onClick={() => setOpen("new")} disabled={!query.isSuccess}>
+            <Button variant="neutral" onClick={() => setOpen("new")} disabled={!query.data}>
               Add item group
             </Button>
           }
         />
-        <ProductList products={query.data?.products ?? []} groupName={groupName} onOpen={setMoving} loading={!query.isSuccess} />
+        <ProductList products={query.data?.products ?? []} groupName={groupName} onOpen={setMoving} loading={!query.data} />
         {(query.data?.unbound.length ?? 0) > 0 && <UnboundSales rows={query.data!.unbound} groupName={groupName} />}
-        <ItemGroupChanges changes={query.data?.changes ?? []} loading={!query.isSuccess} />
+        <ItemGroupChanges changes={query.data?.changes ?? []} loading={!query.data} />
       </div>
       {open && (
         <ItemGroupModal

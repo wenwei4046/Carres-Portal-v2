@@ -194,7 +194,7 @@ export default function OperationDeliveryReport() {
     () => contactRowsOf({ contacts, rows, cards, partnerNameById, month: m }),
     [contacts, rows, cards, partnerNameById, m],
   );
-  const arrivals = inboundQ.isError ? null : inboundQ.data?.arrivals ?? [];
+  const arrivals = inboundQ.isError && !inboundQ.data ? null : inboundQ.data?.arrivals ?? [];
   const returns = useMemo(() => returnRowsOf({ rows, attempts, arrivals, month: m }), [rows, attempts, arrivals, m]);
   const ageing = useMemo(() => ageingRowsOf(cards, attempts, today), [cards, attempts, today]);
   const overdueContacts = contactsOverdueToday(cards);

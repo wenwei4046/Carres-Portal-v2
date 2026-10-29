@@ -85,7 +85,7 @@ export default function CommissionStatement({
       </ListPageShell>
     );
   }
-  if (query.isError) return <LoadFailed what="The statement" onRetry={() => void query.refetch()} />;
+  if (query.isError && !query.data) return <LoadFailed what="The statement" onRetry={() => void query.refetch()} />;
   return (
     <ListPageShell register>
       <DataGrid
@@ -99,12 +99,12 @@ export default function CommissionStatement({
         groupBanner={false}
         allowColumnGrouping={false}
         emptyMessage="No commission or payment for this dealer yet."
-        isLoading={!query.isSuccess}
+        isLoading={!query.data}
         wrapToolbar
         toolbarStart={toolbarStart}
         toolbarEnd={
           // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), dealer commission step 3).
-          <Button variant="neutral" onClick={() => setAdding(true)} disabled={!query.isSuccess}>
+          <Button variant="neutral" onClick={() => setAdding(true)} disabled={!query.data}>
             Add a payment
           </Button>
         }
@@ -175,13 +175,13 @@ function AddPaymentModal({ dealer, onClose }: { dealer: { id: string; name: stri
       }
     >
       <div className="flex flex-col gap-3" data-testid="commission-payment-form">
-        {choices.isError ? (
+        {choices.isError && !choices.data ? (
           <LoadFailed what="The payment vouchers" onRetry={() => void choices.refetch()} />
-        ) : choices.isSuccess && options.length === 0 ? (
+        ) : choices.data && options.length === 0 ? (
           <p className="text-body">No paid direct payment voucher is waiting. Pay the dealer with a payment voucher first.</p>
         ) : (
           <Select id="commission-payment-voucher" label="Payment voucher" required value={voucherId}
-            placeholder={choices.isSuccess ? "Choose" : "Loading"} onValueChange={setVoucherId} options={options} />
+            placeholder={choices.data ? "Choose" : "Loading"} onValueChange={setVoucherId} options={options} />
         )}
         <p className="text-body text-kit-slate-11">A paid direct payment voucher counts as a payment to {dealer.name} on its statement.</p>
         {refusal && <FieldError>{refusal}</FieldError>}

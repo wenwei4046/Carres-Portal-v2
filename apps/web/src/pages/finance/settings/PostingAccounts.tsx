@@ -259,7 +259,7 @@ export default function PostingAccounts() {
     [],
   );
 
-  if (query.isError) return <LoadFailed what="The posting accounts" onRetry={() => void query.refetch()} />;
+  if (query.isError && !query.data) return <LoadFailed what="The posting accounts" onRetry={() => void query.refetch()} />;
   // Without the payment methods the Customer money postings would just be missing.
   if (registry.isError && !registry.data) return <LoadFailed what="The payment methods" onRetry={() => void registry.refetch()} />;
   return (
@@ -279,13 +279,13 @@ export default function PostingAccounts() {
           fixedGroups={{ groups: POSTING_GROUPS.map((g) => ({ key: g.key, label: g.label })), groupOf: (r) => r.group, revealMatches: true }}
           // The Customer money rows come from the payment methods; wait for them
           // too, so the group never appears a moment after the others.
-          isLoading={!query.isSuccess || registry.isLoading}
+          isLoading={!query.data || registry.isLoading}
           emptyMessage="No posting yet."
           onRowDoubleClick={(r) => {
             if (r.change) setOpen(r);
           }}
         />
-        <PostingChanges changes={query.data?.changes ?? []} loading={!query.isSuccess} />
+        <PostingChanges changes={query.data?.changes ?? []} loading={!query.data} />
       </div>
       {open && open.change && (
         <PostingModal

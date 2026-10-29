@@ -108,8 +108,8 @@ function CardRoutes() {
     { key: "bank", label: "Pays out to", width: 320, wrap: true, accessor: (r) => name(r.bank_code), searchValue: (r) => name(r.bank_code) },
   ];
 
-  if (accountQuery.isError) return <LoadFailed what="The accounts" onRetry={() => void accountQuery.refetch()} />;
-  if (routes.isError) return <LoadFailed what="Card payout banks" onRetry={() => void routes.refetch()} />;
+  if (accountQuery.isError && !accountQuery.data) return <LoadFailed what="The accounts" onRetry={() => void accountQuery.refetch()} />;
+  if (routes.isError && !routes.data) return <LoadFailed what="Card payout banks" onRetry={() => void routes.refetch()} />;
   return (
     <ListPageShell register>
       <div className="flex min-h-0 flex-1 flex-col" data-testid="card-routes">
@@ -124,7 +124,7 @@ function CardRoutes() {
           groupBanner={false}
           allowColumnGrouping={false}
           stickyIdentity
-          isLoading={!routes.isSuccess || !accountQuery.isSuccess}
+          isLoading={!routes.data || !accountQuery.data}
           emptyMessage="No card payout bank yet. Press Add a card payout bank."
           onRowDoubleClick={(r) => setEditing(r)}
           /* The note says what the table is for, on the toolbar's left beside it. */
@@ -135,7 +135,7 @@ function CardRoutes() {
             </p>
           }
           toolbarEnd={
-            <Button variant="primary" onClick={() => setEditing(null)} disabled={!accountQuery.isSuccess}>
+            <Button variant="primary" onClick={() => setEditing(null)} disabled={!accountQuery.data}>
               Add a card payout bank
             </Button>
           }
@@ -222,8 +222,8 @@ function ClosedMonths() {
   const [day, setDay] = useState<string | null | undefined>(undefined);
   const [refusal, setRefusal] = useState<string | null>(null);
 
-  if (query.isError) return <LoadFailed what="The closed month" onRetry={() => void query.refetch()} />;
-  if (!query.isSuccess) return null;
+  if (query.isError && !query.data) return <LoadFailed what="The closed month" onRetry={() => void query.refetch()} />;
+  if (!query.data) return null;
   const closed = query.data.closedThrough;
   const picked = day === undefined ? closed : day;
   return (
