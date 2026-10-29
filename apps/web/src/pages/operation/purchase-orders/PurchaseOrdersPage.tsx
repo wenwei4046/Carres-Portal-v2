@@ -1777,7 +1777,9 @@ function PurchaseOrderObject({
                 2026-09-25): the version is the number's `(n)` and the state
                 lives HERE, once, beside `number · party`. The `Status` and
                 `PO Version` facts are retired from the grid. h2: the
-                shell header (PurchasingTabs) already holds the page's h1. */}
+                shell header (PurchasingTabs) holds the page's h1; phones have no
+                shell header, so they get their own sr-only h1. */}
+            <h1 className="sr-only md:hidden">{documentDisplayNumber(`${po.id}-V${row.facts.version}`)} · {row.supplierName}</h1>
             <h2 className="text-page font-semibold text-kit-slate-12">
               <span className="font-mono">{documentDisplayNumber(`${po.id}-V${row.facts.version}`)}</span> · {row.supplierName}
               <span className="ml-3 inline-block whitespace-nowrap align-middle text-body font-normal text-kit-slate-11" data-testid="po-object-state">

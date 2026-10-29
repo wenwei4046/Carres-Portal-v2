@@ -68,7 +68,7 @@ export function OperationPurchaseInvoiceEdit() {
     queryFn: () => apiFetch(`/api/operation/purchase-invoices/${id}`),
   });
   if (draft.isLoading) return <div className="p-4"><Loading variant="skeleton" label="Loading the bill" /></div>;
-  if (draft.isError || !draft.data) {
+  if (!draft.data) {
     return <div role="alert"><EmptyState title="This bill could not be opened" detail="You can change only your own bill, until a payment is recorded."
       action={<Button variant="neutral" onClick={() => void draft.refetch()}>Try again</Button>} /></div>;
   }

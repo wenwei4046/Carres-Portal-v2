@@ -68,21 +68,21 @@ export default function SalesOrderAmendments() {
       docTitle="Amendments · Carres" />
     <ListPageShell register>
       <DataGrid rows={rows} columns={columns} rowKey={(r) => r.id}
-            rowTestId={(r) => `amendment-row-${r.id}`}
-            storageKey="carres.operation.amendments.v1" appearance="reference" fillColumn="reason" exportName="Amendments"
-            groupBanner={false} stickyIdentity isLoading={query.isLoading} wrapToolbar
-            onRowClick={open}
-            searchPlaceholder="Search amendments…"
-            emptyMessage="No amendments yet."
-            errorState={query.isError ? (
-              <div role="alert">
-                <EmptyState title="Could not be loaded" detail="The amendments could not be opened."
-                  action={<Button variant="neutral" onClick={() => void query.refetch()}>Try again</Button>} />
-              </div>
-            ) : undefined}
-            statusSummary={(visible) => <span data-testid="amendments-summary">
-              {visible.length} {visible.length === 1 ? "amendment" : "amendments"} · {waiting} waiting for management
-            </span>} />
+        rowTestId={(r) => `amendment-row-${r.id}`}
+        storageKey="carres.operation.amendments.v1" appearance="reference" fillColumn="reason" exportName="Amendments"
+        groupBanner={false} stickyIdentity isLoading={query.isLoading} wrapToolbar
+        onRowClick={open}
+        searchPlaceholder="Search amendments…"
+        emptyMessage="No amendments yet."
+        errorState={query.isError && !query.data ? (
+          <div role="alert">
+            <EmptyState title="Could not be loaded" detail="The amendments could not be opened."
+              action={<Button variant="neutral" onClick={() => void query.refetch()}>Try again</Button>} />
+          </div>
+        ) : undefined}
+        statusSummary={(visible) => <span data-testid="amendments-summary">
+          {visible.length} {visible.length === 1 ? "amendment" : "amendments"} · {waiting} waiting for management
+        </span>} />
     </ListPageShell>
   </div>;
 }

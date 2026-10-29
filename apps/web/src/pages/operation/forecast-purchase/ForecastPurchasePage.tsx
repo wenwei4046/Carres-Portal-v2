@@ -340,7 +340,7 @@ export default function ForecastPurchasePage({contextFlow=false}:{contextFlow?:b
     }
   }
 
-  const emptyMessage = isError ? W.couldNotRead : models.length === 0 ? W.empty : show === "suggested" ? W.nothingSuggested : show === "ordered" ? W.nothingOrdered : W.empty;
+  const emptyMessage = isError && !data ? W.couldNotRead : models.length === 0 ? W.empty : show === "suggested" ? W.nothingSuggested : show === "ordered" ? W.nothingOrdered : W.empty;
 
   if(contextFlow&&requestSelection!==null)return <ForecastRequestWorkspace selection={requestSelection} onDone={id=>{if(id)navigate(`/operation?tab=manual-purchase&mp=${encodeURIComponent(id)}`);else setRequestSelection(null);void refetch();}}/>;
 
@@ -416,7 +416,7 @@ export default function ForecastPurchasePage({contextFlow=false}:{contextFlow?:b
               allowColumnGrouping={false}
               groupBanner={false}
               isLoading={isLoading}
-              errorState={isError ? (
+              errorState={isError && !data ? (
                 <div className="flex flex-col items-center gap-2 p-6 text-body text-c-secondary" role="alert" data-testid="forecast-error">
                   <span>{W.couldNotRead}</span>
                   <Button onClick={() => void refetch()}>Try again</Button>

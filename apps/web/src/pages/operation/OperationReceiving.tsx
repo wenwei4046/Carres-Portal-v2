@@ -961,7 +961,7 @@ export default function OperationReceiving({ consignmentPage = false }: { consig
           className="flex min-h-0 min-w-0 flex-1 flex-col pl-2"
           data-testid="receiving-register-column"
         >
-          {registerQ.isError ? (
+          {registerQ.isError && !registerQ.data ? (
             /* A failure sentence is never the empty sentence (COPY-STANDARD
                2026-08-28): what broke, then the act that fixes it. */
             <div role="alert" className="flex min-h-0 flex-1 flex-col items-center justify-center bg-white">

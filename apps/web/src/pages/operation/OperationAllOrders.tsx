@@ -55,6 +55,8 @@ export default function OperationAllOrders() {
     queryFn: () => apiFetch(`/api/operation/orders-feed${queryStr}`),
   });
   const orders = data?.orders ?? [];
+  // Only a read with nothing cached is a failure; a failed refetch keeps the rows.
+  const failed = isError && !data;
 
   // Cheap dealer list — derive from rows we just fetched.
   const dealersFromRows = useMemo<DealerOpt[]>(() => {
@@ -74,11 +76,14 @@ export default function OperationAllOrders() {
         docTitle="All Orders · Sales Orders · Carres" />
       <div className="mb-[22px]">
         <div className="kicker">HQ · Operations</div>
+        {/* Phones get no shell header, so the page keeps its own h1 there. */}
+        <h1 className="sr-only md:hidden">All Orders</h1>
         <h2 className="text-page font-display mt-1.5">
           Every order, every dealer
         </h2>
         <div className="text-body text-base-600 mt-1.5">
-          {isError ? "" : `${orders.length} order${orders.length !== 1 ? "s" : ""}. `}Read-only.
+          {failed ? "" : `${orders.length} order${orders.length !== 1 ? "s" : ""}. `}Read-only.
+          {isError && data ? <span role="status" className="ml-2 text-meta text-base-500">Could not refresh. Showing the last list.</span> : null}
         </div>
       </div>
 
@@ -141,13 +146,13 @@ export default function OperationAllOrders() {
             {isLoading && (
               <tr><td colSpan={8} className="p-10"><Loading variant="skeleton" label="Loading orders" /></td></tr>
             )}
-            {isError && (
+            {failed && (
               <tr><td colSpan={8} role="alert">
                 <EmptyState title="Could not be loaded" detail="The orders could not be read."
                   action={<Button variant="neutral" onClick={() => void refetch()}>Try again</Button>} />
               </td></tr>
             )}
-            {!isLoading && !isError && orders.length === 0 && (
+            {!isLoading && !failed && orders.length === 0 && (
               <tr><td colSpan={8} className="p-10 text-center text-meta text-base-500">No orders match those filters.</td></tr>
             )}
             {orders.map((o) => (

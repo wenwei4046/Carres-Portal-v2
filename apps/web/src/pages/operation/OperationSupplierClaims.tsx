@@ -196,7 +196,8 @@ export default function OperationSupplierClaims() {
   const anyFilter = po != null || Object.keys(picks).length > 0;
   const needsSku = claims.some((row) => !row.product_description);
   const columns = useMemo(() => supplierClaimColumns(open, needsSku), [open, needsSku]);
-  const errorState = query.isError
+  // A failed refetch keeps the cached claims; only a first read with nothing cached is an error.
+  const errorState = query.isError && !query.data
     ? <div role="alert"><EmptyState title={errorTitle} action={<Button variant="neutral" onClick={() => void query.refetch()}>Try again</Button>} /></div>
     : undefined;
 
@@ -204,7 +205,7 @@ export default function OperationSupplierClaims() {
     <div className={`flex h-full min-h-0 flex-col ${claimId ? "hidden" : ""}`} aria-hidden={claimId ? true : undefined}>
       {!claimId && <PurchasingTabs />}
       <div ref={canvasRef} className="flex min-h-0 flex-1 overflow-hidden">
-        {railOpen && !query.isError && <FilterRail testId="supplier-claims-rail" onHide={() => setRailVisible(false)}>
+        {railOpen && !errorState && <FilterRail testId="supplier-claims-rail" onHide={() => setRailVisible(false)}>
           {po && <FilterRailGroup title="Source" icon="order">
             <FilterRailRow label={`PO: ${po}`} active onClick={clearSource} title="Clear the purchase order filter" testId="claims-rail-source" />
           </FilterRailGroup>}
@@ -246,7 +247,7 @@ export default function OperationSupplierClaims() {
           <Button variant="ghost" aria-label="Next Claim" disabled={position === visibleRows.length - 1} onClick={() => open(visibleRows[position + 1])}><ChevronRight size={16} /></Button>
         </div> : undefined} />
       <div className="min-h-0 flex-1 overflow-auto p-4" key={claim?.id ?? claimId} data-testid="claim-object-scroll">
-        {query.isError ? errorState
+        {errorState ? errorState
           : query.isLoading ? <Loading variant="skeleton" label="Loading claim" />
           : claim ? <SupplierClaimPanel claim={claim} />
           : <EmptyState title="Claim is not available." action={<Button variant="neutral" onClick={close}>Supplier Claims</Button>} />}

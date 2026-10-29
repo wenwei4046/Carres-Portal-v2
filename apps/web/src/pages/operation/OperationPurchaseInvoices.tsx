@@ -99,7 +99,7 @@ export default function OperationPurchaseInvoices() {
           isLoading={query.isLoading}
           searchPlaceholder="Search bill, supplier or PO…"
           emptyMessage="No purchase invoice yet. Enter one with New Bill or Bill from GRN."
-          errorState={query.isError ? (
+          errorState={query.isError && !query.data ? (
             <div role="alert">
               <EmptyState title="Could not be loaded" detail="The purchase invoices could not be read."
                 action={<Button variant="neutral" onClick={() => void query.refetch()}>Try again</Button>} />

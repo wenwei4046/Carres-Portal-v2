@@ -80,7 +80,7 @@ export default function PurchaseReturnRecord({ id, onBack }: { id: string; onBac
       backTo={`/operation?tab=${tab}`} onBack={(event) => { event.preventDefault(); onBack(); }} />
     <div className="min-h-0 flex-1 overflow-auto p-4" data-testid="purchase-return-object-scroll">
       {read.isError ? <div role="alert"><EmptyState title="Purchase Returns could not be loaded." action={<Button variant="neutral" onClick={() => void read.refetch()}>Try again</Button>} /></div>
-        : read.isLoading ? <Loading variant="skeleton" />
+        : read.isLoading ? <Loading variant="skeleton" label="Loading the Purchase Return" />
         : pr ? <PurchaseReturnPanel pr={pr} />
         : <EmptyState title="Not recorded" action={<Button variant="neutral" onClick={onBack}>Purchase Returns</Button>} />}
     </div>

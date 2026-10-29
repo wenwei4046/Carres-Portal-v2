@@ -76,7 +76,7 @@ export default function PurchaseReturnIssue({ claimId = null, supplierId = null,
   if (read.isError) {
     return <div role="alert"><EmptyState title="Some information could not be refreshed." action={<Button variant="neutral" onClick={() => void read.refetch()}>Try again</Button>} /></div>;
   }
-  if (read.isLoading || !read.data) return <div className="p-4"><Loading variant="skeleton" /></div>;
+  if (read.isLoading || !read.data) return <div className="p-4"><Loading variant="skeleton" label="Loading the Purchase Return" /></div>;
   return <IssueForm source={read.data.source} onClose={onClose} onIssued={onIssued} />;
 }
 
@@ -96,7 +96,7 @@ export function ConsignmentReturnIssue({ onClose, onIssued }: { onClose: () => v
     </div>
     {!supplierId ? <div className="flex justify-end"><Button variant="neutral" onClick={onClose}>Cancel</Button></div>
       : read.isError ? <div role="alert"><EmptyState title="Some information could not be refreshed." action={<Button variant="neutral" onClick={() => void read.refetch()}>Try again</Button>} /></div>
-      : read.isLoading || !read.data ? <Loading variant="skeleton" />
+      : read.isLoading || !read.data ? <Loading variant="skeleton" label="Loading the Purchase Return" />
       : <IssueForm key={supplierId} source={read.data.source} onClose={onClose} onIssued={onIssued} />}
   </div>;
 }
@@ -135,7 +135,8 @@ export function IssueForm({ source, onClose, onIssued }: { source: PurchaseRetur
   return <div className="flex min-h-0 flex-1 flex-col gap-4 min-[1180px]:flex-row" data-testid="purchase-return-issue">
     <div className="flex min-w-0 flex-col gap-3 min-[1180px]:w-1/2" data-testid="purchase-return-issue-form">
       <p className="text-meta text-kit-slate-11">{source.claim_no ?? (claimless ? supplier : "Supplier Claim")}</p>
-      {/* h2: the shell header already holds the page's one h1. */}
+      {/* h2: the shell header holds the page's one h1; phones have no shell header, so they get their own. */}
+      <h1 className="sr-only md:hidden">{title}</h1>
       <h2 className="text-page text-kit-slate-12">{title}</h2>
       {refusal ? <p role="alert" className="rounded-control border border-kit-red-9 bg-kit-red-3 px-3 py-2 text-body text-kit-red-11" data-testid="purchase-return-issue-refusal">{refusal}</p> : null}
       <Block title="Units to return">

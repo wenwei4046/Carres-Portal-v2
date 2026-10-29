@@ -883,7 +883,7 @@ describe("Purchase Orders Register", () => {
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: "PO-260828-4827-V2" }));
     expect(screen.getByTestId("purchase-order-object")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /PO-260828-4827-V2/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: /PO-260828-4827-V2/ })).toBeInTheDocument();
   });
 
   it("does not report empty facts while the required register reads are loading", () => {
@@ -1052,7 +1052,7 @@ describe("Purchase Order object", () => {
 
   it("opens the governed object views and preserves document connections", () => {
     renderPage("/operation/procurement?po=PO-20260828-4827");
-    expect(screen.getByRole("heading", { name: /PO-260828-4827-V2/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: /PO-260828-4827-V2/ })).toBeInTheDocument();
     for (const view of ["Document", "Revisions", "History", "Order Route"]) {
       expect(screen.getByRole("button", { name: view })).toBeInTheDocument();
     }

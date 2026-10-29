@@ -214,7 +214,7 @@ export default function ProcurementTabContent({
     );
   }
 
-  if (tabQ.isError) {
+  if (tabQ.isError && !tabQ.data) {
     return (
       <div className="px-9 py-7" role="alert" data-testid={`procurement-tab-error-${slug}`}>
         <EmptyState title="Could not be loaded"
