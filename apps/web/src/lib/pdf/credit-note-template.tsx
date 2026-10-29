@@ -42,7 +42,7 @@ const styles = StyleSheet.create({
 export const creditNoteMoney = (value: number, currency: string) => `${currency} ${value.toFixed(2)}`;
 
 export function CreditNoteTemplate(data: CreditNotePrintData) {
-  const { credit_note_no, note_date, invoice_no, order_code, customer_name, amount, reason, voided, void_reason, currency } = data;
+  const { credit_note_no, note_date, invoice_no, order_code, amount, reason, voided, void_reason, currency } = data;
   return (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -55,7 +55,7 @@ export function CreditNoteTemplate(data: CreditNotePrintData) {
 
         <View style={styles.party}>
           <Text style={styles.partyLabel}>Credited To</Text>
-          <Text style={styles.partyName}>{displayCustomerName(customer_name ?? "") || " "}</Text>
+          <Text style={styles.partyName}>{displayCustomerName(data.customer_name ?? "") || " "}</Text>
         </View>
 
         <View style={styles.detailBlock}>
