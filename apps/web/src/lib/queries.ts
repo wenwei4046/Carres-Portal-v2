@@ -2920,7 +2920,21 @@ export interface operationOrderListRow {
    *  fall outside of. Optional: an older Worker that does not select it leaves
    *  the field undefined, and the register reads that as "not carried" rather
    *  than as "none exist". */
-  ops_delivery_orders?: { do_number: string }[];
+  ops_delivery_orders?: {
+    do_number: string;
+    leg?: number | null;
+    delivery_date?: string | null;
+    time_slot?: string | null;
+    voided_at?: string | null;
+  }[];
+  /** Delivery's own record per leg (leg 0 = whole order): the carrier and the
+   *  confirmed day the drawer's Delivery card and the Monitor already read. */
+  ops_delivery_arrangements?: {
+    leg: number | null;
+    partner_id: string | null;
+    confirmed_date: string | null;
+    confirmed_time: string | null;
+  }[];
   /** Source-owned document ledgers, including receipts allocated to this SO. */
   invoice_documents?: { id: string; invoice_no: string | null }[];
   receipt_documents?: { id: string; receipt_no: string | null }[];
