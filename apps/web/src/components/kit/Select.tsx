@@ -90,12 +90,15 @@ export default function Select({
         <RadixSelect.Portal container={dialogContainer}>
           {/* `--radix-select-trigger-width` is Radix's own measurement of the
            *  trigger. Binding the list to it is behaviour, not a token: the
-           *  list is as wide as the control that opened it, whatever that is. */}
+           *  list is as wide as the control that opened it, whatever that is.
+           *  The height cap is the same kind of measurement: without it a long
+           *  list (the SO item picker) flips above its trigger and runs off the
+           *  top of the screen; capped, the Viewport scrolls instead. */}
           <RadixSelect.Content
             position="popper"
             sideOffset={4}
             data-kit="select-list"
-            className={`${FLOATING_SURFACE} min-w-[var(--radix-select-trigger-width)] p-1.5`}
+            className={`${FLOATING_SURFACE} min-w-[var(--radix-select-trigger-width)] max-h-[var(--radix-select-content-available-height)] p-1.5`}
           >
             <RadixSelect.Viewport className="flex flex-col gap-0.5">
               {shown.map((o) => (
