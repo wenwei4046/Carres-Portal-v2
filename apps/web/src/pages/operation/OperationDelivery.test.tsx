@@ -1916,9 +1916,10 @@ describe("the row's goods, arrival and stock cells", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
     const list = screen.getByTestId("delivery-monitor-work-list");
     /* The register's cell is `Items & Stock` (§8.3): the readiness word and
-       the exact count — 1 of 4 pieces held, 3 short across the shipment. */
+       the exact count — 3 of 4 pieces held (the pillows are accessories, ready
+       as the DO gate reads them), 1 short across the shipment. */
     expect(within(list).getByText("Not ready")).toBeTruthy();
-    expect(within(list).getByText("1 of 4 · 3 short")).toBeTruthy();
+    expect(within(list).getByText("3 of 4 · 1 short")).toBeTruthy();
     /* The goods themselves live in the brief's fourth panel, one line each. */
     fireEvent.click(within(list).getAllByTitle("Show delivery brief")[0]!);
     const items = screen.getByTestId("delivery-brief-items");
@@ -2048,9 +2049,9 @@ describe("the row's goods, arrival and stock cells", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
     const list = screen.getByTestId("delivery-monitor-work-list");
     expect(within(list).getByText("Not ready")).toBeTruthy();
-    /* The whole delivery is three pieces short — the shipment scope, never
-       the main goods alone, and never a service that moves no Unit. */
-    expect(within(list).getByText(/3 short/)).toBeTruthy();
+    /* One piece short — never a service that moves no Unit, never an
+       accessory that has no reserve step. */
+    expect(within(list).getByText(/1 short/)).toBeTruthy();
   });
 
   it("the arrival icons carry real labels, so colour is never the only signal", () => {

@@ -114,7 +114,9 @@ describe("the shortage is the EXACT number of missing pieces", () => {
     ).toBe(true);
   });
 
-  it("readiness is the WHOLE commitment, accessories included", () => {
+  it("an accessory is warehouse stock with no reserve step: ready, as the DO gate reads it", () => {
+    // SO-1375 (prod, 2026-10-30): the Order Route read the Mattress Protector
+    // ready and Delivery Monitor read it `Not allocated`.
     const readiness = deliveryStockReadinessOf(
       [
         { sku: "MS-K", qty: 1 },
@@ -122,9 +124,19 @@ describe("the shortage is the EXACT number of missing pieces", () => {
       ],
       [{ sku: "MS-K", status: "reserved", qty: 1 }],
     );
-    expect(readiness.ready).toBe(false);
-    expect(readiness.shortQty).toBe(2);
-    expect(readiness.shortLines.map((l) => l.sku)).toEqual(["Pillow"]);
+    expect(readiness.ready).toBe(true);
+    expect(readiness.shortQty).toBe(0);
+  });
+
+  it("an accessory never makes a core line short", () => {
+    const readiness = deliveryStockReadinessOf(
+      [
+        { sku: "MS-K", qty: 1 },
+        { sku: "Mattress Protector", qty: 1 },
+      ],
+      [],
+    );
+    expect(readiness.shortLines.map((l) => l.sku)).toEqual(["MS-K"]);
   });
 
   it("an order with no committed line is not `ready` — nothing was proved", () => {

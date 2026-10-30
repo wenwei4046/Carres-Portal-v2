@@ -40,6 +40,7 @@
 
 import { myHolidaySet } from "./my-holidays";
 import { normalizeSkuKey } from "./sku-code";
+import { lineKind } from "./line-category";
 import { tomorrowDeliveryCallOf } from "./purchasing-supplier-calls";
 import { poReplyDateOf, type PoDatePromise } from "./po-workspace";
 
@@ -174,8 +175,9 @@ export function lineShortagesOf(
     const key = normalizeSkuKey(line.sku);
     const committedQty = Math.max(0, Number(line.qty) || 0);
     const left = pool.get(key) ?? 0;
-    const allocatedQty = Math.min(left, committedQty);
-    pool.set(key, left - allocatedQty);
+    // An accessory has no reserve step: ready, as `lineReadiness` and the DO gate read it.
+    const allocatedQty = lineKind(line.sku) === "acc" ? committedQty : Math.min(left, committedQty);
+    pool.set(key, Math.max(0, left - allocatedQty));
     return {
       sku: line.sku,
       committedQty,
@@ -188,11 +190,10 @@ export function lineShortagesOf(
 /**
  * WHERE THE GOODS STAND — the whole delivery, over every committed line.
  *
- * `ready` means the register holds every committed piece. It is deliberately
- * the WHOLE commitment and not the main goods alone: a delivery that arrives
- * without the pillows the customer paid for was not a delivery that was ready.
- * (Delivery MASTER §3 rules that accessories do not BLOCK the core goods —
- * which is a different statement from pretending they are not in the shipment.)
+ * `ready` means the register holds every committed piece. An accessory has no
+ * reserve step, so it counts as held — the same answer `lineReadiness`, the DO
+ * gate and the Order Route give (Delivery MASTER: accessories do not block
+ * core goods; SO-1375, 2026-10-30, the screens disagreed).
  */
 export interface DeliveryStockReadiness {
   ready: boolean;

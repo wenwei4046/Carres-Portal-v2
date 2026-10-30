@@ -314,7 +314,7 @@ or replaces a PO, which changes only through Purchasing's change or cancel route
 RESOLVED — a single candidate, or a refusal by name; the door never picks out of several.
 
 **RECEIPT RESERVES GOODS BOUGHT FOR A SALES ORDER LINE — owner ruling (Jess) 2026-10-05 · APPROVED /
-NOT BUILT.** Goods bought for an explicit Sales Order goods line (`po_line_sources` lineage) are
+BUILT 2026-10-30 (migration 0736, NOT APPLIED).** Goods bought for an explicit Sales Order goods line (`po_line_sources` lineage) are
 reserved automatically to that original SO line when Receiving posts them; staff do not allocate them
 again. Only the accepted, usable received quantity is reserved. When several SOs share one PO line,
 allocation follows the existing source rows (lineage), never a guess. Damaged, wrong-item and
