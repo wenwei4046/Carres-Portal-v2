@@ -649,7 +649,8 @@ export default function PurchaseOrdersPage() {
      be loaded. Its data feeds two decorative badges and nothing else, and
      `OwnerBadge` already degrades to "PO Duty not assigned" on a null holder,
      which is the right thing to show. */
-  const requiredReadError = posQ.isError || suppliersQ.isError || warehouseQ.isError;
+  // A failed refetch keeps the cached register; only a read with nothing cached replaces it.
+  const requiredReadError = (posQ.isError && !posQ.data) || (suppliersQ.isError && !suppliersQ.data) || (warehouseQ.isError && !warehouseQ.data);
   if (requiredReadError) {
     return (
       <div ref={canvasRef} className="flex h-full min-h-0 flex-col bg-kit-canvas">
@@ -676,7 +677,7 @@ export default function PurchaseOrdersPage() {
     return (
       <div ref={canvasRef} className="flex h-full min-h-0 flex-col bg-kit-canvas">
         <PurchasingTabs />
-        <div className="m-4 text-body text-kit-slate-11">Loading purchase orders…</div>
+        <div className="m-4 max-w-[720px]"><Loading variant="skeleton" label="Loading purchase orders" /></div>
       </div>
     );
   }
@@ -1341,7 +1342,7 @@ export default function PurchaseOrdersPage() {
           {!railOpen && <div className="shrink-0 p-2"><ShowFiltersButton onShow={() => setRailVisible(true)} testId="purchase-orders-show-filters" /></div>}
           <SalesOrderMonthlyDemand view={demandView} focusMonth={focusMonth}
           onOpenMonth={openDemandMonth} loading={demandQ.isLoading}
-          error={demandQ.isError ? demandQ.error : undefined} onRetry={() => void demandQ.refetch()} /></div> :
+          error={demandQ.isError && !demandQ.data ? demandQ.error : undefined} onRetry={() => void demandQ.refetch()} /></div> :
         <div ref={overviewBox} className="flex min-h-0 min-w-0 flex-1 flex-col p-2" data-testid="po-register-content">
           {pdfProblem ? (
             <ReadProblem
@@ -1620,7 +1621,7 @@ function OrderedGoods({ row, destinations }: { row: RegisterRow; destinations: A
       unitIds: counted ? [] : unitIds,
       unitNode: counted
         ? <Absence>{GOODS_ABSENCE_WORDS.countedByQuantity}</Absence>
-        : unitsQ.isError
+        : unitsQ.isError && !unitsQ.data
         ? <span className="text-kit-amber-11">Unit IDs could not be read</span>
         : unitsQ.isLoading
         ? <Absence>Reading Unit IDs…</Absence>
@@ -1776,13 +1777,16 @@ function PurchaseOrderObject({
             {/* ⭐ PO OBJECT PAGE COMPOSITION (Purchasing MASTER §9.3, owner
                 2026-09-25): the version is the number's `(n)` and the state
                 lives HERE, once, beside `number · party`. The `Status` and
-                `PO Version` facts are retired from the grid. */}
-            <h1 className="text-page font-semibold text-kit-slate-12">
+                `PO Version` facts are retired from the grid. h2: the
+                shell header (PurchasingTabs) holds the page's h1; phones have no
+                shell header, so they get their own sr-only h1. */}
+            <h1 className="sr-only md:hidden">{documentDisplayNumber(`${po.id}-V${row.facts.version}`)} · {row.supplierName}</h1>
+            <h2 className="text-page font-semibold text-kit-slate-12">
               <span className="font-mono">{documentDisplayNumber(`${po.id}-V${row.facts.version}`)}</span> · {row.supplierName}
               <span className="ml-3 inline-block whitespace-nowrap align-middle text-body font-normal text-kit-slate-11" data-testid="po-object-state">
                 {row.facts.operationStatus ?? row.facts.documentState}
               </span>
-            </h1>
+            </h2>
           </div>
           <div className="ml-auto flex flex-wrap justify-end gap-2 max-[960px]:basis-full max-[960px]:pl-7" data-testid="po-object-actions">
             {/* ⛔ A BUTTON THAT CAN ONLY REFUSE IS NOT AN ACTION (defect 18).
@@ -1944,9 +1948,9 @@ function PurchaseOrderObject({
             unitLoading={unitsQ.isLoading}
             receivingLoading={receivingQ.isLoading}
             claimsLoading={claimsQ.isLoading}
-            unitError={unitsQ.isError}
-            receivingError={receivingQ.isError}
-            claimsError={claimsQ.isError}
+            unitError={unitsQ.isError && !unitsQ.data}
+            receivingError={receivingQ.isError && !receivingQ.data}
+            claimsError={claimsQ.isError && !claimsQ.data}
             onRetryUnits={() => void unitsQ.refetch()}
             onRetryReceiving={() => void receivingQ.refetch()}
             onRetryClaims={() => void claimsQ.refetch()}
@@ -1957,7 +1961,7 @@ function PurchaseOrderObject({
           <RecordList
             title="Revisions"
             empty="No revised version is recorded. PO V1 is the original purchase order."
-            problem={auditQ.isError ? "The PO revisions could not be loaded" : null}
+            problem={auditQ.isError && !auditQ.data ? "The PO revisions could not be loaded" : null}
             action="Try again. If it still fails, ask the system owner to check the PO history."
             onRetry={() => void auditQ.refetch()}
             rows={[
@@ -2005,7 +2009,7 @@ function PurchaseOrderObject({
           <RecordList
             title="History"
             empty="No history is recorded for this purchase order."
-            problem={auditQ.isError ? "The PO history could not be loaded" : null}
+            problem={auditQ.isError && !auditQ.data ? "The PO history could not be loaded" : null}
             action="Try again. If it still fails, ask the system owner to check the PO history."
             onRetry={() => void auditQ.refetch()}
             rows={[...(po.sends ?? []).flatMap((send) => {
@@ -2031,8 +2035,8 @@ function PurchaseOrderObject({
             claims={claimsQ.data?.claims ?? []}
             receivingLoading={receivingQ.isLoading}
             claimsLoading={claimsQ.isLoading}
-            receivingError={receivingQ.isError}
-            claimsError={claimsQ.isError}
+            receivingError={receivingQ.isError && !receivingQ.data}
+            claimsError={claimsQ.isError && !claimsQ.data}
             onRetryReceiving={() => void receivingQ.refetch()}
             onRetryClaims={() => void claimsQ.refetch()}
           />
@@ -2212,7 +2216,7 @@ function DocumentView({ row, owner, onIssue, units, receiving, claims, destinati
                       used to sit in a card of their own at the bottom of the
                       page, cut off from the line (YH, 2026-09-04). */}
                   <td className={SO_TD} data-testid={`po-line-units-${line.id}`}>{
-                    unitLoading ? <span className="text-kit-slate-11">Loading…</span>
+                    unitLoading ? <Loading label="Loading Unit IDs" />
                     : unitError ? <button type="button" className="text-kit-blue-11 hover:underline" onClick={onRetryUnits}>Unit IDs could not be loaded. Try again</button>
                     : line.identity_mode === "quantity"
                       ? <Absence>{GOODS_ABSENCE_WORDS.countedByQuantity}</Absence>
@@ -2307,7 +2311,7 @@ function PoFact({ label, value }: { label: string; value: string }) {
 }
 
 function ConnectionBlock({ title, empty, children, hasContent, loading, problem, action, onRetry }: { title: string; empty: string; children: React.ReactNode; hasContent: boolean; loading?: boolean; problem?: string | null; action?: string; onRetry?: () => void }) {
-  return <Block title={title}><div className="flex flex-col gap-2">{problem ? <ReadProblem problem={problem} action={action ?? "Try again."} onRetry={onRetry} /> : loading ? <Absence>Loading…</Absence> : hasContent ? children : <p className="text-meta text-kit-slate-11">{empty}</p>}</div></Block>;
+  return <Block title={title}><div className="flex flex-col gap-2">{problem ? <ReadProblem problem={problem} action={action ?? "Try again."} onRetry={onRetry} /> : loading ? <Loading label={`Loading ${title}`} /> : hasContent ? children : <p className="text-meta text-kit-slate-11">{empty}</p>}</div></Block>;
 }
 
 function ConnectionRow({ primary, secondary, href }: { primary: string; secondary: string; href?: string }) {

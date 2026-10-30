@@ -3,6 +3,10 @@ import { useMemo, useState } from "react";
 import { qk } from "@/lib/queries";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
+import ModuleHeader from "./components/ModuleHeader";
 
 /**
  * Phase 10 · Operation · All orders — `reference/proto/principal-views.jsx`
@@ -46,11 +50,13 @@ export default function OperationAllOrders() {
     return s ? `?${s}` : "";
   }, [dealerFilter, statusFilter, search]);
 
-  const { data, isLoading } = useQuery<{ orders: OrderRow[] }>({
+  const { data, isLoading, isError, refetch } = useQuery<{ orders: OrderRow[] }>({
     queryKey: qk.operation.ordersFeed({ dealer: dealerFilter, status: statusFilter, q: search }),
     queryFn: () => apiFetch(`/api/operation/orders-feed${queryStr}`),
   });
   const orders = data?.orders ?? [];
+  // Only a read with nothing cached is a failure; a failed refetch keeps the rows.
+  const failed = isError && !data;
 
   // Cheap dealer list — derive from rows we just fetched.
   const dealersFromRows = useMemo<DealerOpt[]>(() => {
@@ -65,13 +71,19 @@ export default function OperationAllOrders() {
 
   return (
     <div className="px-9 py-8 pb-14">
+      {/* Names the page in the shell header (its one h1) and the browser tab. */}
+      <ModuleHeader destinationHeader testId="all-orders-destination-header" word="All Orders"
+        docTitle="All Orders · Sales Orders · Carres" />
       <div className="mb-[22px]">
         <div className="kicker">HQ · Operations</div>
-        <h1 className="text-page font-display mt-1.5">
+        {/* Phones get no shell header, so the page keeps its own h1 there. */}
+        <h1 className="sr-only md:hidden">All Orders</h1>
+        <h2 className="text-page font-display mt-1.5">
           Every order, every dealer
-        </h1>
+        </h2>
         <div className="text-body text-base-600 mt-1.5">
-          {orders.length} order{orders.length !== 1 ? "s" : ""}. Read-only.
+          {failed ? "" : `${orders.length} order${orders.length !== 1 ? "s" : ""}. `}Read-only.
+          {isError && data ? <span role="status" className="ml-2 text-meta text-base-500">Could not refresh. Showing the last list.</span> : null}
         </div>
       </div>
 
@@ -81,10 +93,12 @@ export default function OperationAllOrders() {
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          aria-label="Search orders"
           placeholder="SO number or customer name…"
           className="flex-1 min-w-[220px] px-3 py-2 border border-base-200 rounded text-body bg-white outline-none focus:border-base-700"
         />
         <select
+          aria-label="Dealer"
           value={dealerFilter}
           onChange={(e) => setDealerFilter(e.target.value)}
           className="px-3 py-2 border border-base-200 rounded text-body bg-white"
@@ -98,6 +112,8 @@ export default function OperationAllOrders() {
           {STATUS_TABS.map((k) => (
             <button
               key={k}
+              type="button"
+              aria-pressed={statusFilter === k}
               onClick={() => setStatusFilter(k)}
               className={`px-3 py-1.5 text-label rounded cursor-pointer capitalize ${
                 statusFilter === k
@@ -128,9 +144,15 @@ export default function OperationAllOrders() {
           </thead>
           <tbody>
             {isLoading && (
-              <tr><td colSpan={8} className="p-10 text-center text-meta text-base-500">Loading…</td></tr>
+              <tr><td colSpan={8} className="p-10"><Loading variant="skeleton" label="Loading orders" /></td></tr>
             )}
-            {!isLoading && orders.length === 0 && (
+            {failed && (
+              <tr><td colSpan={8} role="alert">
+                <EmptyState title="Could not be loaded" detail="The orders could not be read."
+                  action={<Button variant="neutral" onClick={() => void refetch()}>Try again</Button>} />
+              </td></tr>
+            )}
+            {!isLoading && !failed && orders.length === 0 && (
               <tr><td colSpan={8} className="p-10 text-center text-meta text-base-500">No orders match those filters.</td></tr>
             )}
             {orders.map((o) => (

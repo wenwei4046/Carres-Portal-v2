@@ -15,6 +15,7 @@ import {
   type ManualPurchaseStockResponse,
 } from "@carres/shared";
 import Button from "@/components/kit/Button";
+import Loading from "@/components/kit/Loading";
 import { apiFetch } from "@/lib/api";
 import ReadyStockTable, {
   type ReadyStockTableRow,
@@ -111,7 +112,7 @@ export function ReadyStockCell({
   onToggle: () => void;
 }) {
   if (state === "loading") {
-    return <span className="text-kit-slate-11">Loading…</span>;
+    return <Loading label="Loading stock" />;
   }
   if (state === "error") {
     return <span className="text-kit-slate-11">Could not be loaded</span>;

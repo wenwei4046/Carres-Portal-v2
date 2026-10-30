@@ -43,6 +43,8 @@ import ReceivingRecord from "./components/ReceivingRecord";
 import ReceivingCompactView from "./components/ReceivingCompactView";
 import CPopover from "@/components/carres/CPopover";
 import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
 import NewGoodsReceiptModal from "./components/NewGoodsReceiptModal";
 import Tabs from "@/components/kit/Tabs";
 import Drawer from "@/components/kit/Drawer";
@@ -902,7 +904,7 @@ export default function OperationReceiving({ consignmentPage = false }: { consig
       ) : sessionId ? (
         <ReceivingRecord sessionId={sessionId} onBack={closeObject} />
       ) : poId && posQ.isLoading ? (
-        <p role="status" className="p-4 text-body">Loading…</p>
+        <div className="p-4"><Loading label="Loading the purchase order" /></div>
       ) : poId ? (
         <PoReceivingView
           key={poId}
@@ -959,20 +961,12 @@ export default function OperationReceiving({ consignmentPage = false }: { consig
           className="flex min-h-0 min-w-0 flex-1 flex-col pl-2"
           data-testid="receiving-register-column"
         >
-          {registerQ.isError ? (
+          {registerQ.isError && !registerQ.data ? (
             /* A failure sentence is never the empty sentence (COPY-STANDARD
                2026-08-28): what broke, then the act that fixes it. */
-            <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-white">
-              <p className="text-body text-base-700">
-                Receiving could not be opened
-              </p>
-              <button
-                type="button"
-                className="rounded-control border border-base-200 bg-white px-3 py-1.5 text-body font-medium text-base-700 hover:bg-hovertint"
-                onClick={() => void registerQ.refetch()}
-              >
-                Try again
-              </button>
+            <div role="alert" className="flex min-h-0 flex-1 flex-col items-center justify-center bg-white">
+              <EmptyState title="Receiving could not be opened" detail="The GRN records could not be read."
+                action={<Button variant="neutral" onClick={() => void registerQ.refetch()}>Try again</Button>} />
             </div>
           ) : (
             <DataGrid<WarehouseReceiptQueueRow>

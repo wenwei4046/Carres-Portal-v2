@@ -9,6 +9,8 @@ import AssignPickupDialog from "../components/AssignPickupDialog";
 import ReassignWarehouseDialog from "../components/ReassignWarehouseDialog";
 import LpInboundConfirmDialog from "../components/LpInboundConfirmDialog";
 import PoDetailModal from "../components/PoDetailModal";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
 
 /**
  * ProcurementTabContent — Phase 4.5 Chunk 2 Sprint F Task 34.
@@ -212,24 +214,12 @@ export default function ProcurementTabContent({
     );
   }
 
-  if (tabQ.isError) {
+  if (tabQ.isError && !tabQ.data) {
     return (
-      <div className="px-9 py-7" data-testid={`procurement-tab-error-${slug}`}>
-        <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-body">
-          <div className="text-destructive font-medium mb-2">
-            Couldn&rsquo;t load purchase orders
-          </div>
-          <div className="text-meta text-base-700 mb-3">
-            {(tabQ.error as Error | undefined)?.message ?? "Unknown error"}
-          </div>
-          <button
-            type="button"
-            onClick={() => void tabQ.refetch()}
-            className="btn-secondary text-body font-medium py-1.5 px-3"
-          >
-            Retry
-          </button>
-        </div>
+      <div className="px-9 py-7" role="alert" data-testid={`procurement-tab-error-${slug}`}>
+        <EmptyState title="Could not be loaded"
+          detail={`The purchase orders could not be read. ${(tabQ.error as Error | undefined)?.message ?? ""}`.trim()}
+          action={<Button variant="neutral" onClick={() => void tabQ.refetch()}>Try again</Button>} />
       </div>
     );
   }

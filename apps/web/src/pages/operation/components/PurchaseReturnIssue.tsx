@@ -37,11 +37,11 @@ import Checkbox from "@/components/kit/Checkbox";
 import DatePicker from "@/components/kit/DatePicker";
 import EmptyState from "@/components/kit/EmptyState";
 import Input from "@/components/kit/Input";
+import Loading from "@/components/kit/Loading";
 import Select from "@/components/kit/Select";
 import PdfPreview from "@/components/kit/PdfPreview";
 import { Fact } from "../SalesOrderWorkspace";
 
-const PDF_LOADING = "Loading…";
 const PDF_FAILED = "Some information could not be refreshed.";
 
 export function purchaseReturnDraftPrint(
@@ -73,10 +73,10 @@ export function purchaseReturnDraftPrint(
  *  Jess's "only after an approved claim"; Jess was not part of it. */
 export default function PurchaseReturnIssue({ claimId = null, supplierId = null, onClose, onIssued }: { claimId?: string | null; supplierId?: string | null; onClose: () => void; onIssued: (id: string) => void }) {
   const read = usePurchaseReturnIssueSource(claimId, supplierId);
-  if (read.isError) {
+  if (read.isError && !read.data) {
     return <div role="alert"><EmptyState title="Some information could not be refreshed." action={<Button variant="neutral" onClick={() => void read.refetch()}>Try again</Button>} /></div>;
   }
-  if (read.isLoading || !read.data) return <EmptyState title="Loading…" />;
+  if (read.isLoading || !read.data) return <div className="p-4"><Loading variant="skeleton" label="Loading the Purchase Return" /></div>;
   return <IssueForm source={read.data.source} onClose={onClose} onIssued={onIssued} />;
 }
 
@@ -95,8 +95,8 @@ export function ConsignmentReturnIssue({ onClose, onIssued }: { onClose: () => v
         options={(suppliers.data?.suppliers ?? []).map((s) => ({ value: s.id, label: s.name }))} />
     </div>
     {!supplierId ? <div className="flex justify-end"><Button variant="neutral" onClick={onClose}>Cancel</Button></div>
-      : read.isError ? <div role="alert"><EmptyState title="Some information could not be refreshed." action={<Button variant="neutral" onClick={() => void read.refetch()}>Try again</Button>} /></div>
-      : read.isLoading || !read.data ? <EmptyState title="Loading…" />
+      : read.isError && !read.data ? <div role="alert"><EmptyState title="Some information could not be refreshed." action={<Button variant="neutral" onClick={() => void read.refetch()}>Try again</Button>} /></div>
+      : read.isLoading || !read.data ? <Loading variant="skeleton" label="Loading the Purchase Return" />
       : <IssueForm key={supplierId} source={read.data.source} onClose={onClose} onIssued={onIssued} />}
   </div>;
 }
@@ -135,7 +135,9 @@ export function IssueForm({ source, onClose, onIssued }: { source: PurchaseRetur
   return <div className="flex min-h-0 flex-1 flex-col gap-4 min-[1180px]:flex-row" data-testid="purchase-return-issue">
     <div className="flex min-w-0 flex-col gap-3 min-[1180px]:w-1/2" data-testid="purchase-return-issue-form">
       <p className="text-meta text-kit-slate-11">{source.claim_no ?? (claimless ? supplier : "Supplier Claim")}</p>
-      <h1 className="text-page text-kit-slate-12">{title}</h1>
+      {/* h2: the shell header holds the page's one h1; phones have no shell header, so they get their own. */}
+      <h1 className="sr-only md:hidden">{title}</h1>
+      <h2 className="text-page text-kit-slate-12">{title}</h2>
       {refusal ? <p role="alert" className="rounded-control border border-kit-red-9 bg-kit-red-3 px-3 py-2 text-body text-kit-red-11" data-testid="purchase-return-issue-refusal">{refusal}</p> : null}
       <Block title="Units to return">
         <div className="grid gap-1" data-testid="purchase-return-units">
@@ -179,7 +181,7 @@ export function IssueForm({ source, onClose, onIssued }: { source: PurchaseRetur
     </div>
     <div className="flex min-h-[640px] min-w-0 flex-col min-[1180px]:w-1/2" data-testid="purchase-return-issue-preview">
       {pdf.url ? <PdfPreview src={pdf.url} title="Purchase Return" data-testid="purchase-return-issue-pdf" />
-        : <p className="text-body text-kit-slate-11" role="status">{pdf.failed ? PDF_FAILED : PDF_LOADING}</p>}
+        : pdf.failed ? <p className="text-body text-kit-slate-11" role="status">{PDF_FAILED}</p> : <Loading label="Loading the Purchase Return paper" />}
     </div>
   </div>;
 }

@@ -91,6 +91,7 @@ export default function DestinationAllocationEditor({
             <select
               className="h-7 w-full min-w-0 appearance-none truncate rounded-control border border-kit-slate-6 bg-white pl-1.5 pr-5 text-meta"
               data-testid={`so-batch-deliver-to-select-${row.id}`}
+              aria-label="Deliver To"
               value={single.destinationId}
               onClick={(e) => e.stopPropagation()}
               onChange={(e) => onWholeRow(e.target.value)}
@@ -149,6 +150,7 @@ export default function DestinationAllocationEditor({
                 step={1}
                 className="w-16 shrink-0 rounded-control border border-kit-slate-6 px-1 py-0.5 text-right text-meta tabular-nums"
                 data-testid={`so-batch-split-qty-${row.id}-${d.id}`}
+                aria-label={`Quantity to ${d.name}`}
                 value={draft[d.id] ?? ""}
                 onChange={(e) => setDraft((prev) => ({ ...prev, [d.id]: e.target.value }))}
               />

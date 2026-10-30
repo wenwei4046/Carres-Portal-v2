@@ -36,6 +36,7 @@ import {
 import { fetchSupplierClaimInspection, useSupplierClaimInspection, type SupplierClaimListRow } from "@/lib/queries";
 import { fmtDate } from "@/lib/fmt-date";
 import Button from "@/components/kit/Button";
+import Loading from "@/components/kit/Loading";
 import SavedEvidenceViewer from "@/components/kit/SavedEvidenceViewer";
 import SecondLine from "./register-cell";
 
@@ -93,7 +94,7 @@ export default function SupplierClaimUnitsTable({ claim }: { claim: SupplierClai
                 <Cell>
                   <div>{row.problem}</div>
                   {row.note && <div className="whitespace-pre-wrap break-words text-kit-slate-11">{row.note}</div>}
-                  {inspection.isLoading ? <p className="text-meta text-kit-slate-11">Loading…</p>
+                  {inspection.isLoading ? <Loading label="Loading inspection" />
                     : known && controls.length > 0 && <div className="mt-0.5 flex flex-wrap gap-x-3">
                       {controls.map((c) => <button key={c.kind} type="button" aria-expanded={expanded} onClick={() => toggle(row.key)}
                         className="inline-flex items-center gap-1 rounded-control text-meta text-kit-blue-11 hover:bg-kit-slate-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-kit-blue-9">

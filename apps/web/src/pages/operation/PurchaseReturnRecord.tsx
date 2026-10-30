@@ -46,6 +46,7 @@ import DatePicker from "@/components/kit/DatePicker";
 import Drawer from "@/components/kit/Drawer";
 import EmptyState from "@/components/kit/EmptyState";
 import Input from "@/components/kit/Input";
+import Loading from "@/components/kit/Loading";
 import Modal from "@/components/kit/Modal";
 import PdfPreview from "@/components/kit/PdfPreview";
 import Select from "@/components/kit/Select";
@@ -78,8 +79,8 @@ export default function PurchaseReturnRecord({ id, onBack }: { id: string; onBac
     <SalesOrderTabs identity={pr ? purchaseReturnNo(pr.pr_no) : "Purchase Return"} customer={pr?.supplier_name} backLabel={word}
       backTo={`/operation?tab=${tab}`} onBack={(event) => { event.preventDefault(); onBack(); }} />
     <div className="min-h-0 flex-1 overflow-auto p-4" data-testid="purchase-return-object-scroll">
-      {read.isError ? <div role="alert"><EmptyState title="Purchase Returns could not be loaded." action={<Button variant="neutral" onClick={() => void read.refetch()}>Try again</Button>} /></div>
-        : read.isLoading ? <EmptyState title="Loading…" />
+      {read.isError && !read.data ? <div role="alert"><EmptyState title="Purchase Returns could not be loaded." action={<Button variant="neutral" onClick={() => void read.refetch()}>Try again</Button>} /></div>
+        : read.isLoading ? <Loading variant="skeleton" label="Loading the Purchase Return" />
         : pr ? <PurchaseReturnPanel pr={pr} />
         : <EmptyState title="Not recorded" action={<Button variant="neutral" onClick={onBack}>Purchase Returns</Button>} />}
     </div>
@@ -351,6 +352,6 @@ function PdfSheet({ pr, open, onClose }: { pr: PurchaseReturnDetail; open: boole
       <Button icon="download" disabled={!url} onClick={download}>Download</Button>
     </div>}>
     {url ? <PdfPreview src={url} title={number} data-testid="purchase-return-pdf" />
-      : <p className="text-body text-kit-slate-11" role="status">{failed ? "Some information could not be refreshed." : "Loading…"}</p>}
+      : failed ? <p className="text-body text-kit-slate-11" role="status">Some information could not be refreshed.</p> : <Loading label="Loading the Purchase Return paper" />}
   </Drawer>;
 }
