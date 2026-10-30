@@ -485,6 +485,12 @@ export const PORTAL_NAV: PortalNavGroup[] = [
        * Receipts` is retired as navigation — the GRN stays the DOCUMENT's
        * noun, never a page name. */
       { key: "receiving", label: "Receiving", icon: PackageCheck, section: "Purchasing", pageGroup: "purchasing-receive" },
+      /* Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): the supplier bills,
+         inside Purchasing, Houzs way. Jess was not part of this decision. Chew
+         (2026-10-23): Purchasing enters a bill too, and (Q8, Chew
+         2026-10-26) saving posts it; Finance pays (0721). Beside Receiving, the
+         Houzs place (YH, 2026-10-30). */
+      { key: "purchase-invoices", label: "Purchase Invoices", icon: Receipt, section: "Purchasing", pageGroup: "purchasing-receive" },
 
       /* PROBLEMS — what you open when the goods are wrong. */
       { key: "claims", label: "Supplier Claims", icon: Scale, section: "Purchasing", pageGroup: "purchasing-problems" },
@@ -543,8 +549,9 @@ export const PORTAL_NAV: PortalNavGroup[] = [
        * Schedule destination" (Delivery MASTER §8); Jess was not part of this decision. */
       { key: "delivery-planning", label: "Delivery Planning", icon: CalendarDays, tab: "delivery-planning", section: "Delivery" },
       { key: "dp-orders", label: "DP Orders", icon: ClipboardList, tab: "dp-orders", section: "Delivery" },
-      { key: "auto-schedule", label: "Auto-schedule", icon: CalendarClock, tab: "auto-schedule", section: "Delivery" },
-      { key: "trips", label: "Trips", icon: Truck, tab: "trips", section: "Delivery" },
+      /* Auto-schedule and Trips left the rail, as in Houzs (YH, 2026-10-30): dates,
+       * lorry and time slot are set on Delivery Planning. Both pages still open by
+       * `?tab=auto-schedule` and `?tab=trips`. */
       {
         key: "delivery-orders",
         label: "Delivery Orders",
@@ -700,11 +707,6 @@ export const PORTAL_NAV: PortalNavGroup[] = [
          unchanged, so every bookmark and deep link still lands. */
       { key: "suppliers", label: "Suppliers", icon: Truck, section: "Suppliers" },
       { key: "supplier-items", label: "Supplier items", icon: Boxes, section: "Suppliers" },
-      /* Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): the supplier bills,
-         inside Purchasing, Houzs way. Jess was not part of this decision. Chew
-         (2026-10-23): Purchasing enters a bill too, and (Q8, Chew
-         2026-10-26) saving posts it; Finance pays (0721). */
-      { key: "purchase-invoices", label: "Purchase Invoices", icon: Receipt, section: "Suppliers" },
       {
         key: "service-notes",
         label: "Service Cases",

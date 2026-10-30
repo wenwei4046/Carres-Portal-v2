@@ -940,7 +940,7 @@ describe("PortalSidebar — the Purchasing map", () => {
     expect(tree.querySelector(".border-t")).toBeNull();
   });
 
-  it("fourteen pages in the approved order, and not a fifteenth", () => {
+  it("fifteen pages in the approved order, and not a fifteenth", () => {
     renderAt("/operation?tab=purchase");
     for (const key of [
       "purchasing-buy",
@@ -964,6 +964,7 @@ describe("PortalSidebar — the Purchasing map", () => {
       "PO Amendments",
       "Cancellation Requests",
       "Receiving",
+      "Purchase Invoices",
       "Supplier Claims",
       "Purchase Returns",
       "Repair Orders",
@@ -1519,7 +1520,7 @@ describe("PortalSidebar — the Delivery module's two destinations", () => {
     // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22) added these rows, which
     // overturns Jess's "exactly two children"; Jess was not part of it. Their
     // order follows the job: plan, load and deliver, returns, set-up (YH, 2026-10-30).
-    expect(rows).toEqual(["Monitor", "Delivery Planning", "DP Orders", "Auto-schedule", "Trips", "Delivery Orders", "Load Scan", "Fleet Day", "Live Map", "Delivery Returns", "Lorry Capacity", "Crew Leave",
+    expect(rows).toEqual(["Monitor", "Delivery Planning", "DP Orders", "Delivery Orders", "Load Scan", "Fleet Day", "Live Map", "Delivery Returns", "Lorry Capacity", "Crew Leave",
       "Fleet", "Fleet Health", "Delivery Zones", "Rate Cards",
     ]);
   });
