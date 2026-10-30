@@ -117,16 +117,16 @@ export type PortalSection =
    * (Chew, 2026-10-03). It has no module row until a second page joins it. */
   | "Forecast";
 
-/** Rail order of the sections. The queue index's own order, unchanged. */
+/** Rail order of the sections: the business cycle, SO to payment (YH, 2026-10-30). */
 export const SECTION_ORDER: ReadonlyArray<PortalSection> = [
   "Workspace",
   "Sales",
   "Consignment",
   "Purchasing",
-  "Showroom",
-  "Delivery",
   "Warehouse",
+  "Delivery",
   "Payments",
+  "Showroom",
   "Customer Care",
   "Issue Tracker",
   "Suppliers",
@@ -505,6 +505,15 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "consignment-receives", label: "Purchase Consignment Receive", icon: PackageCheck, section: "Purchasing", pageGroup: "purchasing-showroom" },
       { key: "consignment-returns", label: "Consignment Returns", icon: Undo2, section: "Purchasing", pageGroup: "purchasing-showroom" },
 
+      /* 0719 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office staff send
+       * goods to customers on consignment and take unsold goods back, Houzs way.
+       * Overturns Jess's Purchasing MASTER consignment rules and the Consignment
+       * Note ban; Jess was not part of this decision. Customer side only — the
+       * supplier-side Consignment Orders / Returns stay under Purchasing. They
+       * draw in their own Consignment module, the Houzs placement. */
+      { key: "customer-consignment-orders", label: "Customer Consignment Orders", icon: FileText, tab: "customer-consignment-orders", section: "Consignment" },
+      { key: "consignment-notes", label: "Consignment Notes", icon: FileText, tab: "consignment-notes", section: "Consignment" },
+      { key: "customer-consignment-returns", label: "Customer Consignment Returns", icon: Undo2, tab: "customer-consignment-returns", section: "Consignment" },
       // Delivery (T11, Jess 2026-07-27) — **the ONE new menu item in the whole
       // build plan**; every other line upgrades an existing door, and its place
       // in the rail is the one the queue index draws (Orders · Purchasing ·
@@ -525,6 +534,17 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         activeFor: ["tab:delivery"],
         section: "Delivery",
       },
+      /* The Delivery rows follow the job (YH, 2026-10-30): plan it, then load and
+       * deliver it, then what came back, then the set-up pages. Same reading as
+       * Houzs Transportation (Sidebar.tsx:600-613). */
+      /* 0723 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office staff plan
+       * delivery dates and trips with a time slot per stop, the Houzs way.
+       * Overturns Jess's "exactly two children" and "no Trips, Regions or
+       * Schedule destination" (Delivery MASTER §8); Jess was not part of this decision. */
+      { key: "delivery-planning", label: "Delivery Planning", icon: CalendarDays, tab: "delivery-planning", section: "Delivery" },
+      { key: "dp-orders", label: "DP Orders", icon: ClipboardList, tab: "dp-orders", section: "Delivery" },
+      { key: "auto-schedule", label: "Auto-schedule", icon: CalendarClock, tab: "auto-schedule", section: "Delivery" },
+      { key: "trips", label: "Trips", icon: Truck, tab: "trips", section: "Delivery" },
       {
         key: "delivery-orders",
         label: "Delivery Orders",
@@ -537,31 +557,14 @@ export const PORTAL_NAV: PortalNavGroup[] = [
        * record Delivery Returns and mark DOs Delivered by load scan, the Houzs
        * way. Overturns Jess's "exactly two children" (Delivery MASTER §8); Jess
        * was not part of this decision. */
-      { key: "delivery-returns", label: "Delivery Returns", icon: Undo2, tab: "delivery-returns", section: "Delivery" },
       { key: "load-scan", label: "Load Scan", icon: PackageCheck, tab: "load-scan", section: "Delivery" },
-      /* 0719 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office staff send
-       * goods to customers on consignment and take unsold goods back, Houzs way.
-       * Overturns Jess's Purchasing MASTER consignment rules and the Consignment
-       * Note ban; Jess was not part of this decision. Customer side only — the
-       * supplier-side Consignment Orders / Returns stay under Purchasing. They
-       * draw in their own Consignment module, the Houzs placement. */
-      { key: "customer-consignment-orders", label: "Customer Consignment Orders", icon: FileText, tab: "customer-consignment-orders", section: "Consignment" },
-      { key: "consignment-notes", label: "Consignment Notes", icon: FileText, tab: "consignment-notes", section: "Consignment" },
-      { key: "customer-consignment-returns", label: "Customer Consignment Returns", icon: Undo2, tab: "customer-consignment-returns", section: "Consignment" },
-      /* 0723 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): office staff plan
-       * delivery dates and trips with a time slot per stop, the Houzs way.
-       * Overturns Jess's "exactly two children" and "no Trips, Regions or
-       * Schedule destination" (Delivery MASTER §8); Jess was not part of this decision. */
-      { key: "delivery-planning", label: "Delivery Planning", icon: CalendarDays, tab: "delivery-planning", section: "Delivery" },
-      { key: "dp-orders", label: "DP Orders", icon: ClipboardList, tab: "dp-orders", section: "Delivery" },
-      { key: "auto-schedule", label: "Auto-schedule", icon: CalendarClock, tab: "auto-schedule", section: "Delivery" },
-      { key: "trips", label: "Trips", icon: Truck, tab: "trips", section: "Delivery" },
       /* CARRES' OWN LORRIES (0724) — Weisiang's decision (Mr Lim, WhatsApp
        * 2026-10-22): Houzs Fleet Day, Live Map, Lorry Capacity and Crew
        * Leave. Jess was not part of this decision; her "no Fleet / Trips
        * destination" rejection (Delivery MASTER §15) is marked overturned. */
       { key: "fleet-day", label: "Fleet Day", icon: Users, section: "Delivery" },
       { key: "fleet-map", label: "Live Map", icon: MapPin, section: "Delivery" },
+      { key: "delivery-returns", label: "Delivery Returns", icon: Undo2, tab: "delivery-returns", section: "Delivery" },
       { key: "fleet-capacity", label: "Lorry Capacity", icon: Gauge, section: "Delivery" },
       { key: "crew-leave", label: "Crew Leave", icon: CalendarOff, section: "Delivery" },
       /* 0725 — Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): Houzs Fleet
@@ -1058,7 +1061,7 @@ export function navBlocks(
 }
 
 /* ── THE MENU GROUPS — Carres Layout Standard §2 (owner-confirmed template,
- * Jess 2026-10-08). The Operations area is drawn as six small uppercase
+ * Jess 2026-10-08; order changed by YH 2026-10-30). The Operations area is drawn as six small uppercase
  * groups, in this order, and no group is called "Operations". A page the
  * design did not draw stays reachable under its module (owner answer
  * 2026-10-08: keep every real page as a sub-item). */
@@ -1069,10 +1072,12 @@ export interface MenuGroup {
 
 export const OPERATION_MENU_GROUPS: ReadonlyArray<MenuGroup> = [
   { label: "Overview", sections: ["Workspace"] },
-  { label: "Sales locations", sections: ["Showroom"] },
   /* Consignment follows Sales Order, the Houzs placement (Sidebar.tsx:535). */
   { label: "Sales", sections: ["Sales", "Consignment"] },
-  { label: "Supply chain", sections: ["Purchasing", "Warehouse", "Payments", "Delivery"] },
+  /* The cycle order (YH, 2026-10-30): PO, GRN and stock, delivery, payment.
+   * Sales locations left the top because it is not a step of the cycle. */
+  { label: "Supply chain", sections: ["Purchasing", "Warehouse", "Delivery", "Payments"] },
+  { label: "Sales locations", sections: ["Showroom"] },
   { label: "Service", sections: ["Customer Care", "Issue Tracker"] },
   { label: "Data", sections: ["Reports", "Suppliers", "Master Data"] },
 ];
