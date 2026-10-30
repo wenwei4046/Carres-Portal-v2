@@ -6150,6 +6150,18 @@ DEL-04 · DEL-05 · OFF-01/05, owner confirmed 9 Oct 2026). No dash is used as a
 | Work action, `Assign logistics` | line two `Choose the company that carries this delivery · due {date}` | the hard-coded `3 working days before · {date}` is retired |
 | Logistics card, first check | `{n} working days before · {date}` with `n` = the stored Contact lead (`Contact lead days`, DEL-05); at the default it reads the ruled `3 working days before`. `2 working days before` and `1 working day before` stay fixed (Workspace §5.9) | the contact day follows its one setting |
 
+## Sales Invoices list words · YH 30 Oct 2026, following Houzs
+
+Source: `apps/web/src/pages/finance/SalesInvoices.tsx`.
+
+| Where | Words |
+|---|---|
+| Side menu row and page title | `Sales Invoices` |
+| Columns, in order | `Invoice No` · `Invoice date` · `SO No` · `Customer` · `Ref No` · `Status` · `Still owed on SO` · `Invoice total` |
+| Status | `Draft` · `Issued` · `Voided` |
+| A draft's Invoice No | `Draft, no number yet` |
+| Search, summary, empty, failed | `Search sales invoices…` · `{n} sales invoices` · `No sales invoices yet.` · `Sales Invoices could not be loaded. Try again.` |
+
 ## New Sales Invoice words · Weisiang's decision (Mr Lim, WhatsApp 2026-10-22) · BUILT ON BRANCH `feat/office-new-sales-invoice` (0712 not applied)
 
 Office staff open a Sales Invoice by hand, part invoices allowed (Houzs way). Overturns Jess's

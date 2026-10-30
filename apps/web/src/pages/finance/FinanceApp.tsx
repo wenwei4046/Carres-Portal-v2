@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth";
 import FinanceDashboard from "./FinanceDashboard";
 import FinanceAR from "./FinanceAR";
 import PaymentRecords from "./PaymentRecords";
+import SalesInvoices from "./SalesInvoices";
 import PaymentMonitor from "./PaymentMonitor";
 import LegacyPaymentRedirect from "./LegacyPaymentRedirect";
 import FinanceReports from "./FinanceReports";
@@ -131,6 +132,7 @@ export default function FinanceApp() {
               present Payments as a Finance Portal. */}
           <Route path="monitor"   element={<PaymentMonitor />} />
           <Route path="payments"  element={<PaymentRecords />} />
+          <Route path="sales-invoices" element={<SalesInvoices />} />
           {/* RETIRED employee doors, kept as safe redirects (owner ruling
               2026-09-12): the standalone Invoices Register — an Invoice
               belongs to its Sales Order and the Monitor opens the exact one —
