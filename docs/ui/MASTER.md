@@ -100,6 +100,12 @@ Button 32 high (icon button 32 × 32) · status pill 22 high (20 inside dense ro
 
 Side panels: quick card (Module Card) 560 wide · History 560 · Tasks 340. Content inside a panel fits its width; never widen the panel to fit content.
 
+### Table and task content grammar · retained25Oct additions in the supplied Spec
+
+One fact per column. Quantity has its own Qty column; an item's second line is specification only (size, fabric, code), not a hidden quantity. Owning module MASTER still determines record grain and approved columns; this is no permission to add duplicate quantities or change inventory arithmetic. Where Stock age is displayed, show days (`112 days`), not rounded months; retain its owning source/date basis. Relative deadline display uses `Late 12d` / `3d left` only when the owning governed deadline supports that fact; date subtraction alone cannot invent Late.
+
+Task cards use white fill,1px#E5E7EB border and current8px surface radius; hover#F6F7F9, only the open card uses shared soft selection. A task group may remain a title line without a box; if it has a group container that container uses8px, not a new local shape. Task titles/data/results remain source-owned.
+
 ### Template 5 · Row grammar (cards, Order Route, Tasks)
 `[tick 20] [avatar 22] step (13/500) + one fact (12 grey, one line) | date or Due (13) / red Late pill (right 104)`
 One "Now" per page. "What if" rows only when they happen. Missing value = nothing (never "Not recorded").
