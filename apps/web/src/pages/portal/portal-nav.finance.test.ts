@@ -37,7 +37,7 @@ describe("the Finance modules (Chew, 2026-10-03)", () => {
   it("draws the approved shape, in order", () => {
     expect(shape("finance")).toEqual([
       "Dashboard",
-      "Payments: Monitor · Payment Records",
+      "Payments: Monitor · Payment Records · Sales Invoices",
       "Payables: AP · Payables · Payment Vouchers · Bills · Payment Requests · Credit Notes · Debit Notes · Notes to follow up · Suppliers",
       "Receivables: AR · Receivables · Customer Credit Notes · Cancelled orders holding money · Other debtors · Other receipts",
       "Bank & Cards: Daily Bank · Card settlement · Card money waiting · Money moves",
@@ -85,6 +85,7 @@ describe("the Finance modules (Chew, 2026-10-03)", () => {
       "supplier-finance": "/finance/suppliers",
       payments: "/finance/monitor",
       "payment-records": "/finance/payments",
+      "sales-invoices": "/finance/sales-invoices",
       "rental-approver": "/finance/rental-approver",
       subscriptions: "/finance/subscriptions",
       "other-debtors": "/finance/other-debtors",

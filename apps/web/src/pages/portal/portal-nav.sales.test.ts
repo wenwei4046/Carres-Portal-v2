@@ -36,13 +36,13 @@ describe("the approved Sales Orders navigation", () => {
     );
   });
 
-  it("holds exactly three children, in the approved order", () => {
+  it("holds exactly four children, in the approved order", () => {
     const block = navBlocks(OPERATIONS, "operation").find(
       (b) => b.kind === "module" && b.module.section === "Sales",
     );
     expect(block?.kind).toBe("module");
     const pages = block!.kind === "module" ? block!.pages : [];
-    expect(pages.map((p) => p.label)).toEqual(["Outright", "Amendments", "Subscription"]);
+    expect(pages.map((p) => p.label)).toEqual(["Outright", "Amendments", "Subscription", "Sales Invoices"]);
   });
 
   /* NEITHER ADDRESS MOVED. "Menu removal does not delete orders, history,

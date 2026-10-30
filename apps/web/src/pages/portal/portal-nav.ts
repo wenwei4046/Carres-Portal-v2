@@ -365,6 +365,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
        * (`docs/ui/MASTER.md`). The inner Subscription destinations proposed in
        * the Rental Blueprint remain PROPOSAL / NOT LAW and are NOT built here. */
       { key: "rental", label: "Subscription", icon: Repeat, section: "Sales" },
+      { key: "sales-invoices", label: "Sales Invoices", icon: FileText, path: "/finance/sales-invoices", activeFor: ["path:/finance/sales-invoices"], section: "Sales" },
       // Work (SO V2 CARD 10, owner ruling 2026-08-11) — My Work / Team Work:
       // two filters over the ONE open work set the Card 9 engine composes.
       // Sits directly under the register on the Constitution's own mission —
@@ -799,6 +800,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         financePath: "/finance/payments",
         section: "Payments",
       },
+      { key: "sales-invoices", label: "Sales Invoices", icon: FileText, financePath: "/finance/sales-invoices", section: "Payments" },
       {
         // 0268 — the rent-to-own credit gate. Sits next to the money tabs
         // because approving one is a credit decision, not an ops step: it

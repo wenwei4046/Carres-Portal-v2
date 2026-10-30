@@ -132,8 +132,10 @@ PAYMENTS
 └─ Payment Records
 ```
 
-`PAYMENTS` is the module heading; `Monitor` and `Payment Records` are its only two destinations.
-There are no `Payments / Invoices` tabs, no standalone Invoices page, no standalone Receipts page
+`PAYMENTS` is the module heading; `Monitor` and `Payment Records` are its two collection destinations.
+`Sales Invoices` (YH, 30 Oct 2026, following Houzs) is a read-only list of sales invoices at
+`/finance/sales-invoices`; a row opens that invoice on the Monitor, which keeps every invoice action.
+There are no `Payments / Invoices` tabs, no standalone Receipts page
 and no clickable parent page (the module row expands and opens `Monitor`, the named landing, as
 every module row does under the shell grammar). The technical address stays `/finance/monitor` ·
 `/finance/payments`; the retired `/finance/invoices` forwards to the Monitor keeping its

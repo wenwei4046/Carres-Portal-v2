@@ -537,7 +537,7 @@ describe("the tree line", () => {
   it("the trunk stops at the last page: full height before it, half at it", () => {
     renderAt("/operation/orders");
     expect(trunk("orders").style.height).toBe("100%");
-    expect(trunk("rental").style.height).toBe("calc(50% - 8px)");
+    expect(trunk("sales-invoices").style.height).toBe("calc(50% - 8px)");
   });
 
   it("the trunk stops at the last page of EACH group", () => {
@@ -801,7 +801,7 @@ describe("PortalSidebar — Commission is ONE HR entry (Loo 2026-07-27)", () => 
  * does not delete the legacy page whose menu row it removes.
  */
 describe("PortalSidebar — the approved Sales Orders tree", () => {
-  it("is exactly Outright, Amendments, Subscription, under one Sales Orders parent", () => {
+  it("is exactly Outright, Amendments, Subscription, Sales Invoices, under one Sales Orders parent", () => {
     renderAt("/operation/orders");
     expect(module_("sales")).toHaveTextContent("Sales Orders");
     const group = screen.getByTestId("nav-children-sales");
@@ -810,6 +810,7 @@ describe("PortalSidebar — the approved Sales Orders tree", () => {
       "Outright",
       "Amendments",
       "Subscription",
+      "Sales Invoices",
     ]);
   });
 
