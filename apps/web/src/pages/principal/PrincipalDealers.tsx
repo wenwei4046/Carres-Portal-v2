@@ -5,6 +5,8 @@ import { usePrincipalDealers } from "@/lib/queries";
 import DealerRow, { type DealerListItem } from "./components/DealerRow";
 import DealerDrawer from "./components/DealerDrawer";
 import InviteDealerModal from "./components/InviteDealerModal";
+import ReadFailed from "./components/ReadFailed";
+import Loading from "@/components/kit/Loading";
 
 /**
  * Principal · store network admin — Phase 3 M5 (Tasks 22-26). Mirrors
@@ -44,7 +46,7 @@ export default function PrincipalDealers({
   channel: StoreChannel;
   financeView?: boolean;
 }) {
-  const { data, isLoading } = usePrincipalDealers();
+  const { data, isLoading, isError, refetch } = usePrincipalDealers();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -103,9 +105,18 @@ export default function PrincipalDealers({
     });
   }, [dealers, search, statusFilter]);
 
+  if (isError && !data) {
+    return (
+      <div className="px-9 py-8">
+        <ReadFailed what={t.title} onRetry={() => void refetch()} />
+      </div>
+    );
+  }
   if (isLoading || !data) {
     return (
-      <div className="px-9 py-8 text-body text-muted-foreground">Loading…</div>
+      <div className="px-9 py-8">
+        <Loading variant="skeleton" lines={6} label={`Loading ${t.title.toLowerCase()}`} />
+      </div>
     );
   }
 
@@ -135,7 +146,7 @@ export default function PrincipalDealers({
           beside Search, not off in the header corner.
           A dealer is invited (pending → approval); a showroom is ours, so it
           is born straight out of Accounts with its login + first staff PIN. */}
-      <div className="flex gap-2 mb-3.5 items-center">
+      <div className="flex flex-wrap gap-2 mb-3.5 items-center">
         {!financeView && (
           <button
             type="button"
@@ -152,9 +163,10 @@ export default function PrincipalDealers({
         <input
           type="search"
           placeholder={t.searchPlaceholder}
+          aria-label={`Search ${t.title.toLowerCase()}`}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 px-3 py-2 border border-base-200 rounded text-body outline-none"
+          className="flex-1 min-w-[min(220px,100%)] px-3 py-2 border border-base-200 rounded text-body outline-none"
         />
         <div className="flex gap-1 p-1 bg-base-100 rounded">
           {(

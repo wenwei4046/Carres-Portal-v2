@@ -42,4 +42,17 @@ describe("PrincipalPartners page", () => {
     render(wrap(<PrincipalPartners />));
     await waitFor(() => expect(screen.getByText(/no operation partners/i)).toBeInTheDocument());
   });
+
+  it("a failed read says so (never the empty line) and Try again reads again", async () => {
+    vi.mocked(apiFetch).mockReset();
+    vi.mocked(apiFetch).mockRejectedValueOnce(new Error("boom"));
+    render(wrap(<PrincipalPartners />));
+    await waitFor(() => expect(screen.getByText("Could not be loaded")).toBeInTheDocument());
+    expect(screen.queryByText(/no operation partners/i)).toBeNull();
+    vi.mocked(apiFetch).mockResolvedValue([
+      { id: "p1", name: "LP-Alpha", contact: null, address: null, zones: null },
+    ]);
+    screen.getByRole("button", { name: /try again/i }).click();
+    await waitFor(() => expect(screen.getByText("LP-Alpha")).toBeInTheDocument());
+  });
 });

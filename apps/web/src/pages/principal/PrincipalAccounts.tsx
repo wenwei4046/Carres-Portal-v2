@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -27,6 +27,8 @@ import PrincipalStaffDrawer from "./PrincipalStaffDrawer";
 import { ColorDotPicker, tierLabel } from "@/pages/dealer/staff/staff-ui";
 import BirthdayWheelField from "@/pages/dealer/pos/date-keyin/BirthdayWheelField";
 import { personInitials } from "@/lib/staff-avatar";
+import Loading from "@/components/kit/Loading";
+import ReadFailed from "./components/ReadFailed";
 
 /**
  * Phase 10 · Principal · Accounts — `reference/proto/principal-accounts.jsx`
@@ -86,7 +88,7 @@ const ROLE_COLORS: Record<AppRole, string> = {
 };
 
 export default function PrincipalAccounts() {
-  const { data, isLoading } = usePrincipalAccounts();
+  const { data, isLoading, isError, refetch } = usePrincipalAccounts();
   const users = data?.users ?? [];
 
   const [search, setSearch] = useState("");
@@ -140,8 +142,8 @@ export default function PrincipalAccounts() {
             Accounts
           </h1>
           <div className="text-body text-base-600 mt-1.5">
-            Provision portal access for every role. {total} accounts · {active} active
-            · {invited} pending invite{disabled ? ` · ${disabled} disabled` : ""}.
+            Provision portal access for every role.
+            {data && ` ${total} accounts · ${active} active · ${invited} pending invite${disabled ? ` · ${disabled} disabled` : ""}.`}
           </div>
         </div>
         <button
@@ -156,12 +158,16 @@ export default function PrincipalAccounts() {
       <EmailChangeRequestsPanel />
 
       {/* KPI tiles */}
-      <div className="grid gap-3 mb-[18px]" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
-        <KpiTile label="Total accounts" value={total} sub="across all roles" />
-        <KpiTile label="Active" value={active} sub="logged in recently" tone="success" />
-        <KpiTile label="Pending invite" value={invited} sub="not yet accepted" tone="warn" />
-        <KpiTile label="Disabled" value={disabled} sub="access revoked" />
-      </div>
+      {/* No zeros before the list has loaded. min(…, 100%): the 180px floor
+          must never be wider than a phone column. */}
+      {data && (
+        <div className="grid gap-3 mb-[18px]" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(180px, 100%), 1fr))" }}>
+          <KpiTile label="Total accounts" value={total} sub="across all roles" />
+          <KpiTile label="Active" value={active} sub="logged in recently" tone="success" />
+          <KpiTile label="Pending invite" value={invited} sub="not yet accepted" tone="warn" />
+          <KpiTile label="Disabled" value={disabled} sub="access revoked" />
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex gap-2.5 mb-3.5 flex-wrap items-center">
@@ -170,11 +176,13 @@ export default function PrincipalAccounts() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search name, email, title…"
-          className="flex-1 min-w-[220px] px-3 py-2 border border-base-200 rounded text-body bg-white outline-none focus:border-base-700"
+          aria-label="Search accounts"
+          className="flex-1 min-w-[min(220px,100%)] px-3 py-2 border border-base-200 rounded text-body bg-white outline-none focus:border-base-700"
         />
         <select
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value as "all" | AppRole)}
+          aria-label="Role"
           className="px-3 py-2 border border-base-200 rounded text-body bg-white"
         >
           <option value="all">All roles</option>
@@ -216,12 +224,19 @@ export default function PrincipalAccounts() {
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={7} className="p-10 text-center text-meta text-base-500">
-                  Loading…
+                <td colSpan={7} className="p-10">
+                  <Loading variant="skeleton" label="Loading accounts" />
                 </td>
               </tr>
             )}
-            {!isLoading && filtered.length === 0 && (
+            {isError && !data && (
+              <tr>
+                <td colSpan={7}>
+                  <ReadFailed what="Accounts" onRetry={() => void refetch()} />
+                </td>
+              </tr>
+            )}
+            {!isLoading && !(isError && !data) && filtered.length === 0 && (
               <tr>
                 <td colSpan={7} className="p-10 text-center text-meta text-base-500">
                   No accounts match those filters.
@@ -949,6 +964,7 @@ function CreateAccountModal({
                   value={existingDealerId}
                   onChange={(e) => setExistingDealerId(e.target.value)}
                   data-testid="acct-existing-store"
+                  aria-label="Store"
                   className="w-full px-3 py-2.5 border border-base-200 rounded text-body bg-white cursor-pointer"
                 >
                   <option value="">Store</option>
@@ -1049,6 +1065,7 @@ function CreateAccountModal({
                     value={draft.companyName}
                     onChange={(v) => set("companyName", v)}
                     placeholder="e.g. Kota Damansara"
+                    ariaLabel="Showroom name"
                   />
                 ) : (
                   <Input
@@ -1078,6 +1095,7 @@ function CreateAccountModal({
                       value={draft.outletName}
                       onChange={(v) => set("outletName", v)}
                       placeholder="e.g. Mont Kiara"
+                      ariaLabel="Outlet name"
                     />
                   </Field>
                   <Field label="SSM code" hint="Required · company registration number (e.g. 201801234567 or 123456-A)" error={errors.ssmCode}>
@@ -1170,6 +1188,7 @@ function CreateAccountModal({
                     onChange={(e) => set("staffRole", e.target.value as StaffTierDto)}
                     className="w-full px-3 py-2 border border-base-200 rounded text-body bg-white cursor-pointer"
                     data-testid="acct-staff-tier"
+                    aria-label="Position"
                   >
                     {(staffKind === "showroom"
                       ? (["manager", "salesperson"] as StaffTierDto[])
@@ -1214,6 +1233,7 @@ function CreateAccountModal({
                     value={draft.staffGender}
                     onChange={(e) => set("staffGender", e.target.value as StaffGenderDto | "")}
                     data-testid="acct-staff-gender"
+                    aria-label="Gender"
                     className="w-full px-3 py-2 border border-base-200 rounded text-body bg-white cursor-pointer"
                   >
                     <option value="">Gender</option>
@@ -1328,11 +1348,14 @@ function Field({ label, hint, error, children }: { label: string; hint?: string;
         <FieldLabel>{label}</FieldLabel>
         {error && <span className="text-meta text-primary">{error}</span>}
       </div>
-      {children}
+      {/* FieldLabel is not tied to its control, so the label reaches the input as its accessible name. */}
+      <FieldName.Provider value={label}>{children}</FieldName.Provider>
       {hint && !error && <div className="text-meta text-base-500 mt-1">{hint}</div>}
     </div>
   );
 }
+
+const FieldName = createContext<string | undefined>(undefined);
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -1343,8 +1366,10 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 }
 
 function Input({ value, onChange, type = "text", placeholder }: { value: string; onChange: (v: string) => void; type?: string; placeholder?: string }) {
+  const name = useContext(FieldName);
   return (
     <input
+      aria-label={name}
       type={type}
       value={value}
       onChange={(e) => onChange(e.target.value)}

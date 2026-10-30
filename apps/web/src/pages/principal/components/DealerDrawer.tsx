@@ -12,6 +12,8 @@ import { TOAST } from "@/lib/toast-copy";
 import { keepCurrent } from "@/data/malaysia-postcodes";
 import { useAddressLists } from "@/lib/settings-queries";
 import DealerStatusPill from "./DealerStatusPill";
+import ReadFailed from "./ReadFailed";
+import Loading from "@/components/kit/Loading";
 
 /**
  * Right slide-in drawer for a single dealer. Mirrors the proto's
@@ -53,7 +55,7 @@ interface Props {
 }
 
 export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }: Props) {
-  const { data, isLoading } = usePrincipalDealer(dealerId);
+  const { data, isLoading, isError, refetch } = usePrincipalDealer(dealerId);
   const setStatus = useDealerSetStatus(dealerId);
   const update = useUpdateDealer(dealerId);
   // States: national file + Settings → Address lists (0722, Weisiang's decision).
@@ -105,7 +107,11 @@ export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }:
           className="relative bg-white h-screen p-7"
           style={{ width: 520 }}
         >
-          <div className="text-base-500 text-body">Loading…</div>
+          {isError ? (
+            <ReadFailed what="This store" onRetry={() => void refetch()} />
+          ) : (
+            <Loading variant="skeleton" lines={6} label="Loading store" />
+          )}
         </div>
       </div>
     );
@@ -325,6 +331,7 @@ export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }:
                 <div className="grid grid-cols-2 gap-3">
                   <ProfileField label="Dealer code">
                     <input
+                      aria-label="Dealer code"
                       value={draft.code}
                       onChange={(e) => setField("code", e.target.value)}
                       placeholder="e.g. JB1"
@@ -334,6 +341,7 @@ export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }:
                   </ProfileField>
                   <ProfileField label="State">
                     <select
+                      aria-label="State"
                       value={draft.state}
                       onChange={(e) => setField("state", e.target.value)}
                       className="w-full px-3 py-2 border border-base-200 rounded text-body outline-none focus:border-primary bg-white"
@@ -349,6 +357,7 @@ export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }:
                 </div>
                 <ProfileField label="SSM code">
                   <input
+                    aria-label="SSM code"
                     value={draft.ssmCode}
                     onChange={(e) => setField("ssmCode", e.target.value)}
                     placeholder="e.g. 201801234567"
@@ -358,6 +367,7 @@ export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }:
                 <div className="grid grid-cols-2 gap-3">
                   <ProfileField label="Contact person">
                     <input
+                      aria-label="Contact person"
                       value={draft.contactName}
                       onChange={(e) => setField("contactName", e.target.value)}
                       placeholder="e.g. Aisha Rahman"
@@ -366,6 +376,7 @@ export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }:
                   </ProfileField>
                   <ProfileField label="Contact phone">
                     <input
+                      aria-label="Contact phone"
                       value={draft.contactPhone}
                       onChange={(e) => setField("contactPhone", e.target.value)}
                       placeholder="e.g. 012-3344556"
@@ -408,6 +419,7 @@ export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }:
             )}
             <ProfileField label="Business address" hint="Single text field: full address line">
               <textarea
+                aria-label="Business address"
                 value={draft.address}
                 onChange={(e) => setField("address", e.target.value)}
                 placeholder="109, Jalan SS 25/2, Taman Mayang, 47301 Petaling Jaya, Selangor"

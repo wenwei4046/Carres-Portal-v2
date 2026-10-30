@@ -8,6 +8,8 @@ import {
   StaffAvatar,
   TierBadge,
 } from "@/pages/dealer/staff/staff-ui";
+import Loading from "@/components/kit/Loading";
+import ReadFailed from "./components/ReadFailed";
 
 /**
  * PrincipalStaffDrawer (0233) — Carres HQ manages a dealer/showroom store's
@@ -66,10 +68,8 @@ export default function PrincipalStaffDrawer({
             </button>
           </div>
 
-          {staffQ.isPending && <p className="text-body text-base-500">Loading…</p>}
-          {staffQ.error && (
-            <p className="text-body text-destructive">Couldn&apos;t load: {staffQ.error.message}</p>
-          )}
+          {staffQ.isPending && <Loading variant="skeleton" label="Loading staff" />}
+          {staffQ.error && <ReadFailed what="Staff" onRetry={() => void staffQ.refetch()} />}
           {staffQ.data && roster.length === 0 && (
             <p className="text-body text-base-500 italic">No staff yet. Add one to enable PIN sign-in.</p>
           )}

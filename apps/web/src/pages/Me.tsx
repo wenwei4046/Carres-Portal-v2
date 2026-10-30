@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { type MeResponse } from "@carres/shared";
 import type { Role } from "@carres/shared/domain";
@@ -6,6 +6,7 @@ import CarresLockup from "@/components/CarresLockup";
 import { useAuth } from "@/lib/auth";
 import { apiFetch, ApiError } from "@/lib/api";
 import { changeOwnPassword } from "@/lib/password";
+import Loading from "@/components/kit/Loading";
 
 function homeForRole(role: Role | null): string {
   switch (role) {
@@ -53,7 +54,7 @@ export default function Me() {
   return (
     <div className="min-h-screen bg-background p-8">
       <div className="mx-auto max-w-2xl space-y-6">
-        <header className="flex items-center justify-between">
+        <header className="flex flex-wrap items-center justify-between gap-3">
           <CarresLockup showPortal size={28} />
           <div className="flex items-center gap-2">
             <Link
@@ -73,13 +74,13 @@ export default function Me() {
 
         <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
           <h2 className="mb-4 text-body font-semibold uppercase tracking-wider text-muted-foreground">
-            Browser session (Supabase JWT)
+            Your sign-in
           </h2>
-          <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 font-mono text-body">
-            <dt className="text-muted-foreground">user.id</dt>
+          <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-body">
+            <dt className="text-muted-foreground">User ID</dt>
             <dd className="break-all">{user?.id ?? ""}</dd>
-            <dt className="text-muted-foreground">user.email</dt>
-            <dd>{user?.email ?? ""}</dd>
+            <dt className="text-muted-foreground">Email</dt>
+            <dd className="break-all">{user?.email ?? ""}</dd>
           </dl>
         </section>
 
@@ -87,23 +88,23 @@ export default function Me() {
 
         <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
           <h2 className="mb-4 text-body font-semibold uppercase tracking-wider text-muted-foreground">
-            GET /api/auth/me (Hono → JWT verify → response)
+            Your access
           </h2>
-          {loading && <p className="text-body text-muted-foreground">Loading…</p>}
+          {loading && <Loading variant="skeleton" lines={5} label="Loading your access" />}
           {error && (
             <p className="rounded-md bg-destructive/10 px-3 py-2 text-body text-destructive">{error}</p>
           )}
           {me && (
-            <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 font-mono text-body">
-              <dt className="text-muted-foreground">role</dt>
+            <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-body">
+              <dt className="text-muted-foreground">Role</dt>
               <dd className="font-semibold text-primary">{me.role}</dd>
-              <dt className="text-muted-foreground">dealerId</dt>
+              <dt className="text-muted-foreground">Dealer ID</dt>
               <dd className="break-all">{me.dealerId ?? ""}</dd>
-              <dt className="text-muted-foreground">supplierId</dt>
+              <dt className="text-muted-foreground">Supplier ID</dt>
               <dd className="break-all">{me.supplierId ?? ""}</dd>
-              <dt className="text-muted-foreground">partnerId</dt>
+              <dt className="text-muted-foreground">Partner ID</dt>
               <dd className="break-all">{me.partnerId ?? ""}</dd>
-              <dt className="text-muted-foreground">outletId</dt>
+              <dt className="text-muted-foreground">Outlet ID</dt>
               <dd className="break-all">{me.outletId ?? ""}</dd>
             </dl>
           )}
@@ -237,13 +238,15 @@ function PwField({
   hint?: string;
 }) {
   const [show, setShow] = useState(false);
+  const id = useId();
   return (
     <div>
-      <label className="mb-1 block text-meta font-semibold uppercase tracking-wider text-muted-foreground">
+      <label htmlFor={id} className="mb-1 block text-meta font-semibold uppercase tracking-wider text-muted-foreground">
         {label}
       </label>
       <div className="flex items-center gap-2">
         <input
+          id={id}
           type={show ? "text" : "password"}
           value={value}
           onChange={(e) => onChange(e.target.value)}

@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { qk } from "@/lib/queries";
 import { apiFetch } from "@/lib/api";
+import Loading from "@/components/kit/Loading";
+import ReadFailed from "./components/ReadFailed";
 
 /**
  * Phase 10 · Principal · Audit log — `reference/proto/principal-views.jsx`
@@ -73,7 +75,7 @@ const ROLE_COLORS: Record<string, string> = {
 
 export default function PrincipalAudit() {
   const [roleFilter, setRoleFilter] = useState<typeof ROLE_FILTERS[number]>("all");
-  const { data, isLoading } = useQuery<{ rows: AuditRow[] }>({
+  const { data, isLoading, isError, refetch } = useQuery<{ rows: AuditRow[] }>({
     queryKey: qk.principal.audit({ role: roleFilter }),
     queryFn: () =>
       apiFetch(`/api/principal/audit${roleFilter === "all" ? "" : `?role=${roleFilter}`}`),
@@ -101,7 +103,7 @@ export default function PrincipalAudit() {
         </div>
       </div>
 
-      <div className="flex gap-1 mb-3.5 p-1 bg-base-100 rounded w-fit">
+      <div className="flex flex-wrap gap-1 mb-3.5 p-1 bg-base-100 rounded w-fit max-w-full">
         {ROLE_FILTERS.map((r) => (
           <button
             key={r}
@@ -119,9 +121,12 @@ export default function PrincipalAudit() {
 
       <div className="bg-white border border-base-200 rounded">
         {isLoading && (
-          <div className="p-8 text-center text-meta text-base-500">Loading…</div>
+          <div className="p-8">
+            <Loading variant="skeleton" lines={5} label="Loading audit log" />
+          </div>
         )}
-        {!isLoading && rows.length === 0 && (
+        {isError && !data && <ReadFailed what="The audit log" onRetry={() => void refetch()} />}
+        {!isLoading && !(isError && !data) && rows.length === 0 && (
           <div className="p-8 text-center text-meta text-base-500">No entries.</div>
         )}
         {rows.map((e, i) => (
