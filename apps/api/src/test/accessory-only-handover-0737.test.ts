@@ -1,6 +1,9 @@
 import { PGlite } from "@electric-sql/pglite";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { migration, statementOf } from "./stock-register-database";
+
+// Each test builds a PGlite database, which takes several seconds on a loaded CI runner.
+vi.setConfig({ testTimeout: 30_000 });
 
 /**
  * 0737 · A DELIVERY OF ACCESSORIES ONLY HANDS OVER WITHOUT UNIT IDS — run as SQL.
