@@ -100,7 +100,7 @@ function renderShell(initialPath: string, state?: unknown) {
 }
 
 describe("TabbedProcurementShell", () => {
-  it("renders 3 tab links with the expected labels", () => {
+  it("renders 4 tab links with the expected labels", () => {
     renderShell("/operation/procurement/nice-future");
     expect(
       screen.getByTestId("procurement-tab-link-nice-future"),
@@ -111,6 +111,10 @@ describe("TabbedProcurementShell", () => {
     expect(
       screen.getByTestId("procurement-tab-link-hookka-bedframe"),
     ).toHaveTextContent("Ohana Bed Frame");
+    // A supplier with no channel tab still has a way onto this page.
+    expect(
+      screen.getByTestId("procurement-tab-link-all"),
+    ).toHaveTextContent("All suppliers");
   });
 
   it("active tab matches the URL slug", () => {

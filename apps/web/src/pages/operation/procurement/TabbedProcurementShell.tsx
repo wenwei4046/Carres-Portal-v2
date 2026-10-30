@@ -11,6 +11,8 @@ import ProcurementTabContent from "./ProcurementTabContent";
  *   • Nice Future Mattress (`nice-future`)
  *   • Ohana Sofa          (`hookka-sofa`)
  *   • Ohana Bed Frame     (`hookka-bedframe`)
+ * plus `All suppliers` (`all`), so a PO from a supplier with no channel tab
+ * is still reachable from this page.
  *
  * The active tab is decided by the URL `:slug` param. Invalid slugs redirect
  * to the first tab so the user never sees a 404 from a typo or stale link.
@@ -34,6 +36,7 @@ const TAB_LABELS: Record<ProcurementTabSlug, string> = {
   "nice-future": "Nice Future Mattress",
   "hookka-sofa": "Ohana Sofa",
   "hookka-bedframe": "Ohana Bed Frame",
+  all: "All suppliers",
 };
 
 const DEFAULT_SLUG: ProcurementTabSlug = "nice-future";

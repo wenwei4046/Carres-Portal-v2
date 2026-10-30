@@ -105,13 +105,14 @@ describe('SOP shape invariants', () => {
 });
 
 describe('PROCUREMENT_TAB_SLUGS / deriveProcurementSlug', () => {
-  it('PROCUREMENT_TAB_SLUGS has exactly 3 members in the expected order', () => {
+  it('PROCUREMENT_TAB_SLUGS has the 3 channel tabs then `all`, in order', () => {
     expect(PROCUREMENT_TAB_SLUGS).toEqual([
       'nice-future',
       'hookka-sofa',
       'hookka-bedframe',
+      'all',
     ]);
-    expect(PROCUREMENT_TAB_SLUGS).toHaveLength(3);
+    expect(PROCUREMENT_TAB_SLUGS).toHaveLength(4);
   });
 
   it('PROCUREMENT_TAB_SLUGS is a readonly tuple type at compile + runtime', () => {

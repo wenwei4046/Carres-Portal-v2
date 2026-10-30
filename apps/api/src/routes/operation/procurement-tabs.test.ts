@@ -79,8 +79,10 @@ describe("GET /api/operation/procurement/:slug", () => {
   /**
    * Mock the two-pass chain for category-filtered tabs (`hookka-sofa` /
    * `hookka-bedframe`) + Pass C orders enrichment:
-   *   Pass A — sb.from("purchase_order_lines").select(...).like(...).eq(...)
-   *            → { data: matchedLineRows, error }
+   *   Pass A — sb.from("purchase_order_lines").select(...).eq(...).order(...).range(...)
+   *            → { data: supplierLines, error }   (every line of the supplier)
+   *            sb.from("product_skus").select(...).in("sku", [...])
+   *            → { data: catalogRows, error }     (each line's category)
    *   Pass B — sb.from("purchase_orders").select(...).in("id", ids).order(...).limit(...)
    *            → { data: parentRows, error }
    *   Pass C — sb.from("orders").select(...).in("so", [...])
@@ -90,7 +92,8 @@ describe("GET /api/operation/procurement/:slug", () => {
    * parent rows isn't truncated by an inner-join filter.
    */
   function mockTwoPass(opts: {
-    matchedLines: Array<{ po_id: string }>;
+    supplierLines: Array<{ po_id: string; sku: string }>;
+    catalog?: Array<{ sku: string; product_models: { category: string } | null }>;
     parentRows: unknown[];
     passCRows?: Array<{
       so: number;
@@ -98,12 +101,15 @@ describe("GET /api/operation/procurement/:slug", () => {
       delivery_date: string | null;
     }>;
   }) {
-    // Pass A chain — PAGED: `.like().eq().order().range()`, one range per page.
-    const passARange = vi.fn().mockResolvedValue({ data: opts.matchedLines, error: null });
+    // Pass A chain — PAGED: `.eq().order().range()`, one range per page.
+    const passARange = vi.fn().mockResolvedValue({ data: opts.supplierLines, error: null });
     const passAOrder = vi.fn().mockReturnValue({ range: passARange });
     const passAEq = vi.fn().mockReturnValue({ order: passAOrder });
-    const passALike = vi.fn().mockReturnValue({ eq: passAEq });
-    const passASelect = vi.fn().mockReturnValue({ like: passALike });
+    const passASelect = vi.fn().mockReturnValue({ eq: passAEq });
+
+    // Catalog read (`skuCategories`): `.select().in("sku", chunk)`.
+    const catalogIn = vi.fn().mockResolvedValue({ data: opts.catalog ?? [], error: null });
+    const catalogSelect = vi.fn().mockReturnValue({ in: catalogIn });
 
     // Pass B chain
     const passBLimit = vi.fn().mockResolvedValue({ data: opts.parentRows, error: null });
@@ -116,6 +122,7 @@ describe("GET /api/operation/procurement/:slug", () => {
 
     const from = vi.fn((table: string) => {
       if (table === "purchase_order_lines") return { select: passASelect };
+      if (table === "product_skus") return { select: catalogSelect };
       if (table === "purchase_orders") return { select: passBSelect };
       if (table === "orders") return { select: passCSelect };
       throw new Error(`unexpected table: ${table}`);
@@ -125,9 +132,9 @@ describe("GET /api/operation/procurement/:slug", () => {
     return {
       from,
       passASelect,
-      passALike,
       passAEq,
       passARange,
+      catalogIn,
       passBSelect,
       passBIn,
       passBOrder,
@@ -148,7 +155,7 @@ describe("GET /api/operation/procurement/:slug", () => {
     eta_date: "2026-05-20",
     placed_at: "2026-05-06T09:00:00Z",
     suppliers: { slug: "nice-future", name: "Nice Future" },
-    purchase_order_lines: [{ sku: "mattress:carres-cloud:King", qty: 2, received_qty: 0 }],
+    purchase_order_lines: [{ sku: "MS01-FIRMCARE-K", qty: 2, received_qty: 0 }],
   };
 
   // T42-pass3-C4 — Ohana PO with BOTH sofa AND bedframe lines. The
@@ -166,10 +173,19 @@ describe("GET /api/operation/procurement/:slug", () => {
     placed_at: "2026-05-06T09:30:00Z",
     suppliers: { slug: "hookka", name: "Ohana" },
     purchase_order_lines: [
-      { sku: "sofa:harbour:preset:3-seater", qty: 1, received_qty: 0 },
-      { sku: "bedframe:savana:Queen", qty: 2, received_qty: 0 },
+      { sku: "5539-1B(LHF)", qty: 1, received_qty: 0 },
+      { sku: "REGAL-Q", qty: 2, received_qty: 0 },
     ],
   };
+
+  // Real Ohana SKUs carry no `sofa:` / `bedframe:` prefix; the catalog
+  // (`product_skus` → `product_models.category`) is what says which is which.
+  const OHANA_CATALOG = [
+    { sku: "5539-1B(LHF)", product_models: { category: "sofa" } },
+    { sku: "LYYAR-1A(RHF)", product_models: { category: "sofa" } },
+    { sku: "REGAL-Q", product_models: { category: "bedframe" } },
+    { sku: "FENRIR-K", product_models: { category: "bedframe" } },
+  ];
 
   // ----- Happy path: nice-future (no category filter — single pass) -----
   it("nice-future: 200 + supplier-slug filter, single-pass query", async () => {
@@ -204,9 +220,15 @@ describe("GET /api/operation/procurement/:slug", () => {
 
   // ----- Happy path: hookka-sofa (two-pass query) -----
   it("hookka-sofa: 200 with two-pass query preserving full embedded lines (T42-pass3-C4)", async () => {
-    const { from, passASelect, passALike, passAEq, passBSelect, passBIn, passBOrder, passBLimit } =
+    const { from, passASelect, passAEq, catalogIn, passBSelect, passBIn, passBOrder, passBLimit } =
       mockTwoPass({
-        matchedLines: [{ po_id: "PO-3010" }],
+        supplierLines: [
+          { po_id: "PO-3010", sku: "5539-1B(LHF)" },
+          { po_id: "PO-3010", sku: "REGAL-Q" },
+          // A bedframe-only Ohana PO must stay off the sofa tab.
+          { po_id: "PO-3011", sku: "FENRIR-K" },
+        ],
+        catalog: OHANA_CATALOG,
         parentRows: [OHANA_MIXED_PO],
       });
 
@@ -224,14 +246,14 @@ describe("GET /api/operation/procurement/:slug", () => {
     expect(body.pos).toHaveLength(1);
     expect(body.pos[0]?.id).toBe("PO-3010");
     // Critical assertion: BOTH lines (sofa AND bedframe) survive even though
-    // the tab filter narrowed by `sofa:%`. Pre-fix, embedded `!inner` would
-    // truncate the array to only the sofa row.
+    // the tab narrowed to sofa. Pre-fix, embedded `!inner` would truncate the
+    // array to only the sofa row.
     expect(body.pos[0]?.purchase_order_lines).toHaveLength(2);
 
-    // Pass A: lines table queried with category prefix + supplier slug.
+    // Pass A: every line of the supplier, then the catalog decides category.
     expect(from).toHaveBeenCalledWith("purchase_order_lines");
     expect(passASelect).toHaveBeenCalledTimes(1);
-    expect(passALike).toHaveBeenCalledWith("sku", "sofa:%");
+    expect(catalogIn).toHaveBeenCalledWith("sku", ["5539-1B(LHF)", "REGAL-Q", "FENRIR-K"]);
     expect(passAEq).toHaveBeenCalledWith(
       "purchase_orders.suppliers.slug",
       "hookka",
@@ -251,9 +273,45 @@ describe("GET /api/operation/procurement/:slug", () => {
     expect(passBLimit).toHaveBeenCalledWith(200);
   });
 
+  // ----- hookka-bedframe: real prefix-less SKUs (the SO-1375 / PO261030-7839 case) -----
+  it("hookka-bedframe: finds a REGAL-Q PO by its catalog category, not a SKU prefix", async () => {
+    const REGAL_PO = {
+      ...OHANA_MIXED_PO,
+      id: "PO261030-7839",
+      purchase_order_lines: [{ sku: "REGAL-Q", qty: 1, received_qty: 1 }],
+    };
+    const m = mockTwoPass({
+      supplierLines: [
+        { po_id: "PO261030-7839", sku: "REGAL-Q" },
+        { po_id: "PO261014-1594", sku: "LYYAR-1A(RHF)" },
+      ],
+      catalog: OHANA_CATALOG,
+      parentRows: [REGAL_PO],
+    });
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/procurement/hookka-bedframe", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { pos: Array<{ id: string }> };
+    expect(body.pos.map((p) => p.id)).toEqual(["PO261030-7839"]);
+    expect(m.passBIn).toHaveBeenCalledWith("id", ["PO261030-7839"]);
+  });
+
   // ----- hookka-bedframe (two-pass query, empty match set) -----
   it("hookka-bedframe: empty match set short-circuits Pass B (T42-pass3-C4)", async () => {
-    const m = mockTwoPass({ matchedLines: [], parentRows: [] });
+    // A sofa line and a line the catalog does not hold: nothing is a bed frame.
+    const m = mockTwoPass({
+      supplierLines: [
+        { po_id: "PO-3020", sku: "5539-1B(LHF)" },
+        { po_id: "PO-3021", sku: "8022-1NA" },
+      ],
+      catalog: OHANA_CATALOG,
+      parentRows: [],
+    });
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request("http://t/api/operation/procurement/hookka-bedframe", {
@@ -265,8 +323,6 @@ describe("GET /api/operation/procurement/:slug", () => {
     const body = (await res.json()) as { pos: unknown[] };
     expect(body.pos).toEqual([]);
 
-    // Pass A fired with the bedframe prefix.
-    expect(m.passALike).toHaveBeenCalledWith("sku", "bedframe:%");
     expect(m.passAEq).toHaveBeenCalledWith(
       "purchase_orders.suppliers.slug",
       "hookka",
@@ -280,7 +336,11 @@ describe("GET /api/operation/procurement/:slug", () => {
   it("hookka-sofa: dedupes po_id when one PO has multiple matching lines", async () => {
     // 2 sofa lines on the same PO must collapse to a single id in Pass B.
     const m = mockTwoPass({
-      matchedLines: [{ po_id: "PO-3010" }, { po_id: "PO-3010" }],
+      supplierLines: [
+        { po_id: "PO-3010", sku: "5539-1B(LHF)" },
+        { po_id: "PO-3010", sku: "LYYAR-1A(RHF)" },
+      ],
+      catalog: OHANA_CATALOG,
       parentRows: [OHANA_MIXED_PO],
     });
     const jwt = await makeJwt("operation");
@@ -292,6 +352,44 @@ describe("GET /api/operation/procurement/:slug", () => {
     );
     expect(res.status).toBe(200);
     expect(m.passBIn).toHaveBeenCalledWith("id", ["PO-3010"]);
+  });
+
+  // ----- all: every PO, whatever the supplier -----
+  it("all: 200 with no supplier filter, so a PO from a supplier with no tab is reachable", async () => {
+    const DORSETT_PO = {
+      ...NICE_FUTURE_PO,
+      id: "PO-3030",
+      suppliers: { slug: "dorsettloft", name: "Dorsett Loft" },
+      purchase_order_lines: [{ sku: "DL-ARMCHAIR-01", qty: 1, received_qty: 0 }],
+    };
+    const limit = vi
+      .fn()
+      .mockResolvedValue({ data: [NICE_FUTURE_PO, OHANA_MIXED_PO, DORSETT_PO], error: null });
+    const order = vi.fn().mockReturnValue({ limit });
+    const eq = vi.fn();
+    const select = vi.fn().mockReturnValue({ order, eq });
+    const { passCSelect } = makePassCMock();
+    const from = vi.fn((table: string) => {
+      if (table === "purchase_orders") return { select };
+      if (table === "orders") return { select: passCSelect };
+      throw new Error(`unexpected table: ${table}`);
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ from } as any);
+
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/procurement/all", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { pos: Array<{ id: string }> };
+    expect(body.pos.map((p) => p.id)).toEqual(["PO-3001", "PO-3010", "PO-3030"]);
+    expect(eq).not.toHaveBeenCalled();
+    expect(order).toHaveBeenCalledWith("placed_at", { ascending: false });
+    expect(limit).toHaveBeenCalledWith(200);
   });
 
   // ----- 422 invalid slug -----
@@ -339,11 +437,12 @@ describe("GET /api/operation/procurement/:slug", () => {
 
   // ----- 500 supabase error mapping (Pass A) -----
   it("maps an unexpected Pass A supabase error to 500 (category tabs)", async () => {
-    const passAEq = vi
+    const passARange = vi
       .fn()
       .mockResolvedValue({ data: null, error: { code: "XX000", message: "boom" } });
-    const passALike = vi.fn().mockReturnValue({ eq: passAEq });
-    const passASelect = vi.fn().mockReturnValue({ like: passALike });
+    const passAOrder = vi.fn().mockReturnValue({ range: passARange });
+    const passAEq = vi.fn().mockReturnValue({ order: passAOrder });
+    const passASelect = vi.fn().mockReturnValue({ eq: passAEq });
     const from = vi.fn().mockReturnValue({ select: passASelect });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue({ from } as any);

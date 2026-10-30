@@ -94,7 +94,7 @@ vi.mock("@/lib/queries", async () => {
           {
             id: "s2",
             modelId: "m2",
-            sku: "sofa:nordic:3s",
+            sku: "5539-1B(LHF)",
             variant: "Nordic Sofa · 3 seater",
             variantKind: "preset",
             price: 4500,
@@ -128,7 +128,7 @@ function makeSofaPo(
     eta_date: "2026-06-15",
     placed_at: "2026-05-02T00:00:00Z",
     purchase_order_lines: [
-      { id: "00000000-0000-0000-0000-aa0000000128", sku: "sofa:nordic:3s", qty: 1, received_qty: 0 },
+      { id: "00000000-0000-0000-0000-aa0000000128", sku: "5539-1B(LHF)", qty: 1, received_qty: 0 },
     ],
     ...overrides,
   };
