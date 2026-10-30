@@ -102,13 +102,9 @@ describe("Service Cases — stage cards, My cases and the owner", () => {
     expect(screen.getByText("SC-C")).toBeInTheDocument();
   });
 
-  it("names the browser tab; phones get an sr-only h1 and the visible heading is an h2", async () => {
+  it("names the browser tab", async () => {
     mount();
     expect(document.title).toBe("Service Cases · Carres");
-    // jsdom has no media queries: assert the class that hides it from md up.
-    const h1 = screen.getByRole("heading", { level: 1, name: "Service Cases" });
-    expect(h1).toHaveClass("sr-only", "md:hidden");
-    expect(screen.getByRole("heading", { level: 2, name: "Service Cases" })).toBeInTheDocument();
     expect(await screen.findByText("SC-A")).toBeInTheDocument();
   });
 
@@ -123,5 +119,38 @@ describe("Service Cases — stage cards, My cases and the owner", () => {
     await waitFor(() =>
       expect(vi.mocked(apiFetch).mock.calls.some(([u]) => String(u).includes("mine=1"))).toBe(true),
     );
+  });
+});
+
+/** A failed read is never the empty sentence: say it failed and offer a retry. */
+describe("Service Cases — failed read", () => {
+  beforeEach(() => {
+    vi.mocked(apiFetch).mockReset();
+    vi.mocked(apiFetch).mockImplementation(async (url: string) => {
+      if (url.startsWith("/api/operation/staff")) return { staff: [] };
+      throw new Error("boom");
+    });
+  });
+
+  it("shows an error with Try again instead of No cases yet, and Try again re-reads the list", async () => {
+    mount();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Service Cases could not be opened");
+    expect(screen.queryByText("No cases yet.")).toBeNull();
+    const listCalls = () => vi.mocked(apiFetch).mock.calls.filter(([u]) => String(u).startsWith("/api/ops/service-cases")).length;
+    const before = listCalls();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(listCalls()).toBeGreaterThan(before));
+  });
+});
+
+describe("Service Cases — tabs", () => {
+  it("uses real tab roles", async () => {
+    vi.mocked(apiFetch).mockReset();
+    vi.mocked(apiFetch).mockResolvedValue({ items: [row], total: 1 });
+    mount();
+    expect(screen.getByRole("tablist", { name: "Service Cases view" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Cases" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Numbers" })).toBeInTheDocument();
+    expect(await screen.findByText("SC-1")).toBeInTheDocument();
   });
 });

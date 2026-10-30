@@ -22,7 +22,11 @@ import ServiceCaseWizard from "./components/ServiceCaseWizard";
 import CaseOrderLink from "./components/CaseOrderLink";
 import Button from "@/components/kit/Button";
 import Checkbox from "@/components/kit/Checkbox";
-import Loading from "@/components/kit/Loading";
+import Tabs from "@/components/kit/Tabs";
+import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
+import { REGISTER_FIELD_WIDTH as W } from "@/components/register/register-field-widths";
+import ListPageShell from "@/components/ListPageShell";
+import ModuleHeader from "./components/ModuleHeader";
 
 /**
  * Operation Service Cases — the case (病历) list.
@@ -45,12 +49,6 @@ export default function OperationServiceCases() {
   // drawer's Related-cases row links to. Consumed once and stripped from the
   // URL so closing the modal does not immediately reopen it, and a refresh
   // lands on the plain list.
-  // No ModuleHeader on this page, so the tab title is set the way ModuleHeader sets it.
-  useEffect(() => {
-    document.title = "Service Cases · Carres";
-    return () => { document.title = "Carres Portal"; };
-  }, []);
-
   const [searchParams, setSearchParams] = useSearchParams();
   const deepLinkCase = searchParams.get("case");
 
@@ -107,44 +105,54 @@ export default function OperationServiceCases() {
   // injected once for the whole table rather than rebuilt per row.
   const holidayOpts = useMemo(() => ({ holidays: myHolidaySet() }), []);
   const todayIso = appTodayIso();
+  const clockOf = (r: ServiceCase) =>
+    caseSlaClock(
+      { openedAt: r.openedAt, todayIso, events: r.slaEvents ?? [], closed: r.statusIsClosed, customerName: r.customerName },
+      holidayOpts,
+    );
 
   // An empty list under a filter is not an empty module: say which filter emptied it.
   const filtered = state !== "" || mine || stageShown;
   const emptyFilteredSentence = `No ${state || ""}${state ? " " : ""}cases${mine ? " of yours" : ""}${stageShown ? " at this stage" : ""}.`;
 
-  return (
-    // w-full min-w-0: with mx-auto alone this flex child sizes to the table's
-    // min-content width and the whole page scrolls sideways on a phone; now only the table does.
-    <div className="p-4 sm:p-8 max-w-7xl mx-auto w-full min-w-0">
-      {/* Header. The shell header prints the h1 from 768px up; on phones it is hidden, so the sr-only h1 stands in. */}
-      <div className="mb-6">
-        <p className="text-meta uppercase tracking-wider text-base-500 mb-1">Operation</p>
-        <h1 className="sr-only md:hidden">Service Cases</h1>
-        <h2 className="text-page text-base-900">Service Cases</h2>
-        <p className="text-body text-base-600 mt-2">
-          Every issue is a case · classify · record · generate a Service Note dispatch order
-        </p>
-      </div>
+  // The 12 columns, same order and cells as the hand-built table they replace.
+  const columns = useMemo<DataGridColumn<ServiceCase>[]>(() => [
+    { key: "caseNo", label: "Case No.", width: W.documentNo, accessor: (r) => <span className="font-mono font-semibold">{r.caseNo}</span>, searchValue: (r) => r.caseNo },
+    // J2 — the case→order link gets its own column: it answers "which order is this about".
+    { key: "so", label: "Sales order", width: W.documentNo, accessor: (r) => <CaseOrderLink orderId={r.orderId} so={r.so} compact />, searchValue: (r) => String(r.so ?? "") },
+    // S1 — urgency is DERIVED from "can the customer still use it"; nobody types it.
+    { key: "priority", label: "Urgency", width: W.status, accessor: (r) => <PriorityCell priority={r.priority ?? null} />, searchValue: (r) => r.priority ?? "" },
+    { key: "type", label: "Type", width: W.category, accessor: (r) => (r.caseTypeLabel ? <span className="rounded bg-base-100 px-1.5 py-0.5 text-meta text-base-700">{r.caseTypeLabel}</span> : null), searchValue: (r) => r.caseTypeLabel ?? "" },
+    {
+      key: "customer", label: "Customer / Ref", width: W.customer,
+      accessor: (r) => (<><div>{r.customerName || ""}</div>{r.refNo && <div className="text-meta text-base-500 font-mono">{r.refNo}</div>}</>),
+      searchValue: (r) => `${r.customerName ?? ""} ${r.refNo ?? ""}`,
+    },
+    { key: "what", label: "What Happened", width: 260, accessor: (r) => <p className="line-clamp-2 whitespace-normal">{r.whatHappened || null}</p>, searchValue: (r) => r.whatHappened ?? "" },
+    // S3 — the row says what to DO next, derived from the case's own answers.
+    { key: "next", label: "Next step", width: 240, accessor: (r) => <NextStepCell row={r} clock={clockOf(r)} /> },
+    { key: "stage", label: "Stage", width: W.status, accessor: (r) => <span className={`pill ${r.statusIsClosed ? "pill-confirmed" : "pill-neutral"}`}>{r.statusLabel ?? "Unset"}</span>, searchValue: (r) => r.statusLabel ?? "Unset" },
+    { key: "owner", label: "Owner", width: W.requestedBy, accessor: (r) => (r.ownerUserId ? nameOf.get(r.ownerUserId) || null : null), searchValue: (r) => (r.ownerUserId ? nameOf.get(r.ownerUserId) ?? "" : "") },
+    { key: "opened", label: "Opened", width: W.date, accessor: (r) => fmtDate(r.openedAt), dateValue: (r) => r.openedAt, filterType: "date" },
+    // S4 — 14 working days from the day it was reported, from the same clock the case view and server read.
+    { key: "deadline", label: "Deadline", width: W.date, accessor: (r) => <DeadlineCell clock={clockOf(r)} /> },
+    {
+      key: "actions", label: "Actions", width: 90, align: "right",
+      accessor: (r) => (
+        <button type="button" onClick={(e) => { e.stopPropagation(); setEditId(r.id); }}
+          className="rounded border border-base-300 bg-white px-2 py-1 text-meta text-base-700 hover:bg-base-100">Open</button>
+      ),
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], [nameOf, holidayOpts, todayIso]);
 
-      {/* S5 — the module's two doors. The card asks for "a small Numbers tab
-          ON THE MODULE": one page, one sidebar item, two views. */}
-      <div className="flex items-center gap-4 border-b border-base-200 mb-4">
-        {(["cases", "numbers"] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTab(t)}
-            aria-pressed={tab === t}
-            data-testid={`case-tab-${t}`}
-            className={`-mb-px border-b-2 px-1 py-2 text-body font-medium ${
-              tab === t
-                ? "border-primary text-base-900"
-                : "border-transparent text-base-500 hover:text-base-700"
-            }`}
-          >
-            {t === "cases" ? "Cases" : "Numbers"}
-          </button>
-        ))}
+  return (
+    <div className="flex h-full min-h-0 flex-col" data-testid="operation-service-cases">
+      <ModuleHeader destinationHeader testId="operation-service-cases-header" word="Service Cases" docTitle="Service Cases · Carres" />
+      {/* S5 — the module's two doors: one page, one sidebar item, two views. */}
+      <div className="flex items-center gap-4 px-3 pt-3">
+        <Tabs label="Service Cases view" value={tab} onValueChange={(v) => setTab(v as "cases" | "numbers")}
+          tabs={[{ value: "cases", label: "Cases" }, { value: "numbers", label: "Numbers" }]} />
         {/* 0711 — Houzs keeps Service Maintenance beside the cases. */}
         <Link to="/operation/settings/service" className="ml-auto py-2 text-body text-base-500 hover:text-base-700">
           Service Settings
@@ -152,187 +160,59 @@ export default function OperationServiceCases() {
       </div>
 
       {tab === "numbers" ? (
-        <ServiceCaseNumbersPanel />
+        <div className="min-h-0 flex-1 overflow-auto p-3"><ServiceCaseNumbersPanel /></div>
       ) : (
-      <>
-      {/* 0711 — one card per stage with its count (Houzs ServiceCases.tsx). */}
-      {/* Follows Houzs frontend/src/pages/ServiceCases.tsx:1226-1229 (stage cards,
-          click to filter) per Weisiang's ruling (2026-10-22): clear Carres rules, implement Houzs. */}
-      {stages.length > 0 && (
-        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {stages.map((st) => (
-            <button
-              key={st.id}
-              type="button"
-              aria-pressed={stageId === st.id}
-              data-testid={`case-stage-card-${st.id}`}
-              onClick={() => setStageId(stageId === st.id ? null : st.id)}
-              className={`kpi-box text-left ${stageId === st.id ? "border-base-900" : ""}`}
-            >
-              <span className="label text-base-500">{st.label}</span>
-              <span className="text-strong font-semibold t-num text-base-900 mt-1">{st.count}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        <div className="flex rounded border border-base-200 overflow-hidden text-body">
-          {(["", "ongoing", "closed"] as const).map((s) => (
-            <button
-              key={s}
-              type="button"
-              aria-pressed={state === s}
-              onClick={() => setState(s)}
-              className={`px-3 py-1.5 font-medium ${
-                state === s
-                  ? "bg-base-900 text-white"
-                  : "bg-white text-base-600 hover:bg-base-50"
-              }`}
-            >
-              {s === "" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
-            </button>
-          ))}
-        </div>
-
-        <Checkbox id="service-cases-mine" label="My cases" checked={mine} onCheckedChange={setMine} />
-
-        <div className="flex-1" />
-
-        <Button variant="primary" icon="add" onClick={() => setShowCreate(true)}>New Case</Button>
-      </div>
-
-      {/* Table */}
-      {listQ.isLoading ? (
-        <Loading variant="skeleton" label="Loading service cases" />
-      ) : listQ.isError && !listQ.data ? (
-        /* A failure sentence is never the empty sentence (COPY-STANDARD 2026-08-28). */
-        <div role="alert" className="flex flex-col items-center gap-3 rounded border border-base-200 bg-white p-12 text-center">
-          <p className="text-body text-base-700">Service Cases could not be opened</p>
-          <Button variant="neutral" onClick={() => void listQ.refetch()}>Try again</Button>
-        </div>
-      ) : rows.length === 0 ? (
-        filtered ? (
-          <div className="flex flex-col items-center gap-3 rounded border border-base-200 bg-white p-12 text-center">
-            <p className="text-base-700 font-medium">{emptyFilteredSentence}</p>
-            <Button variant="neutral" onClick={() => { setState(""); setMine(false); setStageId(null); }}>Show all cases</Button>
-          </div>
-        ) : (
-          <div className="rounded border border-base-200 bg-white p-12 text-center">
-            <p className="text-base-700 font-medium">No cases yet.</p>
-            <p className="text-body text-base-600 mt-1">Open a new case when an issue arises.</p>
-          </div>
-        )
-      ) : (
-        <div className="rounded border border-base-200 bg-white overflow-x-auto">
-          <table className="w-full text-body">
-            <thead className="bg-base-50 text-meta uppercase tracking-wider text-base-600">
-              <tr>
-                <th className="text-left px-3 py-2 font-medium">Case No.</th>
-                {/* J2 — the case→order link gets its own column: it is the
-                    answer to "which order is this about", not a footnote. */}
-                <th className="text-left px-3 py-2 font-medium">Sales order</th>
-                {/* S1 — urgency is DERIVED from "can the customer still use
-                    it"; nobody types it, so it is the same answer on every
-                    row. High = a manager has to be told. */}
-                <th className="text-left px-3 py-2 font-medium">Urgency</th>
-                <th className="text-left px-3 py-2 font-medium">Type</th>
-                <th className="text-left px-3 py-2 font-medium">Customer / Ref</th>
-                <th className="text-left px-3 py-2 font-medium">What Happened</th>
-                {/* S3 — the row says what to DO next, not only what happened.
-                    Derived from the case's own answers, so it costs no extra
-                    query and cannot drift from the case view. */}
-                <th className="text-left px-3 py-2 font-medium">Next step</th>
-                <th className="text-left px-3 py-2 font-medium">Stage</th>
-                <th className="text-left px-3 py-2 font-medium">Owner</th>
-                <th className="text-left px-3 py-2 font-medium">Opened</th>
-                {/* S4 — 14 working days from the day it was reported. Derived
-                    from the same clock the case view and the server read, so
-                    no row can carry a deadline that disagrees with the rule. */}
-                <th className="text-left px-3 py-2 font-medium">Deadline</th>
-                <th className="text-right px-3 py-2 font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => {
-                const clock = caseSlaClock(
-                  {
-                    openedAt:     r.openedAt,
-                    todayIso,
-                    events:       r.slaEvents ?? [],
-                    closed:       r.statusIsClosed,
-                    customerName: r.customerName,
-                  },
-                  holidayOpts,
-                );
-                return (
-                <tr
-                  key={r.id}
-                  className="border-t border-base-200 hover:bg-base-50 cursor-pointer"
-                  onClick={() => setEditId(r.id)}
-                >
-                  <td className="px-3 py-2 font-mono text-meta text-base-900 font-semibold whitespace-nowrap">
-                    {r.caseNo}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    <CaseOrderLink orderId={r.orderId} so={r.so} compact />
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    <PriorityCell priority={r.priority ?? null} />
-                  </td>
-                  <td className="px-3 py-2">
-                    {r.caseTypeLabel ? (
-                      <span className="rounded bg-base-100 px-1.5 py-0.5 text-meta text-base-700">
-                        {r.caseTypeLabel}
-                      </span>
-                    ) : (
-                      null
-                    )}
-                  </td>
-                  <td className="px-3 py-2">
-                    <div className="text-base-900 text-body">{r.customerName || ""}</div>
-                    {r.refNo && <div className="text-meta text-base-500 font-mono">{r.refNo}</div>}
-                  </td>
-                  <td className="px-3 py-2 max-w-xs">
-                    <p className="text-body text-base-700 line-clamp-2">
-                      {r.whatHappened || null}
-                    </p>
-                  </td>
-                  <td className="px-3 py-2 max-w-[15rem]">
-                    <NextStepCell row={r} clock={clock} />
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    <span className={`pill ${r.statusIsClosed ? "pill-confirmed" : "pill-neutral"}`}>
-                      {r.statusLabel ?? "Unset"}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-body text-base-700">
-                    {r.ownerUserId ? nameOf.get(r.ownerUserId) || null : null}
-                  </td>
-                  <td className="px-3 py-2 text-meta text-base-500 whitespace-nowrap">
-                    {fmtDate(r.openedAt)}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    <DeadlineCell clock={clock} />
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); setEditId(r.id); }}
-                      className="rounded border border-base-300 bg-white px-2 py-1 text-meta text-base-700 hover:bg-base-100"
-                    >
-                      Open
+      <ListPageShell register>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {/* 0711 — one card per stage with its count (Houzs ServiceCases.tsx:1226-1229), click to filter. */}
+          {stages.length > 0 && (
+            <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {stages.map((st) => (
+                <button key={st.id} type="button" aria-pressed={stageId === st.id} data-testid={`case-stage-card-${st.id}`}
+                  onClick={() => setStageId(stageId === st.id ? null : st.id)}
+                  className={`kpi-box text-left ${stageId === st.id ? "border-base-900" : ""}`}>
+                  <span className="label text-base-500">{st.label}</span>
+                  <span className="text-strong font-semibold t-num text-base-900 mt-1">{st.count}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {listQ.isError && !listQ.data ? (
+            /* A failure sentence is never the empty sentence (COPY-STANDARD 2026-08-28). */
+            <div role="alert" className="flex flex-col items-center gap-3 rounded border border-base-200 bg-white p-12 text-center">
+              <p className="text-body text-base-700">Service Cases could not be opened</p>
+              <Button variant="neutral" onClick={() => void listQ.refetch()}>Try again</Button>
+            </div>
+          ) : (
+            <DataGrid<ServiceCase>
+              rows={rows}
+              columns={columns}
+              rowKey={(r) => r.id}
+              storageKey="carres.operation.service-cases.v1"
+              appearance="reference"
+              groupBanner={false}
+              isLoading={listQ.isLoading}
+              onRowClick={(r) => setEditId(r.id)}
+              searchPlaceholder="Search Service Cases"
+              exportName="Service Cases"
+              emptyMessage={filtered ? emptyFilteredSentence : "No cases yet."}
+              toolbarStart={<>
+                <div className="flex rounded border border-base-200 overflow-hidden text-body">
+                  {(["", "ongoing", "closed"] as const).map((s) => (
+                    <button key={s} type="button" aria-pressed={state === s} onClick={() => setState(s)}
+                      className={`px-3 py-1.5 font-medium ${state === s ? "bg-base-900 text-white" : "bg-white text-base-600 hover:bg-base-50"}`}>
+                      {s === "" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
                     </button>
-                  </td>
-                </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                  ))}
+                </div>
+                <Checkbox id="service-cases-mine" label="My cases" checked={mine} onCheckedChange={setMine} />
+                {filtered && <Button variant="neutral" onClick={() => { setState(""); setMine(false); setStageId(null); }}>Show all cases</Button>}
+              </>}
+              toolbarEnd={<Button variant="primary" icon="add" onClick={() => setShowCreate(true)}>New Case</Button>}
+            />
+          )}
         </div>
-      )}
-      </>
+      </ListPageShell>
       )}
 
       {/* S1 — "+ New Case" now opens the guided wizard instead of the
