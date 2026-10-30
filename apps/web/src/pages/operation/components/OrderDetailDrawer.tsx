@@ -5911,7 +5911,7 @@ function PaymentForm({
 /** The collapsed band's Add-payment shortcut — the SAME PaymentForm, wrapped
  *  in a Modal (the panel body is unmounted while collapsed, so the inline
  *  spot doesn't exist yet). */
-function AddPaymentModal({
+export function AddPaymentModal({
   orderId,
   onClose,
 }: {

@@ -134,6 +134,7 @@ import {
 } from "@/lib/queries";
 import { routeActionOwnersOf } from "./workspace-duty-owner";
 import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
+import { AddPaymentModal } from "./components/OrderDetailDrawer";
 import ServiceCaseWizard from "./components/ServiceCaseWizard";
 import CorrectionWorkList from "./CorrectionWorkList";
 import type { RecordedAgreement } from "./customer-agreement";
@@ -883,6 +884,17 @@ export { Block };
  * read-only value wore the same bordered box, so `SO Doc Date` looked exactly
  * as changeable as the phone number beside it (reviewer finding 16).
  */
+/** A Placed order owing money takes a top-up here: the Payments desk records
+ *  only against an invoice (SO-1374, 30 Oct 2026). The roles are the ones the
+ *  payment API admits (order-payments.ts POST). */
+export function canTopUpPayment(
+  role: string | null,
+  money: { known: boolean; outstanding: number },
+): boolean {
+  return (role === "operation" || role === "principal" || role === "finance")
+    && money.known && money.outstanding > 0;
+}
+
 /** Contact corrections do not renew an existing delivery promise. */
 export function isContactOnlyCorrection(fields: readonly string[]): boolean {
   const contactFields = new Set([
@@ -1015,6 +1027,7 @@ function SalesOrderWorkspaceBody() {
   const showRoute = params.get("route") === "1";
   const [viewRev, setViewRev] = useState<number | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [addingPayment, setAddingPayment] = useState(false);
   const [problemOpen, setProblemOpen] = useState(false);
   /* The `Change salesperson` door lives beside the Salesperson it changes; the
      modal behind it lives in `SalesOrderAttribution`. Bumping this opens it. */
@@ -2883,7 +2896,14 @@ function SalesOrderWorkspaceBody() {
           )}
         </div>
       )}
-      <span className="pb-1 pt-3.5 text-[13px] font-medium text-c-ink">Payment</span>
+      <span className="flex items-end justify-between gap-2 pb-1 pt-3.5">
+        <span className="text-[13px] font-medium text-c-ink">Payment</span>
+        {order && !amending && mode !== "oldrev" && canTopUpPayment(role, money) && (
+          <CBtn kind="normal" icon="add" onClick={() => setAddingPayment(true)} data-testid="so-add-payment">
+            Add payment
+          </CBtn>
+        )}
+      </span>
       {amending ? (
         row("instalment", "Instalment months", factOf(draft.installment_months == null ? "None" : String(draft.installment_months)), ["installment_months"],
           <CSelect id="so-instalment" label="Instalment months" value={draft.installment_months == null ? "none" : String(draft.installment_months)}
@@ -3130,6 +3150,9 @@ function SalesOrderWorkspaceBody() {
 
       {order && (
         <CancelSalesOrderDialog orderId={order.id} so={order.so} open={cancelOpen} onOpenChange={setCancelOpen} onCancelled={() => void detailQ.refetch()} />
+      )}
+      {addingPayment && order && (
+        <AddPaymentModal orderId={order.id} onClose={() => setAddingPayment(false)} />
       )}
       {problemOpen && order && (
         <ServiceCaseWizard
