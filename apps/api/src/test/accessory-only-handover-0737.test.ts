@@ -193,3 +193,32 @@ describe("after 0737", () => {
       "select company from delivery_handover_events where delivery_order_id = $1", [id])).rows[0].company).toBe("NETS");
   });
 });
+
+describe("0739 · 0737 from a Windows (CRLF) copy of the file", () => {
+  const M0737 = "0737_a_delivery_of_accessories_only_hands_over_without_unit_ids";
+  const M0739 = "0739_0737_applies_from_a_windows_copy_of_the_file";
+  const crlf = (name: string) => migration(name).replace(/\r?\n/g, "\r\n");
+  const body = async (db: PGlite) => (await db.query<{ d: string }>(
+    "select pg_get_functiondef('public.delivery_handover_record(uuid,text,text,text,jsonb,text,text,text[],jsonb)'::regprocedure) || pg_get_functiondef('public._delivery_mark_delivered(uuid,text,text,text,text,text,text)'::regprocedure) d")).rows[0].d;
+
+  it("0737 refuses itself from a CRLF copy, as it did on production", async () => {
+    const db = await build(false);
+    await expect(db.exec(crlf(M0737))).rejects.toThrow(/holds the text to change 0 times/);
+  });
+
+  it("0739 from a CRLF copy gives the same bodies 0737 gives, and a second run changes nothing", async () => {
+    const via0737 = await build(true);
+    const db = await build(false);
+    await db.exec(crlf(M0739));
+    expect(await body(db)).toBe(await body(via0737));
+    await db.exec(crlf(M0739));
+    expect(await body(db)).toBe(await body(via0737));
+  });
+
+  it("0739 after an applied 0737 changes nothing", async () => {
+    const db = await build(true);
+    const before = await body(db);
+    await db.exec(migration(M0739));
+    expect(await body(db)).toBe(before);
+  });
+});
