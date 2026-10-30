@@ -16,6 +16,8 @@ import { fmtDate } from "@/lib/fmt-date";
 import { ApiError, apiFetch } from "@/lib/api";
 import { useStockMovementEvidence, useStockUnit } from "@/lib/queries";
 import Button from "@/components/kit/Button";
+import Loading from "@/components/kit/Loading";
+import CouldNotLoad from "./components/CouldNotLoad";
 import Modal from "@/components/kit/Modal";
 import SalesOrderTabs from "./SalesOrderTabs";
 import Block from "@/components/kit/Block";
@@ -97,7 +99,7 @@ export default function WarehouseUnitDetail({ unitCode: selectedCode, onBack, ba
   const unitCode = selectedCode ?? routeCode;
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { data, isLoading, isError, error } = useStockUnit(unitCode);
+  const { data, isLoading, isError, error, refetch } = useStockUnit(unitCode);
 
   const unit = data?.unit;
   const physical = useStockMovementEvidence(unit?.unitCode);
@@ -163,14 +165,17 @@ export default function WarehouseUnitDetail({ unitCode: selectedCode, onBack, ba
         ) : null}
 
         {isLoading ? (
-          <p className="text-body text-base-500">Loading…</p>
-        ) : isError ? (
+          <Loading variant="skeleton" label="Loading the Unit" />
+        ) : isError && !data && (error as { status?: number } | undefined)?.status !== 404 ? (
+          <div className="rounded-card border border-kit-slate-5 bg-white">
+            <CouldNotLoad
+              detail={`This Unit could not be loaded. ${(error as Error | undefined)?.message ?? ""}`.trim()}
+              onRetry={() => void refetch()}
+            />
+          </div>
+        ) : isError && (error as { status?: number } | undefined)?.status === 404 ? (
           <div className="rounded-card border border-kit-slate-5 bg-white p-6">
-            <p className="text-body text-base-800">
-              {(error as { status?: number } | undefined)?.status === 404
-                ? "No Unit carries that ID."
-                : "This Unit could not be loaded."}
-            </p>
+            <p className="text-body text-base-800">No Unit carries that ID.</p>
             {(error as Error | undefined)?.message ? (
               <p className="mt-1 text-meta text-base-500">{(error as Error).message}</p>
             ) : null}
@@ -245,8 +250,8 @@ export default function WarehouseUnitDetail({ unitCode: selectedCode, onBack, ba
             {/* ── CURRENT WORK — the one shared Work contract for this Unit ── */}
             <Block title="Current work">
               {issuesQ.isLoading ? (
-                <p className="text-meta text-base-500">Loading…</p>
-              ) : issuesQ.isError ? (
+                <Loading variant="skeleton" lines={2} label="Loading work for this Unit" />
+              ) : issuesQ.isError && !issuesQ.data ? (
                 <p className="text-meta text-base-500">
                   Work for this Unit could not be loaded.{" "}
                   <button type="button" className="text-kit-blue-11 hover:underline" onClick={() => void issuesQ.refetch()}>Try again</button>
@@ -283,7 +288,7 @@ export default function WarehouseUnitDetail({ unitCode: selectedCode, onBack, ba
                   <h3 className="text-label uppercase tracking-[0.06em] text-kit-slate-11">Site visits</h3>
                   {physical.isLoading ? (
                     <p className="mt-1 text-meta text-base-500">Loading physical receipts and departures…</p>
-                  ) : physical.isError ? (
+                  ) : physical.isError && !physical.data ? (
                     <p className="mt-1 text-meta text-base-500">
                       Physical receipt and departure evidence could not be loaded.{" "}
                       <button type="button" className="text-kit-blue-11 hover:underline" onClick={() => void physical.refetch()}>Try again</button>

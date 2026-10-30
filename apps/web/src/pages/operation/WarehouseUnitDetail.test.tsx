@@ -93,6 +93,26 @@ describe("the scan door never leaves the operator on a blank page", () => {
   });
 });
 
+describe("a failed Unit read", () => {
+  it("a non-404 failure says could not be loaded, not 'No Unit'", () => {
+    vi.mocked(useStockUnit).mockReturnValue({ data: undefined, isLoading: false, isError: true, error: Object.assign(new Error("down"), { status: 500 }), refetch: vi.fn() } as never);
+    renderAt("U1-000-082");
+    expect(screen.getByTestId("could-not-load")).toBeInTheDocument();
+    expect(screen.queryByText("No Unit carries that ID.")).toBeNull();
+  });
+  it("a 404 still says no Unit carries that ID", () => {
+    vi.mocked(useStockUnit).mockReturnValue({ data: undefined, isLoading: false, isError: true, error: Object.assign(new Error("gone"), { status: 404 }), refetch: vi.fn() } as never);
+    renderAt("id-nope000000");
+    expect(screen.getByText("No Unit carries that ID.")).toBeInTheDocument();
+  });
+  it("a failed background refetch keeps the Unit on screen", () => {
+    vi.mocked(useStockUnit).mockReturnValue({ data: { unit: unit(), events: [] }, isLoading: false, isError: true, error: Object.assign(new Error("down"), { status: 500 }), refetch: vi.fn() } as never);
+    renderAt("U1-000-082");
+    expect(screen.queryByTestId("could-not-load")).toBeNull();
+    expect(screen.getByText("Stock Details")).toBeInTheDocument();
+  });
+});
+
 describe("the header is the Sales Order page's — owner ruling 2026-09-26", () => {
   it("prints ← Inventory, the Unit ID as identity and the Item beside it", () => {
     loaded();

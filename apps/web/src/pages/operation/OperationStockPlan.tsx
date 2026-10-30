@@ -15,7 +15,9 @@ import {
   useDecideStockPlan,
 } from "@/lib/queries";
 import { fmtMonth } from "@/lib/fmt-date";
+import Loading from "@/components/kit/Loading";
 import StockTabs from "./StockTabs";
+import CouldNotLoad from "./components/CouldNotLoad";
 import UrgentRestockPanel from "./components/UrgentRestockPanel";
 import PoolUsagePanel from "./components/PoolUsagePanel";
 import StockHealthPanel from "./components/StockHealthPanel";
@@ -56,7 +58,7 @@ function thisMonth(): string {
 
 export default function OperationStockPlan() {
   const [period, setPeriod] = useState<string>(() => thisMonth());
-  const { data, isLoading, isError, error } = useStockPlan(period);
+  const { data, isLoading, isError, error, refetch } = useStockPlan(period);
   const openM = useOpenStockPlan();
 
   const planId = data?.plan?.id ?? "";
@@ -113,16 +115,12 @@ export default function OperationStockPlan() {
         <StockHealthPanel />
 
         {isLoading ? (
-          <p className="text-body text-base-500">Loading…</p>
-        ) : isError ? (
-          <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-body">
-            <div className="text-destructive font-semibold mb-1">
-              Couldn&rsquo;t load the plan
-            </div>
-            <div className="text-meta text-base-700">
-              {(error as Error | undefined)?.message ?? "Unknown error"}
-            </div>
-          </div>
+          <Loading variant="skeleton" label="Loading the plan" />
+        ) : isError && !data ? (
+          <CouldNotLoad
+            detail={`The plan could not be loaded. ${(error as Error | undefined)?.message ?? ""}`.trim()}
+            onRetry={() => void refetch()}
+          />
         ) : !data?.plan ? (
           <NoPlanYet
             period={period}

@@ -10,6 +10,7 @@ import Select from "@/components/kit/Select";
 import Textarea from "@/components/kit/Textarea";
 import { FieldError } from "@/components/kit/FieldFrame";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
+import CouldNotLoad from "@/pages/operation/components/CouldNotLoad";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
 
@@ -115,7 +116,7 @@ export function DeliveryReturns() {
 
   return (
     <Page word="Delivery Returns" testId="delivery-returns">
-      {list.isError ? <p role="alert" className="p-4 text-body">The delivery returns could not be loaded. Try again.</p> : (
+      {list.isError && !list.data ? <CouldNotLoad detail="The delivery returns could not be loaded." onRetry={() => void list.refetch()} /> : (
         <ListPageShell register>
           <DataGrid rows={list.data?.returns ?? []} columns={columns} rowKey={(r) => r.id}
             storageKey="carres.delivery.returns.v1" appearance="reference" exportName="Delivery Returns"

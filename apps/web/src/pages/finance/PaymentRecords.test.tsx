@@ -10,7 +10,7 @@ import PaymentRecords from "./PaymentRecords";
  * the Receipt No, `12 payments · RM … received`, no `New Payment`, and the
  * full-width Payment Record object with its ruled section order.
  */
-const state = vi.hoisted(() => ({ data: [] as unknown[], isLoading: false, isError: false,
+const state = vi.hoisted(() => ({ data: [] as unknown[] | undefined, isLoading: false, isError: false,
   refetch: vi.fn(), isSuccess: true, error: null as Error | null, sheet: vi.fn((_data: unknown) => ({})),
   invoices: [] as unknown[], voidMutate: vi.fn(),
   holds: [] as unknown[], openHold: vi.fn(), clearHold: vi.fn() }));
@@ -147,7 +147,7 @@ describe("Payment Records — the listing", () => {
     expect(screen.queryByRole("button", { name: /Export.*receipt/i })).not.toBeInTheDocument();
   });
   it("shows a failed source with recovery rather than a zero total", () => {
-    state.isError = true; state.data = [];
+    state.isError = true; state.data = undefined;
     show();
     expect(screen.getByRole("alert")).toHaveTextContent("Payment Records could not be loaded.");
     expect(screen.queryByTestId("payment-records-summary")).not.toBeInTheDocument();

@@ -387,6 +387,14 @@ describe("OperationWarehouse page", () => {
     expect(refetchSpy).toHaveBeenCalledTimes(1);
   });
 
+  it("8b. a failed background refetch keeps the cached rows", () => {
+    setLoaded();
+    warehouseHookState = { ...warehouseHookState, isError: true, error: new Error("kaboom") };
+    render(wrap(<OperationWarehouse />));
+    expect(screen.queryByText(/Couldn.+t load warehouse/)).toBeNull();
+    expect(screen.getByTestId(`warehouse-row-${SKU_MATTRESS_KING}`)).toBeInTheDocument();
+  });
+
   // 0366 — tests 9–13 covered the "+ Adjust" modal, which is GONE with its
   // endpoint and its RPC. A total can no longer be nudged by hand: stock is
   // counted from the exact Units, so what happened to a Unit is recorded

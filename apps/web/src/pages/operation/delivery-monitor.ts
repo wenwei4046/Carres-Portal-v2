@@ -85,7 +85,9 @@ import { financeHoldLineOf, fmtMoney, paymentApprovalOpensGate } from "@carres/s
  */
 export const MONITOR_COPY = {
   page: "Monitor",
-  docTitle: "Monitor · Carres",
+  /* Names the module: Payments has its own "Monitor" page, and a bare
+     "Monitor · Carres" tab read as that page left open. */
+  docTitle: "Monitor · Delivery · Carres",
   search: "Search deliveries…",
   /** Owner correction 2026-09-06 — the short per-day absence; the spanning
    *  sentence below owns the fully-empty range. */

@@ -22,6 +22,7 @@ import {
   type SupplierRow,
 } from "@/lib/queries";
 import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
+import Loading from "@/components/kit/Loading";
 import ModuleHeader from "./components/ModuleHeader";
 import PoReceivingView from "./components/PoReceivingView";
 import {
@@ -201,6 +202,8 @@ export default function WarehouseInbound() {
     return p;
   }, [params, effectiveStatus]);
   const q = useWarehouseInbound(queryParams, offset);
+  // A failed background refetch must not hide the rows already on screen.
+  const qError = q.data ? null : q.error;
   const rows = q.data?.arrivals ?? [];
   const page = q.data?.page ?? { offset: 0, limit: 50, total: 0 };
   const facets = q.data?.facets ?? { status: {}, sourceType: {}, site: {} };
@@ -716,7 +719,7 @@ export default function WarehouseInbound() {
     ...sites.map((s) => ({
       id: s.id,
       label: s.name,
-      count: q.isLoading || q.error ? undefined : facets.site[s.id] ?? 0,
+      count: q.isLoading || qError ? undefined : facets.site[s.id] ?? 0,
     })),
     ...(unmapped.length > 0
       ? [
@@ -726,7 +729,7 @@ export default function WarehouseInbound() {
                the banner below — never a partner name typed into the code. */
             label: "Destinations without a Site",
             count:
-              q.isLoading || q.error
+              q.isLoading || qError
                 ? undefined
                 : facets.site[INBOUND_UNMAPPED_SITE] ?? 0,
           },
@@ -757,7 +760,7 @@ export default function WarehouseInbound() {
       )}
 
       {receivePoId && posQ.isLoading ? (
-        <p role="status" className="p-4 text-body">Loading…</p>
+        <div className="p-4"><Loading variant="skeleton" label="Loading the purchase order" /></div>
       ) : receivePoId ? (
         <PoReceivingView
           poId={receivePoId}
@@ -808,7 +811,7 @@ export default function WarehouseInbound() {
                   active={effectiveStatus === value}
                   resets={value === "all"}
                   count={
-                    q.isLoading || q.error
+                    q.isLoading || qError
                       ? undefined
                       : facets.status[value] ?? 0
                   }
@@ -827,7 +830,7 @@ export default function WarehouseInbound() {
                   label={label}
                   active={params.get("sourceType") === type}
                   count={
-                    q.isLoading || q.error
+                    q.isLoading || qError
                       ? undefined
                       : facets.sourceType[type] ?? 0
                   }
@@ -900,7 +903,7 @@ export default function WarehouseInbound() {
               confirm the goods go straight to the customer.
             </div>
           ) : null}
-          {!q.error && unresolvedSources.length ? (
+          {!qError && unresolvedSources.length ? (
             <div
               role="status"
               className="border-b border-kit-slate-5 bg-white p-3 text-body"
@@ -918,13 +921,13 @@ export default function WarehouseInbound() {
               ))}
             </div>
           ) : null}
-          {q.error ? (
+          {qError ? (
             <div
               role="alert"
               className="flex flex-1 flex-col items-center justify-center gap-3 bg-white"
             >
               <p>Inbound could not be opened</p>
-              <p>{q.error.message}</p>
+              <p>{qError.message}</p>
               <button
                 className="rounded-control border border-base-200 px-3 py-1.5 text-body"
                 onClick={() => void q.refetch()}

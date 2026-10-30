@@ -196,12 +196,12 @@ export default function WarehouseScheduleCard({ card }: { card: ScheduleCard }) 
         )}
 
         {extraRelated.length > 0 && (
-          <div className="mt-1 flex flex-wrap gap-x-2" data-testid="ws-card-related">
+          <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1" data-testid="ws-card-related">
             {extraRelated.map((r) => (
               <Link
                 key={r.id}
                 to={r.href}
-                className="text-meta leading-[18px] text-kit-blue-11 underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kit-blue-9"
+                className={`${HIT_24} text-meta leading-[18px] text-kit-blue-11 underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kit-blue-9`}
               >
                 {r.ref}
               </Link>
@@ -213,13 +213,16 @@ export default function WarehouseScheduleCard({ card }: { card: ScheduleCard }) 
   );
 }
 
+/** PO and DO links on a card are 16-18px text; this widens the hit area to at least 24px tall. */
+const HIT_24 = "relative after:absolute after:inset-x-0 after:-inset-y-[3px] after:content-['']";
+
 /** A reference — a link when the projection gave it one, plain text otherwise. */
 function ReferenceText({ reference }: { reference: CardReference }) {
   if (!reference.href) return <>{reference.ref}</>;
   return (
     <Link
       to={reference.href}
-      className="underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kit-blue-9"
+      className={`${HIT_24} underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kit-blue-9`}
     >
       {reference.ref}
     </Link>

@@ -38,7 +38,9 @@ import {
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { REGISTER_FIELD_WIDTH } from "@/components/register/register-field-widths";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
+import Loading from "@/components/kit/Loading";
 import ModuleHeader from "./components/ModuleHeader";
+import CouldNotLoad from "./components/CouldNotLoad";
 import { Modal, ModalActions } from "./components/Modal";
 import {
   FilterRail,
@@ -124,6 +126,7 @@ export default function WarehouseOutboundWork() {
   const effectiveView = params.get("view") ?? (selectedDo ? "all" : "open");
 
   const { data, isLoading, error, refetch } = useDeliveryWarehouseSchedule();
+  const shownError = data ? null : error;
   const allCards = useMemo(
     () =>
       warehouseOutboundCards(
@@ -577,7 +580,7 @@ export default function WarehouseOutboundWork() {
           <button type="button" className="text-body text-kit-blue-11" onClick={() => setFilter("loading", "")}>← Back to Outbound</button>
           {workCard && <span className="font-mono text-body">{workCard.doNumber}</span>}
         </div>
-        {isLoading ? <p role="status" className="p-3">Loading…</p> : error ? <div role="alert" className="p-3">{error.message}<button onClick={() => void refetch()}>Try again</button></div> : workCard ? <OutboundUnitWork card={workCard} /> : <p role="alert" className="p-3">This pickup could not be opened.</p>}
+        {isLoading ? <div className="p-3"><Loading variant="skeleton" label="Loading the pickup" /></div> : error && !data ? <CouldNotLoad detail={error.message} onRetry={() => void refetch()} /> : workCard ? <OutboundUnitWork card={workCard} /> : <p role="alert" className="p-3">This pickup could not be opened.</p>}
       </div>}
       <div className={`flex min-h-0 min-w-0 flex-1 ${workId ? "hidden" : ""}`}>
         <div
@@ -603,7 +606,7 @@ export default function WarehouseOutboundWork() {
                   active={effectiveView === value}
                   resets={value === "all"}
                   count={
-                    isLoading || error ? undefined : view.facets.view[value] ?? 0
+                    isLoading || shownError ? undefined : view.facets.view[value] ?? 0
                   }
                   testId={`wo-view-${value}`}
                   onClick={() => {
@@ -621,7 +624,7 @@ export default function WarehouseOutboundWork() {
                     label={name}
                     active={params.get("site") === name}
                     count={
-                      isLoading || error
+                      isLoading || shownError
                         ? undefined
                         : view.facets.site[name] ?? 0
                     }
@@ -642,13 +645,13 @@ export default function WarehouseOutboundWork() {
         <div
           className={`${showFilters ? "hidden md:flex" : "flex"} min-h-0 min-w-0 flex-1 flex-col p-2`}
         >
-          {error ? (
+          {shownError ? (
             <div
               role="alert"
               className="flex flex-1 flex-col items-center justify-center gap-3 bg-white"
             >
               <p>Outbound could not be opened</p>
-              <p>{error.message}</p>
+              <p>{shownError.message}</p>
               <button
                 className="rounded-control border border-base-200 px-3 py-1.5 text-body"
                 onClick={() => void refetch()}

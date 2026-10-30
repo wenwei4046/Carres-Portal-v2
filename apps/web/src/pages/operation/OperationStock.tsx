@@ -1,7 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { qk } from "@/lib/queries";
 import { apiFetch } from "@/lib/api";
+import Loading from "@/components/kit/Loading";
+import CouldNotLoad from "./components/CouldNotLoad";
 
 /**
  * Phase 10 · Operation · Stock — `reference/proto/principal-views.jsx`
@@ -33,7 +35,12 @@ type StockPayload = {
 
 export default function OperationStock() {
   const [view, setView] = useState<"low" | "all">("low");
-  const { data, isLoading } = useQuery<StockPayload>({
+  // No ModuleHeader here, so the tab title is set the way ModuleHeader sets it.
+  useEffect(() => {
+    document.title = "Stock · Warehouse · Carres";
+    return () => { document.title = "Carres Portal"; };
+  }, []);
+  const { data, isLoading, isError, refetch } = useQuery<StockPayload>({
     queryKey: qk.operation.stock(),
     queryFn: () => apiFetch("/api/operation/stock"),
   });
@@ -54,13 +61,17 @@ export default function OperationStock() {
     <div className="px-9 py-8 pb-14">
       <div className="mb-[22px]">
         <div className="text-label uppercase tracking-[0.06em] text-primary">HQ · Operations</div>
-        <h1 className="text-page font-display mt-1.5">
+        {/* Below 768px the shell prints no h1. */}
+        <h1 className="sr-only md:hidden">Stock</h1>
+        {/* h2: the shell header already prints this page's h1. */}
+        <h2 className="text-page font-display mt-1.5">
           Stock across the network
-        </h1>
-        <div className="text-body text-base-600 mt-1.5">
-          {payload?.summary.lowStockCount ?? 0} SKUs low · {warehouses.length} warehouse{warehouses.length !== 1 ? "s" : ""} ·{" "}
-          {payload?.summary.openPos ?? 0} POs in flight
-        </div>
+        </h2>
+        {/* No summary until the read answers: a failed read must not print zeros. */}
+        {payload && <div className="text-body text-base-600 mt-1.5">
+          {payload.summary.lowStockCount} SKUs low · {warehouses.length} warehouse{warehouses.length !== 1 ? "s" : ""} ·{" "}
+          {payload.summary.openPos} POs in flight
+        </div>}
       </div>
 
       <div className="flex gap-1 mb-3.5 p-1 bg-base-100 rounded w-fit">
@@ -100,12 +111,19 @@ export default function OperationStock() {
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={warehouses.length + 4} className="p-10 text-center text-meta text-base-500">
-                  Loading…
+                <td colSpan={warehouses.length + 4} className="p-4">
+                  <Loading variant="skeleton" label="Loading stock" />
                 </td>
               </tr>
             )}
-            {!isLoading && list.length === 0 && (
+            {isError && !data && (
+              <tr>
+                <td colSpan={warehouses.length + 4}>
+                  <CouldNotLoad detail="Stock across the network could not be loaded." onRetry={() => void refetch()} />
+                </td>
+              </tr>
+            )}
+            {!isLoading && !(isError && !data) && list.length === 0 && (
               <tr>
                 <td colSpan={warehouses.length + 4} className="p-10 text-center text-meta text-base-500">
                   {view === "low" ? "Everything is healthy. No low-stock SKUs." : "No SKUs."}
