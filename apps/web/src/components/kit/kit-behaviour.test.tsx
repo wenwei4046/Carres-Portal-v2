@@ -263,6 +263,14 @@ describe("Select", () => {
     render(<Select id="carrier" disabled options={OPTIONS} onValueChange={() => {}} />);
     expect(document.querySelector('[data-kit="select"]')).toBeDisabled();
   });
+
+  it("a long list stays on screen: capped at Radix's available height, and scrolls", () => {
+    // SO-1375 prod test (30 Oct 2026): the item list flipped above its trigger and ran off the top.
+    render(<Select id="carrier" options={OPTIONS} onValueChange={() => {}} />);
+    fireEvent.keyDown(screen.getByRole("combobox"), { key: "Enter" });
+    const list = document.querySelector('[data-kit="select-list"]');
+    expect(list).toHaveClass("max-h-[var(--radix-select-content-available-height)]");
+  });
 });
 
 /* ───────────────────────────────────────────────────────────────────────────
