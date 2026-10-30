@@ -1,18 +1,26 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import {
+  DELIVERY_PHOTO_MAX_BYTES,
+  DELIVERY_PHOTO_MIMES,
+  HANDOVER_EVIDENCE_MAX_FILES,
+  HANDOVER_EVIDENCE_VIDEO_MAX_BYTES,
+  HANDOVER_EVIDENCE_VIDEO_MIMES,
   deliveryGroupOf,
+  isOutsideTheTrip,
   type DeliveryHandoverKind,
   type HandoverGoodsLine,
 } from "@carres/shared";
+import { apiFetch } from "@/lib/api";
+import EvidenceUploadField, { type EvidenceEntry } from "@/components/EvidenceUploadField";
 import { fmtDate } from "@/lib/fmt-date";
 import {
   useDeliveryOrder,
   useRecordHandoverEvent,
   type DeliveryHandoverEventRow,
 } from "@/lib/queries";
-import { Modal } from "./Modal";
+import { Modal, ModalActions } from "./Modal";
 
 /**
  * WAREHOUSE → LOGISTICS HANDOVER — the §4 chain's acts, on the work surface
@@ -83,6 +91,7 @@ export default function WarehouseHandoverBlock({
   const [receiptQty, setReceiptQty] = useState<Record<string, string>>({});
   const [receiptNote, setReceiptNote] = useState("");
   const [formOpen, setFormOpen] = useState(false);
+  const [loadOpen, setLoadOpen] = useState(false);
 
   if (!detailQ.data || !d) return null;
   // A cancelled document has no handover; a resulted trip's chain is history.
@@ -100,6 +109,29 @@ export default function WarehouseHandoverBlock({
       ? "received_by_logistics"
       : null;
   const outboundHref = `/operation?tab=warehouse-outbound&do=${encodeURIComponent(doNumber)}`;
+  /* 0737 · a whole-order DO of accessories only (pillows, protectors) has no
+     Unit list, so Outbound has nothing to scan: the handover is recorded here.
+     The SKU word is a display hint; the server decides by Catalog's
+     stock_identity_mode and refuses if any line is Unit-tracked. */
+  const countedOnly =
+    detailQ.data.scopeUnits?.length === 0 &&
+    !d.trip_groups?.length &&
+    tripGoods.length > 0 &&
+    tripGoods.every((g) => isOutsideTheTrip(g.sku));
+  const loadModal = loadOpen ? (
+    <GoodsLoadedModal
+      doId={d.id}
+      doNumber={doNumber}
+      logisticsName={logisticsName}
+      onClose={() => setLoadOpen(false)}
+      onDone={onDone}
+    />
+  ) : null;
+  const loadButton = (testId: string, className: string) => (
+    <button type="button" data-testid={testId} className={className} onClick={() => setLoadOpen(true)}>
+      {`Record goods loaded to ${logisticsName ?? "logistics"}`}
+    </button>
+  );
 
   const handedGoods = byKind.get("handed_over")?.goods ?? null;
   const receiptBase: HandoverGoodsLine[] =
@@ -119,6 +151,14 @@ export default function WarehouseHandoverBlock({
   if (headerAction) {
     if (closed || !next) return null;
     if (next === "handed_over") {
+      if (countedOnly) {
+        return (
+          <>
+            {loadButton("do-object-primary-action", "btn-primary inline-flex h-7 items-center px-2.5 text-body font-medium")}
+            {loadModal}
+          </>
+        );
+      }
       /* The Warehouse act belongs to Outbound — this is a DOOR, not a form. */
       return (
         <Link
@@ -195,7 +235,12 @@ export default function WarehouseHandoverBlock({
         })}
       </ul>
 
-      {closed ? null : next === "handed_over" ? (
+      {closed ? null : next === "handed_over" && countedOnly ? (
+        <div data-testid="handover-counted-goods">
+          {loadButton("handover-record-goods-loaded", "btn-primary inline-block text-body font-medium py-1.5 px-3")}
+          {loadModal}
+        </div>
+      ) : next === "handed_over" ? (
         <div data-testid="handover-outbound-door">
           <Link to={outboundHref} className="btn-primary inline-block text-body font-medium py-1.5 px-3">
             Open Outbound
@@ -262,5 +307,110 @@ export default function WarehouseHandoverBlock({
         </div>
       ) : null}
     </div>
+  );
+}
+
+/** 0737 · the loading record for a DO of accessories only: no Unit IDs to
+ *  pick, the same receiver and proof as Outbound's `RecordLoadedModal`. The
+ *  goods count defaults on the server to the document's own lines. */
+function GoodsLoadedModal({
+  doId,
+  doNumber,
+  logisticsName,
+  onClose,
+  onDone,
+}: {
+  doId: string;
+  doNumber: string;
+  logisticsName: string | null;
+  onClose: () => void;
+  onDone?: () => void;
+}) {
+  const record = useRecordHandoverEvent(doId);
+  const [receiver, setReceiver] = useState("");
+  const [vehicle, setVehicle] = useState("");
+  const [evidence, setEvidence] = useState<Array<EvidenceEntry & { kind: "photo" | "video" }>>([]);
+  const signEvidence = useCallback(
+    (file: File) =>
+      apiFetch<{ token: string; path: string }>(
+        `/api/operation/delivery-orders/${encodeURIComponent(doId)}/handover-proof/sign-upload`,
+        { method: "POST", body: JSON.stringify({ mimeType: file.type, sizeBytes: file.size }) },
+      ),
+    [doId],
+  );
+  const canSubmit = receiver.trim().length > 0 && evidence.length > 0 && !record.isPending;
+
+  return (
+    <Modal title={`Handed over: ${doNumber}`} onClose={onClose}>
+      <div className="space-y-3 text-[13px]">
+        <label className="block">
+          <span className="text-label uppercase tracking-[0.06em] text-base-500">
+            Loaded to ({logisticsName ?? "logistics"})
+          </span>
+          <input
+            value={receiver}
+            onChange={(e) => setReceiver(e.target.value)}
+            className="mt-0.5 h-8 w-full rounded border border-kit-slate-5 px-2"
+            placeholder="The person who actually received the goods"
+            data-testid="handover-receiver"
+          />
+        </label>
+        <label className="block">
+          <span className="text-label uppercase tracking-[0.06em] text-base-500">
+            Vehicle (when known)
+          </span>
+          <input
+            value={vehicle}
+            onChange={(e) => setVehicle(e.target.value)}
+            className="mt-0.5 h-8 w-full rounded border border-kit-slate-5 px-2"
+            data-testid="handover-vehicle"
+          />
+        </label>
+        <div>
+          <span className="text-label uppercase tracking-[0.06em] text-base-500">
+            Proof: photos and videos of the loaded goods
+          </span>
+          <div className="mt-0.5">
+            <EvidenceUploadField
+              entries={evidence}
+              onChange={setEvidence}
+              sign={signEvidence}
+              bucket="proof-of-delivery"
+              imageMimes={DELIVERY_PHOTO_MIMES}
+              videoMimes={HANDOVER_EVIDENCE_VIDEO_MIMES}
+              imageMaxBytes={DELIVERY_PHOTO_MAX_BYTES}
+              videoMaxBytes={HANDOVER_EVIDENCE_VIDEO_MAX_BYTES}
+              maxFiles={HANDOVER_EVIDENCE_MAX_FILES}
+              ariaLabel="Loading evidence"
+              testId="handover-evidence"
+            />
+          </div>
+        </div>
+      </div>
+      <ModalActions
+        onCancel={onClose}
+        primary={`Record goods loaded to ${receiver.trim() || logisticsName || "logistics"}`}
+        primaryDisabled={!canSubmit}
+        primaryPending={record.isPending}
+        onPrimary={() =>
+          record.mutate(
+            {
+              kind: "handed_over",
+              receiverName: receiver.trim(),
+              vehicle: vehicle.trim() || undefined,
+              evidence,
+            },
+            {
+              onSuccess: () => {
+                toast.success("Handed over");
+                onClose();
+                onDone?.();
+              },
+              onError: (e) => toast.error(e.message),
+            },
+          )
+        }
+      />
+    </Modal>
   );
 }
