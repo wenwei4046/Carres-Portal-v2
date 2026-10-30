@@ -1,5 +1,9 @@
 # ORDERS — MASTER
 
+## Current shared UI intake ·30Oct2026
+
+The owner commissioned kit/rule publication first, then separate frontend page work. Follow [UI MASTER current template](../ui/MASTER.md#current-shared-template--owner-adoption-30-oct-2026) and its30Oct reconciliation for Shell, table, surfaces, document-card composition and Send task presentation. These replace conflicting older visual measurements and blanket50:50 document-bearing record presentation below; historical build evidence is not current visual law. Lists stay lists; document-free objects do not acquire a PDF. Module business facts, saved document versions, permissions, writers, approvals and downstream ownership remain unchanged. No frontend migration, backend change or production verification is claimed by this intake. All modules consume the same Shell and shared components; no local kit or task engine.
+
 ## Current Order Route presentation — owner24Oct2026
 
 The latest Sales Order Template Spec in `../ui/MASTER.md` replaces the old GOODS/DELIVERY/PAYMENT group-band Overview with one Journey line and party cards: Purchasing/Supplier, Warehouse, Logistics and Payment. Overview, Map and Documents read the same source-owned facts. Remove the duplicate GOODS Overview band; retain per-SO-line procurement, PO/source, received/accepted/damaged/wrong quantities, exact Units, location and evidence within the owning party card and source-linked Map/Documents. This is a presentation correction, not permission to discard the goods-chain readers or merge goods with stock ownership.

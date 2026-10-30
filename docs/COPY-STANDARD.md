@@ -1,5 +1,9 @@
 # Carres Portal — Copy Standard
 
+**30Oct shared UI intake:** current visual measurements and Shell/Send-card composition live only in `ui/MASTER.md`. The Send task uses Download → WhatsApp or Email → Record the result; this changes presentation, not the owning action meaning. Preserve exact document/version, recipient, actual actor/time and per-document persisted outcome. Opening a channel or downloading a file never means sent or done. Existing module approval/issue/send wording remains governed here and in its MASTER.
+
+**Supplied template display grammar:** stock age, where already applicable, is `{n} days` (e.g. `112 days`), not rounded months. Governed relative deadlines may show `Late {n}d` / `{n}d left`; the underlying deadline, working/calendar-day basis and status meaning remain module-owned. Quantity keeps its own column; an item's second line is specification, not a second quantity location.
+
 ## Current template copy correction — owner24Oct2026
 
 The latest Sales Order Template Spec in UI MASTER governs label case and missing values across all modules: field labels Title Case, table headers CAPS, sentences/notes sentence case. Missing values show nothing; `Not recorded` is retired as an empty-value placeholder, including quick cards and generated document fields. Keep labels, truthful read/error/permission/setup states and required-field validation. `Not received`, `No PO yet` and other actual business states remain facts, never invented to fill an empty value. Historical quoted observations containing the retired wording are evidence only. The optional Journey-step dash marks not-applicable, not a missing value. UI MASTER owns the exact current type/colour/geometry; this file owns copy.

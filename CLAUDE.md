@@ -1,5 +1,7 @@
 # CARRES PORTAL — PROJECT CONSTITUTION
 
+**Current UI handoff ·30Oct2026:** the ONE `docs/ui/MASTER.md` contains the reconciled `Sales Order (30).zip` kit, including its shared Shell,40px table headers,8px surfaces,6px small controls, proportional table fit,2:1 record/PDF card and shared Send task contract. Fetch `origin/main` and read its current template/reconciliation before every UI chat; older Desktop drafts and the24Oct Spec are superseded for these roles. Preserve all uncommitted work. This is rule publication only, not whole-ERP implementation proof. Subsequent frontend chats reuse the same Shell/components; IT retains backend/database/API ownership. Do not create a second kit.
+
 > **This file is not a development guide. It is the constitution.** It holds only what EVERY
 > chat must know. It is loaded automatically into every session, so it is the one thing nobody
 > can skip — and that is why it stays short. **200–300 lines. If it grows past that, something

@@ -1,3 +1,5 @@
+> **Historical specimen notice ·30Oct2026:** these13Oct HTML/scripts are preserved evidence, not the current visual kit. New chats must read `docs/ui/MASTER.md` and its reconciled30Oct intake. Do not copy this folder's measurements, personal-theme code, page CSS or task/storage engines. The latest supplied archive is recorded by hash in that MASTER; raw sample data is not republished here. The old README below records provenance only, not a second authority.
+
 # Sales Order UI kit specimen · supplied 13 Oct 2026 (round 3: Tasks panel, Workspace, SO Batch By sales order)
 
 > **Repository note. Read before the supplied README below.**
