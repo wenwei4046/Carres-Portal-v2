@@ -51,6 +51,7 @@ import OperationRental from "./OperationRental";
 import OperationToOrder from "./OperationToOrder";
 import OperationManualPurchase from "./OperationManualPurchase";
 import ForecastPurchasePage from "./forecast-purchase/ForecastPurchasePage";
+import OperationMrp from "./OperationMrp";
 import OperationWarehouse from "./OperationWarehouse";
 import OperationMovements from "./OperationMovements";
 import TabbedProcurementShell from "./procurement/TabbedProcurementShell";
@@ -669,6 +670,7 @@ export default function OperationApp({purchaseRequestContext=false}:{purchaseReq
             {/* Forecast Purchase · Outright: the weekly stock suggestion
                 (owner 13 Oct 2026; Purchasing MASTER §9.14). */}
             {tab === "forecast-purchase" && <ForecastPurchasePage contextFlow={purchaseRequestContext} />}
+            {tab === "mrp" && <OperationMrp />}
             {tab === "catalog" &&
               (role === "principal" ? (
                 <Navigate

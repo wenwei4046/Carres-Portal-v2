@@ -56,6 +56,7 @@ type PurchasingPage =
   | "to-order"
   | "manual-purchase"
   | "forecast-purchase"
+  | "mrp"
   | "purchase-orders"
   | "po-amendments"
   | "po-cancellation-requests"
@@ -89,6 +90,7 @@ const PAGE_WORD: Record<PurchasingPage, string> = {
   "manual-purchase": "Manual Purchase Request",
   /* The weekly stock suggestion (owner 13 Oct 2026). The SIDEBAR's own word. */
   "forecast-purchase": "Forecast Purchase",
+  mrp: "MRP",
   "purchase-orders": "Purchase Orders",
   /* 0717 · Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was not
      part of this decision). The SIDEBAR's own words. */
@@ -123,6 +125,8 @@ export default function PurchasingTabs({ right }: { right?: ReactNode } = {}) {
       ? "manual-purchase"
       : tabParam === "forecast-purchase"
       ? "forecast-purchase"
+      : tabParam === "mrp"
+      ? "mrp"
       : tabParam === "po-amendments"
       ? "po-amendments"
       : tabParam === "po-cancellation-requests"

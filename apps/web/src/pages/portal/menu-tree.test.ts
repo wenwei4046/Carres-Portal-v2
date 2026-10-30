@@ -83,6 +83,8 @@ describe("the approved hierarchy", () => {
       "SO Batch Purchase",
       /* Forecast Purchase · Outright (owner 13 Oct 2026), under SO Batch Purchase. */
       "Forecast Purchase",
+      /* Read-only MRP (YH, 30 Oct 2026). */
+      "MRP",
       "Manual Purchase Request",
       "Purchase Orders",
       /* 0717 · Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was not part of this decision). */
@@ -104,9 +106,9 @@ describe("the approved hierarchy", () => {
     ]);
   });
 
-  it("is exactly fourteen pages", () => {
-    /* Eleven, plus PO Amendments and Cancellation Requests (0717) and Purchase Consignment Receive (Houzs) · Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was not part of this decision). */
-    expect(purchasing).toHaveLength(14);
+  it("is exactly fifteen pages", () => {
+    /* Eleven, plus PO Amendments and Cancellation Requests (0717) and Purchase Consignment Receive (Houzs) · Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was not part of this decision), and MRP (YH, 30 Oct 2026). */
+    expect(purchasing).toHaveLength(15);
   });
 
   it("no row carries a hairline — Reports are central, not a Purchasing row", () => {
@@ -160,6 +162,7 @@ describe("the live destinations keep their exact current addresses", () => {
       ["SO Batch Purchase", "/operation?tab=purchase"],
       /* Forecast Purchase · Outright opened 13 Oct 2026; no other address moved. */
       ["Forecast Purchase", "/operation?tab=forecast-purchase"],
+      ["MRP", "/operation?tab=mrp"],
       ["Manual Purchase Request", "/operation?tab=manual-purchase"],
       ["Purchase Orders", "/operation/procurement"],
       /* 0717 · Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was not part of this decision). */
