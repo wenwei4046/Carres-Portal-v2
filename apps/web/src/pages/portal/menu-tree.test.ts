@@ -89,7 +89,7 @@ describe("the approved hierarchy", () => {
       "PO Amendments",
       "Cancellation Requests",
     ]);
-    expect(group("purchasing-receive")).toEqual(["Receiving"]);
+    expect(group("purchasing-receive")).toEqual(["Receiving", "Purchase Invoices"]);
     expect(group("purchasing-problems")).toEqual([
       "Supplier Claims",
       "Purchase Returns",
@@ -104,9 +104,9 @@ describe("the approved hierarchy", () => {
     ]);
   });
 
-  it("is exactly fourteen pages", () => {
+  it("is exactly fifteen pages", () => {
     /* Eleven, plus PO Amendments and Cancellation Requests (0717) and Purchase Consignment Receive (Houzs) · Weisiang's decision (Mr Lim, WhatsApp 2026-10-22; Jess was not part of this decision). */
-    expect(purchasing).toHaveLength(14);
+    expect(purchasing).toHaveLength(15);
   });
 
   it("no row carries a hairline — Reports are central, not a Purchasing row", () => {
@@ -166,6 +166,7 @@ describe("the live destinations keep their exact current addresses", () => {
       ["PO Amendments", "/operation?tab=po-amendments"],
       ["Cancellation Requests", "/operation?tab=po-cancellation-requests"],
       ["Receiving", "/operation?tab=receiving"],
+      ["Purchase Invoices", "/operation?tab=purchase-invoices"],
       ["Supplier Claims", "/operation?tab=claims"],
       /* §9.6 — Purchase Returns opened 2026-09-19 with its register, its read
          and its storage (migration 0548). It is the first of the six planned

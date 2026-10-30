@@ -293,8 +293,8 @@ describe("PortalSidebar — narrow desktop", () => {
  * Layout Standard §2 (owner-confirmed template, 2026-10-08).
  *
  * A module is an icon + a name + a caret. The Operations area is cut into six
- * small uppercase GROUP LABELS — Overview · Sales locations · Sales · Supply
- * chain · Service · Data — which are labels, never destinations; a module row
+ * small uppercase GROUP LABELS — Overview · Sales · Supply chain · Sales
+ * locations · Service · Data — which are labels, never destinations; a module row
  * itself is never an uppercase heading.
  */
 describe("a module is an expandable PARENT ROW, never a heading", () => {
@@ -327,9 +327,9 @@ describe("a module is an expandable PARENT ROW, never a heading", () => {
     );
     expect(heads.map((h) => h.textContent)).toEqual([
       "Overview",
-      "Sales locations",
       "Sales",
       "Supply chain",
+      "Sales locations",
       "Service",
       "Data",
     ]);
@@ -359,16 +359,16 @@ describe("a module is an expandable PARENT ROW, never a heading", () => {
       "child-dashboard",
       "child-work",
       "child-leave",
-      "group-head-sales-locations",
-      "module-showroom",
       "group-head-sales",
       "module-sales",
       "module-consignment",
       "group-head-supply-chain",
       "module-purchasing",
       "module-warehouse",
-      "module-payments",
       "module-delivery",
+      "module-payments",
+      "group-head-sales-locations",
+      "module-showroom",
       "group-head-service",
       "module-customer-care",
       "child-issue-tracker",
@@ -940,7 +940,7 @@ describe("PortalSidebar — the Purchasing map", () => {
     expect(tree.querySelector(".border-t")).toBeNull();
   });
 
-  it("fourteen pages in the approved order, and not a fifteenth", () => {
+  it("fifteen pages in the approved order, and not a sixteenth", () => {
     renderAt("/operation?tab=purchase");
     for (const key of [
       "purchasing-buy",
@@ -964,6 +964,7 @@ describe("PortalSidebar — the Purchasing map", () => {
       "PO Amendments",
       "Cancellation Requests",
       "Receiving",
+      "Purchase Invoices",
       "Supplier Claims",
       "Purchase Returns",
       "Repair Orders",
@@ -1508,7 +1509,7 @@ describe("PortalSidebar — the Delivery module's two destinations", () => {
    * Orders → Delivery Order → Edit Delivery. The first two are NAVIGATION;
    * the object and the writer are reached from cards and rows, never from
    * the rail. This overwrites the 2026-08-21 one-page ruling. */
-  it("Delivery is a module carrying Monitor and Delivery Orders, in that order", () => {
+  it("Delivery is a module carrying its pages in the order of the job", () => {
     renderAt("/operation?tab=delivery");
     expect(screen.getByTestId("nav-module-delivery")).toBeInTheDocument();
     const rows = Array.from(
@@ -1516,11 +1517,10 @@ describe("PortalSidebar — the Delivery module's two destinations", () => {
         .getByTestId("nav-children-delivery")
         .querySelectorAll("[data-testid^='nav-child-']"),
     ).map((el) => el.textContent?.replace("Coming soon", "").trim());
-    // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): Delivery Returns, Load
-    // Scan, Delivery Planning, DP Orders, Auto-schedule and Trips, then Carres' own
-    // lorries (Fleet Day, Live Map, Lorry Capacity, Crew Leave, then 0725 Fleet, Fleet Health, Delivery Zones, Rate Cards) join the rail after
-    // Delivery Orders. This overturns Jess's "exactly two children"; Jess was not part of it.
-    expect(rows).toEqual(["Monitor", "Delivery Orders", "Delivery Returns", "Load Scan", "Delivery Planning", "DP Orders", "Auto-schedule", "Trips", "Fleet Day", "Live Map", "Lorry Capacity", "Crew Leave",
+    // Weisiang's decision (Mr Lim, WhatsApp 2026-10-22) added these rows, which
+    // overturns Jess's "exactly two children"; Jess was not part of it. Their
+    // order follows the job: plan, load and deliver, returns, set-up (YH, 2026-10-30).
+    expect(rows).toEqual(["Monitor", "Delivery Planning", "DP Orders", "Delivery Orders", "Load Scan", "Fleet Day", "Live Map", "Delivery Returns", "Lorry Capacity", "Crew Leave",
       "Fleet", "Fleet Health", "Delivery Zones", "Rate Cards",
     ]);
   });
