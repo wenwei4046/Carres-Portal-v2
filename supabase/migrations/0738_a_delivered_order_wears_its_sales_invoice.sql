@@ -31,7 +31,9 @@
 -- BACKFILL (§E). Only orders that took the Journey path this bug lives on:
 --   stage 'delivered' · invoice_no null · not an AutoCount import
 --   (CLAUDE.md §6) · a live DO of the order has a `received_by_logistics`
---   handover event. Each is touched once with a no-op update under the flag,
+--   handover event · not SO-1312 (a seeded fixture, see §E). On prod
+--   30 Oct 2026 that is SO-1362 (Card 14 Journey walk) and SO-1375. Each is
+--   touched once with a no-op update under the flag,
 --   so the SAME trigger issues the SAME invoice. Each issued number is
 --   RAISE NOTICEd with its SO. A ledger refusal stops the whole file.
 --
@@ -112,6 +114,9 @@ begin
      where o.operation_stage = 'delivered'
        and o.invoice_no is null
        and o.source_system is distinct from 'autocount'
+       -- SO-1312 "Stage Three Fixture — Delivered": a seeded row marked delivered
+       -- with no DO and no handover; it was never sold, so it gets no invoice.
+       and o.so <> 1312
        and exists (
          select 1
            from ops_delivery_orders d
