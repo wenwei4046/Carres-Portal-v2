@@ -529,3 +529,47 @@ describe("Delivery Location reads the one shared address interpretation", () => 
     expect(build().location).toBe("Klang, Selangor");
   });
 });
+
+describe("a document minted before the booking", () => {
+  const undated = (arrangementLeg = 0) =>
+    buildDoRegisterRow(
+      doRow({
+        delivery_date: null,
+        time_slot: null,
+        logistics_partner: null,
+        orders: {
+          ...doRow().orders,
+          ops_delivery_arrangements: [
+            {
+              leg: arrangementLeg,
+              confirmed_date: "2026-10-30",
+              confirmed_time: "Morning (9am to 12pm)",
+              partner_id: "p-1",
+              delivery_partners: { name: "Carres Lorries" },
+            },
+          ],
+        },
+      }),
+      new Map(),
+      new Map(),
+    );
+
+  it("reads the day and carrier Delivery arranged, not Not scheduled / Logistics not assigned", () => {
+    const row = undated();
+    expect(row.confirmedDelivery).toBe("2026-10-30");
+    expect(row.confirmedTime).toBe("Morning (9am to 12pm)");
+    expect(row.logisticsPartner).toBe("Carres Lorries");
+  });
+
+  it("ignores an arrangement of another leg", () => {
+    const row = undated(1);
+    expect(row.confirmedDelivery).toBeNull();
+    expect(row.logisticsPartner).toBeNull();
+  });
+
+  it("the document's own snapshot still wins when it has one", () => {
+    const row = buildDoRegisterRow(doRow(), new Map(), new Map());
+    expect(row.confirmedDelivery).toBe("2026-08-20");
+    expect(row.logisticsPartner).toBe("NETS");
+  });
+});

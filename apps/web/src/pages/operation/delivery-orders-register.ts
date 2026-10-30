@@ -32,6 +32,7 @@
 
 import {
   deliveryGroupOf,
+  scheduledDeliveryOf,
   deliveryOrderStatusOf,
   signedDeliveryDocumentOf,
   latestEvidenceAtOf,
@@ -459,6 +460,18 @@ export function buildDoRegisterRow(
     legStop: stop?.to_loc ?? null,
   });
   const latest = [...attempts].sort((a, b) => b.recorded_at.localeCompare(a.recorded_at))[0];
+  /* The document's own day and carrier were snapshotted when it was minted;
+     one minted before the booking has neither. Delivery's arrangement for the
+     same leg is the one fallback every other surface already reads. */
+  const arrangement = r.orders.ops_delivery_arrangements?.find((a) => (a.leg ?? 0) === leg) ?? null;
+  const scheduled = scheduledDeliveryOf({
+    document: { deliveryDate: r.delivery_date, timeSlot: r.time_slot },
+    arrangement: arrangement
+      ? { confirmedDate: arrangement.confirmed_date, confirmedTime: arrangement.confirmed_time }
+      : null,
+  });
+  const partnerEmbed = arrangement?.delivery_partners;
+  const arrangementPartner = (Array.isArray(partnerEmbed) ? partnerEmbed[0]?.name : partnerEmbed?.name) ?? null;
   const control = overlayOf(r.orders.ops_order_control);
   const photos = control?.delivery_photos;
   const lines = tripLinesOf(r.orders.order_lines ?? [], r.trip_groups);
@@ -505,8 +518,8 @@ export function buildDoRegisterRow(
        Orders register read — never a second copy of the tbd guard. */
     requestedDelivery: requestedDeliveryOf(r.orders).iso,
     requestedTbd: requestedDeliveryOf(r.orders).tbd,
-    confirmedDelivery: r.delivery_date ? r.delivery_date.slice(0, 10) : null,
-    confirmedTime: r.time_slot,
+    confirmedDelivery: scheduled.iso,
+    confirmedTime: scheduled.time,
     /* ⭐ THE SAME ADDRESS READING MONITOR RUNS (owner correction
        2026-09-14). Both pages read the SAME order row, so a second
        interpretation here is how one Delivery surface starts printing
@@ -515,7 +528,7 @@ export function buildDoRegisterRow(
        the structured state — and this is what stops the first one that does
        not from splitting the two registers. */
     location: resolveDeliveryLocality(r.orders).label,
-    logisticsPartner: r.logistics_partner,
+    logisticsPartner: r.logistics_partner ?? arrangementPartner,
     issuedAt: r.issued_at,
     lines,
     goodsSummary: goodsSummaryOf(lines),

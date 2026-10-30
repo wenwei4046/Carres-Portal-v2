@@ -87,7 +87,7 @@ const deliveryOrdersRouter = new Hono<AppEnv>();
  *  same canonical column the single-document read below already selects, on the
  *  same route and the same role — no new permission and no new table. */
 const ORDER_EMBED =
-  "orders!inner(id, so, customer_name, customer_address, customer_address_city, customer_address_state, delivery_date, delivery_date_tbd, do_number, do_file_path, do_uploaded_at, delivery_stops, order_lines(id, sku, qty, attrs), ops_order_control(delivery_photos))";
+  "orders!inner(id, so, customer_name, customer_address, customer_address_city, customer_address_state, delivery_date, delivery_date_tbd, do_number, do_file_path, do_uploaded_at, delivery_stops, order_lines(id, sku, qty, attrs), ops_order_control(delivery_photos), ops_delivery_arrangements(leg, confirmed_date, confirmed_time, partner_id, delivery_partners(name)))";
 
 /**
  * §6.1 (0489) — the proof reviews and the attempt evidence of a set of
