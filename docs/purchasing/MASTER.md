@@ -1,5 +1,9 @@
 # PURCHASING — MASTER
 
+## Current shared UI intake ·30Oct2026
+
+The owner commissioned kit/rule publication first, then separate frontend page work. Follow [UI MASTER current template](../ui/MASTER.md#current-shared-template--owner-adoption-30-oct-2026) and its30Oct reconciliation for Shell, table, surfaces, document-card composition and Send task presentation. These replace conflicting older visual measurements and blanket50:50 document-bearing record presentation below; historical build evidence is not current visual law. Lists stay lists; document-free objects do not acquire a PDF. Module business facts, saved document versions, permissions, writers, approvals and downstream ownership remain unchanged. No frontend migration, backend change or production verification is claimed by this intake. All modules consume the same Shell and shared components; no local kit or task engine.
+
 ## Latest Purchasing design intake · 21 Oct 2026
 
 Jess supplied `Sales Order (28).zip` for frontend specification handoff to IT. The package supersedes the19Oct PO/Receiving exports as design evidence. The one dimensions/states/screen inventory is [UI MASTER · Purchasing design handoff](../ui/MASTER.md#purchasing-design-handoff--21-oct-2026--it-entry). No backend changes, SQL approval, production rollout or blanket business-rule replacement is inferred. The resolved21Oct UI table supersedes earlier presentation instructions in this document for SO/Purchasing record split, table rows, button/dialog sizes and pager. Earlier full-width/no-preview design instructions are retired for document-bearing records; historical implementation evidence remains historical. Internal previews are not new official documents. IT builds full SO/PO/Receiving/Stock/DO flow first in TEST; detailed Settings and approval configuration follows before production use. This does not permit disabling production guards or changing accounting/Stock truth.
@@ -7,7 +11,7 @@ Jess supplied `Sales Order (28).zip` for frontend specification handoff to IT. T
 | Export PLANNER item | Reconciliation / implementation boundary |
 |---|---|
 |1 Claim tabs/grouping | Latest presentation target To do/Waiting/Closed/All plus grouping; existing persisted states determine each set, no new backend status from a tab |
-|2 Always50/50 record | Resolved latest design: document-bearing record50:50 at content820+, stacked below; internal requests use labelled internal previews; PDF generation/content authority unchanged |
+|2 Document-bearing record | Current composition follows UI MASTER30Oct; older50:50 presentation is superseded; internal requests use labelled internal previews; PDF generation/content authority unchanged |
 |3 Claim Reported first | Latest presentation target date-first; status retained in selectable columns, exact reported-event meaning remains module-owned |
 |4 Carres template papers | Use existing PDF/document authority and supplied Carres references; prototype papers are sketches, not a new generator |
 |5 GRN Received by person | Proposed visible person/company tooltip is presentation. Preserve actual confirmer vs count submitter/saver vs duty/company as separate stored facts; do not relabel a saver as physical receiver |
