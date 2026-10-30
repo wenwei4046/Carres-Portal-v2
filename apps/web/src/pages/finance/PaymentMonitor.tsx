@@ -408,7 +408,7 @@ export default function PaymentMonitor() {
       accessor: (r) => <span className="block min-w-0">
         <span className="block truncate">
           {r.so != null
-            ? <button type="button" className="font-mono font-medium text-blue-700 underline-offset-2 hover:underline"
+            ? <button type="button" className="font-mono font-medium text-kit-blue-11 underline-offset-2 hover:underline"
                 onClick={(event) => { event.stopPropagation(); navigate(`/operation/orders/so/${r.orderId}`); }}>SO-{r.so}</button>
             : <span>SO not available</span>}
         </span>
@@ -550,7 +550,7 @@ export default function PaymentMonitor() {
   const weekStart = plan.weekStartIso;
   const weekLabel = `${fmtDate(weekStart)} to ${fmtDate(addDays(weekStart, 4))}`;
   const onPlanWeek = mondayOf(planDay) === weekStart;
-  const weekArrow = "grid h-8 w-7 shrink-0 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3";
+  const weekArrow = "grid h-11 w-11 shrink-0 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3";
 
   const rail = (
     <FilterRail testId="payment-monitor-rail" ariaLabel="Payment follow-up plan"
