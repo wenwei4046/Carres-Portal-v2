@@ -1,4 +1,7 @@
-import { Link, NavLink } from "react-router-dom";
+import { Menu } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Link, NavLink, useLocation } from "react-router-dom";
+import Drawer from "@/components/kit/Drawer";
 import { useAuth } from "@/lib/auth";
 import CarresLockup from "@/components/CarresLockup";
 import { useSupplierPos } from "@/lib/queries";
@@ -30,41 +33,98 @@ export default function SupplierSidebar() {
   const pendingCount = (pendingPos ?? []).filter(
     (p) => p.sup_status === "pending",
   ).length;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const { pathname } = useLocation();
+  useEffect(() => setMenuOpen(false), [pathname]); // a chosen page closes the drawer
+  // Growing to desktop width shows the sidebar, so a drawer left open must close.
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const close = () => mq.matches && setMenuOpen(false);
+    mq.addEventListener("change", close);
+    return () => mq.removeEventListener("change", close);
+  }, []);
 
   return (
-    <aside className="fixed left-0 top-0 bottom-0 w-[240px] bg-card border-r border-border flex flex-col py-[22px] z-10 overflow-auto">
-      <div className="px-[22px] pb-[18px] border-b border-border">
+    <>
+      <aside className="hidden md:flex fixed left-0 top-0 bottom-0 w-[240px] bg-card border-r border-border flex-col py-[22px] z-10 overflow-auto">
+        <div className="px-[22px] pb-[18px] border-b border-border">
+          <Link to="/supplier/dashboard" className="block">
+            <CarresLockup />
+          </Link>
+        </div>
+
+        <nav aria-label="Main" className="flex-1 px-3 pt-5 pb-1 flex flex-col gap-px">
+          {NAV_ITEMS.map((it) => (
+            <NavItem
+              key={it.to}
+              item={it}
+              badge={it.badgeKey === "pending" ? pendingCount : 0}
+            />
+          ))}
+        </nav>
+
+        <Link
+          to="/me"
+          title="Profile · Sign out"
+          className="px-[18px] pt-3 pb-1 border-t border-border flex items-center gap-2.5 hover:bg-accent/40 transition-colors"
+        >
+          <div className="w-[30px] h-[30px] rounded bg-primary text-primary-foreground grid place-items-center text-label font-bold flex-shrink-0">
+            {initials || "SP"}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-body font-medium truncate">{email || "Supplier"}</div>
+            <div className="text-label uppercase tracking-[0.06em] text-muted-foreground mt-px">
+              Supplier · Production
+            </div>
+          </div>
+        </Link>
+      </aside>
+      {/* Below 768px the fixed sidebar would leave ~155px for content: a top bar
+          with a menu button opens the same links in a Drawer instead. */}
+      <header className="sticky top-0 z-10 flex h-[calc(3rem+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)] pl-[max(0.75rem,env(safe-area-inset-left))] items-center gap-2 border-b border-border bg-card pr-3 md:hidden">
+        <button
+          type="button"
+          ref={menuButton}
+          aria-label="Open menu"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen(true)}
+          className="grid h-10 w-10 place-items-center rounded-md text-body hover:bg-accent/50"
+        >
+          <Menu aria-hidden="true" className="h-5 w-5" />
+        </button>
         <Link to="/supplier/dashboard" className="block">
           <CarresLockup />
         </Link>
-      </div>
-
-      <nav className="flex-1 px-3 pt-5 pb-1 flex flex-col gap-px">
-        {NAV_ITEMS.map((it) => (
-          <NavItem
-            key={it.to}
-            item={it}
-            badge={it.badgeKey === "pending" ? pendingCount : 0}
-          />
-        ))}
-      </nav>
-
-      <Link
-        to="/me"
-        title="Profile · Sign out"
-        className="px-[18px] pt-3 pb-1 border-t border-border flex items-center gap-2.5 hover:bg-accent/40 transition-colors"
-      >
-        <div className="w-[30px] h-[30px] rounded bg-primary text-primary-foreground grid place-items-center text-label font-bold flex-shrink-0">
-          {initials || "SP"}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-body font-medium truncate">{email || "Supplier"}</div>
-          <div className="text-label uppercase tracking-[0.06em] text-muted-foreground mt-px">
-            Supplier · Production
+      </header>
+      <Drawer open={menuOpen} onOpenChange={setMenuOpen} title="Menu" returnFocusRef={menuButton}>
+        <nav aria-label="Menu" onClick={() => setMenuOpen(false)} className="flex-1 px-3 pt-5 pb-1 flex flex-col gap-px">
+          {NAV_ITEMS.map((it) => (
+            <NavItem
+              key={it.to}
+              item={it}
+              badge={it.badgeKey === "pending" ? pendingCount : 0}
+            />
+          ))}
+        </nav>
+        <Link
+          to="/me"
+          onClick={() => setMenuOpen(false)}
+          title="Profile · Sign out"
+          className="px-[18px] pt-3 pb-1 border-t border-border flex items-center gap-2.5 hover:bg-accent/40 transition-colors"
+        >
+          <div className="w-[30px] h-[30px] rounded bg-primary text-primary-foreground grid place-items-center text-label font-bold flex-shrink-0">
+            {initials || "SP"}
           </div>
-        </div>
-      </Link>
-    </aside>
+          <div className="min-w-0 flex-1">
+            <div className="text-body font-medium truncate">{email || "Supplier"}</div>
+            <div className="text-label uppercase tracking-[0.06em] text-muted-foreground mt-px">
+              Supplier · Production
+            </div>
+          </div>
+        </Link>
+      </Drawer>
+    </>
   );
 }
 

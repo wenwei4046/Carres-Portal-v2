@@ -9,6 +9,7 @@ import {
 } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
 import { fmtMonth } from "@/lib/fmt-date";
+import Loading from "@/components/kit/Loading";
 
 /**
  * Service Case numbers — card S5 (`docs/service-case-execution-queue.md`).
@@ -51,7 +52,7 @@ export default function ServiceCaseNumbersPanel() {
     placeholderData: keepPreviousData,
   });
 
-  if (q.isLoading) return <p className="text-body text-base-500">Loading…</p>;
+  if (q.isLoading) return <Loading variant="skeleton" label="Loading the numbers" />;
 
   // A browser on this build can reach a Worker that predates /numbers (the
   // deploy is never atomic). That must degrade to a plain sentence, never take

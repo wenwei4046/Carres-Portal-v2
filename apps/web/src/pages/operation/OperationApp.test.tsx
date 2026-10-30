@@ -615,6 +615,8 @@ describe("OperationApp — the phone shell (owner review 2026-09-25, round 2)", 
       expect(screen.queryByTestId("right-rail-stub")).toBeNull();
       expect(screen.queryByTestId("phone-menu-button")).toBeNull();
       expect(screen.getByTestId("sidebar-stub")).toBeInTheDocument();
+      // » expands the left sidebar in place; there is no Menu Drawer.
+      expect(screen.queryByRole("dialog", { name: "Menu" })).toBeNull();
       expectOneHeader();
     } finally {
       restore();

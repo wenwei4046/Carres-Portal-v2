@@ -38,11 +38,13 @@ for (const width of [825, 1025, 1440]) {
     await page.getByRole('checkbox', { name: 'Select all rows', exact: true }).check();
     await expect(group).toBeChecked();
     await page.getByRole('button', { name: 'Clear', exact: true }).click();
-    // Navigation overlays the same canvas and returns to its unchanged selection.
+    // Navigation opens in place on the left and returns to its unchanged selection.
     await child.check();
     await page.getByRole('button', { name: 'Expand menu', exact: true }).click();
-    await expect(page.getByRole('dialog', { name: 'Menu', exact: true })).toBeVisible();
-    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('portal-sidebar')).toHaveCSS('width', '220px');
+    await expect(page.getByRole('dialog', { name: 'Menu', exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Collapse menu', exact: true }).click();
+    await expect(page.getByTestId('portal-sidebar')).toHaveCSS('width', '64px');
     await expect(child).toBeChecked();
     await expect(reminder).toHaveCount(0);
     await page.reload();

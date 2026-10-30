@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, act, screen, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 
 /**
@@ -1818,6 +1818,26 @@ describe("PortalSidebar — common Tasks canvas fit", () => {
       // The shared host may still be asking whether to keep an unsaved task.
       expect(screen.getByTestId("portal-sidebar")).toHaveStyle({ width: "64px" });
       expect(localStorage.getItem(COLLAPSE_KEY)).toBeNull();
+      // Once the host lets it through, the same sidebar opens in place, for now only.
+      act(() => expand.mock.calls[0][0]());
+      expect(screen.getByTestId("portal-sidebar")).toHaveStyle({ width: "220px" });
+      expect(localStorage.getItem(COLLAPSE_KEY)).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Collapse menu" }));
+      expect(expand).toHaveBeenCalledOnce();
+      expect(screen.getByTestId("portal-sidebar")).toHaveStyle({ width: "64px" });
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: previousWidth });
+    }
+  });
+
+  it("stays 64 by default at 1280 too (MASTER 4: 64px compact navigation)", () => {
+    const previousWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1280 });
+    try {
+      render(<MemoryRouter initialEntries={["/operation?tab=purchase"]}>
+        <PortalSidebar compactForCanvas onExpandForCanvas={vi.fn()} />
+      </MemoryRouter>);
+      expect(screen.getByTestId("portal-sidebar")).toHaveStyle({ width: "64px" });
     } finally {
       Object.defineProperty(window, "innerWidth", { configurable: true, value: previousWidth });
     }
@@ -1832,7 +1852,7 @@ describe("PortalSidebar — owner17Oct temporary module rail", () => {
     try {
       render(<MemoryRouter initialEntries={["/operation/orders/so/test-order"]}><PortalSidebar compactForCanvas /></MemoryRouter>);
       expect(screen.getByTestId("portal-sidebar")).toHaveStyle({ width: "64px" });
-      expect(screen.getByRole("button", { name: "Expand menu" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Expand menu" })).toBeEnabled();
       expect(localStorage.getItem(COLLAPSE_KEY)).toBe("0");
       Object.defineProperty(window, "innerWidth", { configurable: true, value: 1164 });
       fireEvent(window, new Event("resize"));

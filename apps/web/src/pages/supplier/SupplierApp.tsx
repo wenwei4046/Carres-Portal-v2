@@ -16,9 +16,9 @@ import SupplierSKU from "./SupplierSKU";
  */
 export default function SupplierApp() {
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground md:flex">
       <SupplierSidebar />
-      <main className="ml-[240px] flex-1 min-w-0">
+      <main className="min-w-0 md:ml-[240px] md:flex-1">
         <Routes>
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<SupplierDashboard />} />
