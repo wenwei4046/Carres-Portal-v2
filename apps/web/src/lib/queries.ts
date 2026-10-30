@@ -7649,6 +7649,15 @@ export interface DeliveryOrderRow {
     do_uploaded_at?: string | null;
     /** 0156 — the order's Journey legs, when it travels in legs. */
     delivery_stops?: DeliveryStop[] | null;
+    /** Delivery's own record per leg: the day and carrier a document minted
+     *  before the booking never snapshotted. */
+    ops_delivery_arrangements?: Array<{
+      leg: number | null;
+      confirmed_date: string | null;
+      confirmed_time: string | null;
+      partner_id: string | null;
+      delivery_partners?: { name: string } | { name: string }[] | null;
+    }>;
     /** The order's goods lines — the register expansion derives THIS TRIP's
      *  lines from them via `trip_groups` (one arithmetic with the DO page). */
     order_lines?: Array<{
