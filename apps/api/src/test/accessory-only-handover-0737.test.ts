@@ -30,7 +30,7 @@ function lastFunction(sql: string, name: string) {
   return text.slice(start, end + tag[1].length) + ";";
 }
 
-async function build(with0737: boolean) {
+async function build(with0737: boolean, eol: "\n" | "\r\n" = "\n") {
   const db = new PGlite();
   await db.exec(`
     create role authenticated; create role anon;
@@ -108,7 +108,10 @@ async function build(with0737: boolean) {
   await db.exec(lastFunction(m0733, "_delivery_sell_do_units"));
   await db.exec(statementOf(m0733, "create or replace function pg_temp.mig0733_rewrite", "$rw$;"));
   await db.exec(statementOf(m0733, "select pg_temp.mig0733_rewrite('public._delivery_mark_delivered", "$new$);"));
-  if (with0737) await db.exec(migration("0737_a_delivery_of_accessories_only_hands_over_without_unit_ids"));
+  if (with0737) {
+    const m0737 = migration("0737_a_delivery_of_accessories_only_hands_over_without_unit_ids");
+    await db.exec(m0737.replace(/\r?\n/g, eol));
+  }
   await db.exec("set check_function_bodies = on");
   return db;
 }
@@ -160,6 +163,16 @@ describe("after 0737", () => {
     const history = (await db.query<{ text: string }>(
       "select text from order_history where order_id = $1", [PILLOW_SO])).rows.map((h) => h.text);
     expect(history).toContain("Handed over the accessories to NETS — received by Ali (DO-1372)");
+  });
+
+  it("applies from a Windows (CRLF) copy of the file, and a second run changes nothing", async () => {
+    const db = await build(true, "\r\n");
+    const def = async () => (await db.query<{ d: string }>(
+      "select pg_get_functiondef('public.delivery_handover_record(uuid,text,text,text,jsonb,text,text,text[],jsonb)'::regprocedure) d")).rows[0].d;
+    const once = await def();
+    expect(once).toContain("Handed over the accessories");
+    await db.exec(migration("0737_a_delivery_of_accessories_only_hands_over_without_unit_ids").replace(/\r?\n/g, "\r\n"));
+    expect(await def()).toBe(once);
   });
 
   it("still needs the receiver and the proof", async () => {
