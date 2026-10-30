@@ -1695,7 +1695,15 @@ function SalesOrderWorkspaceBody() {
     setDraft((d) => ({ ...d, addons: [...d.addons, { key: nextKey(), addon_key: hit.key, qty: 1, unit_price: Number(hit.price), attrs: null, added: true }] }));
   };
   const categoryOfSku = useCallback((sku: string) => catalogBySku.get(sku)?.category ?? null, [catalogBySku]);
-  const consequencesFor = (after: { lines: DraftLine[]; addons: DraftAddon[]; header: Record<string, unknown> }) => {
+  /** ⭐ A GIFT / PWP / BUNDLE LINE KEEPS ITS PROTECTION (0385; owner-approved
+   *  item contract 2026-09-22): its eligibility and source are not a generic
+   *  qty or price box, and the database refuses an edit to one. It reads in
+   *  the draft; cancelling its PARENT shows the gift consequence instead.
+   *  Declared before `consequencesFor`: the request view's memo calls it
+   *  during render, and a later `const` is still in its dead zone then. */
+  const protectedLine = (l: DraftLine) =>
+    ["free_gift", "free_item", "pwp", "bundle_group", "combo_key"].some((k) => (l.attrs ?? {})[k] !== undefined);
+  const consequencesFor =(after: { lines: DraftLine[]; addons: DraftAddon[]; header: Record<string, unknown> }) => {
     const out: string[] = [];
     const poSkus = new Set((detailQ.data?.pos ?? []).flatMap((po) => po.lines.map((l) => l.sku)));
     const unitsOf = new Map((goodsTruthQ.data?.lines ?? []).map((l) => [l.lineId, (l.verifiedUnitIds ?? l.unitIds ?? []) as string[]]));
@@ -2261,12 +2269,6 @@ function SalesOrderWorkspaceBody() {
   const surchargeOf = (attrs: Record<string, unknown> | undefined | null) =>
     Number((attrs as { specials_total?: number } | null)?.specials_total ?? 0) +
     Number((attrs as { options_total?: number } | null)?.options_total ?? 0);
-  /** ⭐ A GIFT / PWP / BUNDLE LINE KEEPS ITS PROTECTION (0385; owner-approved
-   *  item contract 2026-09-22): its eligibility and source are not a generic
-   *  qty or price box, and the database refuses an edit to one. It reads in
-   *  the draft; cancelling its PARENT shows the gift consequence instead. */
-  const protectedLine = (l: DraftLine) =>
-    ["free_gift", "free_item", "pwp", "bundle_group", "combo_key"].some((k) => (l.attrs ?? {})[k] !== undefined);
 
   /* ══ THE DETAIL — owner-confirmed handoff 2026-10-08 (Layout Standard §3.2):
      object header on the canvas · Sales Order · Order Route · Timeline. The
