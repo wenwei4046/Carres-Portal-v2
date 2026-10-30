@@ -22,6 +22,7 @@ import ServiceCaseWizard from "./components/ServiceCaseWizard";
 import CaseOrderLink from "./components/CaseOrderLink";
 import Button from "@/components/kit/Button";
 import Checkbox from "@/components/kit/Checkbox";
+import Loading from "@/components/kit/Loading";
 
 /**
  * Operation Service Cases — the case (病历) list.
@@ -44,6 +45,12 @@ export default function OperationServiceCases() {
   // drawer's Related-cases row links to. Consumed once and stripped from the
   // URL so closing the modal does not immediately reopen it, and a refresh
   // lands on the plain list.
+  // No ModuleHeader on this page, so the tab title is set the way ModuleHeader sets it.
+  useEffect(() => {
+    document.title = "Service Cases · Carres";
+    return () => { document.title = "Carres Portal"; };
+  }, []);
+
   const [searchParams, setSearchParams] = useSearchParams();
   const deepLinkCase = searchParams.get("case");
 
@@ -106,11 +113,14 @@ export default function OperationServiceCases() {
   const emptyFilteredSentence = `No ${state || ""}${state ? " " : ""}cases${mine ? " of yours" : ""}${stageShown ? " at this stage" : ""}.`;
 
   return (
-    <div className="p-4 sm:p-8 max-w-7xl mx-auto">
-      {/* Header */}
+    // w-full min-w-0: with mx-auto alone this flex child sizes to the table's
+    // min-content width and the whole page scrolls sideways on a phone; now only the table does.
+    <div className="p-4 sm:p-8 max-w-7xl mx-auto w-full min-w-0">
+      {/* Header. The shell header prints the h1 from 768px up; on phones it is hidden, so the sr-only h1 stands in. */}
       <div className="mb-6">
         <p className="text-meta uppercase tracking-wider text-base-500 mb-1">Operation</p>
-        <h1 className="text-page text-base-900">Service Cases</h1>
+        <h1 className="sr-only md:hidden">Service Cases</h1>
+        <h2 className="text-page text-base-900">Service Cases</h2>
         <p className="text-body text-base-600 mt-2">
           Every issue is a case · classify · record · generate a Service Note dispatch order
         </p>
@@ -195,8 +205,8 @@ export default function OperationServiceCases() {
 
       {/* Table */}
       {listQ.isLoading ? (
-        <p className="text-body text-base-500">Loading…</p>
-      ) : listQ.isError ? (
+        <Loading variant="skeleton" label="Loading service cases" />
+      ) : listQ.isError && !listQ.data ? (
         /* A failure sentence is never the empty sentence (COPY-STANDARD 2026-08-28). */
         <div role="alert" className="flex flex-col items-center gap-3 rounded border border-base-200 bg-white p-12 text-center">
           <p className="text-body text-base-700">Service Cases could not be opened</p>

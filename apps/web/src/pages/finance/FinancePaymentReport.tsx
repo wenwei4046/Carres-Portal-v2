@@ -4,7 +4,9 @@ import { isLivePayment } from "@carres/shared";
 import type { PaymentRegisterRow } from "@carres/shared/payment-register";
 import type { InvoiceRegisterRow } from "@carres/shared/payment-invoice-register";
 import { soRemaining } from "@carres/shared/payment-invoice-register";
+import Button from "@/components/kit/Button";
 import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import Select from "@/components/kit/Select";
 import { SectionCard } from "@/components/SectionPanel";
@@ -209,10 +211,11 @@ export default function FinancePaymentReport() {
   // browser tab name stay on this report too.
   const header = <ModuleHeader destinationHeader testId="payment-report-header" word="Payment"
     docTitle="Payment · Carres" />;
-  if (paymentsQ.isError || invoicesQ.isError) {
+  if ((paymentsQ.isError && !paymentsQ.data) || (invoicesQ.isError && !invoicesQ.data)) {
     return <div className="flex h-full min-h-0 flex-col">{header}<div className="p-6"><EmptyState
       title="This report could not be opened"
-      detail="Try again."
+      detail="The payments or the invoices could not be loaded."
+      action={<Button variant="neutral" onClick={() => { void paymentsQ.refetch(); void invoicesQ.refetch(); }}>Try again</Button>}
     /></div></div>;
   }
   const loading = paymentsQ.isLoading || invoicesQ.isLoading;
@@ -235,7 +238,7 @@ export default function FinancePaymentReport() {
       </div>
     </div>
 
-    {loading ? <p className="text-body text-base-500">Loading…</p> : <div className="space-y-4">
+    {loading ? <Loading variant="skeleton" label="Loading the payment report" /> : <div className="space-y-4">
 
       <SectionCard><div className="p-3" data-testid="report-money-received">
         <Head note="Voided payments are not money received and are excluded here; they stay under Payment corrections.">
