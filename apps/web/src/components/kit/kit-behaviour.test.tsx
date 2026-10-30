@@ -782,11 +782,11 @@ describe("DataTable sort + filter", () => {
 });
 
 describe("Button pill shape", () => {
-  it("pill rounds fully; the default keeps the v4 8px corner — shape, never a variant", () => {
+  it("pill rounds fully; the default keeps the current6px corner — shape, never a variant", () => {
     const { rerender } = render(<Button shape="pill">Issue Purchase Orders</Button>);
     expect(screen.getByRole("button").className).toContain("rounded-full");
     rerender(<Button>Issue Purchase Orders</Button>);
-    expect(screen.getByRole("button").className).toContain("rounded-lg");
+    expect(screen.getByRole("button").className).toContain("rounded-md");
     expect(screen.getByRole("button").className).not.toContain("rounded-full");
   });
 });

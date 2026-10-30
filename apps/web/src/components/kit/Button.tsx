@@ -77,7 +77,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
       aria-busy={loading || undefined}
       data-kit="button"
       className={
-        `inline-flex items-center justify-center whitespace-nowrap ${iconOnly || shape === "pill" ? "rounded-full" : "rounded-lg"} text-body ${variant === "primary" ? "font-semibold" : "font-medium"} ` +
+        `inline-flex items-center justify-center whitespace-nowrap ${iconOnly || shape === "pill" ? "rounded-full" : "rounded-md"} text-body ${variant === "primary" ? "font-semibold" : "font-medium"} ` +
         "transition-[filter,background-color] " +
         "focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:2px] " +
         "disabled:opacity-[0.45] disabled:cursor-not-allowed " +

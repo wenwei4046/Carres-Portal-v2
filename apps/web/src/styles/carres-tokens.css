@@ -1,14 +1,10 @@
-/* Carres design tokens. Target values: docs/ui/carres-tokens.css (the 12 Oct 2026 kit).
-   The default theme is Blue, and the page ground is one fixed grey in every theme (01 §1, §9): a theme changes only
-   the selection colours. Taken from the kit: ink and greys, ground, lines, hover and table row hover, the selection
-   pair and pill, the main button colour, the menu tree line, the soft lift, the segmented track.
-   Red is not used: an error is amber (01 §1), so the error pair holds the amber pair.
-   Still the earlier build: the muted grey. Use only these; never the UI library's defaults. */
+/* Shared runtime values: docs/ui/MASTER.md, owner-supplied30Oct2026 kit.
+   Components consume these values; one shared blue selection palette. */
 :root{
-  --c-ink:#1F2937; --c-body:#374151; --c-tab:#4B5563; --c-secondary:#6B7280; --c-muted:#8A9099; --c-menu:#5C6168; --c-main:#1B1B39;
-  --c-ground:#F6F7F9; --c-card:#FFFFFF; --c-hover:#E2E4E8; --c-row-hover:#F2F3F5; --c-btn-hover:#EDEFF2; --c-icon-hover:rgba(31,41,55,.10); --c-icon-press:rgba(31,41,55,.16); --c-band:#F8F9FA; --c-open-frame:#CBD0D6;
+  --c-ink:#111827; --c-body:#1F2937; --c-tab:#4B5563; --c-secondary:#6B7280; --c-muted:#6B7280; --c-menu:#5C6168; --c-main:#1B1B39;
+  --c-ground:#F6F7F9; --c-card:#FFFFFF; --c-hover:#E2E4E8; --c-row-hover:#EEF3FF; --c-btn-hover:#EDEFF2; --c-icon-hover:rgba(31,41,55,.10); --c-icon-press:rgba(31,41,55,.16); --c-band:#F8F9FA; --c-open-frame:#CBD0D6;
   --c-card-border:#E5E7EB; --c-btn-border:#E5E7EB; --c-head-line:#E5E7EB; --c-row-line:#F1F2F4; --c-footer-line:#E5E7EB; --c-section-line:#E5E7EB; --c-input-border:#E1E4E8; --c-chip-border:#D5D9DE; --c-search-bg:#F1F2F4;
-  --c-select-bg:#EEF4FF; --c-select-fg:#2F55E0; --c-select-pill:#FFFFFF; --c-tree-line:#BFC5CD; --c-track:#E2E4E8; --c-track-hover:#EEF0F3; --c-column-band:#EEF0F3; --c-focus:2px solid #3965FA;
+  --c-select-bg:#DCE6FD; --c-select-fg:#2F55E0; --c-select-pill:#FFFFFF; --c-tree-line:#BFC5CD; --c-track:#E2E4E8; --c-track-hover:#EEF0F3; --c-column-band:#EEF0F3; --c-focus:2px solid #3965FA;
   --c-ok-bg:#E7F6EC; --c-ok-fg:#1E7A40; --c-warn-bg:#FBF0D6; --c-warn-fg:#7A5A00; --c-err-bg:#FBF0D6; --c-err-fg:#7A5A00; --c-info-bg:#E5E7EB; --c-info-fg:#374151; --c-hold-bg:#1F2937; --c-hold-fg:#FFFFFF; --c-online:#1E8A47;
   --font:'Inter',system-ui,sans-serif;
   --fs-page:20px; --fs-crumb:14px; --fs-menu:14px; --fs-card:15px; --fs-body:13px; --fs-label:12px; --fs-small:11px; --fs-group:10px;
@@ -16,24 +12,14 @@
   --btn-h-header:34px; --btn-h:32px; --btn-pad-header:0 14px; --btn-pad:0 12px; --icon-btn:36px; --icon-btn-header:34px;
   --input-h:32px; --input-h-row:30px; --search-h:34px;
   --tab-pad:5px 12px; --switch-pad:4px 10px; --pill-pad:3px 10px; --chip-pad:4px 10px;
-  --table-head-h:40px; --table-row-h:54px; --table-row-pad:6px 14px; --table-gap:10px; --table-foot-h:44px;
+  --table-head-h:40px; --table-row-h:44px; --table-row-pad:4px 10px; --table-gap:10px; --table-foot-h:44px;
   --card-pad:14px 16px; --menu-item-pad:7px 10px;
-  --menu-w:220px; --menu-w-closed:64px; --tasks-w:320px; --header-h:56px; --drawer-w:400px;
+  --menu-w:220px; --menu-w-closed:64px; --tasks-w:340px; --header-h:56px; --drawer-w:560px;
   --shadow-lift:0 1px 2px rgba(16,24,40,.10); --shadow-drawer:0 12px 40px rgba(34,31,32,.18); --shadow-menu:0 8px 24px rgba(17,24,39,.12); --backdrop:rgba(34,31,32,.18);
 }
 body{font-family:var(--font);font-variant-numeric:tabular-nums;background:var(--c-ground);color:var(--c-ink)}
 
-/* Appearance: set data-theme on <html> from the person's saved choice. Default blue; an absent or unknown value is blue.
-   A theme changes ONLY the selection colours. Ground, greys, lines, hover, buttons and status colours are fixed. */
-[data-theme="blue"]{--c-select-bg:#EEF4FF;--c-select-fg:#2F55E0;--c-select-pill:#FFFFFF}
-[data-theme="slate"]{--c-select-bg:#E6E9EE;--c-select-fg:#1F2937;--c-select-pill:#E6E9EE}
-[data-theme="teal"]{--c-select-bg:#DDF0EE;--c-select-fg:#0F5F59;--c-select-pill:#DDF0EE}
-[data-theme="violet"]{--c-select-bg:#ECE8F7;--c-select-fg:#4C3A8F;--c-select-pill:#ECE8F7}
-[data-theme="carres"]{--c-select-bg:#FBE6DB;--c-select-fg:#A33A14;--c-select-pill:#FBE6DB}
-[data-theme="honey"]{--c-select-bg:#FBEFC9;--c-select-fg:#7A5300;--c-select-pill:#FBEFC9}
-[data-theme="olive"]{--c-select-bg:#E6ECD9;--c-select-fg:#3F5A2A;--c-select-pill:#E6ECD9}
-[data-theme="rose"]{--c-select-bg:#F7E1E4;--c-select-fg:#8A2E40;--c-select-pill:#F7E1E4}
-[data-theme="latte"]{--c-select-bg:#ECE3D8;--c-select-fg:#5A4632;--c-select-pill:#ECE3D8}
+/* One shared blue selection palette; retired saved theme attributes have no effect. */
 /* One keyboard focus rule (01 §3/§9); no personal focus modes. */
 :focus{outline:none}
 :focus-visible{outline:var(--c-focus);outline-offset:2px;border-radius:var(--radius)}

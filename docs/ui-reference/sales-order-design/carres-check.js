@@ -17,7 +17,7 @@
   // 2 three title rows on one 36-px line; content starts together
   const tb = q('[role=tablist][aria-label=Views]')?.parentElement;
   const rows = [['toolbar', tb], ['Summary title', sum?.children[0]], ['Tasks title', tk?.children[0]]].filter(x => x[1]);
-  rows.forEach(([n, e]) => { const b = e.getBoundingClientRect(), drawer = e.closest('[data-kit=drawer][data-variant$="-panel"]'); if (px(b.height) !== 36) say(n, 'row height', px(b.height), 36); if (drawer) { const d = drawer.getBoundingClientRect(), width = drawer.dataset.variant === 'summary-panel' ? 264 : 320; if (px(d.width) !== width) say(n, 'overlay width', px(d.width), width); if (px(b.top) !== px(d.top) + 1) say(n, 'top inside overlay', px(b.top), px(d.top) + 1); } else if (tb && px(b.top) !== px(tb.getBoundingClientRect().top)) say(n, 'top', px(b.top), px(tb.getBoundingClientRect().top)); });
+  rows.forEach(([n, e]) => { const b = e.getBoundingClientRect(), drawer = e.closest('[data-kit=drawer][data-variant$="-panel"]'); if (px(b.height) !== 36) say(n, 'row height', px(b.height), 36); if (drawer) { const d = drawer.getBoundingClientRect(), width = drawer.dataset.variant === 'summary-panel' ? 264 : 340; if (px(d.width) !== width) say(n, 'overlay width', px(d.width), width); if (px(b.top) !== px(d.top) + 1) say(n, 'top inside overlay', px(b.top), px(d.top) + 1); } else if (tb && px(b.top) !== px(tb.getBoundingClientRect().top)) say(n, 'top', px(b.top), px(tb.getBoundingClientRect().top)); });
   // The Tasks body (what follows the 36px title row) starts level with the table. Measured on the body box: the old hunt for a card with an inline
   // border-radius walked out of a class-styled panel (the Portal) and reported top 0 (14 Oct, Code). In the design files the body top is the first card top.
   const table = main?.querySelector('section'), tkCard = tk?.children[1] ?? null, sumCard = sum?.children[1]?.children[0];
@@ -43,7 +43,7 @@
   // 6 no black rings / stray colours
   qa('*').forEach(e => { const s = e.getAttribute('style') || ''; if (/0 0 0 2px #1F2937|0 0 0 2px rgb\(31, 41, 55\)/i.test(s)) say('ring', e.tagName, 'black 2px ring', 'none'); });
   // 7 type scale (Standard §3.3 type hierarchy): only these size/weight pairs; icons and avatar initials excluded
-  const OKT = new Set(['20/600', '15/500', '14/400', '13/400', '13/500', '13/600', '12/400', '12/500', '11/500', '11/700']);
+  const OKT = new Set(['20/600', '15/500', '14/400', '13/400', '13/500', '13/600', '12/400', '12/500', '11/500', '11/600', '11/700', '10/600', '10/700']);
   const badT = new Set(); qa('main *').forEach(e => { if (!e.offsetParent || e.classList.contains('material-symbols-rounded') || e.closest('[aria-label="Sales Order PDF preview"]')) return; if (![...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) return; const st = cs(e), k = parseFloat(st.fontSize) + '/' + st.fontWeight; if (!OKT.has(k) && !/^[a-z_0-9]+$/.test(e.textContent.trim()) && !(st.borderRadius === '50%' && e.textContent.trim().length <= 3)) badT.add(k + ' "' + e.textContent.trim().slice(0, 24) + '"'); });
   badT.forEach(x => say('type', x, 'not in scale', '20/600 · 15/500 · 13 · 12 · 11'));
   // 8 item text: model and spec never on one line

@@ -78,7 +78,7 @@ const SIDE_WIDTH = {
   standard: "max-w-[var(--drawer-w)]",
   card: "max-w-drawer",
   summary: "max-w-[264px]",
-  tasks: "max-w-[320px]",
+  tasks: "max-w-[340px]",
 } as const;
 
 /**

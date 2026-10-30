@@ -59,7 +59,7 @@ async function expectKit(page: Page, width: number, state: string) {
   expect(m, `${state}: the Tasks panel is on the page`).not.toBeNull();
   expect(m!.pageScroll, `${state}: the page scrolls sideways`).toBeLessThanOrEqual(0);
   expect(m!.title, `${state}: the Tasks title row`).toBe(36);
-  if (width < 1280) expect(m!.width, `${state}: the panel's width`).toBe(320);
+  if (width < 1280) expect(m!.width, `${state}: the panel's width`).toBe(340);
   expect(m!.pastEdge, `${state}: parts pass the panel's right edge`).toBe(0);
   expect(m!.cut, `${state}: values cut`).toEqual([]);
   expect(await carresCheck(page), `${state}: carres-check.js`).toEqual(PASS);

@@ -15,7 +15,7 @@ import { migration } from "./stock-register-database";
  * payment voucher paying an opening bill, Unpaid by Supplier, the Self-check's
  * receivables, the stock value, and Reverse.
  */
-const FIXTURE = readFileSync(new URL("./finance-opening-balances-0705.fixture.sql", import.meta.url), "utf8");
+const FIXTURE = readFileSync(new URL("./finance-opening-balances-0705.fixture.sql", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 const FIN = "aaaaaaaa-0000-4000-8000-000000000001";
 const BOSS = "aaaaaaaa-0000-4000-8000-000000000002";
 const PREPARER = "aaaaaaaa-0000-4000-8000-000000000003";

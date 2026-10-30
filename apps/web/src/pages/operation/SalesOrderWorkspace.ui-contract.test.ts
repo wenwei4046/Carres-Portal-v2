@@ -871,8 +871,8 @@ describe("Sales Order detail — owner-confirmed handoff 2026-10-08", () => {
     expect(workspace).toContain("const locked = !amending || l.removed || protectedLine(l);");
   });
 
-  it("keeps the PDF the SAME document, drawn only while its drawer is open, and the old-version notices", () => {
-    expect(workspace).toContain("usePdfCanvases(pdfOpen ? templateData : null)");
+  it("keeps the PDF the SAME document, drawn in the record and expanded preview, and the old-version notices", () => {
+    expect(workspace).toContain('usePdfCanvases(objectView === "Sales Order" || pdfOpen ? templateData : null, pdfZoom)');
     expect(workspace).toContain('data-testid="pending-amendment-banner"');
     expect(workspace).toContain('data-testid="unsaved-watermark"');
     expect(workspace).toContain('data-testid="oldrev-rebuilt"');
