@@ -255,7 +255,7 @@ describe("Select", () => {
     const trigger = document.querySelector('[data-kit="select"]');
     // v4 (01 §3): 32px field, 8px corner, the input hairline.
     expect(trigger).toHaveClass("h-8");
-    expect(trigger).toHaveClass("rounded-lg");
+    expect(trigger).toHaveClass("rounded-md");
     expect(trigger).toHaveClass("border-c-input-border");
   });
 
@@ -782,11 +782,11 @@ describe("DataTable sort + filter", () => {
 });
 
 describe("Button pill shape", () => {
-  it("pill rounds fully; the default keeps the v4 8px corner — shape, never a variant", () => {
+  it("pill rounds fully; the default keeps the current6px corner — shape, never a variant", () => {
     const { rerender } = render(<Button shape="pill">Issue Purchase Orders</Button>);
     expect(screen.getByRole("button").className).toContain("rounded-full");
     rerender(<Button>Issue Purchase Orders</Button>);
-    expect(screen.getByRole("button").className).toContain("rounded-lg");
+    expect(screen.getByRole("button").className).toContain("rounded-md");
     expect(screen.getByRole("button").className).not.toContain("rounded-full");
   });
 });

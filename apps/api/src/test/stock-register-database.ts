@@ -6,7 +6,7 @@ export function statementOf(sql: string, start: string, end: string) {
 }
 
 export function migration(name: string) {
-  return readFileSync(new URL(`../../../../supabase/migrations/${name}.sql`, import.meta.url), "utf8");
+  return readFileSync(new URL(`../../../../supabase/migrations/${name}.sql`, import.meta.url), "utf8").replace(/\r\n/g, "\n");
 }
 
 export const verifyInventorySql = readFileSync(
@@ -16,6 +16,7 @@ export const verifyInventorySql = readFileSync(
 // Use the committed SQL, not a mock response that invents view columns. Only
 // upstream base tables/rows are fixtures; the functions and views are real SQL.
 function statement(sql: string, start: string, end: string) {
+  sql = sql.replace(/\r\n/g, "\n");
   const from = sql.indexOf(start);
   const to = sql.indexOf(end, from);
   if (from < 0 || to < 0) throw new Error(`Missing migration statement: ${start}`);

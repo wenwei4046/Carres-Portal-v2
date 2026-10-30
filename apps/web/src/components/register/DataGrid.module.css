@@ -43,7 +43,7 @@
   --radius-md: var(--radius);
   --radius-pill: var(--radius-round);
   --shadow-3: var(--shadow-menu);
-  /* The body row is a MINIMUM of the template's 54px (01 §5). A page whose
+  /* The body row is a MINIMUM of the template's minimum44px (01 §5). A page whose
      owner ruling needs a TALLER row (`rowHeight`, e.g. the 72px Delivery
      Monitor) still gets it; nothing renders shorter than the template. The
      reset stops a drill-down grid inheriting its parent's row height (the
@@ -53,8 +53,8 @@
   /* Ten between columns, fourteen at the row's two edges (01 §5, the v12
      Carres Table): every cell pads 5 a side and the first and last cell 14 on
      their outer side. One rule for every list; no page sets its own. */
-  --grid-cell-pad: 6px 5px;
-  --grid-edge-pad: 14px;
+  --grid-cell-pad: 4px 5px;
+  --grid-edge-pad: 10px;
 
   /* Toolbar, condition strip and the table card are separate pieces on the
      page, ten pixels apart (01 §5 row gap). */
@@ -137,7 +137,7 @@
   min-width: 0;
 }
 .rootReference .th {
-  color: var(--c-secondary);
+  color: var(--c-body);
   box-sizing: border-box;
   height: var(--table-head-h);
 }
@@ -639,12 +639,12 @@ div:first-child > .columnsMenuGroup {
   height: calc(var(--table-head-h) - 13px);
   padding: var(--grid-cell-pad);
   font-family: var(--font-sans);
-  font-size: var(--fs-label);
-  line-height: 16px;
-  font-weight: 500;
-  letter-spacing: normal;
-  text-transform: none;
-  color: var(--c-muted);
+  font-size: var(--fs-small);
+  line-height: 14px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--c-body);
   text-align: left;
   vertical-align: middle;
   border-bottom: 1px solid var(--c-head-line);
@@ -1208,8 +1208,8 @@ div:first-child > .columnsMenuGroup {
    weekday, 12 / 400 in the secondary grey. A right-aligned column keeps both
    lines on its right edge. */
 .headerSub {
-  font-weight: 400;
-  color: var(--c-secondary);
+  font-weight: inherit;
+  color: inherit;
 }
 .thAlignRight.thTwoLine .sortBtn {
   text-align: right;
@@ -1806,3 +1806,17 @@ div:first-child > .columnsMenuGroup {
 @container list-grid (width < 520px) {
   .rootReference .toolbar:not(.selectionBar) { gap: 4px; }
 }
+
+/* The supplied30Oct template compresses columns, then wraps full facts. */
+.rootShrink .td, .rootShrink .td span { white-space:normal; overflow-wrap:break-word; }
+.rootShrink .thInner { max-width:100%; }
+.rootShrink .sortBtn { white-space:normal; text-align:inherit; }
+.rootShrink .headerSub { font-size:inherit; font-weight:inherit; color:inherit; }
+
+.th .sortBtn { text-transform:inherit; }
+.rootShrink .thTwoLine { font-size:10px; }
+
+.rootShrink .sortBtn { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
+
+.thTwoLine { font-size:10px; }
+.th .sortBtn { max-width:100%; white-space:normal; }

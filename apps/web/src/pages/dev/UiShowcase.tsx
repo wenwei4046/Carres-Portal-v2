@@ -182,7 +182,7 @@ function TableExample({ narrow }: { narrow: boolean }) {
         columns={GRID_COLUMNS}
         storageKey={`carres.ui.table.${narrow ? "narrow" : "wide"}.v1`}
         rowKey={(r) => r.id}
-        rowHeight={54}
+        rowHeight={44}
         appearance="reference"
         palette="slate"
         hideToolbar
@@ -564,7 +564,7 @@ export default function UiShowcase() {
 
       <Section id="typography" title="Typography" note="Inter. The page heading above shows the 20/600 title once. Samples below use the running shared classes; the UI/UX MASTER owns the permitted roles. Table numbers use tabular figures.">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {[["15 / 500 · Card title", "text-strong", "Customer"], ["14 / 400 · Breadcrumb", "text-control", "Sales Orders"], ["13 / 400 · Body", "text-body", "TEST · Order details"], ["13 / 500 · Selected or field value", "text-body font-medium", "TEST · Selected value"], ["13 / 600 · Identifier or main action", "text-body font-semibold", "SO-TEST-01"], ["12 / 400 · Label or second line", "text-meta", "TEST · Customer A"], ["12 / 500 · Header or pill", "text-meta font-medium", "Proceed date"], ["11 / 500 · Caps label", "text-label uppercase tracking-[0.06em]", "Summary"], ["11 / 700 · Count badge", "text-label font-bold", "12"]].map(([label, className, sample]) => (
+          {[["11 / 700 · Card title", "text-label font-bold uppercase tracking-[.08em]", "Customer"], ["14 / 400 · Breadcrumb", "text-control", "Sales Orders"], ["13 / 400 · Body", "text-body", "TEST · Order details"], ["13 / 500 · Selected or field value", "text-body font-medium", "TEST · Selected value"], ["13 / 600 · Identifier or main action", "text-body font-semibold", "SO-TEST-01"], ["12 / 400 · Label or second line", "text-meta", "TEST · Customer A"], ["11 / 600 · Table header", "text-label font-semibold uppercase tracking-[.04em]", "Proceed date"], ["11 / 500 · Caps label", "text-label uppercase tracking-[0.06em]", "Summary"], ["11 / 700 · Count badge", "text-label font-bold", "12"]].map(([label, className, sample]) => (
             <div key={label} className="flex min-w-0 flex-col gap-2 rounded-lg border border-c-card-border bg-c-card p-3">
               <span className="text-meta text-c-secondary">{label}</span>
               <span className={`${className} text-c-ink`} data-type-sample={label}>{sample}</span>
@@ -600,7 +600,7 @@ export default function UiShowcase() {
         </div>
       </Section>
 
-      <Section id="table" title="Shared table · DataGrid" note="Sticky grey 40 header · 54 rows, every cell on one line · ▸ and tick 24 · gap 10 · a column is as wide as its longest value · ▸, tick and the identifier stay while the list scrolls in its own box · ▸ opens the items on the row's own columns · the footer takes two lines at most, short forms when the full words need a third, and never widens the list.">
+      <Section id="table" title="Shared table · DataGrid" note="Uppercase 40 header · minimum44 rows, growing for complete facts · ▸ and tick 24 · gap 10 · a column is as wide as its longest value · ▸, tick and the identifier stay while the list scrolls in its own box · ▸ opens the items on the row's own columns · the footer takes two lines at most, short forms when the full words need a third, and never widens the list.">
         <TableExample narrow={false} />
         <TableExample narrow />
       </Section>
@@ -662,7 +662,7 @@ export default function UiShowcase() {
         </div>
       </Section>
 
-      <Section id="side-panel" title="Side panel" note="The Summary frame: 36px title row; body starts at 36 + 10. In the module Shell below1100, the same content opens in the shared264px Drawer; Tasks uses320px. Inputs and scroll survive resizing.">
+      <Section id="side-panel" title="Side panel" note="The Summary frame: 36px title row; body starts at 36 + 10. In the module Shell below1100, the same content opens in the shared264px Drawer; Tasks uses340px. Inputs and scroll survive resizing.">
         <div className="flex gap-3" style={{ height: 360 }}>
           {summary ? (
             <CSidePanel label="Summary" title="Summary" onHide={() => setSummary(false)}>

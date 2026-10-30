@@ -8,9 +8,9 @@
  *   └ 8  ┘
  *   (the Tasks list — module, week, sections, rows)
  *
- * A 320px white card on the canvas. `›` hides it; the shell header then shows
+ * A 340px white card on the canvas. `›` hides it; the shell header then shows
  * a `Tasks 5` pill that opens it again. The choice is remembered per browser.
- * With a task open the card stays 320 below 1280 wide, so a task takes no
+ * With a task open the card stays 340 at every desktop width wide, so a task takes no
  * room from the list (03 §8); from 1280 it may use the spare width.
  */
 import { useEffect, useRef } from "react";
@@ -114,7 +114,6 @@ export function TasksPill({ fallback = false }: { fallback?: boolean } = {}) {
 export default function ShellTasks() {
   const open = useShellTasks((s) => s.open);
   const setOpen = useShellTasks((s) => s.setOpen);
-  const taskOpen = useTasksHost((s) => s.taskOpen);
   const guard = useTasksHost((s) => s.guard);
   const left = useTasksLeft();
   const pageHosts = useShellTasks((s) => s.pageHosts);
@@ -134,9 +133,8 @@ export default function ShellTasks() {
       aria-label="Tasks"
       data-testid="shell-tasks"
       className={`max-[1099px]:!w-full max-[1099px]:flex-1 flex min-h-0 shrink-0 flex-col overflow-hidden rounded-lg bg-white ring-1 ring-inset ring-c-border ${
-        /* 320 always (01 §2), so opening a task never takes room from the
-           list. On a wide screen the opened task may use the spare width. */
-        taskOpen ? "w-[320px] min-[1280px]:w-[clamp(366px,32vw,560px)]" : "w-[320px]"
+        /* Current fixed340px panel: opening a task keeps the same canvas. */
+        "w-[340px]"
       }`}
     >
       {/* The line is drawn inside the card (an inset ring), so this 36px title row

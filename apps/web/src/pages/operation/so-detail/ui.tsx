@@ -19,7 +19,7 @@ import { DialogContainerProvider } from "@/components/kit/dialog-container";
 import { SEGMENT, SEGMENT_OFF, SEGMENT_ON, SEGMENTED_TRACK } from "@/components/kit/Tabs";
 import { avatarColor, personInitials, personLabel } from "@/lib/staff-avatar";
 
-export const NOT_RECORDED = "Not recorded";
+export const NOT_RECORDED = "";
 
 /* ── Card ───────────────────────────────────────────────────────────────── */
 export function Card({
@@ -52,7 +52,7 @@ export function Card({
 export function CardTitle({ children, note, right }: { children: ReactNode; note?: ReactNode; right?: ReactNode }) {
   return (
     <div className="flex items-center gap-2 pb-1.5">
-      <h2 className="flex-1 text-[15px] font-medium leading-5 text-c-ink">{children}</h2>
+      <h2 className="flex-1 text-[11px] font-bold uppercase tracking-[.08em] leading-4 text-c-body">{children}</h2>
       {note && <span className="text-[12px] text-c-secondary">{note}</span>}
       {right}
     </div>
@@ -121,8 +121,8 @@ export function factOf(v: string | null | undefined, absent = NOT_RECORDED): { v
 /* ── Buttons ────────────────────────────────────────────────────────────── */
 type BtnKind = "main" | "header" | "normal" | "quiet";
 const BTN: Record<BtnKind, string> = {
-  main: "h-[34px] px-3.5 font-semibold bg-c-main text-white enabled:hover:opacity-90",
-  header: "h-[34px] px-3.5 font-medium bg-c-card text-c-ink border border-c-btn-border enabled:hover:bg-c-btn-hover",
+  main: "h-8 px-3.5 font-semibold bg-c-main text-white enabled:hover:opacity-90",
+  header: "h-8 px-3.5 font-medium bg-c-card text-c-ink border border-c-btn-border enabled:hover:bg-c-btn-hover",
   normal: "h-8 px-3 font-medium bg-c-card text-c-ink border border-c-btn-border enabled:hover:bg-c-btn-hover",
   quiet: "h-8 px-2.5 font-medium bg-transparent text-c-secondary enabled:hover:bg-c-btn-hover",
 };
@@ -143,7 +143,7 @@ export function CBtn({
     <button
       type="button"
       {...rest}
-      className={`inline-flex shrink-0 items-center justify-center gap-1.5 focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:2px] whitespace-nowrap rounded-lg text-[13px] leading-none disabled:cursor-not-allowed disabled:opacity-[.45] ${BTN[kind]} ${className}`}
+      className={`inline-flex shrink-0 items-center justify-center gap-1.5 focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:2px] whitespace-nowrap rounded-md text-[13px] leading-none disabled:cursor-not-allowed disabled:opacity-[.45] ${BTN[kind]} ${className}`}
     >
       {icon && <MIcon name={icon} size={18} />}
       {children}
@@ -161,7 +161,7 @@ export function CIconBtn({
 }: {
   icon: string;
   label: string;
-  size?: 34 | 36;
+  size?: 32 | 34 | 36;
   className?: string;
 } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
@@ -170,7 +170,7 @@ export function CIconBtn({
       aria-label={label}
       title={label}
       {...rest}
-      className={`grid shrink-0 place-items-center rounded-full text-c-body enabled:hover:bg-[var(--c-icon-hover)] enabled:active:bg-[var(--c-icon-press)] focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:2px] disabled:opacity-[.45] ${size === 34 ? "h-[34px] w-[34px]" : "h-9 w-9"} ${className}`}
+      className={`grid shrink-0 place-items-center rounded-full text-c-body enabled:hover:bg-[var(--c-icon-hover)] enabled:active:bg-[var(--c-icon-press)] focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:2px] disabled:opacity-[.45] ${size === 32 ? "h-8 w-8" : size === 34 ? "h-[34px] w-[34px]" : "h-9 w-9"} ${className}`}
     >
       <MIcon name={icon} size={20} />
     </button>
@@ -267,7 +267,7 @@ export function Drawer({
   title,
   onClose,
   children,
-  width = 400,
+  width = 560,
   testId,
   actions,
   right = 12,

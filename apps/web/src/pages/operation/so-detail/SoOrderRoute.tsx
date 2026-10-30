@@ -26,11 +26,12 @@ import SalesOrderRoute, { type RouteActionOwners, type RoutePerson, type RouteRe
 import { Avatar, Card, ViewSwitch } from "./ui";
 
 type View = "ov" | "st" | "dt";
-type Branch = "goods" | "delivery" | "money" | "loan";
+type Branch = "goods" | "warehouse" | "delivery" | "money" | "loan";
 
 const BRANCH: Record<Branch, { name: string; icon: string }> = {
-  goods: { name: "Goods", icon: "inventory_2" },
-  delivery: { name: "Delivery", icon: "local_shipping" },
+  goods: { name: "Supplier", icon: "inventory_2" },
+  warehouse: { name: "Warehouse", icon: "warehouse" },
+  delivery: { name: "Logistics", icon: "local_shipping" },
   money: { name: "Payment", icon: "payments" },
   loan: { name: "Loan", icon: "chair" },
 };
@@ -173,7 +174,7 @@ function BranchCard({ branch, nodes, owners, route }: { branch: Branch; nodes: R
     { k: "Due", v: current?.action?.context.detail ? spell(current.action.context.detail) : "Not set", muted: !current?.action?.context.detail },
     { k: "Doc", v: current?.door || last?.door ? <DoorLink node={(current?.door ? current : last)!} /> : "Not yet", muted: !(current?.door || last?.door) },
   ];
-  const items = branch === "goods" ? goodsItems(route) : [];
+  const items = branch === "warehouse" ? goodsItems(route) : [];
   return (
     <div
       className={`flex min-w-0 flex-col gap-2 rounded-lg border px-3.5 py-3 ${problem ? "border-c-btn-border bg-c-warn-bg" : "border-c-card-border bg-c-card"}`}
@@ -182,7 +183,7 @@ function BranchCard({ branch, nodes, owners, route }: { branch: Branch; nodes: R
     >
       <div className="flex items-center gap-2">
         <MIcon name={BRANCH[branch].icon} size={18} className="text-c-secondary" />
-        <span className="flex-1 text-[15px] font-medium text-c-ink">{BRANCH[branch].name}</span>
+        <span className="flex-1 text-[11px] font-bold uppercase tracking-[.08em] text-c-body">{BRANCH[branch].name}</span>
         <CPill tone={pill.tone}>{pill.word}</CPill>
       </div>
       {current?.action && (
@@ -274,8 +275,10 @@ export default function SoOrderRoute({
   const [view, setView] = useState<View>("ov");
   const byBranch = useMemo(() => {
     const out: Array<{ branch: Branch; nodes: RouteNode[] }> = [];
-    for (const b of ["goods", "delivery", "money", "loan"] as const) {
-      const nodes = route.nodes.filter((n) => n.branch === b);
+    for (const b of ["goods", "warehouse", "delivery", "money", "loan"] as const) {
+      const nodes = route.nodes.filter((n) => b === "goods"
+        ? n.kind === "purchasing" || n.kind === "supplier"
+        : b === "warehouse" ? n.kind === "receiving" || n.kind === "stock" : n.branch === b);
       if (nodes.length > 0) out.push({ branch: b, nodes });
     }
     return out;

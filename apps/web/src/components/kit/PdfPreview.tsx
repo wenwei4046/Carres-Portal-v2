@@ -21,17 +21,21 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 interface PdfPreviewProps {
   src: string;
   title: string;
+  /** A record card can own the same zoom toolbar as its generated document. */
+  zoom?: number;
+  controls?: boolean;
   onReady?: (ready: boolean) => void;
   "data-testid"?: string;
 }
 
 /** Actual PDF pages, using the same painter as Sales Order review. */
-export default function PdfPreview({ src, title, onReady, "data-testid": testId }: PdfPreviewProps) {
+export default function PdfPreview({ src, title, onReady, zoom: controlledZoom, controls = true, "data-testid": testId }: PdfPreviewProps) {
   const pane = useRef<HTMLDivElement>(null);
   const readiness = useRef(onReady);
   readiness.current = onReady;
   const [width, setWidth] = useState(0);
-  const [zoom, setZoom] = useState(1);
+  const [localZoom, setZoom] = useState(1);
+  const zoom = controlledZoom ?? localZoom;
   const [attempt, setAttempt] = useState(0);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
 
@@ -64,7 +68,7 @@ export default function PdfPreview({ src, title, onReady, "data-testid": testId 
         loading = pdfjs.getDocument(src);
         const doc = await loading.promise;
         if (cancelled) return;
-        await paintPdfPages(doc, node, Math.max(320, width) * zoom,
+        await paintPdfPages(doc, node, (width || 320) * zoom,
           () => cancelled, (next) => { task = next; });
         if (cancelled) return;
         setStatus("ready");
@@ -85,12 +89,12 @@ export default function PdfPreview({ src, title, onReady, "data-testid": testId 
 
   return (
     <section aria-label={title} data-testid={testId} className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <div className="mb-2 flex shrink-0 flex-wrap items-center gap-2">
+      {controls && <div className="mb-2 flex shrink-0 flex-wrap items-center gap-2">
         <Button size="sm" disabled={zoom <= 1} onClick={() => setZoom((n) => Math.max(1, n - 0.25))}>Zoom out</Button>
         <span className="text-meta tabular-nums">{Math.round(zoom * 100)}%</span>
         <Button size="sm" disabled={zoom >= 3} onClick={() => setZoom((n) => Math.min(3, n + 0.25))}>Zoom in</Button>
         <Button size="sm" disabled={zoom === 1} onClick={() => setZoom(1)}>Fit width</Button>
-      </div>
+      </div>}
       {status !== "ready" && (
         <div role="status" className="mb-2 flex flex-wrap items-center gap-2 text-meta text-kit-slate-11">
           {status === "loading" ? "Rendering preview…" : <>

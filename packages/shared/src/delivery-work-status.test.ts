@@ -355,7 +355,7 @@ function sourceFiles(): string[] {
 }
 
 describe("⭐ one status function and one label function print every surface", () => {
-  const files = sourceFiles().map((full) => ({ path: relative(ROOT, full), text: readFileSync(full, "utf8") }));
+  const files = sourceFiles().map((full) => ({ path: relative(ROOT, full).replaceAll("\\", "/"), text: readFileSync(full, "utf8") }));
 
   it("the module exports exactly one label function and no relabeller", () => {
     const exported = Object.keys(statusModule);

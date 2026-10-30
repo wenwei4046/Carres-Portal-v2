@@ -431,6 +431,8 @@ export type DataGridProps<T> = {
    * (`layout.widths`) still wins. `wrap` columns keep wrapping instead.
    */
   fitContent?: boolean;
+  /** Current template: shrink data columns together to70%, with a52px floor. */
+  shrinkToFit?: boolean;
   toolbar?: ReactNode;
   /** Reference-toolbar slots. Start renders before Search; End renders after
       Filters / Export / Columns. The legacy `toolbar` slot is unchanged. */
@@ -577,7 +579,7 @@ export type DataGridProps<T> = {
    * carry a document over its goods identity (Supplier Claims, §9.5).
    */
   /** 54 is the kit's list row (01 §5); the others are the earlier listings'. */
-  rowHeight?: 32 | 38 | 40 | 51 | 54 | 72;
+  rowHeight?: 32 | 38 | 40 | 44 | 51 | 54 | 72;
   /** show "Drag a column header here to group by that column" banner */
   groupBanner?: boolean;
   emptyMessage?: string;
@@ -894,6 +896,7 @@ function DataGridInner<T>({
   labelledToolbar = false,
   wrapToolbar = false,
   fitContent = false,
+  shrinkToFit = false,
   toolbar,
   toolbarStart,
   toolbarEnd,
@@ -977,7 +980,8 @@ function DataGridInner<T>({
      included, as measured after the last paint; a column is never narrower
      than its declared width, and a width the person dragged still wins. */
   const [fitWidths, setFitWidths] = useState<Record<string, number>>({});
-  const widthOf = (col: { key: string; width?: number; wrap?: boolean }): number => {
+  const [canvasWidth, setCanvasWidth] = useState(0);
+  const naturalWidthOf = (col: { key: string; width?: number; wrap?: boolean }): number => {
     const own = layout.widths[col.key] ?? col.width ?? 140;
     if (!fitContent || col.wrap || layout.widths[col.key] != null) return Number(own);
     return Math.max(Number(own), fitWidths[col.key] ?? 0);
@@ -1410,6 +1414,14 @@ function DataGridInner<T>({
    * gap the rows slide through. Empty when the capability is off, which is
    * what keeps every other register byte-identical.
    */
+  const controlWidth = visibleColumns.filter(c => c.key.startsWith("__")).reduce((n,c) => n + naturalWidthOf(c),0);
+  const dataWidth = visibleColumns.filter(c => !c.key.startsWith("__")).reduce((n,c) => n + naturalWidthOf(c),0);
+  const fitRatio = shrinkToFit && canvasWidth > 0 && dataWidth > 0 ? Math.max(0.7, Math.min(1,(canvasWidth - controlWidth) / dataWidth)) : 1;
+  const widthOf = (col: { key: string; width?: number; wrap?: boolean }): number => {
+    const width = naturalWidthOf(col);
+    return shrinkToFit && !col.key.startsWith("__") ? Math.max(52, Math.floor(width * fitRatio)) : width;
+  };
+
   const pinnedLefts = useMemo(() => {
     const m = new Map<string, number>();
     /* Date-first listings: both lead and pin on a canvas ≥768px; below it the
@@ -1465,7 +1477,7 @@ function DataGridInner<T>({
     }
     return m;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stickyIdentity, leadingColumns, pinnedLeadingKeys, prefixKey, narrowCanvas, visibleColumns, layout.widths, fitWidths]);
+  }, [stickyIdentity, leadingColumns, pinnedLeadingKeys, prefixKey, narrowCanvas, visibleColumns, layout.widths, fitWidths, fitRatio]);
   /** The last pinned column carries the edge that says where the block ends. */
   const pinnedEdgeKey = useMemo(() => {
     const keys = [...pinnedLefts.keys()];
@@ -1827,7 +1839,7 @@ function DataGridInner<T>({
   const groupedTableWidth = useMemo(
     () => visibleColumns.reduce((sum, col) => sum + widthOf(col), 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [visibleColumns, layout.widths, fitWidths],
+    [visibleColumns, layout.widths, fitWidths, fitRatio],
   );
 
   /** One section per governed group: its heading, then the rows under it. */
@@ -2349,6 +2361,7 @@ function DataGridInner<T>({
     if (!viewport || typeof ResizeObserver === "undefined") return;
     const measure = () => {
       setEmptyViewportWidth(viewport.clientWidth);
+      setCanvasWidth(viewport.clientWidth);
       /* The CANVAS decides, not the device: a register squeezed below 768px
          inside a wide window is a touch-sized target problem all the same. */
       setNarrowCanvas(viewport.clientWidth > 0 && viewport.clientWidth < 768);
@@ -2489,7 +2502,7 @@ function DataGridInner<T>({
         const fills = col.key === fillKey;
         const style: CSSProperties = {
           width: fills ? undefined : w,
-          minWidth: fills ? w : col.minWidth ?? 40,
+          minWidth: shrinkToFit ? w : fills ? w : col.minWidth ?? 40,
           ...pinStyle(col.key),
         };
         const isSorted = layout.sort?.key === col.key;
@@ -3058,6 +3071,7 @@ function DataGridInner<T>({
     <div
       className={[
         styles.root,
+        shrinkToFit ? styles.rootShrink : null,
         embedded ? styles.rootEmbedded : null,
         isReference ? styles.rootReference : null,
         palette === "slate" ? styles.rootPaletteSlate : null,

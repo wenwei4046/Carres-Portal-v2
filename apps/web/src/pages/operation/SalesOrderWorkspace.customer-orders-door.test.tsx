@@ -158,8 +158,8 @@ describe("missing saved delivery access facts", () => {
     answer({});
     mount();
     await screen.findByTestId("customer-type-chip");
-    await waitFor(() => expect(screen.getByTestId("so-row-floor")).toHaveTextContent("Not recorded"));
-    expect(screen.getByTestId("so-row-lift")).toHaveTextContent("Not recorded");
+    await waitFor(() => expect(screen.getByTestId("so-row-floor")).toHaveTextContent(/^Floor$/));
+    expect(screen.getByTestId("so-row-lift")).toHaveTextContent(/^Lift$/);
     expect(screen.getByTestId("so-row-lift")).not.toHaveTextContent("No lift");
   });
 });

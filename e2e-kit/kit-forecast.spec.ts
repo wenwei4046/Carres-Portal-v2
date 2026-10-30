@@ -278,7 +278,7 @@ test("1025 shared panels overlay the unchanged canvas and keep the common64 menu
   await page.getByRole("button", { name: /^Tasks/ }).first().click();
   const tasks = page.getByRole("dialog", { name: "Tasks" });
   await expect(tasks).toBeVisible();
-  expect(Math.round((await tasks.boundingBox())!.width)).toBe(320);
+  expect(Math.round((await tasks.boundingBox())!.width)).toBe(340);
   expect(Math.round((await page.locator(BOX).boundingBox())!.width)).toBe(canvasWidth);
   await page.keyboard.press("Escape");
   await expect(tasks).toHaveCount(0);

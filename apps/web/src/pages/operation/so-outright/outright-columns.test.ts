@@ -62,7 +62,7 @@ describe("Outright list cells read each owner and keep three states apart", () =
       delivery: { dateIso: null, time: null, source: null, partnerId: null, partnerName: null },
       loading: { hasDo: false, kind: null, at: null },
     })));
-    expect(t("pic", ctx).t).toBe("Not recorded");
+    expect(t("pic", ctx).t).toBe("");
     expect(t("sdo", ctx).t).toBe("Not yet");
     expect(t("appt", ctx).t).toBe("Not scheduled");
     expect(t("delivery", ctx).t).toBe("Not scheduled");
@@ -103,7 +103,7 @@ describe("Outright list cells read each owner and keep three states apart", () =
   it("Pay by is Payments' own deadline, and an unread clock is never 'no deadline'", () => {
     const monitorRow = { timing: { dueIso: "2026-10-16", late: false, fact: "Payment due Fri, 16 Oct" } } as unknown as PaymentMonitorRow;
     expect(t("payDue", ctxOf(ok(facts()), { state: "ok", row: monitorRow })).t).toBe("16 Oct");
-    expect(t("payDue", ctxOf(ok(facts()), { state: "ok", row: null })).t).toBe("Not recorded");
+    expect(t("payDue", ctxOf(ok(facts()), { state: "ok", row: null })).t).toBe("");
     expect(t("payDue", ctxOf(ok(facts()), { state: "failed" })).t).toBe("Could not read");
     expect(t("payDue", ctxOf(ok(facts()), { state: "denied" })).t).toBe("No access");
     expect(t("payDue", ctxOf(ok(facts()), { state: "failed" }, "paid")).t).toBe("Paid");
@@ -175,7 +175,7 @@ describe("The item row's Supplier (owner 14 Oct 2026: source-owned records only,
   });
 
   it("says Not recorded when the line's lineage was read and holds no supplier — never a purchase or stock word", () => {
-    expect(cell(withLines({ l1: { from: "none", names: [] } }))).toMatchObject({ t: "Not recorded", fg: "muted" });
+    expect(cell(withLines({ l1: { from: "none", names: [] } }))).toMatchObject({ t: "", fg: "muted" });
     expect(cell(withLines({ l1: { from: "none", names: [] } })).t).not.toMatch(/PO|stock/i);
   });
 

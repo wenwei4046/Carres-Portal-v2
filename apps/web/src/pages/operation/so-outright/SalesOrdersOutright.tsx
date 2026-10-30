@@ -723,13 +723,13 @@ export default function SalesOrdersOutright() {
             presentationKey={JSON.stringify([query, pageSize, page, sort])}
             rowKey={(r) => r.id}
             rowTestId={(r) => `outright-row-${r.so}`}
-            rowHeight={54}
+            rowHeight={44}
             appearance="reference"
             palette="slate"
             hideToolbar
             openColumns={columnsDoor}
             searchPresentation="none"
-            fitContent
+            shrinkToFit
             allowColumnGrouping={false}
             groupBanner={false}
             {...(fixedGroups ? { fixedGroups } : {})}

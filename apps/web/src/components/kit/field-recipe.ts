@@ -30,7 +30,7 @@ export const CONTROL_BORDER = {
 } as const;
 
 /** The v4 control corner, 8px (`rounded-lg` is `var(--radius)`). */
-export const CONTROL_RADIUS = "rounded-lg";
+export const CONTROL_RADIUS = "rounded-md";
 
 /** 32px single-line field, 10px sides — the height every form row aligns to. */
 export const CONTROL_SINGLE_LINE = "h-8 [padding-inline:10px]";

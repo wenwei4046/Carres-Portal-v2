@@ -37,7 +37,7 @@ export const LAYOUTS: { key: LayoutKey; label: string; icon: string; columns: st
   { key: "delivery", label: "Delivery", icon: "local_shipping", columns: ["order", "logi", "area", "delivery", "appt", "doNo", "payment"] },
 ];
 
-export const NOT_RECORDED: Cell = { t: "Not recorded", fg: "muted" };
+export const NOT_RECORDED: Cell = { t: "", fg: "muted" };
 export const NO_ACCESS: Cell = { t: "No access", fg: "muted", title: "You may not see this record." };
 export const LOADING: Cell = { t: "Loading", fg: "muted" };
 const NOT_YET: Cell = { t: "Not yet", fg: "muted" };
