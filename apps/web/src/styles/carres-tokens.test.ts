@@ -24,9 +24,9 @@ describe("Carres current shared palette", () => {
   it("saved retired themes cannot override the one palette", () => {
     expect(app).not.toMatch(/\[data-theme=/);
   });
-  it("validation uses the existing amber pair", () => {
-    expect(value("err-bg")).toBe(value("warn-bg"));
-    expect(value("err-fg")).toBe(value("warn-fg"));
+  it("danger and waiting use their distinct approved pairs", () => {
+    expect(value("err-bg")).toBe("#FDE8E6");
+    expect(value("err-fg")).toBe("#B42318");
   });
   it("hover classes consume the common tokens", () => {
     expect(tailwind).toContain('hovertint: "var(--c-row-hover)"');
