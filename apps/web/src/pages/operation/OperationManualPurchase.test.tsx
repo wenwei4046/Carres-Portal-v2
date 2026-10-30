@@ -2013,9 +2013,9 @@ describe("the fifteen columns, in the approved order (owner ruling 2026-09-18)",
     await loaded();
     const grid = screen.getByTestId("register-column");
     expect(heads(grid)).toEqual([
-      "Status",
-      "Proceed Date",
       "MPR No",
+      "Proceed Date",
+      "Status",
       "Approval Status",
       "Purpose",
       "Requested By",
@@ -2090,12 +2090,11 @@ describe("the fifteen columns, in the approved order (owner ruling 2026-09-18)",
     const mprCell = entrance.closest("td")!;
     expect(mprCell.className).toMatch(/sticky|Sticky/);
     /* Proceed Date pins beside it on a wide canvas; `Status` scrolls under the
-       block, because the approved order starts with it and a PIN may not
-       reorder the owner's own column list. */
-    const dateCell = mprCell.previousElementSibling as HTMLElement;
+       block. */
+    const dateCell = mprCell.nextElementSibling as HTMLElement;
     expect(dateCell.className).toMatch(/sticky|Sticky/);
     expect(dateCell.style.left).not.toBe("");
-    expect((mprCell.nextElementSibling as HTMLElement).style.left).toBe("");
+    expect((dateCell.nextElementSibling as HTMLElement).style.left).toBe("");
   });
 
   it("R2 default order: waiting · Order By · Not planned · history newest first", async () => {

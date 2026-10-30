@@ -815,22 +815,6 @@ export default function PurchaseOrdersPage() {
    */
   const columns: Array<DataGridColumn<RegisterRow>> = [
     {
-      key: "po_date",
-      chooserGroup: "Document",
-      label: "PO Doc Date",
-      /* The registry's number, not this page's: SO Batch measured a cross-year
-         date at 99px and landed on 120, which is the widest measurement of the
-         field, so the field is 120 here too (ui MASTER §6.8). */
-      width: 120,
-      sortable: true,
-      accessor: (row) => (row.poDate ? <span className="tabular-nums">{fmtDate(row.poDate)}</span> : <Absence />),
-      searchValue: (row) => (row.poDate ? fmtDate(row.poDate) : "Not recorded"),
-      exportValue: (row) => row.poDate ?? "Not recorded",
-      dateValue: (row) => row.poDate,
-      filterType: "date",
-      sortFn: (a, b) => (a.poDate ?? "").localeCompare(b.poDate ?? ""),
-    },
-    {
       key: "po",
       chooserGroup: "Document",
       label: "PO No",
@@ -856,6 +840,22 @@ export default function PurchaseOrdersPage() {
       searchValue: (row) => `${row.id} ${displayedIdentity(row)} ${row.facts.documentState}`,
       filterValue: (row) => displayedIdentity(row),
       exportValue: (row) => displayedIdentity(row),
+    },
+    {
+      key: "po_date",
+      chooserGroup: "Document",
+      label: "PO Doc Date",
+      /* The registry's number, not this page's: SO Batch measured a cross-year
+         date at 99px and landed on 120, which is the widest measurement of the
+         field, so the field is 120 here too (ui MASTER §6.8). */
+      width: 120,
+      sortable: true,
+      accessor: (row) => (row.poDate ? <span className="tabular-nums">{fmtDate(row.poDate)}</span> : <Absence />),
+      searchValue: (row) => (row.poDate ? fmtDate(row.poDate) : "Not recorded"),
+      exportValue: (row) => row.poDate ?? "Not recorded",
+      dateValue: (row) => row.poDate,
+      filterType: "date",
+      sortFn: (a, b) => (a.poDate ?? "").localeCompare(b.poDate ?? ""),
     },
     {
       key: "source",
@@ -1403,7 +1403,7 @@ export default function PurchaseOrdersPage() {
               activeConditions={activeConditions}
               reserveConditionRow
               onClearConditions={() => setFilter(RAIL_CLEAR)}
-              leadingColumns={overview ? undefined : { date: "po_date", identity: "po" }}
+              pinnedPrefix={overview ? undefined : { columns: ["po", "po_date"], narrow: ["po"] }}
               personalLayouts={overview ? undefined : personalLayouts}
               groupBanner={false}
               fixedGroups={overview ? undefined : {
@@ -1417,7 +1417,7 @@ export default function PurchaseOrdersPage() {
               expandTitle="Show goods"
               expandable={{
                 flush: true,
-                alignToColumn: overview ? "po" : "po_date",
+                alignToColumn: "po",
                 /* The goods rows are wider than the Overview: they scroll
                    sideways inside themselves and never widen the list
                    (01 §6), so `Status` stays in view with a row open. */

@@ -166,14 +166,14 @@ vi.mock("@/components/register/DataGrid", async () => {
   return { DataGrid: (props: any) => {
     lastGridProps = props;
     if (useRealRegisterGrid) return <RealDataGrid {...props} />;
-    const { rows, columns, onRowDoubleClick, statusSummary, fixedGroups, leadingColumns, personalLayouts, activeConditions, expandable, toolbarEnd, renderResults, selectable, selectionPrimary, onFacetRowsChange } = props;
+    const { rows, columns, onRowDoubleClick, statusSummary, fixedGroups, pinnedPrefix, personalLayouts, activeConditions, expandable, toolbarEnd, renderResults, selectable, selectionPrimary, onFacetRowsChange } = props;
     useEffect(() => { onFacetRowsChange?.([...rows]); });
     return (
     <div
       data-testid="register-grid"
       data-groups={fixedGroups?.groups.map((g: any) => g.key).join(",")}
       data-group-labels={fixedGroups?.groups.map((g: any) => g.label).join(" | ")}
-      data-leading={leadingColumns ? `${leadingColumns.date},${leadingColumns.identity}` : undefined}
+      data-leading={pinnedPrefix ? pinnedPrefix.columns.join(",") : undefined}
       data-personal-layouts={personalLayouts ? "1" : undefined}
     >
       {rows.some((row: any) => selectable?.selectedKeys.has(row.id)) ? selectionPrimary : toolbarEnd}
@@ -533,11 +533,11 @@ describe("Purchase Orders Register", () => {
     expect(screen.getByTestId("register-grid")).toBeInTheDocument();
   });
 
-  it("draws exactly the eleven approved columns, date first, and none of the retired ones", () => {
+  it("draws exactly the eleven approved columns, number first, and none of the retired ones", () => {
     renderPage();
     const grid = screen.getByTestId("register-grid");
     expect(screen.getByTestId("register-columns")).toHaveTextContent(
-      /^PO Doc Date \| PO No \| SO No \/ MPR No \| Supplier \| Items \| Supplier Deliver To \| PO Delivery Date \| Supplier Confirmed Delivery Date \| Goods Received Date \| GRN No \| PO Version$/,
+      /^PO No \| PO Doc Date \| SO No \/ MPR No \| Supplier \| Items \| Supplier Deliver To \| PO Delivery Date \| Supplier Confirmed Delivery Date \| Goods Received Date \| GRN No \| PO Version$/,
     );
     /* `Expected Delivery Date` is retired BY NAME: what we planned and what
        the factory promised are two facts, and one cell holding whichever it
@@ -545,7 +545,7 @@ describe("Purchase Orders Register", () => {
     for (const retired of ["PO Issued", "Expected Delivery Date", "Order Qty", "Received Qty", "Pending Delivery Qty", "Sent to Supplier", "Source"]) {
       expect(screen.getByTestId("register-columns")).not.toHaveTextContent(retired);
     }
-    expect(grid).toHaveAttribute("data-leading", "po_date,po");
+    expect(grid).toHaveAttribute("data-leading", "po,po_date");
     expect(screen.getByTestId("grid-row-PO-20260828-4827")).toHaveTextContent("Fri, 28 Aug");
     expect(screen.getByTestId("grid-row-PO-LEGACY")).toBeInTheDocument();
   });
@@ -1410,7 +1410,7 @@ describe("Purchase Orders Overview", () => {
     overview.unmount();
     renderPage(`${OVERVIEW}?view=table`);
     expect(lastGridProps.expandable.fitExpansionToViewport).toBe(false);
-    expect(lastGridProps.expandable.alignToColumn).toBe("po_date");
+    expect(lastGridProps.expandable.alignToColumn).toBe("po");
   });
   it("Table keeps the eleven columns and the four groups", () => {
     renderPage(`${OVERVIEW}?view=table`);

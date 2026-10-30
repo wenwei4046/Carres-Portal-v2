@@ -49,8 +49,8 @@ export function repairProblemLabel(value: string): string {
 
 // ── the register: 17 columns, exactly in this order (§9.7, 2026-09-20) ───────
 export const REPAIR_ORDER_COLUMN_ORDER = [
-  "ro_doc_date",
   "ro_no",
+  "ro_doc_date",
   "supplier",
   "claim_no",
   "category",

@@ -233,15 +233,6 @@ export function PurchaseReturnsRegister({
   const columns = useMemo<DataGridColumn<PurchaseReturnListRow>[]>(
     () => [
       {
-        key: "pr_doc_date",
-        label: PURCHASE_RETURN_COLUMN_LABEL.pr_doc_date,
-        width: 144,
-        accessor: (row) => dateFact(row.pr_doc_date),
-        dateValue: (row) => row.pr_doc_date,
-        filterType: "date",
-        exportValue: (row) => (row.pr_doc_date ? fmtDate(row.pr_doc_date) : ""),
-      },
-      {
         key: "pr_no",
         label: PURCHASE_RETURN_COLUMN_LABEL.pr_no,
         width: 190,
@@ -263,6 +254,15 @@ export function PurchaseReturnsRegister({
         searchValue: (row) => `${purchaseReturnNo(row.pr_no)}${row.cancelled_at ? " Cancelled" : ""}`,
         exportValue: (row) => `${purchaseReturnNo(row.pr_no)}${row.cancelled_at ? " · Cancelled" : ""}`,
         filterType: "numbering",
+      },
+      {
+        key: "pr_doc_date",
+        label: PURCHASE_RETURN_COLUMN_LABEL.pr_doc_date,
+        width: 144,
+        accessor: (row) => dateFact(row.pr_doc_date),
+        dateValue: (row) => row.pr_doc_date,
+        filterType: "date",
+        exportValue: (row) => (row.pr_doc_date ? fmtDate(row.pr_doc_date) : ""),
       },
       {
         key: "supplier",
@@ -544,7 +544,7 @@ export function PurchaseReturnsRegister({
             groupBanner={false}
             /* §6.7 rule 2 — the record date and the identity lead and pin, and
                no saved layout may hide or reorder them away. */
-            leadingColumns={{ date: "pr_doc_date", identity: "pr_no" }}
+            pinnedPrefix={{ columns: ["pr_no", "pr_doc_date"], narrow: ["pr_no"] }}
             isLoading={isLoading}
             emptyMessage={
               anyFilter ? `No matching ${noun}.` : `No ${noun}.`

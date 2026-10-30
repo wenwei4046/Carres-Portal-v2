@@ -71,7 +71,7 @@ function LinesGrid({ kind, rows, loading, failed, retry }: {
     <ModuleHeader destinationHeader testId={`${kind}-lines-header`} word={w.page} docTitle={`${w.page} · Carres`} />
     <ListPageShell register>
       <DataGrid rows={rows} columns={columns} rowKey={(r) => r.key} storageKey={`carres.reports.${kind}-lines.v1`}
-        appearance="reference" exportName={w.page} groupBanner={false} leadingColumns={{ date: "date", identity: "doc" }}
+        appearance="reference" exportName={w.page} groupBanner={false} pinnedPrefix={{ columns: ["doc", "date"], narrow: ["doc"] }}
         sortDefault={{ key: "date", dir: "desc" }} isLoading={loading}
         errorState={failed ? <LoadFailed what={w.page} onRetry={retry} /> : undefined}
         emptyMessage={`No lines yet. ${w.note}`}

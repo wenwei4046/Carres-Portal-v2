@@ -298,7 +298,7 @@ export default function OperationReceiving({ consignmentPage = false }: { consig
    * and no other (`purchasing/MASTER.md` §9.4):
    *
    * ```
-   * GRN Doc Date · GRN No · SO No / MPR No / CO No / RO No · PO No · Supplier ·
+   * GRN No · GRN Doc Date · SO No / MPR No / CO No / RO No · PO No · Supplier ·
    * Supplier Deliver To · Goods arrived at · Supplier Confirmed Delivery Date ·
    * Goods Received Date · Supplier DO No · Items · Received Qty ·
    * Damaged Qty · Wrong Item Qty · Extra Qty
@@ -316,27 +316,6 @@ export default function OperationReceiving({ consignmentPage = false }: { consig
    */
   const columns: DataGridColumn<WarehouseReceiptQueueRow>[] = useMemo(
     () => [
-      {
-        key: "grnDate",
-        label: "GRN Doc Date",
-        width: REGISTER_FIELD_WIDTH.date,
-        sortable: true,
-        /* CREATION — when `Save Receiving` made this document. Never inferred
-           from the physical arrival date, and never the other way round. */
-        searchValue: (r) => r.grn_date ?? "",
-        exportValue: (r) => (r.grn_date ? fmtDate(r.grn_date) : ""),
-        filterType: "date",
-        dateValue: (r) => r.grn_date ?? null,
-        sortFn: (a, b) => (a.grn_date ?? "").localeCompare(b.grn_date ?? ""),
-        accessor: (r) =>
-          r.grn_date ? (
-            <span className="tabular-nums text-body text-base-900">
-              {fmtDate(r.grn_date)}
-            </span>
-          ) : (
-            <span className="text-body text-kit-slate-11">Not recorded</span>
-          ),
-      },
       {
         key: "grn",
         filterValue: receivingDisplayNo,
@@ -368,6 +347,27 @@ export default function OperationReceiving({ consignmentPage = false }: { consig
             )}
           </span>
         ),
+      },
+      {
+        key: "grnDate",
+        label: "GRN Doc Date",
+        width: REGISTER_FIELD_WIDTH.date,
+        sortable: true,
+        /* CREATION — when `Save Receiving` made this document. Never inferred
+           from the physical arrival date, and never the other way round. */
+        searchValue: (r) => r.grn_date ?? "",
+        exportValue: (r) => (r.grn_date ? fmtDate(r.grn_date) : ""),
+        filterType: "date",
+        dateValue: (r) => r.grn_date ?? null,
+        sortFn: (a, b) => (a.grn_date ?? "").localeCompare(b.grn_date ?? ""),
+        accessor: (r) =>
+          r.grn_date ? (
+            <span className="tabular-nums text-body text-base-900">
+              {fmtDate(r.grn_date)}
+            </span>
+          ) : (
+            <span className="text-body text-kit-slate-11">Not recorded</span>
+          ),
       },
       {
         key: "source",
@@ -998,7 +998,7 @@ export default function OperationReceiving({ consignmentPage = false }: { consig
               serverColumns={{ values: registerQ.data?.column_values ?? {}, onChange: changeColumns }}
               /* GRN Doc Date and GRN No lead and pin at a canvas ≥768px; below it
                  the number pins alone. No column is hidden by width. */
-              leadingColumns={{ date: "grnDate", identity: "grn" }}
+              pinnedPrefix={{ columns: ["grn", "grnDate"], narrow: ["grn"] }}
               activeConditions={activeConditions}
               onClearConditions={clearRail}
               groupBanner={false}
@@ -1010,7 +1010,7 @@ export default function OperationReceiving({ consignmentPage = false }: { consig
               expandTitle="Show goods"
               expandable={{
                 flush: true,
-                alignToColumn: "grnDate",
+                alignToColumn: "grn",
                 testId: (r) => `grn-expand-${r.id}`,
                 renderExpansion: (r) => (
                   <div className="px-2 py-3" data-testid={`grn-goods-${r.id}`}>

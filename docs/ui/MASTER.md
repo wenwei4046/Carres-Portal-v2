@@ -1220,14 +1220,15 @@ recorded in §6.0; the compact card in §4.3.4.
    filters narrow the list; clear all three together; preserve permissions and the governed base
    population; the footer shows filtered versus total (`5 of 62`). Grouping is presentation, not a
    filter.
-2. **Date and identity lead — APPROVED (Jess 2026-09-17).** Every listing begins with its own record
-   date, then its document number. Canvas ≥768px pins both; narrower pins identity only; neither can
-   be hidden or moved by a personal layout (`leadingColumns`). Mappings: Sales Orders
-   `Proceed Date · SO Doc Date · SO No` (`Proceed Date` rides `leadingColumns.before`); SO Batch
-   `Proceed Date · SO No`; Manual Purchase `Proceed Date · MPR No`; Purchase Orders `PO Date · PO No`;
-   Receiving `GRN Date · GRN No`; Delivery Orders `DO Date · DO No`; Payment Records
-   `Paid date · Receipt No`. Supplier Claims is the one exception (§7.1). Never invent a date fact;
-   exact page orders live in the module MASTERs and are never rearranged by a general heuristic.
+2. **The document number leads — YH 2026-10-30, follows Houzs.** Every document listing begins with
+   its document number, then its record date. Canvas ≥768px pins both; narrower pins the number only;
+   neither can be hidden or moved by a personal layout (`pinnedPrefix`). Mappings: Manual Purchase
+   `MPR No · Proceed Date`; Purchase Orders `PO No · PO Doc Date`; Receiving `GRN No · GRN Doc Date`;
+   Purchase Returns `PR No · PR Doc Date`; Repair Orders `RO No · RO Doc Date`; Supplier Claims
+   `Supplier Claim No · Claim status`; Delivery Orders `DO No · DO Doc Date`; Payment Records
+   `Receipt No · Paid date`. NOT YET MOVED: Sales Orders still `Proceed Date · SO Doc Date · SO No`
+   and SO Batch `Proceed Date · SO No`. Never invent a date fact; exact page orders live in the module
+   MASTERs.
 3. **A useful default view.** At 1440px with filters open, identity and the facts for the main
    judgement are fully visible in the real shell and font; other columns scroll or sit in Columns;
    never squeeze dates or names, never silently hide approved facts.
@@ -1426,7 +1427,7 @@ into the section it belongs to, and this list loses it.
 | Delivery schedule card: two facts on two lines + type label | 2026-09-14 / 09-25 | Delivery MASTER §§8.2, 8.4 |
 | SO Batch Purchase and Manual Purchase: their own approved listing designs (§6.8); the PO Duty owner chip only beside the selected `Issue PO` (`YJ`), Export at the far right | 2026-09-18 | Purchasing MASTER §§9.1–9.2 |
 | SO Batch `PO No` cell: every linked PO on one line, comma-separated, each its own link, 170px, no wrap (DEPLOYED #1924; signed-in check owed). Sales Orders' `PO No` cell follows the same rule (owner 2026-10-06, NOT BUILT); Sales Orders' `DO No` is unchanged | 2026-10-05 / 10-06 | Purchasing MASTER §9.1 |
-| Supplier Claims leading order `☐ · ▸ · Claim status · Supplier Claim No · Claim Reported · …` (status leads; date never pinned; `pinnedPrefix`, BUILT on branch 2026-09-29) | 2026-09-18 | Purchasing MASTER §9.5 |
+| Supplier Claims leading order `☐ · ▸ · Supplier Claim No · Claim status · Claim Reported · …` (number leads, YH 2026-10-30; date never pinned; `pinnedPrefix`, BUILT on branch 2026-09-29) | 2026-09-18 | Purchasing MASTER §9.5 |
 | Purchase Orders rail: section icons (message/goods/supplier/warehouse, 16px, aria-hidden), no `Clear filters`; Purchasing `reserveConditionRow` | 2026-09-18 / 10-02 | Purchasing MASTER §9.3 |
 | Purchase Returns rail reuses the Supplier Claims supplier list | 2026-09-18 | Purchasing MASTER §9.6 |
 | Repair Orders: automatic RO Doc Date (no backdating), 14-working-day target from evidenced supplier receipt; all Unit IDs shown beneath their PO (row may grow); optional `Price` only in create/detail; outstanding owner consent shown in detail + Workspace, never disabling Issue (APPROVED TARGET / NOT BUILT) | 2026-09-19 / 09-20 | Purchasing MASTER §9.7 |

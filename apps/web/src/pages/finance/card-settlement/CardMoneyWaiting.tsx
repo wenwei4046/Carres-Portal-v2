@@ -70,13 +70,13 @@ export default function CardMoneyWaiting() {
   const ready = report !== null && report !== "unreadable" ? report : null;
 
   const columns = useMemo<DataGridColumn<CardWaitingRow>[]>(() => [
-    { key: "date", label: "Paid on", width: REGISTER_FIELD_WIDTH.date, accessor: (r) => fmtDate(r.wire.entry_date),
-      dateValue: (r) => r.wire.entry_date, filterType: "date", exportValue: (r) => r.wire.entry_date },
     { key: "document", label: "Document", width: 160,
       accessor: (r) => (r.wire.payment_id
         ? <Link className={link} to={`/finance/payments?payment=${r.wire.payment_id}`}>{docOf(r)}</Link>
         : docOf(r)),
       searchValue: (r) => docOf(r), exportValue: (r) => docOf(r) },
+    { key: "date", label: "Paid on", width: REGISTER_FIELD_WIDTH.date, accessor: (r) => fmtDate(r.wire.entry_date),
+      dateValue: (r) => r.wire.entry_date, filterType: "date", exportValue: (r) => r.wire.entry_date },
     { key: "source", label: "Source", width: 150, accessor: (r) => ledgerSourceWord(r.wire.source_type),
       filterValue: (r) => ledgerSourceWord(r.wire.source_type), filterType: "enum", defaultHidden: true },
     { key: "so", label: "SO No", width: 110, accessor: (r) => (r.wire.so != null ? `SO-${r.wire.so}` : ""),

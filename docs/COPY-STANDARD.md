@@ -1375,7 +1375,7 @@ before marking; the Portal cannot observe WhatsApp sending without an API.
 production walk OWED.** Approval is not production proof; Purchasing MASTER §9.3 carries the three
 statuses apart.
 
-Columns, exactly: `PO Date · PO No · SO No / MPR No · Supplier · Items ·
+Columns, exactly: `PO No · PO Doc Date · SO No / MPR No · Supplier · Items ·
 Supplier Deliver To · PO Delivery Date · Supplier Confirmed Delivery Date · Goods Received Date · GRN No · PO Version`.
 
 | Fact | Exact copy |
@@ -4732,11 +4732,11 @@ Warehouse operator-flow review, 2026-09-16: **Loading recorded. Awaiting driver 
 ### Date-first listing contract — APPROVED (Jess, 2026-09-17) · BUILT on Sales Orders, SO Batch, Manual Purchase and Purchase Orders 2026-09-17
 
 Exact leading columns: Sales Orders `Proceed Date · SO Doc Date · SO No` (2026-09-21); SO Batch `Proceed Date · SO No`;
-Manual Purchase `Proceed Date · MPR No` (Purchasing §9.2); Purchase Orders `PO Date · PO No`;
-Receiving `GRN Date · GRN No`; Delivery Orders `DO Date · DO No`;
+Manual Purchase `MPR No · Proceed Date` (Purchasing §9.2); Purchase Orders `PO No · PO Doc Date`;
+Receiving `GRN No · GRN Doc Date`; Delivery Orders `DO No · DO Doc Date`;
 Payment Records `Paid date · Receipt No`. Pin both at canvas ≥768px, identity alone below768px.
 **Supplier Claims is the owner-approved exception (2026-09-18):** its order is
-`Claim status · Supplier Claim No · Claim Reported`, it pins the leading controls plus
+`Supplier Claim No · Claim status · Claim Reported`, it pins the leading controls plus
 `Claim status` and `Supplier Claim No` at ≥768px and `Supplier Claim No` alone below it, and its
 date is never pinned (Purchasing §9.5). Do not "restore" the date-first pair there.
 Date-first adoption: Sales Orders small patch → Manual Purchase Round 2 → Purchase Orders.

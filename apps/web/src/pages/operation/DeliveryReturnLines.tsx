@@ -69,7 +69,7 @@ export function DeliveryReturnLinesReport() {
     <ModuleHeader destinationHeader testId="dr-lines-header" word={PAGE} docTitle={`${PAGE} · Carres`} />
     <ListPageShell register>
       <DataGrid rows={rows} columns={COLUMNS} rowKey={(r) => r.key} storageKey="carres.reports.dr-lines.v2"
-        appearance="reference" exportName={PAGE} groupBanner={false} leadingColumns={{ date: "date", identity: "doc" }}
+        appearance="reference" exportName={PAGE} groupBanner={false} pinnedPrefix={{ columns: ["doc", "date"], narrow: ["doc"] }}
         sortDefault={{ key: "date", dir: "desc" }} isLoading={q.isPending}
         errorState={q.isError ? <LoadFailed what={PAGE} onRetry={() => void q.refetch()} /> : undefined}
         emptyMessage={`No lines yet. ${NOTE}`}

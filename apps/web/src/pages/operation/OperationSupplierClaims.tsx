@@ -99,19 +99,19 @@ function UnitsDisclosure({ row, label }: { row: SupplierClaimListRow; label: str
 export function supplierClaimColumns(open: (row: SupplierClaimListRow) => void, needsSku: boolean): DataGridColumn<SupplierClaimListRow>[] {
   return [
     {
+      key: "claim", label: L.claim, width: W.documentNo, minWidth: 150,
+      accessor: (row) => <button type="button" className="font-semibold text-kit-blue-11 hover:underline" onClick={(event) => { event.stopPropagation(); open(row); }}>{row.claim_no || SUPPLIER_CLAIM_NOT_ISSUED}</button>,
+      searchValue: (row) => row.claim_no || SUPPLIER_CLAIM_NOT_ISSUED,
+      exportValue: (row) => row.claim_no || SUPPLIER_CLAIM_NOT_ISSUED,
+      filterType: "numbering",
+    },
+    {
       key: "status", label: L.status, width: 112, minWidth: 112,
       accessor: (row) => row.status === "open"
         ? <Tooltip content={SUPPLIER_CLAIM_IN_PROGRESS_TOOLTIP}><span tabIndex={0} data-testid="claim-status-in-progress">{supplierClaimStatusWord(row.status)}</span></Tooltip>
         : supplierClaimStatusWord(row.status),
       searchValue: (row) => supplierClaimStatusWord(row.status),
       exportValue: (row) => supplierClaimStatusWord(row.status),
-    },
-    {
-      key: "claim", label: L.claim, width: W.documentNo, minWidth: 150,
-      accessor: (row) => <button type="button" className="font-semibold text-kit-blue-11 hover:underline" onClick={(event) => { event.stopPropagation(); open(row); }}>{row.claim_no || SUPPLIER_CLAIM_NOT_ISSUED}</button>,
-      searchValue: (row) => row.claim_no || SUPPLIER_CLAIM_NOT_ISSUED,
-      exportValue: (row) => row.claim_no || SUPPLIER_CLAIM_NOT_ISSUED,
-      filterType: "numbering",
     },
     { key: "reported", label: L.reported, width: W.date, accessor: (row) => (row.reported_at ? fmtDate(row.reported_at) : <Absence />), dateValue: (row) => row.reported_at, filterType: "date", exportValue: (row) => (row.reported_at ? fmtDate(row.reported_at) : "") },
     { key: "supplier", label: L.supplier, width: W.supplier, accessor: (row) => row.supplier_name || <Absence />, searchValue: (row) => row.supplier_name || "" },
@@ -223,7 +223,7 @@ export default function OperationSupplierClaims() {
         <div className="flex min-w-0 flex-1 flex-col p-2">
           <DataGrid rows={rows} columns={columns} rowKey={(row) => row.id} storageKey="carres.supplier-claims.register.v3"
             appearance="reference" exportName="Supplier Claims" groupBanner={false}
-            pinnedPrefix={{ columns: ["status", "claim"], narrow: ["claim"] }}
+            pinnedPrefix={{ columns: ["claim", "status"], narrow: ["claim"] }}
             rowHeight={51}
             isLoading={query.isLoading}
             errorState={errorState}

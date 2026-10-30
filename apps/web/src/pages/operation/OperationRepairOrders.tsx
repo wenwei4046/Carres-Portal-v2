@@ -91,7 +91,6 @@ export interface RepairOrdersRegisterProps {
 export function repairOrderColumns(): DataGridColumn<RepairOrderListRow>[] {
   const L = REPAIR_ORDER_COLUMN_LABEL;
   return [
-    { key: "ro_doc_date", label: L.ro_doc_date, width: W.date, accessor: (r) => dateFact(r.ro_doc_date), dateValue: (r) => r.ro_doc_date, filterType: "date", exportValue: (r) => fmtDate(r.ro_doc_date) },
     {
       key: "ro_no",
       label: L.ro_no,
@@ -117,6 +116,7 @@ export function repairOrderColumns(): DataGridColumn<RepairOrderListRow>[] {
       exportValue: (r) => r.ro_no,
       filterType: "numbering",
     },
+    { key: "ro_doc_date", label: L.ro_doc_date, width: W.date, accessor: (r) => dateFact(r.ro_doc_date), dateValue: (r) => r.ro_doc_date, filterType: "date", exportValue: (r) => fmtDate(r.ro_doc_date) },
     { key: "supplier", label: L.supplier, width: W.supplier, accessor: (r) => fact(r.supplier_name), searchValue: (r) => r.supplier_name ?? "" },
     {
       key: "claim_no",
@@ -271,7 +271,7 @@ export function RepairOrdersRegister({ rows, isLoading = false, isError = false,
             storageKey="carres.repair-orders.register.v1"
             appearance="reference"
             groupBanner={false}
-            leadingColumns={{ date: "ro_doc_date", identity: "ro_no" }}
+            pinnedPrefix={{ columns: ["ro_no", "ro_doc_date"], narrow: ["ro_no"] }}
             isLoading={isLoading}
             emptyMessage={anyFilter ? "No Repair Orders match these filters" : "No Repair Orders yet."}
             errorState={
