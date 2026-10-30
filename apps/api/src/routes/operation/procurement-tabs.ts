@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { PROCUREMENT_TAB_SLUGS, type ProcurementTabSlug } from "@carres/shared";
 import { IN_URL_MAX, fail, readAllPages, tooManyRows } from "../../lib/route-helpers";
+import { skuCategories } from "../../lib/sku-categories";
 import { todayIsoMYT } from "../../lib/today";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -10,11 +11,13 @@ import type { AppEnv } from "../../types";
  * GET /api/operation/procurement/:slug — Phase 4.5 Chunk 2 Sprint F Task 33.
  *
  * Per-tab PO listing for the tabbed procurement shell. The operation
- * Procurement page is split into 3 tabs (one per supplier × category channel):
+ * Procurement page is split into 3 channel tabs plus one catch-all:
  *
  *   • nice-future     — all POs whose supplier slug is 'nice-future'
  *   • hookka-sofa     — POs from supplier slug 'hookka' AND category 'sofa'
  *   • hookka-bedframe — POs from supplier slug 'hookka' AND category 'bedframe'
+ *   • all             — every PO, whatever the supplier, so a supplier with no
+ *                       channel tab (dorsettloft, armani, …) is still reachable
  *
  * The slug whitelist comes from `PROCUREMENT_TAB_SLUGS` in
  * `packages/shared/src/sops.ts` (T32). Invalid slugs return 422 before any
@@ -24,13 +27,13 @@ import type { AppEnv } from "../../types";
  *   • `suppliers.slug` was added in migration 0032 (NOT NULL + UNIQUE after
  *     seed) so the slug is the stable cross-env handle.
  *   • `purchase_orders` itself has no `category` column. Category lives on
- *     `product_models.category` (product_category enum). The project SKU
- *     convention is `cat:model[:variant]` (lowercase, colon-separated; see
- *     migration 0019 §17.2 D1 + apps/api/src/routes/operation/movements.ts:97
- *     for the same pattern). For category filtering we therefore inner-join
- *     `purchase_order_lines` and apply `.like("sku", "<category>:%")` on the
- *     line's SKU. Any line in a hookka PO whose SKU matches the prefix flips
- *     the parent PO into the result set; this matches movements.ts behavior.
+ *     `product_models.category` (product_category enum), read through the
+ *     shared `skuCategories` catalog reader. Real SKUs (`REGAL-Q`,
+ *     `5539-1B(LHF)`) carry no `cat:` prefix, so the old
+ *     `.like("sku", "<category>:%")` filter matched nothing and both Ohana
+ *     tabs read empty. Any line in a hookka PO whose catalog category matches
+ *     flips the parent PO into the result set. A line the catalog does not
+ *     hold belongs to neither Ohana tab; `all` still lists its PO.
  *   • Response shape `{ pos: [...] }` matches the existing
  *     `GET /api/operation/pos` list endpoint (apps/api/src/routes/operation/pos.ts:47-77),
  *     so the FE can reuse the same row-rendering code on every tab.
@@ -53,12 +56,14 @@ procurementTabsRouter.use("*", async (c, next) => {
   await next();
 });
 
-/** Mapping from slug → (supplierSlug, optional category prefix). */
+/** Mapping from slug → (optional supplierSlug, optional category). */
 function resolveSlugFilters(slug: ProcurementTabSlug): {
-  supplierSlug: string;
+  supplierSlug: string | null;
   category: "sofa" | "bedframe" | null;
 } {
   switch (slug) {
+    case "all":
+      return { supplierSlug: null, category: null };
     case "nice-future":
       return { supplierSlug: "nice-future", category: null };
     case "hookka-sofa":
@@ -205,12 +210,12 @@ procurementTabsRouter.get("/:slug", async (c) => {
   // would then operate on an incomplete PO.
   //
   // Two-pass query instead:
-  //   Pass A — find parent PO IDs whose lines match category prefix
+  //   Pass A — find parent PO IDs with a line of the tab's category
   //   Pass B — refetch full POs by id with the FULL embedded line array
   //   Pass C — enrich with per-source-SO orders + urgency (added 2026-05-18)
   let pos: PoRow[] = [];
-  if (category !== null) {
-    // Pass A: narrow ids via the lines table directly.
+  if (category !== null && supplierSlug !== null) {
+    // Pass A: every line of the supplier, then the catalog's category per SKU.
     //
     // Paged and fail-closed, the same two ceilings the Finance department
     // filter shipped twice (PRs #1456 / #1495): read once with no `.range()`
@@ -219,18 +224,20 @@ procurementTabsRouter.get("/:slug", async (c) => {
     // straight into Pass B's `.in()` URL, so it is capped rather than spelt
     // out at any length. Ordered by `id` — paging on a non-unique order can
     // miss or repeat a row across two pages.
-    const read = await readAllPages<{ po_id: string }>((a, b) => sb
+    const read = await readAllPages<{ po_id: string; sku: string }>((a, b) => sb
       .from("purchase_order_lines")
       .select(
-        "po_id, purchase_orders!inner(suppliers!inner(slug))",
+        "po_id, sku, purchase_orders!inner(suppliers!inner(slug))",
       )
-      .like("sku", `${category}:%`)
       .eq("purchase_orders.suppliers.slug", supplierSlug)
       .order("id", { ascending: true })
       .range(a, b));
     if ("error" in read) return fail(c, read.error);
     if (!("rows" in read)) return tooManyRows(c, TOO_MANY_CATEGORY_LINES);
-    const matchedIds = Array.from(new Set(read.rows.map((r) => r.po_id)));
+    const categories = await skuCategories(sb, read.rows.map((r) => r.sku));
+    const matchedIds = Array.from(
+      new Set(read.rows.filter((r) => categories.get(r.sku) === category).map((r) => r.po_id)),
+    );
     if (matchedIds.length > IN_URL_MAX) return tooManyRows(c, TOO_MANY_CATEGORY_LINES);
     if (matchedIds.length === 0) {
       return c.json({ pos: [] });
@@ -249,13 +256,14 @@ procurementTabsRouter.get("/:slug", async (c) => {
     pos = (data ?? []) as PoRow[];
   } else {
     // 3. No category filter — single-pass query. Embed lines without inner so
-    //    POs with zero lines still surface.
-    const { data, error } = await sb
+    //    POs with zero lines still surface. `all` drops the supplier filter.
+    let query = sb
       .from("purchase_orders")
       .select(
         "id, supplier_id, warehouse_id, status, sup_status, so, so_refs, eta_date, placed_at, suppliers!inner(slug, name), purchase_order_lines(id, sku, qty, received_qty, attrs)",
-      )
-      .eq("suppliers.slug", supplierSlug)
+      );
+    if (supplierSlug !== null) query = query.eq("suppliers.slug", supplierSlug);
+    const { data, error } = await query
       .order("placed_at", { ascending: false })
       .limit(200);
     if (error) return fail(c, error);

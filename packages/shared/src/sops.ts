@@ -94,7 +94,7 @@ export function sopFor(supplierSlug: string, category: string): SopDef {
  * Procurement tab slugs for the per-supplier kanban shell (Phase 4.5 Chunk 2 Sprint F).
  * Each slug maps to one tab on `/operation/procurement/{slug}`.
  */
-export const PROCUREMENT_TAB_SLUGS = ['nice-future', 'hookka-sofa', 'hookka-bedframe'] as const;
+export const PROCUREMENT_TAB_SLUGS = ['nice-future', 'hookka-sofa', 'hookka-bedframe', 'all'] as const;
 export type ProcurementTabSlug = (typeof PROCUREMENT_TAB_SLUGS)[number];
 
 /**
