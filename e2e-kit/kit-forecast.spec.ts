@@ -287,11 +287,12 @@ test("1025 shared panels overlay the unchanged canvas and keep the common64 menu
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect.poll(async () => Math.round((await nav.boundingBox())!.width)).toBe(64);
   await page.getByRole("button", { name: "Expand menu", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "Menu", exact: true })).toBeVisible();
-  await page.keyboard.press("Escape");
+  await expect.poll(async () => Math.round((await nav.boundingBox())!.width)).toBe(220);
   await expect(page.getByRole("dialog", { name: "Menu", exact: true })).toHaveCount(0);
   await expect(page.getByTestId("selection-bar")).toHaveText(selection);
   expect(await page.evaluate(() => localStorage.getItem("carres-menu-collapsed"))).toBe("0");
+  await page.getByRole("button", { name: "Collapse menu", exact: true }).click();
+  await expect.poll(async () => Math.round((await nav.boundingBox())!.width)).toBe(64);
 });
 
 

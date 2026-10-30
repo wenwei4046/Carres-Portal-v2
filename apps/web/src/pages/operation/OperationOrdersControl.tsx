@@ -34,7 +34,7 @@ import {
   lineKind,
 } from "@/lib/line-category";
 import { apiFetch } from "@/lib/api";
-import { orderBookingDay, orderControlOf } from "@/lib/order-booking";
+import { orderBookingDay, orderBookingRead, orderControlOf } from "@/lib/order-booking";
 import { personLabel, personInitials, avatarColor } from "@/lib/staff-avatar";
 import OrderDetailDrawer from "./components/OrderDetailDrawer";
 import { stageOf } from "./components/StageChip";
@@ -89,6 +89,7 @@ import {
   type OpsTask,
   type OpsTasksListResponse,
   type OpsStaffMember,
+  assignedLogisticsIdOf,
 } from "@carres/shared";
 import ChaseSupplierReview from "./components/ChaseSupplierReview";
 import type { ChaseOrder } from "./components/chase-supplier-plan";
@@ -592,8 +593,7 @@ function toggleInSet<T>(prev: Set<T>, v: T): Set<T> {
  *  delivery: booking_stage='confirmed' AND a confirmed_date (invariant #1 —
  *  the stage word alone is never trusted without its date). */
 function bookingConfirmedOf(o: operationOrderListRow): boolean {
-  const ovl = ovlOf(o);
-  return ovl?.booking_stage === "confirmed" && !!ovl.confirmed_date;
+  return orderBookingDay(o).kind === "confirmed";
 }
 
 /** C-vocab (Jess 2026-07-19): the QUEUES rows ARE the actions — one vocabulary
@@ -1030,9 +1030,15 @@ export function orderActionSignalsOf(
     // display-only — to decide a business threshold. That was a third caller
     // filtering on a guess.
     stockWindowDays: safetyDays,
-    hasLogistics: !!(o.delivery_partners?.name || o.ops_assigned_logistic),
+    hasLogistics: !!(
+      o.delivery_partners?.name ||
+      assignedLogisticsIdOf({
+        arrangementPartnerId: o.ops_delivery_arrangements?.find((a) => (a.leg ?? 0) === 0)?.partner_id,
+        triagePartnerId: o.ops_assigned_logistic,
+      })
+    ),
     bookingConfirmed: bookingConfirmedOf(o),
-    confirmedDateIso: ovlOf(o)?.confirmed_date ?? null,
+    confirmedDateIso: orderBookingRead(o).confirmedDate ?? null,
     todayIso: todayIso(),
     // C7 — has this trip's delivery order been issued? `do_number` is the
     // document's own completion signal, and it is on the list select already.
