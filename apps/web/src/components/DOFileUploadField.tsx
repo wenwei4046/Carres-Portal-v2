@@ -146,7 +146,7 @@ export default function DOFileUploadField({
       {previewName && (
         <p className="text-body text-base-600 mt-1">Uploaded: {previewName}</p>
       )}
-      {error && <p className="text-red-600 text-body mt-1">{error}</p>}
+      {error && <p className="text-kit-red-11 text-body mt-1">{error}</p>}
     </div>
   );
 }

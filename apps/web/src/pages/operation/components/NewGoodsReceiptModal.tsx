@@ -114,15 +114,16 @@ export default function NewGoodsReceiptModal({ open, onOpenChange, suppliers, de
           </div>
         </div>
         {draft.lines.map((line, i) => (
-          <div key={line.key} className="grid grid-cols-1 items-end gap-3 md:grid-cols-[minmax(0,1fr)_96px_128px_auto]">
+          <div key={line.key} role="group" aria-label={`Goods line ${i + 1}`} className="grid grid-cols-1 items-end gap-3 md:grid-cols-[minmax(0,1fr)_96px_128px_auto]">
+            {i > 0 && <label htmlFor={`new-grn-sku-${line.key}`} className="sr-only">{`SKU, line ${i + 1}`}</label>}
             <Select id={`new-grn-sku-${line.key}`} label={i === 0 ? "SKU" : undefined} required disabled={!draft.supplierId}
               placeholder={draft.supplierId ? "Select" : "Select a supplier first"}
               value={line.sku || undefined} onValueChange={(sku) => setLine(line.key, { sku })} options={skuOptions} />
-            <Input id={`new-grn-qty-${line.key}`} label={i === 0 ? "Qty" : undefined} type="number" min={1} step={1}
+            <Input id={`new-grn-qty-${line.key}`} label={i === 0 ? "Qty" : undefined} type="number" min={1} step={1} aria-label={i > 0 ? `Qty, line ${i + 1}` : undefined}
               value={line.qty} onChange={(e) => setLine(line.key, { qty: e.target.value })} />
-            <Input id={`new-grn-price-${line.key}`} label={i === 0 ? "Unit Price (RM)" : undefined} type="number" min={0.01} step="0.01"
+            <Input id={`new-grn-price-${line.key}`} label={i === 0 ? "Unit Price (RM)" : undefined} type="number" min={0.01} step="0.01" aria-label={i > 0 ? `Unit Price (RM), line ${i + 1}` : undefined}
               placeholder="Catalog" value={line.price} onChange={(e) => setLine(line.key, { price: e.target.value })} />
-            <Button variant="ghost" disabled={draft.lines.length === 1}
+            <Button variant="ghost" disabled={draft.lines.length === 1} aria-label={`Remove line ${i + 1}`}
               onClick={() => setDraft((d) => ({ ...d, lines: d.lines.filter((l) => l.key !== line.key) }))}>Remove</Button>
           </div>
         ))}
