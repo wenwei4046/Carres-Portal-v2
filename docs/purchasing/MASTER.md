@@ -956,6 +956,7 @@ Purchasing ▾
 ├─ BUY ▾
 │  ├─ SO Batch Purchase
 │  ├─ Forecast Purchase        (§9.14, design handoff 13 Oct 2026)
+│  ├─ MRP                      (§5.1, read-only, YH 30 Oct 2026)
 │  ├─ Manual Purchase
 │  └─ Purchase Orders
 ├─ RECEIVE ▾
@@ -1033,6 +1034,8 @@ exists.
 KEEP §5.1's one source-line demand calculation. ADAPT a transparent readout within the existing SO Batch/approved reporting surfaces: exact source/configuration/destination, usable **allocated** stock, valid allocated PO coverage, remaining need and the date/calendar used. A warehouse's total stock is not automatically allocated stock for every SO; the same goods or shared PO quantity must not cover two demands. Combined and per-source results reconcile without double-counting. Missing source/quantity/date reads remain unknown and cannot make shortage zero or create buying authority. Replenishment still uses the approved Manual Purchase route (§5.2); accessory two-month advance planning does not delay customer fulfilment from real stock (§11).
 
 Recommended acceptance / PROPOSAL where extending the reader: open a shortage to its exact SO/MPR source and coverage contributors; show why a line cannot be bought; recheck demand, approved supplier/configuration and existing coverage at governed issue. Refreshing or regenerating a view completes no purchase, changes no allocation/custody and creates no duplicate PO. A changed source invalidates the old preview rather than issuing yesterday's shortage. Reference calculation, allocation and persistence remain unverified; do not introduce a new editable MRP ledger, independent demand page or warehouse-rebinding shortcut.
+
+**MRP page — YH decision 30 Oct 2026 · BUILT ON BRANCH, not deployed.** `Purchasing → Buy → MRP` is one read-only page of `Needed` · `In Stock` · `On PO` · `Shortage` per SKU, with the Sales Orders under each row. It is the readout above in its own tab rather than inside SO Batch, and it has no demand of its own: it reads `loadToOrder` and draws open POs through `computeNetRequirements`, so `Shortage` is what SO Batch Purchase still has to buy. `In Stock` is units held for these orders; `Free Stock` is shown beside it and never lowers `Shortage` until taken (Jess 2026-07-21). No migration, no stored run, no Regenerate, no PO from this page. Categories are the ones SO Batch buys, so accessories stay on the reorder route. The warehouse split, the Per SO view and the stored as-of run from Houzs are not adopted.
 
 **Forecast Purchase approval and issuance — OWNER-APPROVED, Jess 2026-10-14 (A) · BUILT · DEPLOYED
 14 Oct 2026 (`7e9d3d147`, §9.14; signed-in production walk 14 Oct 2026).** Jess approves Forecast Purchase; after her persisted approval, PO Duty

@@ -2,7 +2,10 @@ import { Hono } from "hono";
 import {
   buildPurchaseTodayReport,
   buildPurchaseChaseReceive,
+  buildMrpLines,
+  mrpResponseSchema,
   officeWorkingDayOptions,
+  stockMatchKey,
   myHolidaySet,
   nextPoDayMYT,
   productionWorkingDaysFor,
@@ -10,6 +13,7 @@ import {
   PURCHASING_CATEGORIES,
   workWeekOffDaysFor,
   type DemandLine,
+  type MrpSourceLine,
   type ProductCategory,
   type PurchaseChase,
   type PurchaseLinkedOrder,
@@ -22,6 +26,7 @@ import {
   loadPurchasingNumbers,
   loadPurchasingSettings,
 } from "../../lib/purchasing-settings";
+import { loadToOrder, readFreeStock } from "../../lib/purchase-demand-read";
 import { fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import { todayIsoMYT } from "../../lib/today";
@@ -489,6 +494,53 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
   });
 
   return c.json(purchaseTodayResponseSchema.parse({ ...report, unrated }));
+});
+
+// MRP · GET /mrp — Needed, In Stock, On PO and Shortage per customer line, off
+// the same read SO Batch Purchase runs on. Read-only, stores nothing.
+purchaseRouter.get("/mrp", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const res = await loadToOrder(sb);
+  if (!res.ok) return c.json(res.body as never, res.status as never);
+  const { registerFacts, supplierNames, openPoBySku, today } = res.data;
+
+  // `required`: a failed stock read refuses the page rather than print Free Stock 0.
+  let freeStock: Record<string, { qty: number }[]>;
+  try {
+    ({ freeStock } = await readFreeStock(sb, true));
+  } catch {
+    return c.json({ error: "stock_coverage_unavailable" }, 503);
+  }
+
+  const sources: MrpSourceLine[] = registerFacts.soLines.map((l) => {
+    const order = registerFacts.ordersById.get(l.orderId);
+    return {
+      lineId: l.lineId,
+      orderId: l.orderId,
+      so: order?.so ?? null,
+      customer: order?.customer ?? null,
+      sku: l.sku,
+      model: l.modelName,
+      variant: l.variant,
+      category: l.category as ProductCategory,
+      supplierName: l.supplierId ? (supplierNames.get(l.supplierId) ?? null) : null,
+      delivery: order?.delivery ?? null,
+      placedAt: l.placedAt ?? today,
+      needed: l.qty,
+      heldInStock: l.heldInStock ?? 0,
+      heldOnPo: l.heldOnPo ?? 0,
+    };
+  });
+
+  const freeStockBySku: Record<string, number> = {};
+  for (const sku of new Set(sources.map((s) => s.sku))) {
+    freeStockBySku[sku] = (freeStock[stockMatchKey(sku)] ?? []).reduce((n, u) => n + u.qty, 0);
+  }
+
+  return c.json(mrpResponseSchema.parse({
+    lines: buildMrpLines(sources, openPoBySku ?? {}, today),
+    freeStockBySku,
+  }));
 });
 
 // Purchase §6 · POST /line/skip · body: { lineIds: string[] }

@@ -362,6 +362,16 @@ describe("the To Order projection", () => {
     expect(body.proposals[0].poCount).toBe(2);
   });
 
+  /* MRP reads these three off the same projection, so Shortage is SO Batch's number. */
+  it("hands MRP the held units, the placed date and the open PO pool", async () => {
+    const body = await project(makeSb(TABLES()));
+    expect(body.openPoBySku).toBeDefined();
+    const line = body.registerFacts.soLines[0];
+    expect(line.heldInStock).toBe(0);
+    expect(line.heldOnPo).toBe(0);
+    expect(line.placedAt).toBeTruthy();
+  });
+
   /**
    * ── T3 · what an open purchase order already covers, and WHICH one ────────
    *

@@ -2337,6 +2337,19 @@ export {
   type BundleRequirement,
   type NetRequirementsResult,
 } from "./net-requirements";
+export {
+  MRP_WORDS,
+  buildMrpLines,
+  mrpCsv,
+  mrpLineSchema,
+  mrpResponseSchema,
+  mrpRows,
+  type MrpFilters,
+  type MrpLine,
+  type MrpResponse,
+  type MrpRow,
+  type MrpSourceLine,
+} from "./mrp";
 // To Order — the Planning Workspace projection (2026-07-30).
 export {
   TO_ORDER_WORDS,

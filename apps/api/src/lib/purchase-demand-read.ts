@@ -212,6 +212,12 @@ export interface SoRegisterLineFact {
    * this line, per PO. They cover the line beside `stockTaken`.
    */
   poReserved?: Array<{ poId: string; qty: number }>;
+  /** MRP — every unit netted out of this line before the open PO draw. Unlike
+   *  `stockTaken` and `poReserved` these keep units with PO lineage, so
+   *  `qty − heldInStock − heldOnPo` is the quantity the engine saw. */
+  heldInStock?: number;
+  heldOnPo?: number;
+  placedAt?: string;
   modelName: string | null;
   variant: string | null;
   category: string | null;
@@ -256,6 +262,8 @@ export type Loaded = {
    * To Order response is byte-identical with or without them.
    */
   registerFacts: RegisterFacts;
+  /** The open PO pool the engine drew from. Absent when no order is proceeded. */
+  openPoBySku?: Record<string, number>;
   /**
    * 0600 — per `stockMatchKey`, the open POs whose incoming Unit IDs no order
    * holds (`purchasing_po_free_units`), merged per PO and sorted by PO No.
@@ -1182,6 +1190,9 @@ export async function loadToOrder(
         qty: l.qty + (l.takenFromStock ?? 0) + poTake,
         stockTaken: Math.max(0, (l.takenFromStock ?? 0) - (linkedStockByLine.get(l.lineId) ?? 0)),
         ...(independentPoReserved.length > 0 ? { poReserved: independentPoReserved } : {}),
+        heldInStock: l.takenFromStock ?? 0,
+        heldOnPo: poTake,
+        placedAt: l.placedAt,
         modelName: l.modelName,
         variant: l.variant,
         category: l.category,
@@ -1243,6 +1254,7 @@ export async function loadToOrder(
         (supRows ?? []).map((s) => [s.id as string, (s.name as string) ?? ""]),
       ),
       registerFacts: { lines: registerLines, ordersById: registerOrders, soLines },
+      openPoBySku,
       poFreeByKey: await readPoFreeByKey(sb),
       lineageByLine: lineage?.totals,
     },

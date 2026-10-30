@@ -227,6 +227,7 @@ import {
   type StoreChannel,
   // Purchase / Procurement MRP cockpit — GET /api/operation/purchase/today.
   type PurchaseTodayResponse,
+  type MrpResponse,
   // Q3 — Purchasing → Report (GET /api/operation/pos/report). Facts only; the
   // figures are computed by `buildPoReport`.
   type PoReportResponse,
@@ -617,6 +618,7 @@ export const qk = {
      *  (GET /api/operation/purchase/today). Nested under `operation` so a blunt
      *  invalidate on `["operation"]` after a PO mutation refreshes it too. */
     purchaseToday: () => ["operation", "purchase", "today"] as const,
+    mrp: () => ["operation", "purchase", "mrp"] as const,
     /** P1 (0303) — the purchasing numbers (GET /api/operation/purchasing/settings). */
     purchasingSettings: () => ["operation", "purchasing", "settings"] as const,
     /** To Order — the Planning Workspace projection, recomputed on every read
@@ -5091,6 +5093,16 @@ export function usePurchaseToday(
       apiFetch<PurchaseTodayResponse>("/api/operation/purchase/today"),
     staleTime: 30_000,
     refetchInterval: 60_000,
+    ...opts,
+  });
+}
+
+/** useMrp — GET /api/operation/purchase/mrp, the read-only MRP screen. */
+export function useMrp(opts?: Partial<UseQueryOptions<MrpResponse>>) {
+  return useQuery({
+    queryKey: qk.operation.mrp(),
+    queryFn: () => apiFetch<MrpResponse>("/api/operation/purchase/mrp"),
+    staleTime: 30_000,
     ...opts,
   });
 }

@@ -2448,6 +2448,10 @@ Use `Listing` consistently for module list-view navigation. The page title ident
 do not repeat SO/PO in the tab. This is the shared navigation label.
 Other views retain their purpose-specific names, such as `Monthly demand`.
 
+### MRP page (YH, 30 Oct 2026; Purchasing MASTER §5.1)
+
+`MRP` is the team's own word for this page. Heads: `SKU` · `Item` · `Category` · `Supplier` · `Needed` · `In Stock` · `On PO` · `Shortage` · `Free Stock`; under a row `Sales Order` · `Customer` · `Delivery Date`. Rail: `Show` (`All` · `Shortages`), `Category`, `Delivery Date`. Button `Export`. Empty: `Nothing is needed for these filters.` Note under the table: `Shortage is Needed less In Stock less On PO. In Stock is held for these orders. Free Stock is held for no order and lowers Shortage only once it is taken on SO Batch Purchase. Each sofa module counts as its own item.`
+
 ### Forecast Purchase · Outright — design handoff 13 Oct 2026 · approval ruling 14 Oct 2026 (A) · BUILT · DEPLOYED 14 Oct 2026 (Purchasing MASTER §9.14)
 
 The page suggests and never tells the person to buy. It says `Suggested` and `Forecast`; it never
