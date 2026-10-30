@@ -7,6 +7,9 @@ import MYAddressFields from "@/components/MYAddressFields";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import { useCreateOutlet, useOutlets, useStaffList } from "@/lib/queries";
 import { useStaffSession } from "@/lib/staff";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
 
 /**
  * Branch management — list + "Add" (principal tier only; a manager is bound to
@@ -47,9 +50,19 @@ export default function OutletsSection() {
             + Add {branch.toLowerCase()}
           </button>
         </div>
-        {outletsQ.isPending && <p className="text-sm text-muted-foreground">Loading…</p>}
-        {outletsQ.error && (
-          <p className="text-sm text-destructive">Couldn&apos;t load: {outletsQ.error.message}</p>
+        {outletsQ.isPending && <Loading variant="skeleton" label={`Loading ${branch.toLowerCase()}s`} />}
+        {outletsQ.error && !outletsQ.data && (
+          <div role="alert">
+            <EmptyState
+              title="Could not be loaded"
+              detail="This list did not load."
+              action={
+                <Button variant="neutral" disabled={outletsQ.isFetching} onClick={() => void outletsQ.refetch()}>
+                  Try again
+                </Button>
+              }
+            />
+          </div>
         )}
         {outletsQ.data && outlets.length === 0 && (
           <p className="text-sm text-muted-foreground italic">

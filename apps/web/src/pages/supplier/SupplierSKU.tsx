@@ -4,6 +4,8 @@ import {
   useSupplierDemand,
   type SupplierProductRow,
 } from "@/lib/queries";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
 
 /**
  * Supplier · Total SKU — Phase 6 V1.
@@ -70,6 +72,22 @@ export default function SupplierSKU() {
     [demandMap],
   );
 
+  if ((products.isError && !products.data) || (demand.isError && !demand.data)) {
+    return (
+      <div className="p-9 max-w-[1400px] mx-auto" role="alert">
+        <EmptyState
+          title="Could not be loaded"
+          detail="Your SKUs did not load."
+          action={
+            <Button variant="neutral" onClick={() => { if (products.isError && !products.data) void products.refetch(); if (demand.isError && !demand.data) void demand.refetch(); }}>
+              Try again
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="p-9 max-w-[1400px] mx-auto">
       <header className="mb-7">
@@ -101,6 +119,7 @@ export default function SupplierSKU() {
       <div className="flex items-center gap-3 mb-5 flex-wrap">
         <input
           type="text"
+          aria-label="Search SKUs"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search SKU, model, variant…"

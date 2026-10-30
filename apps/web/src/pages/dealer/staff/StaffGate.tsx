@@ -142,7 +142,7 @@ function DealerShowroomGate() {
   if (staffQ.isPending || outletsQ.isPending) {
     return <GateSpinner label="Loading…" />;
   }
-  if (staffQ.error) {
+  if (staffQ.error && !staffQ.data) {
     return <GateSpinner label={`Couldn't load staff: ${staffQ.error.message}`} />;
   }
 
@@ -245,10 +245,11 @@ function ForgotPinModal({
           staff member.
         </p>
         <div className="staff-wiz__field">
-          <label className="staff-wiz__label">Store password</label>
+          <label className="staff-wiz__label" htmlFor="staff-forgot-password">Store password</label>
           <input
             type="password"
             className="staff-wiz__input"
+            id="staff-forgot-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             data-testid="staff-forgot-password"

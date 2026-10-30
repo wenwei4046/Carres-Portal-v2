@@ -213,6 +213,7 @@ export default function CreateSofaComboModal({
                     <span className="t-small font-mono">{/^\d+$/.test(h) ? `${h}″` : h}</span>
                     <input
                       inputMode="decimal"
+                      aria-label={`Combo price (RM), size ${h}`}
                       value={rows[h]?.price ?? ""}
                       onChange={(e) => setCell(h, "price", e.target.value)}
                       placeholder=""
@@ -221,6 +222,7 @@ export default function CreateSofaComboModal({
                     />
                     <input
                       inputMode="decimal"
+                      aria-label={`PWP price (RM), size ${h}`}
                       value={rows[h]?.pwp ?? ""}
                       onChange={(e) => setCell(h, "pwp", e.target.value)}
                       placeholder=""

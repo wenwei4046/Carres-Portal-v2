@@ -16,6 +16,9 @@ import {
 import DOFileUploadField from "@/components/DOFileUploadField";
 import PODrawerThreadList from "./PODrawerThreadList";
 import PickupHistoryList from "./PickupHistoryList";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
 
 /**
  * Supplier · Purchase Orders page — Phase 6 spec §6.
@@ -184,7 +187,19 @@ export default function SupplierPOs() {
 
       {/* Stage body */}
       {pos.isLoading ? (
-        <Empty hint="Loading…" />
+        <Loading variant="skeleton" label="Loading purchase orders" />
+      ) : pos.isError && !pos.data ? (
+        <div role="alert">
+          <EmptyState
+            title="Could not be loaded"
+            detail="Your purchase orders did not load."
+            action={
+              <Button variant="neutral" disabled={pos.isFetching} onClick={() => void pos.refetch()}>
+                Try again
+              </Button>
+            }
+          />
+        </div>
       ) : sortedRows.length === 0 ? (
         <Empty hint={emptyHintFor(active)} />
       ) : (

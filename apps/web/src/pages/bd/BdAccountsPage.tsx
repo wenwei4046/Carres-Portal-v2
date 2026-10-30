@@ -5,6 +5,9 @@ import { rmGroup } from "@/pages/dealer/pos/order-board-ui";
 import { useBdActivity, useBdDealers } from "@/lib/queries";
 import BdCreateDealerModal from "./BdCreateDealerModal";
 import BdStaffPanel from "./BdStaffPanel";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
 
 /**
  * BdAccountsPage (2026-07-19) — the BD POS "Accounts" overlay: every
@@ -70,13 +73,19 @@ export default function BdAccountsPage({ onClose }: { onClose: () => void }) {
             <h4 className="os-section__title">
               Stores <span>{dealers.length}</span>
             </h4>
-            {dealersQ.isLoading && (
-              <p style={{ fontSize: 13, color: "var(--fg-muted)" }}>Loading…</p>
-            )}
-            {dealersQ.error && (
-              <p style={{ fontSize: 13, color: "var(--c-burnt)" }}>
-                Couldn&apos;t load dealers: {dealersQ.error.message}
-              </p>
+            {dealersQ.isLoading && <Loading variant="skeleton" label="Loading stores" />}
+            {dealersQ.error && !dealersQ.data && (
+              <div role="alert">
+                <EmptyState
+                  title="Could not be loaded"
+                  detail="Your dealer stores did not load."
+                  action={
+                    <Button variant="neutral" disabled={dealersQ.isFetching} onClick={() => void dealersQ.refetch()}>
+                      Try again
+                    </Button>
+                  }
+                />
+              </div>
             )}
             <div style={{ display: "flex", flexDirection: "column" }}>
               {dealers.map((d) => (

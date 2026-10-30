@@ -2,6 +2,9 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ApiError, apiFetch } from "@/lib/api";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
 import { qk, usePartnerMarkPickupCollected } from "@/lib/queries";
 import PartnerReceiveAtWhModal from "./components/PartnerReceiveAtWhModal";
 import PickupBatchDialog from "./components/PickupBatchDialog";
@@ -231,10 +234,11 @@ export default function PartnerFactoryPickupsPage() {
     });
   }
 
-  const { data: rows = [], isLoading } = useQuery({
+  const { data, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: qk.partner.pickups(),
     queryFn: () => apiFetch<PickupRow[]>("/api/partner/pickups"),
   });
+  const rows = data ?? [];
 
   const accept = useMutation({
     mutationFn: (poId: string) =>
@@ -342,7 +346,24 @@ export default function PartnerFactoryPickupsPage() {
 
   if (isLoading) {
     return (
-      <div className="px-9 py-8 pb-14 text-body text-base-600">Loading…</div>
+      <div className="px-9 py-8 pb-14">
+        <Loading variant="skeleton" label="Loading factory pickups" />
+      </div>
+    );
+  }
+  if (isError && !data) {
+    return (
+      <div className="px-9 py-8 pb-14" role="alert">
+        <EmptyState
+          title="Could not be loaded"
+          detail="Your factory pickups did not load."
+          action={
+            <Button variant="neutral" disabled={isFetching} onClick={() => void refetch()}>
+              Try again
+            </Button>
+          }
+        />
+      </div>
     );
   }
 
@@ -360,10 +381,11 @@ export default function PartnerFactoryPickupsPage() {
         </div>
         <input
           type="search"
+          aria-label="Search pickups"
           placeholder="Search PO / SKU / supplier…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="px-3.5 py-2 border border-base-300 rounded-[4px] text-body min-w-[240px] outline-none focus:border-primary"
+          className="px-3.5 py-2 border border-base-300 rounded-[4px] text-body w-full min-w-0 sm:w-auto sm:min-w-[240px] outline-none focus:border-primary"
         />
       </header>
 

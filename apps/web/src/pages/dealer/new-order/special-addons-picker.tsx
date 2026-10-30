@@ -250,6 +250,7 @@ export function SpecialAddonsPicker({
                     {g.required && <span className="text-primary"> *</span>}
                   </span>
                   <select
+                    aria-label={g.label}
                     value={pick!.choiceLabels[gi] ?? ""}
                     onChange={(e) => setChoice(def.code, gi, e.target.value)}
                     className={selCls}

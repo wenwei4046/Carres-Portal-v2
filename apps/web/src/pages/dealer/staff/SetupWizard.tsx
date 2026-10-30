@@ -122,10 +122,11 @@ function ReauthStep({
         PIN. No more sharing the store password.
       </p>
       <div className="staff-wiz__field">
-        <label className="staff-wiz__label">Store password</label>
+        <label className="staff-wiz__label" htmlFor="staff-reauth-password">Store password</label>
         <input
           type="password"
           className="staff-wiz__input"
+          id="staff-reauth-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           data-testid="staff-reauth-password"
@@ -214,9 +215,10 @@ function IdentityStep({
       </div>
 
       <div className="staff-wiz__field">
-        <label className="staff-wiz__label">Your name</label>
+        <label className="staff-wiz__label" htmlFor="staff-setup-name">Your name</label>
         <input
           className="staff-wiz__input"
+          id="staff-setup-name"
           value={name}
           onChange={(e) => setName(e.target.value)}
           disabled={!!selfStaff}

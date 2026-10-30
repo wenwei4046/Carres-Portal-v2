@@ -3,6 +3,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { qk, usePartnerToDeliver, type PartnerToDeliverRow } from "@/lib/queries";
 import { apiFetch, ApiError } from "@/lib/api";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
 import { renderDoPdf } from "@/lib/pdf/render";
 import type { DoTemplateData } from "@/lib/pdf/types";
 import PartnerRequestForDeliveryDialog from "./components/PartnerRequestForDeliveryDialog";
@@ -45,12 +48,14 @@ export default function PartnerPickupsPage() {
   const qc = useQueryClient();
   const [openRfd, setOpenRfd] = useState<{ threadId: string; poLabel: string } | null>(null);
   const [openPod, setOpenPod] = useState<PartnerToDeliverRow | null>(null);
-  const { data: toDeliverRows = [], isLoading: toDeliverLoading } = usePartnerToDeliver();
+  const toDeliverQ = usePartnerToDeliver();
+  const { data: toDeliverRows = [], isLoading: toDeliverLoading } = toDeliverQ;
 
-  const { data: rfdRows = [], isLoading: rfdLoading } = useQuery({
+  const rfdQ = useQuery({
     queryKey: qk.partner.rfdPending(),
     queryFn: () => apiFetch<RfdPendingRow[]>("/api/partner/pickups/rfd-pending"),
   });
+  const { data: rfdRows = [], isLoading: rfdLoading } = rfdQ;
 
   const buckets = useMemo(() => {
     // 2026-05-13 (Loo) — 3-column model: Awaiting / Scheduled / Delivered.
@@ -77,7 +82,32 @@ export default function PartnerPickupsPage() {
   const totalAll = rfdRows.length + toDeliverRows.length;
 
   if (rfdLoading || toDeliverLoading) {
-    return <div className="px-9 py-8 pb-14 text-body text-base-600">Loading…</div>;
+    return (
+      <div className="px-9 py-8 pb-14">
+        <Loading variant="skeleton" label="Loading deliveries" />
+      </div>
+    );
+  }
+  if ((rfdQ.isError && !rfdQ.data) || (toDeliverQ.isError && !toDeliverQ.data)) {
+    return (
+      <div className="px-9 py-8 pb-14" role="alert">
+        <EmptyState
+          title="Could not be loaded"
+          detail="Your deliveries did not load."
+          action={
+            <Button
+              variant="neutral"
+              onClick={() => {
+                if (rfdQ.isError && !rfdQ.data) void rfdQ.refetch();
+                if (toDeliverQ.isError && !toDeliverQ.data) void toDeliverQ.refetch();
+              }}
+            >
+              Try again
+            </Button>
+          }
+        />
+      </div>
+    );
   }
 
   const closeRfdDialog = () => {

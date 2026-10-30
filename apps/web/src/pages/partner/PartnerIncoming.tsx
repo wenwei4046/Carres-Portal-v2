@@ -7,6 +7,7 @@ import {
 } from "@/lib/queries";
 import { ApiError } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
+import Loading from "@/components/kit/Loading";
 import LpRejectDialog from "./components/LpRejectDialog";
 
 /**
@@ -44,15 +45,16 @@ export default function PartnerIncoming() {
       </div>
 
       {incomingQ.isLoading ? (
-        <div className="rounded border border-dashed border-base-200 bg-card py-16 text-center text-meta text-base-500">
-          Loading…
+        <div className="rounded border border-dashed border-base-200 bg-card p-4">
+          <Loading variant="skeleton" label="Loading incoming orders" />
         </div>
-      ) : incomingQ.isError ? (
+      ) : incomingQ.isError && !incomingQ.data ? (
         <div className="rounded border border-destructive/30 bg-destructive/5 p-4 text-meta text-destructive">
           Couldn&rsquo;t load incoming orders.
           <button
             type="button"
             className="ml-2 underline"
+            disabled={incomingQ.isFetching}
             onClick={() => void incomingQ.refetch()}
           >
             Retry

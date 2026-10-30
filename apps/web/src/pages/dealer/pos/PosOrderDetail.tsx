@@ -65,6 +65,9 @@ import PosConfigurePage from "./PosConfigurePage";
 import SofaConfigurePage from "./SofaConfigurePage";
 import StripeCollectModal from "./StripeCollectModal";
 import GuaranteeCoverStrip from "@/components/GuaranteeCoverStrip";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
 
 /**
  * PosOrderDetail — the POS-native order detail drawer for the My-orders board
@@ -980,7 +983,21 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
       <div className="os-detail-overlay" onClick={onClose} data-testid="pos-od-overlay">
         <aside className="os-detail" onClick={(e) => e.stopPropagation()}>
           <div className="os-detail__body">
-            <p>{orderQ.isError ? "Couldn't load this order. Close and retry." : "Loading…"}</p>
+            {orderQ.isError ? (
+              <div role="alert">
+                <EmptyState
+                  title="Could not be loaded"
+                  detail="This order did not load."
+                  action={
+                    <Button variant="neutral" onClick={() => void orderQ.refetch()}>
+                      Try again
+                    </Button>
+                  }
+                />
+              </div>
+            ) : (
+              <Loading variant="skeleton" label="Loading order" />
+            )}
           </div>
         </aside>
       </div>

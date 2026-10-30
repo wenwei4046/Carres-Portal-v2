@@ -5,6 +5,9 @@ import {
   useSupplierActivity,
   type SupplierPoRow,
 } from "@/lib/queries";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
 
 /**
  * Supplier Dashboard — Phase 6.
@@ -94,6 +97,23 @@ export default function SupplierDashboard() {
 
   const isLoading = pos.isLoading || demand.isLoading;
 
+  // The KPIs and pipeline would read as zero on a failed read.
+  if ((pos.isError && !pos.data) || (demand.isError && !demand.data)) {
+    return (
+      <div className="p-9 max-w-[1400px] mx-auto" role="alert">
+        <EmptyState
+          title="Could not be loaded"
+          detail="Your purchase orders and demand did not load."
+          action={
+            <Button variant="neutral" onClick={() => { if (pos.isError && !pos.data) void pos.refetch(); if (demand.isError && !demand.data) void demand.refetch(); }}>
+              Try again
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="p-9 max-w-[1400px] mx-auto">
       <header className="mb-7">
@@ -112,7 +132,7 @@ export default function SupplierDashboard() {
           the Forecast page's KPI layout (1.5fr/1fr/1fr) so the math is
           visible at a glance. Total = Committed + Pending. */}
       <div
-        className="grid grid-cols-[1.5fr_1fr_1fr] gap-3.5 mb-5"
+        className="grid grid-cols-1 sm:grid-cols-[1.5fr_1fr_1fr] gap-3.5 mb-5"
         data-testid="supplier-dashboard-demand-kpis"
       >
         <div
@@ -279,7 +299,19 @@ export default function SupplierDashboard() {
           Recent activity
         </div>
         {activity.isLoading ? (
-          <div className="text-body text-muted-foreground py-2">Loading…</div>
+          <Loading variant="skeleton" label="Loading recent activity" />
+        ) : activity.isError && !activity.data ? (
+          <div role="alert">
+            <EmptyState
+              title="Could not be loaded"
+              detail="Recent activity did not load."
+              action={
+                <Button variant="neutral" disabled={activity.isFetching} onClick={() => void activity.refetch()}>
+                  Try again
+                </Button>
+              }
+            />
+          </div>
         ) : (activity.data ?? []).length === 0 ? (
           <div className="text-body text-muted-foreground py-2">
             No recent activity yet.
@@ -314,7 +346,7 @@ export default function SupplierDashboard() {
           Top demand · committed + pending
         </div>
         {isLoading ? (
-          <div className="text-body text-muted-foreground py-6">Loading…</div>
+          <Loading variant="skeleton" label="Loading top demand" />
         ) : topDemand.length === 0 ? (
           <div className="text-body text-muted-foreground py-6">
             No demand right now.

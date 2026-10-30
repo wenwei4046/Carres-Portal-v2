@@ -667,7 +667,7 @@ export default function CatalogStep({
             />
           </div>
           {/* One brand today — the series filter activates when series data exists. */}
-          <select className="cat-select" value="All series" onChange={() => {}}>
+          <select className="cat-select" aria-label="Series" value="All series" onChange={() => {}}>
             <option>All series</option>
           </select>
           <span className="cat-toolbar__count">

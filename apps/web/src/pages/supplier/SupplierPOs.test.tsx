@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { act, render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import SupplierPOs from "./SupplierPOs";
@@ -407,5 +407,41 @@ describe("SupplierPOs", () => {
     expect(
       screen.getByRole("button", { name: /Submit DO · Mark Delivered/i }),
     ).toBeDisabled();
+  });
+
+  it("a failed PO read shows Could not be loaded and Try again refetches", async () => {
+    let posCalls = 0;
+    vi.mocked(apiFetch).mockImplementation(async (url: string) => {
+      if (url.includes("/api/supplier/me")) return ME_OWN;
+      if (url.includes("/api/supplier/pos")) {
+        posCalls += 1;
+        throw new Error("boom");
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    });
+    render(wrap(<SupplierPOs />));
+    expect(await screen.findByText("Could not be loaded")).toBeInTheDocument();
+    const before = posCalls;
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(posCalls).toBeGreaterThan(before));
+  });
+
+  it("a failed background refetch keeps the loaded POs", async () => {
+    mockAll({ me: ME_OWN, pos: [PENDING_PO] });
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <SupplierPOs />
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByTestId("po-card-PO-2050")).toBeInTheDocument();
+    vi.mocked(apiFetch).mockImplementation(async () => {
+      throw new Error("boom");
+    });
+    await act(async () => {
+      await qc.refetchQueries();
+    });
+    expect(screen.getByTestId("po-card-PO-2050")).toBeInTheDocument();
+    expect(screen.queryByText("Could not be loaded")).not.toBeInTheDocument();
   });
 });

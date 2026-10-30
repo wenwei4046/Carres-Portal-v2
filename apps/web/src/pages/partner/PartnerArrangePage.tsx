@@ -239,6 +239,7 @@ function DeliveryCard({ card }: { card: PartnerDeliveryCard }) {
               <span className="text-meta font-medium">{PA.cannotDeliverWhy}</span>
               <select
                 className={FIELD}
+                aria-label={PA.cannotDeliverWhy}
                 value={cdReason}
                 onChange={(e) => setCdReason(e.target.value)}
                 data-testid="partner-cannot-deliver-reason"
@@ -252,6 +253,7 @@ function DeliveryCard({ card }: { card: PartnerDeliveryCard }) {
               </select>
               <input
                 className={FIELD}
+                aria-label={PA.cannotDeliverNote}
                 placeholder={PA.cannotDeliverNote}
                 value={cdNote}
                 onChange={(e) => setCdNote(e.target.value)}
@@ -298,7 +300,7 @@ export default function PartnerArrangePage() {
     <div className="mx-auto flex max-w-xl flex-col gap-3 p-4" data-testid="partner-arrange">
       <h1 className="text-page font-semibold">{PA.page}</h1>
       <p className="text-meta text-muted-foreground">{PA.intro}</p>
-      {q.isError ? (
+      {q.isError && !q.data ? (
         <div className="rounded-control border border-border bg-card p-4 text-meta">
           {PA.loadFailed}{" "}
           <button type="button" className="font-medium underline" onClick={() => void q.refetch()}>

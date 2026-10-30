@@ -9,6 +9,9 @@ import {
   StaffAvatar,
   TierBadge,
 } from "@/pages/dealer/staff/staff-ui";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
 
 /**
  * BdStaffPanel (2026-07-19) — BD manages a dealership's staff from the POS
@@ -71,9 +74,19 @@ export default function BdStaffPanel({
             </button>
           </div>
 
-          {staffQ.isPending && <p className="text-body text-base-500">Loading…</p>}
-          {staffQ.error && (
-            <p className="text-body text-destructive">Couldn&apos;t load: {staffQ.error.message}</p>
+          {staffQ.isPending && <Loading variant="skeleton" label="Loading staff" />}
+          {staffQ.error && !staffQ.data && (
+            <div role="alert">
+              <EmptyState
+                title="Could not be loaded"
+                detail="This store's staff did not load."
+                action={
+                  <Button variant="neutral" disabled={staffQ.isFetching} onClick={() => void staffQ.refetch()}>
+                    Try again
+                  </Button>
+                }
+              />
+            </div>
           )}
           {staffQ.data && roster.length === 0 && (
             <p className="text-body text-base-500 italic">No staff yet. Add one to enable PIN sign-in.</p>
