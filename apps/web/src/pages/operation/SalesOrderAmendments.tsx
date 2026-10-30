@@ -45,8 +45,8 @@ export default function SalesOrderAmendments() {
   const open = (r: AmendmentQueueRow) => navigate(`/operation/orders/so/${encodeURIComponent(r.orderId)}`);
 
   const columns = useMemo<DataGridColumn<AmendmentQueueRow>[]>(() => [
-    { key: "status", label: "Status", width: 190, accessor: statusWord, filterValue: statusWord, filterType: "enum", exportValue: statusWord },
     { key: "so", label: "SO No", width: 110, accessor: soNo, searchValue: soNo, exportValue: soNo },
+    { key: "status", label: "Status", width: 190, accessor: statusWord, filterValue: statusWord, filterType: "enum", exportValue: statusWord },
     { key: "customer", label: "Customer", width: 160, wrap: true, accessor: (r) => r.customerName ?? "" },
     { key: "reason", label: "Reason for change", width: 240, wrap: true, accessor: (r) => r.reason ?? "" },
     { key: "submitted_by", label: "Submitted by", width: 140, accessor: (r) => r.submittedBy ?? "",

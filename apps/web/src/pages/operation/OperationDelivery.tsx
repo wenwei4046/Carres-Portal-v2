@@ -1152,32 +1152,6 @@ export default function OperationDelivery() {
   const columns = useMemo<DataGridColumn<DeliveryMonitorCard>[]>(
     () => [
       {
-        /* ⭐ COLUMN 3 — the OPERATION's progress in the actor-first words of
-           the one arithmetic (Delivery MASTER §8.4): line one names who must
-           act and what happened, in its text colour; line two the failure
-           reason, the overdue act, the window, the deadline or the proof gap. */
-        key: "delivery_status",
-        label: MONITOR_COLUMN.deliveryStatus,
-        width: 230,
-        sortable: true,
-        filterType: "enum",
-        chooserGroup: "Delivery",
-        /* ⭐ LINE TWO IS THE DEADLINE ITSELF WHEN ONE IS OWED (owner ruling
-           2026-09-14). A chase row reads the contact rung's act over
-           the kit's phone glyph and the day — no `Call by`, because line one
-           has already said what to do. Every other status keeps its
-           supporting fact; `Order details incomplete` keeps the missing fact
-           and carries the deadline as its title (owner ruling 2026-09-25). */
-        accessor: (r) => <MonitorStatusCell card={r} />,
-        /* Search and Export keep the WORDS: the sheet a manager opens in Excel
-           must still say what the deadline is, and a search for the word
-           `deadline` must still find the rows that owe one. */
-        searchValue: (r) =>
-          [r.statusLabel, statusSecondText(r) ?? "", ...missingProofLabels(r)].join(" "),
-        exportValue: (r) => joinLines(r.statusLabel, statusSecondText(r)),
-        filterValue: (r) => r.statusLabel,
-      },
-      {
         /* ⭐ COLUMN 4 — THE IDENTITY, pinned while the sheet scrolls, in the
            SAME two-line grammar as every other cell (§8.3, owner correction
            2026-09-14). The customer's own reference used to ride the FIRST
@@ -1237,6 +1211,32 @@ export default function OperationDelivery() {
         searchValue: (r) => `${r.customerName} ${r.scope.o.customer_phone ?? ""}`,
         filterValue: (r) => r.customerName,
         exportValue: (r) => joinLines(r.customerName, r.scope.o.customer_phone ?? null),
+      },
+      {
+        /* ⭐ COLUMN 3 — the OPERATION's progress in the actor-first words of
+           the one arithmetic (Delivery MASTER §8.4): line one names who must
+           act and what happened, in its text colour; line two the failure
+           reason, the overdue act, the window, the deadline or the proof gap. */
+        key: "delivery_status",
+        label: MONITOR_COLUMN.deliveryStatus,
+        width: 230,
+        sortable: true,
+        filterType: "enum",
+        chooserGroup: "Delivery",
+        /* ⭐ LINE TWO IS THE DEADLINE ITSELF WHEN ONE IS OWED (owner ruling
+           2026-09-14). A chase row reads the contact rung's act over
+           the kit's phone glyph and the day — no `Call by`, because line one
+           has already said what to do. Every other status keeps its
+           supporting fact; `Order details incomplete` keeps the missing fact
+           and carries the deadline as its title (owner ruling 2026-09-25). */
+        accessor: (r) => <MonitorStatusCell card={r} />,
+        /* Search and Export keep the WORDS: the sheet a manager opens in Excel
+           must still say what the deadline is, and a search for the word
+           `deadline` must still find the rows that owe one. */
+        searchValue: (r) =>
+          [r.statusLabel, statusSecondText(r) ?? "", ...missingProofLabels(r)].join(" "),
+        exportValue: (r) => joinLines(r.statusLabel, statusSecondText(r)),
+        filterValue: (r) => r.statusLabel,
       },
       {
         /* ⭐ COLUMN 6 — city and state; beneath it, the building type and

@@ -73,11 +73,11 @@ function headings(): string[] {
 }
 
 describe("the confirmed column order", () => {
-  it("leads with PR Doc Date then PR No", () => {
+  it("leads with PR No then PR Doc Date", () => {
     show([doc()]);
     const visible = headings();
-    expect(visible.indexOf("PR Doc Date")).toBeLessThan(visible.indexOf("PR No"));
-    expect(visible.indexOf("PR No")).toBeLessThan(visible.indexOf("Supplier"));
+    expect(visible.indexOf("PR No")).toBeLessThan(visible.indexOf("PR Doc Date"));
+    expect(visible.indexOf("PR Doc Date")).toBeLessThan(visible.indexOf("Supplier"));
   });
 
   it("puts Category immediately before the combined PO No / Unit ID cell", () => {

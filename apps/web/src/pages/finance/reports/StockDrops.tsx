@@ -37,10 +37,10 @@ export default function StockDrops() {
   });
 
   const columns = useMemo<DataGridColumn<StockDropRow>[]>(() => [
-    { key: "date", label: "Date", width: 120, accessor: (r) => fmtDate(r.dropped_at),
-      sortFn: (a, b) => a.dropped_at.localeCompare(b.dropped_at) },
     { key: "adjustment", label: "Adjustment No", width: W.documentNo, accessor: (r) => r.adjustment_no,
       searchValue: (r) => r.adjustment_no },
+    { key: "date", label: "Date", width: 120, accessor: (r) => fmtDate(r.dropped_at),
+      sortFn: (a, b) => a.dropped_at.localeCompare(b.dropped_at) },
     { key: "site", label: "Site", width: W.stockLocation, accessor: (r) => r.site_name ?? "",
       filterValue: (r) => r.site_name ?? "", filterType: "enum", searchValue: (r) => r.site_name ?? "" },
     { key: "reason", label: "Reason", width: 220, accessor: (r) => r.reason, searchValue: (r) => r.reason },

@@ -35,7 +35,7 @@ const row = (over: Partial<RepairOrderListRow> = {}): RepairOrderListRow => ({
 describe("Repair Orders vocabulary (§9.7)", () => {
   it("the 17 register columns and the 11 expansion columns, in the approved order", () => {
     expect(REPAIR_ORDER_COLUMN_ORDER.map((k) => REPAIR_ORDER_COLUMN_LABEL[k])).toEqual([
-      "RO Doc Date", "RO No", "Supplier", "Supplier Claim No", "Category", "PO No / Unit ID", "Items", "Qty",
+      "RO No", "RO Doc Date", "Supplier", "Supplier Claim No", "Category", "PO No / Unit ID", "Items", "Qty",
       "Repair Requirement", "Cost Responsibility", "Supplier Pickup Location", "Actual Pickup Date",
       "Supplier Return Location", "Expected Return Date", "Returned Qty", "Goods Received Date", "GRN No",
     ]);

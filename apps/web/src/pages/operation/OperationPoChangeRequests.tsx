@@ -109,8 +109,8 @@ export default function OperationPoChangeRequests({ kind }: { kind: Kind }) {
   const [one, many] = NOUN[kind];
 
   const columns = useMemo<DataGridColumn<PoChangeRequestRow>[]>(() => [
-    { key: "status", label: "Status", width: 220, accessor: word, filterValue: word, filterType: "enum", exportValue: word },
     { key: "po", label: "PO No", width: 150, accessor: (r) => r.po_id, searchValue: (r) => r.po_id },
+    { key: "status", label: "Status", width: 220, accessor: word, filterValue: word, filterType: "enum", exportValue: word },
     { key: "supplier", label: "Supplier", width: 160, wrap: true, accessor: (r) => r.supplier_name ?? "",
       filterValue: (r) => r.supplier_name ?? "", filterType: "enum" },
     { key: "change", label: "Change", width: 240, wrap: true, accessor: (r) => r.summary },

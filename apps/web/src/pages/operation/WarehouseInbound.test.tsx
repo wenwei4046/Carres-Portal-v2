@@ -486,14 +486,14 @@ describe("Inbound · the list itself", () => {
 
 describe("Inbound · the owner's eleven columns (2026-09-25)", () => {
   /** One row is one arrangement, one fact per cell, in the owner's order:
-   *  the three dates first (planned · supplier-confirmed · actual), then the
-   *  two documents and the supplier, then the goods and the three
+   *  the PO number first, then the three dates (planned · supplier-confirmed
+   *  · actual), then the other document and the supplier, the goods and the three
    *  quantities, `Receive` last. */
   const DEFAULT_COLUMNS = [
+    "PO No",
     "PO Delivery Date",
     "Supplier Delivery Date",
     "Goods Received Date",
-    "PO No",
     "Supplier",
     "Supplier DO No",
     "Item",

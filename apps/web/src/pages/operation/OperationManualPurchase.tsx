@@ -1074,6 +1074,63 @@ export default function OperationManualPurchase({ contextFlow = false }: { conte
   const columns = useMemo<DataGridColumn<RequestRegisterRow>[]>(
     () => [
       {
+        key: "mpr_no",
+        label: MW.colMprNo,
+        headerLines: ["MPR", "No"],
+        /* The identifier width (01 §5: minimum 180). Measured 15 Oct 2026:
+           `MPR-20260829-7712` at 13px mono ended in an ellipsis in 152 at
+           1025, 1164 and 1440; 180 holds it whole at 13 / 600. */
+        width: 180,
+        minWidth: 180,
+        sortable: true,
+        chooserGroup: "Request",
+        accessor: (r) =>
+          r.mprNo ? (
+            <button
+              type="button"
+              className="block max-w-full text-left font-mono font-semibold text-kit-blue-11 underline-offset-2 hover:underline"
+              data-testid={`mp-open-${r.id}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                openRequest(r);
+              }}
+            >
+              {r.mprNo}
+            </button>
+          ) : (
+            /* A REQUEST WITH NO NUMBER IS A FACT, NOT A BUTTON. It opens by
+               double-click and from the row menu; nothing here invents a
+               document reference to make a column look complete. */
+            <Absent>{MW.mprNotRecorded}</Absent>
+          ),
+        /* The SKUs and the structured `For` stay searchable behind the number. */
+        /* Every stored identity stays findable, including a retired `REQ-…`
+           the column does not print. */
+        searchValue: (r) =>
+          `${r.mprNo ?? ""} ${r.legacyReqNo ?? ""} ${r.itemsText} ${r.skuTokens} ${r.forText}`,
+        filterValue: (r) => r.mprNo ?? MW.mprNotRecorded,
+        exportValue: (r) => r.mprNo ?? "",
+        sortFn: (a, b) => (a.mprNo ?? "").localeCompare(b.mprNo ?? ""),
+      },
+      {
+        /* The record date leads the facts (ui MASTER §6.7 rule 2). */
+        key: "proceed_date",
+        label: MW.colProceedDate,
+        headerLines: ["Proceed", "Date"],
+        width: 112,
+        minWidth: 94,
+        sortable: true,
+        chooserGroup: "Request",
+        filterType: "date",
+        dateValue: (r) => r.proceedDate,
+        accessor: (r) => (
+          <span className="tabular-nums">{fmtDate(r.proceedDate.slice(0, 10))}</span>
+        ),
+        searchValue: (r) => fmtDate(r.proceedDate.slice(0, 10)),
+        exportValue: (r) => r.proceedDate.slice(0, 10),
+        sortFn: (a, b) => a.proceedDate.localeCompare(b.proceedDate),
+      },
+      {
         /**
          * ⭐ THE PURCHASE NEED, AND IT IS NOT THE APPROVAL STATE.
          *
@@ -1113,63 +1170,6 @@ export default function OperationManualPurchase({ contextFlow = false }: { conte
         filterValue: (r) => needStatusWordOf(r),
         exportValue: (r) => needStatusWordOf(r),
         sortFn: (a, b) => needStatusWordOf(a).localeCompare(needStatusWordOf(b)),
-      },
-      {
-        /* The record date leads the facts (ui MASTER §6.7 rule 2). */
-        key: "proceed_date",
-        label: MW.colProceedDate,
-        headerLines: ["Proceed", "Date"],
-        width: 112,
-        minWidth: 94,
-        sortable: true,
-        chooserGroup: "Request",
-        filterType: "date",
-        dateValue: (r) => r.proceedDate,
-        accessor: (r) => (
-          <span className="tabular-nums">{fmtDate(r.proceedDate.slice(0, 10))}</span>
-        ),
-        searchValue: (r) => fmtDate(r.proceedDate.slice(0, 10)),
-        exportValue: (r) => r.proceedDate.slice(0, 10),
-        sortFn: (a, b) => a.proceedDate.localeCompare(b.proceedDate),
-      },
-      {
-        key: "mpr_no",
-        label: MW.colMprNo,
-        headerLines: ["MPR", "No"],
-        /* The identifier width (01 §5: minimum 180). Measured 15 Oct 2026:
-           `MPR-20260829-7712` at 13px mono ended in an ellipsis in 152 at
-           1025, 1164 and 1440; 180 holds it whole at 13 / 600. */
-        width: 180,
-        minWidth: 180,
-        sortable: true,
-        chooserGroup: "Request",
-        accessor: (r) =>
-          r.mprNo ? (
-            <button
-              type="button"
-              className="block max-w-full text-left font-mono font-semibold text-kit-blue-11 underline-offset-2 hover:underline"
-              data-testid={`mp-open-${r.id}`}
-              onClick={(event) => {
-                event.stopPropagation();
-                openRequest(r);
-              }}
-            >
-              {r.mprNo}
-            </button>
-          ) : (
-            /* A REQUEST WITH NO NUMBER IS A FACT, NOT A BUTTON. It opens by
-               double-click and from the row menu; nothing here invents a
-               document reference to make a column look complete. */
-            <Absent>{MW.mprNotRecorded}</Absent>
-          ),
-        /* The SKUs and the structured `For` stay searchable behind the number. */
-        /* Every stored identity stays findable, including a retired `REQ-…`
-           the column does not print. */
-        searchValue: (r) =>
-          `${r.mprNo ?? ""} ${r.legacyReqNo ?? ""} ${r.itemsText} ${r.skuTokens} ${r.forText}`,
-        filterValue: (r) => r.mprNo ?? MW.mprNotRecorded,
-        exportValue: (r) => r.mprNo ?? "",
-        sortFn: (a, b) => (a.mprNo ?? "").localeCompare(b.mprNo ?? ""),
       },
       {
         key: "approval",
@@ -1830,15 +1830,9 @@ export default function OperationManualPurchase({ contextFlow = false }: { conte
               groupOf: (r) => r.group,
               revealMatches: activeConditions.length > 0,
             }}
-            /* The approved order leads with `Status`, so it is NAMED as a
-               column ahead of the pair (§6.7 rule 2, `before`): `Proceed Date`
-               and `MPR No` still pin — and below 768px `MPR No` pins alone —
-               while `Status` scrolls under the block like any other fact. */
-            leadingColumns={{
-              date: "proceed_date",
-              identity: "mpr_no",
-              before: ["status"],
-            }}
+            /* `MPR No` leads, as Houzs does (YH 30 Oct 2026). `Status` follows
+               the pinned pair and scrolls under it like any other fact. */
+            pinnedPrefix={{ columns: ["mpr_no", "proceed_date"], narrow: ["mpr_no"] }}
             chooserGroupOrder={["Request", "Buying", "Customer", "Documents"]}
             onRowDoubleClick={openRequest}
             contextMenu={rowMenu}

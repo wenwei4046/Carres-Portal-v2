@@ -865,9 +865,9 @@ describe("the two top-level views (owner ruling 2026-09-10)", () => {
     /* The twelve ruled columns (Delivery MASTER §8.3): checkbox · expand ·
        these ten headings, in order. `Actions` and `Edit Delivery` are retired. */
     for (const label of [
-      "Delivery Status",
       "SO No",
       "Customer",
+      "Delivery Status",
       "Delivery Location",
       "Requested Delivery Date",
       "Scheduled delivery",
@@ -1432,9 +1432,9 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
     seedChase();
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
     const ruled = [
-      "Delivery Status",
       "SO No",
       "Customer",
+      "Delivery Status",
       "Delivery Location",
       "Requested Delivery Date",
       "Scheduled delivery",

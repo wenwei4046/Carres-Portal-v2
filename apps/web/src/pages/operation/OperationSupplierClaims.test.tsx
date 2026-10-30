@@ -95,7 +95,7 @@ const headers = () => screen.getAllByRole("columnheader").map((th) => th.getAttr
 describe("Supplier Claims register — the confirmed twelve columns (§9.5, 2026-09-18)", () => {
   it("keeps the confirmed order after the two leading controls", () => {
     show();
-    expect(headers().slice(0, 10)).toEqual(["Claim status", "Supplier Claim No", "Claim Reported", "Supplier", "PO No", "GRN No", "Items", "Qty", "Problem", "Supplier Response"]);
+    expect(headers().slice(0, 10)).toEqual(["Supplier Claim No", "Claim status", "Claim Reported", "Supplier", "PO No", "GRN No", "Items", "Qty", "Problem", "Supplier Response"]);
     expect(screen.getAllByRole("checkbox", { name: "Select row" })).toHaveLength(2);
     expect(headers()).not.toContain("Customer Resolution");
     expect(headers()).not.toContain("Carres Execution");

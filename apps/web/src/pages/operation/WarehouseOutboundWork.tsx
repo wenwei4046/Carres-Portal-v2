@@ -205,6 +205,25 @@ export default function WarehouseOutboundWork() {
   const columns = useMemo<DataGridColumn<WarehouseOutboundCard>[]>(
     () => [
       {
+        key: "document",
+        label: "DO No",
+        width: REGISTER_FIELD_WIDTH.documentNo,
+        sortable: true,
+        chooserGroup: "Documents",
+        searchValue: (c) => `DO No ${c.doNumber}`,
+        exportValue: (c) => c.doNumber,
+        accessor: (c) => (
+          <Link
+            className="font-mono text-kit-blue-11 hover:underline"
+            onClick={(e) => e.stopPropagation()}
+            to={c.deliveryOrderHref}
+            data-testid={`outbound-document-${c.doNumber}`}
+          >
+            {c.doNumber}
+          </Link>
+        ),
+      },
+      {
         key: "date",
         label: "Scheduled handover",
         headerLines: ["Scheduled", "handover"] as const,
@@ -249,25 +268,6 @@ export default function WarehouseOutboundWork() {
           ) : (
             <OutboundBlank />
           ),
-      },
-      {
-        key: "document",
-        label: "DO No",
-        width: REGISTER_FIELD_WIDTH.documentNo,
-        sortable: true,
-        chooserGroup: "Documents",
-        searchValue: (c) => `DO No ${c.doNumber}`,
-        exportValue: (c) => c.doNumber,
-        accessor: (c) => (
-          <Link
-            className="font-mono text-kit-blue-11 hover:underline"
-            onClick={(e) => e.stopPropagation()}
-            to={c.deliveryOrderHref}
-            data-testid={`outbound-document-${c.doNumber}`}
-          >
-            {c.doNumber}
-          </Link>
-        ),
       },
       {
         key: "so",

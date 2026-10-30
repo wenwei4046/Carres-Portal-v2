@@ -321,6 +321,28 @@ export default function WarehouseInbound() {
   const columns = useMemo<DataGridColumn<InboundArrival>[]>(
     () => [
       {
+        key: "poNo",
+        label: "PO No",
+        width: REGISTER_FIELD_WIDTH.documentNo,
+        sortable: true,
+        chooserGroup: "Documents",
+        searchValue: (r) => `${r.documentWord} ${r.documentNo} ${r.sourceId}`,
+        exportValue: (r) => r.documentNo,
+        /* A non-PO arrangement keeps its OWN document word on hover —
+           `Transfer No` · `Repair Order No` · `Claim No` — never `PO / Source No`. */
+        accessor: (r) => (
+          <Link
+            className="font-mono text-kit-blue-11 hover:underline"
+            onClick={(event) => event.stopPropagation()}
+            to={documentHref(r)}
+            title={r.sourceType === "supplier-delivery" ? undefined : `${r.documentWord} ${r.documentNo}`}
+            data-testid={`inbound-document-${r.id}`}
+          >
+            {r.documentNo}
+          </Link>
+        ),
+      },
+      {
         key: "poDeliveryDate",
         label: "PO Delivery Date",
         headerLines: ["PO Delivery", "Date"] as const,
@@ -393,28 +415,6 @@ export default function WarehouseInbound() {
           }
           return <span data-testid={`inbound-received-${r.id}`}>{r.sessions.length} receipt dates</span>;
         },
-      },
-      {
-        key: "poNo",
-        label: "PO No",
-        width: REGISTER_FIELD_WIDTH.documentNo,
-        sortable: true,
-        chooserGroup: "Documents",
-        searchValue: (r) => `${r.documentWord} ${r.documentNo} ${r.sourceId}`,
-        exportValue: (r) => r.documentNo,
-        /* A non-PO arrangement keeps its OWN document word on hover —
-           `Transfer No` · `Repair Order No` · `Claim No` — never `PO / Source No`. */
-        accessor: (r) => (
-          <Link
-            className="font-mono text-kit-blue-11 hover:underline"
-            onClick={(event) => event.stopPropagation()}
-            to={documentHref(r)}
-            title={r.sourceType === "supplier-delivery" ? undefined : `${r.documentWord} ${r.documentNo}`}
-            data-testid={`inbound-document-${r.id}`}
-          >
-            {r.documentNo}
-          </Link>
-        ),
       },
       {
         key: "supplier",

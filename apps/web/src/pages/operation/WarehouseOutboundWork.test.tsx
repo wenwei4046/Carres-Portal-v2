@@ -224,7 +224,7 @@ describe("Warehouse Outbound — the unified Register", () => {
     // The owner's eleven heads, in order (2026-09-25); the composite
     // Document / Units cells are retired.
     const HEADS = [
-      "Scheduled handover", "Ship Date", "DO No", "SO No", "Pickup By",
+      "DO No", "Scheduled handover", "Ship Date", "SO No", "Pickup By",
       "Delivery Location", "Item", "Required", "Loaded", "Driver confirmed",
     ];
     for (const name of HEADS) expect(screen.getByRole("button", { name })).toBeInTheDocument();
