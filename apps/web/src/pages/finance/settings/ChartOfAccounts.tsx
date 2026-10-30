@@ -346,8 +346,8 @@ export default function ChartOfAccounts() {
     [folded, kept, notActive, specialWord, typeWord, open],
   );
 
-  if (query.isError) return <LoadFailed what="The chart of accounts" onRetry={() => void query.refetch()} />;
-  if (moneyQuery.isError) return <LoadFailed what="The money accounts" onRetry={() => void moneyQuery.refetch()} />;
+  if (query.isError && !query.data) return <LoadFailed what="The chart of accounts" onRetry={() => void query.refetch()} />;
+  if (moneyQuery.isError && !moneyQuery.data) return <LoadFailed what="The money accounts" onRetry={() => void moneyQuery.refetch()} />;
   return (
     <ListPageShell register>
       <DataGrid
@@ -362,7 +362,8 @@ export default function ChartOfAccounts() {
         allowColumnGrouping={false}
         fixedGroups={{ groups, groupOf: (r) => r.group, revealMatches: true }}
         stickyIdentity
-        isLoading={!query.isSuccess || !moneyQuery.isSuccess}
+        isLoading={!query.data || !moneyQuery.data}
+        emptyMessage="No account yet."
         onRowDoubleClick={(r) => open(r.account, false)}
         /* Chew 2026-10-14: one main button for the area; the other two acts
            sit in the ⋮ menu (01 §3, one main button per area), and the filter
@@ -378,15 +379,15 @@ export default function ChartOfAccounts() {
         }
         toolbarEnd={
           <div className="flex items-center gap-2">
-            <Button variant="primary" onClick={() => setAdding(true)} disabled={!query.isSuccess}>
+            <Button variant="primary" onClick={() => setAdding(true)} disabled={!query.data}>
               Add account
             </Button>
             <CMenu
               label="More actions"
               items={[
-                { key: "money", label: "Add a money account", onSelect: () => setMoneyEditing(null), disabled: !query.isSuccess },
+                { key: "money", label: "Add a money account", onSelect: () => setMoneyEditing(null), disabled: !query.data },
                 // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0655).
-                { key: "import", label: "Import from AutoCount", onSelect: () => setImporting(true), disabled: !query.isSuccess },
+                { key: "import", label: "Import from AutoCount", onSelect: () => setImporting(true), disabled: !query.data },
               ]}
               trigger={
                 <Button variant="ghost" aria-label="More actions" data-testid="chart-more">

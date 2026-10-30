@@ -102,7 +102,7 @@ export default function CommissionRates({ toolbarStart }: { toolbarStart: React.
     [],
   );
 
-  if (query.isError) return <LoadFailed what="The commission rates" onRetry={() => void query.refetch()} />;
+  if (query.isError && !query.data) return <LoadFailed what="The commission rates" onRetry={() => void query.refetch()} />;
   return (
     <ListPageShell register>
       <div className="flex min-h-0 flex-1 flex-col" data-testid="commission-rates-page">
@@ -116,18 +116,19 @@ export default function CommissionRates({ toolbarStart }: { toolbarStart: React.
           groupBanner={false}
           allowColumnGrouping={false}
           exportName="Commission rates"
+          emptyMessage="No commission rate yet. Press Add a rate."
           fixedGroups={{
             groups: RULE_GROUPS.map((g) => ({ key: g.key, label: g.label, alwaysOpen: true, emptyLabel: g.emptyLabel })),
             groupOf: (r) => r.kind,
             revealMatches: true,
           }}
-          isLoading={!query.isSuccess}
+          isLoading={!query.data}
           onRowDoubleClick={(r) => setOpen(r)}
           wrapToolbar
           toolbarStart={toolbarStart}
           toolbarEnd={
             // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0661).
-            <Button variant="neutral" onClick={() => setOpen("new")} disabled={!query.isSuccess}>
+            <Button variant="neutral" onClick={() => setOpen("new")} disabled={!query.data}>
               Add a rate
             </Button>
           }

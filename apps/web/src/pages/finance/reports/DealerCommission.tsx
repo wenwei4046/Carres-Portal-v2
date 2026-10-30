@@ -154,11 +154,11 @@ export default function DealerCommission() {
     <ModuleHeader destinationHeader testId="dealer-commission-header" word="Dealer commission" docTitle="Dealer commission · Carres" />
     {view === "rates" ? <CommissionRates toolbarStart={<Views current="rates" />} /> :
     view === "kpi" ? <CommissionKpi toolbarStart={<Views current="kpi" />} /> :
-    q.isError ? <LoadFailed what="The report" onRetry={() => void q.refetch()} /> :
+    q.isError && !q.data ? <LoadFailed what="The report" onRetry={() => void q.refetch()} /> :
     view === "quotas" ? <ListPageShell register toolbar={<Views current={view} />}>
       {src && <div className="min-h-0 overflow-y-auto"><Quotas src={src} quota={quota} setQuota={setQuota} /></div>}
     </ListPageShell> :
-    view === "orders" ? <CommissionOrders src={src} loading={!q.isSuccess} month={month}
+    view === "orders" ? <CommissionOrders src={src} loading={!q.data} month={month}
       filter={{ dealerId: dealerId === ALL ? undefined : dealerId, outletId: outletId === ALL ? undefined : outletId }}
       toolbarStart={scope("orders")} /> :
     view === "statement" ? <CommissionStatement dealerId={dealerId === ALL ? null : dealerId} toolbarStart={statementScope}
@@ -167,7 +167,8 @@ export default function DealerCommission() {
     <ListPageShell register>
       <DataGrid rows={rows} columns={columns} rowKey={(r) => r.dealerId} storageKey="carres.finance.dealer-commission.v2"
         appearance="reference" look="finance" personalLayouts={personalLayouts} fillColumn="dealer" exportName={`Dealer commission ${month}`} groupBanner={false} stickyIdentity
-        isLoading={!q.isSuccess} wrapToolbar
+        isLoading={!q.data} wrapToolbar
+        emptyMessage="No dealer has commission in this month."
         // A dealer's row opens its orders for the same month.
         onRowDoubleClick={(r) => { setDealerId(r.dealerId); setOutletId(ALL); setParams({ view: "orders" }); }}
         toolbarStart={scope("report")}

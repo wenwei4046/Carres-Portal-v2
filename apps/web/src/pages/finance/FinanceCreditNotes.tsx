@@ -5,11 +5,13 @@ import type { CreditNoteRow } from "@carres/shared/schemas/finance-credit-note";
 import type { CreditNotePrintData } from "@carres/shared/schemas/finance-credit-note";
 import ListPageShell from "@/components/ListPageShell";
 import Button from "@/components/kit/Button";
+import Loading from "@/components/kit/Loading";
 import Input from "@/components/kit/Input";
 import Modal from "@/components/kit/Modal";
 import { apiFetch } from "@/lib/api";
 import { rm } from "@/lib/format-currency";
 import { renderCreditNotePdf } from "@/lib/pdf/render";
+import { LoadFailed } from "./other-money-in/parts";
 
 /**
  * Finance · Credit Notes (migration 0730).
@@ -65,7 +67,9 @@ export default function FinanceCreditNotes() {
           </thead>
           <tbody>
             {list.isLoading ? (
-              <tr><td colSpan={9} className="p-10 text-center text-muted-foreground">Loading…</td></tr>
+              <tr><td colSpan={9} className="p-10"><Loading variant="skeleton" label="Loading credit notes" /></td></tr>
+            ) : list.isError && !list.data ? (
+              <tr><td colSpan={9}><LoadFailed what="The credit notes" onRetry={() => void list.refetch()} /></td></tr>
             ) : rows.length === 0 ? (
               <tr><td colSpan={9} className="p-10 text-center text-muted-foreground">No credit notes yet.</td></tr>
             ) : rows.map((r) => (
@@ -87,12 +91,6 @@ export default function FinanceCreditNotes() {
           </tbody>
         </table>
       </div>
-
-      {list.error ? (
-        <div className="mt-5 p-3 text-meta rounded-md bg-destructive/5 text-destructive border border-destructive/30">
-          The credit notes could not be loaded: {(list.error as Error).message}
-        </div>
-      ) : null}
 
       <IssueModal
         open={issuing}

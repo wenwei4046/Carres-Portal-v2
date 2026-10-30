@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { liveDeliveryOrderNumber } from "@carres/shared";
 import { toast } from "sonner";
 import { apiFetch, ApiError } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
@@ -60,10 +61,9 @@ function totalItems(lines: Array<Pick<operationOrderDetailLine, "qty">>): number
  * TODAY's date, which a reprint on another day could not reproduce.
  */
 function deliveryOrderNumber(
-  order: Pick<operationOrderDetailOrder, "do_number">,
+  order: Pick<operationOrderDetailOrder, "do_number" | "ops_delivery_orders">,
 ): string | null {
-  const existing = (order.do_number ?? "").trim();
-  return existing || null;
+  return liveDeliveryOrderNumber(order.ops_delivery_orders) ?? ((order.do_number ?? "").trim() || null);
 }
 
 export default function DOAttachModal({ order, warehouse, lines, onClose }: Props) {
