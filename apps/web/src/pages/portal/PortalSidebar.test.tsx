@@ -940,7 +940,7 @@ describe("PortalSidebar — the Purchasing map", () => {
     expect(tree.querySelector(".border-t")).toBeNull();
   });
 
-  it("fifteen pages in the approved order, and not a fifteenth", () => {
+  it("fifteen pages in the approved order, and not a sixteenth", () => {
     renderAt("/operation?tab=purchase");
     for (const key of [
       "purchasing-buy",
