@@ -1475,8 +1475,9 @@ describe("the row's goods, kept in two cells", () => {
     expect(card.items[0]!.qty).toBe(2);
     expect(card.items[0]!.shortQty).toBe(1);
     expect(card.readiness.ready).toBe(false);
-    /* One mattress and two pillows — the SERVICE line is not counted. */
-    expect(card.readiness.shortQty).toBe(3);
+    /* One mattress short; the pillows are accessories (ready) and the SERVICE
+       line is not counted. */
+    expect(card.readiness.shortQty).toBe(1);
   });
 
   it("a service carries no shortage — it moves no Unit", () => {
