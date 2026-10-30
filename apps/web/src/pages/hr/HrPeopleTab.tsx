@@ -18,6 +18,9 @@ import { SectionCard } from "@/components/SectionPanel";
 import { useHrPeople } from "@/lib/queries";
 import HrPersonDrawer from "./HrPersonDrawer";
 import { personInitials } from "@/lib/staff-avatar";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
 
 /**
  * People (HR-P4, migration 0269) — one row per human who has a CRnnn code.
@@ -128,7 +131,7 @@ function GroupBand({ title, count }: { title: string; count: number }) {
 }
 
 export default function HrPeopleTab() {
-  const { data, isLoading, isError } = useHrPeople();
+  const { data, isLoading, refetch } = useHrPeople();
   const [openId, setOpenId] = useState<string | null>(null);
 
   const people = useMemo(() => data?.people ?? [], [data]);
@@ -169,14 +172,18 @@ export default function HrPeopleTab() {
   const needsExit = people.filter(needsExitRecorded);
 
   if (isLoading) {
-    return <div className="text-body py-10 text-center text-base-500">Loading people…</div>;
+    return <div className="py-10"><Loading variant="skeleton" label="Loading people" /></div>;
   }
-  if (isError || !data) {
+  if (!data) {
     // A browser on this build against an older Worker gets a 404 here. Say so
     // instead of showing an empty register, which would read as "no staff".
     return (
-      <div className="text-body py-10 text-center text-base-500">
-        People is not available yet. If this persists, the API needs deploying.
+      <div role="alert" className="py-10">
+        <EmptyState
+          title="Could not be loaded"
+          detail="People is not available yet. If this persists, the API needs deploying."
+          action={<Button variant="neutral" onClick={() => void refetch()}>Try again</Button>}
+        />
       </div>
     );
   }

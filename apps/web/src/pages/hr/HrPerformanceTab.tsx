@@ -26,6 +26,9 @@ import {
   useHrSetStoreManager,
 } from "@/lib/queries";
 import { StatTile } from "./HrOverviewTab";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
 
 /**
  * Performance (HR-P6, migration 0276) — "are we on track this month".
@@ -414,7 +417,7 @@ export default function HrPerformanceTab({
 }) {
   const [kpiKey, setKpiKey] = useState<KpiKey>(DEFAULT_KPI);
   const [edit, setEdit] = useState<EditState | null>(null);
-  const { data, isLoading } = useHrKpi(year, month, kpiKey);
+  const { data, isLoading, isError, refetch } = useHrKpi(year, month, kpiKey);
 
   const metric = kpiMetric(kpiKey);
   const editFor = (row: ScorecardRow): EditState => ({
@@ -434,8 +437,19 @@ export default function HrPerformanceTab({
       .sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom));
   }, [data, kpiKey]);
 
+  if (isError && !data) {
+    return (
+      <div role="alert" className="py-12">
+        <EmptyState
+          title="Could not be loaded"
+          detail="Performance for this month did not arrive."
+          action={<Button variant="neutral" onClick={() => void refetch()}>Try again</Button>}
+        />
+      </div>
+    );
+  }
   if (isLoading || !data) {
-    return <div className="py-12 text-body text-base-500">Loading performance…</div>;
+    return <div className="py-12"><Loading variant="skeleton" label="Loading performance" /></div>;
   }
 
   const s = data.scorecards;

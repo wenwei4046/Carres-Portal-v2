@@ -289,6 +289,7 @@ function WordingForm({
         <div>
           <div className="label mb-1">Document key</div>
           <input
+            aria-label="Document key"
             className={INPUT_CLS}
             value={key}
             onChange={(e) => setKey(e.target.value)}
@@ -299,6 +300,7 @@ function WordingForm({
         <div>
           <div className="label mb-1">Name</div>
           <input
+            aria-label="Name"
             className={INPUT_CLS}
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -328,6 +330,7 @@ function WordingForm({
       <div>
         <div className="label mb-1">Wording</div>
         <textarea
+          aria-label="Wording"
           className={`${INPUT_CLS} h-[260px] font-[inherit] leading-relaxed`}
           value={text}
           onChange={(e) => setText(e.target.value)}

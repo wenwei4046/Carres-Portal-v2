@@ -28,6 +28,9 @@ import {
   useHrSetStaffRate,
   type HrModelOption,
 } from "@/lib/queries";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
 
 /**
  * Commission Setup tab (0244/0245) — four stacked config blocks:
@@ -465,7 +468,7 @@ export default function HrSetupTab({
   year: number;
   month: number;
 }) {
-  const { data, isLoading, isError } = useHrReport(year, month);
+  const { data, isLoading, refetch } = useHrReport(year, month);
 
   const setScheme = useHrSetScheme();
   const setStaffRate = useHrSetStaffRate();
@@ -528,12 +531,16 @@ export default function HrSetupTab({
       ?.method ?? "percentage";
 
   if (isLoading) {
-    return <div className="py-12 text-body text-base-500">Loading commission setup…</div>;
+    return <div className="py-12"><Loading variant="skeleton" label="Loading commission setup" /></div>;
   }
-  if (isError || !data || !config) {
+  if (!data || !config) {
     return (
-      <div className="py-12 text-body text-danger">
-        Failed to load commission setup. Refresh to retry.
+      <div role="alert" className="py-12">
+        <EmptyState
+          title="Could not be loaded"
+          detail="Commission setup did not arrive."
+          action={<Button variant="neutral" onClick={() => void refetch()}>Try again</Button>}
+        />
       </div>
     );
   }

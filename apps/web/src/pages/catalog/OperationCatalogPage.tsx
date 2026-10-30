@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
 import { useCatalog } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
 import { PillTabs, type PillTab } from "./components/PillTabs";
@@ -49,13 +52,22 @@ export default function OperationCatalogPage() {
   const isPrincipal = role === "principal";
   const catalogQ = useCatalog({ admin: true });
   const [tab, setTab] = useState<TabKey>("sku");
+  // No ModuleHeader on this page, so it names the browser tab itself (same as ModuleHeader).
+  useEffect(() => {
+    document.title = "Catalog · Master Data · Carres";
+    return () => {
+      document.title = "Carres Portal";
+    };
+  }, []);
 
   return (
     <div className="px-9 py-8 pb-14">
       <div className="flex justify-between items-end mb-6 gap-4 flex-wrap">
         <div>
           <div className="kicker">Catalog</div>
-          <h1 className="text-page font-display mt-1.5 text-base-900">Operation Catalog</h1>
+          {/* Desktop: the shell header prints the page's h1. Phone: OperationApp's phone bar prints none, so this one does. */}
+          <h1 className="sr-only md:hidden">Operation Catalog</h1>
+          <h2 className="text-page font-display mt-1.5 text-base-900">Operation Catalog</h2>
           {/* ⭐ THE PAGE SAYS WHAT IT IS FOR (Jess, 2026-08-26). She could not
               be told apart the three catalog-ish destinations, and that was a
               real fault rather than a gap in the explaining — so each one now
@@ -68,10 +80,14 @@ export default function OperationCatalogPage() {
         <PillTabs tabs={TABS} active={tab} onChange={setTab} ariaLabel="Operation Catalog" />
       </div>
 
-      {catalogQ.isLoading && <div className="text-body text-base-500">Loading catalog…</div>}
-      {catalogQ.isError && !catalogQ.isLoading && (
-        <div className="text-body text-danger">
-          Failed to load the catalog. Try refreshing. Your session may have expired.
+      {catalogQ.isLoading && <Loading variant="skeleton" label="Loading catalog" />}
+      {catalogQ.isError && !catalogQ.data && (
+        <div role="alert">
+          <EmptyState
+            title="Could not be loaded"
+            detail="The catalog did not arrive. Your session may have expired."
+            action={<Button variant="neutral" onClick={() => void catalogQ.refetch()}>Try again</Button>}
+          />
         </div>
       )}
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import {
@@ -76,6 +76,8 @@ function supplier(
   };
 }
 
+const qcRef: { current: QueryClient | null } = { current: null };
+
 function mount(suppliers: ReturnType<typeof supplier>[]) {
   vi.mocked(apiFetch).mockImplementation(async (path: string) => {
     if (path.endsWith("/pos")) return { pos: [] };
@@ -85,6 +87,7 @@ function mount(suppliers: ReturnType<typeof supplier>[]) {
     };
   });
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  qcRef.current = qc;
   return render(
     <QueryClientProvider client={qc}>
       <MemoryRouter>
@@ -200,5 +203,55 @@ describe("OperationSuppliers · the scorecard", () => {
     expect(
       await screen.findByText(/Delivery record covers the last 365 days/),
     ).toBeInTheDocument();
+  });
+});
+
+describe("OperationSuppliers · page states", () => {
+  it("a failed read says so and Try again reads again, never 'No suppliers yet'", async () => {
+    vi.mocked(apiFetch).mockRejectedValue(new Error("boom"));
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <OperationSuppliers />
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not be loaded");
+    expect(screen.queryByText("No suppliers yet.")).not.toBeInTheDocument();
+    const calls = vi.mocked(apiFetch).mock.calls.length;
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(vi.mocked(apiFetch).mock.calls.length).toBe(calls + 1));
+  });
+
+  it("names the browser tab; its own h1 is phone-only (the desktop shell prints one)", async () => {
+    const { unmount } = mount([]);
+    expect(await screen.findByText("No suppliers yet.")).toBeInTheDocument();
+    expect(document.title).toBe("Suppliers · Carres");
+    const h1s = screen.getAllByRole("heading", { level: 1 });
+    expect(h1s).toHaveLength(1);
+    expect(h1s[0]).toHaveClass("sr-only", "md:hidden");
+    unmount();
+    expect(document.title).toBe("Carres Portal");
+  });
+
+  it("a failed background refetch keeps the list on screen, with no error view", async () => {
+    mount([supplier("Ohana", [], [])]);
+    expect(await screen.findByText("Ohana")).toBeInTheDocument();
+    vi.mocked(apiFetch).mockRejectedValue(new Error("boom"));
+    await act(async () => {
+      await qcRef.current!.refetchQueries();
+    });
+    expect(screen.getByText("Ohana")).toBeInTheDocument();
+    expect(screen.queryByText("Could not be loaded")).not.toBeInTheDocument();
+  });
+
+  it("prints no supplier count while the list is still loading", () => {
+    vi.mocked(apiFetch).mockImplementation(() => new Promise(() => {}));
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <OperationSuppliers />
+      </QueryClientProvider>,
+    );
+    expect(screen.queryByText(/active · upstream/)).not.toBeInTheDocument();
   });
 });

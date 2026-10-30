@@ -131,6 +131,7 @@ export default function ImportSkusDialog({ onClose }: { onClose: () => void }) {
             </button>
           </div>
           <input
+            aria-label="SKU import file"
             ref={fileInput}
             type="file"
             accept=".csv,.xlsx,.xls"

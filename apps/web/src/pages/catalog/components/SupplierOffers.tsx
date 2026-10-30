@@ -11,6 +11,8 @@ import {
 } from "@/lib/queries";
 import { INPUT_CLS, Modal, SectionHead } from "@/pages/operation/components/Modal";
 import { usePatchCatalogSku } from "@/lib/queries";
+import Button from "@/components/kit/Button";
+import Loading from "@/components/kit/Loading";
 
 /**
  * WHO SUPPLIES THIS SKU - the offers half, lifted out of the Operation cost
@@ -111,7 +113,14 @@ export function SupplierOffersStrip({
       data-testid={`opcost-offers-${sku.sku}`}
     >
       {offersQ.isLoading ? (
-        <span className="text-meta text-base-500">Loading…</span>
+        <Loading label="Loading offers" />
+      ) : offersQ.isError && !offersQ.data ? (
+        <span role="alert" className="flex items-center gap-2 text-meta text-base-700">
+          Could not be loaded.
+          <Button variant="ghost" onClick={() => void offersQ.refetch()} data-testid={`opcost-offers-retry-${sku.sku}`}>
+            Try again
+          </Button>
+        </span>
       ) : offers.length === 0 ? (
         <span className="text-meta text-base-500">No offers recorded</span>
       ) : (
@@ -194,6 +203,7 @@ export function SupplierOffersStrip({
             ))}
           </select>
           <input
+            aria-label={`${sku.sku} their code`}
             value={code}
             onChange={(e) => setCode(e.target.value)}
             placeholder="Their code"
@@ -203,6 +213,7 @@ export function SupplierOffersStrip({
           {sofa ? (
             heights.map((h) => (
               <input
+                aria-label={`${sku.sku} offer price at ${h}″`}
                 key={h}
                 value={heightPrices[h] ?? ""}
                 onChange={(e) =>
@@ -216,6 +227,7 @@ export function SupplierOffersStrip({
             ))
           ) : (
             <input
+              aria-label={`${sku.sku} offer price`}
               value={price}
               onChange={(e) => setPrice(e.target.value)}
               placeholder="Price"
@@ -224,6 +236,7 @@ export function SupplierOffersStrip({
             />
           )}
           <input
+            aria-label={`${sku.sku} offer PWP price`}
             value={pwp}
             onChange={(e) => setPwp(e.target.value)}
             placeholder="PWP"

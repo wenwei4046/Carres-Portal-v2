@@ -366,6 +366,7 @@ export default function ModelEditorModal({
           )}
           <div className="flex flex-col gap-1.5">
             <input
+              aria-label="Model photo file"
               ref={fileRef}
               type="file"
               accept="image/jpeg,image/png,image/webp"

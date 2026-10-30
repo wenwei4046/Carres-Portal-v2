@@ -8,6 +8,9 @@ import { useHrReport } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
 import HrCommissionRunPanel from "./HrCommissionRunPanel";
 import { rm } from "@/lib/format-currency";
+import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
+import Loading from "@/components/kit/Loading";
 
 /**
  * Commission tab — the computed month report (0244/0245).
@@ -228,7 +231,7 @@ export default function HrCommissionTab({
   year: number;
   month: number;
 }) {
-  const { data, isLoading, isError } = useHrReport(year, month);
+  const { data, isLoading, refetch } = useHrReport(year, month);
   const role = useAuth((st) => st.role);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
@@ -241,12 +244,16 @@ export default function HrCommissionTab({
     });
 
   if (isLoading) {
-    return <div className="py-12 text-body text-base-500">Loading the month report…</div>;
+    return <div className="py-12"><Loading variant="skeleton" label="Loading the month report" /></div>;
   }
-  if (isError || !data) {
+  if (!data) {
     return (
-      <div className="py-12 text-body text-danger">
-        Failed to load the commission report. Refresh to retry.
+      <div role="alert" className="py-12">
+        <EmptyState
+          title="Could not be loaded"
+          detail="The commission report did not arrive."
+          action={<Button variant="neutral" onClick={() => void refetch()}>Try again</Button>}
+        />
       </div>
     );
   }
