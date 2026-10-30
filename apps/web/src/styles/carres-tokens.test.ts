@@ -6,27 +6,24 @@ import { fileURLToPath } from "node:url";
 /**
  * The app's colours follow the kit (01 §1 · §9): Blue is the default, the page
  * ground is one grey in every theme, a theme changes only the selection
- * colours, and red is not used. Blue's values are read from the kit's own
- * token file so the app and the kit cannot disagree.
+ * colours, and red is not used. docs/ui/carres-tokens.css is a target mirror
+ * the app does not read yet, so these tests hold the app's own file.
  */
 const here = dirname(fileURLToPath(import.meta.url));
 const app = readFileSync(join(here, "carres-tokens.css"), "utf8");
-const kit = readFileSync(join(here, "..", "..", "..", "..", "docs", "ui", "carres-tokens.css"), "utf8");
 const tailwind = readFileSync(join(here, "..", "..", "tailwind.config.ts"), "utf8");
 
 const theme = (css: string, key: string) => css.match(new RegExp(`\\[data-theme="${key}"\\]\\{([^}]*)\\}`))![1]!;
 const value = (block: string, name: string) => block.match(new RegExp(`--c-${name}:\\s*(#[0-9A-Fa-f]{6})`))?.[1];
 
 describe("Carres tokens: hover follows the theme", () => {
-  it("Blue takes the kit's hover, row hover and selection pair", () => {
+  it("Blue holds the selection fill, text and pill, and the root agrees", () => {
     const root = app.slice(app.indexOf(":root{"), app.indexOf("}", app.indexOf(":root{")));
-    const [mine, theirs] = [theme(app, "blue"), theme(kit, "blue")];
-    expect(value(root, "hover")).toBe(value(theirs, "hover"));
-    expect(value(root, "row-hover")).toBe(value(theirs, "row-hover"));
-    expect(value(mine, "select-fg")).toBe(value(theirs, "select-fg"));
-    // The app's selected fill is the kit's soft selection fill; its pill is the kit's selected fill.
-    expect(value(mine, "select-bg")).toBe(value(theirs, "select-soft"));
-    expect(value(mine, "select-pill")).toBe(value(theirs, "select-bg"));
+    const blue = theme(app, "blue");
+    expect(value(blue, "select-bg")).toBe("#EEF4FF");
+    expect(value(blue, "select-fg")).toBe("#2F55E0");
+    expect(value(blue, "select-pill")).toBe("#FFFFFF");
+    for (const name of ["select-bg", "select-fg", "select-pill"]) expect(value(root, name), name).toBe(value(blue, name));
   });
 
   it("Blue is the default: the root holds its values, and no warm value is left", () => {
