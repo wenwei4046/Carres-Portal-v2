@@ -291,6 +291,23 @@ describe("DeliveryOrderPage", () => {
     );
   });
 
+  it("a DO of accessories only records its handover here, not in Outbound (0737)", () => {
+    mount(
+      payload(
+        {
+          orders: {
+            ...payload().deliveryOrder.orders,
+            order_lines: [{ sku: "Memory Pillow", qty: 2 }],
+          },
+        },
+        { scopeUnits: [] },
+      ),
+    );
+    const act = screen.getByTestId("do-object-primary-action");
+    expect(act).toHaveTextContent("Record goods loaded to NETS");
+    expect(act.tagName).toBe("BUTTON");
+  });
+
   it("offers no handover writer after all three facts are recorded", () => {
     mount(
       payload(
