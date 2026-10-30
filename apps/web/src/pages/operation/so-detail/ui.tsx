@@ -121,8 +121,8 @@ export function factOf(v: string | null | undefined, absent = NOT_RECORDED): { v
 /* ── Buttons ────────────────────────────────────────────────────────────── */
 type BtnKind = "main" | "header" | "normal" | "quiet";
 const BTN: Record<BtnKind, string> = {
-  main: "h-[34px] px-3.5 font-semibold bg-c-main text-white enabled:hover:opacity-90",
-  header: "h-[34px] px-3.5 font-medium bg-c-card text-c-ink border border-c-btn-border enabled:hover:bg-c-btn-hover",
+  main: "h-8 px-3.5 font-semibold bg-c-main text-white enabled:hover:opacity-90",
+  header: "h-8 px-3.5 font-medium bg-c-card text-c-ink border border-c-btn-border enabled:hover:bg-c-btn-hover",
   normal: "h-8 px-3 font-medium bg-c-card text-c-ink border border-c-btn-border enabled:hover:bg-c-btn-hover",
   quiet: "h-8 px-2.5 font-medium bg-transparent text-c-secondary enabled:hover:bg-c-btn-hover",
 };
@@ -143,7 +143,7 @@ export function CBtn({
     <button
       type="button"
       {...rest}
-      className={`inline-flex shrink-0 items-center justify-center gap-1.5 focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:2px] whitespace-nowrap rounded-lg text-[13px] leading-none disabled:cursor-not-allowed disabled:opacity-[.45] ${BTN[kind]} ${className}`}
+      className={`inline-flex shrink-0 items-center justify-center gap-1.5 focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:2px] whitespace-nowrap rounded-md text-[13px] leading-none disabled:cursor-not-allowed disabled:opacity-[.45] ${BTN[kind]} ${className}`}
     >
       {icon && <MIcon name={icon} size={18} />}
       {children}

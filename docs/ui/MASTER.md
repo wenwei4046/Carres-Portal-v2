@@ -1577,7 +1577,7 @@ Plain grouped rows: name and purpose on the left, value on the right; no box aro
 
 ## 7 · Canonical component measurements — executable checklist
 
-The single current measurement table is **Current shared template ·24Oct2026**, Template1–7 above. Earlier duplicated numeric tables are removed. For each role record value, trigger, shared component, `/ui` example and CONFORMS / DEVIATION / NOT APPLICABLE in the existing handoff. Spec/checker disagreement is not PASS.
+The single current measurement table is **Current shared template ·30Oct2026**, Template1–7 above. Earlier duplicated numeric tables are removed. For each role record value, trigger, shared component, `/ui` example and CONFORMS / DEVIATION / NOT APPLICABLE in the existing handoff. Spec/checker disagreement is not PASS.
 
 ### 7.1 Shell and controls
 

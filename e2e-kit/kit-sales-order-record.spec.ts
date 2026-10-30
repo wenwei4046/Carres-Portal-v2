@@ -16,9 +16,9 @@ for (const width of [1025, 1164, 1440]) {
     const paper = page.getByTestId("pdf-pane").locator("canvas").first();
     const before = (await paper.boundingBox())!.width;
     await page.getByRole("button", { name: "Zoom in", exact: true }).click();
-    await expect.poll(async () => (await paper.boundingBox())!.width).toBeGreaterThan(before * 1.2);
+    await expect.poll(async () => ((await paper.boundingBox())?.width ?? 0)).toBeGreaterThan(before * 1.2);
     await page.getByRole("button", { name: "Fit width", exact: true }).click();
-    await expect.poll(async () => (await paper.boundingBox())!.width).toBeCloseTo(before, 0);
+    await expect.poll(async () => (await paper.boundingBox())?.width ?? 0).toBeCloseTo(before, 0);
     await page.getByRole("button", { name: "Full screen", exact: true }).click();
     await expect.poll(() => page.evaluate(() => document.fullscreenElement?.getAttribute("aria-label"))).toBe("Sales Order PDF");
     await page.keyboard.press("Escape");

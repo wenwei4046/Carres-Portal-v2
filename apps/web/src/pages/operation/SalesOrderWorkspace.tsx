@@ -1495,6 +1495,15 @@ function SalesOrderWorkspaceBody() {
 
   const [pdfZoom, setPdfZoom] = useState(1);
   const documentCard = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const leaveFullscreen = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && document.fullscreenElement && document.fullscreenElement === documentCard.current) {
+        void document.exitFullscreen().catch(() => {});
+      }
+    };
+    document.addEventListener("keydown", leaveFullscreen);
+    return () => document.removeEventListener("keydown", leaveFullscreen);
+  }, []);
   const { setPane, pdfError, pdfBusy, retryPdf } = usePdfCanvases(objectView === "Sales Order" || pdfOpen ? templateData : null, pdfZoom);
 
   /* ⭐ PRINT IS THE SAVED TRUTH — owner ruling 2026-08-15.

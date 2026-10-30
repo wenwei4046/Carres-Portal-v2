@@ -255,7 +255,7 @@ describe("Select", () => {
     const trigger = document.querySelector('[data-kit="select"]');
     // v4 (01 §3): 32px field, 8px corner, the input hairline.
     expect(trigger).toHaveClass("h-8");
-    expect(trigger).toHaveClass("rounded-lg");
+    expect(trigger).toHaveClass("rounded-md");
     expect(trigger).toHaveClass("border-c-input-border");
   });
 
