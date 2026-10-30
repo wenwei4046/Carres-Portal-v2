@@ -20,6 +20,8 @@ import { apiFetch } from "@/lib/api";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { qk } from "@/lib/queries";
 import ClaimGuaranteeModal from "./components/ClaimGuaranteeModal";
+import ReadFailed from "./components/ReadFailed";
+import Loading from "@/components/kit/Loading";
 
 /**
  * Operation · Guarantees — the claim desk (0261-0263, Loo 2026-07-26).
@@ -90,6 +92,11 @@ export default function OperationGuarantees() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
   const [claiming, setClaiming] = useState<GuaranteeEntitlementDto | null>(null);
+  // No ModuleHeader on this page, so the tab title is set the way ModuleHeader sets it.
+  useEffect(() => {
+    document.title = "Guarantees · Carres";
+    return () => { document.title = "Carres Portal"; };
+  }, []);
 
   // The page LISTS by default (Loo 2026-07-26: he created an order and found
   // this tab empty). It first shipped as a search-only desk that rendered
@@ -127,10 +134,12 @@ export default function OperationGuarantees() {
   const filtered = search.length > 0 || status !== "";
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-8 max-w-7xl mx-auto w-full min-w-0">
+      {/* The shell header prints the h1 from 768px up; on phones the sr-only h1 stands in. */}
       <div className="mb-6">
         <p className="text-meta uppercase tracking-wider text-base-500 mb-1">Operation</p>
-        <h1 className="text-page text-base-900">Guarantees</h1>
+        <h1 className="sr-only md:hidden">Guarantees</h1>
+        <h2 className="text-page text-base-900">Guarantees</h2>
         <p className="text-body text-base-600 mt-2">
           Every guarantee sold, newest first. Narrow by ID, Sales Order, customer name, phone or
           customer ID. Then swap the item and record the claim.
@@ -171,11 +180,13 @@ export default function OperationGuarantees() {
         </div>
       </div>
 
-      {listQ.isPending && <p className="text-body text-base-600">Loading…</p>}
-      {listQ.isError && (
-        <p className="text-body text-danger">Couldn't load guarantees: {listQ.error.message}</p>
+      {listQ.isPending && <Loading variant="skeleton" label="Loading guarantees" />}
+      {listQ.isError && !listQ.data && (
+        <div className="rounded border border-base-200 bg-white">
+          <ReadFailed what="The guarantees" onRetry={() => void listQ.refetch()} />
+        </div>
       )}
-      {!listQ.isPending && !listQ.isError && rows.length === 0 && (
+      {!listQ.isPending && !(listQ.isError && !listQ.data) && rows.length === 0 && (
         <div className="rounded border border-dashed border-base-300 bg-white p-10 text-center">
           <ShieldCheck size={28} strokeWidth={1.5} className="mx-auto text-base-300 mb-3" />
           {filtered ? (

@@ -69,7 +69,7 @@ export default function CommissionKpi({ toolbarStart }: { toolbarStart: React.Re
     [],
   );
 
-  if (query.isError) return <LoadFailed what="The KPI allowance" onRetry={() => void query.refetch()} />;
+  if (query.isError && !query.data) return <LoadFailed what="The KPI allowance" onRetry={() => void query.refetch()} />;
   return (
     <ListPageShell register>
       <div className="flex min-h-0 flex-1 flex-col" data-testid="commission-kpi-page">
@@ -83,13 +83,14 @@ export default function CommissionKpi({ toolbarStart }: { toolbarStart: React.Re
           groupBanner={false}
           allowColumnGrouping={false}
           exportName="KPI allowance"
-          isLoading={!query.isSuccess}
+          emptyMessage="No KPI allowance yet. Press Add a KPI allowance."
+          isLoading={!query.data}
           onRowDoubleClick={(r) => setOpen(r)}
           wrapToolbar
           toolbarStart={toolbarStart}
           toolbarEnd={
             // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), dealer commission step 4).
-            <Button variant="neutral" onClick={() => setOpen("new")} disabled={!query.isSuccess}>
+            <Button variant="neutral" onClick={() => setOpen("new")} disabled={!query.data}>
               Add a KPI allowance
             </Button>
           }
