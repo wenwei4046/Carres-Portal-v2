@@ -161,6 +161,9 @@ describe("what typing searches", () => {
       matchDestinations(permittedDestinations("operation"), "purch").map((d) => d.label),
     ).toEqual([
       "Purchase Orders",
+      /* Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): the supplier bills,
+         beside Receiving (YH, 2026-10-30). */
+      "Purchase Invoices",
       "Purchase Returns",
       /* Follows Houzs Sidebar.tsx:552 per Weisiang's ruling (2026-10-22):
          the consignment receive page is a live destination. */
@@ -168,9 +171,6 @@ describe("what typing searches", () => {
       /* The Purchasing REPORT page under DATA → Reports (owner 2026-10-08) —
          a real page, so a real destination, named as a report. */
       "Purchasing report",
-      /* Weisiang's decision (Mr Lim, WhatsApp 2026-10-22): the supplier bills,
-         read-only, under Suppliers. */
-      "Purchase Invoices",
       "SO Batch Purchase",
       "Forecast Purchase",
       "Manual Purchase Request",
