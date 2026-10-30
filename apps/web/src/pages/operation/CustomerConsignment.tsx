@@ -72,7 +72,7 @@ function Page({ word, testId, children }: { word: string; testId: string; childr
 function Ticks({ list, picked, onChange, empty }: { list: Unit[]; picked: string[]; onChange: (ids: string[]) => void; empty: string }) {
   return (
     <div className="flex flex-col gap-2">
-      <div className="max-h-64 overflow-auto rounded-control border border-c-line p-2" aria-label="Units">
+      <div className="max-h-64 overflow-auto rounded-control border border-c-line p-2" role="group" aria-label="Units">
         {list.length === 0 && <p className="text-body text-c-muted">{empty}</p>}
         {list.map((u) => (
           <Checkbox key={u.id} id={`unit-${u.id}`} label={`${u.unit_code} · ${u.sku}`} checked={picked.includes(u.id)}
@@ -154,7 +154,7 @@ type Money = { total: number; paid: number; balance: number };
  * payments (consignment-notes.ts:1074-1160), per Weisiang's ruling
  * (2026-10-22): clear Carres rules, implement Houzs.
  */
-function Payments({ path, money, payments, onSaved }: { path: string; money: Money; payments: Payment[]; onSaved: () => void }) {
+export function Payments({ path, money, payments, onSaved }: { path: string; money: Money; payments: Payment[]; onSaved: () => void }) {
   const m = useManualMethods();
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState("");
@@ -166,6 +166,8 @@ function Payments({ path, money, payments, onSaved }: { path: string; money: Mon
     }),
     onSuccess: () => { setAmount(""); setReference(""); onSaved(); },
   });
+  // The server takes any amount (0719), so the form is the only cap on an overpayment.
+  const over = PRICE_RE.test(amount) && Math.round(Number(amount) * 100) > Math.round(money.balance * 100);
   const [removing, setRemoving] = useState<Payment | null>(null);
   const remove = useMutation({
     mutationFn: (id: string) => apiFetch(`${BASE}${path}/payments/${id}`, { method: "DELETE" }),
@@ -183,14 +185,14 @@ function Payments({ path, money, payments, onSaved }: { path: string; money: Mon
         </div>
       ))}
       <Input id="ccp-amount" label="Amount (RM)" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)}
-        error={amount && !PRICE_RE.test(amount) ? "Enter an amount, e.g. 500.00" : undefined} />
+        error={amount && !PRICE_RE.test(amount) ? "Enter an amount, e.g. 500.00" : over ? `The balance is ${rm(money.balance)}. Enter that or less.` : undefined} />
       <Select id="ccp-method" label="Payment Method" value={method || undefined} onValueChange={setMethod}
         options={m.methods.map((x) => ({ value: x.value, label: x.label }))} />
       <DatePicker id="ccp-date" label="Payment Date" value={paidAt || null} onChange={(v) => setPaidAt(v ?? "")} />
       <Input id="ccp-ref" label="Reference" value={reference} onChange={(e) => setReference(e.target.value)} />
       {add.isError && <FieldError>{errorText(add.error)}</FieldError>}
       <div>
-        <Button variant="neutral" loading={add.isPending} disabled={!PRICE_RE.test(amount) || Number(amount) <= 0 || !method}
+        <Button variant="neutral" loading={add.isPending} disabled={!PRICE_RE.test(amount) || Number(amount) <= 0 || over || !method}
           onClick={() => add.mutate()}>Add Payment</Button>
       </div>
       <ConfirmActionDialog open={removing !== null} title="Remove this payment?"
