@@ -74,7 +74,7 @@ function UnitPicker({ siteId, picked, onChange, allowReserved }: {
     <div className="flex flex-col gap-2">
       <Input id="find-unit" label="Find Unit" value={find} onChange={(e) => setFind(e.target.value)} />
       {q.isError && <LoadError message="The Units could not be loaded." onRetry={() => void q.refetch()} />}
-      <div className="max-h-64 overflow-auto rounded-control border border-c-line p-2" aria-label="Units">
+      <div role="group" className="max-h-64 overflow-auto rounded-control border border-c-line p-2" aria-label="Units">
         {q.isSuccess && units.length === 0 && <p className="text-body text-c-muted">No Units here.</p>}
         {units.map((u) => {
           const blocked = u.needs_repair || (!allowReserved && u.status === "reserved");
@@ -219,6 +219,7 @@ export function StockTransfers() {
   const [note, setNote] = useState("");
   const [units, setUnits] = useState<string[]>([]);
   const [cancelling, setCancelling] = useState<TransferRow | null>(null);
+  const [viewing, setViewing] = useState<TransferRow | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const done = () => void qc.invalidateQueries({ queryKey: ["stock-moves"] });
   const save = useMutation({
@@ -241,9 +242,13 @@ export function StockTransfers() {
     { key: "units", label: "Units", width: 280, accessor: (r) => unitCodes(r.stock_transfer_units) },
     { key: "status", label: "Status", width: 120, accessor: (r) => (r.status === "posted" ? "Posted" : "Cancelled"), filterType: "enum" },
     { key: "reason", label: "Reason", width: 220, accessor: (r) => r.cancel_reason ?? r.note ?? "" },
-    { key: "act", label: "", width: 150, exportValue: () => "",
-      accessor: (r) => r.status === "posted"
-        ? <Button variant="neutral" onClick={() => setCancelling(r)}>Cancel transfer</Button> : null },
+    { key: "act", label: "", width: 220, exportValue: () => "",
+      accessor: (r) => (
+        <span className="flex gap-2">
+          <Button variant="neutral" onClick={() => setViewing(r)}>Open</Button>
+          {r.status === "posted" && <Button variant="neutral" onClick={() => setCancelling(r)}>Cancel</Button>}
+        </span>
+      ) },
   ], [sites.data]);
 
   return (
@@ -253,7 +258,7 @@ export function StockTransfers() {
           <DataGrid rows={list.data?.transfers ?? []} columns={columns} rowKey={(r) => r.id}
             storageKey="carres.warehouse.stock-transfers.v1" appearance="reference" exportName="Stock Transfer"
             groupBanner={false} stickyIdentity isLoading={!list.isSuccess} searchPlaceholder="Search transfer or Unit ID…"
-            onRowClick={(r) => r.status === "posted" && setCancelling(r)}
+            onRowClick={setViewing}
             toolbarEnd={<Button variant="primary" icon="add" onClick={() => setOpen(true)}>New Stock Transfer</Button>}
             emptyMessage="No stock transfers yet." />
         </ListPageShell>
@@ -272,6 +277,17 @@ export function StockTransfers() {
           {transferHint && <p className="text-body text-c-muted" role="status">Save is off: {transferHint}</p>}
           {save.isError && <FieldError>{errorText(save.error)}</FieldError>}
         </div>
+      </Modal>
+      <Modal open={viewing !== null} onOpenChange={(o) => !o && setViewing(null)} title={viewing?.transfer_no ?? "Stock Transfer"}
+        footer={<Button variant="neutral" onClick={() => setViewing(null)}>Close</Button>}>
+        {viewing && (
+          <dl className="flex flex-col gap-2 text-body">
+            <div><dt className="text-c-muted">Pickup to Delivery Location</dt><dd>{siteName(sites.data?.sites, viewing.from_site_id)} → {siteName(sites.data?.sites, viewing.to_site_id)}</dd></div>
+            <div><dt className="text-c-muted">Status</dt><dd>{viewing.status === "posted" ? "Posted" : "Cancelled"}</dd></div>
+            <div><dt className="text-c-muted">Units</dt><dd>{unitCodes(viewing.stock_transfer_units) || "None"}</dd></div>
+            <div><dt className="text-c-muted">Reason</dt><dd>{viewing.cancel_reason ?? viewing.note ?? ""}</dd></div>
+          </dl>
+        )}
       </Modal>
       <Modal open={cancelling !== null} onOpenChange={(o) => !o && setCancelling(null)} title={`Cancel ${cancelling?.transfer_no ?? ""}`}
         description="The Units move back to the Pickup Location."
@@ -333,7 +349,7 @@ function CountSheet({ id, onClose }: { id: string; onClose: () => void }) {
             <Textarea id="count-codes" label="Unit IDs counted" hint="One Unit ID per line, or scan them." rows={8}
               value={rawCodes ?? codes.join("\n")} onChange={(e) => setRawCodes(e.target.value)} />
           ) : (
-            <div className="max-h-72 overflow-auto rounded-control border border-c-line p-2" aria-label="Units">
+            <div role="group" className="max-h-72 overflow-auto rounded-control border border-c-line p-2" aria-label="Units">
               {(q.data?.units ?? []).map((u) => u.ops_stock_items && (
                 <Checkbox key={u.ops_stock_items.id} id={`count-${u.ops_stock_items.id}`} disabled={!isOpen}
                   label={`${u.ops_stock_items.unit_code} · ${u.ops_stock_items.sku}`}
