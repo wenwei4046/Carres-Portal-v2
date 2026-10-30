@@ -21,9 +21,9 @@ import PartnerProfile from "./PartnerProfile";
  */
 export default function PartnerApp() {
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground md:flex">
       <PartnerSidebar />
-      <main className="ml-[220px] flex-1 min-w-0">
+      <main className="min-w-0 md:ml-[220px] md:flex-1">
         <Routes>
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="incoming" element={<PartnerIncoming />} />

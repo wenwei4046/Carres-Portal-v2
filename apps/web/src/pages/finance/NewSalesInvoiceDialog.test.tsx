@@ -87,4 +87,17 @@ describe("New Sales Invoice", () => {
     expect(screen.getByRole("checkbox", { name: /MS12 Firmcare/ })).toBeChecked();
     expect(screen.getByLabelText("Qty", { selector: "#new-si-qty-bed" })).toHaveValue(1);
   });
+
+  it("a failed find offers Try again, which reads again", async () => {
+    state.fetch.mockRejectedValueOnce(new Error("Failed to fetch"));
+    show();
+    fireEvent.click(screen.getByRole("button", { name: "New Sales Invoice" }));
+    fireEvent.change(screen.getByLabelText("SO No or DO No"), { target: { value: "1300" } });
+    fireEvent.click(screen.getByRole("button", { name: "Find" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
+    await screen.findByText("Invoice total RM 1,100.00", { exact: false });
+    expect(state.fetch).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
+  });
 });
+

@@ -19,13 +19,14 @@ interface HookState {
 }
 
 let approvalsState: HookState = { data: undefined, isLoading: false, error: null };
+const refetch = vi.fn();
 const mutate = vi.fn();
 let isPending = false;
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 vi.mock("@/lib/queries", () => ({
-  useRentalApprovals: () => approvalsState,
+  useRentalApprovals: () => ({ refetch, ...approvalsState }),
   useDecideRentalAgreement: () => ({ mutate, isPending }),
 }));
 
@@ -65,6 +66,7 @@ const ROW = {
 beforeEach(() => {
   approvalsState = { data: undefined, isLoading: false, error: null };
   mutate.mockReset();
+  refetch.mockReset();
   isPending = false;
 });
 
@@ -200,7 +202,7 @@ describe("FinanceRentalApprover", () => {
   it("surfaces a load failure instead of showing an empty queue", () => {
     approvalsState = { data: undefined, isLoading: false, error: new Error("boom") };
     render(<FinanceRentalApprover />);
-    expect(screen.getByText(/Could not read the approval queue/i)).toBeInTheDocument();
+    expect(screen.getByText(/The approval queue could not be loaded/i)).toBeInTheDocument();
     expect(screen.queryByTestId("approver-empty")).not.toBeInTheDocument();
   });
 
@@ -208,5 +210,19 @@ describe("FinanceRentalApprover", () => {
     approvalsState = { data: { approvals: [ROW] }, isLoading: false, error: null };
     const { container } = render(<FinanceRentalApprover />);
     expect(container.textContent).not.toMatch(/pending_approval/);
+  });
+
+  it("Try again on a failed read reads the queue again", () => {
+    approvalsState = { data: undefined, isLoading: false, error: new Error("boom") };
+    render(<FinanceRentalApprover />);
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("a failed background refetch keeps the applications already read", () => {
+    approvalsState = { data: { approvals: [ROW] }, isLoading: false, error: new Error("boom") };
+    render(<FinanceRentalApprover />);
+    expect(screen.getByTestId("approver-list")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });
